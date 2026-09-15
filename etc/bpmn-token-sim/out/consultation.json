@@ -1,0 +1,234 @@
+{
+  "fixture": "jl4/examples/bpmn/expected/consultation.bpmn",
+  "importWarnings": [],
+  "elements": [
+    {
+      "id": "Start_0",
+      "type": "bpmn:StartEvent",
+      "name": null,
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Start_0__Split_0"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Split_0",
+      "type": "bpmn:ParallelGateway",
+      "name": "all of",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": "Diverging",
+      "outgoing": [
+        "Flow_Split_0__Task_1",
+        "Flow_Split_0__Task_4"
+      ],
+      "incoming": [
+        "Flow_Start_0__Split_0"
+      ]
+    },
+    {
+      "id": "Task_1",
+      "type": "bpmn:Task",
+      "name": "MAY file written comments",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_1__Task_2"
+      ],
+      "incoming": [
+        "Flow_Split_0__Task_1"
+      ]
+    },
+    {
+      "id": "Task_2",
+      "type": "bpmn:Task",
+      "name": "MAY publish the record",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_2__Join_0"
+      ],
+      "incoming": [
+        "Flow_Task_1__Task_2"
+      ]
+    },
+    {
+      "id": "End_3",
+      "type": "bpmn:EndEvent",
+      "name": "Fulfilled",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_Join_0__End_3"
+      ]
+    },
+    {
+      "id": "Task_4",
+      "type": "bpmn:Task",
+      "name": "MAY file a response",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_4__Join_0"
+      ],
+      "incoming": [
+        "Flow_Split_0__Task_4"
+      ]
+    },
+    {
+      "id": "Join_0",
+      "type": "bpmn:ParallelGateway",
+      "name": null,
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": "Converging",
+      "outgoing": [
+        "Flow_Join_0__End_3"
+      ],
+      "incoming": [
+        "Flow_Task_2__Join_0",
+        "Flow_Task_4__Join_0"
+      ]
+    }
+  ],
+  "unsupportedElements": [],
+  "pausePoints": [
+    "Task_1",
+    "Task_2",
+    "Task_4"
+  ],
+  "exclusiveGateways": [],
+  "started": {
+    "tokensOn": [
+      "Task_1",
+      "Task_4"
+    ],
+    "boundarySubscriptions": [],
+    "triggers": [
+      "Start_0",
+      "Task_1",
+      "Task_4"
+    ],
+    "history": [
+      "Start_0",
+      "Flow_Start_0__Split_0",
+      "Split_0",
+      "Flow_Split_0__Task_1",
+      "Flow_Split_0__Task_4",
+      "Task_1",
+      "Task_4"
+    ],
+    "endEventsReached": [],
+    "log": [
+      "Process started 0kdr8bm",
+      "Start Event 0kdr8bm",
+      "all of 0kdr8bm"
+    ],
+    "afterWaiting3s": {
+      "tokensOn": [
+        "Task_1",
+        "Task_4"
+      ],
+      "triggers": [
+        "Start_0",
+        "Task_1",
+        "Task_4"
+      ],
+      "endEventsReached": []
+    }
+  },
+  "breach": null,
+  "happy": [
+    {
+      "arm": null,
+      "continued": [
+        "Task_1",
+        "Task_2",
+        "Task_4"
+      ],
+      "steps": [
+        {
+          "tokensOn": [
+            "Task_1",
+            "Task_4"
+          ],
+          "continued": "Task_1"
+        },
+        {
+          "tokensOn": [
+            "Task_4",
+            "Task_2"
+          ],
+          "continued": "Task_2"
+        },
+        {
+          "tokensOn": [
+            "Task_4",
+            "Join_0"
+          ],
+          "continued": "Task_4"
+        }
+      ],
+      "hitStepLimit": false,
+      "tokensOn": [],
+      "boundarySubscriptions": [],
+      "triggers": [
+        "Start_0"
+      ],
+      "history": [
+        "Start_0",
+        "Flow_Start_0__Split_0",
+        "Split_0",
+        "Flow_Split_0__Task_1",
+        "Flow_Split_0__Task_4",
+        "Task_1",
+        "Task_4",
+        "Flow_Task_1__Task_2",
+        "Task_2",
+        "Flow_Task_2__Join_0",
+        "Join_0",
+        "Flow_Task_4__Join_0",
+        "Join_0",
+        "Flow_Join_0__End_3",
+        "End_3"
+      ],
+      "endEventsReached": [
+        "End_3"
+      ],
+      "log": [
+        "Process started 0pqyznq",
+        "Start Event 0pqyznq",
+        "all of 0pqyznq",
+        "MAY file written comments 0pqyznq",
+        "MAY publish the record 0pqyznq",
+        "MAY file a response 0pqyznq",
+        "Parallel Gateway 0pqyznq",
+        "Fulfilled 0pqyznq",
+        "Process finished 0pqyznq"
+      ]
+    }
+  ],
+  "pageErrors": []
+}

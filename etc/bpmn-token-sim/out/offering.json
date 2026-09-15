@@ -1,0 +1,409 @@
+{
+  "fixture": "jl4/examples/bpmn/expected/offering.bpmn",
+  "importWarnings": [],
+  "elements": [
+    {
+      "id": "Start_0",
+      "type": "bpmn:StartEvent",
+      "name": null,
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Start_0__Task_0"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Task_0",
+      "type": "bpmn:Task",
+      "name": "MUST file the offering statement",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_0__Split_1"
+      ],
+      "incoming": [
+        "Flow_Start_0__Task_0"
+      ]
+    },
+    {
+      "id": "Split_1",
+      "type": "bpmn:ParallelGateway",
+      "name": "all of",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": "Diverging",
+      "outgoing": [
+        "Flow_Split_1__Task_2",
+        "Flow_Split_1__Task_5",
+        "Flow_Split_1__Task_6",
+        "Flow_Split_1__Task_7"
+      ],
+      "incoming": [
+        "Flow_Task_0__Split_1"
+      ]
+    },
+    {
+      "id": "Task_2",
+      "type": "bpmn:Task",
+      "name": "MUST check the investor limit",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_2__End_3"
+      ],
+      "incoming": [
+        "Flow_Split_1__Task_2"
+      ]
+    },
+    {
+      "id": "End_3",
+      "type": "bpmn:EndEvent",
+      "name": "Fulfilled",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_Task_2__End_3",
+        "Flow_Boundary_5__End_3",
+        "Flow_Task_6__End_3",
+        "Flow_Boundary_7__End_3"
+      ]
+    },
+    {
+      "id": "End_4",
+      "type": "bpmn:EndEvent",
+      "name": "Breach",
+      "eventDefinitions": [
+        "bpmn:ErrorEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_Boundary_0__End_4",
+        "Flow_Boundary_2__End_4",
+        "Flow_Task_5__End_4",
+        "Flow_Boundary_6__End_4",
+        "Flow_Task_7__End_4"
+      ]
+    },
+    {
+      "id": "Task_5",
+      "type": "bpmn:Task",
+      "name": "SHANT advertise the terms",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_5__End_4"
+      ],
+      "incoming": [
+        "Flow_Split_1__Task_5"
+      ]
+    },
+    {
+      "id": "Task_6",
+      "type": "bpmn:Task",
+      "name": "MUST file the annual report",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_6__End_3"
+      ],
+      "incoming": [
+        "Flow_Split_1__Task_6"
+      ]
+    },
+    {
+      "id": "Task_7",
+      "type": "bpmn:Task",
+      "name": "SHANT resell the securities",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_7__End_4"
+      ],
+      "incoming": [
+        "Flow_Split_1__Task_7"
+      ]
+    },
+    {
+      "id": "Boundary_7",
+      "type": "bpmn:BoundaryEvent",
+      "name": "after P365D, not performed",
+      "eventDefinitions": [
+        "bpmn:TimerEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_7",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Boundary_7__End_3"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Boundary_6",
+      "type": "bpmn:BoundaryEvent",
+      "name": "after P120D",
+      "eventDefinitions": [
+        "bpmn:TimerEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_6",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Boundary_6__End_4"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Boundary_5",
+      "type": "bpmn:BoundaryEvent",
+      "name": "after P30D, not performed",
+      "eventDefinitions": [
+        "bpmn:TimerEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_5",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Boundary_5__End_3"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Boundary_2",
+      "type": "bpmn:BoundaryEvent",
+      "name": "after P7D",
+      "eventDefinitions": [
+        "bpmn:TimerEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_2",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Boundary_2__End_4"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Boundary_0",
+      "type": "bpmn:BoundaryEvent",
+      "name": "after P21D",
+      "eventDefinitions": [
+        "bpmn:TimerEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_0",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Boundary_0__End_4"
+      ],
+      "incoming": []
+    }
+  ],
+  "unsupportedElements": [],
+  "pausePoints": [
+    "Task_0",
+    "Task_2",
+    "Task_5",
+    "Task_6",
+    "Task_7"
+  ],
+  "exclusiveGateways": [],
+  "started": {
+    "tokensOn": [
+      "Task_0"
+    ],
+    "boundarySubscriptions": [
+      "Boundary_0"
+    ],
+    "triggers": [
+      "Start_0",
+      "Task_0",
+      "Boundary_0"
+    ],
+    "history": [
+      "Start_0",
+      "Flow_Start_0__Task_0",
+      "Task_0"
+    ],
+    "endEventsReached": [],
+    "log": [
+      "Process started 042ix1v",
+      "Start Event 042ix1v"
+    ],
+    "afterWaiting3s": {
+      "tokensOn": [
+        "Task_0"
+      ],
+      "triggers": [
+        "Start_0",
+        "Task_0",
+        "Boundary_0"
+      ],
+      "endEventsReached": []
+    }
+  },
+  "breach": {
+    "arm": null,
+    "continuedFirst": [],
+    "fired": "Boundary_0",
+    "tokensOn": [],
+    "boundarySubscriptions": [],
+    "triggers": [
+      "Start_0"
+    ],
+    "history": [
+      "Start_0",
+      "Flow_Start_0__Task_0",
+      "Task_0",
+      "Boundary_0",
+      "Flow_Boundary_0__End_4",
+      "End_4"
+    ],
+    "endEventsReached": [
+      "End_4"
+    ],
+    "log": [
+      "Process started 0p4ktm9",
+      "Start Event 0p4ktm9",
+      "MUST file the offering statement 0p4ktm9",
+      "after P21D 0p4ktm9",
+      "Breach 0p4ktm9",
+      "Process finished 0p4ktm9"
+    ]
+  },
+  "happy": [
+    {
+      "arm": null,
+      "continued": [
+        "Task_0",
+        "Task_2",
+        "Task_5",
+        "Task_6",
+        "Task_7"
+      ],
+      "steps": [
+        {
+          "tokensOn": [
+            "Task_0"
+          ],
+          "continued": "Task_0"
+        },
+        {
+          "tokensOn": [
+            "Task_7",
+            "Task_2",
+            "Task_5",
+            "Task_6"
+          ],
+          "continued": "Task_2"
+        },
+        {
+          "tokensOn": [
+            "Task_7",
+            "Task_5",
+            "Task_6"
+          ],
+          "continued": "Task_5"
+        },
+        {
+          "tokensOn": [
+            "Task_7",
+            "Task_6"
+          ],
+          "continued": "Task_6"
+        },
+        {
+          "tokensOn": [
+            "Task_7"
+          ],
+          "continued": "Task_7"
+        }
+      ],
+      "hitStepLimit": false,
+      "tokensOn": [],
+      "boundarySubscriptions": [],
+      "triggers": [
+        "Start_0"
+      ],
+      "history": [
+        "Start_0",
+        "Flow_Start_0__Task_0",
+        "Task_0",
+        "Flow_Task_0__Split_1",
+        "Split_1",
+        "Flow_Split_1__Task_2",
+        "Flow_Split_1__Task_5",
+        "Flow_Split_1__Task_6",
+        "Flow_Split_1__Task_7",
+        "Task_7",
+        "Task_2",
+        "Task_5",
+        "Task_6",
+        "Flow_Task_2__End_3",
+        "End_3",
+        "Flow_Task_5__End_4",
+        "End_4",
+        "Flow_Task_6__End_3",
+        "End_3",
+        "Flow_Task_7__End_4",
+        "End_4"
+      ],
+      "endEventsReached": [
+        "End_3",
+        "End_4",
+        "End_3",
+        "End_4"
+      ],
+      "log": [
+        "Process started 184kra1",
+        "Start Event 184kra1",
+        "MUST file the offering statement 184kra1",
+        "all of 184kra1",
+        "MUST check the investor limit 184kra1",
+        "Fulfilled 184kra1",
+        "SHANT advertise the terms 184kra1",
+        "Breach 184kra1",
+        "MUST file the annual report 184kra1",
+        "Fulfilled 184kra1",
+        "SHANT resell the securities 184kra1",
+        "Breach 184kra1",
+        "Process finished 184kra1"
+      ]
+    }
+  ],
+  "pageErrors": []
+}

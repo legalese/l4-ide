@@ -23,6 +23,9 @@
 --     edges carry the guard that selects them (see 'guardedIfBranches')
 --   - a @HENCE@ back into the rule being extracted → an edge to the initial
 --     state, so a renewing duty is a cycle rather than a dangling stub
+--   - EVERY … → ONE transition labelled with the quantifier (the cast is a
+--     run-time fact, R-T6), whose join line — @ONCE …@ barrier or @UPON EACH@
+--     fork — travels structurally in 'labelQuantifier' and is drawn on the edge
 module L4.StateGraph
   ( -- * Types
     StateGraph(..)
@@ -37,6 +40,11 @@ module L4.StateGraph
   , GuardAtom(..)
   , branchGuardAtoms
   , renderBranchGuard
+  , Quantifier(..)
+  , JoinLabel(..)
+  , JoinLabelKind(..)
+  , memberDeadline
+  , thresholdText
     -- * Options
   , StateGraphOptions(..)
   , defaultStateGraphOptions
@@ -53,6 +61,7 @@ module L4.StateGraph
 import Base
 import qualified Base.Text as Text
 import qualified Data.Text.Lazy as Text.Lazy
+import Control.Applicative ((<|>))
 import qualified Control.Monad.State.Strict as St
 
 import L4.Syntax
@@ -64,6 +73,8 @@ import L4.Syntax
   , Decide(..)
   , Deonton(..)
   , Subject(..)
+  , Join(..)
+  , Threshold(..)
   , RAction(..)
   , DeonticModal(..)
   , Pattern(..)
@@ -164,6 +175,11 @@ data TransitionLabel = TransitionLabel
     -- to know which conjuncts are negations of the arms above, and which
     -- @DECIDE@ each conjunct applies, and both facts are destroyed by
     -- @intercalate " AND "@.
+  , labelQuantifier :: Maybe Quantifier
+    -- ^ Set on the @HENCE@ edge of an @EVERY@ obligation and nowhere else: a
+    -- @PARTY@ rule, a @LEST@ caption and a junction's branch edge all leave it
+    -- 'Nothing'. It is what makes a barrier and a fork different graphs; see
+    -- 'JoinLabelKind'.
   } deriving (Eq, Show)
 
 -- | One conjunct of a 'BranchGuard': the condition as the reader sees it, plus
@@ -203,6 +219,83 @@ renderBranchGuard bg = case branchGuardAtoms bg of
   as -> Just (Text.intercalate " AND " [render neg a | (neg, a) <- as])
  where
   render neg a = if neg then "NOT (" <> a.gaText <> ")" else a.gaText
+
+-- | An @EVERY@ subject. The obligation is one per member of a cast that is
+-- only known at run time (R-T6), so the graph draws it as ONE transition and
+-- records here that it stands for many.
+data Quantifier = MkQuantifier
+  { quantVar  :: Text
+    -- ^ the member variable — @t@ in @EVERY Tenant t@
+  , quantRoll :: Maybe Text
+    -- ^ the roll the cast is drawn from — @tenants@ in @EVERY Tenant t IN
+    -- tenants@ — as written. Its /members/ are a run-time fact (R-T6); its
+    -- name is not, and a projection that needs a collection to point at
+    -- (BPMN's @loopDataInputRef@) should be told what the source called it.
+  , quantJoin :: Maybe JoinLabel
+    -- ^ the join line. Absent only when the rule has no @HENCE@ and no @LEST@;
+    -- the type checker makes it mandatory otherwise.
+  } deriving (Eq, Show)
+
+-- | The join line of an @EVERY@: its kind, and its own @WITHIN@ if any.
+data JoinLabel = MkJoinLabel
+  { joinKind     :: JoinLabelKind
+  , joinDeadline :: Maybe Text
+    -- ^ The @WITHIN@ on the join line. It bounds the joined /state/ — one
+    -- deadline on the whole, not re-armed by each performance (R-T2) — where
+    -- 'labelDeadline' bounds each act. When the act has no @WITHIN@ of its
+    -- own, this one bounds the acts as well: see 'memberDeadline'.
+  } deriving (Eq, Show)
+
+-- | How a quantified obligation's continuation fires ('L4.Syntax.Join'),
+-- carried structurally so that a projection can tell the two apart.
+--
+-- They are different contracts. Under a barrier the @HENCE@ fires once, when
+-- the threshold is met — for @ALL HAVE@, when the last member has performed.
+-- Under a fork it fires once per member, as that member performs. Until
+-- 2026-09-15 'extractDeonton' did not read the join at all, so the two lowered
+-- to byte-identical BPMN, and the fidelity report — whose job is to list what
+-- an export dropped — was silent about it. See
+-- @specs\/todo\/EVERY-EACH-QUANTIFIER-SPEC.md@ §2.5 and
+-- @specs\/todo\/lexipedia-superset\/LTS-VISUALISER.md@ §4.9.
+--
+-- Named for the label it sits on, not @JoinKind@: that name belongs to
+-- 'L4.EvaluateLazy.DeonticStep.JoinKind', the machine's own join (which
+-- carries the resolved 'L4.Syntax.Threshold' and a third, 'Distributive',
+-- case), and a module drawing the norm plane over this graph imports both.
+data JoinLabelKind
+  = Barrier Text
+    -- ^ @ONCE threshold@, level-triggered. The text is the threshold as the
+    -- source spells it — see 'thresholdText'.
+  | Fork
+    -- ^ @UPON EACH@, edge-triggered.
+  deriving (Eq, Show)
+
+-- | The deadline that actually expires a member's obligation: the act's own
+-- @WITHIN@, else the join line's.
+--
+-- This is the evaluator's rule, not this module's: @memberDue@ in
+-- @L4.EvaluateLazy.Machine@ reads the act's deadline and falls back to the
+-- join's, because a rule whose only @WITHIN@ is on the @ONCE@ line would
+-- otherwise never expire a member and could never fail. So the @LEST@ arm of
+-- such a rule IS reachable, and captioning it 'noTriggerWording' — which is
+-- what reading 'labelDeadline' alone did — contradicted the runtime. Consumers
+-- that draw the expiry (the @LEST@ caption here, the boundary timer in
+-- @L4.Bpmn.Lower@) read this; 'labelDeadline' stays the act's own text, so the
+-- edge shows what the source wrote where it wrote it.
+memberDeadline :: TransitionLabel -> Maybe Text
+memberDeadline l =
+  l.labelDeadline <|> (l.labelQuantifier >>= (.quantJoin) >>= (.joinDeadline))
+
+-- | A threshold as the source spells it.
+--
+-- Exhaustive, with no wildcard, on purpose: phase 3 of the quantifier spec
+-- adds count and measure forms (@SOME 2 OF … HAVE@, @sum OF amount AT LEAST
+-- rent@) as further constructors, and each must say how it is drawn. Under
+-- @-Wall -Werror@ a new constructor fails this build rather than drawing as
+-- nothing.
+thresholdText :: Threshold Resolved -> Text
+thresholdText = \case
+  AllHave _ -> "ALL HAVE"
 
 -- | Classification of transitions for rendering
 data TransitionType
@@ -666,11 +759,19 @@ fanLabel mGuard = TransitionLabel
   -- consumer reading either gets the same guard.
   , labelGuard    = mGuard >>= renderBranchGuard
   , labelBranch   = mGuard
+  , labelQuantifier = Nothing
   }
 
--- | Extract an obligation as a state transition
+-- | Extract an obligation as a state transition.
+--
+-- The pattern is positional, not @MkDeonton{..}@ by field name, and that is
+-- deliberate. A record pattern keeps compiling when the constructor grows a
+-- field, which is exactly how @join@ went unread from the day it was added
+-- until 2026-09-15: the barrier and the fork lowered to byte-identical output,
+-- and nothing warned. A positional pattern makes the next new field a type
+-- error on this line.
 extractDeonton :: Maybe StateId -> Deonton Resolved -> ExtractM ()
-extractDeonton mFromState MkDeonton{subject, action, due, hence, lest} = do
+extractDeonton mFromState (MkDeonton _anno subject action due mJoin hence lest) = do
   -- Create or get the source state
   fromState <- case mFromState of
     Just sid -> pure sid
@@ -683,6 +784,22 @@ extractDeonton mFromState MkDeonton{subject, action, due, hence, lest} = do
       deadlineText = fmap prettyLayout due
       guardText = fmap prettyLayout action.provided
 
+      -- Exhaustive on the join and on the threshold, with no wildcard arm, so
+      -- a new form of either is a compile error here and not a silent drawing.
+      quantifier = case subject of
+        Party{} -> Nothing
+        Every _ _ v mRoll _ ->
+          Just MkQuantifier
+            { quantVar  = prettyLayout v
+            , quantRoll = prettyLayout <$> mRoll
+            , quantJoin = joinLabel <$> mJoin
+            }
+      joinLabel = \case
+        JoinOnce _ th d ->
+          MkJoinLabel { joinKind = Barrier (thresholdText th), joinDeadline = prettyLayout <$> d }
+        JoinUpon _ _ d ->
+          MkJoinLabel { joinKind = Fork, joinDeadline = prettyLayout <$> d }
+
       label = TransitionLabel
         { labelParty    = partyText
         , labelModal    = modalVal
@@ -690,6 +807,7 @@ extractDeonton mFromState MkDeonton{subject, action, due, hence, lest} = do
         , labelDeadline = deadlineText
         , labelGuard    = guardText
         , labelBranch   = Nothing
+        , labelQuantifier = quantifier
         }
 
       -- The caption for whichever LEST arm this obligation turns out to have.
@@ -699,13 +817,18 @@ extractDeonton mFromState MkDeonton{subject, action, due, hence, lest} = do
       -- guard are deliberately absent — they belong to the obligation, which
       -- the HENCE edge already restates, and repeating them here would read as
       -- a second, contradictory copy of the rule.
+      -- The caption reads the deadline that expires a MEMBER, which for a
+      -- quantified rule may sit on the join line rather than on the act; see
+      -- 'memberDeadline'. Passing @due@ here said "unreachable: no WITHIN" of
+      -- a rule the evaluator does expire.
       lestLabel = TransitionLabel
         { labelParty    = Nothing
         , labelModal    = modalVal
-        , labelAction   = lestArmWording action.modal due
+        , labelAction   = lestArmWording action.modal (memberDeadline label)
         , labelDeadline = Nothing
         , labelGuard    = Nothing
         , labelBranch   = Nothing
+        , labelQuantifier = Nothing
         }
 
       defaultToBreach = do
@@ -784,7 +907,7 @@ extractDeonton mFromState MkDeonton{subject, action, due, hence, lest} = do
           extractDeonton (Just nextStateId) nextObl
 
         TargetSelf -> do
-          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing Nothing
+          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing Nothing Nothing
           addTransition fromState initialStateId timeoutLabel LestTransition
 
         TargetOther -> do
@@ -814,7 +937,32 @@ extractDeonton mFromState MkDeonton{subject, action, due, hence, lest} = do
         -- is the wrong place. Fixing it means emitting a real lapse edge here
         -- and retiring that synthesis, which moves BPMN output for every
         -- permission; it is a separate change from smucclaw/l4-ide#927.
-        DMay -> pure ()
+        DMay -> case quantifier >>= (.quantJoin) of
+          -- Under EITHER join a lapsed member's arm goes to Fulfilled, never
+          -- to where HENCE goes. Barrier: a lapsed member means the join can
+          -- never fire, the HENCE is skipped and the member's own FULFILLED is
+          -- returned as the barrier's (Machine.hs, Barrier1's last arm and the
+          -- note on 'barrierFail'). Fork: the HENCE arises only from a
+          -- member's ACT; a member whose permission expires unexercised
+          -- spawns nothing. Both measured, 2026-09-15/16, on the corporate
+          -- resolution (spec §2.2.1 Pattern B): nobody approves and the chair
+          -- publishes anyway → FULFILLED under both joins; one approval with
+          -- no publication → BREACHED (the chair), fork and barrier alike
+          -- (ok/every/tests/run-modals.golden). Drawing the arm here is what
+          -- stops L4.Bpmn.Lower's synthesised lapse timer from routing
+          -- "wherever HENCE lands", which manufactured the chair's duty to
+          -- publish a resolution that did not pass.
+          --
+          -- A first version of this arm drew it for the barrier only, on the
+          -- concurrency review's reading that a fork "carries the real HENCE"
+          -- per member. That reading was wrong at runtime and was caught by
+          -- re-measurement the next day. The single-party PARTY MAY keeps the
+          -- pre-existing gap noted above; it is the same defect and the same
+          -- fix, and moves the handover goldens, so it is its own change.
+          Just _ -> do
+            fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
+            addTransition fromState fulfilledId lestLabel LestTransition
+          Nothing -> pure ()
         -- MUST/SHANT without LEST default to Breach; only the way in differs,
         -- and 'lestArmWording' is where that difference is spelled.
         DMust -> defaultToBreach
@@ -883,11 +1031,13 @@ describeDeonton MkDeonton{subject, action} =
 
 -- | The subject of a deonton as label text.
 --
--- An @EVERY@ is rendered as ONE node labelled with the quantifier. Phase 1 of
--- EVERY-EACH-QUANTIFIER-SPEC does not fan the cast out into per-member
--- transitions here (the cast is only known at run time, once evaluated — R-T6),
--- so the state graph, and the BPMN lowered from it, show a single task for the
--- whole cast. The @ONCE …@ join line is likewise not drawn.
+-- An @EVERY@ is rendered as ONE node labelled with the quantifier. The cast is
+-- only known at run time, once evaluated (R-T6), so the state graph does not
+-- fan it out into per-member transitions, and the BPMN lowered from it shows a
+-- single multi-instance task for the whole cast. The join line is NOT part of
+-- this text: it travels structurally in 'labelQuantifier' and is drawn by
+-- 'formatTransitionLabel', so a barrier and a fork stay distinguishable to
+-- every consumer of the graph.
 subjectText :: Subject Resolved -> Text
 subjectText = \case
   Party _ p -> prettyLayout p
@@ -1025,7 +1175,19 @@ formatTransitionLabel opts TransitionLabel{..} =
         , if opts.showDeadlines then fmap (\d -> "[" <> d <> "]") labelDeadline else Nothing
         , if opts.showGuards then fmap (\g -> "IF " <> g) labelGuard else Nothing
         ]
-  in Text.intercalate " " parts
+      -- The join line, as the source spells it, on a line of its own under the
+      -- obligation — the one place the picture says whether the continuation
+      -- fires once or once per member.
+      joinPart = do
+        q <- labelQuantifier
+        j <- q.quantJoin
+        let kind = case j.joinKind of
+              Barrier th -> "ONCE " <> th
+              Fork       -> "UPON EACH"
+            dl | opts.showDeadlines = maybe "" (" WITHIN " <>) j.joinDeadline
+               | otherwise          = ""
+        pure (kind <> dl)
+  in Text.intercalate " " parts <> maybe "" ("\n" <>) joinPart
 
 -- | Format a deontic modal for display
 formatModal :: DeonticModal -> Text

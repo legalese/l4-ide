@@ -1,0 +1,842 @@
+[
+  {
+    "advancing": [],
+    "breaching": [
+      {
+        "breach": {
+          "due": 14,
+          "missed": "MUST return",
+          "party": "B",
+          "reason": "revealed when the clock ran on with nothing happening",
+          "seenAt": 15
+        },
+        "event": {
+          "at": 15,
+          "deadline": 14,
+          "kind": "tick",
+          "whose": [
+            {
+              "action": "return",
+              "modal": "MUST",
+              "party": "B"
+            }
+          ]
+        }
+      }
+    ],
+    "clock": 10,
+    "contract": "aContract",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY S DOES delivery AT 2",
+      "PARTY B DOES payment OF 21 AT 4",
+      "`WAIT UNTIL` OF 10"
+    ],
+    "format": 1,
+    "line": 23,
+    "nextDeadline": {
+      "at": 14,
+      "whose": [
+        {
+          "action": "return",
+          "modal": "MUST",
+          "party": "B"
+        }
+      ]
+    },
+    "owed": [
+      {
+        "action": "return",
+        "dueBy": 14,
+        "kind": "owed",
+        "modal": "MUST",
+        "party": "B",
+        "remaining": 4
+      }
+    ],
+    "passedOver": [],
+    "standing": {
+      "status": "inProgress"
+    },
+    "steps": [
+      {
+        "clock": 2,
+        "event": {
+          "action": "delivery",
+          "at": 2,
+          "kind": "act",
+          "party": "S"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "S"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 4,
+        "event": {
+          "action": "payment OF …",
+          "at": 4,
+          "kind": "act",
+          "party": "B"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "B"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 10,
+        "event": {
+          "at": 10,
+          "kind": "clock"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "B"
+        },
+        "outcome": {
+          "what": "partyMismatch"
+        },
+        "scrutiny": "witnessedOnly"
+      },
+      {
+        "clock": 10,
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "B"
+        },
+        "outcome": {
+          "what": "waiting"
+        },
+        "scrutiny": "noEvent"
+      }
+    ],
+    "untried": [
+      {
+        "event": {
+          "action": "return",
+          "kind": "act",
+          "party": "B"
+        },
+        "why": "the action binds `return`, which the what-if cannot choose"
+      }
+    ]
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 4,
+    "contract": "aContract",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY S DOES delivery AT 2",
+      "PARTY B DOES payment OF 20 AT 4"
+    ],
+    "format": 1,
+    "line": 29,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "status": "fulfilled"
+    },
+    "steps": [
+      {
+        "clock": 2,
+        "event": {
+          "action": "delivery",
+          "at": 2,
+          "kind": "act",
+          "party": "S"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "S"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 4,
+        "event": {
+          "action": "payment OF …",
+          "at": 4,
+          "kind": "act",
+          "party": "B"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "B"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 9,
+    "contract": "aContract",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY S DOES delivery AT 2",
+      "PARTY B DOES payment OF 30 AT 6",
+      "PARTY B DOES payment OF 10 AT 9"
+    ],
+    "format": 1,
+    "line": 33,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "status": "fulfilled"
+    },
+    "steps": [
+      {
+        "clock": 2,
+        "event": {
+          "action": "delivery",
+          "at": 2,
+          "kind": "act",
+          "party": "S"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "S"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 2,
+        "event": {
+          "action": null,
+          "at": 6,
+          "kind": "act",
+          "party": "B"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "B"
+        },
+        "outcome": {
+          "deadline": 5,
+          "then": "lest",
+          "what": "expired"
+        },
+        "scrutiny": "witnessedOnly"
+      },
+      {
+        "clock": 6,
+        "event": {
+          "action": "payment OF …",
+          "at": 6,
+          "kind": "act",
+          "party": "B"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "B"
+        },
+        "outcome": {
+          "what": "actionMismatch"
+        },
+        "scrutiny": "reoffered"
+      },
+      {
+        "clock": 9,
+        "event": {
+          "action": "payment OF …",
+          "at": 9,
+          "kind": "act",
+          "party": "B"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "B"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 20,
+    "contract": "y",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY B DOES payment OF 2 AT 5",
+      "PARTY S DOES delivery AT 20"
+    ],
+    "format": 1,
+    "line": 58,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "status": "fulfilled"
+    },
+    "steps": [
+      {
+        "clock": 5,
+        "event": {
+          "action": "payment OF …",
+          "at": 5,
+          "kind": "act",
+          "party": "B"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "B"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 1,
+    "contract": "quux",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY B DOES quuux AT 1",
+      "PARTY B DOES baz OF qux AT 1",
+      "PARTY B DOES baz OF bar AT 1"
+    ],
+    "format": 1,
+    "line": 69,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "status": "fulfilled"
+    },
+    "steps": [
+      {
+        "clock": 1,
+        "event": {
+          "action": "quuux",
+          "at": 1,
+          "kind": "act",
+          "party": "B"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MAY",
+          "party": "B"
+        },
+        "outcome": {
+          "what": "actionMismatch"
+        },
+        "scrutiny": "witnessedOnly"
+      },
+      {
+        "clock": 1,
+        "event": {
+          "action": "baz OF …",
+          "at": 1,
+          "kind": "act",
+          "party": "B"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MAY",
+          "party": "B"
+        },
+        "outcome": {
+          "what": "actionMismatch"
+        },
+        "scrutiny": "witnessedOnly"
+      },
+      {
+        "clock": 1,
+        "event": {
+          "action": "baz OF …",
+          "at": 1,
+          "kind": "act",
+          "party": "B"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MAY",
+          "party": "B"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 2,
+    "contract": "(PARTY B MUST payment) ROR FULFILLED",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [],
+    "format": 1,
+    "line": 81,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "status": "fulfilled"
+    },
+    "steps": [
+      {
+        "clock": null,
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": null
+        },
+        "outcome": {
+          "what": "waiting"
+        },
+        "scrutiny": "noEvent"
+      },
+      {
+        "clock": null,
+        "outcome": {
+          "operator": "or",
+          "result": "fulfilled",
+          "what": "joined"
+        },
+        "scrutiny": "noEvent"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 4,
+    "contract": "x",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY S DOES delivery AT 4"
+    ],
+    "format": 1,
+    "line": 83,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "status": "fulfilled"
+    },
+    "steps": [
+      {
+        "clock": 4,
+        "event": {
+          "action": "delivery",
+          "at": 4,
+          "kind": "act",
+          "party": "S"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "S"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [
+      {
+        "breach": {
+          "due": 9,
+          "missed": "MUST payment (EXACTLY n)",
+          "party": "B",
+          "reason": "revealed when the clock ran on with nothing happening",
+          "seenAt": 10
+        },
+        "event": {
+          "at": 10,
+          "deadline": 9,
+          "kind": "tick",
+          "whose": [
+            {
+              "action": "payment (EXACTLY n)",
+              "modal": "MUST",
+              "party": "B"
+            }
+          ]
+        }
+      }
+    ],
+    "clock": 4,
+    "contract": "y",
+    "deadlineNotKnown": [],
+    "discharging": [
+      {
+        "action": "payment OF 2",
+        "at": 4,
+        "kind": "act",
+        "party": "B"
+      }
+    ],
+    "events": [
+      "PARTY B DOES payment OF 4 AT 4"
+    ],
+    "format": 1,
+    "line": 86,
+    "nextDeadline": {
+      "at": 9,
+      "whose": [
+        {
+          "action": "payment OF 2",
+          "modal": "MUST",
+          "party": "B"
+        }
+      ]
+    },
+    "owed": [
+      {
+        "action": "payment OF 2",
+        "dueBy": 9,
+        "kind": "owed",
+        "modal": "MUST",
+        "party": "B",
+        "remaining": 5
+      }
+    ],
+    "passedOver": [],
+    "standing": {
+      "status": "inProgress"
+    },
+    "steps": [
+      {
+        "clock": 4,
+        "event": {
+          "action": "payment OF …",
+          "at": 4,
+          "kind": "act",
+          "party": "B"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "B"
+        },
+        "outcome": {
+          "what": "actionMismatch"
+        },
+        "scrutiny": "witnessedOnly"
+      },
+      {
+        "clock": 4,
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "B"
+        },
+        "outcome": {
+          "what": "waiting"
+        },
+        "scrutiny": "noEvent"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 26,
+    "contract": "z",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY S DOES delivery AT 4",
+      "PARTY B DOES payment OF 4 AT 26"
+    ],
+    "format": 1,
+    "line": 89,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "status": "fulfilled"
+    },
+    "steps": [
+      {
+        "clock": 4,
+        "event": {
+          "action": "delivery",
+          "at": 4,
+          "kind": "act",
+          "party": "S"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "S"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": null,
+        "outcome": {
+          "operator": "or",
+          "result": "fulfilled",
+          "what": "joined"
+        },
+        "scrutiny": "noEvent"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 26,
+    "contract": "z",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY S DOES delivery AT 4",
+      "PARTY B DOES payment OF 5 AT 26"
+    ],
+    "format": 1,
+    "line": 93,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "status": "fulfilled"
+    },
+    "steps": [
+      {
+        "clock": 4,
+        "event": {
+          "action": "delivery",
+          "at": 4,
+          "kind": "act",
+          "party": "S"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "S"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": null,
+        "outcome": {
+          "operator": "or",
+          "result": "fulfilled",
+          "what": "joined"
+        },
+        "scrutiny": "noEvent"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 3,
+    "contract": "goesOn",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY S DOES delivery AT 2",
+      "PARTY B DOES payment OF 6 AT 3"
+    ],
+    "format": 1,
+    "line": 102,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "breach": {
+        "due": 2,
+        "missed": "MUST payment n PROVIDED (n EQUALS 7)",
+        "party": "S",
+        "reason": "revealed by B doing payment OF 6",
+        "seenAt": 3
+      },
+      "status": "breached"
+    },
+    "steps": [
+      {
+        "clock": 2,
+        "event": {
+          "action": "delivery",
+          "at": 2,
+          "kind": "act",
+          "party": "S"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "S"
+        },
+        "outcome": {
+          "what": "actionMismatch"
+        },
+        "scrutiny": "witnessedOnly"
+      },
+      {
+        "clock": 2,
+        "event": {
+          "action": null,
+          "at": 3,
+          "kind": "act",
+          "party": "B"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "S"
+        },
+        "outcome": {
+          "deadline": 2,
+          "then": "breach",
+          "what": "expired"
+        },
+        "scrutiny": "witnessedOnly"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 3,
+    "contract": "goesOn",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY S DOES delivery AT 2",
+      "PARTY S DOES payment OF 7 AT 3"
+    ],
+    "format": 1,
+    "line": 106,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "breach": {
+        "due": 2,
+        "missed": "MUST payment n PROVIDED (n EQUALS 7)",
+        "party": "S",
+        "reason": "revealed by S doing payment OF 7",
+        "seenAt": 3
+      },
+      "status": "breached"
+    },
+    "steps": [
+      {
+        "clock": 2,
+        "event": {
+          "action": "delivery",
+          "at": 2,
+          "kind": "act",
+          "party": "S"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "S"
+        },
+        "outcome": {
+          "what": "actionMismatch"
+        },
+        "scrutiny": "witnessedOnly"
+      },
+      {
+        "clock": 2,
+        "event": {
+          "action": null,
+          "at": 3,
+          "kind": "act",
+          "party": "S"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "S"
+        },
+        "outcome": {
+          "deadline": 2,
+          "then": "breach",
+          "what": "expired"
+        },
+        "scrutiny": "witnessedOnly"
+      }
+    ],
+    "untried": []
+  }
+]

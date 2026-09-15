@@ -20,6 +20,7 @@ module L4.API
   , l4SemanticTokens
   , l4Eval
   , l4VisualizeByName
+  , l4StateGraphByName
   , l4CodeLenses
   , l4EvalDirective
   , l4Definition
@@ -51,6 +52,7 @@ import L4.EvaluateLazy.Machine (prettyEvalException, prettyRefusal)
 import L4.TracePolicy (lspDefaultPolicy)
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import qualified L4.Viz.Ladder as Ladder
+import qualified L4.StateGraph.Lens as SGLens
 import L4.FindDefinition (findDefinition)
 import L4.FindReferences (findReferences)
 
@@ -407,6 +409,14 @@ js_l4_visualize_by_name :: JSString -> JSString -> Int -> JSString -> Bool -> IO
 js_l4_visualize_by_name source uri version functionName simplify = pure $ toJSString $ Text.unpack $
   l4VisualizeByName (Text.pack $ fromJSString source) (Text.pack $ fromJSString uri) version (Text.pack $ fromJSString functionName) simplify
 
+-- | Render the state graph of a specific regulative rule by name, as DOT.
+foreign export javascript "l4_state_graph_by_name"
+  js_l4_state_graph_by_name :: JSString -> JSString -> IO JSString
+
+js_l4_state_graph_by_name :: JSString -> JSString -> IO JSString
+js_l4_state_graph_by_name source functionName = pure $ toJSString $ Text.unpack $
+  l4StateGraphByName (Text.pack $ fromJSString source) (Text.pack $ fromJSString functionName)
+
 -- | Get code lenses for all visualizable DECIDE rules.
 foreign export javascript "l4_code_lenses"
   js_l4_code_lenses :: JSString -> JSString -> Int -> IO JSString
@@ -625,7 +635,44 @@ l4VisualizeByName source uriText version functionName simplify =
             Right ladderInfo ->
               encodeJson ladderInfo
 
--- | Get code lenses for all visualizable DECIDE rules.
+-- | Render the state graph of a regulative rule, addressed by name, as DOT.
+--
+-- The name is spelled the way 'l4CodeLenses' spells it in the lens's
+-- arguments — 'L4.StateGraph.Lens.targetName' — so a click round-trips.
+--
+-- Returns:
+--
+-- @
+-- { "name": "the tenancy", "dot": "digraph { ... }" }
+-- // or
+-- { "error": "...", "notFound": true }
+-- @
+--
+-- Unlike 'l4VisualizeByName' this does not refuse on a type error elsewhere
+-- in the module: the graph is extracted from the resolved syntax, and a rule
+-- that resolved is drawable whatever its neighbours did.
+l4StateGraphByName :: Text -> Text -> Text
+l4StateGraphByName source functionName =
+  case checkWithImports emptyVFS source of
+    Left errors ->
+      encodeJson $ Aeson.object
+        [ "error" .= Text.intercalate "; " errors
+        ]
+    Right result ->
+      case SGLens.stateGraphByName result.tcdModule functionName of
+        Nothing ->
+          encodeJson $ Aeson.object
+            [ "error" .= ("Rule '" <> functionName <> "' not found or has no state graph" :: Text)
+            , "notFound" .= True
+            ]
+        Just target ->
+          SGLens.stateGraphResponseText target.targetGraph
+
+-- | Get code lenses for all visualizable DECIDE rules — the ladder's
+-- "Show decision graph" above every boolean rule it can draw, and
+-- "Show state graph" above every regulative rule 'L4.StateGraph' can
+-- extract. The two sets are disjoint (R13 in LTS-VISUALISER.md §8), so no
+-- line ever carries both.
 --
 -- Returns JSON array of code lens objects for Monaco:
 --
@@ -652,8 +699,9 @@ l4CodeLenses source uriText version =
       -- (the LSP does the same — CodeLens is always shown after successful parse)
       let decides = Ladder.findAllVisualizableDecides result.tcdUri result.tcdModule result.tcdSubstitution
           vizLenses = map (mkVizLens uriText version) decides
+          stateGraphLenses = map (mkStateGraphLens uriText version) (SGLens.stateGraphTargets result.tcdModule)
           directiveLenses = collectDirectiveLenses (directiveToCodeLens uriText version) result.tcdModule
-      in encodeJson (vizLenses <> directiveLenses)
+      in encodeJson (vizLenses <> stateGraphLenses <> directiveLenses)
   where
     mkVizLens :: Text -> Int -> Ladder.VisualizableDecide -> Aeson.Value
     mkVizLens uriTxt ver vd = Aeson.object
@@ -671,6 +719,27 @@ l4CodeLenses source uriText version =
               [ Aeson.object [ "uri" .= uriTxt, "version" .= ver ]
               , Aeson.String vd.vdName
               , Aeson.Bool False
+              ]
+          ]
+      ]
+
+    -- Same shape as 'mkVizLens': name-addressed, Monaco 1-indexed. The
+    -- arguments are [verDocId, name]; there is no simplify flag because
+    -- there is nothing to simplify.
+    mkStateGraphLens :: Text -> Int -> SGLens.StateGraphTarget -> Aeson.Value
+    mkStateGraphLens uriTxt ver t = Aeson.object
+      [ "range" .= Aeson.object
+          [ "startLineNumber" .= t.targetStart.line
+          , "startColumn" .= t.targetStart.column
+          , "endLineNumber" .= t.targetStart.line
+          , "endColumn" .= t.targetStart.column
+          ]
+      , "command" .= Aeson.object
+          [ "id" .= ("l4.stateGraph" :: Text)
+          , "title" .= ("Show state graph" :: Text)
+          , "arguments" .=
+              [ Aeson.object [ "uri" .= uriTxt, "version" .= ver ]
+              , Aeson.String t.targetName
               ]
           ]
       ]

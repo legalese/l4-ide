@@ -145,6 +145,59 @@ nestedJoinSrc =
   , "  RAND (PARTY Alice MAY notify WITHIN 9)"
   ]
 
+-- | A quantified obligation under each join. They differ in exactly one line,
+-- and until 2026-09-15 they lowered to byte-identical XML and a byte-identical
+-- fidelity report, because the state graph never read the join. See
+-- @specs\/todo\/EVERY-EACH-QUANTIFIER-SPEC.md@ §2.5.
+everyBarrierSrc, everyForkSrc :: [Text]
+everyBarrierSrc = everySrc "ONCE ALL HAVE"
+everyForkSrc = everySrc "UPON EACH"
+
+everySrc :: Text -> [Text]
+everySrc joinLine =
+  [ "`group` MEANS"
+  , "  EVERY p"
+  , "    MUST pay"
+  , "    WITHIN 3"
+  , "    " <> joinLine
+  , "    HENCE FULFILLED"
+  , "    LEST BREACH"
+  ]
+
+-- | A deadline on the join line beside the act's; and one on the join line
+-- alone, which is then the deadline that expires each member.
+everyBothDeadlinesSrc, everyJoinDeadlineSrc :: [Text]
+everyBothDeadlinesSrc = everySrc "ONCE ALL HAVE WITHIN 30"
+everyJoinDeadlineSrc =
+  [ "`group` MEANS"
+  , "  EVERY p"
+  , "    MUST pay"
+  , "    ONCE ALL HAVE WITHIN 30"
+  , "    HENCE FULFILLED"
+  , "    LEST BREACH"
+  ]
+
+-- | The other cells of the modal × join product. The multi-instance marker is
+-- right for MUST and, unqualified, wrong for both of these: a SHANT barrier
+-- drawn as breaching only when EVERY member has offended, and a MAY barrier
+-- whose lapse timer manufactures the duty that follows a passed resolution.
+-- Found by the concurrency review of 2026-09-15; nothing here exercised them.
+shantBarrierSrc, shantForkSrc, mayBarrierSrc, mayForkSrc :: [Text]
+shantBarrierSrc = modalJoinSrc "SHANT notify" "ONCE ALL HAVE"
+shantForkSrc = modalJoinSrc "SHANT notify" "UPON EACH"
+mayBarrierSrc = modalJoinSrc "MAY pay" "ONCE ALL HAVE"
+mayForkSrc = modalJoinSrc "MAY pay" "UPON EACH"
+
+modalJoinSrc :: Text -> Text -> [Text]
+modalJoinSrc act joinLine =
+  [ "`group` MEANS"
+  , "  EVERY p"
+  , "    " <> act
+  , "    WITHIN 3"
+  , "    " <> joinLine
+  , "    HENCE (PARTY Bob MUST deliver WITHIN 5)"
+  ]
+
 -- | A prohibition with a deadline, and the same shape as a MUST. Deliberately
 -- named identically so that the two sources differ in exactly one token: any
 -- difference in the output is attributable to the modal and nothing else.
@@ -291,6 +344,7 @@ edge src dst ty act =
           , labelDeadline = Nothing
           , labelGuard = Nothing
           , labelBranch = Nothing
+          , labelQuantifier = Nothing
           }
     , transType = ty
     }
@@ -748,8 +802,8 @@ graphWithDeadline due =
         , ContractState 2 "Breach" TerminalBreach Linear
         ]
     , sgTransitions =
-        [ Transition 0 1 (TransitionLabel (Just "Alice") (Just DMust) "pay" (Just due) Nothing Nothing) HenceTransition
-        , Transition 0 2 (TransitionLabel Nothing Nothing "timeout" Nothing Nothing Nothing) LestTransition
+        [ Transition 0 1 (TransitionLabel (Just "Alice") (Just DMust) "pay" (Just due) Nothing Nothing Nothing) HenceTransition
+        , Transition 0 2 (TransitionLabel Nothing Nothing "timeout" Nothing Nothing Nothing Nothing) LestTransition
         ]
     , sgInitialState = 0
     }
@@ -1563,6 +1617,132 @@ spec = do
   -- in the repository that demonstrates a drawn conjunction, so what it
   -- demonstrates is asserted here rather than left implicit in 400 lines of
   -- XML nobody re-reads.
+  -- The regression this pins is a silent one: the two sources below differ in
+  -- one line, and for a week the exporter produced the same bytes for both and
+  -- a report that did not mention it. Every assertion here is on meaning —
+  -- which loss is reported, what the timer is armed with — not on shape.
+  describe "a quantified obligation (EVERY)" $ do
+    let barrier = exportOf defaultBpmnOptions "group" everyBarrierSrc
+        fork = exportOf defaultBpmnOptions "group" everyForkSrc
+        both = exportOf defaultBpmnOptions "group" everyBothDeadlinesSrc
+        joinOnly = exportOf defaultBpmnOptions "group" everyJoinDeadlineSrc
+        party = exportOf defaultBpmnOptions "rule" mustSrc
+        theTask bx = case tasks bx of
+          [t] -> t
+          ts -> error ("expected one task, got " <> show (length ts))
+
+    it "the sources differ in exactly one line" $
+      length (filter id (zipWith (/=) everyBarrierSrc everyForkSrc)) `shouldBe` 1
+
+    it "the barrier and the fork produce different XML, and different reports" $ do
+      xmlOf "group" everyBarrierSrc `shouldNotBe` xmlOf "group" everyForkSrc
+      barrier.bxFidelity `shouldNotBe` fork.bxFidelity
+
+    it "draws the task as a parallel multi-instance activity; a PARTY task is not one" $ do
+      (theTask barrier).nodeMultiInstance `shouldBe` Just CompleteWhenAll
+      (theTask fork).nodeMultiInstance `shouldBe` Just CompleteWhenAll
+      (theTask party).nodeMultiInstance `shouldBe` Nothing
+      xmlOf "group" everyBarrierSrc
+        `shouldSatisfy` Text.isInfixOf
+          "<bpmn:multiInstanceLoopCharacteristics id=\"MultiInstance_Task_0\" isSequential=\"false\" />"
+      xmlOf "rule" mustSrc `shouldSatisfy` (not . Text.isInfixOf "multiInstance")
+
+    it "restates the join line in the task's documentation, and does not call an EVERY a PARTY" $ do
+      (theTask barrier).nodeDoc `shouldSatisfy` maybe False (Text.isInfixOf "ONCE ALL HAVE")
+      (theTask fork).nodeDoc `shouldSatisfy` maybe False (Text.isInfixOf "UPON EACH")
+      (theTask barrier).nodeDoc `shouldSatisfy` maybe False (not . Text.isInfixOf "PARTY EVERY")
+
+    it "reports P-CAST on both joins and on neither PARTY rule, and P-FORK on the fork alone" $ do
+      length (findingsFor "P-CAST" barrier) `shouldBe` 1
+      length (findingsFor "P-CAST" fork) `shouldBe` 1
+      findingsFor "P-CAST" party `shouldBe` []
+      findingsFor "P-FORK" barrier `shouldBe` []
+      length (findingsFor "P-FORK" fork) `shouldBe` 1
+      map (.severity) (findingsFor "P-FORK" fork) `shouldBe` [Lossy]
+
+    it "reports the join line's own deadline as undrawn only when the act has one too" $ do
+      length (findingsFor "P-JOIN-DEADLINE" both) `shouldBe` 1
+      map (.severity) (findingsFor "P-JOIN-DEADLINE" both) `shouldBe` [Lossy]
+      findingsFor "P-JOIN-DEADLINE" joinOnly `shouldBe` []
+      findingsFor "P-JOIN-DEADLINE" barrier `shouldBe` []
+
+    -- The runtime does not enforce a join deadline on a fork (joinStateDue is
+    -- Nothing for JoinUpon), so on a fork the note may not claim BPMN dropped
+    -- something the source had. It says the clause is dead in both.
+    it "on a fork, says the join deadline is dead in the runtime too, at Advisory" $ do
+      let forkBoth = exportOf defaultBpmnOptions "group" (everySrc "UPON EACH WITHIN 30")
+      map (.severity) (findingsFor "P-JOIN-DEADLINE" forkBoth) `shouldBe` [Advisory]
+      map (.message) (findingsFor "P-JOIN-DEADLINE" forkBoth)
+        `shouldSatisfy` all (Text.isInfixOf "does not enforce it on a fork either")
+
+    -- The fork's largest loss: the interrupting timer cancels every instance,
+    -- so a continuation a member already spawned is never drawn as arising.
+    it "names the cancelled continuations on a fork that has a timer, and only there" $ do
+      length (findingsFor "P-FORK-CANCEL" fork) `shouldBe` 1
+      findingsFor "P-FORK-CANCEL" barrier `shouldBe` []
+      -- a MAY fork's timer is its lapse, drawn as a LEST arm to Fulfilled, and
+      -- it cancels every instance too: a member who approved has already
+      -- spawned the continuation, which the timer deletes (measured: one
+      -- approval, no publication → the chair BREACHED)
+      length (findingsFor "P-FORK-CANCEL" (exportOf defaultBpmnOptions "group" mayForkSrc)) `shouldBe` 1
+
+    -- The modal × join cells the marker inverted. Both assertions are on
+    -- MEANING: where a token ends up, not which element is present.
+    describe "a prohibition under EVERY" $ do
+      let shantBarrier = exportOf defaultBpmnOptions "group" shantBarrierSrc
+          shantFork = exportOf defaultBpmnOptions "group" shantForkSrc
+          -- these fixtures continue into Bob's obligation, so they have two
+          -- tasks; the quantified one is the first
+          task0 bx = fromMaybe (error "no Task_0") (nodeNamed bx "Task_0")
+      it "completes on the first member's act, because one act is the breach" $ do
+        (task0 shantBarrier).nodeMultiInstance `shouldBe` Just CompleteOnFirst
+        (task0 shantFork).nodeMultiInstance `shouldBe` Just CompleteOnFirst
+        xmlOf "group" shantBarrierSrc
+          `shouldSatisfy` Text.isInfixOf "<bpmn:completionCondition xsi:type=\"bpmn:tFormalExpression\">nrOfCompletedInstances &gt;= 1</bpmn:completionCondition>"
+        length (findingsFor "P-PROHIBITION-FIRST" shantBarrier) `shouldBe` 1
+        findingsFor "P-PROHIBITION-FIRST" barrier `shouldBe` []
+      it "still races the arms the prohibition's way round: completing is the breach" $
+        raceOutcome shantBarrier `shouldBe` (ToBreach, ToFulfilled)
+      it "does not report cancellation on a prohibition's fork, where the timer is compliance" $ do
+        findingsFor "P-FORK-CANCEL" shantFork `shouldBe` []
+        length (findingsFor "P-FORK" shantFork) `shouldBe` 1
+
+    describe "a permission under EVERY" $ do
+      let mayBarrier = exportOf defaultBpmnOptions "group" mayBarrierSrc
+          mayFork = exportOf defaultBpmnOptions "group" mayForkSrc
+          -- the timers hung on the quantified task, and where each one's
+          -- outgoing flow lands. A boundary's arm is attached, not flowed to,
+          -- so this is asked of the flows rather than of 'terminalFrom'.
+          lapses bx =
+            [ (b.nodeId, [f.flowTo | f <- bx.bxProcess.procFlows, f.flowFrom == b.nodeId])
+            | b <- boundaries bx
+            , Boundary "Task_0" _ <- [b.nodeKind]
+            ]
+      -- Under either join the state graph draws the lapse as a LEST arm to
+      -- Fulfilled, so it is the exporter's ordinary boundary event — not its
+      -- synthesised lapse timer — that carries it, and it lands on the
+      -- Fulfilled end event, never on Bob's obligation. A first version of
+      -- the fork case pinned the opposite ("routes where HENCE routes"),
+      -- on the review's reading rather than a run; the run says FULFILLED.
+      let lapseEndsFulfilled bx = case lapses bx of
+            [("Boundary_0", [tgt])] ->
+              maybe Nothing (\n -> Just n.nodeKind) (nodeNamed bx tgt) `shouldBe` Just (EndEvent False)
+            other -> expectationFailure ("expected one boundary on Task_0 with one flow, got " <> show other)
+      it "under a barrier, a lapse ends the rule fulfilled with nothing following" $
+        lapseEndsFulfilled mayBarrier
+      it "under a fork too: the continuation arises only from an act, never from a lapse" $
+        lapseEndsFulfilled mayFork
+
+    -- The evaluator expires each member on a deadline written only on the
+    -- join line, so the LEST arm is reachable; drawing it as untriggered
+    -- (P-DEADLINE at Blocking) contradicted the runtime.
+    it "a deadline written only on the join line still arms the boundary timer" $ do
+      map (.nodeKind) (boundaries joinOnly) `shouldBe` [Boundary "Task_0" (TimerAfter "P30D")]
+      findingsFor "P-DEADLINE" joinOnly `shouldBe` []
+
+    it "and with both written, the act's is the one on the timer" $
+      map (.nodeKind) (boundaries both) `shouldBe` [Boundary "Task_0" (TimerAfter "P3D")]
+
   describe "the join exhibit (consultation.l4)" $ do
     it "really does draw a converging gateway, and reports no loss for it" $ do
       bx <- exportOfFile "consultation" "the consultation"
@@ -1781,6 +1961,14 @@ spec = do
     , (regcfCorpus, "ongoing reporting obligation", "regcf-reporting")
     , (regcfCorpus, "advertising restriction", "regcf-advertising")
     , (regcfCorpus, "resale restriction", "regcf-resale")
+    , ("bpmn" </> "tenancy.l4", "the tenancy", "tenancy-barrier")
+    , ("bpmn" </> "tenancy.l4", "receipts", "tenancy-fork")
+    , ("bpmn" </> "modals.l4", "the resolution", "modals-may-barrier")
+    , ("bpmn" </> "modals.l4", "no subletting", "modals-shant-barrier")
+    , ("bpmn" </> "modals.l4", "each approval is published", "modals-may-fork")
+    , ("bpmn" </> "modals.l4", "no subletting, severally", "modals-shant-fork")
+    , ("bpmn" </> "modals.l4", "quorum by ten", "modals-must-barrier-both-deadlines")
+    , ("bpmn" </> "modals.l4", "approve, or else", "modals-must-fork-join-deadline")
     ]
 
   regcfCorpus = "legal" </> "regcf" </> "regcf.l4"
@@ -1838,4 +2026,11 @@ spec = do
     , ("mixed", rorInRandSrc)
     , ("deferred", opaqueDeadlineSrc)
     , ("rule", shantOpaqueSrc)
+    , ("group", everyBarrierSrc)
+    , ("group", everyForkSrc)
+    , ("group", everyJoinDeadlineSrc)
+    , ("group", shantBarrierSrc)
+    , ("group", shantForkSrc)
+    , ("group", mayBarrierSrc)
+    , ("group", mayForkSrc)
     ]

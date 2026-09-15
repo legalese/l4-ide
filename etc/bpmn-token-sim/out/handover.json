@@ -1,0 +1,453 @@
+{
+  "fixture": "jl4/examples/bpmn/expected/handover.bpmn",
+  "importWarnings": [],
+  "elements": [
+    {
+      "id": "Start_0",
+      "type": "bpmn:StartEvent",
+      "name": null,
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Start_0__Task_0"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Task_0",
+      "type": "bpmn:Task",
+      "name": "MUST give vacant possession",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_0__Split_1"
+      ],
+      "incoming": [
+        "Flow_Start_0__Task_0"
+      ]
+    },
+    {
+      "id": "Split_1",
+      "type": "bpmn:ParallelGateway",
+      "name": "all of",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": "Diverging",
+      "outgoing": [
+        "Flow_Split_1__Task_2",
+        "Flow_Split_1__Task_4"
+      ],
+      "incoming": [
+        "Flow_Task_0__Split_1"
+      ]
+    },
+    {
+      "id": "Task_2",
+      "type": "bpmn:Task",
+      "name": "MAY inspect the premises",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_2__End_3"
+      ],
+      "incoming": [
+        "Flow_Split_1__Task_2"
+      ]
+    },
+    {
+      "id": "End_3",
+      "type": "bpmn:EndEvent",
+      "name": "Fulfilled",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_Task_2__End_3",
+        "Flow_Lapse_2__End_3",
+        "Flow_Task_4__End_3",
+        "Flow_Lapse_4__End_3",
+        "Flow_Task_6__End_3",
+        "Flow_Lapse_6__End_3",
+        "Flow_Task_7__End_3",
+        "Flow_Lapse_7__End_3"
+      ]
+    },
+    {
+      "id": "Task_4",
+      "type": "bpmn:Task",
+      "name": "MAY photograph the premises",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_4__End_3"
+      ],
+      "incoming": [
+        "Flow_Split_1__Task_4"
+      ]
+    },
+    {
+      "id": "Split_5",
+      "type": "bpmn:ExclusiveGateway",
+      "name": "one of",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": "Diverging",
+      "outgoing": [
+        "Flow_Split_5__Task_6",
+        "Flow_Split_5__Task_7"
+      ],
+      "incoming": [
+        "Flow_Boundary_0__Split_5"
+      ]
+    },
+    {
+      "id": "Task_6",
+      "type": "bpmn:Task",
+      "name": "MAY retain the deposit",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_6__End_3"
+      ],
+      "incoming": [
+        "Flow_Split_5__Task_6"
+      ]
+    },
+    {
+      "id": "Task_7",
+      "type": "bpmn:Task",
+      "name": "MAY apply to the tribunal",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_7__End_3"
+      ],
+      "incoming": [
+        "Flow_Split_5__Task_7"
+      ]
+    },
+    {
+      "id": "Lapse_7",
+      "type": "bpmn:BoundaryEvent",
+      "name": "after P30D",
+      "eventDefinitions": [
+        "bpmn:TimerEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_7",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Lapse_7__End_3"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Lapse_6",
+      "type": "bpmn:BoundaryEvent",
+      "name": "after P30D",
+      "eventDefinitions": [
+        "bpmn:TimerEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_6",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Lapse_6__End_3"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Lapse_4",
+      "type": "bpmn:BoundaryEvent",
+      "name": "after P7D",
+      "eventDefinitions": [
+        "bpmn:TimerEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_4",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Lapse_4__End_3"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Lapse_2",
+      "type": "bpmn:BoundaryEvent",
+      "name": "after P7D",
+      "eventDefinitions": [
+        "bpmn:TimerEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_2",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Lapse_2__End_3"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Boundary_0",
+      "type": "bpmn:BoundaryEvent",
+      "name": "timeout",
+      "eventDefinitions": [
+        "bpmn:ConditionalEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_0",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Boundary_0__Split_5"
+      ],
+      "incoming": []
+    }
+  ],
+  "unsupportedElements": [],
+  "pausePoints": [
+    "Task_0",
+    "Task_2",
+    "Task_4",
+    "Task_6",
+    "Task_7"
+  ],
+  "exclusiveGateways": [
+    {
+      "id": "Split_5",
+      "arms": [
+        "Flow_Split_5__Task_6",
+        "Flow_Split_5__Task_7"
+      ]
+    }
+  ],
+  "started": {
+    "tokensOn": [
+      "Task_0"
+    ],
+    "boundarySubscriptions": [
+      "Boundary_0"
+    ],
+    "triggers": [
+      "Start_0",
+      "Task_0",
+      "Boundary_0"
+    ],
+    "history": [
+      "Start_0",
+      "Flow_Start_0__Task_0",
+      "Task_0"
+    ],
+    "endEventsReached": [],
+    "log": [
+      "Process started 17j7asw",
+      "Start Event 17j7asw"
+    ],
+    "afterWaiting3s": {
+      "tokensOn": [
+        "Task_0"
+      ],
+      "triggers": [
+        "Start_0",
+        "Task_0",
+        "Boundary_0"
+      ],
+      "endEventsReached": []
+    }
+  },
+  "breach": {
+    "arm": "Flow_Split_5__Task_6",
+    "continuedFirst": [],
+    "fired": "Boundary_0",
+    "tokensOn": [
+      "Task_6"
+    ],
+    "boundarySubscriptions": [
+      "Lapse_6"
+    ],
+    "triggers": [
+      "Start_0",
+      "Task_6",
+      "Lapse_6"
+    ],
+    "history": [
+      "Start_0",
+      "Flow_Start_0__Task_0",
+      "Task_0",
+      "Boundary_0",
+      "Flow_Boundary_0__Split_5",
+      "Split_5",
+      "Flow_Split_5__Task_6",
+      "Task_6"
+    ],
+    "endEventsReached": [],
+    "log": [
+      "Process started 0yypcn0",
+      "Start Event 0yypcn0",
+      "MUST give vacant possession 0yypcn0",
+      "timeout 0yypcn0",
+      "one of 0yypcn0"
+    ]
+  },
+  "happy": [
+    {
+      "arm": "Flow_Split_5__Task_6",
+      "continued": [
+        "Task_0",
+        "Task_2",
+        "Task_4"
+      ],
+      "steps": [
+        {
+          "tokensOn": [
+            "Task_0"
+          ],
+          "continued": "Task_0"
+        },
+        {
+          "tokensOn": [
+            "Task_2",
+            "Task_4"
+          ],
+          "continued": "Task_2"
+        },
+        {
+          "tokensOn": [
+            "Task_4"
+          ],
+          "continued": "Task_4"
+        }
+      ],
+      "hitStepLimit": false,
+      "tokensOn": [],
+      "boundarySubscriptions": [],
+      "triggers": [
+        "Start_0"
+      ],
+      "history": [
+        "Start_0",
+        "Flow_Start_0__Task_0",
+        "Task_0",
+        "Flow_Task_0__Split_1",
+        "Split_1",
+        "Flow_Split_1__Task_2",
+        "Flow_Split_1__Task_4",
+        "Task_2",
+        "Task_4",
+        "Flow_Task_2__End_3",
+        "End_3",
+        "Flow_Task_4__End_3",
+        "End_3"
+      ],
+      "endEventsReached": [
+        "End_3",
+        "End_3"
+      ],
+      "log": [
+        "Process started 0ci55af",
+        "Start Event 0ci55af",
+        "MUST give vacant possession 0ci55af",
+        "all of 0ci55af",
+        "MAY inspect the premises 0ci55af",
+        "Fulfilled 0ci55af",
+        "MAY photograph the premises 0ci55af",
+        "Fulfilled 0ci55af",
+        "Process finished 0ci55af"
+      ]
+    },
+    {
+      "arm": "Flow_Split_5__Task_7",
+      "continued": [
+        "Task_0",
+        "Task_2",
+        "Task_4"
+      ],
+      "steps": [
+        {
+          "tokensOn": [
+            "Task_0"
+          ],
+          "continued": "Task_0"
+        },
+        {
+          "tokensOn": [
+            "Task_2",
+            "Task_4"
+          ],
+          "continued": "Task_2"
+        },
+        {
+          "tokensOn": [
+            "Task_4"
+          ],
+          "continued": "Task_4"
+        }
+      ],
+      "hitStepLimit": false,
+      "tokensOn": [],
+      "boundarySubscriptions": [],
+      "triggers": [
+        "Start_0"
+      ],
+      "history": [
+        "Start_0",
+        "Flow_Start_0__Task_0",
+        "Task_0",
+        "Flow_Task_0__Split_1",
+        "Split_1",
+        "Flow_Split_1__Task_2",
+        "Flow_Split_1__Task_4",
+        "Task_2",
+        "Task_4",
+        "Flow_Task_2__End_3",
+        "End_3",
+        "Flow_Task_4__End_3",
+        "End_3"
+      ],
+      "endEventsReached": [
+        "End_3",
+        "End_3"
+      ],
+      "log": [
+        "Process started 17ut1ar",
+        "Start Event 17ut1ar",
+        "MUST give vacant possession 17ut1ar",
+        "all of 17ut1ar",
+        "MAY inspect the premises 17ut1ar",
+        "Fulfilled 17ut1ar",
+        "MAY photograph the premises 17ut1ar",
+        "Fulfilled 17ut1ar",
+        "Process finished 17ut1ar"
+      ]
+    }
+  ],
+  "pageErrors": []
+}

@@ -14,6 +14,8 @@ module L4.EvaluateLazy
 , setTemporalContext
 , withEvalClauses
 , execEvalModuleWithEnv
+, execEvalModuleWithDeonticLog
+, captureDeonticSteps
 , execEvalModuleWithJSON
 , execEvalExprInContextOfModule
 , prettyEvalException
@@ -46,6 +48,7 @@ import qualified Base.DList as DList
 import qualified Base.Map as Map
 import qualified Base.Text as Text
 import L4.EvaluateLazy.Machine
+import L4.EvaluateLazy.DeonticStep (DeonticLog (..), DeonticStep, newDeonticLog)
 import L4.EvaluateLazy.Trace
 import L4.Evaluate.Ledger
   ( EventRoute (..)
@@ -177,6 +180,22 @@ captureTrace m = do
     combine Nothing   _   = pure ()
     combine (Just tr) tas = liftIO (modifyIORef' tr (<> tas))
 
+-- | LTS-VISUALISER §4.3 (P2b): run an action with the deontic step log ON,
+-- and return the steps it logged, oldest-first.
+--
+-- Modelled on 'captureTrace', with one deliberate difference: a nested
+-- capture gets a FRESH log and does not merge into the enclosing one. The
+-- log carries per-site activation counters and an @EVERY@ cast register
+-- beside the steps, and two captures sharing those would number the same
+-- site twice. Nothing nests captures today; if something must, it should
+-- capture once at the outermost directive.
+captureDeonticSteps :: Eval a -> Eval (a, [DeonticStep])
+captureDeonticSteps m = do
+  l <- liftIO newDeonticLog
+  r <- local (\ s -> s { deonticLog = Just l }) m
+  steps <- liftIO (readIORef l.dlSteps)
+  pure (r, toList steps)
+
 runConfig :: Config -> Eval WHNF
 runConfig = \ case
   ForwardMachine env expr -> do
@@ -203,7 +222,15 @@ runConfig = \ case
 -- | Evaluate an EVAL directive. For this, we evaluate to normal form,
 -- not just WHNF.
 nfDirective :: EvalDirective -> Eval EvalDirectiveResult
-nfDirective (MkEvalDirective r traced assertKind expr env) = withFreshLedger $ do
+nfDirective d = fst <$> nfDirectiveWith False d
+
+-- | 'nfDirective', optionally with the deontic step log captured for the
+-- directive (P2b). The log is switched on around the evaluation only — the
+-- normal-form pass runs inside it too, because forcing the residual can run
+-- nothing regulative — and it is off again before the ledger is snapshotted.
+-- With the flag off this IS 'nfDirective': the same code path, an empty list.
+nfDirectiveWith :: Bool -> EvalDirective -> Eval (EvalDirectiveResult, [DeonticStep])
+nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withFreshLedger $ do
   -- T6: open a fresh, directive-local context-read span. (Exceptional
   -- unwinding closes spans as it pops UpdateThunk frames — see
   -- 'unwindFrame' — but a successful directive legitimately leaves its own
@@ -216,7 +243,7 @@ nfDirective (MkEvalDirective r traced assertKind expr env) = withFreshLedger $ d
   -- during THIS directive can leak into subsequent directives, whatever the
   -- unwind path.
   ambientCtx <- getTemporalContext
-  (v, mt) <-
+  ((v, mt), steps) <- captureSteps $
     if traced
       then second Just <$> do
         captureTrace $ tryEval $ do
@@ -284,7 +311,12 @@ nfDirective (MkEvalDirective r traced assertKind expr env) = withFreshLedger $ d
           Left exc -> Errored exc
           Right _  -> FailsBecause "expected a refusal, but the expression produced a value"
     quoted t = "\"" <> t <> "\""
-  pure (MkEvalDirectiveResult r v' finalTrace directiveLedger)
+  pure (MkEvalDirectiveResult r v' finalTrace directiveLedger, steps)
+  where
+    captureSteps :: Eval a -> Eval (a, [DeonticStep])
+    captureSteps
+      | withSteps = captureDeonticSteps
+      | otherwise = fmap (, [])
 
 -- | 'postprocessTrace', guarded so it can never escape an exception: if trace
 -- post-processing throws (e.g. a malformed action sequence produced by an
@@ -616,7 +648,22 @@ evalAndNF d r = do
 -- the results of the (L)EVAL directives in this module.
 --
 execEvalModuleWithEnv :: EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
-execEvalModuleWithEnv evalConfig entityInfo env m0@(MkModule _ moduleUri _) = do
+execEvalModuleWithEnv = execEvalModuleWith nfDirective
+
+-- | LTS-VISUALISER §4.3 (P2b): 'execEvalModuleWithEnv' with the deontic step
+-- log switched on for every directive, returning each directive's steps
+-- beside its result. The result half is exactly what 'execEvalModuleWithEnv'
+-- returns — the log changes nothing the machine computes — and the steps
+-- are oldest-first. A @#TRACE@ is where the steps come from; a plain
+-- @#EVAL@ of a non-regulative expression logs none.
+--
+-- This is the library seam P2c (the marking and the enabled set) and P2a′
+-- (the list) build on; it is deliberately not a CLI.
+execEvalModuleWithDeonticLog :: EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [(EvalDirectiveResult, [DeonticStep])])
+execEvalModuleWithDeonticLog = execEvalModuleWith (nfDirectiveWith True)
+
+execEvalModuleWith :: (EvalDirective -> Eval r) -> EvalConfig -> EntityInfo -> Environment -> Module Resolved -> IO (Environment, [r])
+execEvalModuleWith runDirective evalConfig entityInfo env m0@(MkModule _ moduleUri _) = do
   -- Discharge is a property of EVALUATION, not of the checked module: the
   -- checker's job is to say the program is well formed, and this pass says what
   -- an implicit input means when it is run. Doing it here rather than in
@@ -624,7 +671,7 @@ execEvalModuleWithEnv evalConfig entityInfo env m0@(MkModule _ moduleUri _) = do
   -- and the backends lower exactly the module the author wrote.
   let m = dischargeModule m0
   st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
-  r <- try (runEval st0 (evalModuleAndDirectives env m))
+  r <- try (runEval st0 (evalModuleAndDirectivesWith runDirective env m))
   case r of
     Left exc -> do
       hPutStrLn stderr $ "Eval failure in module: " <> show moduleUri
@@ -646,7 +693,9 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   reofferedEvents <- newIORef mempty
   envLedger    <- newIORef emptyStore
   currentParty <- newIORef Nothing
-  pure MkEvalState {moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo, evalTime = actualTime, temporalContext, ctxReads, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, reofferedEvents}
+  -- P2b: off by default (R5); 'captureDeonticSteps' installs one per directive
+  let deonticLog = Nothing
+  pure MkEvalState {moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo, evalTime = actualTime, temporalContext, ctxReads, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, reofferedEvents, deonticLog}
 
 -- | Build a minimal 'EvalState' and run an 'Eval' action against it, catching
 -- evaluation exceptions at the boundary.
@@ -700,8 +749,8 @@ moduleEnvForLedger env m = do
 -- TODO: This currently allocates the initial environment once per module.
 -- This isn't a big deal, but can we somehow do this only once per program,
 -- for example by passing this in from the outside?
-evalModuleAndDirectives :: Environment -> Module Resolved -> Eval (Environment, [EvalDirectiveResult])
-evalModuleAndDirectives env m = do
+evalModuleAndDirectivesWith :: (EvalDirective -> Eval r) -> Environment -> Module Resolved -> Eval (Environment, [r])
+evalModuleAndDirectivesWith runDirective env m = do
   ienv <- initialEnvironment
   let baseEnv = env <> ienv
   -- First pass: get env' (the module's exported bindings) and the directive
@@ -714,7 +763,7 @@ evalModuleAndDirectives env m = do
   -- defs against fresh References, so an effectful read (RECALL) inside a CAF is
   -- re-run against that directive's own (isolated) ledger instead of returning a
   -- value cached from whichever directive forced it first. See 'forEachDirectiveFreshHeap'.
-  results <- forEachDirectiveFreshHeap (\_ -> pure ()) baseEnv m (length directives0)
+  results <- forEachDirectiveFreshHeap (\_ -> pure ()) runDirective baseEnv m (length directives0)
   -- NOTE: We are only returning the new definitions of this module, not any imports.
   -- Depending on future export semantics, this may have to change.
   pure (env', results)
@@ -742,16 +791,17 @@ evalModuleAndDirectives env m = do
 -- directive is evaluated.
 forEachDirectiveFreshHeap
   :: (Environment -> Eval ())     -- ^ per-pass preparation over the fresh combined env (e.g. JSON writes)
+  -> (EvalDirective -> Eval r)    -- ^ how to run one directive ('nfDirective', or its step-logging form)
   -> Environment                  -- ^ base env (imports <> initial environment), allocated once
   -> Module Resolved
   -> Int                          -- ^ number of directives (from the first pass)
-  -> Eval [EvalDirectiveResult]
-forEachDirectiveFreshHeap prepare baseEnv m n =
+  -> Eval [r]
+forEachDirectiveFreshHeap prepare runDirective baseEnv m n =
   for [0 .. n - 1] $ \i -> do
     (moduleEnv, dirs) <- evalModule baseEnv m  -- fresh preAllocate => fresh IORefs => Unevaluated CAFs
     prepare (moduleEnv <> baseEnv)
     case drop i dirs of
-      (d : _) -> nfDirective d
+      (d : _) -> runDirective d
       []      -> error "forEachDirectiveFreshHeap: directive index out of range (evalModule produced fewer directives than the first pass)"
 
 -- | Evaluate module with JSON input bindings for batch processing.
@@ -764,11 +814,11 @@ evalModuleAndDirectivesWithJSON json env m = do
   let baseEnv = env <> ienv
   -- First pass: get moduleEnv (exports) and the directive count for the return value.
   (moduleEnv, dirs0) <- evalModule baseEnv m
-  -- Same CAF-isolation rebuild as 'evalModuleAndDirectives', but the per-pass
+  -- Same CAF-isolation rebuild as 'evalModuleAndDirectivesWith', but the per-pass
   -- 'prepare' hook re-applies the JSON ASSUME bindings to EACH fresh heap's
   -- combined environment — otherwise the freshly re-thunked References would lack
   -- the JSON-provided values.
-  results <- forEachDirectiveFreshHeap (writeJSONToReferences json) baseEnv m (length dirs0)
+  results <- forEachDirectiveFreshHeap (writeJSONToReferences json) nfDirective baseEnv m (length dirs0)
   pure (moduleEnv, results)
 
 execEvalModuleWithJSON :: EvalConfig -> EntityInfo -> Aeson.Value -> Module Resolved -> IO (Environment, [EvalDirectiveResult])

@@ -347,7 +347,9 @@ This generates a graph showing:
 - **Transitions**: Actions that move between states
 - **Deadlines**: When actions must occur
 
-The graph makes complex contracts easier to understand.
+The graph makes complex contracts easier to understand. In the editor, the same map is one click
+away: **Show state graph** appears above every regulative rule. What the map shows, and what it
+leaves out, is on the [state graph reference page](../../reference/regulative/STATE-GRAPH.md).
 
 ---
 
