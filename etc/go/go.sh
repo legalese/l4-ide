@@ -38,13 +38,15 @@
 #             HG1 is the only waivable gate. HG2 guards anything outward-facing
 #             and opens on a signature or not at all; --waive HG2 exits 2.
 #
-#             --provisional HG1=REASON runs the stages behind HG1 while the
-#             review is still PENDING, so P6's tests and P8's findings are
-#             available to the reviewer instead of waiting on them. Every
-#             artifact is stamped provisional, none is servable, the verdict is
-#             PROVISIONAL rather than COMPLETE, and the gate stays open. It is
-#             not a weaker waiver: a waiver says the review did not apply.
-#             --provisional HG2 exits 2, like --waive HG2.
+#             HG1 DEFAULTS TO A PROVISIONAL GRANT: with no review on record the
+#             run proceeds rather than stopping, because the stages behind HG1
+#             produce the evidence a review reads. Every artifact is stamped
+#             provisional, none is servable, and the verdict is PROVISIONAL
+#             rather than COMPLETE. --require-review restores the old refusal
+#             (exit 3, VERDICT GATE) for anyone who wants it, CI included.
+#             --provisional HG1=REASON records your own reason instead of the
+#             canned one. It is not a weaker waiver: a waiver says the review
+#             did not apply. --provisional HG2 exits 2, like --waive HG2.
 #     doctor  [--subject ID] [--encoding primary|ID|undeclared]
 #             the front-door forecast: which declared stages will run whole,
 #             which will SKIP and why, each with its remedy. Runs no stage.
@@ -254,6 +256,7 @@ KEEP=5
 WANT_GATES=0
 declare -a WAIVERS=()
 declare -a PROVISIONALS=()
+REQUIRE_REVIEW=0
 NEW_ID=""
 NEW_DISPLAY_NAME=""
 NEW_CITATION=""
@@ -314,6 +317,10 @@ while [[ $# -gt 0 ]]; do
       need_val "$@"
       PROVISIONALS+=("$2")
       shift 2
+      ;;
+    --require-review)
+      REQUIRE_REVIEW=1
+      shift
       ;;
     --phase)
       need_val "$@"
@@ -1645,6 +1652,39 @@ EOF
             --signer "$(cat "$RUN/$gate.signer" 2>/dev/null || echo "")" \
             --payload-digest "$(node "$LIB/digest.mjs" "$RUN/$gate.payload.txt" 2>/dev/null || echo "")" \
             --signature-file "$RUN/$gate.payload.txt.sig"
+        elif [[ "$gate" == "HG1" && "$REQUIRE_REVIEW" -eq 0 ]]; then
+          # HG1 FALLS BACK TO A PROVISIONAL GRANT RATHER THAN STOPPING THE RUN.
+          #
+          # The stages behind HG1 produce the EVIDENCE the review reads — P6's
+          # divergence witnesses, P8's unsat and dead-branch findings, the
+          # projections, the report. Refusing to compute them until somebody has
+          # reviewed the encoding had the order backwards: it withheld the
+          # reviewer's material until after the review.
+          #
+          # Nothing about the claims is relaxed. The artifacts are stamped
+          # `produced_under.state: provisional`, store.mjs refuses to serve any
+          # of them, and the run verdict is PROVISIONAL and never COMPLETE. What
+          # changes is only that the pipeline stops DEMANDING the review before
+          # it will do the work, which is safe precisely because nothing behind
+          # HG1 is outward-facing — P10 is HG2's, and the MCP leg has its own
+          # loopback fence.
+          #
+          # After a review that tweaks the encoding, re-run: the corpus digest
+          # moves, this grant goes stale, and a fresh one is recorded over what
+          # the reviewer actually approved. After a review that signs an unmoved
+          # corpus, re-run and the same bytes are re-admitted under the
+          # signature — `satisfied` outranks this everywhere.
+          #
+          # HG2 IS DELIBERATELY NOT IN THIS BRANCH. Its subject is an
+          # outward-facing act, so there is no evidence-gathering to do ahead of
+          # it and nothing to be provisional about.
+          node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gate" --state provisional \
+            --subject "$SUBJECT" --run-id "$RUN_ID" --covers-from "$RUN/.corpus-members.json" \
+            --corpus-digest "$corpus_digest" \
+            --reason "AUTOMATIC: no HG1 review is on record over this corpus. The stages behind the gate ran to produce the evidence such a review would read; nothing they produced is servable, and the run verdict is PROVISIONAL rather than COMPLETE. Pass --require-review to refuse instead."
+          echo "go: HG1 has no review on record — proceeding PROVISIONALLY." >&2
+          echo "go:   Every artifact from here is stamped provisional and none is servable." >&2
+          echo "go:   The verdict will be PROVISIONAL, not COMPLETE. --require-review refuses instead." >&2
         else
           node "$LIB/receipt.mjs" gate --run "$RUN" --gate "$gate" --state refused \
             --subject "$SUBJECT" --run-id "$RUN_ID" --covers-from "$RUN/.corpus-members.json" \

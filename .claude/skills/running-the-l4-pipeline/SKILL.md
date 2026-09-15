@@ -168,14 +168,29 @@ etc/go/go.sh run --subject regcf --encoding primary \
   --waive HG1="this replays the already-reviewed committed encoding; no new encoding exists for a domain expert to review"
 ```
 
-If the review is not waived but simply **has not happened yet**, that is a third thing and it has its own state:
+**Most of the time you need none of this.** With no review on record, HG1 grants itself
+**provisionally** and the run proceeds to the end — because the stages behind HG1 produce the
+evidence a review reads, and refusing to compute them until somebody had reviewed was backwards.
+You will see:
 
-```bash
-etc/go/go.sh run --subject regcf --encoding primary \
-  --provisional HG1="domain-expert review is scheduled; this run exists to put P6's divergence witnesses and P8's findings in front of the reviewer"
+```
+go: HG1 has no review on record — proceeding PROVISIONALLY.
+...
+go: VERDICT: PROVISIONAL
 ```
 
-The stages behind HG1 run, every artifact they produce is stamped `provisional` and none of it is servable, and the run verdict is `PROVISIONAL` rather than `COMPLETE`. **This is the briefing pack for the review, not a way around it** — running P6 and P8 first is what gives the reviewer something to read. Sign HG1 over an unmoved corpus and re-run to promote: the stages replay, the same bytes are re-admitted under the signature, and the verdict returns to `COMPLETE`.
+Every artifact is stamped `provisional`, none is servable, and the verdict is never `COMPLETE`.
+Nothing behind HG1 is outward-facing — P10 is HG2's and the MCP leg has its own loopback fence —
+so a provisional run publishes nothing.
+
+- **`--require-review`** restores the old behaviour: refuse at `p6-tests`, exit 3, `VERDICT: GATE`.
+  That is what CI wants when a run must not proceed unreviewed.
+- **`--provisional HG1="reason"`** records your reason instead of the canned `AUTOMATIC:` one.
+  Worth doing when the review is scheduled, or when you know something the canned text does not.
+- **After a review, run it again.** If the review tweaked the encoding, the corpus digest moves,
+  the grant goes stale, and the fresh run covers what the reviewer actually approved. If the
+  review signed an unmoved corpus, re-running promotes: the stages replay, the same bytes are
+  re-admitted under the signature, and the verdict returns to `COMPLETE`.
 
 **Key idioms:**
 

@@ -100,6 +100,8 @@ That exclusion is right for the receipts list and was **wrong for the corpus sec
 
 Added 2026-09-15 (SPEC.md §7.3.2). A third state beside `satisfied` and `waived`, for the case the other two could not say: **the review has not happened yet.**
 
+**It is the default.** A run with no review on record grants HG1 provisionally — with a reason marked `AUTOMATIC:`, so a reader can tell it from a human's — and proceeds to the end rather than stopping at `p6-tests`. `--require-review` restores the refusal. The automatic grant is HG1-only: HG2 is excluded by the branch condition, because its subject is an outward-facing act and there is no evidence to gather ahead of it.
+
 The invocation is in SKILL.md step 5, beside the waiver it is not — written down once, there, so there is only one copy to keep true.
 
 §7.3's sentence is "after P5, **before P6's tests are treated as specifications**". The gate is about what the downstream artifacts are permitted to _claim_, not about whether the machine may compute them — and running P6 and P8 before the review is what puts the divergence witnesses and the `unsat` / `dead-branch` findings **in front of** the reviewer. A provisional run is the briefing pack for HG1. Withholding the evidence until after the review had the order backwards.

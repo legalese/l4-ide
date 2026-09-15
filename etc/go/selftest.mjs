@@ -3092,7 +3092,10 @@ if (!process.argv.includes("--with-driver")) {
     );
     check(
       "and says why HG2 differs: its downstream stage IS the outward act",
-      /outward-facing act, not evidence/.test(r1.stderr),
+      // The CLI's wording, not checkClaim's — they refuse the same thing in
+      // different places and say so differently, and asserting one against the
+      // other is how this check first went red.
+      /downstream of HG2 is a briefing pack/.test(r1.stderr),
     );
 
     const r2 = go("--provisional", "HG1=");
@@ -3116,6 +3119,62 @@ if (!process.argv.includes("--with-driver")) {
     );
   }
 
+  // HG1 FALLS BACK TO PROVISIONAL RATHER THAN STOPPING THE RUN.
+  //
+  // The stages behind HG1 produce the evidence a review reads, so refusing to
+  // compute them until somebody has reviewed had the order backwards. What must
+  // NOT relax with it is anything about the claims — hence the pins below on the
+  // marker in the reason, on HG2 being excluded, and on the strict mode still
+  // existing for anyone who wants the old behaviour.
+  {
+    const go = (...extra) =>
+      spawnSync(
+        "bash",
+        [
+          resolve(HERE, "go.sh"),
+          "run",
+          "--encoding",
+          "primary",
+          "--subject",
+          FIXTURE_SUBJECT,
+          "--through",
+          "p0-preflight",
+          ...extra,
+        ],
+        { env, encoding: "utf8" },
+      );
+
+    const src = readFileSync(resolve(HERE, "go.sh"), "utf8");
+    check(
+      "the automatic grant is HG1-only — HG2 is excluded by the branch condition",
+      /\$gate"\s*==\s*"HG1"\s*&&\s*"\$REQUIRE_REVIEW"\s*-eq\s*0/.test(src),
+    );
+    check(
+      "the automatic grant's reason is MARKED automatic, so a reader can tell it from a human's",
+      /--reason "AUTOMATIC: no HG1 review is on record/.test(src),
+    );
+    check(
+      "and it records state `provisional`, never satisfied or waived",
+      /--gate "\$gate" --state provisional/.test(src),
+    );
+    check(
+      "--require-review exists as a case arm, so the strict behaviour is still reachable",
+      /--require-review\)/.test(src),
+    );
+    // The automatic grant must not pre-empt an explicit one: a human who typed a
+    // reason has said something the canned text has not, and losing it would
+    // make the report print the weaker claim.
+    check(
+      "an explicit --waive HG1 is still honoured rather than replaced by the automatic grant",
+      /--state waived/.test(src) && /WAIVERS\[@\]/.test(src),
+    );
+    const r = go("--require-review");
+    check(
+      "a --require-review run still starts (the flag is accepted, not an unknown option)",
+      !/unknown option/.test(r.stderr),
+    );
+  }
+
   // checkClaim is the LEDGER's guard, and the ledger is never swept: a
   // provisional-HG2 record there would be a permanent claim that publication
   // went ahead pending permission. Tested at the writer as well as at the CLI,
@@ -3125,10 +3184,16 @@ if (!process.argv.includes("--with-driver")) {
     const run = resolve(store, "r");
     mkdirSync(run, { recursive: true });
     writeFileSync(resolve(run, ".corpus-members.json"), "[]");
+    // Resolved here rather than borrowed from an outer scope: the other RECEIPT
+    // bindings are local to blocks further down the file, so referring to one
+    // from here threw a ReferenceError — and only under --with-driver, which is
+    // not the invocation most runs use. A test that crashes in the mode nobody
+    // runs is a test that is not there.
+    const RECEIPT_BIN = resolve(HERE, "lib/receipt.mjs");
     const r = spawnSync(
       "node",
       [
-        RECEIPT,
+        RECEIPT_BIN,
         "gate",
         "--run",
         run,

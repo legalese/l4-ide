@@ -615,8 +615,25 @@ before the review is what puts the divergence witnesses and the `unsat`/`dead-br
 **in front of** the reviewer. **A provisional run is the briefing pack for HG1, not a way
 around it.** Withholding the evidence until after the review had the order backwards.
 
-`--provisional HG1="reason"` records a gate row with `state: provisional`, a required reason,
-and the corpus digest — bound to content exactly as a waiver is (§6.2). Then:
+**It is the DEFAULT, not an opt-in** (amended 2026-09-15, on Meng's instruction: "I want HG1 to
+be okay with not being human-reviewed; the subsequent phases can still run"). A run with no
+review on record records a provisional grant automatically, with a reason marked `AUTOMATIC:`
+so a reader can tell it from a human's, and proceeds. `--require-review` restores the refusal
+(exit 3, `VERDICT: GATE`) for CI or for anyone who wants a run to stop; `--provisional
+HG1="reason"` records your own reason in place of the canned one.
+
+This is safe precisely because **nothing behind HG1 is outward-facing** — P10 is HG2's, and the
+MCP leg has its own loopback fence — so the stages produce local evidence and publish nothing.
+The automatic grant is HG1-only; HG2 is excluded by the branch condition, because its subject is
+an outward-facing act and there is no evidence to gather ahead of it.
+
+**Re-running after a review is the ordinary path.** A review that tweaks the encoding moves the
+corpus digest, the grant goes stale, and a fresh run records one over what the reviewer actually
+approved. A review that signs an unmoved corpus promotes: the stages replay and the same bytes
+are re-admitted under the signature.
+
+Whichever way it is granted, the row carries `state: provisional`, a reason, and the corpus
+digest — bound to content exactly as a waiver is (§6.2). Then:
 
 - the stages behind HG1 **run**, and every receipt they write carries
   `produced_under.state: provisional`, derived from the journal by `receipt.mjs` and assertable
