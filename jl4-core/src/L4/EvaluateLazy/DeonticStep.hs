@@ -44,6 +44,7 @@ module L4.EvaluateLazy.DeonticStep
   , NormKey (..)
   , MemberOf (..)
   , JoinKind (..)
+  , isBarrier
   , EventKey (..)
   , Scrutiny (..)
   , StepOutcome (..)
@@ -62,7 +63,7 @@ import Base
 import qualified Base.Map as Map
 import L4.Evaluate.ValueLazy (RBinOp (..))
 import L4.Parser.SrcSpan (SrcRange)
-import L4.Syntax (DeonticModal (..))
+import L4.Syntax (DeonticModal (..), Resolved, Threshold (..))
 
 -- | One scrutiny of one event by one obligation, on the contract clock.
 --
@@ -147,12 +148,26 @@ data MemberOf = MkMemberOf
 
 -- | The three families an @EVERY@ can assemble (EVERY-EACH-QUANTIFIER-SPEC
 -- §2.4, §3.1–§3.3).
+--
+-- A 'Barrier' carries the 'Threshold' its @ONCE@ line waits for (P2c, spec
+-- §4.9: the marking is written against 'Threshold', not against the phase-1
+-- barrier alone), so a consumer reading the cast register back out of the
+-- steps can say what "released" would take without re-reading the source.
 data JoinKind
-  = Barrier       -- ^ @ONCE ALL HAVE@: level-triggered, the continuation fires once
+  = Barrier !(Threshold Resolved)
+    -- ^ @ONCE …@: level-triggered, the continuation fires once, when the
+    -- threshold is met
   | Fork          -- ^ @UPON EACH@: edge-triggered, each member carries its own copy
   | Distributive  -- ^ no join line and no continuation: one obligation per member
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
+
+-- | Is this the barrier family? The 'Threshold' is what it waits for.
+isBarrier :: JoinKind -> Bool
+isBarrier = \ case
+  Barrier{}    -> True
+  Fork         -> False
+  Distributive -> False
 
 -- | What identifies the event a step looked at. The stamp is always known
 -- (it is what the machine compared against the deadline); party and action

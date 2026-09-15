@@ -31,6 +31,11 @@ module L4.EvaluateLazy.Machine
 -- the write; the capture lives in 'L4.EvaluateLazy'.
 , tellDeonticStep
 , partyKeyWHNF
+-- * What the marking (LTS-VISUALISER §4.2a, P2c) needs to read a residual:
+-- the barrier sentinels' names and the FULFILLED view.
+, joinCheckpointName
+, joinFailpointName
+, pattern ValFulfilled
 , currentLedgerEval
 , readEvalRef
 , Config (..)
@@ -370,7 +375,7 @@ logStep l step = liftIO (modifyIORef' l.dlSteps (`DList.snoc` step))
 tellRoutedStep :: NormKey -> DS.Branch -> DeonticStep -> Eval ()
 tellRoutedStep norm branch step = whenDeonticLog \ l -> do
   progress <- case (norm.nkMember, branch) of
-    (Just m, ToHence) | m.moJoin == Barrier -> do
+    (Just m, ToHence) | isBarrier m.moJoin -> do
       n <- liftIO (bumpCounter l.dlJoinDone m.moJoinSite)
       pure (Just (MemberSatisfied n m.moTotal))
     (Just m, b) | m.moJoin == Fork, b /= ToBreach ->
@@ -2368,7 +2373,7 @@ assembleQuantified ctx members =
   case ctx.deonton.join of
     Nothing                      -> registerCast ctx Distributive members >> runQuantifiedFold ctx members memberDue
     Just JoinUpon{}              -> registerCast ctx Fork members >> runQuantifiedFold ctx members memberDue
-    Just (JoinOnce _ AllHave{} _)
+    Just (JoinOnce _ threshold@AllHave{} _)
       -- A barrier's HENCE and LEST belong to the JOIN, not to a member (spec
       -- §3.1 writes them @shared_h@ / @shared_l@), so there is no member for
       -- the variable to denote. The type checker binds it throughout the rule
@@ -2377,7 +2382,7 @@ assembleQuantified ctx members =
       -- crashed on.
       | any (mentionsVar ctx.var) (catMaybes [ctx.deonton.hence, ctx.deonton.lest])
       -> userException (UserError (sharedContinuationRefusal ctx.var))
-      | otherwise -> registerCast ctx Barrier members >> startBarrier ctx members memberDue
+      | otherwise -> registerCast ctx (Barrier threshold) members >> startBarrier ctx members memberDue
   where
     -- The act's own WITHIN bounds each performance; the join's bounds the
     -- whole (R-T2). When only the join carries one it has to bound the acts
@@ -2470,6 +2475,14 @@ barrierMember ctx cp cpRef mfail mdue (mref, mval) =
       $ maybe id (\ (fp, fpRef) -> Map.insert (getUnique fp) fpRef) mfail
       $ Map.insert (getUnique ctx.var) mref ctx.env
 
+-- | The names of the barrier's two sentinels, as a member's residual prints
+-- them (@HENCE `the join` LEST `the join fails`@). They are minted fresh per
+-- barrier ('startBarrier'), so the NAME is the only thing a reader of a
+-- residual can recognise them by; "L4.Lts.Marking" does exactly that.
+joinCheckpointName, joinFailpointName :: Text
+joinCheckpointName = "the join"
+joinFailpointName  = "the join fails"
+
 -- | Arm the barrier. The checkpoint is a FRESH constructor, minted here and
 -- bound into each member's environment: applied to the @[time, events]@ that
 -- every continuation receives, it yields @ValConstructor cp [time, events]@,
@@ -2482,10 +2495,10 @@ startBarrier ctx members mdue = do
   -- Both names are user-visible: a member that has not yet acted when the
   -- event stream runs out is printed as a residual obligation carrying these
   -- sentinels in its HENCE and LEST, so they have to read as English there.
-  cp <- def (MkName emptyAnno (NormalName "the join"))
+  cp <- def (MkName emptyAnno (NormalName joinCheckpointName))
   cpRef <- allocateValue (ValUnappliedConstructor cp)
   mfail <- for ctx.deonton.lest \ _ -> do
-    fp <- def (MkName emptyAnno (NormalName "the join fails"))
+    fp <- def (MkName emptyAnno (NormalName joinFailpointName))
     fpRef <- allocateValue (ValUnappliedConstructor fp)
     pure (fp, fpRef)
   case map (barrierMember ctx cp cpRef mfail mdue) members of

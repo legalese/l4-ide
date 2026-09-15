@@ -384,6 +384,63 @@ exporters, and reads _"the service serves data, the browser draws."_ P2 obeys it
 step log, the marking, the enabled set **and the rank/lane assignment** (§4.7) are Haskell in
 `jl4-core`, served as data; the animation is TypeScript in the browser.
 
+**LANDED 2026-09-15 (P2c), the replay form as built, on `lts/p2b-step-log` (not merged).**
+`jl4-core/src/L4/Lts/WhatIf.hs`. It contains no modal routing: grep it for `DMustNot`, `DMay`,
+`ToLest` — none. What it contains:
+
+- **A candidate is** (`candidatesOf`, `WhatIf.hs:209`) one of three things read off the
+  position's residual, which is data the evaluator already computed (endpoint 18): for every
+  obligation in force, the act that is its own `(party, action)` shape, stamped at the position's
+  clock — the party as the machine forced it (`reifyNF`) or its expression, the action pattern
+  instantiated (`patternExpr`, `:370`: `PatApp`/`PatLit`/`PatExpr`, with an `EXACTLY e` read
+  through the residual's heap by `reifyExpr`, `:386`, so `Sign (EXACTLY t)` under an `EVERY`
+  names the member); for every distinct live deadline, a tick to just past it (endpoint 24) — a
+  `WAIT UNTIL`, the machine's own no-party event, stamped by `tickPast` (`:267`: one unit past, or
+  half-way to the next live deadline when nearer, because the machine expires on `stamp >
+deadline` and a tick AT the deadline reveals nothing); and a listed refusal, when the shape
+  cannot be instantiated — an action pattern that BINDS (`payment price`: "the action binds
+  `price`, which the what-if cannot choose"), a `WITHIN` that was never evaluated and is not a
+  literal (`deadlineOf`, `:254`). Refusals are listed, not dropped: an enabled set that omitted
+  them would say "nothing else can happen".
+- **The replay** (`replay`, `:351`) rewrites the checked module so that every directive is dropped
+  except the `#TRACE` in question, which gets the hypothetical appended, and runs
+  `execEvalModuleWithDeonticLog` on it. The verdict (`classify`, `:303`) reads only the machine's
+  own terminals: `ValFulfilled` → `Discharging`, `ValBreached` → `Breaching blame`, anything else
+  → `Advancing marking` with the marking from the replay's own steps. An error or a refusal is
+  `Untried` with the text. The steps an outcome carries are those past the longest prefix the
+  replay's log shares with the position's (`afterCommonPrefix`, `:300`): a `Waiting` in the
+  position becomes a match in the replay, so a fixed-length drop would be wrong, and was.
+- **Cost per candidate** is one full replay: the module's top-level heap rebuilt, every prior
+  event re-scrutinised, then the hypothetical. For a trace of _n_ events and _k_ live obligations
+  with _d_ distinct deadlines, _k + d_ evaluations of _n + 1_ events each; nothing cached across
+  candidates. **Measured**, warm, wall-clock around the call with verdict and steps forced:
+  `ok/every/run-barrier.l4` trace 5 (one event, three-tenant barrier): position 45 µs; the two
+  member acts 184 µs and 313 µs; the tick 83 µs. `ok/contracts.l4` trace 1 (three events):
+  position 38 µs; the tick 93 µs. The first `position` call on a fresh module costs ~40 ms, which
+  is the type-check being forced, not the replay. See R11.
+- **The partition** is `discharging`/`breaching`/`advancing`/`untried` over an `EnabledSet`
+  (`enabledSet`, `:320`), i.e. endpoints 19 and 20 are a classification of 22's result and not a
+  projection of their own.
+
+**Measured** (`jl4-core/test/LtsWhatIfSpec.hs`, 12 examples): a `MUST` at the start — the act
+advances into the `HENCE`, the tick past 10 breaches; one event in — the clock is the last stamp,
+Bob's act discharges, the tick past 3 + 5 breaches. A `SHANT` with no `LEST` — the act
+**breaches** and the tick **discharges**, which is the polarity the machine routes and this module
+never states. A `MAY` with a `HENCE` — the act advances, the tick discharges (`LEST` defaulting to
+`FULFILLED`). `contracts.l4`'s `aContract` one event in — `payment price` is listed `Untried`
+naming the binder; the tick past 2 + 3 advances to the `LEST`'s `EXACTLY payment OF fine`. A
+barrier of three with nobody acted — each member's act is **`Advancing`** with the `Awaiting` at
+1 of 3, the tick breaches; with two acted — the last member's act is **`Discharging`** (the
+`HENCE` is `FULFILLED`), the tick breaches. A fork — each member's act advances its **own**
+continuation and leaves the others at `WITHIN 7`. Corpus goldens: `cabal test jl4-test`, see the
+commit message — no `.l4` file and no printer changed, so none moves.
+
+**Not built.** No CLI verb, no service endpoint, no `doc/` page: nothing a user can invoke
+changed, and P2a′ (the list) is the deliverable that will need the page. A `PatCons` action is
+not instantiated. A party the machine never forced and whose expression names a local it cannot
+read fails at replay time and surfaces as `Untried` with the evaluator's message — loud, but late.
+`what_if_sequence` (endpoint 23) is `replay` with a longer list and no separate entry.
+
 ---
 
 ## 3. The mapping
@@ -601,6 +658,74 @@ Four facts make this sound, each checked against `Machine.hs`:
 `normOf` is where B1 bites: it needs `(rangeOf act, activation ordinal)` to place the norm on the
 board (§3.4). Without B1, `markingOf` still produces a perfectly good **list** — which is §1.1a's
 rival, and is why P2a′ can be built before any precondition is closed.
+
+**LANDED 2026-09-15 (P2c), on `lts/p2b-step-log` (not merged; the integrator flips the §7.2 row).**
+`jl4-core/src/L4/Lts/Marking.hs`, `markingOf :: LayoutPrinter a => MarkingContext -> Value a ->
+[NormPlacement]` (`:234`). The sketch above is superseded by the module; this block records where
+the built type departs from it and why, and what was measured.
+
+- **The final `NormPlacement`** (`Marking.hs:82`): `Created {crSite, crSource}` (Symboleo),
+  `InEffect LiveNorm` (Symboleo), `Violated Blame` (Anderson/Meyer), `Lapsed Blame` (this spec's
+  coinage, R12 still open), and the join state `Awaiting {awJoinSite, awProgress :: Maybe
+Progress}` (`:103`). `LiveNorm` carries the site (`rangeOf` the `RAction`), the bearer as
+  `KnownParty`/`UnforcedParty` (a `PARTY p` that never met an event still holds the expression),
+  the modal, the action pattern, a `Countdown` (`NoDeadline | UnforcedDeadline Text | Remaining
+Rational` — the residual `WITHIN` is a number only once the obligation has scrutinised an event;
+  before that it is the unevaluated expression, measured on the fixtures marked B″ and K), the
+  `HENCE`/`LEST` text, and `lnMember :: Maybe MemberOf` from the context. Fulfilled marks `[]`, as
+  sketched — there is no `Discharged` place; §3.1's row was the table, §4.2a's fold is the rule.
+- **Two `Created` shapes, not one.** The sketch had only the `Left rexpr` operand of a `ValROp`. A
+  `ValQuantified` — an `EVERY` that has not met its event stream, so its cast is not drawn — is
+  the other, and is `Created` with the whole rule's range and source (`markingOf`'s
+  `ValQuantified` arm). It was not in the sketch because the sketch predates the quantifier.
+- **The join, against `Threshold`.** `Progress = {prDone, prTotal, prThreshold :: Threshold
+Resolved}` and `thresholdMet` (`:184`) is the one place phase 3's count and measure forms add
+  arms; it has no wildcard, so a new `Threshold` constructor is a compile error there. To get the
+  threshold to the marking, `DeonticStep.JoinKind`'s `Barrier` now carries it (`Barrier
+!(Threshold Resolved)`, `DeonticStep.hs:156`; `isBarrier` for the tests and `tellRoutedStep`),
+  written at `registerCast` (`Machine.hs:473`) from the `JoinOnce` in hand. One `Awaiting` is
+  emitted per barrier, after the members, however many are still pending.
+- **Where the barrier's state comes from — the honest part.** The residual of a pending barrier is
+  the `RAND` fold of its pending members whose `HENCE`/`LEST` slots hold the machine's sentinels
+  (`barrierFinish`, `Machine.hs:2524`, "Phase-2 limit: the residual does NOT carry the JOIN
+  LINE"). Neither the count nor the total nor the threshold is in the value. So `markingOf` takes
+  a `MarkingContext` (`:211`, `contextOf :: [DeonticStep] -> MarkingContext`), read back out of
+  P2b's steps: casts by ACTION site from any step's `nkMember`, arms-done per JOIN site as the
+  largest `MemberSatisfied` logged. Nothing new is captured. Without a context (`noContext`) the
+  `Awaiting` is still emitted — the member is recognised by the checkpoint sentinel's NAME in its
+  `HENCE`, `joinCheckpointName` (`Machine.hs:2482`, now a named constant and exported) — but its
+  `awProgress` is `Nothing`. The rule for a reader: no `Awaiting` means no barrier; an `Awaiting`
+  with no progress means the residual was read without its run's log. Fixture B′ pins both.
+- **The register cannot be matched by bearer from a normal form**, which is why the context is
+  keyed by action site alone: P2b keys the cast register by `partyKeyWHNF`, which for a
+  constructor party is its layout with unforced fields as heap addresses (`Tenant OF
+&161@main.l4`), while the NF residual prints `Tenant OF "Bob"`. The two never agree. Keying by
+  site inherits P2b's known limit — a `HENCE` re-entering its own `EVERY` overwrites the cast —
+  and adds nothing to it.
+- **`liveObligations`** (`:306`) is the same walk unrendered, for "L4.Lts.WhatIf", which needs
+  the value and not its text; the K fixture asserts it yields exactly the `InEffect` places.
+
+**Measured.** `JL4_LIBRARY_PATH=$PWD/jl4-core/libraries cabal test jl4-core-test`: 607 examples,
+0 failures (was 578; 17 in `jl4-core/test/LtsMarkingSpec.hs`, 12 in `LtsWhatIfSpec.hs`). The
+marking spec runs every §4.2a case as a `#TRACE` and reads the marking off the returned value:
+FULFILLED → `[]`; a breach → `Violated (Alice, deadline 10)`; an obligation one event in →
+`InEffect … Remaining 7`; an `RAND` of two → both; the `ROr` counterexample → `[InEffect Alice,
+Lapsed Bob]` and nothing `Violated`; `#EVAL either` → two `Created` from the runtime's own `Left`s;
+``#EVAL `the tenancy` `` → one `Created`, whole; `#EVAL 5` → `[]`. The four facts, each as a run:
+F1 `RAND` with one side breaching reduces to `[Violated]` with no `Lapsed`; F2 `ROR` with one side
+fulfilled reduces to `[]`; F3 both sides breached reduces to one `Violated`; F4 is case 6. The
+barrier fixture (three tenants, one signed) marks `[InEffect Bob, InEffect Carol, Awaiting 1 of 3,
+not met]` with `AllHave` as the threshold; nobody signed marks three members with
+`UnforcedDeadline "14"` and `Awaiting 0 of 3`. The fork fixture marks the landlord's running
+continuation (`UnforcedDeadline "5"`, no member), the two waiting members (`Remaining 6`, `Fork`
+of 3, carrying the drafter's `HENCE` and not a sentinel) and **no** `Awaiting`. `cabal test
+jl4-test`: see the §2.4 block — the corpus goldens do not move, since no `.l4` and no printer
+changed.
+
+**Not built.** The drawing rule for "marked but not enabled" (§4.9's other half) — that is
+P2d's, and P2d is gated. `Lapsed`'s name is unverified against Symboleo (R12, unchanged).
+`awProgress` from the residual alone, for the reason above. B1's static half of the key: nothing
+in `L4.StateGraph` was touched.
 
 ### 4.3 The one piece of new back end: a deontic step log
 
@@ -1020,7 +1145,9 @@ goldens cut from the reference page's own example. jBPM rejects both new files f
 collection on the multi-instance activity (`ForEach has no collection expression`) — the exact gap
 `P-CAST` declares, now with an engine's word for it; `etc/bpmn-kie-baseline.txt` records it as
 class (d). What P2 still owes is the second half: the norm-plane drawing rule for "marked but not
-enabled", and `markingOf` against `Threshold`.
+enabled", and `markingOf` against `Threshold`. **The second of those LANDED 2026-09-15** (P2c,
+§4.2a's block: `Awaiting {awProgress :: Maybe Progress}` with `Progress.prThreshold :: Threshold
+Resolved`); the drawing rule is still owed, and is P2d's.
 
 #### What follows for P2
 
@@ -1294,7 +1421,7 @@ rather than assumed benign. R11 and R12 are new in revision 2; R13 was added on 
 | **R8**  | **Verify Lomuscio & Sergot before print.** The green/red state-partition characterisation in §2.2 is from secondary sources; the primary PDF would not extract. It carries architectural weight (per-party colouring is the F2 shape). Symboleo's exact lifecycle state names are likewise search-verified rather than read — there is probably an `Expired`/`Terminated` and a `Suspended`→`Resumed` pair we have not recorded. §7.4's citation failure is the reason this caveat is now load-bearing rather than decorative.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | **R9**  | **Does P2 draw powers, or refuse?** G5 says a power changes the transition system, so it cannot be an edge in it. Symboleo gives powers their own lifecycle, which is one answer. Refusing and drawing the boundary is another, and is consistent with §25.5's own precedent of drawing the seam rather than pretending.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **R10** | **Does P2f belong here or in the bounded-deontics work?** Sharpened by revision 2's unbundling: P2f no longer needs anything of P2's except the graph P0 already ships, so the case for it living here is weaker than it was. The query is that paper's contribution; the graph is `StateGraph`'s; the renderer may be P1's BPMN or a list.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| **R11** | **NEW. Does `STATEFUL` §6.4 need correcting?** §2.4 rules that P2 uses the replay endpoints (22/23/24) rather than 18/19/20, because "would lead to `FULFILLED`" cannot be answered by a pure walk without reimplementing modal routing. That is a finding **about `STATEFUL`'s own spec**, whose §6.4 promises exactly that pure walk with "microsecond responses". Either that spec should record the faithfulness obligation, or 19/20 should be re-specified as replay, or the pure walk should be kept behind a cross-validation test. Not P2's call alone.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **R11** | **NEW. Does `STATEFUL` §6.4 need correcting?** §2.4 rules that P2 uses the replay endpoints (22/23/24) rather than 18/19/20, because "would lead to `FULFILLED`" cannot be answered by a pure walk without reimplementing modal routing. That is a finding **about `STATEFUL`'s own spec**, whose §6.4 promises exactly that pure walk with "microsecond responses". Either that spec should record the faithfulness obligation, or 19/20 should be re-specified as replay, or the pure walk should be kept behind a cross-validation test. Not P2's call alone. **OBSERVED 2026-09-15, not decided:** P2c's replay form (§2.4 block) measured 80–310 µs per candidate, warm, on the corpus's barrier and `contracts.l4` traces — inside the "microsecond responses" §6.4 promised for the pure walk, at trace lengths of one to three events. The replay's cost is linear in the persisted history (every prior event is re-scrutinised per candidate), so the promise is met today by the form §2.4 prefers and would stop being met at some history length nobody has measured. What §6.4 needs is therefore not a faster form but a number: the history length at which replay exceeds its budget, which is when a pure walk earns its faithfulness obligation. Still not P2's call alone.                                                                                                                                                                                                                                                                             |
 | **R12** | **NEW. Is `Lapsed` the right name, and is it Symboleo's?** §4.2a needs a lifecycle state for "this `ROr` alternative is definitively lost but the compound is not violated". Symboleo has `terminated` and possibly `expired`; whether either covers this, or whether we are coining, is unverified and folded into R8's reading task.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | **R13** | **NEW (2026-09-14). Do the ladder lens and the deontic lens ever stack on the same line?** §4.8 asks for a lens above every regulative `Decide`; the ladder already puts one above every `Decide` that `canVisualize` accepts. Whether those two sets are disjoint is **unmeasured** — nobody has run `Ladder.doVisualize` against a regulative body to see whether it succeeds. If they overlap, two lenses share one anchor position and the titles have to distinguish them ("Show decision graph" is already taken). Five minutes against `jl4/examples/legal/regcf/regcf.l4` settles it, and it should be settled before the lens is designed rather than after.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 

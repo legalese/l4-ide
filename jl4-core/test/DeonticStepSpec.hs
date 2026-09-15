@@ -503,7 +503,7 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
       , Row (Just "Landlord OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 6) (Just 6) Nothing
       ]
     -- the two members share one site, are two bearers, and two activations of it
-    let members' = [ s | s <- ss, Just m <- [member s], m.moJoin == Barrier ]
+    let members' = [ s | s <- ss, Just m <- [member s], isBarrier m.moJoin ]
     length (nubOrd (map site members')) `shouldBe` 1
     length (nubOrd (map rawBearer members')) `shouldBe` 2
     map (\s -> fmap (.moIndex) (member s)) members' `shouldBe` [Just 1, Just 2, Just 2]
@@ -569,7 +569,7 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
       , Row (Just "Tenant OF ") 2 (Just DMust) Waiting NoEvent Nothing (Just 1) Nothing
       ]
     -- the Waiting step is the member's, and says so
-    fmap (.moJoin) (member (ss !! 2)) `shouldBe` Just Barrier
+    fmap (isBarrier . (.moJoin)) (member (ss !! 2)) `shouldBe` Just True
 
   it "12. a prohibition violated is Consumed and routed to LEST, or to a breach when it has none" $ do
     rs <- runLogged prohibitionSrc

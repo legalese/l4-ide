@@ -150,6 +150,8 @@ library
     L4.EvaluateLazy.GraphViz2
     L4.EvaluateLazy.GraphVizOptions
     L4.EvaluateLazy.Trace
+    L4.Lts.Marking
+    L4.Lts.WhatIf
     L4.StateGraph
     L4.ExactPrint
     L4.Discharge
@@ -249,6 +251,8 @@ test-suite jl4-core-test
     TraceOrderingSpec
     StateGraphSpec
     DeonticStepSpec
+    LtsMarkingSpec
+    LtsWhatIfSpec
     RelationalSpec
     BlawxAssumeSpec
     BlawxNlgSpec
