@@ -157,6 +157,18 @@ what was implemented, with the two departures named under _What review changed_.
   `takeDirectory inputFile </> "tests"` would look in `cases/tests/`, and canon has no
   `cases/tests/` directory anywhere. Had the change shipped on the import rationale it would have
   been right for the wrong reason and the next person would have re-derived it wrongly.
+- **The first run found a stale canon golden, which is what the mechanism is for.**
+  `sg-csp.golden` carried two lines; today's binary adds a 19-line Info block at `sg-csp.l4:79:8`
+  telling the author that `ASSUME` is being retired in favour of a section-level `GIVEN`. The
+  **binary is right and the golden is stale** — that diagnostic is landed behaviour (the
+  ASSUME-as-implicit-parameter arc), and l4-ide's own corpus was swept for it in #337 while
+  canon's was not. It was re-blessed in canon and the pin bumped, exercising the §5 loop on a
+  real divergence rather than a constructed one. Note what did **not** happen: the mirror was not
+  re-blessed in place, which would have made this repository's copy disagree with canon silently.
+- **`--check` counted build output as a difference.** `jl4-test` writes a gitignored
+  `<stem>.actual` beside every golden; the raw directory walk called all sixty of them EXTRA and
+  failed. It fires only for someone who has just run the tests and never in CI, so the person who
+  meets it is the one least able to believe it. `--check` now filters through `git check-ignore`.
 - **§2's count and §4's paths were both wrong** and are corrected in place above rather than
   silently — see the two _Corrected 2026-09-15_ notes.
 
@@ -181,8 +193,17 @@ what was implemented, with the two departures named under _What review changed_.
    repo boundary except this one equality check.
 5. **`etc/go` is unchanged.** A vendored subject is at an l4-ide path; `subject.json` points at
    `jl4/examples/canon/<to>/...`. The open question about `canon:` addressing closes.
-6. **Blessed is explicit and lives on canon `main`** — §3A.4 applies unchanged, and so does the
-   first list.
+6. **Blessed is explicit and lives on canon `main`** — §3A.4's _location_ requirement applies
+   unchanged, and so does the first list. **Its eligibility test does not.** §3A.4 said a dir is
+   eligible once it "checks green at the pin", which was written before there was a harness to ask.
+
+   **RULED 2026-09-15, replacing that clause: a directory is blessed when its four goldens per
+   file match the pinned binary's output UNDER THE HARNESS.** `l4 check` exiting zero is
+   necessary and **not sufficient** — it is a weaker question, and the first run showed the two
+   answers diverge. `canon/sg/child-support/sg-csp.l4` passes `l4 check` (0 of 15 mirrored files
+   exit non-zero) and **fails** the harness (1 of 90 examples), because the binary emits an
+   Info-level ASSUME-retirement diagnostic that canon's golden predates. The harness is the
+   definition of green, because the harness is what CI runs.
 
 ## 4. The migration, once §3B is green in CI
 
