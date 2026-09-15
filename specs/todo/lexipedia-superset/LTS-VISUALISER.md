@@ -411,20 +411,56 @@ weakened, not strengthened, by overstating it.)_
 
 ### 2.2 Four formalisms that do carry deontic content, and what each contributes
 
-| Source                                                                                                                             | The move                                                                                                                                                                                                        | What P2 takes                                        |
-| ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| **Anderson 1958** (_Mind_ 67(265):100-103); **Meyer 1988** (_NDJFL_ 29(1)) — `Fα ↔ [α]V`, `Pα ↔ ⟨α⟩¬V`                           | A distinguished **violation atom**. The three modals differ only in which transitions reach `V`.                                                                                                                | The reduction itself, and its price. §6 G4           |
-| **Sileno, Boer & van Engers**, LPPN (AICOL/MIREL 2018, DOI `10.1007/978-3-030-00178-0_6`; author copy `MIREL2017.pdf`)             | **Two planes.** A procedural net for the world; a declarative net where normative positions — `Perm(A)`, `Forb(A)`, `Obl(B)` — are **places**, joined by constitutive links. CTD is topological, not axiomatic. | The architecture. §2.3                               |
-| **Azzopardi, Pace, Schapachnik & Schneider**, contract automata (_AI & Law_ 24(3):203-243, 2016; timed variant arXiv `2410.12585`) | Modality annotated on **states**, not transitions. A state carries the set of norms in force — i.e. **a marking**. Persistent vs ephemeral norms.                                                               | Confirmation of where deontic status lives. §3.4     |
-| **Sharifi, Parvizimosaed, Amyot, Logrippo & Mylopoulos**, Symboleo (RE 2020; _SoSyM_ 2022, DOI `10.1007/s10270-022-01053-6`)       | **One statechart per obligation and per power** — created / in-effect / suspended / discharged / violated / terminated.                                                                                         | The F3 answer: vacuity becomes a _named state_. §3.1 |
+| Source                                                                                                                                                                               | The move                                                                                                                                                                                                                                                                                                                  | What P2 takes                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **Anderson 1958** (_Mind_ 67(265):100-103); **Meyer 1988** (_NDJFL_ 29(1)) — `Fα ↔ [α]V`, `Pα ↔ ⟨α⟩¬V`                                                                             | A distinguished **violation atom**. The three modals differ only in which transitions reach `V`.                                                                                                                                                                                                                          | The reduction itself, and its price. §6 G4           |
+| **Sileno, Boer & van Engers**, LPPN (AICOL/MIREL 2018, DOI `10.1007/978-3-030-00178-0_6`; author copy `MIREL2017.pdf`)                                                               | **Two planes.** A procedural net for the world; a declarative net where normative positions — `Perm(A)`, `Forb(A)`, `Obl(B)` — are **places**, joined by constitutive links. CTD is topological, not axiomatic.                                                                                                           | The architecture. §2.3                               |
+| **Azzopardi, Pace, Schapachnik & Schneider**, contract automata (_AI & Law_ 24(3):203-243, 2016; timed variant arXiv `2410.12585`)                                                   | Modality annotated on **states**, not transitions. A state carries the set of norms in force — i.e. **a marking**. Persistent vs ephemeral norms.                                                                                                                                                                         | Confirmation of where deontic status lives. §3.4     |
+| **Sharifi, Parvizimosaed, Amyot, Logrippo & Mylopoulos**, Symboleo (RE 2020, DOI `10.1109/RE48521.2020.00049`, Fig. 2 p. 367; Parvizimosaed's 2022 thesis Fig. 5.1 p. 38 — read, R8) | **One statechart per obligation and per power.** Obligation states as printed: `Create`, `Active` ⊃ {`InEffect`, `Suspension`}, `Discharge`, `Fulfillment`, `Violation`, `Unsuccessful Termination`. Power states: `Create`, `Active` ⊃ {`InEffect`, `Suspension`}, `Successful Termination`, `Unsuccessful Termination`. | The F3 answer: vacuity becomes a _named state_. §3.1 |
 
-A fifth, **Lomuscio & Sergot**, _Deontic Interpreted Systems_ (_Studia Logica_ 2003; implemented
-in MCMAS), partitions each agent's local states into "green" (correctly functioning) and "red",
-with `O_i φ` holding iff `φ` holds in all of agent _i_'s green states — a **per-agent colouring
-of states**. **Unverified:** the primary PDF would not extract and this characterisation rests on
-secondary sources. It is flagged in R8 because it carries architectural weight — if correct, it
-is a third independent formalism locating deontic status off the transition, and it is
-per-party, which is the F2 shape.
+A fifth, **Lomuscio & Sergot**, _Deontic Interpreted Systems_ (_Studia Logica_ 75(1):63-92,
+2003, DOI `10.1023/A:1026176900459`), partitions each agent's local states into "green"
+(correctly functioning) and "red", with `O_i φ` holding iff `φ` holds in all global states in
+which agent _i_ is in a green local state — a **per-agent colouring of states**.
+
+**VERIFIED 2026-09-16 (R8), from the primary text** — the authors' copy, `LomSer-DIS.ps` on
+Lomuscio's Imperial page, converted with `ps2pdf` + `pdftotext`; page numbers below are that
+copy's, not the journal's. §2.3, Definition 5, p. 6: _"We now define deontic systems of global
+states by assuming that for every agent, its set of local states can be divided into allowed and
+disallowed states. We indicate these as green states, and red states respectively. … G_i is
+called the set of green states for agent i. The complement of G_e with respect to L_e
+(respectively G_i with respect to L_i) is called the set of red states for the environment
+(respectively for agent i)."_ Definition 8, p. 8: _"the truth of formula O_i φ at a global state
+signifies the truth of formula φ in all the global states in which agent i is in a correct local
+state, i.e. in a green state."_ The characterisation this spec carried was correct. Three things
+the primary text adds that the secondary sources did not:
+
+- **It is a colouring of states with no transitions at all.** p. 5: _"In this paper we do not
+  deal with time, and so we will simplify this notion by not considering runs."_ So "locating
+  deontic status off the transition" is true of it by construction, not by choice; protocols and
+  transitions enter only in the companion paper (Lomuscio & Sergot, "A formalisation of
+  violation, error recovery, and enforcement in the bit transmission problem", _J. Applied
+  Logic_ 2(1):93-116, 2004, DOI `10.1016/j.jal.2004.01.005`, §2 Definition 2, p. 4 — also read
+  from the author copy `LomSer-JAL.ps`; it restates the green/red definition and adds, p. 4: _"The
+  terms 'green' and 'red' are chosen as neutral terms, to avoid overloading them with unintended
+  readings and connotations."_).
+- **The colouring is absolute**, §4.1 p. 15: _"the criterion for what counts as a green state is
+  absolute, that is to say, the set of green states for an agent is independent of the state in
+  which it currently is."_ Our `Violated` is history-dependent (a deadline was missed); in their
+  model that history has to be folded into the local state. The F2 shape survives, but the
+  per-party colour is a property of the state, not of how it was reached.
+- **`O_i` is a correctness operator, not an obligation on a party.** JAL 2004 p. 4: _"it would
+  not be appropriate to read the expression O_i φ as 'there is an obligation on agent i that
+  φ'."_ It is the third independent formalism locating deontic status on states rather than
+  transitions, and it is per-party — but what it colours is compliance, not a norm lifecycle,
+  so it corroborates R1 and says nothing about §3.1's lifecycle names.
+
+"Implemented in MCMAS" is also verified, from a different paper: Lomuscio, Qu & Raimondi,
+"MCMAS: A Model Checker for the Verification of Multi-Agent Systems", CAV 2009, LNCS 5643:682-688,
+DOI `10.1007/978-3-642-02658-4_55` (author copy `CAV-AL+.pdf`), §3: _"An optional section
+`RedStates` permits the definition of non-green states by means of any Boolean formula on the
+variables of the local states to interpret the correctness modalities O_i"_, with predefined
+atoms `GreenStates` and `RedStates`. The 2003 paper itself does not name MCMAS; it predates it.
 
 ### 2.3 The ruling — a two-plane marked transition system
 
@@ -737,8 +773,11 @@ junction kind, branch sets, associative flattening and the tests that pin them
 discharged.
 
 Note that moving modality off the transition (R1) is corroborated by two independent published
-formalisms — contract automata annotate states, LPPN marks places — and possibly a third
-(Lomuscio & Sergot, unverified). Our IR is the odd one out.
+formalisms — contract automata annotate states, LPPN marks places — and a third with a caveat
+(Lomuscio & Sergot colour states per agent, but their 2003 model has no transitions to put the
+modality on, so it is off the transition by construction rather than by choice, and what it
+colours is compliance, not a norm lifecycle — verified 2026-09-16, §2.2). Our IR is the odd one
+out.
 
 > **B1 LANDED 2026-09-16** (`lts/b1-b2-loops`). `TransitionLabel.labelSite :: Maybe SrcRange`
 > (`jl4-core/src/L4/StateGraph.hs`, the field's own comment), set in `extractDeonton` to
@@ -968,10 +1007,11 @@ landed, the drawing rule has not).** `jl4-core/src/L4/Lts/Marking.hs`, `markingO
 LayoutPrinter a => MarkingContext -> Value a -> [NormPlacement]` (`:294`). The sketch above is superseded by the module; this block records where
 the built type departs from it and why, and what was measured.
 
-- **The final `NormPlacement`** (`Marking.hs:100`): `Created {crSite, crSource}` (Symboleo),
-  `InEffect LiveNorm` (Symboleo), `Violated Blame` (Anderson/Meyer), `Lapsed Blame` (this spec's
-  coinage, R12 still open), and the join state `Awaiting {awJoinSite, awProgress :: Maybe
-Progress}` (`:121`). `LiveNorm` carries the site (`rangeOf` the `RAction`), the bearer as
+- **The final `NormPlacement`** (`Marking.hs:100`): `Created {crSite, crSource}` (Symboleo's
+  `Create`, past-participled), `InEffect LiveNorm` (Symboleo's `InEffect`, exactly), `Violated
+Blame` (Anderson/Meyer's violation atom; Symboleo's state is `Violation`), `Lapsed Blame`
+  (**ours** — R12 ANSWERED 2026-09-16, below), and the join state `Awaiting {awJoinSite,
+awProgress :: Maybe Progress}` (`:121`). `LiveNorm` carries the site (`rangeOf` the `RAction`), the bearer as
   `KnownParty`/`UnforcedParty` (a `PARTY p` that never met an event still holds the expression),
   the modal, the action pattern, a `Countdown` (`NoDeadline | UnforcedDeadline Text | Remaining
 Rational` — the residual `WITHIN` is a number only once the obligation has scrutinised an event;
@@ -1059,9 +1099,100 @@ changed.
 §4.9, and blocked on nothing. (P2c's first write-up assigned it to the gated P2d in this sentence
 and in §4.9; that was a re-staging done in a LANDED block, not a decision, and is retracted. If
 it should move to P2d, that is an open question for the integrator: proposed 2026-09-15, not
-decided.) `Lapsed`'s name is unverified against Symboleo (R12, unchanged).
+decided.) `Lapsed` is ours, not Symboleo's — R12, answered below.
 `awProgress` from the residual alone, for the reason above. B1's static half of the key: nothing
 in `L4.StateGraph` was touched.
+
+**ANSWERED 2026-09-16 (R8 half, R12) — the lifecycle provenance, read from the primary text.**
+Two Symboleo sources were read, not searched: the RE 2020 paper (Sharifi, Parvizimosaed, Amyot,
+Logrippo & Mylopoulos, "Symboleo: Towards a Specification Language for Legal Contracts", _RE
+2020_ pp. 364-369, DOI `10.1109/RE48521.2020.00049`; open copy at the Cyberjustice Laboratory,
+Fig. 2 on p. 367, rendered and read because the statechart labels are not in the PDF's text
+layer), and Parvizimosaed, _Symboleo: Specification and Verification of Legal Contracts_, PhD
+thesis, University of Ottawa, 2022, <https://ruor.uottawa.ca/handle/10393/44186>, Fig. 5.1 p. 38
+and Listing 7.4 p. 78. The two figures agree on the obligation and power charts (the thesis adds
+`Rescission` to the _contract_ chart only). The _SoSyM_ 2022 paper (DOI
+`10.1007/s10270-022-01053-6`, resolved via Crossref: first author is **Parvizimosaed**, not
+Sharifi, pp. 2395-2427) is paywalled and was **not** read; nothing here rests on it.
+
+- **Every obligation state, as printed** (RE 2020 Fig. 2; thesis Fig. 5.1): `Create`; the
+  `Active` superstate containing `InEffect` and `Suspension`; and four terminal states
+  `Discharge`, `Fulfillment`, `Violation`, `Unsuccessful Termination`. The transitions are
+  `Triggered` (→ `Create` if conditional, → `InEffect` if unconditional — the thesis labels these
+  `Triggered(conditional)` / `Triggered (unconditional)`), `Activated` (`Create` → `InEffect`),
+  `Expired` (`Create` → `Discharge`), `Discharged` (`InEffect` → `Discharge`), `Fulfilled`,
+  `Violated`, `Terminated` (`Active` → `Unsuccessful Termination`), and the `Suspended` /
+  `Resumed` pair. So R8's guess was half right: there **is** a `Suspended`→`Resumed` pair and
+  there **are** `Expired` and `Terminated` — but as _events_, not states; the states they lead to
+  are `Discharge` and `Unsuccessful Termination`. The thesis's nuXmv encoding (Listing 7.4 p. 78)
+  enumerates the states as `{not_created, create, inEffect, suspension, discharge, fulfillment,
+violation, unsTermination}`. (§3.1 and `Marking.hs` write `InEffect`, as the figures do. The
+  `Marking.hs` Haddock — `1a90524b`, 2026-09-15, and still the tree's text at `:113` — writes
+  `/inEffect/`; that predates this reading of the thesis, so it was not borrowed from Listing
+  7.4. It is **not** corrected in this track; see the NOT BUILT block at the end of §4.2a.)
+- **Every power state, as printed**: `Create`; `Active` ⊃ {`InEffect`, `Suspension`};
+  `Successful Termination` (reached by `Exerted`) and `Unsuccessful Termination` (reached by
+  `Expired` from either `Create` or `InEffect`, or by `Terminated`). Relevant to R9, which stays
+  open.
+- **`Created` / `InEffect` — Symboleo's, with one letter of licence.** `InEffect` is exact.
+  `Created` is Symboleo's `Create` past-participled to match its siblings; the thesis's own
+  prose does the same (p. 39: _"Conditional obligations are created (instantiated) when their
+  triggers become true"_). Kept.
+- **`Violated` — Anderson/Meyer, as recorded; Symboleo's state is `Violation`** and its event is
+  `Violated`. The provenance line stands; the Haddock (`Marking.hs:17-18`) does not yet say
+  which is which — that is the NOT BUILT block below.
+- **`Lapsed` — ours. No Symboleo state covers it, and the two candidates both mislead.** What
+  `Lapsed` marks is a `ValBreached` operand of a surviving `ROr`: the machine **did** conclude a
+  breach of that alternative, with blame (§3.1's counterexample), and only the compound is not
+  violated. Symboleo has one lifecycle per obligation instance. An alternative can be encoded
+  there as a separate obligation (which would simply be in `Violation`) or as a disjunct of one
+  obligation's consequent — the grammar admits it: `Proposition: POr;` / `POr returns
+Proposition: PAnd ({POr.left=current} "or" right=PAnd)*` (thesis Listing A.1, printed
+  p. 149), and p. 107: _"Recursive combinations of atomic situations result in a composite
+  situation"_ — and in **neither** encoding is there a state for "this disjunct is lost but the
+  obligation stands": a lost disjunct inside a consequent has no state at all, and a separate
+  obligation has only `Violation`. (An earlier draft of this block said Symboleo expresses
+  alternatives as "separate obligations plus powers"; the thesis does not say that, and the
+  grammar contradicts it. Corrected 2026-09-16.) The two candidates R12 named: `Discharge` is
+  _"cancelled obligations rather than unsuccessfully terminated ones"_ (thesis p. 39; RE 2020
+  p. 368), reached by `Expired` from `Create` — an obligation whose **antecedent** can never come
+  true, i.e. one that never took effect — **or** by `Discharged` from `InEffect`, the creditor's
+  power (thesis p. 40: a power _"entitles its creditor to suspend, terminate, or discharge one
+  or more InEffect obligation instances"_; the edge is in RE 2020 Fig. 2 and thesis Fig. 5.1);
+  in neither case has the debtor breached. `Unsuccessful Termination` is reached by
+  `Terminated` — cancellation by a power or by the contract's own termination, again with no
+  breach by the debtor. Both would erase the blame `Lapsed` carries. **Ruling: keep `Lapsed`,
+  record it as this spec's coinage, do not rename.** No P2c follow-up is needed for the name;
+  the only code-side consequence is the Haddock provenance comment, which this track does not
+  touch (below).
+- **A naming hazard, recorded because it fails silently.** §3.1 maps `ValFulfilled` to
+  `Discharged`, in the ordinary legal sense of discharge by performance. That is **not**
+  Symboleo's `Discharge`, which is the no-performance cancellation above; Symboleo's word for
+  performance is `Fulfillment`. There is no `Discharged` place today (`Marking.hs` marks
+  `ValFulfilled` as `[]`), so nothing is wrong in the tree — but whoever adds one must not
+  label it with Symboleo's name, or the picture will say "cancelled" where the evaluator said
+  "performed".
+
+**NOT BUILT 2026-09-16 — the `Marking.hs` Haddock still carries the pre-ruling text.**
+`jl4-core/src/L4/Lts/Marking.hs:12-24`, the module's "Provenance of the lifecycle vocabulary"
+list, reads `'Lapsed' is a COINAGE of this spec (§4.2a, ruling R12 open)` and `Symboleo may have
+a state for it; that is R8's reading task` (`:19`, `:21`), cites Symboleo's states without naming
+them (`:14-15`), and the constructor comments write `Symboleo /created/` and `/inEffect/`
+(`:108`, `:113`) where the figures print `Create` and `InEffect`. A comment-only correction was
+written on this branch — `1603ae64` and `a627e7f3`, 19 lines added, 10 removed, no code — and
+reverted on 2026-09-16, because this track (R8-R12, cut from `lts/p2-followups`) is gated on
+`git diff --name-only lts/p2-followups...HEAD | grep -E '\.hs$|\.cabal$'` being empty: no
+Haskell, Haddock included. The revert also un-shifted the ten `Marking.hs` line cites in this
+section, which the reverted commits had moved to `+4` and then, after the second commit grew the
+header by five more lines without re-anchoring, left five lines short of every definition they
+name; they are now checked against the tree at `lts/p2-followups` (`data NormPlacement` `:100`,
+`Awaiting` `:121`, `Family` `:158`, `thresholdMet` `:220`, `MarkingContext` `:228`, `contextOf`
+`:252`, `markingOf` `:294`, `renderLive` `:345`, `liveObligations` `:377`, `thresholdText`
+`:449`). What would make this block true-and-closed: in the next track that is allowed to touch
+Haskell, re-apply the two commits' `Marking.hs` hunks (`git show 1603ae64 a627e7f3 --
+jl4-core/src/L4/Lts/Marking.hs`; the text is the one this block's bullets agree with) and shift
+the ten cites above by whatever the header grows — measure it, do not assume `+9`. Until then a
+reader of the Haddock alone gets the answer as it stood on 2026-09-15; the ruling is here.
 
 ### 4.3 The one piece of new back end: a deontic step log
 
@@ -1423,8 +1554,8 @@ must not be on P2's critical path.
   breach. A _remaining_ token is an obligation never discharged — F3 vacuity, at the end of the
   trace. These are established words for the two diagnostics we most need; do not coin new ones.
 - **`Verdict`**, from `DESIGN.md:1506`, unchanged.
-- **Symboleo's lifecycle names**, subject to R8's verification caveat. `Lapsed` (§4.2a) is
-  **ours** and is flagged as such — R12.
+- **Symboleo's lifecycle names**, read from the primary text 2026-09-16 (R8; the exact list is
+  in §4.2a's ANSWERED block). `Lapsed` (§4.2a) is **ours**, confirmed — R12.
 
 ### 4.7 Layout — the section revision 1 did not have
 
@@ -2695,7 +2826,7 @@ on documented losses (five do). No number in the table changed.
 ## 8. Open rulings
 
 In the style of the other track specs: questions this document could not settle, recorded
-rather than assumed benign. R11 and R12 are new in revision 2; R13 was added on 2026-09-14 with §4.8 and answered on 2026-09-15.
+rather than assumed benign. R11 and R12 are new in revision 2; R13 was added on 2026-09-14 with §4.8 and answered on 2026-09-15; R8 and R12 were answered on 2026-09-16.
 
 | #       | Ruling needed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -2706,11 +2837,11 @@ rather than assumed benign. R11 and R12 are new in revision 2; R13 was added on 
 | **R5**  | **Is the deontic step log optional or non-optional?** `traceEval` is optional and off by default; `tellEventRouted` is deliberately non-optional. Optional keeps the evaluator's hot path untouched and keeps P2b off M4's critical path. Non-optional means the residual can always explain itself, which is what an audit-grade tool-calling story wants. **ANSWERED 2026-09-15: OPTIONAL, off by default**, mirroring `cliDefaultPolicy` (`jl4-core/src/L4/TracePolicy.hs:97-101`), because §7.5 requires the evaluator's hot path untouched for M4 and P2b is built (on `lts/p2b-step-log`, merged into `lts/p2-stack` 2026-09-15, not yet in `unstable`) as `EvalState.deonticLog :: Maybe DeonticLog` with every call site behind that `Maybe` (`Machine.hs:286,359`). What non-optional would have bought — a residual that always explains itself — is available to any caller through `execEvalModuleWithDeonticLog` at the cost of asking; the audit-grade story can turn it on per request the way `#EVALTRACE` turns the trace on.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | **R6**  | **How is a re-offered event drawn?** §4.4. `dsScrutiny` records the distinction; it does not decide the rendering. One frame with a "witnessed" mark, or two frames with the second marked "re-offered"? Getting this wrong makes the animation lie about how many things happened.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | **R7**  | **Was `logic-not-flowcharts.md`'s state-transitions row intended as unranked?** It reads as unranked and PROCESS-TRACK §1 reads it that way, but it was written before P2 was contemplated, so it may simply never have been asked the question. **Ask Meng** rather than infer; §1.2's whole framing depends on it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| **R8**  | **Verify Lomuscio & Sergot before print.** The green/red state-partition characterisation in §2.2 is from secondary sources; the primary PDF would not extract. It carries architectural weight (per-party colouring is the F2 shape). Symboleo's exact lifecycle state names are likewise search-verified rather than read — there is probably an `Expired`/`Terminated` and a `Suspended`→`Resumed` pair we have not recorded. §7.4's citation failure is the reason this caveat is now load-bearing rather than decorative.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **R8**  | **ANSWERED 2026-09-16, see §2.2 VERIFIED and §4.2a ANSWERED: confirmed, from the primary texts.** Lomuscio & Sergot's green/red partition of each agent's local states and the `O_i` semantics are quoted from the authors' copy of _Deontic Interpreted Systems_ (_Studia Logica_ 75(1):63-92, 2003, DOI `10.1023/A:1026176900459`, Definitions 5 and 8) and the companion _J. Applied Logic_ 2(1):93-116, 2004 paper (DOI `10.1016/j.jal.2004.01.005`, Definition 2); the characterisation §2.2 carried was right, with three caveats now recorded there (no transitions in the 2003 model; the colouring is absolute; `O_i` is correctness, not obligation-on-a-party). MCMAS's `RedStates` is verified from CAV 2009 (DOI `10.1007/978-3-642-02658-4_55`). Symboleo's lifecycle states were read off RE 2020 Fig. 2 (DOI `10.1109/RE48521.2020.00049`, p. 367) and the 2022 thesis Fig. 5.1 (p. 38); the full list is in §4.2a. The guessed `Expired`/`Terminated` exist but are **events**, not states; the `Suspended`→`Resumed` pair exists. All four DOIs were resolved via Crossref on 2026-09-16 before being written down.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | **R9**  | **Does P2 draw powers, or refuse?** G5 says a power changes the transition system, so it cannot be an edge in it. Symboleo gives powers their own lifecycle, which is one answer. Refusing and drawing the boundary is another, and is consistent with §25.5's own precedent of drawing the seam rather than pretending.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **R10** | **Does P2f belong here or in the bounded-deontics work?** Sharpened by revision 2's unbundling: P2f no longer needs anything of P2's except the graph P0 already ships, so the case for it living here is weaker than it was. The query is that paper's contribution; the graph is `StateGraph`'s; the renderer may be P1's BPMN or a list. **Observation 2026-09-15 (still OPEN):** P2f was built on `lts/p2f-dominators` as a function over `StateGraph` (`L4.StateGraph.Dominators`) with **no dependency on the rest of P2** — not on the step log, the marking or the picture (its reader-facing wording of an `EVERY` act does read P2h-first-half's `labelQuantifier`, so it is stacked on that branch) — and it needed one thing of the graph the paper's definition does not mention: the `RAND` and `ROR` joins the IR lacks, supplied inside the module as `fulfilmentView` and `breachView`. That is evidence for the split the ruling proposes — the graph (and its join) is `StateGraph`'s, the query is the paper's — and the paper's §7 sentence _"the dominator query … designed and not yet built"_ is now false and should be updated when it is next touched.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **R11** | **NEW. Does `STATEFUL` §6.4 need correcting?** §2.4 rules that P2 uses the replay endpoints (22/23/24) rather than 18/19/20, because "would lead to `FULFILLED`" cannot be answered by a pure walk without reimplementing modal routing. That is a finding **about `STATEFUL`'s own spec**, whose §6.4 promises exactly that pure walk with "microsecond responses". Either that spec should record the faithfulness obligation, or 19/20 should be re-specified as replay, or the pure walk should be kept behind a cross-validation test. Not P2's call alone. **OBSERVED 2026-09-15, not decided:** P2c's replay form (§2.4 block) measured 83–313 µs per candidate, warm, on the corpus's barrier and `contracts.l4` traces — inside the "microsecond responses" §6.4 promised for the pure walk, at trace lengths of one to three events. The replay's cost is linear in the persisted history (every prior event is re-scrutinised per candidate), so the promise is met today by the form §2.4 prefers and would stop being met at some history length nobody has measured. What §6.4 needs is therefore not a faster form but a number: the history length at which replay exceeds its budget, which is when a pure walk earns its faithfulness obligation. Still not P2's call alone.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **R12** | **NEW. Is `Lapsed` the right name, and is it Symboleo's?** §4.2a needs a lifecycle state for "this `ROr` alternative is definitively lost but the compound is not violated". Symboleo has `terminated` and possibly `expired`; whether either covers this, or whether we are coining, is unverified and folded into R8's reading task.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **R12** | **ANSWERED 2026-09-16, see §4.2a ANSWERED: `Lapsed` is ours, and stays.** Symboleo has one lifecycle per obligation instance; an alternative can be a separate obligation (which would simply be in `Violation`) or a disjunct of one obligation's consequent (`POr`, thesis Listing A.1 p. 149), and in neither encoding is there a state for "this disjunct is lost but the obligation stands". Its `Discharge` is reached by `Expired` from `Create` (the antecedent can no longer come true) or by `Discharged` from `InEffect` (the creditor's power), and `Unsuccessful Termination` is cancellation by a power or by the contract's termination — none of these involves a breach by the debtor, and either name would erase the blame `Lapsed` carries. (Corrected 2026-09-16: an earlier form of this row said Symboleo "has no compound obligations" and that `Discharge` is reached only from `Create`; both were sharper than the sources.) `Created`/`InEffect` are Symboleo's `Create`/`InEffect`; `Violated` stays Anderson/Meyer (Symboleo's state is `Violation`). No rename, so no P2c follow-up; the `Marking.hs` Haddock still reads "R12 open" and is NOT touched in this track (§4.2a NOT BUILT 2026-09-16 — the R8-R12 gate forbids Haskell, comments included). One hazard recorded: Symboleo's `Discharge` is _not_ discharge by performance — that is `Fulfillment`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | **R13** | **ANSWERED 2026-09-15, see §4.8 LANDED: no, never — by measurement and by construction.** Measured with `cabal repl jl4-core-test --repl-no-load` from `jl4-core/`, loading each file with `checkWithImports emptyVFS`, taking `map (.sgName) (extractStateGraphs m)` against `map (.vdName) (findAllVisualizableDecides uri m subst)` with the ladder's backticks stripped (the two spell names differently — the first run compared unstripped names and its 0 was worthless; the number below is the corrected run): `regcf.l4`: 109 top-level `Decide`s, 3 state graphs (`advertising restriction`, `ongoing reporting obligation`, `resale restriction`), 43 ladder-visualisable, **0 in both**; `ok/contracts.l4`: 8 / 7 / 0 / **0**; `every-run-example.l4`: 7 / 2 / 0 / **0**. So 0 of 12 regulative rules pass `canVisualize`. It could not be otherwise: `Ladder.translateDecide` (`jl4-core/src/L4/Viz/Ladder.hs:304-305`) throws `InvalidDecideMustHaveBoolRetType` unless the body is `BOOLEAN`, and a regulative body — including an `IF` whose arms are regulative — is `DEONTIC`. Consequences taken: the lens is titled "Show state graph" beside "Show decision graph", anchored at the same `Decide` start, and no title needs to disambiguate a shared line. Pinned by `jl4-lsp/test/StateGraphLensSpec.hs` and `jl4-core/test/ApiStateGraphLensSpec.hs`. _Original question (2026-09-14):_ Do the ladder lens and the deontic lens ever stack on the same line? §4.8 asks for a lens above every regulative `Decide`; the ladder already puts one above every `Decide` that `canVisualize` accepts. Whether those two sets are disjoint is **unmeasured** — nobody has run `Ladder.doVisualize` against a regulative body to see whether it succeeds. If they overlap, two lenses share one anchor position and the titles have to distinguish them ("Show decision graph" is already taken). Five minutes against `jl4/examples/legal/regcf/regcf.l4` settles it, and it should be settled before the lens is designed rather than after. |
 
 ---
@@ -2798,9 +2929,19 @@ explicit DFA over an event alphabet, with a completeness-relative-to-alphabet ch
 yet do). Sileno, Boer & van Engers, LPPN, AICOL/MIREL 2018,
 DOI `10.1007/978-3-030-00178-0_6`. Azzopardi, Pace, Schapachnik & Schneider, "Contract
 automata", _AI & Law_ 24(3), 2016, DOI `10.1007/s10506-016-9185-2`; Azzopardi & Pace, arXiv
-`2410.12585`, 2024. Sharifi et al., Symboleo, RE 2020; _SoSyM_ 2022,
-DOI `10.1007/s10270-022-01053-6`. Lomuscio & Sergot, "Deontic interpreted systems", _Studia
-Logica_ 2003 (**unverified**, R8). Natschläger, Deontic BPMN, DEXA 2011; Natschläger, Kossak &
+`2410.12585`, 2024. Sharifi, Parvizimosaed, Amyot, Logrippo & Mylopoulos, "Symboleo: Towards a
+Specification Language for Legal Contracts", _RE 2020_ pp. 364-369, DOI
+`10.1109/RE48521.2020.00049` (read; Fig. 2); Parvizimosaed, _Symboleo: Specification and
+Verification of Legal Contracts_, PhD thesis, University of Ottawa, 2022,
+<https://ruor.uottawa.ca/handle/10393/44186> (read; Fig. 5.1, Listing 7.4); Parvizimosaed,
+Sharifi, Amyot, Logrippo, Roveri, Rasti, Roudak & Mylopoulos, "Specification and analysis of
+legal contracts with Symboleo", _SoSyM_ 21:2395-2427, 2022, DOI `10.1007/s10270-022-01053-6`
+(DOI resolved, text not read). Lomuscio & Sergot, "Deontic interpreted systems", _Studia Logica_
+75(1):63-92, 2003, DOI `10.1023/A:1026176900459` (read, R8); Lomuscio & Sergot, "A formalisation
+of violation, error recovery, and enforcement in the bit transmission problem", _J. Applied
+Logic_ 2(1):93-116, 2004, DOI `10.1016/j.jal.2004.01.005` (read); Lomuscio, Qu & Raimondi,
+"MCMAS: A Model Checker for the Verification of Multi-Agent Systems", CAV 2009, LNCS
+5643:682-688, DOI `10.1007/978-3-642-02658-4_55` (read, §3). Natschläger, Deontic BPMN, DEXA 2011; Natschläger, Kossak &
 Schewe, _SoSyM_ 2015, DOI `10.1007/s10270-013-0329-5`; Kossak & Illibauer, "Deontic process
 diagrams", 2016. Martínez, Cambronero, Díaz & Schneider, C-O Diagrams, TSE 2013. Pesic & van der
 Aalst, DECLARE; Di Ciccio et al., "Semantical vacuity detection in declarative process mining",
