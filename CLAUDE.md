@@ -212,7 +212,14 @@ run on your PR, and the failure surfaces on the next person's branch instead.
 the VENDORED MIRROR of blessed directories in `legalese/canon`, at the SHA in
 `etc/canon-pin.json` — do not edit it or bless its goldens by hand; edit in canon and
 `node etc/sync-canon.mjs --bump <sha>`. The `Canon Mirror` CI job fails when the mirror and
-canon at the pin disagree.
+canon at the pin disagree. **`jl4/examples/docassemble/` and
+`jl4/examples/openfisca/` are in NO glob**, which is why their `.l4` files carry no `tests/`
+directory and adding one there needs no goldens. State this rule with its scope: an earlier
+unqualified reading of this paragraph sent a session hunting a golden trap in `docassemble/` that
+does not exist there. Generate them by running `cabal test
+jl4-test` once (it creates them and fails), then again to prove they hold, then commit **only** the
+`.golden` files — `.actual` is gitignored. Read them before committing: blessing output you have not
+looked at is how a wrong answer becomes the expected answer.
 
 > **Do not wrap a code span in bold when the span itself ends in two asterisks.** Doing that
 > unbalances markdown emphasis for the rest of the paragraph, and `prettier --write` then
