@@ -5,8 +5,14 @@
  * The renderer is `@viz-js/viz`: Graphviz itself, compiled to WebAssembly
  * and embedded in one JavaScript file (no `.wasm` asset to serve, no worker,
  * no `fetch`). Because it *is* Graphviz, the picture is the one `dot -Tsvg`
- * draws from the same DOT — measured on every corpus graph before this
- * package was adopted (LTS-VISUALISER.md §4.8, "in-pane rendering").
+ * draws from the same DOT. Measured, not assumed: `etc/state-graph-corpus-diff.mjs`
+ * renders every `.dot` in the tree (41 on 2026-09-16) through this wrapper
+ * and through the system `dot`, and compares the counts of nodes, edges,
+ * ellipses, polygons, paths and text runs and the set of `<title>`s — 41 of
+ * 41 identical against Graphviz 14.1.0 once the white canvas is stripped
+ * from both (LTS-VISUALISER.md §4.8, "MEASURED 2026-09-16"). Coordinates
+ * are not compared; they move between Graphviz releases, which is why
+ * `graphvizVersion` is pinned below.
  *
  * This module is the only place the renderer is named. Hosts call
  * {@link renderStateGraphSvg} and know nothing else, so swapping the engine

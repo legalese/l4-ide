@@ -34,7 +34,10 @@ export const stateGraphCsp = (nonce: string): string =>
  * `<a>` or `<foreignObject>`); the payload also travels as JSON in a
  * non-executed `<script type="application/json">` so the page's script can
  * wire the copy button and, on `update` messages, replace the picture in
- * place without a reload.
+ * place without a reload. An `update` that carries an `error` and no `svg`
+ * (Graphviz refused the DOT the server sent after an edit) keeps the last
+ * picture, dimmed, under the error text — deliberately, like the `stale`
+ * notice keeps it undimmed; a redraw after a successful render undims it.
  */
 export function renderStateGraphHtml(payload: StateGraphPayload): string {
   const nonce = Math.random().toString(36).slice(2)
@@ -53,6 +56,9 @@ export function renderStateGraphHtml(payload: StateGraphPayload): string {
     p.stale { margin: 0.25em 0 0.75em; font-size: 0.9em; color: var(--vscode-editorWarning-foreground); }
     p.error { margin: 0.25em 0 0.75em; color: var(--vscode-errorForeground); white-space: pre-wrap; }
     #picture { overflow: auto; }
+    /* An update whose render failed keeps the last picture but dims it, so
+       an old drawing is not mistaken for the rule as it now stands. */
+    #picture.faded { opacity: 0.35; }
     #picture svg { max-width: 100%; height: auto; }
     /* Graphviz draws on white with black text and black default strokes.
        The white canvas is stripped before the SVG gets here; recolour what
@@ -105,7 +111,10 @@ export function renderStateGraphHtml(payload: StateGraphPayload): string {
         el('stale').hidden = true;
         el('error').hidden = !msg.error;
         el('error').textContent = msg.error || '';
+        // No svg means Graphviz refused this DOT: keep the last picture,
+        // dimmed under the error, rather than blanking the pane.
         if (msg.svg) { el('picture').innerHTML = msg.svg; }
+        el('picture').classList.toggle('faded', !msg.svg);
       } else if (msg.type === 'stale') {
         el('stale').textContent = msg.reason;
         el('stale').hidden = false;

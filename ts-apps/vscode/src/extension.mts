@@ -105,6 +105,16 @@ let lastVizArgs: unknown[] | null = null
  */
 let lastStateGraphTarget: { uri: string; srcPos: SrcPos } | null = null
 
+/**
+ * Bumped every time the pane is given a new target (a click) or a refresh is
+ * sent for the current one. A refresh captures the value before its request
+ * and applies the reply only if nothing has moved on since: an edit's reply
+ * arriving after a click on a *different* rule would otherwise overwrite the
+ * fresh picture with the old one (the click branch and `didChange` are
+ * independent async chains, and the slower one used to win).
+ */
+let stateGraphGeneration = 0
+
 /** `l4.stateGraph` sent straight to the server, bypassing the command
  *  middleware: the refresh must not re-reveal the pane the way a click does. */
 const ExecuteStateGraphRequest = makeL4RpcRequestType<
@@ -351,6 +361,7 @@ export async function activate(context: ExtensionContext) {
             if (isStateGraphResponse(responseFromLangServer)) {
               const [verDocId, srcPos] = args as [{ uri: string }, SrcPos]
               lastStateGraphTarget = { uri: verDocId.uri, srcPos }
+              stateGraphGeneration++
               await stateGraphPanel.show(
                 responseFromLangServer.name,
                 responseFromLangServer.dot
@@ -424,21 +435,27 @@ export async function activate(context: ExtensionContext) {
           )
           if (!moved) {
             lastStateGraphTarget = null
+            stateGraphGeneration++ // an in-flight refresh must not undo the notice
             await stateGraphPanel.markStale(
               'The rule this graph was drawn from was edited away. Press "Show state graph" again to redraw.'
             )
             return
           }
           lastStateGraphTarget.srcPos = moved
+          const generation = ++stateGraphGeneration
           try {
             const reply = await client.sendRequest(ExecuteStateGraphRequest, {
               command: cmdStateGraph,
               arguments: [verDocId, moved],
             })
+            // A click or a later edit has moved the pane on: this reply is
+            // for a picture nobody wants any more.
+            if (generation !== stateGraphGeneration) return
             if (isStateGraphResponse(reply)) {
               await stateGraphPanel.refresh(reply.name, reply.dot)
             }
           } catch (e) {
+            if (generation !== stateGraphGeneration) return
             // The server refuses when no regulative rule starts there any
             // more (renamed to a non-rule, made boolean, moved past the
             // tracker). Keep the last picture; stop asking until the next click.

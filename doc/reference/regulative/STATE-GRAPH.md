@@ -40,7 +40,9 @@ rule, the rule is one the tools cannot yet draw — see the limits below.
 **The pane shows the picture.** The map is drawn for you, in the pane, the moment you click: the
 places as circles, the arrows between them, the labels on the arrows. It is the same picture the
 `dot` program from GraphViz would draw — because it _is_ GraphViz, compiled to run inside the
-editor — so what you see in the editor is what the command line below produces.
+editor — so what you see in the editor is what the command line below produces. (GraphViz 16.0.0
+is what is built in; another GraphViz version on your machine may place things slightly
+differently, but it draws the same places, arrows and labels.)
 
 Under the picture, folded away, is **DOT source** with a **Copy DOT** button. DOT is the small text
 language the map is written in, and the input format of GraphViz. You will not normally need it;
@@ -50,10 +52,14 @@ someone.
 **The map redraws as you edit.** Change the rule — add a `LEST`, rename an action, move a deadline
 — and the pane follows, the same way the decision graph does. In the web editor the picture and
 the decision graph share one pane, but an edit no longer hands the pane back to the decision graph
-while the map is showing; click **Show decision graph** to switch. The pane follows the rule by
-_where it is_ in the file, so an edit that deletes the rule's first line, or turns the rule into
-something that is not a regulative rule, leaves the last picture up with a note saying so; click
-**Show state graph** again to draw the rule as it now stands.
+while the map is showing; click **Show decision graph** to switch. The pane keeps hold of the
+rule in one of two ways: in Visual Studio Code by _where it is_ in the file, and in the web editor
+usually by its _name_ (the web editor normally runs L4 inside your browser; when it is instead
+connected to a language server over the network it follows the rule by place, as Visual Studio
+Code does). So an edit that removes what the pane was holding on to — deleting the rule's first
+line in Visual Studio Code, renaming the rule in the web editor, or in either turning the rule
+into something that is not a regulative rule — leaves the last picture up with a note saying so;
+click **Show state graph** again to draw the rule as it now stands.
 
 Two things to know about the picture itself. It is drawn on a transparent background, so in a
 dark editor theme the labels on arrows and the title take the theme's text colour while the places

@@ -1145,6 +1145,12 @@ a facility unavailable in the browser, where K6 and §2.4 put the drawing. So P2
 own picture, and the two-plane form is **strictly harder** than P1's: norm-plane places plus
 constitutive links that cross between planes.
 
+> **2026-09-16:** "unavailable in the browser" stopped being true on `lts/p2g-render`: GraphViz is
+> in both hosts via `@repo/state-graph-render` (viz.js), and its `json`/`plain`/`xdot` outputs
+> expose every coordinate it computes (`instance().formats`, `renderJSON`). **B3 stands on the
+> coordinate-ownership argument, not on unavailability** — see §4.8's LANDED block of the same
+> date for the argument as corrected.
+
 **What P1 proved.** The BPMN exporter's layout is ~400 lines of `L4.Bpmn.Lower` (`:1210-1609`):
 a layered left-to-right assignment from the **longest-path ranking**, banded by lane, with a
 derived gutter width holding one channel per turning flow. Its own header is worth quoting as a
@@ -1371,17 +1377,28 @@ gap from the extractor's own NOTE (`:917-935`), and the web-host pane eviction a
 
 Three design memos (A: vendor Graphviz-in-wasm; B: SVG from Haskell reusing P1's `layoutDiagram`;
 C: a dependency-free layered layout in TypeScript) were written and judged on 2026-09-16; A won,
-22 points to C's 18 and B's 17, on fidelity and effort. This block records what was built from it.
-Line numbers are of the tree this block was committed in. "Landed" means committed on the branch;
-it is unpushed and has no PR.
+22 points to C's 18 and B's 17, on fidelity and effort. **The memos and the scoring are not in the
+tree**: they were written in the session that built this (`lts-diagrams-2`) and the numbers are
+quoted from it, so a reader of this tree cannot re-check them; what the tree carries is the
+measurement in the "MEASURED" paragraph below. This block records what was built. Line numbers
+are of the tree this block was committed in, re-anchored 2026-09-16 by the review fix-up commit
+that follows the first. "Landed" means committed on the branch; it is unpushed and has no PR.
 
 **This is the read-only picture, and only that.** It draws the DOT the lens already returned. It
 does not change ruling B3 (§4.7): _Haskell serves structure (rank, feedback-edge set), TypeScript
-assigns pixels_ is unchanged and still pending, because the scrubber, the highlight and the
-animation (§4.1, K6) need a coordinate model TypeScript owns, and viz.js's coordinates are
-Graphviz's, computed inside a wasm binary this repository cannot reach into. **P2 must not build on
-viz.js's coordinates**; when the token game arrives it replaces this renderer behind the wrapper
-below rather than decorating its output. The wrapper's single export is the seam.
+assigns pixels_ is unchanged and still pending. The reason is **not** that Graphviz's coordinates
+are out of reach — they are not: the vendored `@viz-js/viz` 3.30.0 lists `json`, `json0`, `plain`,
+`plain-ext`, `xdot` and `xdot_json` among `instance().formats`, exports `renderJSON`
+(`node_modules/@viz-js/viz/types/index.d.ts:74`), and `render('digraph{0->0;0->1}', {format:
+'json'})` returns `_draw_` point arrays (checked 2026-09-16; an earlier draft of this paragraph
+said the opposite and was wrong). The reason is that the scrubber, the highlight and the
+animation (§4.1, K6) need a coordinate model **TypeScript owns**: stable place positions across
+edits, ranks and a feedback-edge set that carry L4 meaning (§4.7), and edge geometry a token can
+be moved along. Graphviz gives spline control points that it re-lays-out from scratch on every
+input and moves between its own releases (`render.test.ts` asserts no coordinate for exactly this
+reason). **P2 must not build on viz.js's coordinates**; when the token game arrives it replaces
+this renderer behind the wrapper below rather than decorating its output. The wrapper's single
+export is the seam.
 
 **The dependency.** `@viz-js/viz` 3.30.0 (MIT; embeds Graphviz 16.0.0 under EPL-1.0 and Expat),
 pinned without a caret, declared **only** in the new workspace
@@ -1395,12 +1412,26 @@ no `.wasm` asset, no worker, no `fetch`. The EPL attribution is in `ts-apps/vsco
 `grep -c "Viz.js 3.30.0" out/extension.js` → 1.
 
 **The wrapper.** `ts-shared/state-graph-render/src/index.ts`: `renderStateGraphSvg(dot):
-Promise<string>` (`:76`) — one lazily-instantiated Graphviz per process, `render(dot, {format:
+Promise<string>` (`:82`) — one lazily-instantiated Graphviz per process, `render(dot, {format:
 'svg', engine: 'dot'})`, the XML prologue stripped, Graphviz's `agerr` messages surfaced as a typed
 `StateGraphRenderError`, and the canvas-sized `<polygon fill="white">` removed (`stripBackground`,
-`:108`) so the picture sits on the host's theme; `graphvizVersion` (`:31`) re-exported so a bump
+`:114`) so the picture sits on the host's theme; `graphvizVersion` (`:37`) re-exported so a bump
 is a visible diff. Swapping in `@hpcc-js/wasm-graphviz`, or a TS layout, touches this file and no
 host.
+
+**MEASURED 2026-09-16 — is it the picture `dot` draws?** The first commit's module header said
+the renderer had been "measured on every corpus graph"; nothing in the tree recorded that, so it
+was measured and recorded. `etc/state-graph-corpus-diff.mjs` (new; local evidence, not CI — it
+needs a system `dot`) renders every `.dot` under `jl4/` and `doc/` — the 37 goldens in
+`jl4/examples/state-graphs/` and the four figures in `doc/reference/regulative/figures/`, 41 files
+— through the wrapper and through the system `dot -Tsvg`, and compares counts of `class="node"`,
+`class="edge"`, `<ellipse>`, `<polygon>`, `<path>`, `<text>` and the sorted set of `<title>`s.
+Coordinates are not compared. `node etc/state-graph-corpus-diff.mjs` → `viz.js Graphviz 16.0.0
+vs system "dot - graphviz version 14.1.0 (20251206.1807)": 41 same, 0 differ, of 41`. The first
+run reported 41 differ, every one by exactly one `<polygon>`: the white canvas the wrapper strips
+and the system output keeps; the script now strips it from both. So the doc page's "the same
+picture the `dot` program would draw" holds structurally across two major Graphviz versions, and
+the page now says which version is built in.
 
 **VS Code host.** Rendering happens **in the extension host**, not the webview
 (`src/state-graph-panel.ts`, `show` `:43`, `refresh` `:73`, `markStale` `:85`), and the finished
@@ -1410,9 +1441,13 @@ unit-tested). The webview CSP is **byte-identical** to P2g's — `default-src 'n
 `img-src` — and a unit test pins it. Inline SVG is DOM, not a fetched resource; Graphviz writes
 presentation attributes, not `style=`; and every label is XML-escaped by Graphviz (a rule named
 `<script>` arrives as `&lt;script&gt;`, tested). The DOT `<pre>` and **Copy DOT** stay under a
-`<details>` fold (`:83`). Dark themes: with the white polygon gone, the title, edge labels and
-`stroke="black"` strokes are recoloured to `--vscode-foreground` by CSS (`:62-64`); node-label text
-keeps Graphviz's black because the node fills are pastel in every theme. Extension bundle, measured
+`<details>` fold (`:89`). Dark themes: with the white polygon gone, the title, edge labels and
+`stroke="black"` strokes are recoloured to `--vscode-foreground` by CSS (`:68-70`); node-label text
+keeps Graphviz's black because the node fills are pastel in every theme. An `update` whose render
+failed (no `svg`, an `error`) keeps the last picture **dimmed** under the error text
+(`#picture.faded`, `:61`; toggled `:117`) — deliberate, so a stale drawing is not read as current;
+the `stale` notice, by contrast, keeps it undimmed because that picture _is_ the last good one.
+Extension bundle, measured
 with `npm run bundle-esbuild` before and after: `out/extension.js` **984,946 → 2,527,575 B**
 (+1,542,629; gzip 276,473 → 771,819, +495,346). It is in the main bundle, not lazy: the bundle is
 `format: 'cjs'`, and esbuild only splits ESM.
@@ -1426,12 +1461,19 @@ B across 30 → 31 files — the 14.4 MB Monaco chunk is still the largest thing
 
 **Live refresh — built in both hosts, one middleware branch and one last-target slot each, the
 shape P2g predicted.** The slot is `lastStateGraphTarget` (`extension.mts:106`) /
-`stateGraphTarget` (`+page.svelte:90`), filled by the click's branch (`extension.mts:350`); the
-branch is in `didChange`, after the ladder's own refresh (`extension.mts:421-434`,
-`+page.svelte:892`). The refresh does **not** go through `vscode.commands.executeCommand`: the
+`stateGraphTarget` (`+page.svelte:90`), filled by the click's branch (`extension.mts:363`); the
+branch is in `didChange`, after the ladder's own refresh (`extension.mts:427-469`,
+`+page.svelte:900`). The refresh does **not** go through `vscode.commands.executeCommand`: the
 click's branch reveals the pane, and a keystroke must not, so the refresh sends
 `workspace/executeCommand` straight to the server (`ExecuteStateGraphRequest`,
-`extension.mts:110`; `+page.svelte:188`, debounced 150 ms like the ladder's). What the two
+`extension.mts:120`; `+page.svelte:98`, sent by `debouncedStateGraphRefresh` `:193`, debounced
+150 ms like the ladder's). **Replies are guarded by a generation counter** (`stateGraphGeneration`,
+`extension.mts:116`, `+page.svelte:95`), bumped on every click, every refresh sent and every
+"edited away"; a refresh applies its reply only if the counter is still what it captured. Without
+it — the first commit — a click on a _different_ rule while an edit's request was in flight let
+the slower reply win, retitling the pane to the old rule while the slot pointed at the new one;
+VS Code has no debounce, so an edit burst could also deliver replies out of order. Found in
+review, not by a click. What the two
 producers disagree on (§4.8's table) bites here: the wasm lens addresses by **name**, so its args
 are re-sent unchanged; the LSP lens addresses by **exact `SrcPos`**
 (`L4.StateGraph.Lens.stateGraphAtPos`), so the position must be moved along under every edit.
@@ -1446,7 +1488,7 @@ too fragile.
 **The web-host eviction is resolved as "survive", not "redraw over".** P2g measured that every
 edit's ladder auto-refresh set `rightPaneView = 'ladder'` unconditionally. Now it does so only when
 the ladder was asked for by a click (`args.length > 1`, i.e. `[verDocId, name, simplify]`) or the
-pane is not showing the state graph (`+page.svelte:854`); the auto-refresh `[verDocId]` redraws
+pane is not showing the state graph (`+page.svelte:864`); the auto-refresh `[verDocId]` redraws
 the ladder in place behind the state graph, which is being redrawn from the same edit. The
 `'inspector'` view's eviction is untouched.
 
@@ -1458,12 +1500,16 @@ stroke-dasharray="5,2"`, and two `<text>` lines on edge1 with `ONCE ALL HAVE` se
 by `l4 state-graph`, `0 -> 0` — the task's cycle witness) renders the loop in HENCE green with its
 label; RAND/ROR diamonds with `ALL OF`/`ONE OF`; XML escaping of `<img onerror>` and `<script>`;
 bad DOT rejects with Graphviz's `syntax error`. `ts-apps/vscode/src/unit-tests/state-graph.test.ts`
-(`node --test`, the existing rig): 11 tests — the CSP string, the inlined picture and the
-`<details>` fold, heading escaping and `</`-safe JSON, the error document, and `trackSrcPos`
-across six edit shapes (below/above/at the DECIDE, same-line column shifts, a covering delete, two
-changes in order). Root `npm run test` → 28 tasks successful, `state-graph-render` 8/8, `l4-vscode`
-17/17 (6 pre-existing + 11); `npm run build`, `lint`, `format:check`, `check` all green;
-`doc/test-docs.sh` → 1518 links, 103 `.l4` files, 254 linked, 0 errors. The Haskell side is
+(`node --test`, the existing rig): 12 tests — the CSP string, the inlined picture and the
+`<details>` fold, heading escaping and `</`-safe JSON, the error document, the dimmed-under-error
+update (added by the review fix-up; it pins the CSS rule and the two lines of the message handler,
+since the webview script has no DOM to run in here), and `trackSrcPos` across six edit shapes
+(below/above/at the DECIDE, same-line column shifts, a covering delete, two changes in order). Root
+`npm run test` → 28 tasks successful, `state-graph-render` 8/8, `l4-vscode` 18/18 (6 pre-existing
+plus 12); `npm run build`, `lint`, `format:check`, `check` all green; `doc/test-docs.sh` → 1518
+links, 103 `.l4` files, 254 linked, 0 errors (re-run after the fix-up: same counts). The
+generation guard has no unit test: both hosts' refresh paths live inside the language-client
+middleware, which neither rig instantiates; it was read, not clicked. The Haskell side is
 untouched, so `StateGraphLensSpec.hs` was not extended and no cabal target was rebuilt.
 
 **Doc.** `doc/reference/regulative/STATE-GRAPH.md` no longer says the pane shows source, no longer
@@ -1477,10 +1523,14 @@ feature line and the third-party notice.
 - _A human click, in either host._ Still nobody. This session tried: `jl4-lsp ws` on `:5007`
   plus `vite dev` on `:5173`, driven from Chrome — the page's `MonacoLanguageClient` construction
   throws `Default api is not ready yet, do not forget to import 'vscode/localExtensionHost'`
-  before any lens can exist, **identically with this branch's `+page.svelte` and with `HEAD`'s
-  swapped back in** (measured by copying the two files aside, `git show HEAD:… >`, reloading,
-  and restoring), so the failure is pre-existing in this dev setup and not this change, and
-  it blocks the click here. What was exercised in Chrome instead, by importing the built
+  before any lens can exist, **identically with this branch's `+page.svelte` and with
+  `0139c6c5`'s (`lts/p2-followups`, the base) swapped back in** — measured by copying the two
+  edited files under `ts-apps/jl4-web/src/` aside, `git show 0139c6c5:… >`, reloading, and
+  restoring; **two files reverted, the new workspace dependency in `ts-apps/jl4-web/package.json`
+  and the lockfile stayed in place**, so the experiment clears the Svelte edits, not the
+  dependency change (a `monaco-vscode-api` init error is not plausibly a dependency's doing, but
+  the swap did not test that). The failure is pre-existing in this dev setup and not this
+  change, and it blocks the click here. What was exercised in Chrome instead, by importing the built
   wrapper into the loaded page: the self-loop fixture rendered in **31.6 ms** with 6 ellipses and
   the `0 -> 0` edge, i.e. Graphviz-in-wasm instantiates and draws in this browser. The VS Code
   path was exercised only as far as an esbuild `cjs` bundle of the wrapper under Node (renders

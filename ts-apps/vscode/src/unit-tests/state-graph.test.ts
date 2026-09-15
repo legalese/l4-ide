@@ -72,6 +72,28 @@ describe('renderStateGraphHtml', () => {
     assert.ok(html.includes('<div id="picture"></div>'))
   })
 
+  test('an update that failed to render keeps the last picture, dimmed under the error', () => {
+    // The webview script is not run here (no DOM); pin the two halves of the
+    // behaviour it implements: a `.faded` rule exists, and the update branch
+    // replaces the picture only when an svg arrived and toggles `faded` on
+    // exactly the no-svg case.
+    const html = renderStateGraphHtml({ name: 'r', dot: 'digraph {}', svg })
+    assert.match(html, /#picture\.faded \{ opacity: 0\.35; \}/)
+    const script = html.match(
+      /<script nonce="[a-z0-9]+">([\s\S]*?)<\/script>/
+    )?.[1]
+    assert.ok(script)
+    assert.ok(
+      script.includes("if (msg.svg) { el('picture').innerHTML = msg.svg; }")
+    )
+    assert.ok(
+      script.includes("el('picture').classList.toggle('faded', !msg.svg);")
+    )
+    // and the initial document never starts dimmed
+    assert.ok(html.includes('<div id="picture">'))
+    assert.ok(!html.includes('<div id="picture" class='))
+  })
+
   test('escapeHtml covers the four characters that matter', () => {
     assert.equal(escapeHtml('a & <b> "c"'), 'a &amp; &lt;b&gt; &quot;c&quot;')
   })

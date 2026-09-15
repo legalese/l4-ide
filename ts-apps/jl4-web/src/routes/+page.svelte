@@ -88,6 +88,11 @@
   // the language server's by the DECIDE's 1-indexed start position (args
   // [verDocId, srcPos]), which trackSrcPos moves along under each edit.
   let stateGraphTarget: { uri: string; address: string | SrcPos } | null = null
+  // Bumped on every lens click and every refresh sent; a refresh applies its
+  // reply only if the value is still the one it captured, so a reply for a
+  // superseded target (a click on another rule, or a later edit) is dropped
+  // instead of overwriting the fresher picture.
+  let stateGraphGeneration = 0
   // `l4.stateGraph` sent straight to the server (or the wasm shim), bypassing
   // the command middleware: the click's branch there also switches panes.
   const ExecuteStateGraphRequest = makeL4RpcRequestType<
@@ -189,11 +194,14 @@
     async (verDocId: VersionedDocId) => {
       if (!monacoL4LangClient || !stateGraphTarget) return
       const target = stateGraphTarget
+      const generation = ++stateGraphGeneration
       try {
         const reply = await monacoL4LangClient.sendRequest(
           ExecuteStateGraphRequest,
           { command: 'l4.stateGraph', arguments: [verDocId, target.address] }
         )
+        // Superseded while in flight: a click or a later edit owns the pane now
+        if (generation !== stateGraphGeneration) return
         if (isStateGraphResponse(reply)) {
           stateGraph = { name: reply.name, dot: reply.dot }
           stateGraphStale = null
@@ -204,6 +212,7 @@
             'No state graph for this rule after that edit. Press "Show state graph" again to redraw.'
         }
       } catch (e) {
+        if (generation !== stateGraphGeneration) return
         // The language server refuses when no regulative rule starts there
         stateGraphTarget = null
         stateGraphStale = `No state graph at the rule's position after that edit (${
@@ -808,6 +817,7 @@
                 string | SrcPos,
               ]
               stateGraphTarget = { uri: verDocId.uri, address }
+              stateGraphGeneration++
               stateGraphStale = null
               stateGraph = {
                 name: responseFromLangServer.name,
@@ -895,6 +905,7 @@
               )
               if (!moved) {
                 stateGraphTarget = null
+                stateGraphGeneration++ // an in-flight refresh must not undo the notice
                 stateGraphStale =
                   'The rule this graph was drawn from was edited away. Press "Show state graph" again to redraw.'
                 return

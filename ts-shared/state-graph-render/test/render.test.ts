@@ -29,7 +29,7 @@ const selfLoop = readFileSync(resolve(HERE, 'fixtures/self-loop.dot'), 'utf8')
 
 const count = (s: string, re: RegExp) => (s.match(re) ?? []).length
 
-test('the Graphviz version is the one the memo measured', () => {
+test('the Graphviz version is the one the corpus was measured against (etc/state-graph-corpus-diff.mjs)', () => {
   assert.equal(graphvizVersion, '16.0.0')
 })
 
