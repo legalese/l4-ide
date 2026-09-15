@@ -760,13 +760,19 @@ and then never says how the reader reaches it. A view with no entry point is not
 
 #### The template, traced end to end
 
-The ladder's lens is the thing to copy, and it exists in full today:
+The ladder's lens is the thing to copy, and it existed in full when this was written. _(The
+anchors in this list and in the table below are of `unstable` before P2g; the P2g commit moved or
+shifted every one of them — items 1 and 4 and the table's `producer` row now live at
+`jl4-lsp/src/LSP/L4/Actions.hs:181` and `API.hs:691`, `:706`, `:405` — see LANDED below. They are
+left as written so the "four edits" argument still reads against the tree it was made on.)_
 
-1. **LSP producer** (`jl4-lsp/app/LSP/L4/Handlers.hs:381-407`). `mkDecisionGraphCodeLens` emits
+1. **LSP producer** (`jl4-lsp/app/LSP/L4/Handlers.hs:381-407`; moved 2026-09-15 to
+   `Actions.hs:181` `decisionGraphCodeLenses`). `mkDecisionGraphCodeLens` emits
    `{ title = "Show decision graph", command = "l4.visualize", arguments = [verTextDocId, srcPos, False] }`
    anchored at `pointRange (srcPosToPosition node.start)`. `foldTopLevelDecides` supplies the
-   candidates and `canVisualize` (`:392`) filters them by **speculatively running the visualiser**
-   and keeping only the `isRight` — so a lens never appears above something that would fail to draw.
+   candidates and `canVisualize` (`:392`; now `Actions.hs:196`) filters them by **speculatively
+   running the visualiser** and keeping only the `isRight` — so a lens never appears above
+   something that would fail to draw.
 2. **VS Code host.** `l4.visualize` is declared in `ts-apps/vscode/package.json:274`, named in
    `ts-apps/vscode/src/commands.ts:1`, and handled in `extension.mts`, which owns a panel manager
    (`:335`).
@@ -775,8 +781,9 @@ The ladder's lens is the thing to copy, and it exists in full today:
    `codeLensProvider` with `l4.visualize` in its command list (`:296-302`), routes
    `textDocument/codeLens` (`:245`) to `handleCodeLens` (`:356`), and executes the command at
    `:586`.
-4. **Wasm producer** (`jl4-core/src/L4/API.hs:644-676`). `l4CodeLenses` builds its own lens via
-   `Ladder.findAllVisualizableDecides` (`jl4-core/src/L4/Viz/Ladder.hs:242`) and `mkVizLens`.
+4. **Wasm producer** (`jl4-core/src/L4/API.hs:644-676`; shifted 2026-09-15 to `:691`, `mkVizLens`
+   at `:706`). `l4CodeLenses` builds its own lens via `Ladder.findAllVisualizableDecides`
+   (`jl4-core/src/L4/Viz/Ladder.hs:242`) and `mkVizLens`.
 
 **The discovery half is already symmetric.** `L4.StateGraph`'s own walk
 (`extractFromTopDecl`, `StateGraph.hs:393-398`) is the same shape as `foldTopLevelDecides` plus
@@ -790,13 +797,13 @@ The costly, non-obvious part — and the reason this is a spec entry rather than
 is that the two lens producers are **independent code paths that do not agree on how a target is
 named**:
 
-|                         | LSP path (VS Code)                                | wasm path (web IDE)                                                                   |
-| ----------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| producer                | `Handlers.hs:381`, in Haskell                     | `API.hs:658` `mkVizLens`, in Haskell                                                  |
-| addresses the target by | **source position** (`srcPos`)                    | **name** (`vd.vdName`)                                                                |
-| dispatches to           | `Ladder.doVisualize` on the node at that position | `l4_visualize_by_name` (`API.hs:403-407`)                                             |
-| index base              | LSP, 0-indexed                                    | Monaco, **1-indexed** (`mkVizLens`'s comment says so)                                 |
-| TS side must also       | declare the command in `package.json`             | list the command in `codeLensProvider` **and** add a `case` to the command dispatcher |
+|                         | LSP path (VS Code)                                   | wasm path (web IDE)                                                                   |
+| ----------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| producer                | `Handlers.hs:381`, in Haskell (now `Actions.hs:181`) | `API.hs:658` `mkVizLens`, in Haskell (now `:706`)                                     |
+| addresses the target by | **source position** (`srcPos`)                       | **name** (`vd.vdName`)                                                                |
+| dispatches to           | `Ladder.doVisualize` on the node at that position    | `l4_visualize_by_name` (`API.hs:403-407`; now `:405-409`)                             |
+| index base              | LSP, 0-indexed                                       | Monaco, **1-indexed** (`mkVizLens`'s comment says so)                                 |
+| TS side must also       | declare the command in `package.json`                | list the command in `codeLensProvider` **and** add a `case` to the command dispatcher |
 
 So a deontic lens is **four edits, not one**: a lens in the LSP handler, a lens in `l4CodeLenses`, a
 new name-addressed wasm export beside `l4_visualize_by_name` (there is no `l4_state_graph_by_name`
@@ -822,10 +829,12 @@ Two smaller points, stated rather than ruled:
   observation against `jl4/examples/legal/regcf/regcf.l4` and it should be made before the lens is
   designed, not after. R13. _(Measured 2026-09-15: they never stack. See §8 R13.)_
 
-#### LANDED 2026-09-15 — P2g, on `lts/p2g-codelens`
+#### LANDED 2026-09-15 — P2g, on `lts/p2g-codelens` (branch only; not merged to `unstable`)
 
 The four edits, plus the shared piece the "four edits" framing did not predict. Line numbers are
-of the tree this block was committed in.
+of the tree this block was committed in. "Landed" here means committed on the branch: at the time
+of writing the branch is unpushed and has no PR, and what would make it more than that is a PR
+into `unstable` with the `wasm-build` job green (see the last "not built" item).
 
 **The shared piece: `jl4-core/src/L4/StateGraph/Lens.hs` (new).** Both producers need the same
 three things — which `Decide`s earn a lens, how to find one again from a click, and what a click
@@ -844,8 +853,9 @@ for it — and `L4.StateGraph` itself is untouched.
    simplify flag), anchored at the `Decide` node's start like the ladder's. `stateGraphAtPos`
    (`:229`) serves the click. `Handlers.hs` concatenates the two producers (`:394-395`), gains
    `CmdStateGraph` (`:1044`, `:1051`) and dispatches it (`:322-329`). Because `l4CmdNames` feeds
-   `optExecuteCommandCommands` (`Server.hs:91`), both hosts' language clients register the command
-   without any further declaration.
+   `optExecuteCommandCommands` (`jl4-lsp/app/Server.hs:90-91`), the VS Code client and the
+   websocket-connected web client register the command from server capabilities; the wasm shim
+   has no server to ask and lists the command itself (item 4).
 2. **Wasm producer.** `jl4-core/src/L4/API.hs`: `l4CodeLenses` appends `stateGraphLenses` (`:702`)
    built by `mkStateGraphLens` (`:729`) — name-addressed, Monaco 1-indexed, arguments
    `[verDocId, name]` where `name` is `prettyLayout (getActual …)` with backticks, spelled the same
@@ -884,7 +894,12 @@ check` (jl4-web, 0 errors 0 warnings), `npm run test` (vscode, 6 pass), `npx pre
 
 **Doc.** `doc/reference/regulative/STATE-GRAPH.md` (new), linked from `SUMMARY.md`, the regulative
 README, module 6 and the regulative-rules concept page; `doc/test-docs.sh` → 1495 links, 100 `.l4`
-files, 250 linked, 0 errors.
+files, 250 linked, 0 errors. _Review 2026-09-15 changed:_ the page had said the lens "works the
+same way … in the web editor at jl4.legalese.com" in the present tense; the web path was never
+built for wasm here (previous bullet), and that host is deployed by hand with `nixos-rebuild`
+from a checkout (`nix/README.md:22-29`) that cannot contain an unpushed branch. It now says the web editor gets it "from the release that carries this change" and names no URL.
+Same pass: `next`/`failure` for the two hand-over arms (`StateGraph.hs:861`, `:909`), the bare-MAY
+gap from the extractor's own NOTE (`:917-935`), and the web-host pane eviction above.
 
 **Not built, and what would make it true.**
 
@@ -894,13 +909,30 @@ files, 250 linked, 0 errors.
 - _Live refresh._ The ladder redraws on every `didChange`; the state-graph pane is a snapshot and
   says so. Wiring it to `didChange` is one more branch in each host's middleware plus a "last
   target" slot, the same shape as `lastVizArgs`; not done because a snapshot of DOT text that
-  nobody renders in-pane gains nothing from refreshing.
+  nobody renders in-pane gains nothing from refreshing. **In the web host the snapshot is also
+  evicted:** every edit runs `debouncedVisualize` (`+page.svelte:161-167`, called from `didChange`
+  at `:826`), and a successful ladder reply sets `rightPaneView = 'ladder'` unconditionally
+  (`:797`), reclaiming the shared pane from `'stategraph'` (`:763`) — the same thing already
+  happens to the `'inspector'` view (`:561`, `:718`). Read from code, not clicked. Left as is
+  rather than guarded, because guarding would leave a stale map in front of a reader who has just
+  changed the rule, and the doc page now says what happens instead. VS Code is unaffected: its
+  pane is a separate webview (`state-graph-panel.ts`).
 - _Pane sharing._ VS Code got a panel of its own rather than a second view type in the ladder's
   `PanelManager`, because that manager loads the ladder webview bundle and messenger, none of which
   a `<pre>` needs. Revisit when there is a picture.
 - _Neither host was exercised by a human click._ The producers and the LSP click handler are
-  under test; the TS is type-checked, linted and (vscode) unit-tested, but nobody opened an editor
+  under test; the TS is type-checked and linted, but **no unit test covers the state-graph path
+  in either host** — the "6 pass" above is `path-translation.test.ts` and `extension.test.ts`,
+  both pre-existing, and `grep -rn "stateGraph\|StateGraphPanel\|cmdStateGraph"` over
+  `ts-apps/vscode/src/unit-tests/` and `src/test/suite/` finds nothing. Nobody opened an editor
   and pressed the lens. That is the first thing the integrator should do.
+- _The wasm build._ `l4_state_graph_by_name` (`API.hs:413`) and the `l4CodeLenses` change sit
+  under `#if defined(wasm32_HOST_ARCH)` (`API.hs:356`–`444`), and no wasm toolchain is installed
+  where this was built (`wasm32-wasi-ghc`, `wasm32-wasi-cabal`: not found), so `cabal test all`
+  never compiled that export and nothing on this branch has run it. CI's `wasm-build` job
+  (`.github/workflows/pr-checks.yml:2018`) compiles it on the PR; nothing executes it until someone
+  clicks the lens in jl4-web in wasm mode. The native tests in `ApiStateGraphLensSpec.hs` exercise
+  `l4StateGraphByName`/`l4CodeLenses`, i.e. everything up to the FFI edge, not the edge itself.
 
 ### 4.9 Catching up with EVERY/EACH — where the join is lost, measured
 

@@ -8,7 +8,7 @@ import * as vscode from 'vscode'
  * @hpcc-js/wasm anywhere in the lockfile — checked 2026-09-15), and adding a
  * renderer is a lockfile change with its own review, so step 1 is the honest
  * one: show the DOT, let the reader copy it into any Graphviz. See
- * `doc/reference/regulative/state-graph-lens.md` for what it does and does
+ * `doc/reference/regulative/STATE-GRAPH.md` for what it does and does
  * not say, and LTS-VISUALISER.md §4.8 for why the entry point is worth having
  * before the picture is.
  *

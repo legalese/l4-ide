@@ -5,7 +5,7 @@
   `l4.stateGraph` with the rule's state graph as GraphViz DOT source. Nothing
   in this repository renders DOT, and adding a renderer means a lockfile
   change, so step 1 shows the DOT and lets the reader copy it into any
-  Graphviz. See doc/reference/regulative/state-graph-lens.md.
+  Graphviz. See doc/reference/regulative/STATE-GRAPH.md.
 -->
 <script lang="ts">
   import { toast } from '@zerodevx/svelte-toast'

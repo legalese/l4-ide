@@ -3,8 +3,9 @@
 -- | The wasm side of the state-graph code lens: 'L4.API.l4CodeLenses' emits
 -- a name-addressed "Show state graph" lens above every regulative rule, and
 -- 'L4.API.l4StateGraphByName' serves the click with the name the lens
--- carried. The web IDE never runs the language server, so this path is the
--- only one it has (LTS-VISUALISER.md §4.8, "two producers, two addressing
+-- carried. The web IDE in wasm mode has no language server, so this is the
+-- only producer it sees there; over its websocket transport it gets the LSP
+-- producer instead (LTS-VISUALISER.md §4.8, "two producers, two addressing
 -- modes, two hosts").
 module ApiStateGraphLensSpec (spec) where
 

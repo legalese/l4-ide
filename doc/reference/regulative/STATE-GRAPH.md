@@ -14,8 +14,9 @@ important — what the map does and does not tell you.
 ## Getting the map in the editor
 
 Open any `.l4` file that has a regulative rule in it. Just above the rule, in small grey text, the
-editor offers **Show state graph**. This works the same way in the L4 extension for Visual Studio
-Code and in the web editor at jl4.legalese.com.
+editor offers **Show state graph**. It is built for the L4 extension for Visual Studio Code and
+for the web editor alike; the web editor gets it from the release that carries this change, so if
+you do not see it there yet, that release has not shipped.
 
 ```l4
 GIVETH A DEONTIC Actor Action
@@ -43,7 +44,10 @@ Drawing the picture inside the editor is the next step, and it has not been buil
 the pane is honest about being the source.
 
 The pane is a snapshot. It does not redraw itself as you edit; click **Show state graph** again to
-see the map for the rule as it now stands.
+see the map for the rule as it now stands. In the web editor the pane is also shared with the
+decision graph, which _does_ redraw on every edit — so your next keystroke hands the pane back to
+the ladder, and the map is gone until you click again. In Visual Studio Code the map has a pane of
+its own and stays put, stale, until you click again.
 
 ## Getting the map from the command line
 
@@ -98,12 +102,14 @@ by the map. A map with every road on it is not a map with a "you are here" dot, 
 dot.
 
 **It shows one rule at a time.** A `HENCE` or `LEST` that hands over to another named rule is drawn
-as an arrow into a place labelled `next`, and stops there. To see where that rule goes, open its
-own map.
+as an arrow into a place labelled `next` (for `HENCE`) or `failure` (for `LEST`), and stops there.
+To see where that rule goes, open its own map.
 
 **A `MAY` with no `LEST` has no red arrow.** A permission nobody exercises simply ends, so the
-default there is `FULFILLED`, and the map draws only the green arrow. A `MAY` with an explicit
-`LEST` gets a red arrow captioned `lapses`.
+default there is `FULFILLED`, and the map draws only the green arrow. If such a `MAY` has a
+`HENCE` that leads on to another obligation, the lapse route to `FULFILLED` is not drawn at all —
+the map shows only the `HENCE` path, and a rule that can in fact end quietly looks as if it cannot.
+A `MAY` with an explicit `LEST` gets a red arrow captioned `lapses`.
 
 **An `EVERY` is one arrow, not one per member.** `EVERY Tenant t IN tenants MUST Sign` is drawn as
 a single arrow labelled with the quantifier, because who the tenants are is only known when the
