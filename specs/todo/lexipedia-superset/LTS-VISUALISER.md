@@ -882,7 +882,13 @@ inverted a `SHANT` barrier (drawn as breaching only when _every_ member had offe
 one act) and a `MAY` barrier with a continuation (the lapse timer routed _into_ the chair's duty to
 publish a resolution that did not pass; `l4 run` says FULFILLED). Fixed: `completionCondition
 nrOfCompletedInstances >= 1` on a prohibition, read off R-Q5; and the state graph now draws a
-barrier-joined `MAY`'s lapse as a LEST arm to Fulfilled. (2) The fork's interrupting timer cancels
+barrier-joined `MAY`'s lapse as a LEST arm to Fulfilled. **Corrected 2026-09-16:** the review's
+§A also said a fork's `MAY` "carries the real HENCE per member, so a lapsed member does route
+there", and the first cut drew it so. Re-measured by `lts-diagrams-2` and reproduced: nobody
+approves, chair publishes anyway → FULFILLED under the fork as under the barrier; the continuation
+arises only from an act. The lapse arm now goes to Fulfilled under either join, the two tests that
+had pinned the reviewer's reading were flipped, and `modals-may-fork` re-goldened. A reviewer's
+sentence is a claim like any other; the pin that caught nothing was the pin written from it. (2) The fork's interrupting timer cancels
 every instance, so a continuation a member had already spawned is never drawn — an obligation L4
 says arose is absent and its breacher exonerated; new `P-FORK-CANCEL`. (3) `P-JOIN-DEADLINE` on a
 fork reported a loss that is not one: `joinStateDue` is `Nothing` for `JoinUpon`, so the runtime

@@ -8,7 +8,10 @@ fidelity report — BPMN 2.0
   [P-FORK] lossy — Task_0
       The diagram says: what follows this activity happens once, after the last instance completes. The rule says: the join line is UPON EACH, and what follows fires once per member, as that member completes. BPMN has shapes for once-per-member — a multi-instance subProcess enclosing the continuation, or a None completion behaviour caught by a non-interrupting boundary event — and this exporter emits neither.
       lost: the per-member firing of the continuation; what is drawn fires once, for the group
-  [P-DEADLINE-UNIT] advisory — Lapse_0
+  [P-FORK-CANCEL] lossy — Task_0
+      The diagram says: when the timer on this activity fires, every instance is cancelled and nothing drawn after the activity is reached. The rule says: a member who has already acted has already started their own continuation, which another member's failure does not touch — so an obligation that arose in L4 is absent from the diagram, and a party who breached it is drawn as owing nothing.
+      lost: every continuation spawned before the timer fired, and the breaches of those continuations
+  [P-DEADLINE-UNIT] advisory — Boundary_0
       Deadline ‘30’ carries no unit, because nothing in L4 fixes one — WITHIN is typed as a bare NUMBER (TypeCheck.hs) and the evaluator only ever adds it to an event timestamp. It is read here as days (P30D), following the commonest convention in the corpus, where event clocks are day counts (libraries/daydate.l4, `Day` AKA `Date to days`). A model stamping events in abstract ticks will need this edited.
       lost: certainty about the unit — if this model's clock is not days, the duration needs editing
   [F1] blocking — Task_1

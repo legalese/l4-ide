@@ -98,9 +98,11 @@ byte-identical fidelity report, because `L4.StateGraph.extractDeonton` never rea
   documentation on the task says so. **Not so for the other modals**, which the review of
   2026-09-15 caught: a `SHANT` completes on the _first_ instance (`completionCondition
   nrOfCompletedInstances >= 1`, read off R-Q5 — one act is the breach; `P-PROHIBITION-FIRST`), and
-  a `MAY` barrier's lapse is a LEST arm to Fulfilled in the state graph, so the exporter's
-  synthesised "lapse routes where HENCE routes" never fires for it — a resolution that did not
-  pass creates no duty to publish it. `modals.l4` pins every cell.
+  a quantified `MAY`'s lapse — under either join — is a LEST arm to Fulfilled in the state graph,
+  so the exporter's synthesised "lapse routes where HENCE routes" never fires for it: a resolution
+  that did not pass creates no duty to publish it, and under a fork the continuation arises only
+  from a member's act, never from a lapse (measured 2026-09-16; a first cut drew the fork the
+  other way on the review's word). `modals.l4` pins every cell.
 - **The fork (`UPON EACH`) is the one this exporter does not draw faithfully.** The source fires
   the continuation once per member as that member completes; the activity fires once, after all of
   them (`P-FORK`, lossy), and its interrupting timer cancels every instance, so a continuation a
