@@ -53,6 +53,7 @@ import qualified Base.DList as DList
 import qualified Base.Text as Text
 import qualified Base.Map as Map
 import qualified Base.Set as Set
+import qualified Data.List.NonEmpty as NE
 import Control.Concurrent
 import System.Environment (lookupEnv)
 import qualified Data.ByteString as BS
@@ -92,7 +93,7 @@ import L4.Evaluate.Ledger
 import L4.Evaluate.Operators
 import L4.Evaluate.ValueLazy
 import L4.TemporalContext (CtxReads (..), EvalClause (..), ReadObs (..), TemporalContext (..), applyEvalClauses, hasReads, noReads, validFor)
-import L4.Parser.SrcSpan (SrcRange)
+import L4.Parser.SrcSpan (SrcRange, prettySrcRangeM)
 import L4.Print hiding (tryLoadTZ, tryLoadTZPure, formatDateTimeIso)
 import L4.Syntax
 import qualified L4.TypeCheck as TypeCheck
@@ -1004,11 +1005,19 @@ forwardExpr env = \ case
   AsString _ann e -> do
     pushFrame AsStringFrame
     continueExpr env e
-  Breach _ann mParty mReason -> do
-    -- Explicit breach terminal clause - immediately produces a breach value
-    mPartyRef <- traverse (\p -> allocate_ p env) mParty
+  Breach ann mParty mReason -> do
+    -- Explicit breach terminal clause - produces a breach value. The BY
+    -- expression is a party or a LIST of parties (R-T3, spec §6.1): the
+    -- checker admits both and leaves no mark, so the machine forces it and
+    -- decides by shape ('BreachBy'). A breach with no BY names nobody.
     mReasonRef <- traverse (\r -> allocate_ r env) mReason
-    continueBackward (ValBreached (ExplicitBreach mPartyRef mReasonRef))
+    case mParty of
+      Nothing -> continueBackward (ValBreached (ExplicitBreach Nothing mReasonRef))
+      Just p  -> do
+        partyRef <- allocate_ p env
+        pushFrame $ ContractFrame $ BreachBy BreachByFrame
+          { partyRef, acc = [], mReason = mReasonRef, clause = prettySrcRangeM (rangeOf ann) }
+        continueRef partyRef
   -- REFUSE only ever reaches 'forwardExpr' when the machine actually REDUCES
   -- it, so a refusal inside an unforced thunk is never entered. That is what
   -- makes @FALSE AND <refusing>@ answer FALSE while @<refusing> AND FALSE@
@@ -1631,7 +1640,7 @@ backwardContractFrame val = \ case
               Nothing -> do
                 -- NOTE: this is not too nice, but not wanting this would require to change `App1` to take MaybeEvaluated's
                 partyR <- either (`allocate_` env) allocateValue party
-                continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp partyR act deadline))
+                continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp (partyR :| []) act deadline))
               Just lestFollowup -> reofferResolve lestFollowup
       else do
         -- NOTE: we have observed the event and do not branch, either, the
@@ -1693,7 +1702,7 @@ backwardContractFrame val = \ case
               -- matrix only mandates SHANT+action => LEST/breach and does not
               -- prescribe the breach record's deadline field, so this does
               -- not contradict the spec.
-              continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp partyRef act stamp))
+              continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp (partyRef :| []) act stamp))
           -- MUST, MAY, DO: action done = success
           _ -> allocateValue time
             >>= continueWithFollowup (Just (partyKeyWHNF party)) (env `Map.union` henceEnv) followup events
@@ -1752,17 +1761,26 @@ backwardContractFrame val = \ case
         continueRef tRef
       -- The failure sentinel carries the anchor and the residual stream the
       -- machine computed for this member's miss, which is exactly what the
-      -- barrier's LEST needs — so it runs ONCE, here, and the member is never
-      -- applied to the stream a second time.
-      ValConstructor n [tRef, evRef] | Just fp <- failpoint, n `sameResolved` fp ->
-        barrierFail ctx tRef evRef
+      -- barrier's LEST needs — so it runs ONCE, after every member has been
+      -- run ('barrierFinish'), anchored at the EARLIEST failure, and no
+      -- member is ever applied to the stream a second time. The anchor is
+      -- forced here so the failures can be ordered.
+      ValConstructor n [tRef, evRef] | Just fp <- failpoint, n `sameResolved` fp -> do
+        pushCFrame (Barrier5 BarrierFailStampFrame {step = BarrierStepFrame {..}, timeRef = tRef, evsRef = evRef})
+        continueRef tRef
       -- Still waiting. Keep the RESIDUAL ('val'), not the obligation as it
       -- stood before the scan ('current'): the residual is the one whose
       -- deadline has been decremented by the time that has passed.
       ValObligation{} -> barrierNext BarrierStepFrame {pending = val : pending, ..}
       ValROp{}        -> barrierNext BarrierStepFrame {pending = val : pending, ..}
+      -- A member's own breach, under a barrier with no LEST (so no sentinel
+      -- was minted). Recorded, not returned: the scan goes on so that the
+      -- verdict can name EVERY member that failed (R-T3, spec §6.1).
+      ValBreached reason ->
+        barrierNext BarrierStepFrame {failures = BarrierBreached reason : failures, ..}
       -- A MAY member whose permission expired under a barrier with no LEST:
       -- nothing was owed, so nothing is breached, but the join cannot fire.
+      ValFulfilled    -> barrierNext BarrierStepFrame {lapsed = True, ..}
       _               -> continueBackward val
   -- EVERY, the barrier: a completion's timestamp. The LATEST one is the
   -- join's firing time, and the stream that followed it is what the HENCE
@@ -1773,6 +1791,39 @@ backwardContractFrame val = \ case
           Just (t, _) | t >= stamp -> step.tLast
           _                        -> Just (stamp, evsRef)
     barrierNext step {tLast = better}
+  -- EVERY, the barrier: a failing member's anchor, forced. Kept in roll
+  -- order; 'barrierFinish' picks the earliest.
+  Barrier5 BarrierFailStampFrame {..} -> do
+    stamp <- assertTime val
+    barrierNext step
+      { failures = BarrierFailedAt {failAt = stamp, failTimeRef = timeRef, failEvsRef = evsRef} : step.failures }
+  -- BREACH BY e: the party expression, forced. A LIST names each of its
+  -- elements (walked one cell per step, like the roll call); anything else
+  -- is the one party, already forced, so there is nothing to deduplicate.
+  BreachBy BreachByFrame {..} ->
+    case val of
+      ValCons hd tl -> do
+        pushCFrame (BreachBy BreachByFrame {acc = hd : acc, ..})
+        continueRef tl
+      ValNil -> case reverse acc of
+        []       -> userException (UserError (emptyBreachByRefusal clause))
+        (p : ps) -> blameParties (ExplicitBreach Nothing mReason) (p : ps)
+      _ | null acc -> continueBackward (ValBreached (ExplicitBreach (Just (partyRef :| [])) mReason))
+        | otherwise -> internalException $ RuntimeTypeError $
+            "expected a LIST of parties after BREACH BY but found: " <> prettyLayout val
+  -- The blame set: one party forced per step, deduplicated by the same key
+  -- that names a party's ledger, first occurrence kept.
+  BreachParties BreachPartiesFrame {..} -> do
+    let key   = partyKeyWHNF val
+        seen' = if any ((== key) . fst) seen then seen else (key, current) : seen
+    case rest of
+      (p : ps) -> do
+        pushCFrame (BreachParties BreachPartiesFrame {seen = seen', current = p, rest = ps, ..})
+        continueRef p
+      [] -> case reverse (map snd seen') of
+        (p : ps) -> continueBackward (ValBreached (withParties (p :| ps) anchor))
+        []       -> internalException $ RuntimeTypeError
+          "a breach's blame set came back empty after at least one party was forced"
   -- EVERY, the barrier: the WITHIN on the ONCE line (R-T2), which bounds the
   -- WHOLE (spec §2.2.7.5 point 3) rather than any one act.
   Barrier3 BarrierStateDueFrame {..} -> do
@@ -1811,30 +1862,36 @@ backwardContractFrame val = \ case
     | ValBreached r1 <- rval1
     , ValBreached r2 <- val
     -> do
-      -- NOTE: depending on the operation, we return
-      -- the first breach, if the operation was and,
-      -- because they're already the reason
-      -- the second breach, if the operation was or,
-      -- because they "missed their chance"
-      -- If both happen at the same time, we return
-      -- an arbitrary one (consistently with CSL):
-      -- the left operand for RAND, the right for ROR.
+      -- NOTE: the compound breach is ANCHORED at one operand's breach and
+      -- BLAMES both operands' parties (R-T3, spec §6.1, built 2026-09-15).
+      --
+      -- The anchor — whose revealing event, action, deadline and BECAUSE the
+      -- result carries — is chosen by time: the FIRST breach for RAND,
+      -- because it is already the reason the conjunction is lost; the
+      -- SECOND for ROR, because that is when the last alternative "missed
+      -- its chance". When both happen at the same time the tie goes to the
+      -- left operand for RAND and the right for ROR (consistently with CSL).
       -- ExplicitBreach carries no timestamp (adding one would ripple through
       -- the constructor arity and the jl4-service wire — known limitation),
       -- so a pair involving one is treated as simultaneous and resolved by
       -- the same tie-break.
-      continueBackward $ ValBreached $
-        case (breachTime r1, breachTime r2) of
-          (Just vt, Just vt')
-            | vt <= vt' -> case op of
-                ValRAnd -> r1
-                ValROr -> r2
-            | otherwise -> case op of
-                ValROr -> r1
-                ValRAnd -> r2
-          _ -> case op of
-            ValRAnd -> r1
-            ValROr -> r2
+      --
+      -- The parties are the UNION of both operands', left operand first,
+      -- deduplicated by party key keeping the first occurrence — which needs
+      -- each party forced, hence the 'BreachParties' frames. A breach with
+      -- no BY contributes nothing; two of them name nobody, as before.
+      let anchor = case (breachTime r1, breachTime r2) of
+            (Just vt, Just vt')
+              | vt <= vt' -> case op of
+                  ValRAnd -> r1
+                  ValROr -> r2
+              | otherwise -> case op of
+                  ValROr -> r1
+                  ValRAnd -> r2
+            _ -> case op of
+              ValRAnd -> r1
+              ValROr -> r2
+      blameParties anchor (breachParties r1 <> breachParties r2)
 
   RBinOp2 MkRBinOp2 {..}
     | ValFulfilled <- val
@@ -2199,7 +2256,8 @@ startBarrier ctx members mdue = do
     []       -> fireBarrierHence ctx ctx.time ctx.events
     (o : os) -> barrierRun BarrierStepFrame
       { ctx, checkpoint = cp, failpoint = fmap fst mfail
-      , current = o, queue = os, tLast = Nothing, pending = [] }
+      , current = o, queue = os, tLast = Nothing, pending = []
+      , failures = [], lapsed = False }
 
 -- | Apply the barrier's current member to the (whole) event stream.
 barrierRun :: BarrierStepFrame -> Machine Config
@@ -2214,27 +2272,79 @@ barrierNext step = case step.queue of
   []       -> barrierFinish step
   (o : os) -> barrierRun step {current = o, queue = os}
 
--- | Every member has been run and none failed.
+-- | Every member has been run: the verdict.
+--
+-- Failures come first, because a member that definitively did not complete
+-- settles the barrier whatever the others did — as it did when the first
+-- failure ended the scan, only now every member has been run, so ALL of
+-- them are named and the earliest of them is the anchor (R-T3, spec §6.1;
+-- ordering by R-Q5's failure time, §5.2):
+--
+--   * with a @LEST@, each failure arrived through the failpoint sentinel
+--     ('BarrierFailedAt'). The @LEST@ runs ONCE, with the anchor and residual
+--     stream of the EARLIEST failure (ties: the first in roll order). The
+--     anchor the sentinel carries is the revealing event's stamp, and
+--     ordering by it orders by the missed deadline, because every member
+--     scans the same stream: an earlier deadline is revealed by an
+--     earlier-or-equal event, and a tie is the same event — same anchor,
+--     same residual. §5.2's change of what the anchor IS is not built here.
+--   * with no @LEST@, each failure is the member's own breach
+--     ('BarrierBreached'). The verdict is ONE breach: anchored at the
+--     earliest failure — the smallest missed deadline for @MUST@\/@DO@, the
+--     violating event's stamp for @SHANT@, which is R-Q5's failure time and
+--     what 'DeadlineMissed' carries as its deadline — and naming every
+--     failed member, in roll order ('blameParties').
+--
+-- A lapsed @MAY@ (no @LEST@) is a non-completer that breached nothing: the
+-- join cannot fire and the verdict is @FULFILLED@, as before.
 barrierFinish :: BarrierStepFrame -> Machine Config
-barrierFinish step = case reverse step.pending of
-  -- Some members are still waiting for their event. The barrier has neither
-  -- fired nor failed; what remains to be done is those obligations, as the
-  -- scan left them — deadlines already decremented by the time that passed.
-  -- Their continuation slots still hold the sentinels, which print as
-  -- @`the join`@ and @`the join fails`@. Phase-2 limit: the residual does NOT
-  -- carry the JOIN LINE, so re-applying it to more events would run the
-  -- members and not the join.
-  (o : os) -> continueBackward (randFoldWHNF step.ctx.env o os)
-  [] -> case step.tLast of
-    Nothing       -> fireBarrierHence step.ctx step.ctx.time step.ctx.events
-    Just (t, evs) -> case joinStateDue step.ctx of
-      Nothing  -> do
-        tRef <- allocateValue (ValNumber t)
-        fireBarrierHence step.ctx tRef evs
-      Just due -> do
-        pushFrame (ContractFrame
-          (Barrier3 BarrierStateDueFrame {ctx = step.ctx, joinTime = t, joinEvents = evs}))
-        continueExpr step.ctx.env due
+barrierFinish step = case reverse step.failures of
+  (f : fs) -> case earliestFailure (f :| fs) of
+    BarrierFailedAt {failTimeRef, failEvsRef} -> barrierFail step.ctx failTimeRef failEvsRef
+    BarrierBreached {failReason} ->
+      blameParties failReason (concatMap failedParties (f : fs))
+  []
+    | step.lapsed -> continueBackward ValFulfilled
+    | otherwise -> case reverse step.pending of
+      -- Some members are still waiting for their event. The barrier has neither
+      -- fired nor failed; what remains to be done is those obligations, as the
+      -- scan left them — deadlines already decremented by the time that passed.
+      -- Their continuation slots still hold the sentinels, which print as
+      -- @`the join`@ and @`the join fails`@. Phase-2 limit: the residual does NOT
+      -- carry the JOIN LINE, so re-applying it to more events would run the
+      -- members and not the join.
+      (o : os) -> continueBackward (randFoldWHNF step.ctx.env o os)
+      [] -> case step.tLast of
+        Nothing       -> fireBarrierHence step.ctx step.ctx.time step.ctx.events
+        Just (t, evs) -> case joinStateDue step.ctx of
+          Nothing  -> do
+            tRef <- allocateValue (ValNumber t)
+            fireBarrierHence step.ctx tRef evs
+          Just due -> do
+            pushFrame (ContractFrame
+              (Barrier3 BarrierStateDueFrame {ctx = step.ctx, joinTime = t, joinEvents = evs}))
+            continueExpr step.ctx.env due
+  where
+    failedParties = \ case
+      BarrierBreached {failReason} -> breachParties failReason
+      BarrierFailedAt {}           -> []
+
+-- | The earliest of a barrier's failures, in the order they were recorded
+-- (roll order): a later one replaces the best so far only when both carry a
+-- time and the later one's is strictly earlier, so a tie keeps the first in
+-- roll order and an untimed failure ('ExplicitBreach', which no barrier
+-- member produces today) neither wins nor loses.
+earliestFailure :: NonEmpty BarrierFailure -> BarrierFailure
+earliestFailure (f :| fs) = foldl' pick f fs
+  where
+    pick best cand = case (failureTime best, failureTime cand) of
+      (Just tb, Just tc) | tc < tb -> cand
+      _                            -> best
+    failureTime = \ case
+      BarrierFailedAt {failAt} -> Just failAt
+      BarrierBreached {failReason} -> case failReason of
+        DeadlineMissed _ _ _ _ _ deadline -> Just deadline
+        ExplicitBreach _ _                -> Nothing
 
 -- | The join fires. The HENCE is anchored at the last completion and sees the
 -- stream that followed it (R-Q7, §5.1: unanchored, a HENCE counts from the
@@ -2252,10 +2362,11 @@ fireBarrierHence ctx timeRef eventsRef = do
   pushFrame (App1 [timeRef, eventsRef] Nothing)
   continueExpr ctx.env (fromMaybe fulfilExpr ctx.deonton.hence)
 
--- | A member did not complete, so the barrier cannot: run the barrier's LEST,
--- once, with the anchor and the residual stream the FAILING MEMBER'S OWN
--- expiry produced. Those arrive here through the 'failpoint' sentinel, which
--- is why the member is never applied to the event stream twice.
+-- | Some member did not complete, so the barrier cannot: run the barrier's
+-- LEST, once, with the anchor and the residual stream the EARLIEST failing
+-- member's own expiry produced ('barrierFinish'). Those arrive through the
+-- 'failpoint' sentinel, which is why no member is applied to the event
+-- stream twice.
 --
 -- The anchor is therefore the machine's usual one for a single-party
 -- obligation — the revealing event's stamp, not the missed deadline. §5.2
@@ -2263,11 +2374,14 @@ fireBarrierHence ctx timeRef eventsRef = do
 -- this one together; making only this one diverge would leave the language
 -- with two anchors.
 --
--- When the barrier has NO LEST this is unreachable: no sentinel is minted, so
--- a member's own outcome (a 'ValBreached' for a missed @MUST@, a
--- 'ValFulfilled' for a lapsed @MAY@) is returned as the barrier's, one
--- non-completer named, first in roll order — spec §6.1 wants the SET, and
--- 'ReasonForBreach' holds one party (R-T3, unbuilt).
+-- The LEST is the drafter's expression, run as written: a bare @LEST BREACH@
+-- names nobody, and @LEST BREACH BY LIST a, b@ names whom the drafter named.
+-- The machine does not inject the failed members into it — a quantified
+-- @BY@ that would name them from inside a barrier's LEST is not ruled (spec
+-- §6.1, BUILT 2026-09-15). Who failed is named by the verdict of a barrier
+-- WITHOUT a LEST, which is one 'DeadlineMissed' over every non-completer.
+--
+-- When the barrier has NO LEST this is unreachable: no sentinel is minted.
 barrierFail :: QuantCtx -> Reference -> Reference -> Machine Config
 barrierFail ctx timeRef eventsRef = case ctx.deonton.lest of
   Nothing -> internalException $ RuntimeTypeError
@@ -2304,6 +2418,41 @@ partyKeyWHNF :: WHNF -> Text
 partyKeyWHNF = \ case
   ValString t -> t
   v           -> prettyLayout v
+
+-- | The parties a breach names, in order (R-T3, spec §6.1).
+breachParties :: ReasonForBreach a -> [a]
+breachParties = \ case
+  DeadlineMissed _ _ _ ps _ _ -> NE.toList ps
+  ExplicitBreach mps _        -> maybe [] NE.toList mps
+
+-- | The same breach, blaming these parties instead.
+withParties :: NonEmpty a -> ReasonForBreach a -> ReasonForBreach a
+withParties ps = \ case
+  DeadlineMissed ev'p ev'a stamp _ act deadline -> DeadlineMissed ev'p ev'a stamp ps act deadline
+  ExplicitBreach _ mReason                      -> ExplicitBreach (Just ps) mReason
+
+-- | Finish a breach by settling its blame set: force each candidate party in
+-- turn (a party inside a breach is often still a thunk — the BY expression,
+-- or an obligation's party that no event ever reached), deduplicate by the
+-- key that names a party's ledger, keeping the first occurrence, and put the
+-- result in the anchor's party slot. With no candidates the anchor is
+-- returned as it is, naming whoever it already named.
+blameParties :: ReasonForBreach Reference -> [Reference] -> Machine Config
+blameParties anchor = \ case
+  []       -> continueBackward (ValBreached anchor)
+  (p : ps) -> do
+    pushFrame $ ContractFrame $ BreachParties BreachPartiesFrame
+      { anchor, seen = [], current = p, rest = ps }
+    continueRef p
+
+-- | What the machine says when @BREACH BY@ is given a list with nobody in it.
+emptyBreachByRefusal :: Text -> Text
+emptyBreachByRefusal clause = Text.unwords
+  [ "BREACH BY names an empty list, at " <> clause <> "."
+  , "A breach blames at least one party: give BY a party, or a LIST with"
+  , "someone in it, or leave BY out to blame nobody."
+  , "(EVERY-EACH-QUANTIFIER-SPEC section 6.1, R-T3.)"
+  ]
 
 -- | STATE-AS-LEDGER M1: perform a RECORD/COMMIT/ATTEST write.
 --

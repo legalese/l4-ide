@@ -7,11 +7,12 @@ Provides a reason or justification for a breach in regulative rules. Used with B
 ```l4
 BREACH BECAUSE reason
 BREACH BY party BECAUSE reason
+BREACH BY LIST party, party BECAUSE reason
 ```
 
 Where:
 
-- `party` - The party responsible for the breach (optional)
+- `party` - The party responsible for the breach (optional). After `BY` you may write one party, or a `LIST` of them when several share the blame
 - `reason` - A STRING explaining why the breach occurred
 
 ## Purpose
@@ -112,12 +113,32 @@ HENCE BREACH BY Employee BECAUSE "smoking policy violation logged"
 
 BREACH can be used in several forms:
 
-| Form        | Example                             | Description                  |
-| ----------- | ----------------------------------- | ---------------------------- |
-| Simple      | `BREACH`                            | Anonymous breach             |
-| With party  | `BREACH BY Seller`                  | Identifies responsible party |
-| With reason | `BREACH BECAUSE "reason"`           | Documents why                |
-| Full form   | `BREACH BY Seller BECAUSE "reason"` | Complete breach info         |
+| Form         | Example                             | Description                  |
+| ------------ | ----------------------------------- | ---------------------------- |
+| Simple       | `BREACH`                            | Anonymous breach             |
+| With party   | `BREACH BY Seller`                  | Identifies responsible party |
+| With parties | `BREACH BY LIST Seller, Carrier`    | Several share the blame      |
+| With reason  | `BREACH BECAUSE "reason"`           | Documents why                |
+| Full form    | `BREACH BY Seller BECAUSE "reason"` | Complete breach info         |
+
+### Several parties
+
+`BY` takes a `LIST` as well as a single party, for a breach that several parties carry together. The list can be written out or computed, and it is read when the breach happens: the same party named twice is named once, and a list with nobody in it is an error when the rule runs — a breach blames at least one party, so write no `BY` at all to blame nobody.
+
+```l4
+LEST BREACH BY LIST Seller, Carrier BECAUSE "goods lost in transit"
+```
+
+prints, when it fires:
+
+```
+DEONTIC BREACHED:
+  BREACH
+  BY LIST Seller, Carrier
+  BECAUSE "goods lost in transit"
+```
+
+You do not have to write the list yourself when the language already knows who failed. When both sides of a `RAND` are lost, the breach names both sides' parties; when several members of an `EVERY … ONCE ALL HAVE` group fail and the group has no `LEST`, the breach names every one of them. See [EVERY](EVERY.md#what-runs-today-and-what-does-not).
 
 ## Best Practices
 

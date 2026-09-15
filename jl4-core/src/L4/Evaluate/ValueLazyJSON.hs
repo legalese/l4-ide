@@ -14,18 +14,26 @@
 --   hand-rolled @serializeBreachReason@ in jl4-service (Backend.Jl4), so the
 --   two wire surfaces stay convergent: @eventParty@ / @eventAction@ /
 --   @timestamp@ / @obligationAction@ / @deadline@, plus @obligatedParty@
---   (which jl4-service currently drops on its own wire).
+--   (which jl4-service dropped on its own wire until 2026-09-15).
 --
 -- * For a violated prohibition (SHANT/MUST NOT with no LEST), the machine
 --   reuses the violating event's timestamp as the deadline sentinel, so
 --   @deadline == timestamp@ on the wire; see the Contract10 'DMustNot'
 --   branch in "L4.EvaluateLazy.Machine".
+--
+-- * The blame set (R-T3, EVERY-EACH-QUANTIFIER-SPEC §6.1, built 2026-09-15):
+--   a compound breach names every party that failed. The wire stays
+--   additive: the scalar @obligatedParty@ \/ @party@ is the HEAD of the set
+--   (for a single obligation's breach, the one party, exactly as before) and
+--   the array @obligatedParties@ \/ @parties@ is the whole set in operand \/
+--   roll order. @parties@ is @null@ when the explicit breach names nobody.
 module L4.Evaluate.ValueLazyJSON () where
 
 import Base
 import Data.Aeson (ToJSON(..), object, (.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
+import qualified Data.List.NonEmpty as NE
 import Data.Ratio (numerator, denominator)
 import qualified Data.Vector as Vector
 
@@ -90,17 +98,19 @@ instance ToJSON a => ToJSON (ReasonForBreach a) where
   --                  <obligated party> <obligation action> <deadline>
   -- (the first three describe the event that *revealed* the deadline expiry;
   -- the last three describe the obligation that was missed).
-  toJSON (DeadlineMissed evParty evAction stamp party action deadline) = object
+  toJSON (DeadlineMissed evParty evAction stamp parties action deadline) = object
     [ "type" .= ("deadline_missed" :: Text)
     , "eventParty" .= evParty
     , "eventAction" .= evAction
     , "timestamp" .= (fromRational stamp :: Double)
-    , "obligatedParty" .= party
+    , "obligatedParty" .= NE.head parties
+    , "obligatedParties" .= NE.toList parties
     , "obligationAction" .= prettyLayout action
     , "deadline" .= (fromRational deadline :: Double)
     ]
-  toJSON (ExplicitBreach mParty mReason) = object
+  toJSON (ExplicitBreach mParties mReason) = object
     [ "type" .= ("explicit_breach" :: Text)
-    , "party" .= mParty
+    , "party" .= fmap NE.head mParties
+    , "parties" .= fmap NE.toList mParties
     , "reason" .= mReason
     ]

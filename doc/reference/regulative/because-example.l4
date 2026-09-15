@@ -28,6 +28,14 @@ DECLARE Action IS ONE OF
   HENCE FULFILLED
   LEST BREACH BECAUSE "delivery deadline exceeded"
 
+-- Several parties share the blame: BY takes a LIST as well as one party
+`delivery, jointly` MEANS
+  PARTY Seller
+  MUST `deliver goods`
+  WITHIN 14
+  HENCE FULFILLED
+  LEST BREACH BY LIST Seller, Buyer BECAUSE "goods lost in transit"
+
 -- Full form: BY party BECAUSE reason
 `delivery full form` MEANS
   PARTY Seller

@@ -4,12 +4,12 @@ Evaluation successful
 deontic-breach-semantics.l4:41:1-42:22:
   DEONTIC BREACHED:
     BREACH
-    BY Bob
+    BY LIST Alice, Bob
     BECAUSE "missed second"
 deontic-breach-semantics.l4:51:1-52:22:
   DEONTIC BREACHED:
     BREACH
-    BY Alice
+    BY LIST Alice, Bob
     BECAUSE "missed first"
 deontic-breach-semantics.l4:67:1-68:22:
   DEONTIC BREACHED:
@@ -19,7 +19,8 @@ deontic-breach-semantics.l4:67:1-68:22:
       NEVERMATCHESACT
     at
       20
-    surpassed the deadline of party
+    surpassed the deadline of parties
+      Alice
       Bob
     who had to do obligatory action
       MUST deliver
@@ -28,7 +29,7 @@ deontic-breach-semantics.l4:67:1-68:22:
 deontic-breach-semantics.l4:70:1-71:22:
   DEONTIC BREACHED:
     BREACH
-    BY Alice
+    BY LIST Bob, Alice
     BECAUSE "missed payment"
 deontic-breach-semantics.l4:81:1-82:21:
   DEONTIC BREACHED:

@@ -1285,27 +1285,38 @@ instance LayoutPrinter BinOp where
     BinOpWhenNext -> "WHEN NEXT"
     BinOpValueAt -> "VALUE AT"
 
+-- | A breach names its parties. One party prints exactly as it always did;
+-- a COMPOUND breach (R-T3: both operands of a @RAND@\/@ROR@ lost, or several
+-- members of a barrier) lists every party that failed, in operand \/ roll
+-- order — one per line under @parties@ for a missed deadline, and as the
+-- source form @BY LIST p, q@ for an explicit breach.
 instance LayoutPrinter a => LayoutPrinter (ReasonForBreach a) where
   printWithLayout = \ case
-    DeadlineMissed ev'party ev'action ev'time party action deadline -> vcat
+    DeadlineMissed ev'party ev'action ev'time parties action deadline -> vcat $
       [ "party"
       , i2 $ printWithLayout ev'party
       , "who did action"
       , i2 $ printWithLayout ev'action
       , "at"
       , i2 $ pretty (prettyRatio ev'time)
-      , "surpassed the deadline of party"
-      , i2 $ printWithLayout party
-      , "who had to do obligatory action"
+      ]
+      <> (case parties of
+            p :| [] -> [ "surpassed the deadline of party", i2 $ printWithLayout p ]
+            ps      -> "surpassed the deadline of parties" : map (i2 . printWithLayout) (NE.toList ps))
+      <>
+      [ "who had to do obligatory action"
       , i2 $ printWithLayout action
       , "before their deadline, which was at"
       , i2 $ pretty (prettyRatio deadline)
       ]
       where i2 = indent 2
-    ExplicitBreach mParty mReason -> vcat $
+    ExplicitBreach mParties mReason -> vcat $
       [ "BREACH" ]
-      <> maybe [] (\p -> [ "BY" <+> printWithLayout p ]) mParty
+      <> maybe [] (\ps -> [ "BY" <+> printParties ps ]) mParties
       <> maybe [] (\r -> [ "BECAUSE" <+> printWithLayout r ]) mReason
+      where
+        printParties (p :| []) = printWithLayout p
+        printParties ps        = "LIST" <+> hsep (punctuate comma (map printWithLayout (NE.toList ps)))
 
 instance LayoutPrinter Lazy.NF where
   printWithLayout = \ case

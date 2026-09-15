@@ -1,9 +1,9 @@
 -- Regression pins for the deontic breach-semantics fix cluster:
 --
 --   (b) RAND/ROR over ANY both-breached pair (DeadlineMissed and/or
---       ExplicitBreach) reports a breach instead of a residual:
---       RAND reports the earliest breach, ROR the latest; untimestamped
---       ExplicitBreach pairs fall back to the tie-break (RAND left, ROR right).
+--       ExplicitBreach) reports a breach instead of a residual, ANCHORED at
+--       one operand (RAND the earliest, ROR the latest; untimestamped pairs
+--       tie-break RAND left, ROR right) and BLAMING both operands' parties.
 --   (c) the event whose timestamp reveals deadline expiry is re-offered to
 --       the HENCE/LEST continuation instead of being silently consumed.
 --   (d) the deadline boundary is strict: arriving exactly AT the deadline is
@@ -36,8 +36,8 @@ GIVETH A DEONTIC Person Action
     ROR
     (PARTY Bob MUST deliver WITHIN 10 HENCE FULFILLED LEST BREACH BY Bob BECAUSE "missed second")
 
--- Both alternatives definitively breached => single breach (not a residual OR).
--- ExplicitBreach is untimestamped, so ROR reports the RIGHT operand.
+-- Both alternatives definitively breached => single breach (not a residual OR),
+-- naming BOTH parties, left first; the BECAUSE is the RIGHT operand's (ROR).
 #TRACE `ror both explicit` AT 0 WITH
     (`WAIT UNTIL` 20)
 
@@ -47,7 +47,7 @@ GIVETH A DEONTIC Person Action
     RAND
     (PARTY Bob MUST deliver WITHIN 10 HENCE FULFILLED LEST BREACH BY Bob BECAUSE "missed second")
 
--- RAND over an untimestamped pair reports the LEFT operand ("the reason").
+-- RAND over an untimestamped pair: both parties, the LEFT operand's BECAUSE.
 #TRACE `rand both explicit` AT 0 WITH
     (`WAIT UNTIL` 20)
 
@@ -63,7 +63,7 @@ GIVETH A DEONTIC Person Action
     ROR
     (PARTY Alice MUST pay 1 WITHIN 5 HENCE FULFILLED LEST BREACH BY Alice BECAUSE "missed payment")
 
--- Mixed breach kinds, both operand orders: a single breach, the right operand.
+-- Mixed kinds, both orders: the RIGHT operand's breach, naming BOTH parties.
 #TRACE `explicit or deadline` AT 0 WITH
     (`WAIT UNTIL` 20)
 

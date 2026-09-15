@@ -435,11 +435,11 @@ And if neither pays by the seventh:
 Result:
   DEONTIC BREACHED:
     BREACH
-    BY `Mr Lim`
+    BY LIST Alice, `Mr Lim`
     BECAUSE "the guarantor did not pay the rent"
 ```
 
-Both of them failed, and the screen names one of them. A choice between obligations is only broken when every one of its sides is lost, and when that happens today the screen reports a single side — the last to be lost, or the right-hand one when they are lost together — rather than everyone who failed. [Several Parties](several-parties.md) comes back to this, because it matters more when there are three flatmates than when there is one guarantor.
+Both of them failed, and the screen names both, in the order the rule wrote them. A choice between obligations is only broken when every one of its sides is lost; when that happens the `BY` lists everyone who failed, and the `BECAUSE` is the one from the side that was lost last — the right-hand side, when they are lost together, which is why the reason here is the guarantor's. [Several Parties](several-parties.md) comes back to this, because it matters more when there are three flatmates than when there is one guarantor.
 
 ---
 
@@ -462,7 +462,7 @@ The three things the screen can say are the same as for one obligation, but they
 - **An act can accept any amount**: leave the amount as a blank, test it with `PROVIDED`, and hand it on to a rule that gives the next obligation, so that the same obligation can be used from more than one place.
 - **A named figure and a literal figure are required the same way.** A name in an act requires the value it names, whether that name sits on the whole act or on one figure inside it; there is no special keyword for it any more.
 - **Two guarantees, one word apart.** A guarantor who pays only after the tenant's default is a `LEST`. A guarantor the landlord may go to first is a `ROR`. Which one the source text says is a question of law, and the encoding has to answer it.
-- **A choice is broken only when every side is lost**, and the screen then names one side, not all of them.
+- **A choice is broken only when every side is lost**, and the screen then names everyone who failed, with the reason from the side lost last.
 
 ---
 

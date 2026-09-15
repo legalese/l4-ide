@@ -523,7 +523,9 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
       {},
       null,
     ),
-    { BREACH: { detail: null, party: null, reason: "explicit" } },
+    {
+      BREACH: { detail: null, parties: null, party: null, reason: "explicit" },
+    },
   );
   // Control: the same multiset in ascending order fulfils the first leg and
   // leaves a residual buyer obligation — proving order is the sole driver.
@@ -553,7 +555,9 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
       {},
       null,
     ),
-    { BREACH: { detail: null, party: null, reason: "explicit" } },
+    {
+      BREACH: { detail: null, parties: null, party: null, reason: "explicit" },
+    },
   );
 
   // Blocker 2a — explicit LEST BREACH BY p BECAUSE r carries party/detail.
@@ -582,6 +586,7 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
     {
       BREACH: {
         detail: "loan not repaid",
+        parties: ["`the borrower`"],
         party: "`the borrower`",
         reason: "explicit",
       },
@@ -628,6 +633,12 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
         // byte-identical against jl4-service with exactly these two spellings.
         eventAction: "wear seatbelt",
         eventParty: { Driver: { name: "Alice" } },
+        // The obligated party (the blame set, R-T3): the reference
+        // normalises the breach before serializing it, so this is the
+        // EVALUATED record, tagged like eventParty — and the array is its
+        // singleton, this runtime modelling one obligation at a time.
+        obligatedParties: [{ Driver: { name: "Alice" } }],
+        obligatedParty: { Driver: { name: "Alice" } },
         obligationAction: "`wear seatbelt`",
         reason: "deadline_missed",
         timestamp: 2,

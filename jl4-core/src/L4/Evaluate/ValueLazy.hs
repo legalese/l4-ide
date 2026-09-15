@@ -93,9 +93,29 @@ instance NFData RBinOp where
   rnf ValROr = ()
   rnf ValRAnd = ()
 
+-- | Why a contract is in breach.
+--
+-- The party slot is a 'NonEmpty' (R-T3, EVERY-EACH-QUANTIFIER-SPEC §6.1): a
+-- COMPOUND breach — both operands of a @RAND@\/@ROR@ lost, or several members
+-- of a barrier — names every party that failed, in operand \/ roll order,
+-- deduplicated by party key ('partyKeyWHNF' in the machine) keeping the first
+-- occurrence. A single obligation's breach is the singleton, which prints and
+-- serializes exactly as the one-party form did.
+--
+-- 'DeadlineMissed' keeps ONE revealing event and ONE (action, deadline) pair
+-- beside the blame set: those describe the failure the compound breach is
+-- ANCHORED at (the earliest for @RAND@ and for a barrier, the latest for
+-- @ROR@ — see the @RBinOp2@ clause and 'barrierFinish' in the machine). A
+-- per-party (action, deadline) was considered and declined: a party
+-- contributed by an 'ExplicitBreach' operand has neither, so the union across
+-- breach kinds would have to invent one, and the wire could no longer stay a
+-- scalar-plus-array (spec §6.1, BUILT 2026-09-15).
 data ReasonForBreach a
-  = DeadlineMissed a a Rational a (RAction Resolved) Rational
-  | ExplicitBreach (Maybe a) (Maybe a)  -- optional party, optional reason
+  = DeadlineMissed a a Rational (NonEmpty a) (RAction Resolved) Rational
+    -- ^ revealing event's party, action and stamp; the parties in breach;
+    -- the anchoring obligation's action and deadline
+  | ExplicitBreach (Maybe (NonEmpty a)) (Maybe a)
+    -- ^ optional parties (@BY p@, or @BY LIST p, q@), optional reason (@BECAUSE@)
   deriving stock (Generic, Show, Functor, Foldable, Traversable)
   deriving anyclass NFData
 
