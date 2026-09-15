@@ -1,0 +1,17 @@
+`the tenancy` — after 2 events, the clock stands at 2 (the #TRACE on line 85)
+    PARTY alice DOES Sign OF alice AT 1
+    PARTY bob DOES Sign OF bob AT 2
+  Standing: in progress.
+
+  Owed now:
+    - Tenant OF "Carol" MUST Sign OF (Tenant OF "Carol") — due by 14 (12 from now) (one of 3 who must all act before the next step)
+    - the next step is held back until all have acted: 2 of 3 have
+
+  What would put someone in breach:
+    - nothing happens by 14 (the clock reaches 15) → the contract is in breach (no party is named)
+
+  What would move things along (neither ends nor breaches it):
+    - Tenant OF "Carol" does Sign OF (Tenant OF "Carol") now (at 2) → then:
+          · Landlord OF "Ms Ng" MUST Deliver (EXACTLY theLandlord) — due by 7 (5 from now)
+
+  Next deadline: 14 (Tenant OF "Carol": Sign OF (Tenant OF "Carol"))

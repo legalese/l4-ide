@@ -1,0 +1,127 @@
+{
+  "advancing": [],
+  "breaching": [
+    {
+      "breach": {
+        "party": "Tenant OF \"Alice\""
+      },
+      "event": {
+        "at": 8,
+        "deadline": 7,
+        "kind": "tick",
+        "whose": [
+          {
+            "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+            "modal": "MUST",
+            "party": "Tenant OF \"Alice\""
+          },
+          {
+            "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+            "modal": "MUST",
+            "party": "Tenant OF \"Bob\""
+          },
+          {
+            "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+            "modal": "MUST",
+            "party": "Tenant OF \"Carol\""
+          }
+        ]
+      }
+    }
+  ],
+  "clock": 0,
+  "contract": "receipts",
+  "deadlineNotKnown": [],
+  "discharging": [],
+  "events": [],
+  "format": 1,
+  "line": null,
+  "nextDeadline": {
+    "at": 7,
+    "whose": [
+      {
+        "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+        "modal": "MUST",
+        "party": "Tenant OF \"Alice\""
+      },
+      {
+        "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+        "modal": "MUST",
+        "party": "Tenant OF \"Bob\""
+      },
+      {
+        "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+        "modal": "MUST",
+        "party": "Tenant OF \"Carol\""
+      }
+    ]
+  },
+  "owed": [
+    {
+      "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+      "dueBy": 7,
+      "dueWithin": "7",
+      "group": {
+        "join": "fork",
+        "total": 3
+      },
+      "kind": "owed",
+      "modal": "MUST",
+      "party": "Tenant OF \"Alice\""
+    },
+    {
+      "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+      "dueBy": 7,
+      "dueWithin": "7",
+      "group": {
+        "join": "fork",
+        "total": 3
+      },
+      "kind": "owed",
+      "modal": "MUST",
+      "party": "Tenant OF \"Bob\""
+    },
+    {
+      "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+      "dueBy": 7,
+      "dueWithin": "7",
+      "group": {
+        "join": "fork",
+        "total": 3
+      },
+      "kind": "owed",
+      "modal": "MUST",
+      "party": "Tenant OF \"Carol\""
+    }
+  ],
+  "passedOver": [],
+  "standing": {
+    "status": "inProgress"
+  },
+  "untried": [
+    {
+      "event": {
+        "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+        "kind": "act",
+        "party": "Tenant OF \"Alice\""
+      },
+      "why": "the action binds `amount`, which the what-if cannot choose"
+    },
+    {
+      "event": {
+        "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+        "kind": "act",
+        "party": "Tenant OF \"Bob\""
+      },
+      "why": "the action binds `amount`, which the what-if cannot choose"
+    },
+    {
+      "event": {
+        "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+        "kind": "act",
+        "party": "Tenant OF \"Carol\""
+      },
+      "why": "the action binds `amount`, which the what-if cannot choose"
+    }
+  ]
+}

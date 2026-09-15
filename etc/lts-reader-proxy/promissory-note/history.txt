@@ -1,0 +1,7 @@
+The contract is `Payment Obligations` from jl4/examples/legal/promissory-note.l4, a promissory note: the Borrower (Jane Dough Pte Ltd) owes the Lender (John Doe) twelve monthly installments of USD 2256.46 (USD 25,000 at 15% per annum), starting from the note date of 4 February 2025. Time is counted in days; where a day number appears, day 739650 is 4 February 2025, so day 739691 is 17 March 2025, day 739708 is 3 April 2025 and day 739769 is 3 June 2025.
+
+What has happened so far, in order:
+  1. The note started on 4 February 2025 (day 739650) with the full USD 27,077.49 (principal plus interest) outstanding.
+  2. The first installment fell due on 17 March 2025 (day 739691: one month of 30.4375 days rounded up to 31, plus a 10-day grace period). No payment was made by then.
+  3. On 3 April 2025 (day 739708) the Borrower paid USD 2256.46 to the Lender. This was the plain installment amount, paid after the deadline.
+  4. Nothing else has happened; the clock now stands at 3 April 2025 (day 739708).

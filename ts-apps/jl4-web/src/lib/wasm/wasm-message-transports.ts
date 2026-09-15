@@ -609,7 +609,10 @@ export class WasmLspHandler {
    *
    * Arguments are [verDocId, functionName], the name-addressed form
    * `l4CodeLenses` emits (LTS-VISUALISER.md §4.8). Answers { name, dot } for
-   * the page to show, or null when the rule is gone or has no graph.
+   * the page to show; the bridge's { error, notFound? } when it could not
+   * draw, passed through so the page can tell a rule that is gone
+   * (`notFound`) from a file that merely does not parse right now; or null
+   * when the request itself is malformed.
    */
   private async handleStateGraph(args?: unknown[]): Promise<unknown> {
     if (!args || args.length < 2) {
@@ -622,7 +625,10 @@ export class WasmLspHandler {
       return null
     }
     const result = await this.bridge.stateGraphByName(content, functionName)
-    if (result.error || typeof result.dot !== 'string') {
+    if (result.error) {
+      return { error: result.error, notFound: result.notFound === true }
+    }
+    if (typeof result.dot !== 'string') {
       return null
     }
     return { name: result.name ?? functionName, dot: result.dot }

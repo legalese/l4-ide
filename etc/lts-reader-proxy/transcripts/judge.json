@@ -1,0 +1,54 @@
+{
+  "tenancy": {
+    "model_id": "claude-opus-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "aec651a0a102c31c9",
+    "prompt_file": "judge/tenancy.prompt.txt",
+    "prompt_sha256": "9951fd820be3404e277a2470d6df948a12e5d5b90c485a765b5d22751032b718",
+    "output_file": "judge/tenancy.output.json",
+    "started_at": "2026-09-15T17:35:32.387Z",
+    "answered_at": "2026-09-15T17:37:11.087Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true
+  },
+  "every-run-example": {
+    "model_id": "claude-opus-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "ac4f081887ab550da",
+    "prompt_file": "judge/every-run-example.prompt.txt",
+    "prompt_sha256": "022dafac9b8c95ecc4bb7181c300fb6e31c9d6e2123be6d9272d1e5107ba2199",
+    "output_file": "judge/every-run-example.output.json",
+    "started_at": "2026-09-15T17:35:33.843Z",
+    "answered_at": "2026-09-15T17:36:22.576Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true
+  },
+  "contracts": {
+    "model_id": "claude-opus-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "ae8fe3c786faf158c",
+    "prompt_file": "judge/contracts.prompt.txt",
+    "prompt_sha256": "669cc35eefea7f9985e79d7db6d12dfe1f06786d3a4aebc1a6526a78e7789026",
+    "output_file": "judge/contracts.output.json",
+    "started_at": "2026-09-15T17:35:33.844Z",
+    "answered_at": "2026-09-15T17:36:12.085Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true
+  },
+  "promissory-note": {
+    "model_id": "claude-opus-5",
+    "harness": "claude-code 2.1.272 (workflow subagent; the harness system prompt is not in the transcript)",
+    "agent_id": "aa04dfc0393461014",
+    "prompt_file": "judge/promissory-note.prompt.txt",
+    "prompt_sha256": "b115c881ce876532d49c20179169a7024cacbd71bd0dfc4b29564e9c4d0279c9",
+    "output_file": "judge/promissory-note.output.json",
+    "started_at": "2026-09-15T17:35:34.048Z",
+    "answered_at": "2026-09-15T17:37:18.199Z",
+    "tools_used": ["StructuredOutput"],
+    "thinking_blocks": 1,
+    "thinking_redacted_in_transcript": true
+  }
+}

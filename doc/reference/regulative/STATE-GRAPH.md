@@ -37,19 +37,38 @@ yes-or-no rule as a ladder. The two never appear on the same rule: a rule is eit
 question or a set of obligations, and each offer knows which it is for. If you see neither above a
 rule, the rule is one the tools cannot yet draw — see the limits below.
 
-**What the pane shows today is the map's source, not the picture.** The map is written in a small
-text language called DOT, the input format of a widely used drawing tool called GraphViz. The pane
-shows that text, with a **Copy DOT** button. Paste it into any GraphViz renderer — the `dot`
-program, if you have GraphViz installed, or one of the many online viewers — to see the picture.
-Drawing the picture inside the editor is the next step, and it has not been built; until it is,
-the pane is honest about being the source.
+**The pane shows the picture.** The map is drawn for you, in the pane, the moment you click: the
+places as circles, the arrows between them, the labels on the arrows. It is the same picture the
+`dot` program from GraphViz would draw — because it _is_ GraphViz, compiled to run inside the
+editor — so what you see in the editor is what the command line below produces. (GraphViz 16.0.0
+is what is built in; another GraphViz version on your machine may place things slightly
+differently, but it draws the same places, arrows and labels.)
 
-The pane is a snapshot. It does not redraw itself as you edit; click **Show state graph** again to
-see the map for the rule as it now stands. In the web editor the pane is also shared with the
-decision graph, which _does_ redraw on every edit — so if a decision graph has already been shown
-for this file, your next keystroke hands the pane back to it, and the map is gone until you click
-again. In Visual Studio Code the map has a pane of its own and stays put, stale, until you click
-again.
+Under the picture, folded away, is **DOT source** with a **Copy DOT** button. DOT is the small text
+language the map is written in, and the input format of GraphViz. You will not normally need it;
+it is there so you can paste the map into another tool, put it in a document, or send it to
+someone.
+
+**The map redraws as you edit.** Change the rule — add a `LEST`, rename an action, move a deadline
+— and the pane follows, the same way the decision graph does. Halfway through an edit the file
+usually does not parse — a `LEST` with no arm yet, a half-typed `WITHIN` — and for that moment the
+pane keeps the last picture up with a note that it is waiting for the file to parse; it redraws
+as soon as the file does. In the web editor the picture and the decision graph share one pane,
+but an edit no longer hands the pane back to the decision graph while the map is showing; click
+**Show decision graph** to switch. The pane keeps hold of the rule in one of two ways: in Visual
+Studio Code by _where it is_ in the file, and in the web editor usually by its _name_ (the web
+editor normally runs L4 inside your browser; when it is instead connected to a language server
+over the network it follows the rule by place, as Visual Studio Code does). So an edit that
+removes what the pane was holding on to — deleting the rule's first line in Visual Studio Code,
+renaming the rule in the web editor, or in either turning the rule into something that is not a
+regulative rule — leaves the last picture up with a note saying so; click **Show state graph**
+again to draw the rule as it now stands.
+
+Two things to know about the picture itself. It is drawn on a transparent background, so in a
+dark editor theme the labels on arrows and the title take the theme's text colour while the places
+keep their pale fills. And it does not zoom or pan: a map wider than the pane is shrunk to fit,
+a taller one is scrolled, and if you need to look closely, the DOT source under the fold will open
+in any GraphViz viewer at any size.
 
 ## Getting the map from the command line
 
@@ -81,15 +100,18 @@ Take `the tenancy` above. Its map has four places and four arrows:
 
 So the conventions are:
 
-| you see                       | it means                                                                                                                                                                                     |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| a circle                      | a place the rule can be: somebody owes something, or it is over                                                                                                                              |
-| a double-bordered circle      | it is over — `Fulfilled` (green) or `Breach` (red)                                                                                                                                           |
-| a solid green arrow           | the action was taken, and this is where the `HENCE` goes                                                                                                                                     |
-| a red dashed arrow            | the `LEST` path, captioned by what reaches it: `timeout` for a `MUST` whose deadline passed, `violation` for a `SHANT` whose forbidden thing was done, `lapses` for a `MAY` nobody exercised |
-| `[14]` on an arrow            | the `WITHIN` deadline                                                                                                                                                                        |
-| `ONCE ALL HAVE` / `UPON EACH` | for an `EVERY` rule, whether the next step waits for the whole group or fires for each member                                                                                                |
-| a diamond                     | a fork, captioned `ALL OF` for a `RAND` (every branch runs) or `ONE OF` for an `ROR` (exactly one does) or an `IF` choosing between rules                                                    |
+| you see                       | it means                                                                                                                                                                                                                                                   |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a circle                      | a place the rule can be: somebody owes something, or it is over                                                                                                                                                                                            |
+| a double-bordered circle      | it is over — `Fulfilled` (green) or `Breach` (red)                                                                                                                                                                                                         |
+| a solid green arrow           | the action was taken, and this is where the `HENCE` goes                                                                                                                                                                                                   |
+| a red dashed arrow            | the `LEST` path, captioned by what reaches it: `timeout` for a `MUST` whose deadline passed, `violation` for a `SHANT` whose forbidden thing was done, `lapses` for a `MAY` nobody exercised                                                               |
+| `[14]` on an arrow            | the `WITHIN` deadline                                                                                                                                                                                                                                      |
+| `ONCE ALL HAVE` / `UPON EACH` | for an `EVERY` rule, whether the next step waits for the whole group or fires for each member                                                                                                                                                              |
+| a diamond                     | a fork, captioned `ALL OF` for a `RAND` (every branch runs) or `ONE OF` for an `ROR` (exactly one does) or an `IF` choosing between rules                                                                                                                  |
+| a circle named after a rule   | a `HENCE` or `LEST` handed over to another rule in the same file; that rule's own places and arrows follow, drawn once on a path however many arrows on that path lead into it (the two branches of a `RAND` or `ROR` each get their own copy — see below) |
+| an arrow back to `initial`    | the rule renews itself, or hands over to a rule that hands back: a loop                                                                                                                                                                                    |
+| a heavy arrow                 | only with `--dominators --dot`: an act on every path to `FULFILLED` or to `BREACH`, and its caption says which — see [the picture, marked](#the-picture-marked---dominators---dot)                                                                         |
 
 ## Asking what has to happen: `--dominators`
 
@@ -160,10 +182,37 @@ _there_. For the sale:
     - the deadline passing on PARTY The Buyer pay the price (MUST, WITHIN 30)
 ```
 
-The start state answers "nothing has to happen to be there". A rule whose arms are only other
-named rules has no `FULFILLED` or `BREACH` state of its own, and the answer says so: `(this graph
-has no FULFILLED or BREACH state to reach)`. (The answer "No path reaches …" exists for a state
-nothing points at; a drawing made from an `.l4` file never contains one.)
+The start state answers "nothing has to happen to be there". A rule whose arms hand over to other
+rules of the same file draws those rules' endings as its own (see
+[What the map does not say](#what-the-map-does-not-say)), so it is answered like any other. A rule
+that never reaches an ending at all — every arm is a permission that leads on to another
+permission, or hands over to something the map cannot follow, such as a rule from an `IMPORT`ed
+file — has no `FULFILLED` or `BREACH` state, and the answer says so: `(this graph has no FULFILLED
+or BREACH state to reach)`.
+
+One more answer exists: `No path reaches FULFILLED from the start state.` It appears when an ending
+is drawn but every route to it is cut off by the rule's own structure — for instance
+`(PARTY Alice MUST foo HENCE v) RAND (PARTY Bob MUST bar)` as the body of `v`, whose first branch
+can only renew, so the pair as a whole can never fulfil. That is a true statement about the rule,
+and worth a second look at the source. (Until 2026-09-16 it could also appear falsely, for a rule
+such as `z RAND z` that names one rule from two branches; that was a defect in the drawing, and
+`ok/contracts.l4`'s `a` now answers "nothing in particular" for both endings.)
+
+### The picture, marked: `--dominators --dot`
+
+```bash
+l4 state-graph --dominators --dot state-graph-example.l4 | dot -Tsvg -o sale.svg
+```
+
+is the same answer drawn onto the map instead of printed as a list. Every arrow the list would
+name is drawn heavy, and its caption gains a line — `on every path to FULFILLED`, `on every path
+to BREACH`, or `on every path to FULFILLED and to BREACH` for an act neither ending can avoid.
+Nothing else about the drawing changes: an arrow the list would not name is drawn exactly as it
+is without the flag, so a diagram you already have can be regenerated with the marks and compared.
+
+`--dot` needs `--dominators` (on its own the ordinary output is already DOT, and the flag would
+have nothing to add), and it does not combine with `--all-states`: the map marks the two endings
+only, because a mark for every intermediate place would put several captions on most arrows.
 
 ### How the acts are worded
 
@@ -219,9 +268,20 @@ running the rule with `#TRACE` (see [the regulative reference](README.md#testing
 read out as a list, by `l4 lts` (see [What is owed now](lts-list.md)), not by the map. A map with
 every road on it is not a map with a "you are here" dot, and this one has no dot.
 
-**It shows one rule at a time.** A `HENCE` or `LEST` that hands over to another named rule is drawn
-as an arrow into a place labelled `next` (for `HENCE`) or `failure` (for `LEST`), and stops there.
-To see where that rule goes, open its own map.
+**It follows a hand-over to another rule in the same file, and stops at the file's edge.** A
+`HENCE` or `LEST` that names another regulative rule — ``HENCE `a receipt to` Alice amount`` —
+draws an arrow into a place named after that rule, and that rule's own places and arrows follow
+from there, so the map of `rent, receipt for the amount paid` shows the receipt being issued. A
+second arrow into the same rule from the same path — the `HENCE` and the `LEST` of one obligation,
+or a rule reached again from further down — lands on the same place, which is how two rules that
+hand over to each other come out as a loop rather than as an endless chain. The two branches of a
+`RAND` or `ROR` are the exception: they run side by side, so a rule both of them name is drawn once
+per branch (`z RAND z` is two places called `z`, just as it is two copies of `z` when the contract
+runs). (The named rule still has a map of its own, printed separately.) What the arrow carries is only the
+hand-over, not the arguments: a rule called with `amount` and the same rule called with
+`amount - 1` are the same place. A hand-over the map cannot follow — a rule from an `IMPORT`ed
+file, a `RECORD` step, or anything else that is not a rule of this file — is drawn as an arrow
+into a place labelled `next` (for `HENCE`) or `failure` (for `LEST`), and stops there.
 
 **A single party's `MAY` with no `LEST` has no red arrow.** A permission nobody exercises simply
 ends, so the default there is `FULFILLED`, and for a `PARTY … MAY` the map draws only the green
@@ -246,7 +306,11 @@ rules, appears as text on an arrow. The map does not work out when the condition
 refers to another rule by name — is not drawn, and the editor offers nothing above it.
 
 **A rule that renews itself is a loop.** `HENCE` back into the rule's own name draws an arrow back
-to the start, so a renewing duty is drawn as a cycle rather than a dead end.
+to the start, so a renewing duty is drawn as a cycle rather than a dead end; so is a rule that
+hands over to a second rule which hands back. A loop has no `Fulfilled` of its own if nothing in
+it ever ends well — the map then shows only the ways out to `Breach`. (The BPMN export of a loop
+is still a diagram, but its fidelity report will say `P-CYCLE`: its left-to-right layout means
+"later" only off the loop. See [DMN and BPMN](../../exports/dmn-bpmn.md).)
 
 **The branches of an `RAND` wait for each other, and the map does not show it.** Each branch's
 arrow simply lands on the shared `Fulfilled` circle, and each `ROR` alternative's failure on the

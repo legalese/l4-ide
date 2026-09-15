@@ -43,6 +43,12 @@ function describeElement(element) {
           isSequential: !!mi.isSequential,
           loopCardinality: !!mi.loopCardinality,
           loopDataInputRef: !!mi.loopDataInputRef,
+          // The text of the condition as bpmn-moddle imported it, so the JSON
+          // can say the simulator was *given* it (whether it reads it is a
+          // question for its source, not for this census).
+          completionCondition: mi.completionCondition
+            ? mi.completionCondition.body || null
+            : null,
         }
       : null,
     cancelActivity: b.cancelActivity === undefined ? null : !!b.cancelActivity,

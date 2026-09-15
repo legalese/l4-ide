@@ -106,7 +106,9 @@ declines to say how many. Three notes go with it, and the last two are the ones 
   `P-PROHIBITION-FIRST` instead: its activity completes on the _first_ member's act, since one
   act is the breach. A `MAY`'s lapse timer, under either join, routes to the fulfilled end, not
   into what follows — a resolution that did not pass creates no duty to publish it, and under
-  `UPON EACH` what follows arises only from a member's act.
+  `UPON EACH` what follows arises only from a member's act (measured 2026-09-16,
+  `jl4/examples/ok/every/run-modals.l4` §7: nobody approves, the chair publishes late, and the
+  run is `FULFILLED`).
 - `P-FORK-CANCEL` (lossy): the timer on a fork's activity cancels every member at once, so a
   follow-on that a member had already earned is not drawn as arising at all. This is the fork's
   largest loss, and the note is written as "the diagram says…; the rule says…" because you have
@@ -116,6 +118,24 @@ declines to say how many. Three notes go with it, and the last two are the ones 
 
 Until 2026-09-15 the export could not tell the two join lines apart at all, and said nothing
 about it. If you have a `.bpmn` of a quantified rule from before that date, re-export it.
+
+A rule that hands over to another rule by name — ``HENCE `the receipt` `` — is drawn through into
+that rule since 2026-09-16 (before, the flow stopped at a dangling end, and the report said
+`P-DANGLING`). Two consequences to know about:
+
+- `P-CYCLE` (lossy): a rule that renews itself, or two rules that hand over to each other, is a
+  loop, and BPMN draws loops. What this export's layout cannot do is place a node on a loop by
+  "how far along it is", so inside the loop left-to-right no longer means later. The diagram is
+  still valid and still sound; only the reading of the horizontal axis is lost.
+- Two branches of one `RAND` or `ROR` that both hand over to the **same** rule get a copy of
+  that rule each, because the L4 runs two instances of it concurrently (`z RAND z` is two `z`s).
+  A hand-over reached twice on one path — the `HENCE` and the `LEST` of one obligation, or a rule
+  reached again from further down — lands on one node, which is how a loop comes out as a loop.
+  (The first cut of this change, on the same day, landed the sibling branches on one node too,
+  and `etc/check-bpmn-soundness.mjs` reported that as an unsafe net; that was a defect in the
+  drawing, not a property of the rule, and no released export ever drew it.)
+
+If you have a `.bpmn` of a rule that hands over by name from before 2026-09-16, re-export it.
 
 ## When a decision can refuse
 

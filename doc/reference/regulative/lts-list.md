@@ -94,7 +94,7 @@ A section is printed only when it has something in it (**Owed now** is the excep
 | **What could not be tried**           | a shape the list can name but cannot run — see [Limits](#limits)                                                                                                                                                                                                                                                                                                                       |
 | **Next deadline**                     | the soonest due date among everything owed, and whose it is; any obligation whose deadline could not be confirmed is named on the same line                                                                                                                                                                                                                                            |
 
-The things the list tries are exactly the obligations' own acts (each one, done now by the party who owes it) and, for each distinct deadline, the clock running just past it with nothing happening. That is what "what could happen" means here; it is not every conceivable event.
+The things the list tries are exactly the obligations' own acts (each one, done now by the party who owes it) and, for each distinct deadline, the clock running just past it with nothing happening — one unit past, or half-way to the next deadline when that is nearer, which is why a line can read `the clock reaches 7.5`. That is what "what could happen" means here; it is not every conceivable event.
 
 ## Groups: the barrier and the fork
 
@@ -146,21 +146,21 @@ The list is about **now**. Add `--steps` and it also prints the history: one lin
 
 ```
   Steps, in order:
-    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 1 of 3) — done; on to what follows (1 of 3 have acted; the shared next step waits for the rest)
-    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 2 of 3) — not this party's event; passed over
-    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 2 of 3) — done; on to what follows (2 of 3 have acted; the shared next step waits for the rest)
-    at 1: Tenant OF … does Sign OF … at 1; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
-    at 2: Tenant OF … does Sign OF … at 2; Tenant OF … MUST (member 3 of 3) — not this party's event; passed over
-    at 9: Tenant OF … does Sign OF … at 9; Tenant OF … MUST (member 3 of 3) — done; on to what follows (3 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF "Alice" does Sign OF … at 1; Tenant OF "Alice" MUST (member 1 of 3) — done; on to what follows (1 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF "Alice" does Sign OF … at 1; Tenant OF "Bob" MUST (member 2 of 3) — not this party's event; passed over
+    at 2: Tenant OF "Bob" does Sign OF … at 2; Tenant OF "Bob" MUST (member 2 of 3) — done; on to what follows (2 of 3 have acted; the shared next step waits for the rest)
+    at 1: Tenant OF "Alice" does Sign OF … at 1; Tenant OF "Carol" MUST (member 3 of 3) — not this party's event; passed over
+    at 2: Tenant OF "Bob" does Sign OF … at 2; Tenant OF "Carol" MUST (member 3 of 3) — not this party's event; passed over
+    at 9: Tenant OF "Carol" does Sign OF … at 9; Tenant OF "Carol" MUST (member 3 of 3) — done; on to what follows (3 of 3 have acted; the shared next step waits for the rest)
     at 9: the group — everyone has acted; the shared next step begins
-    at 13: Landlord OF … does Deliver OF … at 13; Landlord OF … MUST — done; on to what follows
+    at 13: Landlord OF "Ms Ng" does Deliver OF … at 13; Landlord OF "Ms Ng" MUST — done; on to what follows
 ```
 
 Each line reads: the clock; the event looked at; whose obligation looked at it; what it decided. The same event appears once per obligation that looked at it — Alice's signature on day 1 is "done" for Alice and "passed over" for Bob and Carol — so the count of lines is not the count of events. The clock at the start of the line (`at 2:`) is the time the obligation had in hand when it looked — the last event it had seen — and the event's own time follows it, so a line can read `at 2: the event at 20; … deadline 14 passed without the act`: the obligation, last updated on day 2, looked at an event from day 20 and found its deadline gone.
 
 Two things about this history are worth knowing:
 
-- A party or an act shown as `Tenant OF …` is one the contract had not fully looked at when the step was recorded: the log writes down only what the contract had in hand at that moment, and does not go and fetch the rest. The **member number** (`member 2 of 3`) is what tells the members apart; the events are listed in full under the heading.
+- A party is named in full — `Tenant OF "Bob"`, the same words the **Owed now** lines use — once the contract has looked at every part of it. Comparing it with an event's party is the first thing an obligation does with an event that is in time, and that comparison looks at the parts in order and stops at the first one that differs. So a line that looked at an event names who looked when the two parties matched, or when they differed only in the last part — which is every case for a party with one part, like the `Tenant OF "Bob"` here — and names who acted where the contract got as far as looking at them (an expiry is found from the event's time alone, so that line says only `the event at 20`). A party with several parts, say `Tenant OF "Bob", 40`, whose first part already differed from the actor's, is shown as `Tenant OF …, …` on that `not this party's event` line and on the `still waiting` line after it, because its later parts were never looked at. An act shown as `Sign OF …`, or a party shown as `Tenant OF …`, is one the contract had not fully looked at when the step was recorded (an act is only unpacked as far as the rule's pattern needs; a party is looked at only when an event arrives): the log writes down what the contract had in hand at that moment, and does not go and fetch the rest. A `still waiting` line before any event has arrived is the usual case of a party still shown as `Tenant OF …`; there, the **member number** (`member 2 of 3`) is what tells the members apart, and the events are listed in full under the heading.
 - `at —` marks a step with no clock. Four steps have none: a look before any event has arrived; the moment two parallel parts of a contract are combined — a `RAND`/`ROR`, or the members of an `UPON EACH` fork, which the contract runs as parallel parts; a `BREACH` the rule declares outright (`LEST BREACH`), which is a verdict, not a look at an event; and a group with no `LEST` of its own whose member ended without a time — a member's permission lapsed, or a member's own `LEST BREACH` fired. (A group whose member missed a deadline is clocked at the moment the miss was seen.)
 
 ## `--json`

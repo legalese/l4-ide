@@ -39,10 +39,9 @@ import L4.Parser.SrcSpan (SrcPos, SrcRange(..))
 import L4.Print (prettyLayout)
 import L4.StateGraph
   ( StateGraph(..)
-  , defaultStateGraphOptions
   , extractStateGraphs
-  , stateGraphToDot
   )
+import L4.StateGraph.Dot (defaultStateGraphOptions, stateGraphToDot)
 import L4.Syntax
   ( AppForm(..)
   , Decide(..)

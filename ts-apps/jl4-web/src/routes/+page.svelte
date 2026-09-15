@@ -29,8 +29,14 @@
   import {
     EvalDirectiveResultRequestType,
     QueryPlanRequestType,
+    makeL4RpcRequestType,
+    isStateGraphFailure,
+    isStateGraphResponse,
+    stateGraphTargetGone,
+    trackSrcPos,
     type DirectiveResult,
     type SrcPos,
+    type StateGraphResponse,
   } from 'jl4-client-rpc'
 
   import {
@@ -77,6 +83,24 @@
   let rightPaneView: 'ladder' | 'inspector' | 'stategraph' = $state('ladder')
   // What the "Show state graph" lens last answered; shown when rightPaneView is 'stategraph'
   let stateGraph: { name: string; dot: string } | null = $state(null)
+  // Set when an edit made the rule unfindable; the pane keeps the last picture and says so
+  let stateGraphStale: string | null = $state(null)
+  // The rule the state-graph pane is showing, so didChange can redraw it. The
+  // wasm producer's lens addresses the rule by name (args [verDocId, name]);
+  // the language server's by the DECIDE's 1-indexed start position (args
+  // [verDocId, srcPos]), which trackSrcPos moves along under each edit.
+  let stateGraphTarget: { uri: string; address: string | SrcPos } | null = null
+  // Bumped on every lens click and every refresh sent; a refresh applies its
+  // reply only if the value is still the one it captured, so a reply for a
+  // superseded target (a click on another rule, or a later edit) is dropped
+  // instead of overwriting the fresher picture.
+  let stateGraphGeneration = 0
+  // `l4.stateGraph` sent straight to the server (or the wasm shim), bypassing
+  // the command middleware: the click's branch there also switches panes.
+  const ExecuteStateGraphRequest = makeL4RpcRequestType<
+    { command: string; arguments: unknown[] },
+    StateGraphResponse
+  >('workspace/executeCommand')
   let inspectorPanel: InspectorPanel | undefined = $state(undefined)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let paneGroup: any = $state()
@@ -165,6 +189,54 @@
       verDocId
     )
   }, 150)
+
+  // The state-graph pane's own redraw. Position tracking has already happened
+  // in didChange (it must see every change); only the request is debounced.
+  const debouncedStateGraphRefresh = debounce(
+    async (verDocId: VersionedDocId) => {
+      if (!monacoL4LangClient || !stateGraphTarget) return
+      const target = stateGraphTarget
+      const generation = ++stateGraphGeneration
+      try {
+        const reply = await monacoL4LangClient.sendRequest(
+          ExecuteStateGraphRequest,
+          { command: 'l4.stateGraph', arguments: [verDocId, target.address] }
+        )
+        // Superseded while in flight: a click or a later edit owns the pane now
+        if (generation !== stateGraphGeneration) return
+        if (isStateGraphResponse(reply)) {
+          stateGraph = { name: reply.name, dot: reply.dot }
+          stateGraphStale = null
+        } else if (isStateGraphFailure(reply) && !stateGraphTargetGone(reply)) {
+          // The wasm shim could not check the file: it does not parse right
+          // now, which is where every edit passes through. Keep the picture
+          // and the target; the next edit asks again.
+          stateGraphStale =
+            'Waiting for the file to parse; this is the rule as it last checked.'
+        } else {
+          // The wasm shim answers notFound (or null) when the rule is gone
+          // or has no graph
+          stateGraphTarget = null
+          stateGraphStale =
+            'No state graph for this rule after that edit. Press "Show state graph" again to redraw.'
+        }
+      } catch (e) {
+        if (generation !== stateGraphGeneration) return
+        if (stateGraphTargetGone(e)) {
+          // The language server refuses when no regulative rule starts there
+          stateGraphTarget = null
+          stateGraphStale = `No state graph at the rule's position after that edit (${
+            e instanceof Error ? e.message : String(e)
+          }). Press "Show state graph" again to redraw.`
+        } else {
+          // "Could not check": transient, as above
+          stateGraphStale =
+            'Waiting for the file to parse; this is the rule as it last checked.'
+        }
+      }
+    },
+    150
+  )
 
   // /**************************
   //       Monadco
@@ -754,12 +826,18 @@
           // "Show state graph": the answer is { name, dot }, not a ladder
           // payload, so it must not reach the decoder below.
           if (command === 'l4.stateGraph') {
-            const { name, dot } = responseFromLangServer as {
-              name?: string
-              dot?: string
-            }
-            if (typeof dot === 'string') {
-              stateGraph = { name: name ?? '', dot }
+            if (isStateGraphResponse(responseFromLangServer)) {
+              const [verDocId, address] = args as [
+                { uri: string },
+                string | SrcPos,
+              ]
+              stateGraphTarget = { uri: verDocId.uri, address }
+              stateGraphGeneration++
+              stateGraphStale = null
+              stateGraph = {
+                name: responseFromLangServer.name,
+                dot: responseFromLangServer.dot,
+              }
               rightPaneView = 'stategraph'
               showVisualizer = true
             } else {
@@ -794,7 +872,13 @@
               if (decoded.right) {
                 const renderLadderInfo: RenderAsLadderInfo = decoded.right
                 await makeLadderFlow(renderLadderInfo)
-                rightPaneView = 'ladder'
+                // A lens click ([verDocId, name, simplify]) brings the ladder
+                // forward; the auto-refresh after an edit ([verDocId]) redraws
+                // it in place and must not evict the state-graph pane, which
+                // is being redrawn from the same edit (see didChange).
+                if (rightPaneView !== 'stategraph' || args.length > 1) {
+                  rightPaneView = 'ladder'
+                }
               }
               break
             case 'Left':
@@ -824,6 +908,27 @@
               event.document
             )
           debouncedVisualize(verDocId)
+
+          // The state-graph pane redraws too. A position-addressed target is
+          // followed through the edit first; if the edit swallowed it, the
+          // pane keeps its last picture, says so, and waits for the next click.
+          if (stateGraphTarget && stateGraphTarget.uri === verDocId.uri) {
+            if (typeof stateGraphTarget.address !== 'string') {
+              const moved = trackSrcPos(
+                stateGraphTarget.address,
+                event.contentChanges
+              )
+              if (!moved) {
+                stateGraphTarget = null
+                stateGraphGeneration++ // an in-flight refresh must not undo the notice
+                stateGraphStale =
+                  'The rule this graph was drawn from was edited away. Press "Show state graph" again to redraw.'
+                return
+              }
+              stateGraphTarget.address = moved
+            }
+            debouncedStateGraphRefresh(verDocId)
+          }
         },
       }
     }
@@ -1227,7 +1332,11 @@
               class:hidden-pane={rightPaneView !== 'stategraph'}
             >
               {#if stateGraph}
-                <StateGraphPanel name={stateGraph.name} dot={stateGraph.dot} />
+                <StateGraphPanel
+                  name={stateGraph.name}
+                  dot={stateGraph.dot}
+                  stale={stateGraphStale}
+                />
               {/if}
             </div>
             <div

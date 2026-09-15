@@ -1,0 +1,102 @@
+-- The two joins of a quantified obligation, on the BPMN exporter.
+--
+-- `the tenancy` is the BARRIER: every tenant signs, and when the last of them
+-- has, one delivery follows. `receipts` is the FORK: each tenant who pays gets
+-- a receipt of their own. They are the reference page's own pair
+-- (doc/reference/regulative/every-run-example.l4) with the traces left out.
+--
+-- Until 2026-09-15 these two lowered to byte-identical BPMN and a
+-- byte-identical fidelity report: L4.StateGraph.extractDeonton never read
+-- Deonton.join, so the exporter could not tell them apart and the report that
+-- exists to list the losses did not list this one. Now the task is a parallel
+-- multi-instance activity (P-CAST says its cardinality is a run-time fact),
+-- the barrier is that activity's own completion, and the fork — which BPMN
+-- can only draw with a multi-instance subProcess this exporter does not emit
+-- — is reported as P-FORK. The two goldens are the witness that the pair
+-- stays distinguishable.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Deliver HAS who    IS AN Actor
+    Pay     HAS payer  IS AN Actor, payee IS AN Actor, amount IS A NUMBER
+    Receipt HAS issuer IS AN Actor, to    IS AN Actor, amount IS A NUMBER
+
+theLandlord MEANS Landlord OF "Ms Ng"
+alice       MEANS Tenant OF "Alice"
+bob         MEANS Tenant OF "Bob"
+carol       MEANS Tenant OF "Carol"
+tenants     MEANS LIST alice, bob, carol
+
+GIVETH A DEONTIC Actor Action
+`the tenancy` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign (EXACTLY t)
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5)
+        LEST   BREACH
+
+GIVETH A DEONTIC Actor Action
+`receipts` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Pay (EXACTLY t) (EXACTLY theLandlord) amount
+        WITHIN 7
+        UPON   EACH
+        HENCE  (PARTY theLandlord
+                    MUST   Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)
+                    WITHIN 5)
+        LEST   BREACH BY t
+
+-- PROBES for the ground truth of etc/lts-reader-proxy/tenancy. Everything
+-- above is jl4/examples/bpmn/tenancy.l4 verbatim. The proxy position is the
+-- outset of `receipts` (clock 0, nothing has happened); each #TRACE adds
+-- events to it.
+
+-- Q2/Q5: Alice pays at 3 -> the landlord owes her a receipt within 5 (by 8);
+-- Bob and Carol still owe their payments by 7.
+#TRACE receipts AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord 100 AT 3
+
+-- Q2: any amount counts, even 0 (the rule binds `amount`, it does not test it).
+#TRACE receipts AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord 0 AT 3
+
+-- Q2: paying somebody other than the landlord does not count.
+#TRACE receipts AT 0 WITH
+  PARTY alice DOES Pay alice bob 100 AT 3
+
+-- Q2: paying on the deadline day (7) counts.
+#TRACE receipts AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord 100 AT 7
+
+-- Q3: nothing by 7; the next event is at 8 -> breach, named to Alice.
+#TRACE receipts AT 0 WITH
+  PARTY theLandlord DOES Deliver theLandlord AT 8
+
+-- Q3: Alice pays late (8) -> breach, named to Alice.
+#TRACE receipts AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord 100 AT 8
+
+-- Q5: Alice pays at 3, no receipt by 8 -> the landlord is in breach.
+#TRACE receipts AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord 100 AT 3
+  PARTY theLandlord DOES Deliver theLandlord AT 9
+
+-- Q5: Alice pays at 3, receipt at 8 -> Alice's branch done; Bob and Carol
+-- still owe by 7 -- so at 8 they are already late and the contract is in breach.
+#TRACE receipts AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord 100 AT 3
+  PARTY theLandlord DOES Receipt theLandlord alice 100 AT 8
+
+-- Q5: all three pay, all three receipts -> fulfilled.
+#TRACE receipts AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord 100 AT 1
+  PARTY bob   DOES Pay bob   theLandlord 200 AT 2
+  PARTY carol DOES Pay carol theLandlord 300 AT 3
+  PARTY theLandlord DOES Receipt theLandlord alice 100 AT 4
+  PARTY theLandlord DOES Receipt theLandlord bob   200 AT 5
+  PARTY theLandlord DOES Receipt theLandlord carol 300 AT 6

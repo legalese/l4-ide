@@ -25,7 +25,8 @@
         "type": "bpmn:MultiInstanceLoopCharacteristics",
         "isSequential": false,
         "loopCardinality": false,
-        "loopDataInputRef": false
+        "loopDataInputRef": false,
+        "completionCondition": null
       },
       "cancelActivity": null,
       "attachedTo": null,
@@ -142,8 +143,8 @@
     ],
     "endEventsReached": [],
     "log": [
-      "Process started 0zd2wtc",
-      "Start Event 0zd2wtc"
+      "Process started 111ksj6",
+      "Start Event 111ksj6"
     ],
     "afterWaiting3s": {
       "tokensOn": [
@@ -178,12 +179,12 @@
       "End_3"
     ],
     "log": [
-      "Process started 0fa1kdy",
-      "Start Event 0fa1kdy",
-      "MUST Pay ... 0fa1kdy",
-      "after P7D 0fa1kdy",
-      "Breach 0fa1kdy",
-      "Process finished 0fa1kdy"
+      "Process started 00dz9x3",
+      "Start Event 00dz9x3",
+      "MUST Pay ... 00dz9x3",
+      "after P7D 00dz9x3",
+      "Breach 00dz9x3",
+      "Process finished 00dz9x3"
     ]
   },
   "happy": [
@@ -226,12 +227,12 @@
         "End_2"
       ],
       "log": [
-        "Process started 0obklah",
-        "Start Event 0obklah",
-        "MUST Pay ... 0obklah",
-        "MUST Receipt ... 0obklah",
-        "Fulfilled 0obklah",
-        "Process finished 0obklah"
+        "Process started 05leqz9",
+        "Start Event 05leqz9",
+        "MUST Pay ... 05leqz9",
+        "MUST Receipt ... 05leqz9",
+        "Fulfilled 05leqz9",
+        "Process finished 05leqz9"
       ]
     }
   ],

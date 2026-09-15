@@ -1,0 +1,209 @@
+
+You are a reader in a comprehension experiment. Use NO tools — do not read files, do not search, do not run anything; answer only from the text below. You are looking at a BPMN 2.0 process diagram in XML (read it as a flowchart of tasks, gateways and timer events) for a contract, and a description of what has happened so far.
+WHAT HAS HAPPENED SO FAR:
+The contract is `Payment Obligations` from jl4/examples/legal/promissory-note.l4, a promissory note: the Borrower (Jane Dough Pte Ltd) owes the Lender (John Doe) twelve monthly installments of USD 2256.46 (USD 25,000 at 15% per annum), starting from the note date of 4 February 2025. Time is counted in days; where a day number appears, day 739650 is 4 February 2025, so day 739691 is 17 March 2025, day 739708 is 3 April 2025 and day 739769 is 3 June 2025.
+
+What has happened so far, in order:
+  1. The note started on 4 February 2025 (day 739650) with the full USD 27,077.49 (principal plus interest) outstanding.
+  2. The first installment fell due on 17 March 2025 (day 739691: one month of 30.4375 days rounded up to 31, plus a 10-day grace period). No payment was made by then.
+  3. On 3 April 2025 (day 739708) the Borrower paid USD 2256.46 to the Lender. This was the plain installment amount, paid after the deadline.
+  4. Nothing else has happened; the clock now stands at 3 April 2025 (day 739708).
+
+
+THE ARTIFACT:
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_Payment_Obligations"
+                  targetNamespace="https://l4.legalese.com/bpmn"
+                  exporter="jl4 (L4.Bpmn)"
+                  exporterVersion="1">
+  <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
+  <bpmn:collaboration id="Collaboration_Payment_Obligations">
+    <bpmn:participant id="Participant_Payment_Obligations" name="Payment Obligations" processRef="Process_Payment_Obligations" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Payment_Obligations" name="Payment Obligations" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_1__The_Borrower_" name="`The Borrower`">
+        <bpmn:flowNodeRef>Task_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_4</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_unassigned" name="(unassigned)">
+        <bpmn:flowNodeRef>Start_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Split_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_5</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_0" />
+    <bpmn:exclusiveGateway id="Split_0" name="one of" gatewayDirection="Mixed">
+      <bpmn:documentation>ROR: exactly one branch is entered</bpmn:documentation>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="Task_1" name="MUST pay monthly installment to ...">
+      <bpmn:documentation>PARTY `The Borrower` MUST pay monthly installment to ... WITHIN `Next Payment Due Date` PROVIDED `is money at least equal within error` OF `Amount Transferred`, (`Next Payment Due`&apos;s Amount)</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:boundaryEvent id="Boundary_1" name="timeout" attachedToRef="Task_1" cancelActivity="true">
+      <bpmn:documentation>LEST: the obligation is not discharged within `Next Payment Due Date`</bpmn:documentation>
+      <bpmn:conditionalEventDefinition id="Cond_Boundary_1">
+        <bpmn:condition xsi:type="bpmn:tFormalExpression">`Next Payment Due Date`</bpmn:condition>
+      </bpmn:conditionalEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:task id="Task_2" name="MUST pay monthly installment to ...">
+      <bpmn:documentation>PARTY `The Borrower` MUST pay monthly installment to ... WITHIN `Default After Days Beyond Commencement` PROVIDED `is money at least equal within error` OF `Amount Transferred`, `Next Payment Due Amount With Penalty`</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:boundaryEvent id="Boundary_2" name="timeout" attachedToRef="Task_2" cancelActivity="true">
+      <bpmn:documentation>LEST: the obligation is not discharged within `Default After Days Beyond Commencement`</bpmn:documentation>
+      <bpmn:conditionalEventDefinition id="Cond_Boundary_2">
+        <bpmn:condition xsi:type="bpmn:tFormalExpression">`Default After Days Beyond Commencement`</bpmn:condition>
+      </bpmn:conditionalEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="End_3" name="Fulfilled" />
+    <bpmn:task id="Task_4" name="MUST pay monthly installment to ...">
+      <bpmn:documentation>PARTY `The Borrower` MUST pay monthly installment to ... PROVIDED `is money at least equal within error` OF `Amount Transferred`, `All Outstanding Debts`</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:boundaryEvent id="Boundary_4" name="unreachable: no WITHIN" attachedToRef="Task_4" cancelActivity="true">
+      <bpmn:documentation>LEST: the obligation is not discharged — but the rule sets no WITHIN, and for every modal but SHANT this arm is reached only by the deadline passing, so nothing reaches it</bpmn:documentation>
+      <bpmn:conditionalEventDefinition id="Cond_Boundary_4">
+        <bpmn:condition xsi:type="bpmn:tFormalExpression">unreachable: no WITHIN</bpmn:condition>
+      </bpmn:conditionalEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="End_5" name="Breach">
+      <bpmn:errorEventDefinition id="ErrorDef_End_5" errorRef="Error_breach" />
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_Start_0__Split_0" sourceRef="Start_0" targetRef="Split_0" />
+    <bpmn:sequenceFlow id="Flow_Split_0__Task_1" sourceRef="Split_0" targetRef="Task_1">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">(`Outstanding Payment Amount`&apos;s Value) GREATER THAN 0</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Split_0__End_3" sourceRef="Split_0" targetRef="End_3">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">NOT ((`Outstanding Payment Amount`&apos;s Value) GREATER THAN 0)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Task_1__Split_0" sourceRef="Task_1" targetRef="Split_0">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">`is money at least equal within error` OF `Amount Transferred`, (`Next Payment Due`&apos;s Amount)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Boundary_1__Task_2" sourceRef="Boundary_1" targetRef="Task_2" />
+    <bpmn:sequenceFlow id="Flow_Task_2__End_3" sourceRef="Task_2" targetRef="End_3">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">`is money at least equal within error` OF `Amount Transferred`, `Next Payment Due Amount With Penalty`</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Boundary_2__Task_4" sourceRef="Boundary_2" targetRef="Task_4" />
+    <bpmn:sequenceFlow id="Flow_Task_4__End_3" sourceRef="Task_4" targetRef="End_3">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">`is money at least equal within error` OF `Amount Transferred`, `All Outstanding Debts`</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Boundary_4__End_5" sourceRef="Boundary_4" targetRef="End_5" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_Payment_Obligations">
+      <bpmndi:BPMNShape id="Shape_Participant_Payment_Obligations" bpmnElement="Participant_Payment_Obligations" isHorizontal="true">
+        <dc:Bounds x="130" y="80" width="2030" height="440" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_1__The_Borrower_" bpmnElement="Lane_1__The_Borrower_" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="2000" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_unassigned" bpmnElement="Lane_unassigned" isHorizontal="true">
+        <dc:Bounds x="160" y="240" width="2000" height="280" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Start_0" bpmnElement="Start_0">
+        <dc:Bounds x="232" y="282" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Split_0" bpmnElement="Split_0">
+        <dc:Bounds x="2025" y="275" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_1" bpmnElement="Task_1">
+        <dc:Bounds x="2000" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Boundary_1" bpmnElement="Boundary_1">
+        <dc:Bounds x="2054" y="162" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_2" bpmnElement="Task_2">
+        <dc:Bounds x="1820" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Boundary_2" bpmnElement="Boundary_2">
+        <dc:Bounds x="1874" y="162" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_3" bpmnElement="End_3">
+        <dc:Bounds x="2032" y="402" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_4" bpmnElement="Task_4">
+        <dc:Bounds x="1640" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Boundary_4" bpmnElement="Boundary_4">
+        <dc:Bounds x="1694" y="162" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_5" bpmnElement="End_5">
+        <dc:Bounds x="1492" y="282" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Split_0" bpmnElement="Flow_Start_0__Split_0">
+        <di:waypoint x="268" y="300" />
+        <di:waypoint x="314" y="300" />
+        <di:waypoint x="314" y="360" />
+        <di:waypoint x="1934" y="360" />
+        <di:waypoint x="1934" y="300" />
+        <di:waypoint x="2025" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Split_0__Task_1" bpmnElement="Flow_Split_0__Task_1">
+        <di:waypoint x="2075" y="300" />
+        <di:waypoint x="2114" y="300" />
+        <di:waypoint x="2114" y="140" />
+        <di:waypoint x="2000" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Split_0__End_3" bpmnElement="Flow_Split_0__End_3">
+        <di:waypoint x="2075" y="300" />
+        <di:waypoint x="2131" y="300" />
+        <di:waypoint x="2131" y="420" />
+        <di:waypoint x="2032" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_1__Split_0" bpmnElement="Flow_Task_1__Split_0">
+        <di:waypoint x="2100" y="140" />
+        <di:waypoint x="2148" y="140" />
+        <di:waypoint x="2148" y="300" />
+        <di:waypoint x="2025" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_1__Task_2" bpmnElement="Flow_Boundary_1__Task_2">
+        <di:waypoint x="2072" y="198" />
+        <di:waypoint x="1951" y="198" />
+        <di:waypoint x="1951" y="140" />
+        <di:waypoint x="1820" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_2__End_3" bpmnElement="Flow_Task_2__End_3">
+        <di:waypoint x="1920" y="140" />
+        <di:waypoint x="1968" y="140" />
+        <di:waypoint x="1968" y="420" />
+        <di:waypoint x="2032" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_2__Task_4" bpmnElement="Flow_Boundary_2__Task_4">
+        <di:waypoint x="1892" y="198" />
+        <di:waypoint x="1754" y="198" />
+        <di:waypoint x="1754" y="140" />
+        <di:waypoint x="1640" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_4__End_3" bpmnElement="Flow_Task_4__End_3">
+        <di:waypoint x="1740" y="140" />
+        <di:waypoint x="1805" y="140" />
+        <di:waypoint x="1805" y="200" />
+        <di:waypoint x="1985" y="200" />
+        <di:waypoint x="1985" y="420" />
+        <di:waypoint x="2032" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_4__End_5" bpmnElement="Flow_Boundary_4__End_5">
+        <di:waypoint x="1712" y="198" />
+        <di:waypoint x="1574" y="198" />
+        <di:waypoint x="1574" y="300" />
+        <di:waypoint x="1492" y="300" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
+
+
+Answer these five questions in order, each in one or two plain sentences; if the artifact does not let you answer, say "cannot tell from this" — do not guess:
+1. Q1. What is owed right now, and by whom?
+2. Q2. Which event(s) would discharge what is owed?
+3. Q3. Which event(s) or deadline(s) would put someone in breach?
+4. Q4. Where in the contract are we — which rule, branch or state is live?
+5. Q5. What happens after the next discharging event?

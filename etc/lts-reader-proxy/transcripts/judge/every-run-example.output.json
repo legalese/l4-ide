@@ -1,0 +1,88 @@
+{
+  "rows": [
+    {
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 1, 0, 1],
+      "rationale": "Q1-Q3 match truth (Carol, Sign, by 14, 2 of 3 signed; breach at 15 with no party named). Q4 'cannot tell' scored 0: truth says the live state is identifiable (signing stage inside the EVERY barrier, 2 of 3 done). Q5 correct on party/obligation/5-day window; 'by 7' is the artifact's sign-now hypothetical, accepted."
+    },
+    {
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 1, 1, 0, 1],
+      "rationale": "Q1-Q3 and Q5 correct (Carol Sign by 14, 12 days away; breach at 15 unnamed; landlord Deliver within 5). Q4 'cannot tell' scored 0 for the same reason as repeat 0 — the state is identifiable."
+    },
+    {
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All five match: Carol owes Sign by 14; Carol signing discharges (2 of 3 already acted); breach when clock reaches 15, no party named; live state is waiting on the third signature; then landlord Deliver within 5."
+    },
+    {
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All five match; Q4 correctly names the all-must-sign gate with 2 of 3 done; Q5 gives landlord Deliver 5 ticks after Carol's signature (the 'by 7' is the sign-now hypothetical)."
+    },
+    {
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Q1 lands on Carol as the sole remaining signer though it omits the day-14 deadline (incomplete, not wrong). Q2-Q5 correct: Carol sign -> state 1 -> landlord Deliver [5]; timeouts from state 0 and state 1 to breach; live state 0 with the EVERY-tenant rule."
+    },
+    {
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Carol's signature owed (deadline omitted but nothing wrong); Carol sign -> node 1 -> landlord Deliver -> Fulfilled; timeouts [14] and [5] to breach; node 0 with the EVERY rule live; landlord Deliver next."
+    },
+    {
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All five match including Alice/Bob already discharged, the 0->3 timeout as the signing breach, state 0 on the ONCE ALL HAVE rule, and landlord Deliver within [5] leading to Fulfilled or Breach."
+    },
+    {
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Q1 opens with a self-contradictory 'nothing is owed yet' but resolves to Carol owes Sign (deadline 14) and landlord not yet started, which is the truth. Q2-Q5 correct; Q3 honestly hedges on the deadline's reference point without asserting anything wrong."
+    },
+    {
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Carol must sign (deadline omitted, nothing wrong); Carol sign -> Ms Ng Deliver -> End_2; Boundary_0 at 14 days and Boundary_1 at 5 days to breach; Task_0 with Alice/Bob done and Carol pending; Task_1 Deliver within 5 days."
+    },
+    {
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All five match: Carol pending in Task_0; her signature completes the multi-instance barrier and starts Ms Ng's Deliver; 14-day and 5-day boundary timers to Breach; 2 of 3 instances done; Deliver within 5 then Fulfilled."
+    },
+    {
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All five match with full detail: landlord's Deliver not yet live, Carol's Sign completes Task_0 and fires the flow into Task_1, P14D/P5D boundaries to End_3, live state inside Task_0 with Carol outstanding, Deliver within 5 to Fulfilled or Breach."
+    },
+    {
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Q1 has the same 'nothing is owed, strictly speaking' hedge but states Carol owes Sign and the landlord's obligation is not live, matching truth. Q2-Q5 correct: barrier fires on Carol's Sign, P14D/P5D timers, Task_0 with Boundary_0 running and Task_1 unreached, landlord Deliver within 5 to End_2 or End_3."
+    }
+  ]
+}
