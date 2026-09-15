@@ -37,19 +37,29 @@ yes-or-no rule as a ladder. The two never appear on the same rule: a rule is eit
 question or a set of obligations, and each offer knows which it is for. If you see neither above a
 rule, the rule is one the tools cannot yet draw — see the limits below.
 
-**What the pane shows today is the map's source, not the picture.** The map is written in a small
-text language called DOT, the input format of a widely used drawing tool called GraphViz. The pane
-shows that text, with a **Copy DOT** button. Paste it into any GraphViz renderer — the `dot`
-program, if you have GraphViz installed, or one of the many online viewers — to see the picture.
-Drawing the picture inside the editor is the next step, and it has not been built; until it is,
-the pane is honest about being the source.
+**The pane shows the picture.** The map is drawn for you, in the pane, the moment you click: the
+places as circles, the arrows between them, the labels on the arrows. It is the same picture the
+`dot` program from GraphViz would draw — because it _is_ GraphViz, compiled to run inside the
+editor — so what you see in the editor is what the command line below produces.
 
-The pane is a snapshot. It does not redraw itself as you edit; click **Show state graph** again to
-see the map for the rule as it now stands. In the web editor the pane is also shared with the
-decision graph, which _does_ redraw on every edit — so if a decision graph has already been shown
-for this file, your next keystroke hands the pane back to it, and the map is gone until you click
-again. In Visual Studio Code the map has a pane of its own and stays put, stale, until you click
-again.
+Under the picture, folded away, is **DOT source** with a **Copy DOT** button. DOT is the small text
+language the map is written in, and the input format of GraphViz. You will not normally need it;
+it is there so you can paste the map into another tool, put it in a document, or send it to
+someone.
+
+**The map redraws as you edit.** Change the rule — add a `LEST`, rename an action, move a deadline
+— and the pane follows, the same way the decision graph does. In the web editor the picture and
+the decision graph share one pane, but an edit no longer hands the pane back to the decision graph
+while the map is showing; click **Show decision graph** to switch. The pane follows the rule by
+_where it is_ in the file, so an edit that deletes the rule's first line, or turns the rule into
+something that is not a regulative rule, leaves the last picture up with a note saying so; click
+**Show state graph** again to draw the rule as it now stands.
+
+Two things to know about the picture itself. It is drawn on a transparent background, so in a
+dark editor theme the labels on arrows and the title take the theme's text colour while the places
+keep their pale fills. And it does not zoom or pan: a large map is scrolled, not shrunk, and if
+you need to look closely, the DOT source under the fold will open in any GraphViz viewer at any
+size.
 
 ## Getting the map from the command line
 
