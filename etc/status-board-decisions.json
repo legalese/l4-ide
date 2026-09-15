@@ -44,10 +44,10 @@
     {
       "id": "#392",
       "owner": "Meng",
-      "kind": "confirm + review",
+      "kind": "in the queue",
       "quick": true,
       "raised": "2026-09-15",
-      "ask": "PR #392 (smucclaw#960 fix) narrows the accepted language: a WITH supply checked against one section binder and delivered to another same-spelled binder of a different type is now refused. Zero corpus sites affected. Meng asked for the PR with the §7 note in front of him; confirm on review, then say enqueue. It is 127 behind after this morning's merges and the 958-file sweep has not been re-run over #386's renames — GM will rebase and re-sweep before enqueue.",
+      "ask": "PR #392 (smucclaw#960 fix) narrows the accepted language: a WITH supply checked against one section binder and delivered to another same-spelled binder of a different type is now refused. Rebased to 95dcd92d (0 behind); full verify-branch.sh gate PASS on all eight stages; sweep of all 1051 tracked .l4 with the branch binary fires the new diagnostic on its fixture only. Meng said \"enqueue 392\" 2026-09-15 10:40Z; auto-merge is armed. After merge, smucclaw/l4-ide#960 is closed by hand — merge-manager was asked (Meng's instruction), with GM's watch as fallback.",
       "unblocks": "closing smucclaw/l4-ide#960 by hand (CLAUDE.md §1.1)",
       "source": {
         "file": "doc/reference/functions/WITH.md",
@@ -65,7 +65,7 @@
       "kind": "go / no-go",
       "quick": true,
       "raised": "2026-09-14",
-      "ask": "lang/whose-opening @ 68b1ae35: 30 commits, self-verified only (etc/verify-branch.sh green; the final adversarial round was killed twice by session limits), now 166 behind unstable. Options: (a) GM rebases and runs a refuter panel, then PRs — recommended; (b) park; (c) PR as-is. The narrowing rule Meng cut on 2026-09-13 is already reflected (a later DECIDE clause is refused outright). WHOSE itself is unbuilt; the branch is S2/S3.",
+      "ask": "lang/whose-opening: 30 commits, self-verified only (etc/verify-branch.sh green before the rebase; the final adversarial round was killed twice by session limits). REBASED by GM 2026-09-15 onto unstable e578654c — 68b1ae35 → 74d4e7fb, clean, 0 behind, NOT rebuilt after the rebase. Options: (a) GM runs a refuter panel, then PRs — recommended; (b) park; (c) PR as-is. The narrowing rule Meng cut on 2026-09-13 is already reflected (a later DECIDE clause is refused outright). WHOSE itself is unbuilt; the branch is S2/S3 section-binder work.",
       "unblocks": "the EVERY-EACH §13.6 direction Meng endorsed 2026-09-08",
       "source": {
         "file": "specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md",
@@ -121,7 +121,7 @@
       "kind": "triage",
       "quick": true,
       "raised": "2026-09-15",
-      "ask": "Six mengwong/* branches from 2026-08-26 to 09-08 are ahead of unstable by 1–8 commits with no PR: sg-child-support (+7, the Addendum A pricing commits), sg-family-gia (+8), go-cost-accounting (+2), r2-vocab / r4-readsets / r9-milestone (merge-commit residue). Delete, or does any of them hold work to land? GM will not delete another person's remote branch unasked. backup/refuse-pre-drop (+9) and webchat-mobile-ui (Thomas, +8, 1686 behind) are listed but not proposed for deletion.",
+      "ask": "Rebase pass 2026-09-15 (Meng's suggestion), pre-rebase SHAs kept as local tags pre-rebase/*. PUSHED clean: lang/whose-opening (30), sg-family-gia (7), sg-child-support (7), docs/prerelease-status-correction (1), ci/unstable-prerelease-main (1). COLLAPSED TO ZERO on rebase — pure merge-commit residue, nothing to push, DELETE on Meng's word: mengwong/r4-readsets, r2-vocab, r9-milestone, go-cost-accounting, backend-portfolio. SUPERSEDED, delete candidate: mengwong/corpus-style (175096b8, the doubled-copula fix #386 did repo-wide). CONFLICTS, held: applies-corpus-survey (GM takes it with A1–A5 — unstable gained its own §11 from #318, so the branch's §11 must be renumbered), ci/skills-layout (GM's; waits on Thomas's Q1), ladder-false-vs-unknown (Aug 2, +1, goldens conflict; #191 merged from a different branch — needs a look before deleting). FINDING: sg-child-support's seven commits — a whole subject encoding plus its go registration and a prettyLayout fix — were merged by #303 into the stacked branch sg-family-gia and never reached unstable; none is on unstable by patch-id. PR it (or route to canon) and delete the twin — Meng's call which. SKIPPED on purpose: backup/refuse-pre-drop (a backup), webchat-mobile-ui and `origin` (Thomas's), claude/computational-law-intro-k2n1zu (a live cloud session's), claude/unstable-branch-reorganization-6cle91 (release-train tooling, deferred).",
       "unblocks": "a 'committed, not PR'd' pane short enough to read",
       "source": {
         "file": "etc/status-board.mjs",
