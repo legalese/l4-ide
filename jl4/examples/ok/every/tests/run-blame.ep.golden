@@ -1,16 +1,19 @@
 IMPORT prelude
--- EVERY-EACH-QUANTIFIER-SPEC §6.1, R-T3 (built 2026-09-15): the BLAME SET.
+-- EVERY-EACH-QUANTIFIER-SPEC §6.1, R-T3 (built 2026-09-15): the BLAME LIST.
 --
--- A breach names every party that failed, not one of them. Three places
+-- A breach names every obligation that failed, not one of them — one entry
+-- per failure, each with what was failed (the action and deadline missed, or
+-- the reason declared), duplicates kept: the same party twice is two entries,
+-- and the two ways are visible (RULED 2026-09-15: no dedup). Three places
 -- produce a compound breach, and the traces below pin each:
 --
 --   * a BARRIER (`ONCE ALL HAVE`) with no LEST: every member that did not
---     complete is named, in ROLL order, and the breach is anchored at the
---     EARLIEST failure;
+--     complete is named, in ROLL order, each with its own deadline, and the
+--     breach is anchored at the EARLIEST failure;
 --   * a barrier WITH a LEST: the LEST runs once, anchored at the earliest
 --     failure — not at the first failure in roll order — which shows up as
 --     the reparation's deadline;
---   * `RAND`: when both sides are lost, both sides' parties are named, left
+--   * `RAND`: when both sides are lost, both sides' failures are named, left
 --     operand first.
 --
 -- And `BREACH BY` takes a LIST of parties as well as a party. A single
@@ -32,9 +35,9 @@ tenants     MEANS LIST alice, bob, carol
 `tenants, reversed` MEANS LIST carol, bob, alice
 
 -- 1. Two members fail: both are named, in roll order. Alice signs; Bob and
---    Carol never do. The breach is one record: the deadline it reports is the
---    earliest one missed (both are 14 here), and the parties are everyone who
---    missed.
+--    Carol never do. The breach is one record, anchored at the earliest miss
+--    (both are 14 here), and it lists everyone who missed, each with the
+--    action and deadline they missed.
 GIVETH A DEONTIC Actor Action
 `all sign` MEANS
     EVERY Tenant t IN tenants
@@ -89,7 +92,7 @@ GIVETH A DEONTIC Actor Action
 -- The same staggered deadlines with no LEST: the breach is anchored at the
 -- earliest failure (Carol's deadline, day 5, revealed at day 8) and names
 -- both non-completers in roll order — Bob before Carol, although Carol failed
--- first. The deadline printed is the anchor's; the parties are everyone's.
+-- first — each with their own deadline: Bob's 14, Carol's 5.
 GIVETH A DEONTIC Actor Action
 `staggered signing, no reparation` MEANS
     EVERY Tenant t IN tenants
@@ -103,7 +106,7 @@ GIVETH A DEONTIC Actor Action
   (`WAIT UNTIL` 8)
   (`WAIT UNTIL` 20)
 
--- 4. RAND of two single-party obligations, both missed: both parties are
+-- 4. RAND of two single-party obligations, both missed: both failures are
 --    named, left operand first. The anchor is the earliest breach as before
 --    (here a tie, revealed by the same event, so the left one).
 GIVETH A DEONTIC Actor Action
@@ -115,7 +118,10 @@ GIVETH A DEONTIC Actor Action
 #TRACE `both sign` AT 0 WITH
   (`WAIT UNTIL` 20)
 
--- The same party on both sides of a RAND is named once.
+-- The same party on both sides of a RAND is named TWICE, once per way: Alice
+-- missed the signing and Alice missed the refund, and the answer says both.
+-- (Meng, 2026-09-15: "maybe we need to be able to say, 'well, Alice screwed
+-- the pooch two different ways'".)
 GIVETH A DEONTIC Actor Action
 `alice twice` MEANS
     (PARTY alice MUST Sign (EXACTLY alice) WITHIN 14)
@@ -125,8 +131,9 @@ GIVETH A DEONTIC Actor Action
 #TRACE `alice twice` AT 0 WITH
   (`WAIT UNTIL` 20)
 
--- 5. BREACH BY a LIST of parties: the drafter names several. Duplicates are
---    dropped, first occurrence kept.
+-- 5. BREACH BY a LIST of parties: the drafter names several, and the answer
+--    names them as written — one entry each, in order, duplicates kept, each
+--    carrying the BECAUSE.
 GIVETH A DEONTIC Actor Action
 `joint and several` MEANS
     PARTY theLandlord
@@ -137,8 +144,9 @@ GIVETH A DEONTIC Actor Action
 #TRACE `joint and several` AT 0 WITH
   (`WAIT UNTIL` 20)
 
--- A LIST with nobody in it is refused at run time, by name: a breach blames
--- at least one party.
+-- A computed LIST with nobody in it is refused at run time, by name: a breach
+-- blames at least one party. (A literal empty list — `BY EMPTY` — is refused
+-- when the file is checked; see not-ok/tc/breach-by-empty.l4.)
 GIVEN t IS AN Actor
 GIVETH A BOOLEAN
 nobody t MEANS FALSE
@@ -166,4 +174,19 @@ GIVETH A DEONTIC Actor Action
 #TRACE `one misses` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
   PARTY bob   DOES Sign bob   AT 2
+  (`WAIT UNTIL` 20)
+
+-- 7. A party that is itself a LIST. `BY` then names the one party, not its
+--    elements: the checker reads a LIST at the party type as that party
+--    (and a LIST of such lists as several).
+DECLARE Step IS ONE OF deliver
+
+GIVETH A DEONTIC (LIST OF STRING) Step
+`the pair delivers` MEANS
+    PARTY (LIST "a", "b")
+        MUST   deliver
+        WITHIN 5
+        LEST   BREACH BY (LIST "a", "b") BECAUSE "the pair did not deliver"
+
+#TRACE `the pair delivers` AT 0 WITH
   (`WAIT UNTIL` 20)

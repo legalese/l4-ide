@@ -89,11 +89,11 @@ Only Alice pays, and day 8 arrives:
 Result:
   DEONTIC BREACHED:
     BREACH
-    BY LIST Bob, Carol
-    BECAUSE "Bob's share was not paid"
+    BY Bob BECAUSE "Bob's share was not paid"
+    BY Carol BECAUSE "Carol's share was not paid"
 ```
 
-Bob and Carol both failed, and the screen names both, in the order the rule wrote them. When several sides of a `RAND` fail together, the `BY` lists every failing side; the `BECAUSE` comes from one of them — the first to fail, and the first as written when they fail together — so read the reason as one person's and the `BY` as everyone's. [What Follows](what-follows.md) met the same thing with `ROR`.
+Bob and Carol both failed, and the screen names both, in the order the rule wrote them, each with the reason written on their own side. When several sides of a `RAND` fail, the breach carries one line per failing side — whom, and why — so nothing about one person's failure is read off another's. The same person can appear twice, if two sides of theirs both failed. [What Follows](what-follows.md) met the same thing with `ROR`.
 
 And the case that shows what kind of arrangement this is. Alice, feeling generous, pays $500 twice, and Carol pays hers:
 
@@ -209,11 +209,12 @@ Not the rent, so nothing is discharged, and all three alternatives stand with fo
 Result:
   DEONTIC BREACHED:
     BREACH
-    BY LIST Alice, Bob, Carol
-    BECAUSE "the rent was not paid"
+    BY Alice BECAUSE "the rent was not paid"
+    BY Bob BECAUSE "the rent was not paid"
+    BY Carol BECAUSE "the rent was not paid"
 ```
 
-All three of them failed, and the screen names all three, as written. That is what the law says of a shared debt: the three are in breach together. (Before 15 September 2026 the screen named only the last of them; if you have older output, that is why.)
+All three of them failed, and the screen names all three, as written, one line each. That is what the law says of a shared debt: the three are in breach together. (Before 15 September 2026 the screen named only the last of them; if you have older output, that is why.)
 
 ---
 
@@ -395,8 +396,9 @@ L4 says the rent was paid in time. It was not: two-thirds of it arrived after th
 Result:
   DEONTIC BREACHED:
     BREACH
-    BY LIST Alice, Bob, Carol
-    BECAUSE "the rent was not paid in full"
+    BY Alice BECAUSE "the rent was not paid in full"
+    BY Bob BECAUSE "the rent was not paid in full"
+    BY Carol BECAUSE "the rent was not paid in full"
 ```
 
 The debt is everyone's, and the screen says so. What it still cannot say is the one deadline on the total.
@@ -426,7 +428,7 @@ Read the last column as the agenda for [What Is Coming](what-is-coming.md).
 
 - **`RAND` is all of these**: every side must reach its end; the "still owed" line is a checklist joined by `AND`; one person's act discharges only that person's side.
 - **`ROR` is any of these**: the first side to reach its end settles the whole; the "still owed" line is joined by `OR`; the whole is broken only when every side is lost.
-- **A breach from a group names everyone who failed together**, in the order written. The `BECAUSE` is one side's — the first to fail for `RAND`, the last for `ROR`.
+- **A breach from a group names everyone who failed together**, in the order written, one line each with that side's own `BECAUSE`.
 - **A follow-on belongs to one obligation, not to a group or a choice**, so "when all have done this, then that, once" cannot be written in one place today, and a repayment nested inside one side of a choice joins the race.
 - **A rule that uses itself** turns a debt into instalments — with a clock that restarts on every instalment.
 - **Six arrangements of one debt** are told apart by whether one payment discharges the others, and by where the follow-on attaches. Two run with nothing missing; the other four each run with a stated gap.

@@ -288,7 +288,7 @@ GIVETH A DEONTIC Actor Action
 
 **`LEST`** fires when the group's obligation fails: under a barrier, when the group can no longer all be done in time; under a fork, when the member it belongs to fails. A barrier's `LEST` runs once, and it is anchored at the **earliest** failure — the member whose deadline was missed first, wherever that member stood on the roll — so a reparation's own `WITHIN` counts from there.
 
-**Who is blamed.** A barrier with **no** `LEST` answers with one breach that names **every** member who did not act, in the order the roll named them. A barrier's own `LEST BREACH` names whom you name: a party, or several with `BREACH BY LIST a, b`, or nobody if you write no `BY` — it cannot name the members who failed, because it belongs to the join and not to any member. See [What runs today](#what-runs-today-and-what-does-not) for the shape of the answer.
+**Who is blamed.** A barrier with **no** `LEST` answers with one breach that names **every** member who did not act, in the order the roll named them, each with the deadline they missed. A barrier's own `LEST BREACH` names whom you name: a party, or several with `BREACH BY LIST a, b`, or nobody if you write no `BY` — it cannot name the members who failed, because it belongs to the join and not to any member. See [What runs today](#what-runs-today-and-what-does-not) for the shape of the answer.
 
 ## Combining with RAND and ROR, and nesting
 
@@ -369,7 +369,7 @@ Verified 2026-09-08 against the compiler at the head of this branch; the blame s
 - Type checking: the variable has the party type; the cast must be a constructor of that type; the condition must be a `BOOLEAN`; both deadlines must be `NUMBER`s; a `HENCE` or `LEST` under `EVERY` without a join line is rejected, naming the two spellings; a join line under `PARTY` is rejected; an action that rebinds the variable is rejected.
 - Printing: `l4 format` reproduces the source; the layout printer used by `l4 batch` re-emits a parseable, re-checkable rule.
 - **Running**, as described above: the roll call, the barrier, the fork, the plain distributive form with no join line, all four modals, the deadline on the act and the deadline on the join line, and nesting one quantified rule inside another's `HENCE`.
-- **A failed barrier's breach names everyone who failed.** With no `LEST` on the join, the answer is one breach naming every member who did not act, in roll order, anchored at the earliest missed deadline. Two of three tenants never sign:
+- **A failed barrier's breach names everyone who failed.** With no `LEST` on the join, the answer is one breach naming every member who did not act, in roll order, each with the action and deadline they missed, and dated at the earliest missed deadline. Two of three tenants never sign:
 
   ```
   DEONTIC BREACHED:
@@ -379,16 +379,22 @@ Verified 2026-09-08 against the compiler at the head of this branch; the blame s
       NEVERMATCHESACT
     at
       20
-    surpassed the deadline of parties
+    revealed the breach of
       Tenant OF "Bob"
+        who had to do obligatory action
+          MUST Sign (EXACTLY t)
+        before their deadline, which was at
+          14
       Tenant OF "Carol"
-    who had to do obligatory action
-      MUST Sign (EXACTLY t)
-    before their deadline, which was at
-      14
+        who had to do obligatory action
+          MUST Sign (EXACTLY t)
+        before their deadline, which was at
+          14
   ```
 
-  One failure prints as it always did — `party`, singular, and one name. The same goes for `RAND`: when both sides are lost, both sides' parties are named, left first. And `BREACH BY` takes a list: `LEST BREACH BY LIST alice, bob BECAUSE "…"` prints `BY LIST Tenant OF "Alice", Tenant OF "Bob"`, duplicates dropped; a list with nobody in it is refused at run time, by name. With a `LEST` on the join, the `LEST` runs once, anchored at the **earliest** failure — a member late on the roll who fails first is the one whose failure sets the clock — and it names whom you wrote in it, as the next section says. (Built 2026-09-15; the design calls this the set-valued breach, R-T3.)
+  One failure prints as it always did — `party`, singular, and one name. The same goes for `RAND`: when both sides are lost, both sides' failures are named, left first, each with its own deadline or its own `BECAUSE`. Nothing is collapsed: a member listed twice on the roll who never acts is named twice, and `PARTY alice MUST x RAND PARTY alice MUST y` with both missed names Alice twice, once per way. And `BREACH BY` takes a list: `LEST BREACH BY LIST alice, bob BECAUSE "…"` prints one `BY … BECAUSE …` line per name, in order; a list literal with nobody in it is refused when the file is checked, and a computed one that turns out empty is refused at run time, by name. With a `LEST` on the join, the `LEST` runs once, anchored at the **earliest** failure — a member late on the roll who fails first is the one whose failure sets the clock — and it names whom you wrote in it, as the next section says. (Built 2026-09-15; the design calls this the set-valued breach, R-T3.)
+
+  Because the answer lists everyone, **every member is run** before the barrier decides, even after an earlier member on the roll has already failed. Before 2026-09-15 the first failure ended the scan and the later members were never evaluated; now they are, so a later member whose `WITHIN` (or anything its run reaches) raises an error makes that error the barrier's answer, where it used to be hidden behind the earlier failure.
 
 - The state graph and the BPMN lowered from it show the quantified obligation as **one** element labelled with the quantifier — a single transition in the state graph, a single task in the BPMN. They do not draw one element per member, and they do not draw the join line.
 

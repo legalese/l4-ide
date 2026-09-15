@@ -1867,6 +1867,19 @@ checkExpr ec (LetIn ann ds e) t = softprune $ do
       re <- checkExpr ec e t
       nlgExpr re
   setAnnResolvedType t Nothing (LetIn ann rds re)
+-- A BREACH checked against a KNOWN deontic type unifies with it FIRST, so
+-- that its BY expression is read against the rule's party type (see
+-- 'checkBreachParty'): inferring it with a fresh party type and unifying
+-- afterwards would decide the list-versus-party reading before the party type
+-- was known. A LEST/HENCE, the operand of a RAND/ROR under a GIVETH, and a
+-- top-level @x MEANS BREACH BY …@ under a GIVETH all arrive here.
+checkExpr ec e@(Breach ann mParty mReason) t = softprune $ errorContext (WhileCheckingExpression e) do
+  partyT <- fresh (NormalName "party")
+  actionT <- fresh (NormalName "action")
+  expect ec t (contract partyT actionT)
+  mParty' <- traverse (checkBreachParty partyT) mParty
+  mReason' <- traverse (\r -> checkExpr ExpectBreachReasonContext r string) mReason
+  setAnnResolvedType t Nothing (Breach ann mParty' mReason')
 checkExpr ec e t = softprune $ errorContext (WhileCheckingExpression e) do
   (re, rt) <- inferExpr e
   expect ec t rt
@@ -1881,22 +1894,52 @@ checkExpr ec e t = softprune $ errorContext (WhileCheckingExpression e) do
 -- a party whose type is still an inference variable (a bare @MEANS@ with no
 -- @GIVETH@) would then leave both branches viable and report an ambiguity
 -- where there was none; read this way, it falls to the scalar reading the
--- checker always had. The machine cannot see which reading was taken — no
--- mark is left on the syntax — and decides by the value's shape at run time.
+-- checker always had.
 --
--- The one thing this gives up: a contract whose party type is ITSELF a list
--- (@DEONTIC (LIST OF Person) Action@) can no longer write @BREACH BY ps@ with
--- @ps@ that whole list — the list reading wins. No corpus file has such a
--- party type (measured 2026-09-15).
+-- The machine cannot see which reading was taken — no mark is left on the
+-- syntax — and reads a LIST value as several parties. So the one case where
+-- the two readings collide is settled HERE, by rewriting: when the party type
+-- is ITSELF the list type @e@ has (both fully known, so this is a structural
+-- comparison, not a unification), the drafter named ONE party whose value is
+-- a list — @DEONTIC (LIST OF Person) Action@ with @BREACH BY ps@ — and @e@ is
+-- wrapped as the one-element list @LIST e@, which the machine walks into
+-- exactly that one party. The wrap is idempotent under re-check (the printed
+-- @LIST (LIST …)@ takes the element reading, whose element type is the
+-- party type) and invisible to exactprint, which prints the parsed tree.
+-- Restored 2026-09-15 by the adversarial pass; the first build gave this
+-- case up.
+--
+-- A list LITERAL with nobody in it (@EMPTY@, or @LIST@ with no elements) is
+-- refused here, loudly: a breach blames at least one party, and the literal
+-- is decidable at check time. A computed list that turns out empty is
+-- refused when the rule runs ('emptyBreachByRefusal' in the machine).
 checkBreachParty :: Type' Resolved -> Expr Name -> Check (Expr Resolved)
 checkBreachParty partyT p = errorContext (WhileCheckingExpression p) do
+  partyT' <- applySubst partyT
   (rp, pt) <- inferExpr p
+  when (isEmptyListLiteral rp) $ addError (EmptyBreachBy p)
   pt' <- applySubst pt
+  let ground t = not (hasInfVarKey (typeKey t))
   case pt' of
     TyApp _ n [elemT] | getUnique n == getUnique listRef ->
-      expect ExpectRegulativePartyContext partyT elemT
-    _ -> expect ExpectRegulativePartyContext partyT pt'
-  setAnnResolvedType pt' Nothing rp
+      if ground partyT' && ground pt' && typeKey partyT' == typeKey pt'
+        then do
+          -- the party type IS this list type: one party, wrapped (see above)
+          rp' <- setAnnResolvedType pt' Nothing rp
+          pure (List emptyAnno [rp'])
+        else do
+          expect ExpectBreachPartyContext partyT elemT
+          setAnnResolvedType pt' Nothing rp
+    _ -> do
+      expect ExpectBreachPartyContext partyT pt'
+      setAnnResolvedType pt' Nothing rp
+  where
+    -- @LIST@ with no elements, or the builtin @EMPTY@ (a nullary constructor)
+    isEmptyListLiteral = \ case
+      List _ []  -> True
+      Var _ r    -> getUnique r == emptyUnique
+      App _ r [] -> getUnique r == emptyUnique
+      _          -> False
 
 checkIfThenElse :: ExpectationContext -> Anno -> Expr Name -> Expr Name -> Expr Name -> Type' Resolved -> Check (Expr Resolved)
 checkIfThenElse ec ann e1 e2 e3 t = do
@@ -6068,6 +6111,13 @@ prettyCheckError (QuantifierVariableRebound b q) =
   , ""
   , "in that position; to mean a fresh name, choose a different spelling."
   ]
+prettyCheckError (EmptyBreachBy _) =
+  [ "BREACH BY names an empty list."
+  , ""
+  , "A breach blames at least one party: give BY a party, or a LIST with"
+  , "someone in it, or leave BY out to blame nobody. (A list that is computed"
+  , "and turns out empty is refused when the rule runs.)"
+  ]
 prettyCheckError (JoinWithoutEvery _) =
   [ "A join line needs an EVERY."
   , ""
@@ -6443,6 +6493,12 @@ prettyTypeMismatch ExpectPartyActionAgreementContext expected given =
     ] expected given
 prettyTypeMismatch ExpectAssertContext expected given =
   standardTypeMismatch [ "An ASSERT directive is expected to be of type" ] expected given
+prettyTypeMismatch ExpectBreachPartyContext expected given =
+  standardTypeMismatch
+    [ "The party named by BREACH BY is expected to be of the rule's party type."
+    , "A LIST there names several parties, each of that type (or, when the party"
+    , "type is itself a LIST, the one party). The party type here is"
+    ] expected given
 prettyTypeMismatch ExpectBreachReasonContext expected given =
   standardTypeMismatch [ "The BECAUSE clause of a BREACH is expected to be of type" ] expected given
 prettyTypeMismatch ExpectRefuseMessageContext expected given =

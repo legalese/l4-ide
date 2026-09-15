@@ -3,7 +3,7 @@
 --   (b) RAND/ROR over ANY both-breached pair (DeadlineMissed and/or
 --       ExplicitBreach) reports a breach instead of a residual, ANCHORED at
 --       one operand (RAND the earliest, ROR the latest; untimestamped pairs
---       tie-break RAND left, ROR right) and BLAMING both operands' parties.
+--       tie-break RAND left, ROR right), naming BOTH failures with their detail.
 --   (c) the event whose timestamp reveals deadline expiry is re-offered to
 --       the HENCE/LEST continuation instead of being silently consumed.
 --   (d) the deadline boundary is strict: arriving exactly AT the deadline is
@@ -35,7 +35,7 @@ GIVETH A DEONTIC Person Action
     (PARTY Bob MUST deliver WITHIN 10 HENCE FULFILLED LEST BREACH BY Bob BECAUSE "missed second")
 
 -- Both alternatives definitively breached => single breach (not a residual OR),
--- naming BOTH parties, left first; the BECAUSE is the RIGHT operand's (ROR).
+-- naming BOTH failures, left first, each with its own BECAUSE.
 #TRACE `ror both explicit` AT 0 WITH
     (`WAIT UNTIL` 20)
 
@@ -45,7 +45,7 @@ GIVETH A DEONTIC Person Action
     RAND
     (PARTY Bob MUST deliver WITHIN 10 HENCE FULFILLED LEST BREACH BY Bob BECAUSE "missed second")
 
--- RAND over an untimestamped pair: both parties, the LEFT operand's BECAUSE.
+-- RAND over an untimestamped pair: both failures, each with its own BECAUSE.
 #TRACE `rand both explicit` AT 0 WITH
     (`WAIT UNTIL` 20)
 
@@ -61,7 +61,7 @@ GIVETH A DEONTIC Person Action
     ROR
     (PARTY Alice MUST pay 1 WITHIN 5 HENCE FULFILLED LEST BREACH BY Alice BECAUSE "missed payment")
 
--- Mixed kinds, both orders: the RIGHT operand's breach, naming BOTH parties.
+-- Mixed kinds, both orders: anchored at the RIGHT operand's breach, naming BOTH.
 #TRACE `explicit or deadline` AT 0 WITH
     (`WAIT UNTIL` 20)
 
