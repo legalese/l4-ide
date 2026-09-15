@@ -1,0 +1,44 @@
+-- A small sale, drawn and questioned by `l4 state-graph`.
+-- See state-graph.md, which walks through the pictures and the answers.
+
+DECLARE Person IS ONE OF `The Seller`, `The Buyer`, `The Courier`
+DECLARE Action IS ONE OF
+  `deliver the goods`
+  `pay the price`
+  `collect the goods`
+  `pay the late fee`
+
+GIVETH DEONTIC Person Action
+`the sale` MEANS
+  PARTY `The Seller`
+  MUST  `deliver the goods`
+  WITHIN 10
+  HENCE (PARTY `The Buyer`
+         MUST  `pay the price`
+         WITHIN 30
+         HENCE FULFILLED
+         LEST (PARTY `The Buyer`
+               MUST  `pay the late fee`
+               WITHIN 7))
+
+-- Two obligations that both have to be met: the seller delivers AND the
+-- buyer pays. RAND is "both", so both acts are on every path to FULFILLED.
+GIVETH DEONTIC Person Action
+`delivery and payment` MEANS
+       (PARTY `The Seller` MUST `deliver the goods` WITHIN 10)
+  RAND (PARTY `The Buyer`  MUST `pay the price`     WITHIN 30)
+
+-- Two ways to get the goods to the buyer: the seller delivers OR the buyer
+-- collects. ROR is "one of", so neither act is on every path to FULFILLED.
+GIVETH DEONTIC Person Action
+`delivery or collection` MEANS
+       (PARTY `The Seller` MUST `deliver the goods`  WITHIN 10)
+  ROR  (PARTY `The Buyer`  MUST `collect the goods`  WITHIN 10)
+
+#TRACE `the sale` AT 0 WITH
+  PARTY `The Seller` DOES `deliver the goods` AT 3
+  PARTY `The Buyer`  DOES `pay the price` AT 20
+
+#TRACE `the sale` AT 0 WITH
+  PARTY `The Seller` DOES `deliver the goods` AT 3
+  PARTY `The Buyer`  DOES `pay the late fee` AT 35

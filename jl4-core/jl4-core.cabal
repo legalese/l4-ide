@@ -154,6 +154,7 @@ library
     L4.Lts.Marking
     L4.Lts.WhatIf
     L4.StateGraph
+    L4.StateGraph.Dominators
     L4.ExactPrint
     L4.Discharge
     L4.Export
@@ -255,6 +256,7 @@ test-suite jl4-core-test
     LtsListSpec
     LtsMarkingSpec
     LtsWhatIfSpec
+    DominatorsSpec
     RelationalSpec
     BlawxAssumeSpec
     BlawxNlgSpec

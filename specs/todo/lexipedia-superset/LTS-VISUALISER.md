@@ -181,6 +181,90 @@ _set of acts_ — "on every path from here to J you must do these" — which pri
 a list, or as an annotation on the **BPMN P1 already emits**. It is unbundled in §7.2 and no
 longer gates on, or is gated by, the new picture.
 
+> **LANDED 2026-09-15** (`lts/p2f-dominators`) — `jl4-core/src/L4/StateGraph/Dominators.hs`,
+> a new module with no edit to `StateGraph.hs`. The dominator query itself has no dependency
+> on P2b/P2c/P2h; the reader-facing wording of an `EVERY` act reads P2h-first-half's
+> `labelQuantifier` / `JoinKind` (`Dominators.hs`, `renderTransition` and `joinText`), so the
+> branch is based on `fix/join-on-state-graph` and merges after it — measured:
+> `git log -S labelQuantifier -- jl4-core/src/L4/StateGraph.hs` lists only `f1efcbd2`, which is
+> on that branch.
+>
+> **Algorithm.** Not Lengauer–Tarjan. The classical dominance equations —
+> `Dom(entry) = {entry}`, `Dom(n) = {n} ∪ ⋂ Dom(pred)` — solved by iteration to their greatest
+> fixpoint over the reachable nodes (`solveDominators`, `Dominators.hs`). That is the
+> formulation Cooper, Harvey & Kennedy, _A Simple, Fast Dominance Algorithm_ (Rice CS
+> TR-06-33870; see the bibliography) §2 start from; the answer is identical **by definition**
+> — the dominator set of a node is unique, and every correct algorithm computes exactly it.
+> The graphs are tens of nodes, so the near-linear engineering (theirs or Lengauer–Tarjan's)
+> buys nothing here. Two adaptations: (i) acts are **edges**, so every transition is
+> subdivided into a node of its own and the answer is read off the edge nodes; (ii) **neither
+> `RAND` nor `ROR` has its join in the IR** (R2), so a literal walk says neither branch of a
+> conjunction dominates `Fulfilled` and neither alternative of a choice dominates `Breach`.
+> The evaluator's join (`Machine.hs`, `RBinOp2`: _"for RAND because all components must be
+> fulfilled, for ROR because every alternative has been definitively lost"_) is supplied by
+> two dual views, each for the one query that needs it: `fulfilmentView` rewrites each
+> `AllOf` so its branches run in sequence — branch _k_'s arrivals at `Fulfilled` are
+> re-pointed at branch _k+1_'s entry — and `breachView` does the same to each `ROR`-derived
+> `OneOf` with arrivals at `Breach`. Each has the same set of edges on every path to its sink
+> as the concurrent contract has on every run, since dominance is order-blind. An
+> `IF`-derived `OneOf` (branch edges carry a `labelBranch`) is exclusive and left alone by
+> both; an intermediate state lies inside one branch and is answered over the literal graph.
+>
+> _What review changed (2026-09-15)._ The first cut carried only the `RAND` half and asserted
+> that breach "is already right" over the literal graph — the §2.4 hazard exactly, a
+> re-derivation of half the `RBinOp` join. Measured with `l4 run` on
+> `(PARTY Alice MUST pay WITHIN 3) ROR (PARTY Bob MUST deliver WITHIN 5)`: a stray event AT 4
+> gives a residual `… OR PARTY Bob MUST deliver WITHIN 1`, AT 6 gives the breach — so both
+> deadlines are on every run to `Breach`, and the tool now says so (`DominatorsSpec.hs`, "ROR:
+> both timeouts dominate the breach sink"; nested cases `(a RAND b) ROR c` → only `c`'s
+> deadline, `(a ROR b) RAND c` → nothing, each cross-checked the same way).
+>
+> **Scope, stated.** Two narrowings of the paper's `dom_s(J)` are deliberate: the question is
+> asked from the start state only (no `s` parameter), and per **edge**, not per action label —
+> the same act on two edges (say `sign` in both arms of an `IF`) dominates nothing here where
+> the paper would count the label.
+>
+> **Command.** `l4 state-graph --dominators FILE` prints, per rule, the acts every path to
+> `FULFILLED` and to `BREACH` must traverse; `--all-states` widens it to every state. Default
+> DOT output is byte-identical to the reference checkout's 7 Aug binary on
+> `jl4/examples/ok/contracts.l4`, `jl4/examples/bpmn/offering.l4` and
+> `doc/reference/regulative/state-graph-example.l4` (measured by `diff`, 2026-09-15);
+> `l4-cli-test` asserts only that the DOT path still prints DOT and no dominator text. The DOT
+> annotation ("bold the dominating edges") is **not built**: it needs an option on
+> `StateGraphOptions`, which is an edit to `StateGraph.hs` this branch was told to avoid while
+> a fix to that file is in flight.
+>
+> **Measured**, `l4 state-graph --dominators jl4/examples/ok/contracts.l4`:
+>
+> ```
+> aContract
+>   Every path to FULFILLED passes through:
+>     - PARTY S delivery (MUST, WITHIN 3)
+>   Every path to BREACH passes through: nothing in particular (there is more than one route).
+> ```
+>
+> — correct on inspection of the graph: B's payment is bypassed by the `LEST` fine, and
+> breach is reachable from the first deadline. On the spec fixtures in
+> `jl4-core/test/DominatorsSpec.hs` (27 examples, 0 failures): a chain dominates its sink with
+> every act; `ROR` fulfils with nothing and breaches with **both** timeouts; `RAND` fulfils
+> with **both** branches (two-way and three-way) and breaches with nothing; `(a ROR b) RAND c`
+> fulfils with `c` alone; `(a RAND b) ROR c` breaches with `c`'s timeout alone; an `IF` arm
+> dominates the state inside it and is not sequentialised; a renewing duty (`HENCE` to self)
+> terminates and only its timeout reaches breach; a hand-built unreachable state answers
+> `Unreachable` (extraction never draws one — a rule whose arms are other named rules has no
+> sink at all, and prints "this graph has no FULFILLED or BREACH state to reach").
+>
+> **What the answer inherits** is §1.1b's three blind spots unchanged — it is sound in the
+> direction "this act is on every drawn route" and says nothing about whether each drawn
+> route is live — **plus one in the opposite direction**: a bare `MAY` whose `HENCE` leads on
+> to another obligation lapses straight to `FULFILLED` in the evaluator, and the graph does not
+> draw that route (`StateGraph.hs`, the `DMay` NOTE in `extractDeonton`). Measured:
+> `PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)` with a stray event
+> AT 6 evaluates to `FULFILLED`, while `--dominators` lists both `pay` and `deliver` as on every
+> path to `FULFILLED`. So "listed ⇒ necessary" fails below a lapsing `MAY`. The user page
+> (`doc/reference/regulative/state-graph.md`, "What the answer does not know", item 4) says
+> so; fixing the drawing is a separate change and would retire the caveat.
+
 ### 1.1d So what is left of the existence argument
 
 Honestly stated:
@@ -1699,7 +1783,7 @@ rather than assumed benign. R11 and R12 are new in revision 2; R13 was added on 
 | **R7**  | **Was `logic-not-flowcharts.md`'s state-transitions row intended as unranked?** It reads as unranked and PROCESS-TRACK §1 reads it that way, but it was written before P2 was contemplated, so it may simply never have been asked the question. **Ask Meng** rather than infer; §1.2's whole framing depends on it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | **R8**  | **Verify Lomuscio & Sergot before print.** The green/red state-partition characterisation in §2.2 is from secondary sources; the primary PDF would not extract. It carries architectural weight (per-party colouring is the F2 shape). Symboleo's exact lifecycle state names are likewise search-verified rather than read — there is probably an `Expired`/`Terminated` and a `Suspended`→`Resumed` pair we have not recorded. §7.4's citation failure is the reason this caveat is now load-bearing rather than decorative.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | **R9**  | **Does P2 draw powers, or refuse?** G5 says a power changes the transition system, so it cannot be an edge in it. Symboleo gives powers their own lifecycle, which is one answer. Refusing and drawing the boundary is another, and is consistent with §25.5's own precedent of drawing the seam rather than pretending.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| **R10** | **Does P2f belong here or in the bounded-deontics work?** Sharpened by revision 2's unbundling: P2f no longer needs anything of P2's except the graph P0 already ships, so the case for it living here is weaker than it was. The query is that paper's contribution; the graph is `StateGraph`'s; the renderer may be P1's BPMN or a list.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **R10** | **Does P2f belong here or in the bounded-deontics work?** Sharpened by revision 2's unbundling: P2f no longer needs anything of P2's except the graph P0 already ships, so the case for it living here is weaker than it was. The query is that paper's contribution; the graph is `StateGraph`'s; the renderer may be P1's BPMN or a list. **Observation 2026-09-15 (still OPEN):** P2f was built on `lts/p2f-dominators` as a function over `StateGraph` (`L4.StateGraph.Dominators`) with **no dependency on the rest of P2** — not on the step log, the marking or the picture (its reader-facing wording of an `EVERY` act does read P2h-first-half's `labelQuantifier`, so it is stacked on that branch) — and it needed one thing of the graph the paper's definition does not mention: the `RAND` and `ROR` joins the IR lacks, supplied inside the module as `fulfilmentView` and `breachView`. That is evidence for the split the ruling proposes — the graph (and its join) is `StateGraph`'s, the query is the paper's — and the paper's §7 sentence _"the dominator query … designed and not yet built"_ is now false and should be updated when it is next touched.                                                                                                                                                                                                                                                                                                                                                                                          |
 | **R11** | **NEW. Does `STATEFUL` §6.4 need correcting?** §2.4 rules that P2 uses the replay endpoints (22/23/24) rather than 18/19/20, because "would lead to `FULFILLED`" cannot be answered by a pure walk without reimplementing modal routing. That is a finding **about `STATEFUL`'s own spec**, whose §6.4 promises exactly that pure walk with "microsecond responses". Either that spec should record the faithfulness obligation, or 19/20 should be re-specified as replay, or the pure walk should be kept behind a cross-validation test. Not P2's call alone. **OBSERVED 2026-09-15, not decided:** P2c's replay form (§2.4 block) measured 83–313 µs per candidate, warm, on the corpus's barrier and `contracts.l4` traces — inside the "microsecond responses" §6.4 promised for the pure walk, at trace lengths of one to three events. The replay's cost is linear in the persisted history (every prior event is re-scrutinised per candidate), so the promise is met today by the form §2.4 prefers and would stop being met at some history length nobody has measured. What §6.4 needs is therefore not a faster form but a number: the history length at which replay exceeds its budget, which is when a pure walk earns its faithfulness obligation. Still not P2's call alone.                                                                                                                                                                                                                                                                             |
 | **R12** | **NEW. Is `Lapsed` the right name, and is it Symboleo's?** §4.2a needs a lifecycle state for "this `ROr` alternative is definitively lost but the compound is not violated". Symboleo has `terminated` and possibly `expired`; whether either covers this, or whether we are coining, is unverified and folded into R8's reading task.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | **R13** | **NEW (2026-09-14). Do the ladder lens and the deontic lens ever stack on the same line?** §4.8 asks for a lens above every regulative `Decide`; the ladder already puts one above every `Decide` that `canVisualize` accepts. Whether those two sets are disjoint is **unmeasured** — nobody has run `Ladder.doVisualize` against a regulative body to see whether it succeeds. If they overlap, two lenses share one anchor position and the titles have to distinguish them ("Show decision graph" is already taken). Five minutes against `jl4/examples/legal/regcf/regcf.l4` settles it, and it should be settled before the lens is designed rather than after.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -1797,7 +1881,10 @@ diagrams", 2016. Martínez, Cambronero, Díaz & Schneider, C-O Diagrams, TSE 201
 Aalst, DECLARE; Di Ciccio et al., "Semantical vacuity detection in declarative process mining",
 BPM 2016. Dijkman, Dumas & Ouyang, "Semantics and analysis of business process models in BPMN",
 _IST_ 50(12):1281-1294, 2008. Bartoletti et al., lending Petri nets, arXiv `1211.3624`.
-Lengauer & Tarjan, 1979 (the dominator computation P2f needs). Sugiyama, Tagawa & Toda, "Methods
+Lengauer & Tarjan, 1979 (the dominator computation P2f names); Cooper, Harvey & Kennedy, "A
+simple, fast dominance algorithm", Rice CS TR-06-33870 — the report's own front-page stamp; the
+Rice repository catalogues the same PDF as TR06-38870, <https://hdl.handle.net/1911/96345>,
+issued 2006 (the iterative formulation P2f implements, §1.1c). Sugiyama, Tagawa & Toda, "Methods
 for visual understanding of hierarchical system structures", _IEEE SMC_ 11(2), 1981 (the
 layered-layout phases §4.7 needs once B2 introduces cycles). Maslov & Poelmans, _I&M_ 61:103967,
 2024, DOI `10.1016/j.im.2024.103967`; Maslov, Poelmans, Wautelet & Gailly, _JCL_ 84:101350, 2025,
