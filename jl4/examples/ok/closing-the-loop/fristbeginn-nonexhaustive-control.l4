@@ -1,0 +1,45 @@
+IMPORT prelude
+
+§ `Kontrollprobe — die Erschöpfungsprüfung des § 187, mit einem fehlenden Arm`
+
+-- ===========================================================================
+-- WARUM ES DIESE DATEI GIBT.
+--
+-- `fristberechnung.l4` behauptet, die Fallunterscheidung des § 187 sei
+-- ERSCHÖPFEND, und läuft ohne Erschöpfungswarnung durch. Für sich genommen
+-- belegt ein sauberer Lauf GAR NICHTS: er ist genauso vereinbar damit, dass
+-- der Prüfer gar nicht hingesehen hat. Diese Datei ist die Gegenprobe. Sie
+-- ist `§ 187 Abs. 1 ist einschlägig bei` mit GELÖSCHTEM DRITTEN ARM und sonst
+-- nichts. Ihr Golden hält die Erschöpfungsdiagnose wörtlich fest. Sieht man
+-- sie hier, so hat der Prüfer dort hingesehen.
+--
+-- KEIN #EVAL, NIEMALS. Ein Wert, der den fehlenden Arm erreicht, stürzte zur
+-- Laufzeit ab, und diese Datei muss sauber typprüfen und auswerten, um unter
+-- `ok/**` leben zu dürfen. Die einzige Direktive ist ein #CHECK.
+--
+-- EHRLICH ZUM MECHANISMUS: die Erschöpfungsdiagnose ist eine WARNUNG, keine
+-- Fehlermeldung. `l4 check` gibt deswegen KEINEN Rückgabewert ungleich 0. Die
+-- Durchsetzung sitzt in der Testsuite: `jl4-test` schreibt den
+-- Diagnosetext in das Golden, und eine Änderung daran färbt den Bau rot.
+-- Wer glaubt, der Übersetzer weise die Datei ZURÜCK, irrt sich öffentlich.
+--
+-- Vorbild: jl4/examples/ok/nonexhaustive-decorator-control.l4
+-- ===========================================================================
+
+DECLARE `Die Art des Fristbeginns` IS ONE OF
+    `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt`
+    `der Beginn eines Tages`
+    `der Tag der Geburt bei der Berechnung des Lebensalters`
+
+-- Der dritte Arm — `der Tag der Geburt bei der Berechnung des Lebensalters` —
+-- FEHLT ABSICHTLICH. In `fristberechnung.l4` ist er da; das ist § 187 Abs. 2
+-- Satz 2, den Teil III.A des Aufsatzes stillschweigend fallen lässt. Genau
+-- dieses Fallenlassen sähe so aus.
+GIVEN a IS A `Die Art des Fristbeginns`
+GIVETH A BOOLEAN
+`§ 187 Abs. 1 ist einschlägig bei (unvollständig)` a MEANS
+    CONSIDER a
+    WHEN `ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt` THEN TRUE
+    WHEN `der Beginn eines Tages`                                            THEN FALSE
+
+#CHECK `§ 187 Abs. 1 ist einschlägig bei (unvollständig)`

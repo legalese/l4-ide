@@ -1,0 +1,96 @@
+{
+    "$defs": {
+        "Der Gegenstand": {
+            "enum": [
+                "eine WillenserklÃ¤rung ist abzugeben",
+                "eine Leistung ist zu bewirken",
+                "eine VerjÃ¤hrungsfrist lÃ¤uft ab",
+                "eine Rechtsfolge tritt lediglich ein"
+            ],
+            "type": "string"
+        },
+        "Die Art des Fristbeginns": {
+            "enum": [
+                "ein Ereignis oder ein in den Lauf eines Tages fallender Zeitpunkt",
+                "der Beginn eines Tages",
+                "der Tag der Geburt bei der Berechnung des Lebensalters"
+            ],
+            "type": "string"
+        },
+        "Fristdauer": {
+            "properties": {
+                "die Einheit": {
+                    "$ref": "#/$defs/Fristeinheit"
+                },
+                "die Zahl": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "die Zahl",
+                "die Einheit"
+            ],
+            "type": "object"
+        },
+        "Fristeinheit": {
+            "enum": [
+                "Tage",
+                "Wochen",
+                "Monate",
+                "Jahre",
+                "Monate und ein halber Monat"
+            ],
+            "type": "string"
+        },
+        "Fristfall": {
+            "properties": {
+                "der AnknÃ¼pfungstag": {
+                    "format": "date",
+                    "type": "string"
+                },
+                "der Gegenstand der Frist": {
+                    "$ref": "#/$defs/Der Gegenstand"
+                },
+                "die Art des Fristbeginns": {
+                    "$ref": "#/$defs/Die Art des Fristbeginns"
+                },
+                "die Fristdauer": {
+                    "$ref": "#/$defs/Fristdauer"
+                },
+                "die maÃgebenden Orte": {
+                    "$ref": "#/$defs/Die maÃgebenden Orte"
+                },
+                "eine abweichende Bestimmung": {
+                    "anyOf": [
+                        {
+                            "format": "date",
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "der AnknÃ¼pfungstag",
+                "die Art des Fristbeginns",
+                "die Fristdauer",
+                "der Gegenstand der Frist",
+                "die maÃgebenden Orte"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+        "f": {
+            "$ref": "#/$defs/Fristfall"
+        }
+    },
+    "required": [
+        "f"
+    ],
+    "title": "das Fristende zu",
+    "type": "object"
+}
