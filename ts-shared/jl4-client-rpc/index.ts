@@ -16,3 +16,7 @@ export * from './utils.js'
 // JSON → L4 source rendering (drives chat tool-call cards: renders rule
 // arguments / return values as L4 syntax using `x-l4-type` annotations)
 export * from './render-l4-value.js'
+
+// The "Show state graph" lens: its reply, and the position
+// arithmetic a host needs to redraw the pane after an edit
+export * from './state-graph.js'

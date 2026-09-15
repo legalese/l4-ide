@@ -30,8 +30,12 @@ import {
   ToggleSimplify,
   EvalDirectiveResultRequestType,
   makeLspRelayRequestType,
+  makeL4RpcRequestType,
+  isStateGraphResponse,
+  trackSrcPos,
   type DirectiveResult,
   type SrcPos,
+  type StateGraphResponse,
 } from 'jl4-client-rpc'
 import { cmdRenderResult, cmdStateGraph } from './commands.js'
 import { StateGraphPanel } from './state-graph-panel.js'
@@ -91,6 +95,32 @@ const vizWebviewFrontend: WebviewTypeMessageParticipant = {
 
 /** Stored args from the last successful l4.visualize invocation, used for simplify toggle */
 let lastVizArgs: unknown[] | null = null
+
+/**
+ * The rule the state-graph pane is showing, so `didChange` can redraw it:
+ * the document, and where its `DECIDE` starts (1-indexed, the LSP lens's
+ * address). The position is moved along by `trackSrcPos` as the document is
+ * edited and cleared when an edit swallows it, at which point the pane says
+ * it is stale and waits for the next click.
+ */
+let lastStateGraphTarget: { uri: string; srcPos: SrcPos } | null = null
+
+/**
+ * Bumped every time the pane is given a new target (a click) or a refresh is
+ * sent for the current one. A refresh captures the value before its request
+ * and applies the reply only if nothing has moved on since: an edit's reply
+ * arriving after a click on a *different* rule would otherwise overwrite the
+ * fresh picture with the old one (the click branch and `didChange` are
+ * independent async chains, and the slower one used to win).
+ */
+let stateGraphGeneration = 0
+
+/** `l4.stateGraph` sent straight to the server, bypassing the command
+ *  middleware: the refresh must not re-reveal the pane the way a click does. */
+const ExecuteStateGraphRequest = makeL4RpcRequestType<
+  { command: string; arguments: unknown[] },
+  StateGraphResponse
+>('workspace/executeCommand')
 
 function initializeWebviewMessenger(
   outputChannel: vscode.OutputChannel,
@@ -328,12 +358,14 @@ export async function activate(context: ExtensionContext) {
           // "Show state graph": the server answered { name, dot }. It is not
           // a ladder payload, so it must not reach the decoder below.
           if (command === cmdStateGraph) {
-            const { name, dot } = responseFromLangServer as {
-              name?: string
-              dot?: string
-            }
-            if (typeof dot === 'string') {
-              stateGraphPanel.show(name ?? '', dot)
+            if (isStateGraphResponse(responseFromLangServer)) {
+              const [verDocId, srcPos] = args as [{ uri: string }, SrcPos]
+              lastStateGraphTarget = { uri: verDocId.uri, srcPos }
+              stateGraphGeneration++
+              await stateGraphPanel.show(
+                responseFromLangServer.name,
+                responseFromLangServer.dot
+              )
             } else {
               outputChannel.appendLine(
                 `l4.stateGraph returned no dot: ${JSON.stringify(responseFromLangServer)}`
@@ -388,6 +420,53 @@ export async function activate(context: ExtensionContext) {
             event.document
           )
         await vscode.commands.executeCommand('l4.visualize', verDocId)
+
+        // The state-graph pane redraws too, from the same edit. Its target is
+        // a position, so follow the DECIDE through the edit first; if the
+        // edit swallowed it, the pane says so and waits for the next click.
+        if (
+          lastStateGraphTarget &&
+          stateGraphPanel.isOpen &&
+          lastStateGraphTarget.uri === verDocId.uri
+        ) {
+          const moved = trackSrcPos(
+            lastStateGraphTarget.srcPos,
+            event.contentChanges
+          )
+          if (!moved) {
+            lastStateGraphTarget = null
+            stateGraphGeneration++ // an in-flight refresh must not undo the notice
+            await stateGraphPanel.markStale(
+              'The rule this graph was drawn from was edited away. Press "Show state graph" again to redraw.'
+            )
+            return
+          }
+          lastStateGraphTarget.srcPos = moved
+          const generation = ++stateGraphGeneration
+          try {
+            const reply = await client.sendRequest(ExecuteStateGraphRequest, {
+              command: cmdStateGraph,
+              arguments: [verDocId, moved],
+            })
+            // A click or a later edit has moved the pane on: this reply is
+            // for a picture nobody wants any more.
+            if (generation !== stateGraphGeneration) return
+            if (isStateGraphResponse(reply)) {
+              await stateGraphPanel.refresh(reply.name, reply.dot)
+            }
+          } catch (e) {
+            if (generation !== stateGraphGeneration) return
+            // The server refuses when no regulative rule starts there any
+            // more (renamed to a non-rule, made boolean, moved past the
+            // tracker). Keep the last picture; stop asking until the next click.
+            lastStateGraphTarget = null
+            await stateGraphPanel.markStale(
+              `No state graph at the rule's position after this edit (${
+                e instanceof Error ? e.message : String(e)
+              }). Press "Show state graph" again to redraw.`
+            )
+          }
+        }
       },
     },
   }

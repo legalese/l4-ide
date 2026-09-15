@@ -24,6 +24,8 @@ A built-in chat that knows L4 inside and out. Describe a clause, paste a statute
 
 Click _Show decision graph_ above any rule and open an interactive ladder diagram that updates as you type. Spot logic errors, walk a stakeholder through an outcome, or just make sense of your own rules at a glance.
 
+Above a regulative rule — `PARTY … MUST … WITHIN … HENCE … LEST …` — the offer is _Show state graph_ instead: a map of every place the rule can be and every action or missed deadline that moves it, drawn in a pane beside the editor and redrawn as you edit.
+
 ### Live result inspector
 
 Annotate rules with `#EVAL`, `#EVALTRACE`, `#CHECK`, `#TRACE`, or `#ASSERT` and watch results update live as you edit. Click _Track result_ in the codelens to pin it to the Inspector tab — no re-running, no extra terminal.
@@ -226,3 +228,7 @@ Or specify the path manually:
 ## License
 
 Apache 2.0 — see license file for details.
+
+### Third-party notices
+
+The state-graph pane draws its picture with [Viz.js](https://github.com/mdaines/viz-js) (`@viz-js/viz`, MIT, © Michael Daines), which contains, in object-code form, [Graphviz](https://www.graphviz.org) (Eclipse Public License 1.0) and [Expat](https://libexpat.github.io) (MIT). The Graphviz source is available from graphviz.org; the copyright banner naming all three is preserved at the top of the bundled extension script.

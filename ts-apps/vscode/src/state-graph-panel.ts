@@ -1,18 +1,31 @@
 import * as vscode from 'vscode'
+import {
+  renderStateGraphSvg,
+  StateGraphRenderError,
+} from '@repo/state-graph-render'
+import {
+  renderStateGraphHtml,
+  type StateGraphPayload,
+} from './state-graph-html.js'
 
 /**
  * The pane the "Show state graph" code lens opens.
  *
  * The language server answers `l4.stateGraph` with the graph as GraphViz DOT
- * source. Nothing in this repository renders DOT (no viz.js, d3-graphviz or
- * @hpcc-js/wasm anywhere in the lockfile — checked 2026-09-15), and adding a
- * renderer is a lockfile change with its own review, so step 1 is the honest
- * one: show the DOT, let the reader copy it into any Graphviz. See
- * `doc/reference/regulative/STATE-GRAPH.md` for what it does and does
- * not say, and LTS-VISUALISER.md §4.8 for why the entry point is worth having
- * before the picture is.
+ * source. The DOT is rendered to SVG **here, in the extension host**, by
+ * `@repo/state-graph-render` (Graphviz compiled to WebAssembly), and the
+ * finished markup is handed to the webview — so the webview's CSP needs no
+ * `wasm-unsafe-eval`, no script source and no resource root: inline SVG is
+ * DOM, not a fetched resource. The DOT source and a **Copy DOT** button stay
+ * under a fold beneath the picture. See `doc/reference/regulative/STATE-GRAPH.md`
+ * for what the picture does and does not say, and LTS-VISUALISER.md §4.8.
  *
- * One panel is reused across clicks; a new click replaces its contents.
+ * One panel is reused across clicks; a click replaces its contents and brings
+ * it forward. `refresh` (called from `didChange`) replaces the contents
+ * without stealing focus and is a no-op once the pane has been closed.
+ *
+ * The document itself is built by `state-graph-html.ts`, which imports no
+ * `vscode` so the unit tests can load it.
  */
 export class StateGraphPanel {
   static readonly viewType = 'l4StateGraph'
@@ -21,8 +34,14 @@ export class StateGraphPanel {
 
   constructor(private readonly output: vscode.OutputChannel) {}
 
-  /** Show `dot` for the rule called `name`, creating the pane if needed. */
-  show(name: string, dot: string): void {
+  /** The pane exists (it may be hidden behind another tab). */
+  get isOpen(): boolean {
+    return this.#panel !== undefined
+  }
+
+  /** Show the graph called `name`, creating the pane if needed. */
+  async show(name: string, dot: string): Promise<void> {
+    const payload = await this.#render(name, dot)
     if (!this.#panel) {
       this.#panel = vscode.window.createWebviewPanel(
         StateGraphPanel.viewType,
@@ -41,67 +60,44 @@ export class StateGraphPanel {
           }
         }
       )
+      this.#panel.title = `L4 State Graph: ${name}`
+      this.#panel.webview.html = renderStateGraphHtml(payload)
     } else {
       this.#panel.reveal(undefined, /* preserveFocus */ true)
+      this.#panel.title = `L4 State Graph: ${name}`
+      await this.#panel.webview.postMessage({ type: 'update', ...payload })
     }
-    this.#panel.title = `L4 State Graph: ${name}`
-    this.#panel.webview.html = renderHtml(name, dot)
   }
-}
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
+  /** Redraw after an edit. Does not reveal; does nothing if the pane is gone. */
+  async refresh(name: string, dot: string): Promise<void> {
+    if (!this.#panel) return
+    const payload = await this.#render(name, dot)
+    this.#panel.title = `L4 State Graph: ${name}`
+    await this.#panel.webview.postMessage({ type: 'update', ...payload })
+  }
 
-function renderHtml(name: string, dot: string): string {
-  const nonce = Math.random().toString(36).slice(2)
-  const csp = `default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';`
-  // The DOT travels to the script as JSON inside a <script type="application/json">,
-  // which the browser does not execute, so no escaping of the DOT itself is
-  // needed beyond closing-tag safety.
-  const dotJson = JSON.stringify(dot).replace(/<\//g, '<\\/')
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="${csp}">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>L4 State Graph</title>
-  <style>
-    body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 0 1em 1em; }
-    h1 { font-size: 1.1em; font-weight: 600; margin: 1em 0 0.25em; }
-    p.note { margin: 0.25em 0 0.75em; opacity: 0.8; font-size: 0.9em; }
-    button { font: inherit; padding: 0.3em 0.8em; margin-bottom: 0.75em;
-             color: var(--vscode-button-foreground); background: var(--vscode-button-background);
-             border: none; border-radius: 2px; cursor: pointer; }
-    button:hover { background: var(--vscode-button-hoverBackground); }
-    pre { font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size);
-          background: var(--vscode-textCodeBlock-background); padding: 0.75em; overflow: auto;
-          white-space: pre; user-select: text; }
-  </style>
-</head>
-<body>
-  <h1>State graph: ${escapeHtml(name)}</h1>
-  <p class="note">The action plane of this rule as GraphViz DOT: states, and the actions that move between them.
-  It does not show who is obliged to do what at any moment. Copy it into any Graphviz renderer to see the picture.</p>
-  <button id="copy">Copy DOT</button>
-  <pre id="dot"></pre>
-  <script type="application/json" id="dot-source">${dotJson}</script>
-  <script nonce="${nonce}">
-    const vscode = acquireVsCodeApi();
-    const dot = JSON.parse(document.getElementById('dot-source').textContent);
-    document.getElementById('dot').textContent = dot;
-    document.getElementById('copy').addEventListener('click', () => {
-      vscode.postMessage({ type: 'copy', text: dot });
-      const b = document.getElementById('copy');
-      b.textContent = 'Copied';
-      setTimeout(() => { b.textContent = 'Copy DOT'; }, 1500);
-    });
-  </script>
-</body>
-</html>`
+  /**
+   * The rule the pane was showing is no longer at the position the lens named
+   * (it moved under an edit the tracker could not follow, or was deleted).
+   * Keep the last picture, say so, and stop refreshing until the next click.
+   */
+  async markStale(reason: string): Promise<void> {
+    if (!this.#panel) return
+    await this.#panel.webview.postMessage({ type: 'stale', reason })
+  }
+
+  async #render(name: string, dot: string): Promise<StateGraphPayload> {
+    try {
+      const svg = await renderStateGraphSvg(dot)
+      return { name, dot, svg }
+    } catch (e) {
+      const error =
+        e instanceof StateGraphRenderError
+          ? e.message
+          : `Could not render the state graph: ${String(e)}`
+      this.output.appendLine(`[state graph] ${error}`)
+      return { name, dot, error }
+    }
+  }
 }
