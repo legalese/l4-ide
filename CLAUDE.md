@@ -219,9 +219,10 @@ looked at is how a wrong answer becomes the expected answer.
 
 **The canon glob is the one exception to that procedure, and it is a prohibition.**
 `jl4/examples/canon/` is a VENDORED MIRROR of blessed directories in `legalese/canon`, at the SHA
-in `etc/canon-pin.json`. Do not edit it, and do not bless its goldens with `--accept` — the
-paragraph above is how you bless everywhere else and is exactly the wrong move here. Edit the file
-in canon, re-bless it there, then `node etc/sync-canon.mjs --bump <sha> --ref <branch>`. The
+in `etc/canon-pin.json`. Do not edit it, and **do not bless its goldens by the procedure above** —
+deleting the stale golden and running the suite twice is right everywhere else and is exactly the
+wrong move here, because it makes this repository's copy disagree with canon silently. Edit the
+file in canon, re-bless it there, then `node etc/sync-canon.mjs --bump <sha> --ref <branch>`. The
 `Canon Mirror` CI job fails when the mirror and canon at the pin disagree.
 
 > **Do not wrap a code span in bold when the span itself ends in two asterisks.** Doing that

@@ -92,7 +92,8 @@ about. Meng to confirm on return; recorded here so the two shapes are not re-der
    the compiler no longer accepts arrives in l4-ide as a pin-bump PR and is reviewed as one.
 2. **One golden harness, not two.** `jl4-test` (`jl4/tests/Main.hs`) reads the pin and, when
    `L4_CANON_DIR` is set, adds each blessed dir to the golden globs with today's semantics
-   (`failFirstTime = True`, four goldens per file, `--accept` to bless). Locally, `L4_CANON_DIR`
+   (`failFirstTime = True`, four goldens per file; ~~`--accept` to bless~~ **blessing is
+   delete-the-golden-and-run-twice — see §3B's review note**). Locally, `L4_CANON_DIR`
    unset → the canon block is skipped with a printed notice, exactly as `etc/validate-dmn.mjs`
    skips without dmnmd. In CI it is never unset.
 3. **A CI job, `Canon Corpus`,** in `pr-checks.yml`: `actions/checkout` with
@@ -170,6 +171,27 @@ what was implemented, with the two departures named under _What review changed_.
   `takeDirectory inputFile </> "tests"` would look in `cases/tests/`, and canon has no
   `cases/tests/` directory anywhere. Had the change shipped on the import rationale it would have
   been right for the wrong reason and the next person would have re-derived it wrongly.
+- **`--accept` never existed, and this document is where it came from.** §3A.2 above said the
+  golden harness takes "`--accept` to bless". It does not — measured:
+
+  ```
+  $ cabal test jl4-test --test-options='--accept --match "canon/sg/penal"'
+  jl4-test: unrecognized option `--accept'
+  ```
+
+  The sentence entered the tree in this spec's own first commit (`9853462d`, merged via #396) and
+  was then copied, unchecked, into `jl4/tests/Main.hs`, `jl4/examples/canon/README.md` and
+  **`CLAUDE.md`** — where it was sharpened into "do not bless its goldens with `--accept`", an
+  instruction not to use a flag that does not exist, which implies that it does. That is the
+  borrowed-claim rule failing twice over: once where the claim was written, once at each site that
+  repeated it without running it.
+
+  The real mechanism is the one CLAUDE.md §3.1 already taught: delete the stale `.golden` and run
+  `cabal test jl4-test` twice — once to write it and fail, once to prove it holds. It cost a wrong
+  reading before it was caught: an "accept" run reported `FAIL` and was read as a test failure when
+  it was the unrecognized-option error, and the goldens that appeared came from the _next_ run's
+  `failFirstTime` rather than from any blessing.
+
 - **The first run found a stale canon golden, which is what the mechanism is for.**
   `sg-csp.golden` carried two lines; today's binary adds a 19-line Info block at `sg-csp.l4:79:8`
   telling the author that `ASSUME` is being retired in favour of a section-level `GIVEN`. The

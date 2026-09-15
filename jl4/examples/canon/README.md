@@ -49,8 +49,13 @@ because a hand-edit has been ruled out — so read the diff rather than the exit
 legitimate way to move a golden here is to re-bless it in canon and bump the pin.
 
 The regression itself still runs: `canon/**` is an ordinary golden glob in `jl4/tests/Main.hs`,
-with the same semantics as `legal/**` — four goldens per file, `failFirstTime`, `--accept` to
-bless. If the suite goes red here, the compiler's output moved; re-bless in canon and bump.
+with the same semantics as `legal/**` — four goldens per file, `failFirstTime`. If the suite goes
+red here, the compiler's output moved; re-bless **in canon** and bump the pin.
+
+Blessing anywhere else in this repository means deleting the stale `.golden` and running
+`cabal test jl4-test` twice — once to write it and fail, once to prove it holds (CLAUDE.md §3.1).
+**Do not do that here.** It would make this repository's copy disagree with canon silently, which
+is the one thing the pin exists to prevent.
 
 ## The one place this is not verbatim
 
