@@ -36,6 +36,7 @@ import {
   networkClass,
   pipelineFromJournal,
   segKey,
+  segTitle,
   unionMs,
 } from "./lib/cost-ledger.mjs";
 import {
@@ -474,6 +475,68 @@ check(
   "a run that declares NOTHING is INCOMPLETE, not vacuously COMPLETE",
   runVerdict({ declared: [], receipts: [], gates: [] }).verdict ===
     "INCOMPLETE",
+);
+// ---- the provisional grant: passage without standing ----------------------
+//
+// The value of the state is entirely in what it REFUSES to say. These pin the
+// refusals, because the failure mode is not that provisional stops working —
+// it is that it quietly starts reading as COMPLETE.
+check(
+  "a PROVISIONAL gate does not block the run",
+  runVerdict({
+    declared,
+    receipts: ok,
+    gates: [{ gate: "HG1", state: "provisional", reason: "review pending" }],
+  }).exit === 0,
+);
+check(
+  "but the verdict is PROVISIONAL, never COMPLETE",
+  runVerdict({
+    declared,
+    receipts: ok,
+    gates: [{ gate: "HG1", state: "provisional", reason: "review pending" }],
+  }).verdict === "PROVISIONAL",
+);
+check(
+  "promotion works: a later SATISFIED row for the same gate restores COMPLETE",
+  runVerdict({
+    declared,
+    receipts: ok,
+    gates: [
+      { gate: "HG1", state: "provisional", reason: "review pending" },
+      { gate: "HG1", state: "satisfied" },
+    ],
+  }).verdict === "COMPLETE",
+);
+check(
+  "a provisional grant on ONE gate does not promote another",
+  runVerdict({
+    declared,
+    receipts: ok,
+    gates: [
+      { gate: "HG1", state: "provisional", reason: "pending" },
+      { gate: "HG2", state: "satisfied" },
+    ],
+  }).verdict === "PROVISIONAL",
+);
+check(
+  "INCOMPLETE outranks PROVISIONAL — an unfinished run is not merely unreviewed",
+  runVerdict({
+    declared,
+    receipts: ok.slice(0, 2),
+    gates: [{ gate: "HG1", state: "provisional", reason: "pending" }],
+  }).verdict === "INCOMPLETE",
+);
+check(
+  "and a REFUSED gate still outranks it",
+  runVerdict({
+    declared,
+    receipts: ok,
+    gates: [
+      { gate: "HG1", state: "provisional", reason: "pending" },
+      { gate: "HG2", state: "refused", reason: "no signature" },
+    ],
+  }).verdict === "GATE",
 );
 check(
   "BROKEN outranks GATE",
@@ -2278,6 +2341,8 @@ process.stdout.write("\n-- cost accounting --\n");
     check("bracketsFrom pairs each executed stage once", br.length === 2);
     const at = (sec) =>
       Date.parse(`2026-01-01T00:00:${String(sec).padStart(2, "0")}.000Z`);
+    const at30iso = () => "2026-01-01T00:00:30.000Z";
+    const at35iso = () => "2026-01-01T00:00:35.000Z";
     check(
       "labelAt is total over the timeline",
       segKey(labelAt(at(5), br)) === "before:a" &&
@@ -2291,6 +2356,67 @@ process.stdout.write("\n-- cost accounting --\n");
       segKey(labelAt(at(10), br)) === "during:a" &&
         segKey(labelAt(at(20), br)) === "during:a",
     );
+
+    // ---- agent `work` brackets: they LABEL spend and never ATTEST time ------
+    //
+    // The gap between two phase scripts is where every token of a human-gated
+    // pipeline actually goes, and before these rows it was one unattributable
+    // bucket. What follows pins the containment, not just the feature: a work
+    // bracket must be opt-in, must lose to a driver bracket on any overlap, and
+    // must close itself when the agent forgets to.
+    {
+      const W = [
+        rows[0],
+        rows[1], // stage a: 10s..20s
+        { kind: "work", phase: "p3-encode", state: "begin", ts: at30iso() },
+        { kind: "work", phase: "p3-encode", state: "end", ts: at35iso() },
+        rows[2],
+        rows[3], // stage b: 40s..50s
+      ];
+      check(
+        "work rows are IGNORED unless includeWork is asked for",
+        bracketsFrom(W).length === 2,
+      );
+      const bw = bracketsFrom(W, { includeWork: true });
+      check("and become a bracket when it is", bw.length === 3);
+      check(
+        "the agent's gap is now attributed to the phase it declared",
+        segKey(labelAt(at(32), bw)) === "encoding:p3-encode",
+      );
+      check(
+        "…under a title that never reads as a driver measurement",
+        segTitle(labelAt(at(32), bw)) === "agent working on p3-encode",
+      );
+      check(
+        "while the driver's own stages are untouched",
+        segKey(labelAt(at(15), bw)) === "during:a" &&
+          segKey(labelAt(at(45), bw)) === "during:b",
+      );
+
+      // An agent that crashes mid-phase is ordinary. The bracket it leaves must
+      // degrade to "until something else happened", not swallow the run.
+      const unclosed = bracketsFrom(
+        [
+          rows[0],
+          rows[1],
+          { kind: "work", phase: "p3-encode", state: "begin", ts: at30iso() },
+          rows[2],
+          rows[3],
+        ],
+        { includeWork: true },
+      );
+      check(
+        "an unclosed work bracket is closed at the next stage_begin",
+        unclosed.length === 3 &&
+          unclosed.some(
+            (b) => b.stage === "p3-encode" && b.to === at(40) && b.declared,
+          ),
+      );
+      check(
+        "so it never shadows the stage that followed it",
+        segKey(labelAt(at(45), unclosed)) === "during:b",
+      );
+    }
     check(
       "a stage re-run inside one journal contributes two brackets, not one",
       bracketsFrom([
@@ -2321,6 +2447,13 @@ process.stdout.write("\n-- the driver --\n");
 // go.sh's two `--inputs` no-op blocks in step; the idempotence checks below
 // compare against it as a SET, not as a count.
 const NEVER_REPLAY = ["p9-cost", "p9-report", "p9-explain"];
+
+// go.sh's HG1_EXEMPT, restated here as the thing the tests measure against.
+// Restated and not imported: this file is where the membership is PINNED, and a
+// pin that reads its expectation out of the code it is pinning cannot fail.
+// Changing the set is a spec change (SPEC.md §7.3), so it should cost two edits
+// and a deliberate one here.
+const HG1_EXEMPT_EXPECTED = ["p9-cost"];
 
 // THE ASSERTION THAT DID NOT EXIST, and whose absence is total when it bites.
 //
@@ -2361,9 +2494,25 @@ const NEVER_REPLAY = ["p9-cost", "p9-report", "p9-explain"];
     process.stdout.write(
       `     ungated at or after p6-tests: ${ungated.join(", ")}\n`,
     );
+  // HG1_EXEMPT, MEASURED FROM THE DRIVER'S OWN PLAN rather than grepped out of
+  // go.sh. The criterion is at the declaration: HG1 certifies the ENCODING, and
+  // p9-cost measures the RUN — it reports identical figures over an isomorphic
+  // encoding and a nonsensical one, so a domain expert's signature has no
+  // purchase on it. The set is pinned to exactly one member because the
+  // cheapest way to smuggle unreviewed work past HG1 would be to add its stage
+  // here, and that must be a test failure and not a judgement call.
   check(
-    "every declared primary stage sequenced at or after p6-tests is gated",
-    plan.status === 0 && from >= 0 && ungated.length === 0,
+    "the set of ungated stages at or after P6 is exactly HG1_EXEMPT",
+    plan.status === 0 &&
+      from >= 0 &&
+      ungated.length === HG1_EXEMPT_EXPECTED.length &&
+      ungated.every((s) => HG1_EXEMPT_EXPECTED.includes(s)),
+  );
+  check(
+    "every declared primary stage sequenced at or after p6-tests is gated, HG1_EXEMPT aside",
+    plan.status === 0 &&
+      from >= 0 &&
+      ungated.every((s) => HG1_EXEMPT_EXPECTED.includes(s)),
   );
   check(
     "the never-replaying stages are declared primary members, and the plan names them",
@@ -2420,12 +2569,20 @@ const NEVER_REPLAY = ["p9-cost", "p9-report", "p9-explain"];
       // declared stage, so it is outside the rule either way.
       const declared = pr.filter((r) => r.gate !== "NOT WIRED");
       check(
-        `every declared ${label} stage from P6 onward is HG1-gated, and none before P6 is`,
+        `every declared ${label} stage from P6 onward is HG1-gated, HG1_EXEMPT aside, and none before P6 is`,
         declared.every((r) =>
-          phase(r.stage) >= 6 && r.gate !== "HG2"
+          phase(r.stage) >= 6 &&
+          r.gate !== "HG2" &&
+          !HG1_EXEMPT_EXPECTED.includes(r.stage)
             ? r.gate === "HG1"
             : r.gate !== "HG1",
         ),
+      );
+      check(
+        `every HG1_EXEMPT stage declared on the ${label} path is ungated, on both paths alike`,
+        declared
+          .filter((r) => HG1_EXEMPT_EXPECTED.includes(r.stage))
+          .every((r) => r.gate === "-"),
       );
     }
   }
@@ -2901,6 +3058,100 @@ if (!process.argv.includes("--with-driver")) {
       "--waive HG2 is refused by the driver, not only by the skill",
       r.status === 2 && /--waive HG2 is REFUSED/.test(r.stderr),
     );
+  }
+
+  // ...and neither is it provisional-able. A new grant state is exactly the
+  // shape of change that reopens a closed hole: HG2's unwaivability was
+  // enforced in one place, and a second granting state that skipped that place
+  // would restore the self-service route past the only gate that has none.
+  {
+    const go = (...extra) =>
+      spawnSync(
+        "bash",
+        [
+          resolve(HERE, "go.sh"),
+          "run",
+          "--encoding",
+          "primary",
+          "--subject",
+          FIXTURE_SUBJECT,
+          "--through",
+          "p0-preflight",
+          ...extra,
+        ],
+        { env, encoding: "utf8" },
+      );
+
+    const r1 = go(
+      "--provisional",
+      "HG2=publishing while permission is pending",
+    );
+    check(
+      "--provisional HG2 is refused by the driver",
+      r1.status === 2 && /--provisional HG2 is REFUSED/.test(r1.stderr),
+    );
+    check(
+      "and says why HG2 differs: its downstream stage IS the outward act",
+      /outward-facing act, not evidence/.test(r1.stderr),
+    );
+
+    const r2 = go("--provisional", "HG1=");
+    check(
+      "a provisional grant with no reason is refused, like a waiver with none",
+      r2.status === 2 && /needs a reason/.test(r2.stderr),
+    );
+
+    // The two states make CONTRADICTORY claims about the same gate. Accepting
+    // both would put two granting rows on the journal and let the report print
+    // whichever one flattered the run.
+    const r3 = go(
+      "--waive",
+      "HG1=the review did not apply",
+      "--provisional",
+      "HG1=the review has not happened",
+    );
+    check(
+      "--waive HG1 and --provisional HG1 together are refused as contradictory",
+      r3.status === 2 && /contradictory/.test(r3.stderr),
+    );
+  }
+
+  // checkClaim is the LEDGER's guard, and the ledger is never swept: a
+  // provisional-HG2 record there would be a permanent claim that publication
+  // went ahead pending permission. Tested at the writer as well as at the CLI,
+  // because the CLI is not the only caller.
+  {
+    const store = mkdtempSync(resolve(tmpdir(), "l4-go-hg2p-"));
+    const run = resolve(store, "r");
+    mkdirSync(run, { recursive: true });
+    writeFileSync(resolve(run, ".corpus-members.json"), "[]");
+    const r = spawnSync(
+      "node",
+      [
+        RECEIPT,
+        "gate",
+        "--run",
+        run,
+        "--gate",
+        "HG2",
+        "--state",
+        "provisional",
+        "--subject",
+        "sg",
+        "--run-id",
+        "r",
+        "--covers-from",
+        resolve(run, ".corpus-members.json"),
+        "--reason",
+        "pending",
+      ],
+      { env: { ...process.env, L4_GO_STORE: store }, encoding: "utf8" },
+    );
+    check(
+      "the writer refuses a provisional HG2 blessing even when the CLI is bypassed",
+      r.status === 4 && /HG2 admits no provisional grant/.test(r.stderr),
+    );
+    rmSync(store, { recursive: true, force: true });
   }
 
   // --- g2 replay correctness (D9, 2026-08-09) -------------------------------
@@ -7289,6 +7540,77 @@ process.stdout.write("\n-- the blessing edge --\n");
       "produced_under is DERIVED from the journal, never accepted as a CLI flag",
       !/args\.blessing/.test(src) && /gated_stages/.test(src),
     );
+
+    // ---- provisional: the stage runs, and NOTHING it makes is servable ------
+    const prov = mkRun(store, GATED);
+    grant(store, prov, "provisional", ["--reason", "HG1 review is pending"]);
+    // The artifact must EXIST for this one: an absent artifact is recorded
+    // `absent` with no sha256, and a servability check over nothing would pass
+    // for the wrong reason.
+    mkdirSync(resolve(prov, "artifacts"), { recursive: true });
+    writeFileSync(resolve(prov, "artifacts", "a.txt"), "provisional bytes\n");
+    const r5 = stage(store, prov, "PASS", [
+      ...OK,
+      "--artifact",
+      resolve(prov, "artifacts", "a.txt"),
+    ]);
+    check(
+      "with a PROVISIONAL grant the stage runs and may write PASS",
+      r5.status === 0,
+    );
+    const pp = lastEnd(prov)?.produced_under;
+    check(
+      "and the receipt is stamped provisional, not satisfied and not waived",
+      pp?.state === "provisional",
+    );
+    check(
+      "carrying the reason, so the report can say what is still owed",
+      pp?.reason === "HG1 review is pending",
+    );
+    {
+      const sha = lastEnd(prov)?.artifacts?.find((a) => a.sha256)?.sha256;
+      const s = sha ? Store.servability(store, sha) : null;
+      check(
+        "a PASS produced under a provisional grant is NOT servable",
+        s?.servable === false && s?.state === "provisional",
+      );
+    }
+    rmSync(store, { recursive: true, force: true });
+  }
+
+  // THE RANKING IS OF CLAIMS, NOT OF RECENCY. A waiver is a judgement that the
+  // review did not apply; a provisional grant says it has not happened. Over the
+  // same bytes the waiver must win whichever row the ledger happens to hold
+  // first, or a provisional re-run would silently downgrade reviewed work —
+  // and, worse, the reverse ordering would let a provisional grant be dressed up
+  // by a later waiver.
+  {
+    const store = mkdtempSync(resolve(tmpdir(), "l4-go-l2p-"));
+    for (const order of [
+      ["provisional", "waived"],
+      ["waived", "provisional"],
+    ]) {
+      let sha = null;
+      for (const st of order) {
+        const run = mkRun(store, GATED);
+        grant(store, run, st, ["--reason", `${st} here`]);
+        // THE SAME BYTES under both grants — that is the whole point of the
+        // ranking, which is content-addressed.
+        mkdirSync(resolve(run, "artifacts"), { recursive: true });
+        writeFileSync(resolve(run, "artifacts", "a.txt"), "same bytes\n");
+        stage(store, run, "PASS", [
+          ...OK,
+          "--artifact",
+          resolve(run, "artifacts", "a.txt"),
+        ]);
+        sha = lastEnd(run)?.artifacts?.find((a) => a.sha256)?.sha256 ?? sha;
+      }
+      const s = sha ? Store.servability(store, sha) : null;
+      check(
+        `waived outranks provisional over the same bytes (${order.join(" then ")})`,
+        s?.state === "waived" && s?.servable === false,
+      );
+    }
     rmSync(store, { recursive: true, force: true });
   }
 

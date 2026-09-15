@@ -107,6 +107,26 @@ etc/go/go.sh run --subject regcf --encoding primary
 - **`--fixed-now ISO8601`** pins the clock threaded into every `run`, `check`, `render` and `batch`. It defaults to a fixed value on purpose: an unpinned clock makes two runs of the same corpus disagree.
 - **`L4_GO_REQUIRED=1`** turns every `SKIPPED` into exit 5. That is what CI wants and what a laptop does not.
 
+### 3a. Bracket your own working time, or the front end is invisible
+
+`p9-cost` measures every token spent inside the run's window, and that window opens at the run's **first journal record**. Reading the statute, arguing with its cross-references and writing the L4 all happen before the driver is first invoked — so the most expensive part of encoding a body of law lands outside the only instrument that measures it, and the whole-session column is the only bound left, which includes everything else you did that day.
+
+Open the run first, then bracket the work:
+
+```bash
+etc/go/go.sh run --subject regcf --encoding primary --through p0-preflight   # opens the run, prints the id
+etc/go/go.sh work begin --run-id <id> --phase p3-encode                      # ...then go and encode
+etc/go/go.sh work end   --run-id <id> --phase p3-encode
+etc/go/go.sh run --subject regcf --encoding primary --run-id <id>            # resume; the window already covers it
+```
+
+**Key idioms:**
+
+- **`--through p0-preflight` is how you open a run without committing to anything.** It is cheap, it declares the corpus, and it writes the `run_begin` the brackets hang from.
+- **This is the only thing you ever tell the journal that it cannot check.** Everything else is measured by the driver or read out of a harness transcript. A `work` bracket is your claim about which phase you were on, so the ledger lets it **label** spend and never lets it widen `busy_ms_lower_bound`, which stays a floor over driver-attested time.
+- **An unclosed bracket is closed at the next `stage_begin` or `work begin`.** Forgetting `work end` costs you precision, not the timeline.
+- **Bracket the phase you are actually on.** A bracket labelled `p3-encode` that covers an afternoon of reading case law makes the P3 ratio wrong, and the ratio is what the cost projection is built from.
+
 ### 4. Read the statuses, and resist the urge to make them green
 
 A run reports one row per declared stage. What the regcf sidecar's primary-encoding run measures, as a worked example:
@@ -148,9 +168,20 @@ etc/go/go.sh run --subject regcf --encoding primary \
   --waive HG1="this replays the already-reviewed committed encoding; no new encoding exists for a domain expert to review"
 ```
 
+If the review is not waived but simply **has not happened yet**, that is a third thing and it has its own state:
+
+```bash
+etc/go/go.sh run --subject regcf --encoding primary \
+  --provisional HG1="domain-expert review is scheduled; this run exists to put P6's divergence witnesses and P8's findings in front of the reviewer"
+```
+
+The stages behind HG1 run, every artifact they produce is stamped `provisional` and none of it is servable, and the run verdict is `PROVISIONAL` rather than `COMPLETE`. **This is the briefing pack for the review, not a way around it** — running P6 and P8 first is what gives the reviewer something to read. Sign HG1 over an unmoved corpus and re-run to promote: the stages replay, the same bytes are re-admitted under the signature, and the verdict returns to `COMPLETE`.
+
 **Key idioms:**
 
 - **A waiver is a verdict, not an absence.** It lands on the journal and prints in the report's Gates section with your reason attached. A waiver that is not in the report is impossible.
+- **Pick the state that is TRUE.** A waiver says the review did not apply; a provisional grant says it has not happened. Passing both for one gate is refused as contradictory. Before the provisional state existed, `--waive` was the only route and so it got used for both, which made the report's gate table say something false.
+- **There is no `--allow-provisional`.** `store cat` will serve waived bytes under `--allow-waived`, because a waiver is a judgement a caller can read and weigh. A provisional grant has no judgement in it to weigh, so the remedy is the review, not a flag.
 - **Write the reason for the reader, not for the parser.** Someone will read it a year from now trying to work out whether the gate mattered.
 - **HG2 cannot be waived** — `go.sh run --waive HG2=…` exits 2, so this is the driver's rule and not only the skill's. HG1 covers work that has already been reviewed by other means; HG2 covers anything outward-facing, and there is no circumstance in which an agent should decide that on its own. See [references/gates.md](references/gates.md).
 
@@ -193,6 +224,31 @@ Two things worth knowing when you read the figures:
 - **`busy_ms_lower_bound` is a floor.** Time you spend reasoning between two tool calls is real work that leaves no interval to measure, and the ledger counts none of it rather than guessing.
 
 If you ran a leg by hand, or from something that sets no session id, the row records `null` and the report says a leg was unattributable — which is the honest reading, and the reason the stage will not print a zero.
+
+### 7f. Project what the next one will cost
+
+A cost ledger is a numerator. To forecast an ingestion programme you need the denominator — how much law went in — and the ratio between them, which is a fact about this pipeline that can only be measured by running it.
+
+```bash
+# the denominator: measure the SOURCE, not the encoding
+node etc/go/lib/source-metrics.mjs --json <subject>/source/ > /tmp/src.json
+
+# the ratio: what one real run actually cost over that source
+node etc/go/lib/estimate-cost.mjs calibrate \
+  --ledger "$TMPDIR/l4-go/<run-id>/cost-ledger.json" --sources /tmp/src.json \
+  --subject sg-succession --model claude-opus-5 --append etc/go/lib/cost-calibration.json
+
+# the projection: apply it to law nobody has encoded yet
+node etc/go/lib/estimate-cost.mjs project --sources <some other statute>/
+```
+
+**Key idioms:**
+
+- **Measure the source, not the directory.** Pointing `source-metrics.mjs` at a subject directory counts the `.l4` encoding and its goldens as if they were statute. The denominator is the text that went **in**.
+- **Read the `BASIS` block before quoting the number.** At n=1 it says n=1 and prints no interval, because there is nothing to take an interval over. Treat it as an order of magnitude.
+- **Only calibrated models are measured.** The other rows are that one observation rescaled by price, which assumes every model spends the same tokens on the same work — it does not. Calibrating a second model is the point of an independent re-encoding (SPEC.md §8.0).
+- **A refusal to print is doing its job.** `estimate-cost.mjs` exits 1 rather than use a price table older than its own staleness bound, because a stale price does not fail — it prints a confident wrong dollar figure. Re-read the pricing page, update `model-prices.json` **and** its `measured` date in the same edit.
+- **Caching is modelled; batch and effort are not.** Every output states which exclusions applied.
 
 ### 7a. The store: what outlives the run
 

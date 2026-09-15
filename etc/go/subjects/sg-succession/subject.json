@@ -75,7 +75,7 @@
     "than pretending the comparison was made."
   ],
   "id": "sg-succession",
-  "display_name": "Singapore family and succession — Wills, Intestate Succession, Probate and Administration, Guardianship of Infants",
+  "display_name": "Singapore family and succession \u2014 Wills, Intestate Succession, Probate and Administration, Guardianship of Infants",
   "citation": "Wills Act 1838; Intestate Succession Act 1967; Probate and Administration Act 1934; Guardianship of Infants Act 1934 (Singapore)",
   "source_url": "https://sso.agc.gov.sg/Act/ISA1967",
   "encoding": {
@@ -122,6 +122,11 @@
       "checks": {
         "min_dated_arms": 0,
         "min_assertions": 1907
+      },
+      "encoder": {
+        "model": "claude-opus-5",
+        "date": "2026-08-26",
+        "notes": "BACKFILLED 2026-09-15 from the deposit's own commit trailers (cc7e1117, 4be5c2f6, both 2026-08-26, both 'Co-Authored-By: Claude Opus 5 (1M context)'), not recorded by the run that produced the encoding. That is weaker evidence than a contemporaneous record in two ways worth knowing before this row is used as a data point: a trailer names the session that COMMITTED the files, which need not be the session that wrote them, and it cannot distinguish work the model did itself from work it delegated to a subagent on another model. Deposits made after this key existed record it at deposit time."
       }
     }
   }

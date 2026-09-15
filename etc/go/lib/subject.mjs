@@ -540,6 +540,7 @@ export function loadSubject(id, selectedEncoding = "primary") {
         "checks",
         "legs",
         "roadmap",
+        "encoder",
       ]);
 
       const out = {
@@ -548,7 +549,45 @@ export function loadSubject(id, selectedEncoding = "primary") {
         GO_S_MIN_DATED_ARMS: "",
         GO_S_MIN_ASSERTIONS: "",
         GO_S_ENCODING_DMN_CASES: "",
+        GO_S_ENCODING_ENCODER_MODEL: "",
+        GO_S_ENCODING_ENCODER_DATE: "",
+        GO_S_ENCODING_ENCODER_SKILL: "",
       };
+      // WHO — or WHAT — PRODUCED THIS ENCODING.
+      //
+      // Optional, because encodings predating this key exist and an absent
+      // encoder is an honest "not recorded" rather than a defect. But it is the
+      // dimension the whole comparison programme turns on: two independent
+      // encodings of one statute are only evidence about MODELS if the run
+      // knows which model made each, and without it the acceptance diff can say
+      // that two encodings disagree and never that Sonnet and Opus disagree.
+      //
+      // `model` is written as the exact API model id (`claude-opus-5`), not a
+      // family name: "opus" stops identifying anything the moment there are two,
+      // and the cost projection joins on this string.
+      if (e.encoder !== undefined) {
+        if (typeof e.encoder !== "object" || e.encoder === null)
+          die(`encodings['${encId}'].encoder must be an object`);
+        checkKeys(`encodings['${encId}'].encoder`, e.encoder, [
+          "model",
+          "date",
+          "skill_version",
+          "notes",
+        ]);
+        for (const k of ["model", "date", "skill_version", "notes"])
+          if (e.encoder[k] !== undefined && typeof e.encoder[k] !== "string")
+            die(`encodings['${encId}'].encoder.${k} must be a string`);
+        if (
+          e.encoder.date !== undefined &&
+          !/^\d{4}-\d{2}-\d{2}$/.test(e.encoder.date)
+        )
+          die(
+            `encodings['${encId}'].encoder.date must be YYYY-MM-DD — it is the date the ENCODING was made, which is what makes a later comparison against a newer model meaningful`,
+          );
+        out.GO_S_ENCODING_ENCODER_MODEL = e.encoder.model ?? "";
+        out.GO_S_ENCODING_ENCODER_DATE = e.encoder.date ?? "";
+        out.GO_S_ENCODING_ENCODER_SKILL = e.encoder.skill_version ?? "";
+      }
       // REQUIRED, unlike every other key here. An encoding with no modules is
       // not an under-specified encoding, it is not an encoding — and the old
       // schema allowed exactly that, because `denovo` was a grab-bag in which

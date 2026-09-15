@@ -17,7 +17,8 @@
 //   node etc/go/lib/receipt.mjs run-begin  --run DIR --run-id ID --encoding E --subject S ...
 //   node etc/go/lib/receipt.mjs session    --run DIR [--session UUID] [--agent NAME] [--cwd DIR]
 //   node etc/go/lib/receipt.mjs run-end    --run DIR --verdict V
-//   node etc/go/lib/receipt.mjs gate       --run DIR --gate HG1 --state satisfied|waived|refused \
+//   node etc/go/lib/receipt.mjs work       --run DIR --phase P --state begin|end [--note TEXT]
+//   node etc/go/lib/receipt.mjs gate       --run DIR --gate HG1 --state satisfied|waived|provisional|refused \
 //        [--namespace NS] [--payload-digest D] [--corpus-digest D] \
 //        [--signature-file PATH] [--reason TEXT]
 //
@@ -464,7 +465,9 @@ switch (kind) {
           (x) =>
             x.kind === "gate" &&
             x.gate === gatedBy &&
-            (x.state === "satisfied" || x.state === "waived"),
+            (x.state === "satisfied" ||
+              x.state === "waived" ||
+              x.state === "provisional"),
         )
         .at(-1);
       receipt.produced_under = granting
@@ -547,6 +550,46 @@ switch (kind) {
     break;
   }
 
+  case "work": {
+    // WHEN THE AGENT WAS WORKING, AND ON WHICH PHASE.
+    //
+    // THIS IS A CLAIM, AND IT IS THE ONLY CLAIM IN THE JOURNAL. Everything else
+    // here is either measured by the driver or read out of a file the harness
+    // wrote; a `work` bracket is the agent saying "I was encoding P3 between
+    // these two moments", and nothing stops it bracketing an hour it spent
+    // elsewhere. It is admitted anyway, for a reason worth stating plainly: the
+    // alternative is not a better number, it is NO number. Before this row
+    // existed, the tokens an agent spent reading a statute and writing L4 —
+    // which is nearly the whole cost of encoding a body of law — landed in an
+    // unlabelled gap between two phase scripts, and "what does it cost to
+    // encode a statute?" had no answer at all.
+    //
+    // So the claim is contained rather than trusted: cost-ledger.mjs lets these
+    // brackets LABEL spend and never lets them widen `busy_ms_lower_bound`,
+    // which stays a floor over driver-attested time. The session id is still
+    // observed from the environment, not declared, so WHOSE tokens these are
+    // remains a measurement even though WHICH PHASE they belong to is not.
+    if (args.state !== "begin" && args.state !== "end") {
+      process.stderr.write("receipt.mjs: work --state must be begin|end\n");
+      process.exit(EXIT.USAGE);
+    }
+    if (!args.phase) {
+      process.stderr.write(
+        "receipt.mjs: work --phase is required; an unlabelled bracket is the " +
+          "unattributable gap this row exists to remove\n",
+      );
+      process.exit(EXIT.USAGE);
+    }
+    append(journal, {
+      kind: "work",
+      phase: args.phase,
+      state: args.state,
+      session: args.session || process.env.CLAUDE_CODE_SESSION_ID || null,
+      note: args.note?.length ? args.note.join(" ") : null,
+    });
+    break;
+  }
+
   case "gate": {
     // THE BLESSING GOES TO THE LEDGER FIRST, THEN THE JOURNAL.
     //
@@ -565,6 +608,7 @@ switch (kind) {
     if (
       args.state === "satisfied" ||
       args.state === "waived" ||
+      args.state === "provisional" ||
       args.state === "refused"
     ) {
       let store = null;
@@ -636,7 +680,7 @@ switch (kind) {
       // unavailable — the gate still works, it just is not durable.
       blessing: blessingId,
       gate: args.gate,
-      state: args.state, // satisfied | waived | refused
+      state: args.state, // satisfied | waived | provisional | refused
       namespace: args.namespace ?? null,
       payload_digest: args.payload_digest ?? null,
       // The sha256 over the corpus files this gate was granted over. A
