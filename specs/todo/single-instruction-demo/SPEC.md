@@ -440,6 +440,56 @@ GitHub first: a corpus-of-law repository **separate from l4-ide** (`jl4/examples
 `experiments/` are not the right long-term home — R1). Upload to lexipedia too if their format
 and licensing admit it (R2). Publication is outward-facing and human-gated (§7.3).
 
+#### P10.1 — The destination is computed, and the branch belongs to the depositor. RULED 2026-09-15.
+
+P10 refuses and will keep refusing until depositing is an HG2 act somebody has signed. It now
+nonetheless **computes and prints the exact destination it would write to**, because a refusal
+that names a directory is one the reader can check, and because the fence is then built and
+exercised before the feature that needs it — the same order the MCP leg's loopback guard was
+built in.
+
+| part       | value                                              | where it comes from                                        |
+| ---------- | -------------------------------------------------- | ---------------------------------------------------------- |
+| repository | `legalese/canon`                                   | R1. Not a parameter                                        |
+| branch     | `<username>/drafts`                                | **resolved from whoever is running** — see below           |
+| directory  | `subjects/<subject_path>/encodings/<encoding-id>/` | the sidecar's `canon.subject_path`, and the run's encoding |
+
+**The branch is derived, never defaulted to a person.** `mengwong/drafts` is where Meng's
+encodings go; somebody running the same pipeline out of `legalese/l4-plugin` must land on
+**their** shelf. A hardcoded default would quietly put every contributor's work on one person's
+branch and the failure would look like success. `lib/canon-destination.mjs` resolves an owner in
+order and **records which source answered**, because they are not equally trustworthy: `gh api
+user` (the GitHub identity itself — the only source answering the question actually asked),
+then `git config github.user`, then `$USER`. A `$USER`-derived branch carries a warning: an OS
+account name need not be a GitHub login, and when it is not, the result is a shelf belonging to
+nobody on a public repository. With nothing able to name an owner the branch is **null**, and
+the tooling says so rather than choosing. `L4_GO_CANON_BRANCH` overrides.
+
+**Never the default branch.** `main` and `master` are refused outright, and so is any branch
+that does not look like a drafts shelf. An encoding lands on a drafts branch and stays there
+until its source-terms question is settled; a deposit straight onto `main` is a larger outward
+act than the one HG2 was asked about.
+
+**The row id is the encoding id, and that is an observation rather than a convention invented
+here**: canon's drafts branch already holds
+`subjects/sg/succession/encodings/cleanroom-2026-08/`, filed under exactly the id this
+pipeline's sidecar calls that encoding. The two vocabularies already agreed; the default keeps
+them agreeing.
+
+**The path grammar is advisory, with a reason.** canon's `docs/directory-conventions.md` is
+**proposed, not adopted** — it says so in its own header — and canon's `main` holds
+`western-australia/`, `singapore/` and `european-union/`, which predate it and do not conform,
+while its drafts branch holds `sg/`, `il/`, `us/` and `contracts/`, which do. So a
+non-conforming path **warns and does not fail**: refusing would enforce, from the tools
+repository, a convention the law repository has not adopted, and would reject paths that are
+correct for the tree as it stands. When the conventions land, the warning becomes a refusal in
+one edit.
+
+**A subject with no `canon` block has no destination**, and P10 says exactly that rather than
+guessing one. A guessed path on a public repository is worse than an absent one. The run record
+carries the destination **path only** — the branch is resolved at deposit time, so freezing one
+person's shelf onto a run record would record the wrong kind of fact.
+
 ## 5. Component inventory — verified 2026-07-31
 
 Verified against unstable @ `a94a8f1d` (post-#178) and `gh` on 2026-07-31. "Merged" means on

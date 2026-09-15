@@ -209,7 +209,28 @@ export function loadSubject(id, selectedEncoding = "primary") {
     "comparison",
     "encodings",
     "explainer",
+    "canon",
   ]);
+  // WHERE THIS SUBJECT'S ENCODINGS ARE DESTINED, in `legalese/canon`.
+  //
+  // Optional. A subject with no `canon` block has no declared destination, and
+  // p10 says exactly that instead of guessing one — a guessed path on a public
+  // repo is worse than an absent one.
+  //
+  // Only the SUBJECT PATH lives here, because only it is a fact about the law.
+  // The branch is a fact about WHO is depositing (`<username>/drafts`) and is
+  // resolved per-run in lib/canon-destination.mjs; the encoding row id is the
+  // encoding's own id, which canon's drafts branch already agrees with —
+  // subjects/sg/succession/encodings/cleanroom-2026-08/ is filed under exactly
+  // the id this sidecar calls that encoding.
+  if (desc.canon !== undefined) {
+    if (typeof desc.canon !== "object" || desc.canon === null)
+      die("subject.json: 'canon' must be an object");
+    checkKeys("subject.json 'canon'", desc.canon, ["subject_path"]);
+    if (typeof desc.canon.subject_path !== "string" || !desc.canon.subject_path)
+      die("subject.json: canon.subject_path must be a non-empty string");
+  }
+
   for (const k of ["id", "display_name", "citation", "source_url"]) {
     if (typeof desc[k] !== "string" || !desc[k])
       die(`subject.json: '${k}' must be a non-empty string`);
@@ -765,6 +786,7 @@ export function loadSubject(id, selectedEncoding = "primary") {
       GO_S_MIN_ASSERTIONS: String(desc.checks.min_assertions),
       GO_S_EXPLAINER_DIR: explainerDir,
       GO_S_LEGS: legs.join(" "),
+      GO_S_CANON_PATH: desc.canon?.subject_path ?? "",
       ...extra,
       ...env,
       // THE SELECTION WINS, LAST. Spread after the committed defaults so a run

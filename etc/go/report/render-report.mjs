@@ -840,6 +840,13 @@ const values = {
     ? "verifies"
     : `**DOES NOT VERIFY** — ${chain.problems.join("; ")}`,
   "run.verdict": end?.verdict ?? mv.verdict,
+  // The destination is a PATH, and the branch is deliberately absent from it:
+  // which drafts shelf an encoding lands on is a fact about who deposits it,
+  // resolved at deposit time by lib/canon-destination.mjs. Saying "a drafts
+  // branch" rather than naming one is the accurate claim, not a hedge.
+  "run.canon_destination": begin?.canon_destination
+    ? `\`${esc(begin.canon_destination)}/\` in **legalese/canon**, on the depositor's own drafts branch (named at deposit time; never the default branch)`
+    : "_no `canon` block in this subject's sidecar, so no destination is declared. A guessed path on a public repository is worse than an absent one._",
   "run.verdict_gloss":
     VERDICT_GLOSS[end?.verdict ?? mv.verdict] ?? "(no gloss recorded)",
   "gates.table": gatesTable(),

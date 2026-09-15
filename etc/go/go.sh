@@ -101,6 +101,11 @@
 #     L4_GO_REQUIRED       1 ⇒ any SKIPPED stage is fatal (exit 5), as CI
 #                          wants; `run` refuses at the door when the doctor
 #                          forecasts one, rather than minutes in
+#     L4_GO_CANON_BRANCH   the drafts shelf p10 would deposit to. Derived from
+#                          the GitHub login of whoever is running when unset
+#                          (gh -> git config github.user -> $USER), so a
+#                          contributor lands on THEIR <username>/drafts and not
+#                          on somebody else's. `main` is refused outright.
 #     L4_GO_FIXED_NOW      pin the clock (default 2025-01-31T00:00:00Z)
 
 set -euo pipefail
@@ -1429,8 +1434,21 @@ EOF
   # run_begin is written once per run dir, not once per invocation: a resumed
   # run is the same run.
   if [[ ! -f "$RUN/journal.ndjson" ]]; then
+    # WHERE THIS ENCODING IS DESTINED, recorded at run_begin so the report stays
+    # a function of the journal and nothing else.
+    #
+    # The BRANCH is deliberately not part of it. Which drafts shelf an encoding
+    # lands on is a fact about WHO deposits it, resolved at deposit time by
+    # lib/canon-destination.mjs from the person actually running — so freezing
+    # one person's shelf onto a run record would be recording the wrong kind of
+    # fact, and would also put a `gh` call on the critical path of every run.
+    local canon_dest=""
+    if [[ -n "${GO_S_CANON_PATH:-}" ]]; then
+      canon_dest="subjects/$GO_S_CANON_PATH/encodings/$GO_S_ENCODING_ID"
+    fi
     node "$LIB/receipt.mjs" run-begin --run "$RUN" \
       --run-id "$RUN_ID" --encoding "$GO_S_ENCODING_ID" --subject "$SUBJECT" \
+      --canon-destination "$canon_dest" \
       --repo-head "$head" --tree-state "$tree_state" --fixed-now "$FIXED_NOW" \
       --l4-binary "$L4" --declared "$(echo "$stages" | tr '\n' ',')" \
       --gated-stages "{\"HG1\":[$(for x in $gated_by_HG1; do printf '"%s",' "$x"; done | sed 's/,$//')],\"HG2\":[$(for x in $gated_by_HG2; do printf '"%s",' "$x"; done | sed 's/,$//')]}"

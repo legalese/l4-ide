@@ -250,6 +250,22 @@ node etc/go/lib/estimate-cost.mjs project --sources <some other statute>/
 - **A refusal to print is doing its job.** `estimate-cost.mjs` exits 1 rather than use a price table older than its own staleness bound, because a stale price does not fail — it prints a confident wrong dollar figure. Re-read the pricing page, update `model-prices.json` **and** its `measured` date in the same edit.
 - **Caching is modelled; batch and effort are not.** Every output states which exclusions applied.
 
+### 7g. Where the output is destined
+
+Every run's report now carries a **destined for** row, and `p10-publish` prints the same destination in its refusal. Nothing publishes — P10 still exits 3 — but the destination is computed rather than described, so it is something you can check:
+
+```
+legalese/canon @ mengwong/drafts : subjects/sg/succession/encodings/cleanroom-2026-08/ (branch via gh)
+```
+
+**Key idioms:**
+
+- **The branch is yours, not Meng's.** It resolves to `<your-username>/drafts` — from `gh api user` first, then `git config github.user`, then `$USER`. Running this out of `legalese/l4-plugin` lands your encoding on your own shelf. Override with `L4_GO_CANON_BRANCH`.
+- **Check the branch when it came from `$USER`.** The destination line says which source answered. An OS account name need not be a GitHub login, and when it is not, the branch names a shelf belonging to nobody on a public repo.
+- **`main` is refused, and so is any non-drafts branch.** An encoding stays on a drafts shelf until its source-terms question is settled.
+- **A subject with no `canon` block has no destination**, and P10 says so instead of guessing. Declare one with `"canon": { "subject_path": "sg/succession" }` — the grammar is canon's `docs/directory-conventions.md`.
+- **The row id is the encoding id.** No mapping to remember: canon's drafts branch already files `cleanroom-2026-08` under that name.
+
 ### 7a. The store: what outlives the run
 
 Run directories are volatile — measured, files in `$TMPDIR` last about two to five days — and that used to take the evidence with them. Artifacts and blessings now also go to a durable store, `$L4_GO_STORE` (default `${XDG_STATE_HOME:-~/.local/state}/l4-go/store`).
