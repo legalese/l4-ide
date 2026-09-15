@@ -22,18 +22,18 @@ Regulative keywords express legal obligations, permissions, prohibitions, and th
 
 ### Rule Structure
 
-| Keyword               | Purpose                           |
-| --------------------- | --------------------------------- |
-| [PARTY](PARTY.md)     | Who has the obligation/permission |
-| [EVERY](EVERY.md)     | Every member of a group has it    |
-| WITHIN                | Temporal deadline (relative)      |
-| HENCE                 | Consequence on fulfillment        |
-| LEST                  | Consequence on breach             |
-| PROVIDED              | Guard condition on action         |
-| EXACTLY               | Exact value matching on action    |
-| BREACH                | Terminal violation state          |
-| [BECAUSE](BECAUSE.md) | Reason for breach                 |
-| FULFILLED             | Terminal success state            |
+| Keyword               | Purpose                                             |
+| --------------------- | --------------------------------------------------- |
+| [PARTY](PARTY.md)     | Who has the obligation/permission                   |
+| [EVERY](EVERY.md)     | Every member of a group has it                      |
+| WITHIN                | Temporal deadline (relative, or absolute with `OF`) |
+| HENCE                 | Consequence on fulfillment                          |
+| LEST                  | Consequence on breach                               |
+| PROVIDED              | Guard condition on action                           |
+| EXACTLY               | Exact value matching on action                      |
+| BREACH                | Terminal violation state                            |
+| [BECAUSE](BECAUSE.md) | Reason for breach                                   |
+| FULFILLED             | Terminal success state                              |
 
 ### Parallel Obligation Combinators
 
@@ -44,9 +44,9 @@ Regulative keywords express legal obligations, permissions, prohibitions, and th
 
 ### Planned Keywords
 
-| Keyword | Purpose                      | Status          |
-| ------- | ---------------------------- | --------------- |
-| BEFORE  | Temporal deadline (absolute) | Not implemented |
+| Keyword | Purpose                                                                                                        | Status          |
+| ------- | -------------------------------------------------------------------------------------------------------------- | --------------- |
+| BEFORE  | Absolute deadline, as the window's closing edge (`WITHIN d OF instant` already expresses an absolute deadline) | Not implemented |
 
 ## Basic Rule Structure
 
@@ -91,7 +91,7 @@ The duration can be anchored with `OF`, and then the deadline is **absolute**: t
 | `OF THE ARMING`   | the instant the enclosing obligation was entered                                                |
 | `OF expression`   | an instant: a `NUMBER` on the trace's clock, or a `DATE`                                        |
 
-"The enclosing obligation" is the one whose `HENCE` or `LEST` this obligation is the continuation of — the one it is attached to when it runs. Usually that is the obligation it is written under; but a continuation can also arrive as a value (a rule with `GIVEN k IS A DEONTIC …` that ends `HENCE k`, or a `WHERE` local), and then the anchors name the obligation it is handed to, not the one it was written under. It is the _nearest_ enclosing obligation: two levels down, `THE ARMING` is the middle obligation's arming, not the outermost rule's, so "within 10 days of this agreement" (below) works from one level down, where the phrase is written.
+"The enclosing obligation" is the one whose `HENCE` or `LEST` this obligation is the continuation of — the one it is attached to when it runs. Usually that is the obligation it is written under; but a continuation can also arrive as a value (a rule with `GIVEN k IS A DEONTIC …` that ends `HENCE k`, or a `WHERE` local), and then the anchors name the obligation it is handed to, not the one it was written under — also when the value is one operand of a `RAND` or `ROR` there. It is the _nearest_ enclosing obligation: two levels down, `THE ARMING` is the middle obligation's arming, not the outermost rule's, so "within 10 days of this agreement" (below) works from one level down, where the phrase is written.
 
 For a `MUST`, `DO` or `MAY`, the join is the act that completed it. For a prohibition (`SHANT`) that was kept, the `HENCE` fires when the machine _learns_ it was kept — the first event after its deadline, not the deadline itself — and `THE JOIN` is that instant, the same one an unanchored `WITHIN` counts from. To count from the day a prohibition was discharged, anchor to `THE DEADLINE`.
 
@@ -153,12 +153,12 @@ The type checker refuses a lifecycle anchor where the position it names does not
 - `THE DEADLINE` where the enclosing obligation has no `WITHIN` at all.
 - An `OF` expression that is neither a `NUMBER` nor a `DATE`.
 
-The checker sees only where an anchor is _written_. A top-level rule referenced by name inside a `HENCE` (`HENCE cure`), and a `WHERE` local, are checked where they are written — outside any `HENCE` or `LEST` — and so cannot use `THE JOIN` or `THE DEADLINE`: write the anchored obligation inline under the `HENCE`. `THE ARMING` is accepted there, and when the rule runs it names the arming of the obligation the continuation is attached to (its own, when there is none), so factoring an inline continuation out into a `WHERE` does not move its deadline.
+The checker sees only where an anchor is _written_. A top-level rule referenced by name inside a `HENCE` (`HENCE cure`), and a `WHERE` local, are checked where they are written — outside any `HENCE` or `LEST` — and so cannot use `THE JOIN` or `THE DEADLINE`: write the anchored obligation inline under the `HENCE`. `THE ARMING` is accepted there, and when the rule runs it names the arming of the obligation the continuation is attached to (its own, when there is none), so factoring an inline continuation out into a `WHERE` does not move its deadline, nor does putting the local inside a `RAND` or `ROR`.
 
 Two refusals only a run can make, because the checker cannot see them, are reported when the rule runs, naming the cause:
 
 - `THE DEADLINE` in the `HENCE` of a barrier (`ONCE ALL HAVE`) whose group turned out to be _empty_ and whose `ONCE` line has no `WITHIN` — nobody had a deadline to meet, so there is none to name.
-- An obligation written under one `HENCE` and handed on as a value to a place where the position does not exist — `THE JOIN` attached under a `LEST`, `THE DEADLINE` attached under an obligation with no `WITHIN`.
+- An obligation written under one `HENCE` and handed on as a value to a place where the position does not exist — `THE JOIN` attached under a `LEST`, `THE DEADLINE` attached under an obligation with no `WITHIN` — whether it is attached on its own or as one operand of a `RAND`/`ROR`.
 
 Under `EVERY` the same anchors work on the act's `WITHIN`, and a join line's own `WITHIN` may be anchored to `THE ARMING` or to an instant; see [EVERY](EVERY.md#anchored-deadlines-under-a-join).
 
@@ -474,9 +474,9 @@ ROR
 
 ## BEFORE (NOT YET IMPLEMENTED)
 
-Planned temporal keyword for specifying absolute deadlines in deontic rules (as opposed to WITHIN, which specifies relative durations).
+Planned temporal keyword naming an absolute deadline as the closing edge of the window, in one word. An absolute deadline is already expressible today: `WITHIN d OF instant` (see [WITHIN](#within-temporal-deadline)) is `instant + d`, so `WITHIN 0 OF (YMD 2026 6 30)` means "by 30 June 2026". `BEFORE` would be the spelling for the same thing when there is no duration to add.
 
-**Status:** Planned but not yet in the parser. Use WITHIN for relative durations in the meantime.
+**Status:** Planned but not yet in the parser. Use `WITHIN d OF instant` for an absolute deadline in the meantime, and a bare `WITHIN d` for a relative one.
 
 ### Intended Syntax
 
@@ -488,7 +488,7 @@ BEFORE deadline
 
 ### See Also
 
-- **WITHIN** -- implemented, for relative durations
+- **WITHIN** -- implemented; relative as `WITHIN d`, absolute as `WITHIN d OF instant`
 
 ---
 

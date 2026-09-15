@@ -32,9 +32,18 @@ executing contract `handed on, the join` at 0 with the following events:  party 
 executing contract `handed on, the join` at 0 with the following events:  party `alice` did `Sign` with `alice` at 3 party `bob` did `Sign` with `bob` at 50 party `theLandlord` did `Deliver` with `theLandlord` at 56
 executing contract `handed on, the deadline` at 0 with the following events:  party `alice` did `Sign` with `alice` at 3 party `bob` did `Sign` with `bob` at 50 party `theLandlord` did `Deliver` with `theLandlord` at 108
 executing contract `handed on, the deadline` at 0 with the following events:  party `alice` did `Sign` with `alice` at 3 party `bob` did `Sign` with `bob` at 50 party `theLandlord` did `Deliver` with `theLandlord` at 109
+executing contract `handed on, in a compound, the join` at 0 with the following events:  party `alice` did `Sign` with `alice` at 3 party `bob` did `Sign` with `bob` at 50 party `theLandlord` did `Deliver` with `theLandlord` at 55 party `bob` did `Refund` with `bob` at 60
+executing contract `handed on, in a compound, the join` at 0 with the following events:  party `alice` did `Sign` with `alice` at 3 party `bob` did `Sign` with `bob` at 50 party `theLandlord` did `Deliver` with `theLandlord` at 56 party `bob` did `Refund` with `bob` at 60
+executing contract `handed on, in a compound, the deadline` at 0 with the following events:  party `alice` did `Sign` with `alice` at 3 party `bob` did `Sign` with `bob` at 50 party `theLandlord` did `Deliver` with `theLandlord` at 108 party `bob` did `Refund` with `bob` at 110
+executing contract `handed on, in a compound, the deadline` at 0 with the following events:  party `alice` did `Sign` with `alice` at 3 party `bob` did `Sign` with `bob` at 50 party `theLandlord` did `Deliver` with `theLandlord` at 109 party `bob` did `Refund` with `bob` at 110
+executing contract `handed on, either way` at 0 with the following events:  party `alice` did `Sign` with `alice` at 3 party `bob` did `Sign` with `bob` at 50 party `theLandlord` did `Deliver` with `theLandlord` at 55
 executing contract `factored out` at 0 with the following events:  party `alice` did `Sign` with `alice` at 3 party `theLandlord` did `Deliver` with `theLandlord` at 6
+executing contract `factored out, in a compound` at 0 with the following events:  party `alice` did `Sign` with `alice` at 3 party `theLandlord` did `Deliver` with `theLandlord` at 6 party `bob` did `Sign` with `bob` at 7
+executing contract `handed under a LEST` at 0 with the following events:  party `alice` did `Sign` with `alice` at 3 party `bob` did `Smoke` with `bob` at 14 party `theLandlord` did `Deliver` with `theLandlord` at 18
+executing contract `handed under a LEST, in a compound` at 0 with the following events:  party `alice` did `Sign` with `alice` at 3 party `bob` did `Smoke` with `bob` at 14 party `theLandlord` did `Deliver` with `theLandlord` at 18 party `bob` did `Refund` with `bob` at 20
+executing contract `handed to no WITHIN` at 0 with the following events:  party `alice` did `Sign` with `alice` at 3 party `bob` did `Sign` with `bob` at 50 party `theLandlord` did `Deliver` with `theLandlord` at 60
 executing contract `kept, the join` at 0 with the following events:  party `bob` did `Sign` with `bob` at 30 party `theLandlord` did `Deliver` with `theLandlord` at 34
-executing contract `kept, the deadline` at 0 with the following events:  party `bob` did `Sign` with `bob` at 30 party `theLandlord` did `Deliver` with `theLandlord` at 14
+executing contract `kept, the deadline` at 0 with the following events:  party `theLandlord` did `Deliver` with `theLandlord` at 14
 `of the join`
 executing contract `of the deadline` at 0 with the following events:  party `alice` did `Sign` with `alice` at 8
 executing contract `of the deadline` at 0 with the following events:  party `alice` did `Sign` with `alice` at 8 party `bob` did `Sign` with `bob` at 20

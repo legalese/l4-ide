@@ -466,11 +466,81 @@ GIVETH A DEONTIC Actor Action
   PARTY bob   DOES Sign bob   AT 50
   PARTY theLandlord DOES Deliver theLandlord AT 109
 
+-- Inside a compound the rule is the same. `afterBoth k` attaches k as ONE
+-- operand of the `RAND` in its HENCE, and k is still Bob's continuation:
+-- OF THE JOIN is Bob's signature at 50 and OF THE DEADLINE is 103, exactly
+-- as under `after` — delivery at 55 / 108 is timely, and at 56 / 109 the
+-- breach reports 55 / 108. An operand is handed off when the compound is
+-- applied, one operand at a time, so a value inside a compound anchors to
+-- the obligation the compound is attached to (spec §5.1.1.1, "Threading").
+GIVEN k IS A DEONTIC Actor Action
+GIVETH A DEONTIC Actor Action
+afterBoth k MEANS
+    PARTY bob MUST Sign (EXACTLY bob) WITHIN 100
+    HENCE (k RAND (PARTY bob MUST Refund (EXACTLY bob) WITHIN 100))
+    LEST  BREACH
+
+GIVETH A DEONTIC Actor Action
+`handed on, in a compound, the join` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    HENCE (afterBoth (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE JOIN))
+    LEST  BREACH
+
+#TRACE `handed on, in a compound, the join` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY bob   DOES Sign bob   AT 50
+  PARTY theLandlord DOES Deliver theLandlord AT 55
+  PARTY bob   DOES Refund bob AT 60
+
+#TRACE `handed on, in a compound, the join` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY bob   DOES Sign bob   AT 50
+  PARTY theLandlord DOES Deliver theLandlord AT 56
+  PARTY bob   DOES Refund bob AT 60
+
+GIVETH A DEONTIC Actor Action
+`handed on, in a compound, the deadline` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    HENCE (afterBoth (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE))
+    LEST  BREACH
+
+#TRACE `handed on, in a compound, the deadline` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY bob   DOES Sign bob   AT 50
+  PARTY theLandlord DOES Deliver theLandlord AT 108
+  PARTY bob   DOES Refund bob AT 110
+
+#TRACE `handed on, in a compound, the deadline` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY bob   DOES Sign bob   AT 50
+  PARTY theLandlord DOES Deliver theLandlord AT 109
+  PARTY bob   DOES Refund bob AT 110
+
+-- `ROR` the same: delivery at 55 is timely, and one alternative met is enough.
+GIVEN k IS A DEONTIC Actor Action
+GIVETH A DEONTIC Actor Action
+afterEither k MEANS
+    PARTY bob MUST Sign (EXACTLY bob) WITHIN 100
+    HENCE (k ROR (PARTY bob MUST Refund (EXACTLY bob) WITHIN 100))
+    LEST  BREACH
+
+GIVETH A DEONTIC Actor Action
+`handed on, either way` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    HENCE (afterEither (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE JOIN))
+    LEST  BREACH
+
+#TRACE `handed on, either way` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY bob   DOES Sign bob   AT 50
+  PARTY theLandlord DOES Deliver theLandlord AT 55
+
 -- A WHERE local is the same case. `cure` is defined outside the HENCE and
 -- attached to Alice's obligation when her HENCE fires, so OF THE ARMING is
 -- Alice's arming, 0, exactly as if `cure` had been written inline: the
 -- deadline is 5, and delivery at 6 breaches reporting 5. Factoring an
--- inline continuation out into a WHERE does not move its deadline.
+-- inline continuation out into a WHERE does not move its deadline — nor
+-- does putting the local inside a compound.
 GIVETH A DEONTIC Actor Action
 `factored out` MEANS
     PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
@@ -483,15 +553,91 @@ GIVETH A DEONTIC Actor Action
   PARTY alice DOES Sign alice AT 3
   PARTY theLandlord DOES Deliver theLandlord AT 6
 
+GIVETH A DEONTIC Actor Action
+`factored out, in a compound` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    HENCE (cure RAND (PARTY bob MUST Sign (EXACTLY bob) WITHIN 100))
+    LEST  BREACH
+    WHERE
+      cure MEANS PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE ARMING
+
+#TRACE `factored out, in a compound` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY theLandlord DOES Deliver theLandlord AT 6
+  PARTY bob   DOES Sign bob   AT 7
+
+-- What a value may NOT be attached to. The checker sees only where an
+-- anchor is written, so it lets THE JOIN and THE DEADLINE through here:
+-- both are written under Alice's HENCE, which has a WITHIN. The run refuses
+-- them where they are attached — THE JOIN under a LEST, whose join never
+-- fired, and THE DEADLINE under an obligation that has no WITHIN — and a
+-- compound does not hide the attachment.
+GIVEN k IS A DEONTIC Actor Action
+GIVETH A DEONTIC Actor Action
+unless k MEANS
+    PARTY bob MUST Sign (EXACTLY bob) WITHIN 10
+    HENCE FULFILLED
+    LEST  k
+
+GIVEN k IS A DEONTIC Actor Action
+GIVETH A DEONTIC Actor Action
+unlessBoth k MEANS
+    PARTY bob MUST Sign (EXACTLY bob) WITHIN 10
+    HENCE FULFILLED
+    LEST  (k RAND (PARTY bob MUST Refund (EXACTLY bob) WITHIN 100))
+
+GIVEN k IS A DEONTIC Actor Action
+GIVETH A DEONTIC Actor Action
+`after, open-ended` k MEANS
+    PARTY bob MUST Sign (EXACTLY bob)
+    HENCE k
+
+GIVETH A DEONTIC Actor Action
+`handed under a LEST` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    HENCE (unless (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE JOIN))
+    LEST  BREACH
+
+#TRACE `handed under a LEST` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY bob   DOES Smoke bob   AT 14
+  PARTY theLandlord DOES Deliver theLandlord AT 18
+
+GIVETH A DEONTIC Actor Action
+`handed under a LEST, in a compound` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    HENCE (unlessBoth (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE JOIN))
+    LEST  BREACH
+
+#TRACE `handed under a LEST, in a compound` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY bob   DOES Smoke bob   AT 14
+  PARTY theLandlord DOES Deliver theLandlord AT 18
+  PARTY bob   DOES Refund bob AT 20
+
+GIVETH A DEONTIC Actor Action
+`handed to no WITHIN` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    HENCE (`after, open-ended` (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE))
+    LEST  BREACH
+
+#TRACE `handed to no WITHIN` AT 0 WITH
+  PARTY alice DOES Sign alice AT 3
+  PARTY bob   DOES Sign bob   AT 50
+  PARTY theLandlord DOES Deliver theLandlord AT 60
+
 
 § `A prohibition kept: the join is the event that revealed it`
 
 -- Alice must not smoke for ten days. Nothing happens on day 10 itself; the
--- machine learns the prohibition was kept when the next event arrives —
--- Bob's signature at 30 — and that is where the HENCE's clock starts,
--- anchored or not: OF THE JOIN is 30, so delivery is due 33 and at 34 the
--- breach reports 33. To count from the day the prohibition was discharged,
--- anchor to THE DEADLINE: 10 + 3 = 13, and delivery at 14 reports 13.
+-- machine learns the prohibition was kept when the next event arrives, and
+-- that revealing event is where the HENCE's clock starts when the WITHIN is
+-- unanchored or anchored OF THE JOIN: below, Bob's signature at 30 reveals
+-- it, so delivery is due 33 and at 34 the breach reports 33. To count from
+-- the day the prohibition was discharged instead, anchor to THE DEADLINE:
+-- 10 + 3 = 13, whatever event reveals the kept prohibition — in the second
+-- trace the landlord's own delivery at 14 is that event, and it is already
+-- late, reporting 13.
 GIVETH A DEONTIC Actor Action
 `kept, the join` MEANS
     PARTY alice SHANT Smoke (EXACTLY alice) WITHIN 10
@@ -509,7 +655,6 @@ GIVETH A DEONTIC Actor Action
     LEST  BREACH
 
 #TRACE `kept, the deadline` AT 0 WITH
-  PARTY bob DOES Sign bob AT 30
   PARTY theLandlord DOES Deliver theLandlord AT 14
 
 
