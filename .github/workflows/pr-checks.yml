@@ -344,6 +344,29 @@ jobs:
         run: node etc/sync-canon.mjs --selftest
       - name: The vendored mirror equals canon at the pin
         run: node etc/sync-canon.mjs --check
+      # A mode difference is invisible to --check, which compares content. The
+      # obvious fix — diff modes canon-side against mirror-side — is the wrong
+      # one HERE: this job gates every PR, and a mode comparison is hostage to
+      # core.fileMode, the runner's umask and filesystems that do not carry the
+      # bit. A false red in the job people are being taught to trust costs more
+      # than the defect, which cannot change an answer (nothing executes a .l4
+      # or a .golden).
+      #
+      # This is stronger AND cheaper. It reads git's INDEX, so no filesystem
+      # noise reaches it, needs no fetch, and also catches canon acquiring a
+      # stray exec bit on a carried file. MEASURED at the pin: all 85 carried
+      # files are 100644; the only 100755 files in the blessed dirs are
+      # source/fetch.sh and source/fetch-sso.py, which included() excludes.
+      # If included() ever carries a script this line must be revisited, and it
+      # will say so the moment it does.
+      - name: No file in the mirror is executable
+        run: |
+          bad=$(git ls-files -s jl4/examples/canon | awk '$1 != "100644"')
+          if [ -n "$bad" ]; then
+            echo "mirror files must all be mode 100644; found:"
+            echo "$bad"
+            exit 1
+          fi
 
   corpus-goldens:
     name: Corpus Goldens Present
