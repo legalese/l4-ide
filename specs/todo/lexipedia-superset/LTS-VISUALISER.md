@@ -527,7 +527,7 @@ deadline` and a tick AT the deadline reveals nothing); and a listed refusal, whe
   `price`, which the what-if cannot choose"), a `WITHIN` that was never evaluated and is not a
   literal (`deadlineOf`, `:264`). Refusals are listed, not dropped: an enabled set that omitted
   them would say "nothing else can happen". Each candidate's `LiveNorm` is rendered by
-  `renderLive` (`Marking.hs:349`) from the very `RawObligation` its act is built from — the
+  `renderLive` (`Marking.hs:345`) from the very `RawObligation` its act is built from — the
   first cut paired `liveObligations` with the marking's `InEffect` list by `zip`, on the
   unguarded assumption that two walks agree in order; review 2026-09-15 replaced that with one
   walk.
@@ -824,20 +824,20 @@ rival, and is why P2a′ can be built before any precondition is closed.
 **LANDED 2026-09-15 (P2c), on `lts/p2b-step-log` (merged into `lts/p2-stack` 2026-09-15, not yet in `unstable`; the §7.2 P2c
 row and the P2h row's second-half status were updated at integration — the `Threshold`-shaped `markingOf` half has
 landed, the drawing rule has not).** `jl4-core/src/L4/Lts/Marking.hs`, `markingOf ::
-LayoutPrinter a => MarkingContext -> Value a -> [NormPlacement]` (`:298`). The sketch above is superseded by the module; this block records where
+LayoutPrinter a => MarkingContext -> Value a -> [NormPlacement]` (`:294`). The sketch above is superseded by the module; this block records where
 the built type departs from it and why, and what was measured.
 
-- **The final `NormPlacement`** (`Marking.hs:104`): `Created {crSite, crSource}` (Symboleo's
+- **The final `NormPlacement`** (`Marking.hs:100`): `Created {crSite, crSource}` (Symboleo's
   `Create`, past-participled), `InEffect LiveNorm` (Symboleo's `InEffect`, exactly), `Violated
 Blame` (Anderson/Meyer's violation atom; Symboleo's state is `Violation`), `Lapsed Blame`
   (**ours** — R12 ANSWERED 2026-09-16, below), and the join state `Awaiting {awJoinSite,
-awProgress :: Maybe Progress}` (`:125`). `LiveNorm` carries the site (`rangeOf` the `RAction`), the bearer as
+awProgress :: Maybe Progress}` (`:121`). `LiveNorm` carries the site (`rangeOf` the `RAction`), the bearer as
   `KnownParty`/`UnforcedParty` (a `PARTY p` that never met an event still holds the expression),
   the modal, the action pattern, a `Countdown` (`NoDeadline | UnforcedDeadline Text | Remaining
 Rational` — the residual `WITHIN` is a number only once the obligation has scrutinised an event;
   before that it is the unevaluated expression, measured on the fixtures marked B″ and K), the
   `HENCE`/`LEST` text, and `lnMember :: Maybe Family` from the context — the family (join,
-  total, join site; `Family`, `:162`), not a `MemberOf`: through a context keyed by action site
+  total, join site; `Family`, `:158`), not a `MemberOf`: through a context keyed by action site
   a `moIndex` would be whichever member the log wrote last, so it is not carried (review
   2026-09-15; the first cut exposed `MemberOf` with an index that was nobody's). Fulfilled marks `[]`, as
   sketched — there is no `Discharged` place; §3.1's row was the table, §4.2a's fold is the rule.
@@ -846,8 +846,8 @@ Rational` — the residual `WITHIN` is a number only once the obligation has scr
   the other, and is `Created` with the whole rule's range and source (`markingOf`'s
   `ValQuantified` arm). It was not in the sketch because the sketch predates the quantifier.
 - **The join, against `Threshold`.** `Progress = {prDone, prTotal, prThreshold :: Threshold
-Resolved}`. Phase 3's count and measure forms add arms at `thresholdMet` (`:224`), at
-  `placementText`'s `thresholdText` (`:453`), and in the machine at `assembleQuantified`'s
+Resolved}`. Phase 3's count and measure forms add arms at `thresholdMet` (`:220`), at
+  `placementText`'s `thresholdText` (`:449`), and in the machine at `assembleQuantified`'s
   `threshold@AllHave{}` (`Machine.hs:2376`); none of the three has a wildcard, so a new
   `Threshold` constructor is a compile error at each. (An earlier version of this sentence said
   `thresholdMet` was "the one place"; it was not, even within `Marking.hs`.) The same discipline
@@ -862,7 +862,7 @@ Nothing` and print as "run with the step log on". To get the
   the `RAND` fold of its pending members whose `HENCE`/`LEST` slots hold the machine's sentinels
   (`barrierFinish`, `Machine.hs:2524`, "Phase-2 limit: the residual does NOT carry the JOIN
   LINE"). Neither the count nor the total nor the threshold is in the value. So `markingOf` takes
-  a `MarkingContext` (`:232`, `contextOf :: [DeonticStep] -> MarkingContext`, `:256`), read back
+  a `MarkingContext` (`:228`, `contextOf :: [DeonticStep] -> MarkingContext`, `:252`), read back
   out of P2b's steps: casts by ACTION site from any step's `nkMember`, arms-done per JOIN site by
   a fold IN STEP ORDER — a `MemberSatisfied n` sets the site's count to `n`, and the join's own
   terminal (`JoinReleased`/`JoinExpired`/`JoinFailed`/`JoinStalled`, keyed by the join site in
@@ -891,8 +891,8 @@ False)`; R′ pins the step sequence the reading depends on. Without a context (
   total, join site) is the first's. What the context does NOT inherit is the count: that is
   folded per activation, above. (This sentence first read "adds nothing to it", written before
   the maximum-fold bug was found; it did add something, and the fold is the repair.)
-- **`liveObligations`** (`:381`) is the same walk unrendered, for "L4.Lts.WhatIf", which needs
-  the value and not its text, and `renderLive` (`:349`) is the `InEffect` reading of one raw
+- **`liveObligations`** (`:377`) is the same walk unrendered, for "L4.Lts.WhatIf", which needs
+  the value and not its text, and `renderLive` (`:345`) is the `InEffect` reading of one raw
   obligation, used by `markingOf` for every `ValObligation` and by `candidatesOf` for every
   candidate; the K fixture asserts `map (renderLive ctx) (liveObligations v)` equals the
   `InEffect` list exactly — sites, bearers, text — not merely in length.
@@ -947,9 +947,9 @@ Sharifi, pp. 2395-2427) is paywalled and was **not** read; nothing here rests on
   are `Discharge` and `Unsuccessful Termination`. The thesis's nuXmv encoding (Listing 7.4 p. 78)
   enumerates the states as `{not_created, create, inEffect, suspension, discharge, fulfillment,
 violation, unsTermination}`. (§3.1 and `Marking.hs` write `InEffect`, as the figures do. The
-  first `Marking.hs` Haddock — `1a90524b`, 2026-09-15 — wrote `/inEffect/`; that predates this
-  reading of the thesis, so it was not borrowed from Listing 7.4, and it was corrected in the
-  same commit as this block.)
+  `Marking.hs` Haddock — `1a90524b`, 2026-09-15, and still the tree's text at `:113` — writes
+  `/inEffect/`; that predates this reading of the thesis, so it was not borrowed from Listing
+  7.4. It is **not** corrected in this track; see the NOT BUILT block at the end of §4.2a.)
 - **Every power state, as printed**: `Create`; `Active` ⊃ {`InEffect`, `Suspension`};
   `Successful Termination` (reached by `Exerted`) and `Unsuccessful Termination` (reached by
   `Expired` from either `Create` or `InEffect`, or by `Terminated`). Relevant to R9, which stays
@@ -959,7 +959,8 @@ violation, unsTermination}`. (§3.1 and `Marking.hs` write `InEffect`, as the fi
   prose does the same (p. 39: _"Conditional obligations are created (instantiated) when their
   triggers become true"_). Kept.
 - **`Violated` — Anderson/Meyer, as recorded; Symboleo's state is `Violation`** and its event is
-  `Violated`. The provenance line stands; the Haddock now says which is which.
+  `Violated`. The provenance line stands; the Haddock (`Marking.hs:17-18`) does not yet say
+  which is which — that is the NOT BUILT block below.
 - **`Lapsed` — ours. No Symboleo state covers it, and the two candidates both mislead.** What
   `Lapsed` marks is a `ValBreached` operand of a surviving `ROr`: the machine **did** conclude a
   breach of that alternative, with blame (§3.1's counterexample), and only the compound is not
@@ -982,7 +983,8 @@ Proposition: PAnd ({POr.left=current} "or" right=PAnd)*` (thesis Listing A.1, pr
   `Terminated` — cancellation by a power or by the contract's own termination, again with no
   breach by the debtor. Both would erase the blame `Lapsed` carries. **Ruling: keep `Lapsed`,
   record it as this spec's coinage, do not rename.** No P2c follow-up is needed for the name;
-  the only code change is the Haddock provenance comment, made in the same commit.
+  the only code-side consequence is the Haddock provenance comment, which this track does not
+  touch (below).
 - **A naming hazard, recorded because it fails silently.** §3.1 maps `ValFulfilled` to
   `Discharged`, in the ordinary legal sense of discharge by performance. That is **not**
   Symboleo's `Discharge`, which is the no-performance cancellation above; Symboleo's word for
@@ -990,6 +992,27 @@ Proposition: PAnd ({POr.left=current} "or" right=PAnd)*` (thesis Listing A.1, pr
   `ValFulfilled` as `[]`), so nothing is wrong in the tree — but whoever adds one must not
   label it with Symboleo's name, or the picture will say "cancelled" where the evaluator said
   "performed".
+
+**NOT BUILT 2026-09-16 — the `Marking.hs` Haddock still carries the pre-ruling text.**
+`jl4-core/src/L4/Lts/Marking.hs:12-24`, the module's "Provenance of the lifecycle vocabulary"
+list, reads `'Lapsed' is a COINAGE of this spec (§4.2a, ruling R12 open)` and `Symboleo may have
+a state for it; that is R8's reading task` (`:19`, `:21`), cites Symboleo's states without naming
+them (`:14-15`), and the constructor comments write `Symboleo /created/` and `/inEffect/`
+(`:108`, `:113`) where the figures print `Create` and `InEffect`. A comment-only correction was
+written on this branch — `1603ae64` and `a627e7f3`, 19 lines added, 10 removed, no code — and
+reverted on 2026-09-16, because this track (R8-R12, cut from `lts/p2-followups`) is gated on
+`git diff --name-only lts/p2-followups...HEAD | grep -E '\.hs$|\.cabal$'` being empty: no
+Haskell, Haddock included. The revert also un-shifted the ten `Marking.hs` line cites in this
+section, which the reverted commits had moved to `+4` and then, after the second commit grew the
+header by five more lines without re-anchoring, left five lines short of every definition they
+name; they are now checked against the tree at `lts/p2-followups` (`data NormPlacement` `:100`,
+`Awaiting` `:121`, `Family` `:158`, `thresholdMet` `:220`, `MarkingContext` `:228`, `contextOf`
+`:252`, `markingOf` `:294`, `renderLive` `:345`, `liveObligations` `:377`, `thresholdText`
+`:449`). What would make this block true-and-closed: in the next track that is allowed to touch
+Haskell, re-apply the two commits' `Marking.hs` hunks (`git show 1603ae64 a627e7f3 --
+jl4-core/src/L4/Lts/Marking.hs`; the text is the one this block's bullets agree with) and shift
+the ten cites above by whatever the header grows — measure it, do not assume `+9`. Until then a
+reader of the Haddock alone gets the answer as it stood on 2026-09-15; the ruling is here.
 
 ### 4.3 The one piece of new back end: a deontic step log
 
@@ -2083,7 +2106,7 @@ rather than assumed benign. R11 and R12 are new in revision 2; R13 was added on 
 | **R9**  | **Does P2 draw powers, or refuse?** G5 says a power changes the transition system, so it cannot be an edge in it. Symboleo gives powers their own lifecycle, which is one answer. Refusing and drawing the boundary is another, and is consistent with §25.5's own precedent of drawing the seam rather than pretending.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **R10** | **Does P2f belong here or in the bounded-deontics work?** Sharpened by revision 2's unbundling: P2f no longer needs anything of P2's except the graph P0 already ships, so the case for it living here is weaker than it was. The query is that paper's contribution; the graph is `StateGraph`'s; the renderer may be P1's BPMN or a list. **Observation 2026-09-15 (still OPEN):** P2f was built on `lts/p2f-dominators` as a function over `StateGraph` (`L4.StateGraph.Dominators`) with **no dependency on the rest of P2** — not on the step log, the marking or the picture (its reader-facing wording of an `EVERY` act does read P2h-first-half's `labelQuantifier`, so it is stacked on that branch) — and it needed one thing of the graph the paper's definition does not mention: the `RAND` and `ROR` joins the IR lacks, supplied inside the module as `fulfilmentView` and `breachView`. That is evidence for the split the ruling proposes — the graph (and its join) is `StateGraph`'s, the query is the paper's — and the paper's §7 sentence _"the dominator query … designed and not yet built"_ is now false and should be updated when it is next touched.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **R11** | **NEW. Does `STATEFUL` §6.4 need correcting?** §2.4 rules that P2 uses the replay endpoints (22/23/24) rather than 18/19/20, because "would lead to `FULFILLED`" cannot be answered by a pure walk without reimplementing modal routing. That is a finding **about `STATEFUL`'s own spec**, whose §6.4 promises exactly that pure walk with "microsecond responses". Either that spec should record the faithfulness obligation, or 19/20 should be re-specified as replay, or the pure walk should be kept behind a cross-validation test. Not P2's call alone. **OBSERVED 2026-09-15, not decided:** P2c's replay form (§2.4 block) measured 83–313 µs per candidate, warm, on the corpus's barrier and `contracts.l4` traces — inside the "microsecond responses" §6.4 promised for the pure walk, at trace lengths of one to three events. The replay's cost is linear in the persisted history (every prior event is re-scrutinised per candidate), so the promise is met today by the form §2.4 prefers and would stop being met at some history length nobody has measured. What §6.4 needs is therefore not a faster form but a number: the history length at which replay exceeds its budget, which is when a pure walk earns its faithfulness obligation. Still not P2's call alone.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **R12** | **ANSWERED 2026-09-16, see §4.2a ANSWERED: `Lapsed` is ours, and stays.** Symboleo has one lifecycle per obligation instance; an alternative can be a separate obligation (which would simply be in `Violation`) or a disjunct of one obligation's consequent (`POr`, thesis Listing A.1 p. 149), and in neither encoding is there a state for "this disjunct is lost but the obligation stands". Its `Discharge` is reached by `Expired` from `Create` (the antecedent can no longer come true) or by `Discharged` from `InEffect` (the creditor's power), and `Unsuccessful Termination` is cancellation by a power or by the contract's termination — none of these involves a breach by the debtor, and either name would erase the blame `Lapsed` carries. (Corrected 2026-09-16: an earlier form of this row said Symboleo "has no compound obligations" and that `Discharge` is reached only from `Create`; both were sharper than the sources.) `Created`/`InEffect` are Symboleo's `Create`/`InEffect`; `Violated` stays Anderson/Meyer (Symboleo's state is `Violation`). No rename, so no P2c follow-up; the `Marking.hs` Haddock was corrected in the same commit. One hazard recorded: Symboleo's `Discharge` is _not_ discharge by performance — that is `Fulfillment`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **R12** | **ANSWERED 2026-09-16, see §4.2a ANSWERED: `Lapsed` is ours, and stays.** Symboleo has one lifecycle per obligation instance; an alternative can be a separate obligation (which would simply be in `Violation`) or a disjunct of one obligation's consequent (`POr`, thesis Listing A.1 p. 149), and in neither encoding is there a state for "this disjunct is lost but the obligation stands". Its `Discharge` is reached by `Expired` from `Create` (the antecedent can no longer come true) or by `Discharged` from `InEffect` (the creditor's power), and `Unsuccessful Termination` is cancellation by a power or by the contract's termination — none of these involves a breach by the debtor, and either name would erase the blame `Lapsed` carries. (Corrected 2026-09-16: an earlier form of this row said Symboleo "has no compound obligations" and that `Discharge` is reached only from `Create`; both were sharper than the sources.) `Created`/`InEffect` are Symboleo's `Create`/`InEffect`; `Violated` stays Anderson/Meyer (Symboleo's state is `Violation`). No rename, so no P2c follow-up; the `Marking.hs` Haddock still reads "R12 open" and is NOT touched in this track (§4.2a NOT BUILT 2026-09-16 — the R8-R12 gate forbids Haskell, comments included). One hazard recorded: Symboleo's `Discharge` is _not_ discharge by performance — that is `Fulfillment`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | **R13** | **ANSWERED 2026-09-15, see §4.8 LANDED: no, never — by measurement and by construction.** Measured with `cabal repl jl4-core-test --repl-no-load` from `jl4-core/`, loading each file with `checkWithImports emptyVFS`, taking `map (.sgName) (extractStateGraphs m)` against `map (.vdName) (findAllVisualizableDecides uri m subst)` with the ladder's backticks stripped (the two spell names differently — the first run compared unstripped names and its 0 was worthless; the number below is the corrected run): `regcf.l4`: 109 top-level `Decide`s, 3 state graphs (`advertising restriction`, `ongoing reporting obligation`, `resale restriction`), 43 ladder-visualisable, **0 in both**; `ok/contracts.l4`: 8 / 7 / 0 / **0**; `every-run-example.l4`: 7 / 2 / 0 / **0**. So 0 of 12 regulative rules pass `canVisualize`. It could not be otherwise: `Ladder.translateDecide` (`jl4-core/src/L4/Viz/Ladder.hs:304-305`) throws `InvalidDecideMustHaveBoolRetType` unless the body is `BOOLEAN`, and a regulative body — including an `IF` whose arms are regulative — is `DEONTIC`. Consequences taken: the lens is titled "Show state graph" beside "Show decision graph", anchored at the same `Decide` start, and no title needs to disambiguate a shared line. Pinned by `jl4-lsp/test/StateGraphLensSpec.hs` and `jl4-core/test/ApiStateGraphLensSpec.hs`. _Original question (2026-09-14):_ Do the ladder lens and the deontic lens ever stack on the same line? §4.8 asks for a lens above every regulative `Decide`; the ladder already puts one above every `Decide` that `canVisualize` accepts. Whether those two sets are disjoint is **unmeasured** — nobody has run `Ladder.doVisualize` against a regulative body to see whether it succeeds. If they overlap, two lenses share one anchor position and the titles have to distinguish them ("Show decision graph" is already taken). Five minutes against `jl4/examples/legal/regcf/regcf.l4` settles it, and it should be settled before the lens is designed rather than after. |
 
 ---
