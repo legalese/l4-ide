@@ -41,7 +41,9 @@ Pass `--browser=chromium` to use Playwright's own build instead, after
 | `happy[-k]` | fresh start; keep firing "continue" on every waiting activity until nothing waits or 12 steps; one run per arm `k` of the first exclusive gateway (the simulator's own default is arm 0)                                       | `out/<fixture>.happy[-armk].png` |
 
 Everything the simulator reports is written to `out/<fixture>.json`: the
-element census bpmn-js imported, import warnings, the elements the simulator
+element census bpmn-js imported (for a multi-instance activity, whether it
+carries a `loopCardinality`, a `loopDataInputRef` or a `completionCondition`,
+the last as its text), import warnings, the elements the simulator
 flags unsupported, the live scopes (token positions and their subscriptions),
 the trigger pads offered, the history, the end events reached and the text of
 the simulator's own log panel. `out/run-meta.json` records date, browser

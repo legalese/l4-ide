@@ -109,7 +109,13 @@ byte-identical fidelity report, because `L4.StateGraph.extractDeonton` never rea
   loss). BPMN has shapes for once-per-member — a multi-instance subProcess around the continuation,
   or the `None` completion behaviour caught by a non-interrupting boundary — and this exporter
   emits neither. Both notes are written "the diagram says…; the rule says…", because the reader
-  has to disbelieve the drawing rather than fill it in.
+  has to disbelieve the drawing rather than fill it in. Two gaps in that reporting, measured
+  2026-09-16 and not yet fixed: a `MAY` fork with a continuation (`modals-may-fork`) has its lapse
+  timer drawn into the continuation — the chair's `MUST Publish` — which the runtime never does
+  (`ok/every/run-modals.l4` §7: nobody approves, the chair publishes late, FULFILLED; the barrier's
+  LEST-to-Fulfilled edge of 2026-09-15 was not extended to the fork), and no tag says so; and
+  `P-FORK-CANCEL` is emitted on the `MUST` forks only, though the `MAY` fork's timer is interrupting
+  too (`modals-may-fork.bpmn:36`).
 - **A deadline written only on the join line arms the boundary timer** (`memberDeadline` in
   `L4.StateGraph`, mirroring the evaluator). When the act has a deadline of its own, that one is
   on the timer and the join line's is reported undrawn as `P-JOIN-DEADLINE` (lossy).
@@ -337,11 +343,20 @@ cd etc/bpmn-token-sim && npm ci && npm run build && npm run run
 ```
 
 It is not a check and has no verdict. The short version of what it found
-(2026-09-15): the simulator accepts all eight files without complaint and
-animates a `MUST`, a `MAY` and a `SHANT` with the same token and the same
-buttons; `tenancy-barrier` and `tenancy-fork` animate identically; no timer fired on
-its own in 4.5 s of wall clock (the simulator has no clock — timers are play
-buttons); and a breach end event does not stop the siblings.
+(2026-09-15, re-run 2026-09-15 17:19 UTC over all fourteen — 2026-09-16 in Singapore): the simulator accepts every
+file without complaint and animates a `MUST`, a `MAY` and a `SHANT` with the
+same token and the same buttons; `tenancy-barrier` and `tenancy-fork` animate
+identically, and so do the `modals-shant-*` pair; no timer fired on its own in
+4.5 s of wall clock (the simulator has no clock — timers are play buttons); a
+breach end event does not stop the siblings; and the `SHANT`'s
+`completionCondition` is imported but never consulted — one instance, one click.
+The one barrier/fork pair that animates differently is `modals-may-*`, where
+the fork's lapse timer lands on the chair's `MUST Publish` and the barrier's
+lands on Fulfilled. The runtime does what the barrier draws in both cases: a
+permission nobody exercised creates no duty (`ok/every/run-modals.l4` §7,
+measured 2026-09-16), so the fork's drawing is wrong there and not yet fixed; `Lower.hs`'s
+`KNOWN WRONG` note measures a different shape (a bare `PARTY … MAY`) and does
+not yet name this one — LTS-VISUALISER.md §4.9 does.
 
 ## Asking an actual engine: the jBPM/KIE second opinion
 

@@ -1,0 +1,240 @@
+{
+  "fixture": "jl4/examples/bpmn/expected/modals-may-barrier.bpmn",
+  "importWarnings": [],
+  "elements": [
+    {
+      "id": "Start_0",
+      "type": "bpmn:StartEvent",
+      "name": null,
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Start_0__Task_0"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Task_0",
+      "type": "bpmn:Task",
+      "name": "MAY Approve ...",
+      "eventDefinitions": [],
+      "multiInstance": {
+        "type": "bpmn:MultiInstanceLoopCharacteristics",
+        "isSequential": false,
+        "loopCardinality": false,
+        "loopDataInputRef": false,
+        "completionCondition": null
+      },
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_0__Task_1"
+      ],
+      "incoming": [
+        "Flow_Start_0__Task_0"
+      ]
+    },
+    {
+      "id": "Task_1",
+      "type": "bpmn:Task",
+      "name": "MUST Publish ...",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_1__End_2"
+      ],
+      "incoming": [
+        "Flow_Task_0__Task_1"
+      ]
+    },
+    {
+      "id": "End_2",
+      "type": "bpmn:EndEvent",
+      "name": "Fulfilled",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_Boundary_0__End_2",
+        "Flow_Task_1__End_2"
+      ]
+    },
+    {
+      "id": "End_3",
+      "type": "bpmn:EndEvent",
+      "name": "Breach",
+      "eventDefinitions": [
+        "bpmn:ErrorEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_Boundary_1__End_3"
+      ]
+    },
+    {
+      "id": "Boundary_1",
+      "type": "bpmn:BoundaryEvent",
+      "name": "after P5D",
+      "eventDefinitions": [
+        "bpmn:TimerEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_1",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Boundary_1__End_3"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Boundary_0",
+      "type": "bpmn:BoundaryEvent",
+      "name": "after P30D",
+      "eventDefinitions": [
+        "bpmn:TimerEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_0",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Boundary_0__End_2"
+      ],
+      "incoming": []
+    }
+  ],
+  "unsupportedElements": [],
+  "pausePoints": [
+    "Task_0",
+    "Task_1"
+  ],
+  "exclusiveGateways": [],
+  "started": {
+    "tokensOn": [
+      "Task_0"
+    ],
+    "boundarySubscriptions": [
+      "Boundary_0"
+    ],
+    "triggers": [
+      "Start_0",
+      "Task_0",
+      "Boundary_0"
+    ],
+    "history": [
+      "Start_0",
+      "Flow_Start_0__Task_0",
+      "Task_0"
+    ],
+    "endEventsReached": [],
+    "log": [
+      "Process started 0ckss80",
+      "Start Event 0ckss80"
+    ],
+    "afterWaiting3s": {
+      "tokensOn": [
+        "Task_0"
+      ],
+      "triggers": [
+        "Start_0",
+        "Task_0",
+        "Boundary_0"
+      ],
+      "endEventsReached": []
+    }
+  },
+  "breach": {
+    "arm": null,
+    "continuedFirst": [],
+    "fired": "Boundary_0",
+    "tokensOn": [],
+    "boundarySubscriptions": [],
+    "triggers": [
+      "Start_0"
+    ],
+    "history": [
+      "Start_0",
+      "Flow_Start_0__Task_0",
+      "Task_0",
+      "Boundary_0",
+      "Flow_Boundary_0__End_2",
+      "End_2"
+    ],
+    "endEventsReached": [
+      "End_2"
+    ],
+    "log": [
+      "Process started 0221r6v",
+      "Start Event 0221r6v",
+      "MAY Approve ... 0221r6v",
+      "after P30D 0221r6v",
+      "Fulfilled 0221r6v",
+      "Process finished 0221r6v"
+    ]
+  },
+  "happy": [
+    {
+      "arm": null,
+      "continued": [
+        "Task_0",
+        "Task_1"
+      ],
+      "steps": [
+        {
+          "tokensOn": [
+            "Task_0"
+          ],
+          "continued": "Task_0"
+        },
+        {
+          "tokensOn": [
+            "Task_1"
+          ],
+          "continued": "Task_1"
+        }
+      ],
+      "hitStepLimit": false,
+      "tokensOn": [],
+      "boundarySubscriptions": [],
+      "triggers": [
+        "Start_0"
+      ],
+      "history": [
+        "Start_0",
+        "Flow_Start_0__Task_0",
+        "Task_0",
+        "Flow_Task_0__Task_1",
+        "Task_1",
+        "Flow_Task_1__End_2",
+        "End_2"
+      ],
+      "endEventsReached": [
+        "End_2"
+      ],
+      "log": [
+        "Process started 15gg00b",
+        "Start Event 15gg00b",
+        "MAY Approve ... 15gg00b",
+        "MUST Publish ... 15gg00b",
+        "Fulfilled 15gg00b",
+        "Process finished 15gg00b"
+      ]
+    }
+  ],
+  "pageErrors": []
+}
