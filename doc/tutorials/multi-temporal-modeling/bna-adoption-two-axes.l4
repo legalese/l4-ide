@@ -1,0 +1,251 @@
+-- British Nationality Act 1981, s 1(5)-(5A), on two time axes.
+--
+-- Companion to "Multi-Temporal Rule Modeling". The GST example beside this
+-- one moves ONE axis at a time. This file exists because a real provision
+-- moves two at once, and the fragment below is the clearest small case of it
+-- in the corpus.
+--
+-- THE TWO IDEAS. An adoption is effected on a day. The law that governs it
+-- was itself enacted, substituted and amended on days of its own. Section
+-- 1(5A) ties both to the same instant -- "on the date on which the order is
+-- made or the Convention adoption is effected" -- so a single date has to
+-- answer two different questions:
+--
+--   * WHICH FACTS?  Was the adopter a British citizen THEN? Habitually
+--     resident THEN? Facts change; a Boolean that says "is a British
+--     citizen" answers about today, not about the date of the order. This
+--     is the VALID-TIME axis, and the facts live in the ledger.
+--
+--   * WHICH TEXT?   Section 1(5) and (5A) in their present form were
+--     SUBSTITUTED with effect from 1 June 2003, and limb (b) was AMENDED
+--     with effect from 30 December 2005, when the words "or in a designated
+--     territory" were inserted. An adoption effected in 2004 is judged by
+--     the text in force in 2004. This is the RULE-EFFECTIVE axis.
+--
+-- Both are pinned to the same day, by `judged as at` below. They are still
+-- two axes, which is what lets the last case ask a counterfactual the
+-- statute cannot: these facts, under today's text.
+--
+-- Amendment dates are from the Textual Amendments block of
+-- jl4/examples/legal/bna/source-s1.txt (F13, F16) -- F13 substituted
+-- s 1(5)/(5A) in force 1.6.2003; F16 inserted the words in s 1(5A)(b) in
+-- force 30.12.2005. The quoted words are that file's, verbatim.
+--
+-- SCOPE. An illustration of the axes, not a replacement for the corpus
+-- encoding at jl4/examples/legal/bna/bna.l4, which models all of section 1
+-- and takes its facts as a GIVEN record instead.
+
+IMPORT prelude
+IMPORT daydate
+
+TIMEZONE IS "Etc/UTC"
+
+§ `The statutory days`
+
+-- F13: s 1(5) and (5A) substituted by the Adoption (Intercountry Aspects)
+-- Act 1999, in force 1 June 2003.
+`the substitution of s 1(5) and (5A)` MEANS Date 1 6 2003
+
+-- F16: "or in a designated territory" inserted in s 1(5A)(b) by the Adoption
+-- and Children Act 2002, in force 30 December 2005.
+`the designated-territory amendment` MEANS Date 30 12 2005
+
+§ `The facts, as they stood on the day`
+
+-- Each fact is a ledger cell. A write under EVAL UNDER VALID TIME carries a
+-- valid-from stamp; a read under EVAL UNDER VALID TIME selects the entry
+-- whose interval covers that day. Before the first entry the answer is a
+-- principled NOTHING, which `fromMaybe FALSE` turns into "not shown".
+`the adopter a British citizen` MEANS
+    fromMaybe FALSE (RECALL `the adopter is a British citizen`)
+
+`the second adopter a British citizen` MEANS
+    fromMaybe FALSE (RECALL `the second adopter is a British citizen`)
+
+`the adopter habitually resident in the United Kingdom` MEANS
+    fromMaybe FALSE (RECALL `the adopter is habitually resident in the United Kingdom`)
+
+`the adopter habitually resident in a designated territory` MEANS
+    fromMaybe FALSE (RECALL `the adopter is habitually resident in a designated territory`)
+
+`the second adopter habitually resident in the United Kingdom` MEANS
+    fromMaybe FALSE (RECALL `the second adopter is habitually resident in the United Kingdom`)
+
+`the second adopter habitually resident in a designated territory` MEANS
+    fromMaybe FALSE (RECALL `the second adopter is habitually resident in a designated territory`)
+
+`a joint adoption` MEANS
+    fromMaybe FALSE (RECALL `the adoption is a joint adoption`)
+
+`a Convention adoption` MEANS
+    fromMaybe FALSE (RECALL `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom`)
+
+§ `The text, as it stood on the day`
+
+-- The only moving part in this fragment: before 30 December 2005 limb (b)
+-- read "habitually resident in the United Kingdom" and nothing else.
+`the designated-territory words are in force` MEANS
+    (DATE_SERIAL `RULES EFFECTIVE DATE`) AT LEAST (DATE_SERIAL `the designated-territory amendment`)
+
+`the section as substituted is in force` MEANS
+    (DATE_SERIAL `RULES EFFECTIVE DATE`) AT LEAST (DATE_SERIAL `the substitution of s 1(5) and (5A)`)
+
+GIVEN `resident in the United Kingdom` IS A BOOLEAN
+      `resident in a designated territory` IS A BOOLEAN
+GIVETH A BOOLEAN
+`habitual residence qualifies` `resident in the United Kingdom` `resident in a designated territory` MEANS
+        `resident in the United Kingdom`
+    OR  (`the designated-territory words are in force` AND `resident in a designated territory`)
+
+§ `The requirements`
+
+@ref British Nationality Act 1981 s 1(5A)(a)
+`1(5A)(a) — the adopter, or one of the adopters, a British citizen` MEANS
+        "(a) the adopter or, in the case of a joint adoption, one of the adopters is a British citizen"
+    ... `the adopter a British citizen`
+        OR  (`a joint adoption` AND `the second adopter a British citizen`)
+
+@ref British Nationality Act 1981 s 1(5A)(b)
+`1(5A)(b) — habitual residence, in a Convention case` MEANS
+        "(b) in a case within subsection (5)(b), the adopter or, in the case of a joint adoption, both of the adopters are habitually resident in the United Kingdom [F16 or in a designated territory]"
+    ... IF NOT `a Convention adoption`
+        THEN TRUE
+        ELSE (`habitual residence qualifies`
+                  `the adopter habitually resident in the United Kingdom`
+                  `the adopter habitually resident in a designated territory`)
+             AND (IF NOT `a joint adoption`
+                  THEN TRUE
+                  ELSE `habitual residence qualifies`
+                           `the second adopter habitually resident in the United Kingdom`
+                           `the second adopter habitually resident in a designated territory`)
+
+@ref British Nationality Act 1981 s 1(5A)
+`1(5A) — the requirements are met` MEANS
+        "(5A) Those requirements are that on the date on which the order is made or the Convention adoption is effected (as the case may be)—"
+    ... `1(5A)(a) — the adopter, or one of the adopters, a British citizen`
+    AND `1(5A)(b) — habitual residence, in a Convention case`
+
+§ `Both axes, pinned to the one day the section names`
+
+-- This is the whole point of the file. "On the date on which the order is
+-- made" fixes the facts AND the text, so the same date goes to both axes.
+GIVEN d IS A DATE
+GIVETH A BOOLEAN
+`the requirements are met, judged as at` d MEANS
+    `EVAL UNDER VALID TIME` d (`EVAL UNDER RULES EFFECTIVE AT` d `1(5A) — the requirements are met`)
+
+-- The counterfactual the statute cannot ask, and the axes can: these facts,
+-- as they stood on the day of the order, under a DIFFERENT version of the
+-- text. Used by case 6 to isolate the amendment's effect.
+GIVEN `the day of the order` IS A DATE
+      `the version of the text` IS A DATE
+GIVETH A BOOLEAN
+`the requirements are met, on the facts at` `the day of the order` `under the text at` `the version of the text` MEANS
+    `EVAL UNDER VALID TIME` `the day of the order`
+        (`EVAL UNDER RULES EFFECTIVE AT` `the version of the text` `1(5A) — the requirements are met`)
+
+§ `Cases`
+
+-- One directive is one ledger, so each case writes its own facts and then
+-- asks its own question. Writes come first and evaluate left to right; the
+-- last element of each LIST is the answer.
+--
+-- Every write is stamped with the day the fact BEGAN to hold, not the day
+-- anyone wrote it down.
+
+-- CASE 1. Sole adopter, a British citizen since 1995. UK court order, 2004.
+-- Not a Convention adoption, so limb (b) is vacuous. Requirements met.
+-- expected: LIST TRUE, FALSE, FALSE, TRUE
+#EVAL LIST
+    ( `EVAL UNDER VALID TIME` (Date 12 3 1995) (RECORD `the adopter is a British citizen` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS FALSE) ),
+    ( `the requirements are met, judged as at` (Date 1 6 2004) )
+
+-- CASE 2. The order came FIRST. The adopter naturalised on 1 September 2006,
+-- two years AFTER the 2004 order. Section 1(5A) asks about the date of the
+-- order, so the requirements were NOT met -- even though the adopter is a
+-- British citizen now. The fourth element is the same fact read with no
+-- valid time in scope: last write wins, TRUE. That gap between the third and
+-- fourth answers is the whole argument for the axis.
+-- expected: LIST TRUE, FALSE, FALSE, FALSE, TRUE
+#EVAL LIST
+    ( `EVAL UNDER VALID TIME` (Date 1 9 2006) (RECORD `the adopter is a British citizen` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS FALSE) ),
+    ( `the requirements are met, judged as at` (Date 1 6 2004) ),
+    ( `the adopter a British citizen` )
+
+-- CASE 3. Naturalised ON the day of the order. "On the date on which the
+-- order is made" includes that date, and a valid-time interval starts
+-- inclusively, so the requirements are met.
+-- expected: LIST TRUE, FALSE, FALSE, TRUE
+#EVAL LIST
+    ( `EVAL UNDER VALID TIME` (Date 1 6 2004) (RECORD `the adopter is a British citizen` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS FALSE) ),
+    ( `the requirements are met, judged as at` (Date 1 6 2004) )
+
+-- CASE 4. Joint adoption; the first adopter is not a British citizen, the
+-- second is. Limb (a) wants "one of the adopters", so it is satisfied.
+-- expected: LIST FALSE, TRUE, TRUE, FALSE, TRUE
+#EVAL LIST
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adopter is a British citizen` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 4 7 1999) (RECORD `the second adopter is a British citizen` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS FALSE) ),
+    ( `the requirements are met, judged as at` (Date 1 6 2004) )
+
+-- CASE 5. Convention adoption effected 1 June 2004. Sole adopter, a British
+-- citizen, habitually resident in a designated territory and NOT in the
+-- United Kingdom. On 1 June 2004 limb (b) still read "habitually resident in
+-- the United Kingdom" and stopped there -- the designated-territory words
+-- were not inserted until 30 December 2005. Requirements NOT met.
+-- expected: LIST TRUE, FALSE, TRUE, FALSE, TRUE, FALSE
+#EVAL LIST
+    ( `EVAL UNDER VALID TIME` (Date 12 3 1995) (RECORD `the adopter is a British citizen` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adopter is habitually resident in the United Kingdom` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the adopter is habitually resident in a designated territory` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS TRUE) ),
+    ( `the requirements are met, judged as at` (Date 1 6 2004) )
+
+-- CASE 6. Case 5's facts, on Case 5's day, read against the text as it stood
+-- on 1 June 2006. Nothing about the adoption has changed; only the words
+-- have. This is the counterfactual the statute cannot ask and the two axes
+-- can, and it isolates what F16 did.
+-- expected: LIST TRUE, FALSE, TRUE, FALSE, TRUE, FALSE, TRUE
+#EVAL LIST
+    ( `EVAL UNDER VALID TIME` (Date 12 3 1995) (RECORD `the adopter is a British citizen` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adopter is habitually resident in the United Kingdom` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the adopter is habitually resident in a designated territory` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS TRUE) ),
+    ( `the requirements are met, on the facts at` (Date 1 6 2004) `under the text at` (Date 1 6 2004) ),
+    ( `the requirements are met, on the facts at` (Date 1 6 2004) `under the text at` (Date 1 6 2006) )
+
+-- CASE 7. Joint Convention adoption, 2006. One adopter habitually resident
+-- in the United Kingdom, the other in neither. Limb (b) wants BOTH of the
+-- adopters, so it fails, and the designated-territory words do not help.
+-- expected: LIST TRUE, TRUE, FALSE, FALSE, TRUE, TRUE, FALSE
+#EVAL LIST
+    ( `EVAL UNDER VALID TIME` (Date 12 3 1995) (RECORD `the adopter is a British citizen` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1990) (RECORD `the adopter is habitually resident in the United Kingdom` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the second adopter is habitually resident in the United Kingdom` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the second adopter is habitually resident in a designated territory` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS TRUE) ),
+    ( `the requirements are met, judged as at` (Date 1 6 2006) )
+
+-- CASE 8. Citizenship held and then lost. The adopter was a British citizen
+-- from 1995 and renounced in 2002; the order is 2004. The later interval
+-- covers the day of the order, so the requirements are not met. A single
+-- Boolean field cannot express this at all.
+-- expected: LIST TRUE, FALSE, FALSE, FALSE, FALSE, TRUE
+#EVAL LIST
+    ( `EVAL UNDER VALID TIME` (Date 12 3 1995) (RECORD `the adopter is a British citizen` IS TRUE) ),
+    ( `EVAL UNDER VALID TIME` (Date 30 9 2002) (RECORD `the adopter is a British citizen` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a joint adoption` IS FALSE) ),
+    ( `EVAL UNDER VALID TIME` (Date 1 1 1983) (RECORD `the adoption is a Convention adoption effected under the law of a country or territory outside the United Kingdom` IS FALSE) ),
+    ( `the requirements are met, judged as at` (Date 1 6 2004) ),
+    ( `the requirements are met, judged as at` (Date 1 6 1999) )

@@ -319,3 +319,69 @@ AT` by hand) is planned but not yet implemented.
 - [`TEMPORAL-RULE-VERSION-DESIGN.md`](../../../specs/todo/TEMPORAL-RULE-VERSION-DESIGN.md) — the full design rationale and decision log behind this feature, for readers who want the "why" in depth.
 - [Common Patterns](../../reference/patterns/common-patterns.md) — the `daydate` library used alongside these builtins in the example.
 - [Encoding Legislation](../getting-started/encoding-legislation.md) — general technique for translating legal text into L4, if you haven't already.
+
+---
+
+## Facts that change: the ledger
+
+Everything above moves the **rule** through time. The GST rate is a rule with
+versions, and `EVAL UNDER VALID TIME` is used to ask which version governs a
+transaction that happened on a given day.
+
+That leaves the other half. A **fact** also has a history — a person was not a
+citizen, then was, then renounced — and a rule that asks "was this true on that
+date?" needs to read the fact as it stood, not as it stands. Facts with a
+history live in the ledger:
+
+```l4
+-- a write under a valid time carries a valid-from stamp
+`EVAL UNDER VALID TIME` (Date 12 3 1995) (RECORD `is a British citizen` IS TRUE)
+
+-- a read under a valid time selects the entry whose interval covers that day
+fromMaybe FALSE (`EVAL UNDER VALID TIME` (Date 1 6 2004) (RECALL `is a British citizen`))
+```
+
+Three things worth knowing before you reach for it:
+
+- **One directive is one ledger.** Writes and the reads that depend on them
+  must share a single `#EVAL`, usually as a `LIST` whose elements evaluate
+  left to right.
+- **Before the first entry the answer is `NOTHING`, not `FALSE`.** "We have no
+  record" and "we have a record saying no" are different, and the ledger keeps
+  them different. `fromMaybe FALSE` is how you decide to collapse them.
+- **A plain `RECORD`, with no valid time in scope, is stamped with the
+  transaction day.** A read at an earlier valid time will not see it. If a
+  fact began before today, say so when you write it.
+
+### Both axes at once
+
+Rules move and facts move, and a provision can pin both to the same day. The
+companion file [`bna-adoption-two-axes.l4`](./bna-adoption-two-axes.l4) works
+this through on British Nationality Act 1981 s 1(5A), which says the
+requirements must be met "on the date on which the order is made or the
+Convention adoption is effected". That one date answers two questions — which
+facts, and which text — because s 1(5A) was itself substituted in 2003 and
+amended on 30 December 2005, when "or in a designated territory" was inserted
+into limb (b).
+
+The file binds both axes to the one date the section names:
+
+```l4
+GIVEN d IS A DATE
+GIVETH A BOOLEAN
+`the requirements are met, judged as at` d MEANS
+    `EVAL UNDER VALID TIME` d (`EVAL UNDER RULES EFFECTIVE AT` d `1(5A) — the requirements are met`)
+```
+
+They are still two axes, and keeping them apart buys a question the statute
+cannot ask: *these* facts, on *that* day, under a **different** version of the
+text. That is how the file isolates what the 2005 amendment did — one case
+runs the same adoption under the 2004 words and the 2006 words and gets
+different answers.
+
+Its eight cases are the reason to read it: an adopter naturalised two years
+*after* the order (not met, though a plain Boolean field would say met), one
+naturalised *on* the day (met — the interval start is inclusive), citizenship
+held and then renounced before the order (not met, which a single Boolean
+cannot express at all), and the joint-adoption limbs, where (a) wants one of
+the adopters and (b) wants both.
