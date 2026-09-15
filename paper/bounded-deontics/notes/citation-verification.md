@@ -128,4 +128,12 @@ and how do they tackle state-space explosion?" Feeds `draft/section-permission-a
   (MCMAS/deontic interpreted systems) use generic OBDD/POR/BMC; (3) planning landmarks
   = dominators dodge the product via delete-relaxation (Hoffmann–Porteous–Sebastia 2004;
   Helmert–Domshlak 2009; Richter–Westphal 2010). Lomuscio & Sergot 2003 srctag still
-  needs a bib entry + primary-source check before camera-ready.
+  needs a bib entry before camera-ready. **Primary-source check DONE 2026-09-16** in
+  `specs/todo/lexipedia-superset/LTS-VISUALISER.md` §2.2 (VERIFIED block), from the author
+  copies filed in `~/Dropbox/Documents/papers/misc/`: _Deontic Interpreted Systems_,
+  _Studia Logica_ 75(1):63-92, 2003, DOI 10.1023/A:1026176900459; the companion _J. Applied
+  Logic_ 2(1):93-116, 2004, DOI 10.1016/j.jal.2004.01.005; and MCMAS, CAV 2009, LNCS
+  5643:682-688, DOI 10.1007/978-3-642-02658-4_55. One consequence for the draft: the 2003
+  paper does not name MCMAS (it predates it; the tool is CAV 2009), so the
+  "\textsc{mcmas}-style verifiers" clause in `section-permission-and-explosion.tex` now
+  cites Lomuscio, Qu & Raimondi 2009 beside LS 2003 — the bib needs both entries.

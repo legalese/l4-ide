@@ -20,9 +20,14 @@
 --   concluded a breach. Symboleo's state for the same thing is @Violation@.
 -- * 'Lapsed' is this spec's own coinage (§4.2a; R12 ANSWERED 2026-09-16):
 --   an @ROR@ alternative that is definitively lost while the compound is
---   not violated. Symboleo has no compound obligations and so no such
---   state; its @Discharge@ and @Unsuccessful Termination@ are both
---   cancellations without breach and would erase the blame this carries.
+--   not violated. Symboleo has one lifecycle per obligation instance; an
+--   alternative there is either a separate obligation (simply in
+--   @Violation@) or a disjunct of one obligation's consequent (@POr@,
+--   thesis Listing A.1), and neither encoding has a state for "this
+--   disjunct is lost but the obligation stands". Its @Discharge@ (reached
+--   by @Expired@ from @Create@ or by @Discharged@ from @InEffect@) and
+--   @Unsuccessful Termination@ are both cancellations without breach and
+--   would erase the blame this carries.
 -- * 'Awaiting' is the join state §4.9 asks for: a barrier's continuation,
 --   marked but not enabled until its 'Threshold' is met. It has no
 --   Symboleo name; it is the Petri-net "place with too few tokens".
