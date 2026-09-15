@@ -1,6 +1,7 @@
 # `etc/lts-reader-proxy` — materials for an LLM-reader PROXY of the §7.3 gate
 
-**Status (2026-09-16): prepared, not run.** Nothing in this directory is a verdict on the gate.
+**Status (2026-09-16): prepared, and run the same day as a proxy — see [`RESULTS.md`](./RESULTS.md)
+and the raw scored rows in `results.json`.** Nothing in this directory is a verdict on the gate.
 
 `specs/todo/lexipedia-superset/LTS-VISUALISER.md` §7.3 gates the two-plane picture (P2d/P2e) on a
 **reader** experiment: can readers answer _what do I owe, what discharges it, what breaches it_

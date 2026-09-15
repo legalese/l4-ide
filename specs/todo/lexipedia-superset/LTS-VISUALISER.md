@@ -1695,6 +1695,14 @@ leads with.
 > paragraph called §7.3's second conjunct "satisfied" when no reader was measured. Each is now
 > stated as measured.
 
+**PROXY RUN 2026-09-16, for P2a′.** An LLM-reader _proxy_ of the P2a′ reader experiment was run
+over four contracts — the list, the DOT source and the BPMN XML, each read as text by fresh LLM
+readers with no tools — and is written up in §7.7 and `etc/lts-reader-proxy/RESULTS.md`. Pooled:
+list 50/80, DOT 71/80, BPMN 66/80; on Q1–Q3 the list is 39/48 against 41/48 and 42/48, on Q4–Q5
+11/32 against 30/32 and 24/32. It is **not** the gate — no person, no picture, no cognitive-load
+measure — and §7.7 says what it can and cannot support. The staging table above is left for the
+integrator.
+
 ### 7.3 The gate
 
 > **Build P2d/P2e only if P2a′ shows that readers cannot answer "what do I owe, what discharges
@@ -1706,8 +1714,9 @@ Both experiments together cost about three days. B1-B3 plus P2d plus P2e cost co
 and §4.7 says the layout half is under-costed even now. Spending the three days first is the
 whole of revision 2's staging argument.
 
-**PREPARED 2026-09-16 — materials for an LLM-reader _proxy_ of this gate, on `lts/p2a-prime-proxy`.
-Not run; no verdict.** The gate is a reader experiment and no human has been shown anything. What
+**PREPARED 2026-09-16 — materials for an LLM-reader _proxy_ of this gate, on `lts/p2a-prime-proxy`;
+RUN the same day, as a proxy — results in §7.7 and `etc/lts-reader-proxy/RESULTS.md`. No verdict
+on the gate.** The gate is a reader experiment and no human has been shown anything. What
 exists is `etc/lts-reader-proxy/` (its `README.md` is the authoritative description): for four
 contracts, at one fixed position each, the three artifacts a reader would be given — **A** the
 `l4 lts` list at default flags, **B** the `l4 state-graph` DOT for the rule, **C** the P1 BPMN
@@ -2000,7 +2009,93 @@ readers against the same contract drawn by `stateGraphToDot` and P1's BPMN, and 
 can answer the three questions from the list. That cannot be run from a build session, and it
 has not been. This section records that the list exists and what it says; it records **no
 verdict** on whether the picture beats it, and nothing below P2d should be read as unblocked by
-it.
+it. An LLM-reader _proxy_ was run on 2026-09-16 (§7.7); it changes nothing in this paragraph.
+
+### 7.7 The §7.3 gate — an LLM-reader proxy, RUN 2026-09-16
+
+**RUN 2026-09-16, on `lts/p2a-prime-proxy`, as a PROXY. This section decides nothing about the
+gate.** Full write-up, per-reading rationales and the raw scored rows:
+`etc/lts-reader-proxy/RESULTS.md` and `results.json`; every number here is computed from that
+file.
+
+**Method.** The materials §7.3's PREPARED block describes: four contracts at one fixed position
+each (`contracts`, `every-run-example`, `tenancy`, `promissory-note`), three artifacts each — **A**
+the `l4 lts` list at default flags, **B** the `l4 state-graph` DOT source _as text_, **C** the P1
+BPMN XML _as text_ (B and C readers also got the position in plain words, `history.txt`; A readers
+got only the list). Readers: two Claude models, recorded as `haiku` and `sonnet`; each reading a
+fresh single-turn conversation, **no tools**, one artifact and the five questions, nothing else;
+**two repeats** per (contract, artifact, model) — 48 readings, 240 answers. Judge: an LLM scoring
+each answer 0/1 against `truth.json` with a rationale; a "cannot tell" verdict where the truth is
+definite scores 0, an incomplete answer that asserts nothing wrong scores 1. **Not recorded** and
+to be committed on a rerun: the exact model identifiers, the wrapper prompt, the judge's model and
+prompt.
+
+**Accuracy, correct/readings** (a per-contract cell is 2 models × 2 repeats; pooled is 16):
+
+| contract            | artifact   | Q1        | Q2        | Q3        | Q4        | Q5        | all                                  |
+| ------------------- | ---------- | --------- | --------- | --------- | --------- | --------- | ------------------------------------ |
+| `contracts`         | A / B / C  | 4 / 4 / 4 | 1 / 4 / 4 | 4 / 4 / 4 | 2 / 4 / 4 | 0 / 4 / 4 | 11 / 20 / 20 of 20                   |
+| `every-run-example` | A / B / C  | 4 / 4 / 4 | 4 / 4 / 4 | 4 / 4 / 4 | 2 / 4 / 4 | 4 / 4 / 4 | 18 / 20 / 20 of 20                   |
+| `tenancy`           | A / B / C  | 4 / 3 / 4 | 1 / 4 / 4 | 4 / 2 / 4 | 3 / 4 / 4 | 0 / 4 / 0 | 12 / 17 / 16 of 20                   |
+| `promissory-note`   | A / B / C  | 4 / 2 / 2 | 2 / 3 / 2 | 3 / 3 / 2 | 0 / 3 / 2 | 0 / 3 / 2 | 9 / 14 / 10 of 20                    |
+| **pooled**          | **A** list | 16/16     | 8/16      | 15/16     | 7/16      | 4/16      | **50/80** (Q1–Q3 39/48, Q4–Q5 11/32) |
+|                     | **B** DOT  | 13/16     | 15/16     | 13/16     | 15/16     | 15/16     | **71/80** (Q1–Q3 41/48, Q4–Q5 30/32) |
+|                     | **C** BPMN | 14/16     | 14/16     | 14/16     | 14/16     | 10/16     | **66/80** (Q1–Q3 42/48, Q4–Q5 24/32) |
+
+By model: haiku A 22/40, B 33/40, C 36/40; sonnet A 28/40, B 38/40, C 30/40. The two repeats of
+a cell agreed exactly in 16 of 24 cells.
+
+**The misses, sorted before they are read** (53 of 240; classification from the judge rationales):
+the list's 30 are **25 "cannot tell"**, 3 incomplete, 2 wrong; the DOT's 9 are 7 wrong, 2 vague,
+0 "cannot tell"; the BPMN's 14 are **13 wrong**, 1 "cannot tell". The list fails loudly; the
+pictures-as-text fail silently.
+
+**What the proxy can say** (each with its evidence in RESULTS.md §3):
+
+1. **On Q1 and Q3 the list is not beaten** — 16/16 and 15/16 against 13/16, 13/16 (DOT) and
+   14/16, 14/16 (BPMN). All five Q1 misses are on the pictures and all five are definite wrong
+   answers.
+2. **The list's Q2 loss (8/16) is entirely `WhatIf`'s refusal of open pattern variables.** All
+   eight misses are on the three contracts whose `A.txt` prints _"the action binds `return` /
+   `amount` / `Amount Transferred`, which the what-if cannot choose"_
+   (`jl4-core/src/L4/Lts/WhatIf.hs:510`, printed by `L4/Lts/List.hs:216` under _What could not
+   be tried_); on `every-run-example`, the one contract where the act could be tried, the list
+   is 4/4. The readers who scored 1 inferred what the list did not print. This points at a
+   list-side repair, re-measurable with the same materials, before any picture.
+3. **On Q4–Q5 the list loses badly (11/32 vs 30/32 and 24/32), in §1.1a's direction — and
+   §1.1a's reason is only half right.** All four of the list's Q5 hits are `every-run-example`,
+   where the list itself prints the `→ then:` continuation one step deep (§7.6); it printed
+   nothing on the other three because the what-if was refused (point 2). The residual, measured
+   claim is Q4: the list gives the event history, not the branch taken (`contracts`: sonnet
+   reconstructed the `ELSE` branch from the history twice, haiku said "cannot tell" twice;
+   `promissory-note`: 0/4, and A readers alone were not told the April payment was refused).
+4. **The BPMN's wrong answers are the exporter's documented losses read back as facts.**
+   `tenancy` Q5 0/4: three readers said receipts wait for _all_ tenants — `[P-FORK] lossy` in
+   `tenancy/C.fidelity.txt` verbatim, _"what is drawn fires once, for the group"_.
+   `promissory-note`, sonnet 2/10: both readings credited the refused April payment — the
+   `PROVIDED` guard is an opaque `conditionExpression` (`[F4]`), the deadline a text boundary
+   (`[P-DEADLINE]`); haiku 8/10 with Q3 wrong twice, asserting `Boundary_4` fires when its own
+   `<documentation>` says nothing can fire it.
+5. **The DOT source as text is the best artifact** — 71/80, 10 of 16 readings perfect; its
+   misses are 7 confident wrong answers, 6 of them on the note.
+
+**What the proxy cannot decide — the gate.** (i) §7.3 is about people; no person read anything,
+and an LLM that infers an unprinted discharge is not evidence a member of the public would.
+(ii) It measures right answers, not cognitive load — the quantity §7.4's warrant is about and the
+one §7.4 says animation does _not_ move. (iii) B and C were read as text: "DOT beats BPMN" here
+means one serialisation was easier to read than another, and says nothing about a drawing.
+(iv) A readers were disadvantaged on the note by design (day serials unconverted), which
+confounds that contract's Q4 column. (v) The judge is an LLM, and "cannot tell = 0" is a choice
+that costs the list 25 of its 30 misses and the pictures almost nothing; it is the right rule for
+_can the reader answer_ and the wrong rule for _does the artifact mislead_, and those two
+questions have opposite answers on this data. (vi) Four contracts, two models, two repeats, no
+intervals: a one- or two-answer difference in a column of sixteen is within what a rerun could
+reverse. **Nothing here passes or fails §7.3.** The staging table in §7.2 is the integrator's.
+
+_What would move it, in cost order, none decided here:_ repair the open-binder what-if and rerun
+the same 48 readings; equalise the note's calendar conversion across A/B/C; commit model ids,
+prompts and judge with the rows; a vision run with B and C rendered, to separate content from
+drawing; and then the reader experiment §7.3 actually asks for.
 
 ---
 
