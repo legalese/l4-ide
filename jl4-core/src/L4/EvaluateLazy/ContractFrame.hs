@@ -88,6 +88,14 @@ data ContractFrame
   | Barrier5 BarrierFailStampFrame
   -- ^ EVERY, the barrier: a FAILING member's anchor, forced, so the earliest
   -- failure can be picked out once every member has run (R-T3, spec §6.1).
+  | Barrier5c BarrierFailPosFrame
+  -- ^ EVERY, the barrier: the same failing member's stream position — how
+  -- far into the stream the event that revealed (or, for @SHANT@, WAS) the
+  -- failure stands — forced, so that two failures at the same stamp are
+  -- ordered by the stream before anything else: two @SHANT@ members violated
+  -- by two events at one stamp are two failures with two residuals, and the
+  -- @LEST@ must be handed the residual of the one the stream reached first
+  -- (spec §11.0.1 "Stacking B on C", round 1).
   | Barrier5b BarrierFailDueFrame
   -- ^ EVERY, the barrier: the same failing member's absolute deadline,
   -- forced, so that two failures the same event revealed can be ordered by
@@ -123,6 +131,10 @@ data ScrutinizeEvents = ScrutinizeEvents
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , time :: Reference
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
   , armed :: Reference
     -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
@@ -140,6 +152,10 @@ data ScrutinizeEvent = ScrutinizeEvent
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , events :: Reference, time :: Reference, ev'reoffered :: Bool
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
   , armed :: Reference
     -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
@@ -150,6 +166,10 @@ data CurrentTimeWHNF = CurrentTimeWHNF
   , ev'party :: Reference, ev'act :: Reference, ev'time :: Reference
   , events :: Reference, time :: Reference, ev'reoffered :: Bool
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
   , armed :: Reference
     -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
@@ -160,6 +180,10 @@ data ScrutinizeDue = ScrutinizeDue
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
   , events :: Reference, time :: Reference, ev'reoffered :: Bool
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
   , armed :: Reference
     -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
@@ -172,6 +196,10 @@ data ScrutinizeAnchor = ScrutinizeAnchor
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
   , events :: Reference, time :: WHNF, ev'reoffered :: Bool
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
   , armed :: Reference
   , duration :: RExpr        -- ^ the @d@ of @WITHIN d OF …@, evaluated once the anchor is known
   }
@@ -182,6 +210,10 @@ data CheckTiming = CheckTiming
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
   , events :: Reference, time :: WHNF, ev'reoffered :: Bool
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
   , armed :: Reference
     -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   , anchorT :: Maybe Rational
@@ -198,6 +230,10 @@ data PartyWHNF = PartyWHNF
   , ev'party :: Reference, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
   , armed :: Reference
     -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
@@ -208,6 +244,10 @@ data PartyEqual = PartyEqual
   , ev'party :: Reference, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
   , armed :: Reference
     -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
@@ -218,6 +258,10 @@ data ScrutinizeParty = ScrutinizeParty
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
   , armed :: Reference
     -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
@@ -228,6 +272,10 @@ data ScrutinizeEnvironment = ScrutinizeEnvironment
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
   , armed :: Reference
     -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
@@ -238,6 +286,10 @@ data ScrutinizeActions = ScrutinizeActions
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment, henceEnv :: Environment -- ^ the environment to extend by when evaluating the hence clause
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
   , armed :: Reference
   }
   deriving stock Show
@@ -247,6 +299,10 @@ data ActionDoesn'tmatch = ActionDoesn'tmatch
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
   , armed :: Reference
     -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
@@ -376,9 +432,14 @@ data BarrierStepFrame = BarrierStepFrame
 data BarrierFailure
   = BarrierFailedAt
       { failAt      :: Rational    -- ^ the anchor the machine computed for the miss, forced
+      , failPos     :: Int
+        -- ^ the stream position of the event that revealed the miss (for
+        -- @SHANT@, the violating event itself), forced ('Barrier5c'): the
+        -- first tie-break when two failures share a 'failAt' — the earlier
+        -- in the stream wins, and only the same event ties
       , failDue     :: Maybe Rational
         -- ^ the member's absolute act deadline, forced ('Barrier5b'): the
-        -- tie-break when two failures share a 'failAt'
+        -- tie-break when two failures share a 'failAt' AND a 'failPos'
       , failTimeRef :: Reference   -- ^ …and as the reference the @LEST@ is handed
       , failEvsRef  :: Reference   -- ^ the residual stream that followed the miss
       , failDueRef  :: Maybe Reference
@@ -391,11 +452,16 @@ data BarrierFailure
     -- 'failAt' is the sentinel's anchor forced, and 'failTimeRef' the same
     -- value as the reference the @LEST@ is handed, so the ordering key IS the
     -- anchor. Today it reads the revealing event's stamp (spec §5.2's
-    -- deadline anchor is not built), which orders by the missed deadline up
-    -- to ties — a tie is the same revealing event, so the same anchor and
-    -- residual either way; but NOT the same @THE DEADLINE@ (R-Q7B), so a
-    -- tie is broken by 'failDue', the deadline actually missed, and only
-    -- then by roll order (see 'barrierFinish', 'earliestFailure').
+    -- deadline anchor is not built). For @MUST@\/@DO@\/@MAY@ that orders by
+    -- the missed deadline up to ties, and a tie is the same revealing event;
+    -- for @SHANT@ the stamp is the violating event's own, and two members
+    -- violated at one stamp by two events are two failures with two
+    -- residuals. So a tie on 'failAt' is broken first by 'failPos' — the
+    -- stream position, which only the same event ties — then by 'failDue',
+    -- the deadline actually missed (the same event can reveal two deadlines,
+    -- and @THE DEADLINE@ in the @LEST@ reads the chosen member's, R-Q7B), and
+    -- only then by roll order, which by then names the same anchor, residual
+    -- and deadline either way (see 'barrierFinish', 'earliestFailure').
   | BarrierBreached
       { failReason :: ReasonForBreach Reference }
     -- ^ the member's own breach — a barrier WITHOUT a @LEST@ mints no
@@ -414,15 +480,28 @@ data BarrierFailStampFrame = BarrierFailStampFrame
   { step    :: BarrierStepFrame
   , timeRef :: Reference           -- ^ the failure's anchor, being forced
   , evsRef  :: Reference           -- ^ the stream the failing member handed back
+  , posRef  :: Reference           -- ^ the failure's stream position, forced next ('Barrier5c')
+  , dueRef  :: Maybe Reference     -- ^ the failing member's absolute deadline, if it had one
+  }
+  deriving stock Show
+
+-- | The failing member's stream position is being forced ('Barrier5c'), its
+-- anchor already known.
+data BarrierFailPosFrame = BarrierFailPosFrame
+  { step    :: BarrierStepFrame
+  , failAt  :: Rational            -- ^ the failure's anchor, forced by 'Barrier5'
+  , timeRef :: Reference           -- ^ …and as a reference
+  , evsRef  :: Reference           -- ^ the stream the failing member handed back
   , dueRef  :: Maybe Reference     -- ^ the failing member's absolute deadline, if it had one
   }
   deriving stock Show
 
 -- | The failing member's absolute deadline is being forced ('Barrier5b'),
--- its anchor already known.
+-- its anchor and stream position already known.
 data BarrierFailDueFrame = BarrierFailDueFrame
   { step    :: BarrierStepFrame
   , failAt  :: Rational            -- ^ the failure's anchor, forced by 'Barrier5'
+  , failPos :: Int                 -- ^ the failure's stream position, forced by 'Barrier5c'
   , timeRef :: Reference           -- ^ …and as a reference
   , evsRef  :: Reference           -- ^ the stream the failing member handed back
   , dueRef  :: Reference           -- ^ the deadline, being forced
@@ -469,6 +548,7 @@ data ResolvePartyFrame = ResolvePartyFrame
   , env :: Environment       -- ^ environment in which to run the followup
   , events :: Reference      -- ^ remaining event stream (passed on to 'continueWithFollowup')
   , time :: Reference        -- ^ the (already-allocated) event time
+  , seen :: Int              -- ^ the stream position of the revealing event (see 'ScrutinizeEvents')
   , lifecycle :: Lifecycle   -- ^ what the followup may anchor to (R-Q7B)
   }
   deriving stock Show

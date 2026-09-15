@@ -1,9 +1,9 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-run-stack.l4:61:1-65:20:
+run-stack.l4:64:1-68:20:
   FULFILLED
-run-stack.l4:67:1-71:20:
+run-stack.l4:70:1-74:20:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -17,9 +17,9 @@ run-stack.l4:67:1-71:20:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       10
-run-stack.l4:77:1-81:20:
+run-stack.l4:80:1-84:20:
   FULFILLED
-run-stack.l4:83:1-87:20:
+run-stack.l4:86:1-90:20:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -33,7 +33,7 @@ run-stack.l4:83:1-87:20:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       10
-run-stack.l4:101:1-104:50:
+run-stack.l4:104:1-107:50:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -47,7 +47,7 @@ run-stack.l4:101:1-104:50:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       10
-run-stack.l4:106:1-109:50:
+run-stack.l4:109:1-112:50:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -61,9 +61,9 @@ run-stack.l4:106:1-109:50:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       10
-run-stack.l4:130:1-134:20:
+run-stack.l4:133:1-137:20:
   FULFILLED
-run-stack.l4:136:1-140:20:
+run-stack.l4:139:1-143:20:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -77,7 +77,7 @@ run-stack.l4:136:1-140:20:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       10
-run-stack.l4:142:1-146:20:
+run-stack.l4:145:1-149:20:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -91,7 +91,41 @@ run-stack.l4:142:1-146:20:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       10
-run-stack.l4:164:1-166:20:
+run-stack.l4:165:1-169:20:
+  FULFILLED
+run-stack.l4:171:1-175:20:
+  FULFILLED
+run-stack.l4:182:1-186:20:
+  FULFILLED
+run-stack.l4:188:1-191:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      19
+run-stack.l4:193:1-196:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      19
+run-stack.l4:214:1-216:20:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY

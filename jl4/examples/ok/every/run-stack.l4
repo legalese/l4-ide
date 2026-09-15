@@ -10,11 +10,14 @@ IMPORT prelude
 --
 -- Stacked, these must name the SAME member: THE DEADLINE under a barrier's
 -- LEST is the deadline of the member whose failure the LEST is anchored at
--- — the earliest failure — wherever that member stands on the roll, and
--- also when two misses come to light at the same event (then the earlier
--- deadline wins the tie, not the earlier roll position). Every trace below
--- pins the number that rule produces; the comment says what a different
--- rule would have produced instead.
+-- — the earliest failure — wherever that member stands on the roll. Two
+-- failures at the same stamp are ordered by the stream first (two SHANT
+-- violations at one stamp are two events, and the LEST gets the residual
+-- of the one the stream reached first), then by the deadline missed (two
+-- misses the same event revealed), and only then by roll position, which by
+-- then names the same anchor, residual and deadline either way. Every trace
+-- below pins the number that rule produces; the comment says what a
+-- different rule would have produced instead.
 
 DECLARE Actor IS ONE OF
     Landlord HAS name IS A STRING
@@ -144,6 +147,53 @@ GIVETH A DEONTIC Actor Action
   PARTY bob   DOES Smoke bob   AT 10
   PARTY theLandlord DOES Refund theLandlord AT 11
   (`WAIT UNTIL` 20)
+
+
+§ `4b. SHANT at one stamp: two events, two residuals — the stream orders`
+
+-- Bob (window 14) and Carol (window 5) BOTH smoke at 3, Bob's event first,
+-- and the landlord refunds at 3 BETWEEN the two violations. Two failures
+-- at one stamp, but two different events: Bob's residual stream still holds
+-- the refund, Carol's does not. The LEST is anchored at the failure the
+-- stream reached first — Bob's — so THE DEADLINE is his window end, 14, the
+-- refund is due 19, and the refund at 3 discharges it: FULFILLED, on both
+-- rolls. (Ordered by the window's end instead — Carol's 5 — the refund
+-- would be dropped from the residual and the verdict BREACHED at 20
+-- reporting 10, on both rolls: measured 2026-09-16 before the stream key
+-- was added. Ordered by the roll, FULFILLED on `tenants` and BREACHED on
+-- `tenants, reversed`: the blame set alone, measured on its own branch.)
+#TRACE `no smoking` tenants AT 0 WITH
+  PARTY bob   DOES Smoke bob   AT 3
+  PARTY theLandlord DOES Refund theLandlord AT 3
+  PARTY carol DOES Smoke carol AT 3
+  (`WAIT UNTIL` 20)
+
+#TRACE `no smoking` `tenants, reversed` AT 0 WITH
+  PARTY bob   DOES Smoke bob   AT 3
+  PARTY theLandlord DOES Refund theLandlord AT 3
+  PARTY carol DOES Smoke carol AT 3
+  (`WAIT UNTIL` 20)
+
+-- The same two violations with the refund AFTER both. Bob's failure is
+-- still the first in the stream, so THE DEADLINE is 14 and the refund is
+-- due 19: at 11 FULFILLED; at 20 BREACHED reporting 19, on both rolls.
+-- (By the window's end the refund would be due 10: the one at 11 BREACHED
+-- reporting 10.)
+#TRACE `no smoking` tenants AT 0 WITH
+  PARTY bob   DOES Smoke bob   AT 3
+  PARTY carol DOES Smoke carol AT 3
+  PARTY theLandlord DOES Refund theLandlord AT 11
+  (`WAIT UNTIL` 20)
+
+#TRACE `no smoking` tenants AT 0 WITH
+  PARTY bob   DOES Smoke bob   AT 3
+  PARTY carol DOES Smoke carol AT 3
+  PARTY theLandlord DOES Refund theLandlord AT 20
+
+#TRACE `no smoking` `tenants, reversed` AT 0 WITH
+  PARTY bob   DOES Smoke bob   AT 3
+  PARTY carol DOES Smoke carol AT 3
+  PARTY theLandlord DOES Refund theLandlord AT 20
 
 
 § `5. RAND of two anchored continuations, both breached`

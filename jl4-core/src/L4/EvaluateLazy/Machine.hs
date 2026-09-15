@@ -1124,8 +1124,9 @@ backward val = withPoppedFrame $ \ case
             "expected a time stamp, and a list of events but found: " <> foldMap prettyLayout rs'
         -- this is the arming point: the clock now is what THE ARMING will
         -- name in this obligation's continuation (R-Q7B), so keep it —
-        -- 'time' itself advances with every scrutinised event
-        pushFrame (ContractFrame (Contract1 ScrutinizeEvents {armed = time, ..}))
+        -- 'time' itself advances with every scrutinised event; no event has
+        -- been taken from the stream yet
+        pushFrame (ContractFrame (Contract1 ScrutinizeEvents {armed = time, seen = 0, ..}))
         continueRef events
       ValQuantified env deonton -> do
         -- EVERY meets its event stream: this is the arming point, so the roll
@@ -1538,7 +1539,9 @@ backwardContractFrame val = \ case
     case val of
       ValCons e es -> do
         ev'reoffered <- isReoffered e
-        pushCFrame (Contract2 ScrutinizeEvent {events = es, ..})
+        -- one more event taken: 'seen' is now this event's position in the
+        -- stream, which is what a barrier orders same-stamp failures by
+        pushCFrame (Contract2 ScrutinizeEvent {events = es, seen = seen + 1, ..})
         continueRef e
       ValNil -> continueBackward (ValObligation env party act due followup lest)
       _ -> internalException $ RuntimeTypeError $
@@ -1669,14 +1672,14 @@ backwardContractFrame val = \ case
                   -- this event was already re-offered once and has now
                   -- revealed a second expiry: consume it (see NOTE above)
                   t <- allocateValue ev'time
-                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events, time = t, lifecycle = lifecycleAt isHence t})
+                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events, time = t, seen, lifecycle = lifecycleAt isHence t})
                   maybeEvaluate env party
               | otherwise = do
                   ev'timeR <- allocateValue ev'time
                   evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
                   markReoffered evR
                   eventsR <- allocateValue (ValCons evR events)
-                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = ev'timeR, lifecycle = lifecycleAt isHence ev'timeR})
+                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = ev'timeR, seen, lifecycle = lifecycleAt isHence ev'timeR})
                   maybeEvaluate env party
         case act.modal of
           DMustNot ->
@@ -1742,7 +1745,7 @@ backwardContractFrame val = \ case
               deadlineR <- absoluteDeadline time due
               -- LEST: the join did not fire, so no THE JOIN (R-Q7B)
               let lifecycle = MkLifecycle {join = Nothing, deadline = deadlineR, armed}
-              continueWithFollowup (Just (partyKeyWHNF party)) lifecycle (env `Map.union` henceEnv) lestFollowup events timeR
+              continueWithFollowup (Just (partyKeyWHNF party)) lifecycle (env `Map.union` henceEnv) lestFollowup events timeR seen
             -- No LEST clause: immediate breach
             Nothing -> do
               -- Extract timestamp from time (which has been updated to event time)
@@ -1768,7 +1771,7 @@ backwardContractFrame val = \ case
             -- continuation counts from here, so OF THE JOIN is the default
             -- said out loud)
             let lifecycle = MkLifecycle {join = Just timeR, deadline = deadlineR, armed}
-            continueWithFollowup (Just (partyKeyWHNF party)) lifecycle (env `Map.union` henceEnv) followup events timeR
+            continueWithFollowup (Just (partyKeyWHNF party)) lifecycle (env `Map.union` henceEnv) followup events timeR seen
       ValBool False -> do
         newTime <- allocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
@@ -1778,7 +1781,7 @@ backwardContractFrame val = \ case
     -- 'val' is the obligation party, now forced to WHNF by 'maybeEvaluate env party'
     -- on the deadline-passed / LEST path. Key it exactly as the matched HENCE path
     -- does, so a RECORD in the followup/reparation attributes to the real party.
-    continueWithFollowup (Just (partyKeyWHNF val)) lifecycle env followup events time
+    continueWithFollowup (Just (partyKeyWHNF val)) lifecycle env followup events time seen
   -- R-Q7B: the continuation's value, about to meet its [time, events]: make
   -- the anchors inside it name THIS hand-off's obligation, whatever
   -- environment the value happened to capture ('rebindLifecycle').
@@ -1826,7 +1829,7 @@ backwardContractFrame val = \ case
     case val of
       ValConstructor n args
         | n `sameResolved` checkpoint
-        , Just (dRef, tRef, evRef) <- sentinelArgs args -> do
+        , Just (dRef, _, tRef, evRef) <- sentinelArgs args -> do
         pushCFrame (Barrier2 BarrierStampFrame {step = BarrierStepFrame {..}, evsRef = evRef, dueRef = dRef})
         continueRef tRef
       -- The failure sentinel carries the anchor and the residual stream the
@@ -1835,14 +1838,16 @@ backwardContractFrame val = \ case
       -- run ('barrierFinish'), anchored at the EARLIEST failure, and no
       -- member is ever applied to the stream a second time. The anchor is
       -- forced here so the failures can be ordered. The sentinel also
-      -- carries the member's missed deadline (its third argument), which is
+      -- carries the stream position of the event that revealed the miss
+      -- (its third argument; forced next, 'Barrier5c') and the member's
+      -- missed deadline (its fourth, when it had one; 'Barrier5b'), which is
       -- what OF THE DEADLINE in the LEST names (R-Q5's act layer, R-Q7B):
       -- kept beside the anchor, so the LEST is handed the deadline of the
       -- member whose failure anchors it.
       ValConstructor n args
         | Just fp <- failpoint, n `sameResolved` fp
-        , Just (dRef, tRef, evRef) <- sentinelArgs args -> do
-        pushCFrame (Barrier5 BarrierFailStampFrame {step = BarrierStepFrame {..}, timeRef = tRef, evsRef = evRef, dueRef = dRef})
+        , Just (dRef, pRef, tRef, evRef) <- sentinelArgs args -> do
+        pushCFrame (Barrier5 BarrierFailStampFrame {step = BarrierStepFrame {..}, timeRef = tRef, evsRef = evRef, posRef = pRef, dueRef = dRef})
         continueRef tRef
       -- Still waiting. Keep the RESIDUAL ('val'), not the obligation as it
       -- stood before the scan ('current'): the residual is the one whose
@@ -1886,21 +1891,31 @@ backwardContractFrame val = \ case
     t <- assertTime val
     barrierJoined ctx t ctx.events Nothing
   -- EVERY, the barrier: a failing member's anchor, forced. Kept in roll
-  -- order; 'barrierFinish' picks the earliest. The member's deadline, when
-  -- it had one, is forced next ('Barrier5b'): it breaks a tie between two
-  -- failures the same event revealed.
+  -- order; 'barrierFinish' picks the earliest. The failure's stream position
+  -- is forced next ('Barrier5c'): it breaks a tie between two failures at
+  -- one stamp that two DIFFERENT events revealed (a SHANT barrier, where the
+  -- failure is the member's own violating event). Then the member's
+  -- deadline, when it had one ('Barrier5b'): it breaks a tie between two
+  -- failures the SAME event revealed.
   Barrier5 BarrierFailStampFrame {..} -> do
     stamp <- assertTime val
+    pushCFrame (Barrier5c BarrierFailPosFrame {step, failAt = stamp, timeRef, evsRef, dueRef})
+    continueRef posRef
+  Barrier5c BarrierFailPosFrame {..} -> do
+    pos <- case val of
+      ValNumber n -> pure (truncate n)
+      v -> internalException $ RuntimeTypeError $
+        "expected a NUMBER as a barrier sentinel's stream position but got: " <> prettyLayout v
     case dueRef of
       Nothing -> barrierNext step
-        { failures = BarrierFailedAt {failAt = stamp, failDue = Nothing, failTimeRef = timeRef, failEvsRef = evsRef, failDueRef = Nothing} : step.failures }
+        { failures = BarrierFailedAt {failAt, failPos = pos, failDue = Nothing, failTimeRef = timeRef, failEvsRef = evsRef, failDueRef = Nothing} : step.failures }
       Just d -> do
-        pushCFrame (Barrier5b BarrierFailDueFrame {step, failAt = stamp, timeRef, evsRef, dueRef = d})
+        pushCFrame (Barrier5b BarrierFailDueFrame {step, failAt, failPos = pos, timeRef, evsRef, dueRef = d})
         continueRef d
   Barrier5b BarrierFailDueFrame {..} -> do
     due <- assertTime val
     barrierNext step
-      { failures = BarrierFailedAt {failAt, failDue = Just due, failTimeRef = timeRef, failEvsRef = evsRef, failDueRef = Just dueRef} : step.failures }
+      { failures = BarrierFailedAt {failAt, failPos, failDue = Just due, failTimeRef = timeRef, failEvsRef = evsRef, failDueRef = Just dueRef} : step.failures }
   -- BREACH BY e: the party expression, forced. A LIST names each of its
   -- elements (walked one cell per step, like the roll call), ONE declared
   -- failure each, in the list's order and WITH duplicates — @BY LIST a, a@
@@ -2103,14 +2118,23 @@ backwardContractFrame val = \ case
     -- whatever its closure captured when it was built. The type checker only
     -- ever sees where an anchor is WRITTEN, which is why it refuses THE JOIN
     -- and THE DEADLINE at the top level: a value's anchor is resolved here.
-    continueWithFollowup :: Maybe Text -> Lifecycle -> Environment -> RExpr -> Reference -> Reference -> Machine Config
-    continueWithFollowup mParty lifecycle env followup events time = do
+    --
+    -- A barrier sentinel ('isSentinel') is handed two more things after the
+    -- @[time, events]@ every continuation receives: the stream position of
+    -- the event this hand-off happened at ('seen' — what a barrier orders
+    -- same-stamp failures by), and the obligation's absolute deadline when
+    -- it had one (what @OF THE DEADLINE@ in the barrier's @LEST@ names).
+    -- See 'sentinelArgs'.
+    continueWithFollowup :: Maybe Text -> Lifecycle -> Environment -> RExpr -> Reference -> Reference -> Int -> Machine Config
+    continueWithFollowup mParty lifecycle env followup events time seen = do
       mOriginal <- getCurrentParty
       putCurrentParty mParty
       pushFrame (RestoreCurrentParty mOriginal)
-      let args = case followup of
-            App _ r [] | isSentinel r -> [time, events] <> maybeToList lifecycle.deadline
-            _                         -> [time, events]
+      args <- case followup of
+        App _ r [] | isSentinel r -> do
+          posRef <- allocateValue (ValNumber (fromIntegral seen))
+          pure ([time, events, posRef] <> maybeToList lifecycle.deadline)
+        _ -> pure [time, events]
       pushFrame (App1 args Nothing)
       pushCFrame (Handoff lifecycle)
       continueExpr (bindLifecycle lifecycle env) followup
@@ -2410,9 +2434,10 @@ runQuantifiedFold ctx members mdue =
 -- NOTE for why the real LEST is never handed to a member.
 --
 -- Each sentinel is a constructor minted with 'defSentinel', which is what
--- lets the member's hand-off recognise it and pass it the member's absolute
--- deadline as a third argument (see 'continueWithFollowup') — how the
--- barrier learns the deadline a member met or missed without a second pass.
+-- lets the member's hand-off recognise it and pass it the hand-off's stream
+-- position and the member's absolute deadline as further arguments (see
+-- 'continueWithFollowup') — how the barrier learns where in the stream a
+-- member failed, and the deadline it met or missed, without a second pass.
 barrierMember
   :: QuantCtx -> Resolved -> Reference -> Maybe (Resolved, Reference)
   -> MemberDue -> CastMember -> WHNF
@@ -2427,13 +2452,14 @@ barrierMember ctx cp cpRef mfail mdue (mref, mval) =
       $ memberEnv ctx mdue mref
 
 -- | The arguments a barrier sentinel reports: the anchor and the residual
--- stream every continuation receives, then the member's absolute deadline
--- when it had one. See 'barrierMember' and 'continueWithFollowup'.
-sentinelArgs :: [Reference] -> Maybe (Maybe Reference, Reference, Reference)
+-- stream every continuation receives, then the stream position of the event
+-- the hand-off happened at, then the member's absolute deadline when it had
+-- one. See 'barrierMember' and 'continueWithFollowup'.
+sentinelArgs :: [Reference] -> Maybe (Maybe Reference, Reference, Reference, Reference)
 sentinelArgs = \ case
-  [tRef, evRef]       -> Just (Nothing, tRef, evRef)
-  [tRef, evRef, dRef] -> Just (Just dRef, tRef, evRef)
-  _                   -> Nothing
+  [tRef, evRef, pRef]       -> Just (Nothing, pRef, tRef, evRef)
+  [tRef, evRef, pRef, dRef] -> Just (Just dRef, pRef, tRef, evRef)
+  _                         -> Nothing
 
 -- | Mint a barrier sentinel: a fresh constructor whose unique is of sort
 -- @s@, used nowhere else, so 'isSentinel' can tell it from every other name.
@@ -2506,17 +2532,26 @@ barrierNext step = case step.queue of
 --     the EARLIEST failure. The ordering key is the sentinel's own anchor,
 --     forced ('failAt' is the same reference the @LEST@ is handed), so
 --     whatever §5.2 makes that anchor read, the ordering follows it. Today
---     it reads the revealing event's stamp, which orders by the missed
---     deadline UP TO TIES: every member scans the same stream, so an
---     earlier deadline is revealed by an earlier-or-equal event; two
---     deadlines revealed by the same event tie. A tie is the same event,
---     hence the same anchor and the same residual — but not the same
+--     it reads the revealing event's stamp. For @MUST@\/@DO@\/@MAY@ that
+--     orders by the missed deadline UP TO TIES: every member scans the same
+--     stream, so an earlier deadline is revealed by an earlier-or-equal
+--     event; two deadlines revealed by the same event tie. For @SHANT@ the
+--     stamp is the violating event's own, which the window's end does not
+--     order, and two members violated at one stamp are two DIFFERENT events
+--     with two different residuals — a tie there is NOT the same event. So
+--     a tie on the stamp is broken first by the stream position ('failPos':
+--     the failure the stream reached first, whose residual still holds
+--     whatever followed it; measured before this key, a refund between two
+--     same-stamp violations was dropped from the chosen residual and the
+--     verdict flipped, spec §11.0.1 round 1), which only the same event
+--     ties — hence the same anchor and the same residual, but not the same
 --     deadline, and @OF THE DEADLINE@ in the @LEST@ reads the chosen
---     member's, so the tie is broken by the deadline missed ('failDue';
---     measured before this tie-break: `LIST alice, bob, carol` reported 19
---     and the reversed roll 10 for the same events) and only a tie on both
---     keeps the first in roll order, which then names the same deadline
---     either way. §5.2's change of what the anchor IS is not built here.
+--     member's, so that tie is broken by the deadline missed ('failDue';
+--     measured before this key: `LIST alice, bob, carol` reported 19 and the
+--     reversed roll 10 for the same events) — and only a tie on all three
+--     keeps the first in roll order, which then names the same anchor,
+--     residual and deadline either way. §5.2's change of what the anchor IS
+--     is not built here.
 --   * with no @LEST@, each failure is the member's own breach
 --     ('BarrierBreached'). The verdict is ONE breach: anchored at the
 --     earliest failure — the smallest missed deadline for @MUST@\/@DO@, the
@@ -2572,19 +2607,28 @@ barrierFinish step = case reverse step.failures of
 -- | The earliest of a barrier's failures, with its position in the order
 -- they were recorded (roll order): a later one replaces the best so far only
 -- when both carry a time and the later one's is strictly earlier — or the
--- times tie and both carry a deadline and the later one's deadline is
--- strictly earlier — so a tie on both keeps the first in roll order, and an
--- untimed failure ('ExplicitBreach', which no barrier member produces
--- today) neither wins nor loses. The second key only ever applies to
--- 'BarrierFailedAt' (a 'BarrierBreached' orders by its deadline already).
+-- times tie and the later one's stream position is strictly earlier — or
+-- both tie and both carry a deadline and the later one's deadline is
+-- strictly earlier — so a tie on all three keeps the first in roll order,
+-- and an untimed failure ('ExplicitBreach', which no barrier member produces
+-- today) neither wins nor loses. The second and third keys only ever apply
+-- to 'BarrierFailedAt' (a 'BarrierBreached' orders by its deadline already,
+-- and carries no position: with no @LEST@ there is no residual to hand on,
+-- so a same-stamp tie there falls to roll order, and names every failure
+-- regardless).
 earliestFailure :: NonEmpty BarrierFailure -> (Int, BarrierFailure)
 earliestFailure (f :| fs) = foldl' pick (0, f) (zip [1 ..] fs)
   where
     pick best@(_, b) cand@(_, c) = case (failureTime b, failureTime c) of
       (Just tb, Just tc)
         | tc < tb -> cand
-        | tc == tb, Just db <- failureDue b, Just dc <- failureDue c, dc < db -> cand
+        | tc == tb, Just pb <- failurePos b, Just pc <- failurePos c, pc < pb -> cand
+        | tc == tb, failurePos b == failurePos c
+        , Just db <- failureDue b, Just dc <- failureDue c, dc < db -> cand
       _ -> best
+    failurePos = \ case
+      BarrierFailedAt {failPos} -> Just failPos
+      BarrierBreached {}        -> Nothing
     failureDue = \ case
       BarrierFailedAt {failDue} -> failDue
       BarrierBreached {}        -> Nothing

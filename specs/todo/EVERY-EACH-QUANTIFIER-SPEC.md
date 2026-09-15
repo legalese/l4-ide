@@ -1774,12 +1774,18 @@ the last one as a build decision, not a ruling; see "refusals".)
 
 ##### 5.1.1.1 BUILT 2026-09-15 — the mechanism, and the decisions the ruling left to the build
 
-Built on `every/anchors`, cut from `unstable` `e578654c`, rebased onto `0b640727` on 2026-09-16. Witness:
+Built on `every/anchors`, cut from `unstable` `e578654c`, rebased onto `0b640727` on 2026-09-16 (and,
+on `every/anchors-on-blame`, onto `every/blame-set`'s `cedbf7e6` the same day — §11.0.1 "Stacking B on C"). Witness:
 `jl4/examples/ok/every/run-anchors.l4` (41 directives, each pinning one anchor to the deadline it
 produces, or what a residual prints; 27 at the first commit, 14 added by the adversarial pass —
 see the list at the end of §11.0.1's ledger entry); refusals witnessed by `jl4/examples/not-ok/tc/anchor-{top-level-join,lest-join,not-an-instant,no-deadline,on-join-line}.l4`;
-highlighting by `jl4/examples/lsp/semantic-tokens/anchors.l4`. Line numbers below are on the
-branch at the commit that carries this section (re-cited after the adversarial pass).
+highlighting by `jl4/examples/lsp/semantic-tokens/anchors.l4`. **Line numbers below are on
+`every/anchors` at `82c61419`** — its tip before the stack onto `every/blame-set`, where they were
+re-cited after the adversarial pass — and are NOT current on `every/anchors-on-blame`, where C's
+insertions shift every `Machine.hs`, `ContractFrame.hs`, `TypeCheck.hs`, `Types.hs`, `Syntax.hs`,
+`ValueLazy.hs`, `Print.hs` and `Backend/Jl4.hs` number (the `Parser.hs` cites still hold there).
+Read them with `git show 82c61419:<file>`; §11.0.1 "Stacking B on C" carries the live cites for
+the stacked tree.
 
 **Syntax.** `Deonton.due` and the join line's deadline both become `Maybe (Deadline n)`
 (`Syntax.hs:420`, `:491`, `:493`), where `Deadline n = MkDeadline Anno (Expr n) (Maybe (Anchor n))`
@@ -2335,9 +2341,11 @@ computeBlame bo tr =
 
 The sketch above is a design record and is left as it was written: `BarrierObligation`,
 `computeBlame` and `Set Party` do not exist in the tree. What the tree has, and what each decision
-below rests on, is recorded here against the branch's HEAD after the adversarial pass of
-2026-09-15 (the first build's shape is recorded where the pass reversed it, so a later reader can
-see what changed and why).
+below rests on, is recorded here against `every/blame-set`'s HEAD after the adversarial pass of
+2026-09-15 — **`cedbf7e6`; the line numbers below are on that commit** and are NOT current on
+`every/anchors-on-blame`, where B's insertions shift them (`git show cedbf7e6:<file>` reads them
+as cited; §11.0.1 "Stacking B on C" has the live cites for the stacked tree). The first build's
+shape is recorded where the pass reversed it, so a later reader can see what changed and why.
 
 **The ruling that decided the shape.** Meng, 2026-09-15, in session, after the first build had
 started: _"let's not bother deduping the ReasonForBreach -- maybe we need to be able to say, 'well,
@@ -2431,16 +2439,25 @@ only insofar as both operands were always run; it is new for the barrier.
   `ContractFrame.hs:298`; it is the same reference the `LEST` is handed), so whatever §5.2 makes the
   anchor read, the ordering follows — there is no second key to switch. Today the anchor reads the
   revealing event's stamp (§5.2's deadline anchor is NOT built here; the anchor's VALUE is untouched,
-  one change in one place for the §5.2 track), which orders by the missed deadline **up to ties**:
-  every member scans the same stream, so an earlier deadline is revealed by an earlier-or-equal
-  event; two deadlines revealed by the same event tie, the tie keeps the first in roll order, and
-  that is the same event — same anchor, same residual — so the answer cannot differ from ordering
-  by deadline. **Stacked under R-Q7B (2026-09-16, §11.0.1 "Stacking B on C") that last sentence
-  stopped being true**: the `LEST` also reads `THE DEADLINE` from the chosen member, and a tie on
-  the revealing event does differ there (measured 19 vs 10 across the two rolls), so a second key
-  was added — the deadline missed, `BarrierFailedAt.failDue`, forced by `Barrier5b` — and roll
-  order breaks only a tie on both, which names the same deadline either way. The anchor's VALUE
-  and the number of `LEST` firings are unchanged by it. (The first build's comment said "orders by the missed deadline" without the tie
+  one change in one place for the §5.2 track), which — **for `MUST`/`DO`/`MAY`** — orders by the
+  missed deadline **up to ties**: every member scans the same stream, so an earlier deadline is
+  revealed by an earlier-or-equal event; two deadlines revealed by the same event tie, the tie
+  keeps the first in roll order, and that is the same event — same anchor, same residual — so the
+  answer cannot differ from ordering by deadline. **For `SHANT` that reasoning does not hold, and
+  this build's roll-order tie-break was NOT harmless there** (found by round 1 of the stacked
+  branch's adversarial pass, 2026-09-16): a `SHANT` member's stamp is its own violating event's,
+  so two members violated at one stamp by two events are two failures with two residuals, and
+  which residual the `LEST` got depended on the roll — measured on this branch's own binary
+  (`cedbf7e6`, probe `H-shant-C.l4`: Bob smokes 3, the landlord refunds 3, Carol smokes 3,
+  `WAIT UNTIL 20`, unanchored `LEST … WITHIN 5`): `FULFILLED` on `LIST alice, bob, carol` and
+  `BREACHED` at 8 on the reversed roll, the same events. **Stacked under R-Q7B (2026-09-16, §11.0.1 "Stacking
+  B on C") the `MUST` sentence stopped being sufficient too**: the `LEST` also reads `THE DEADLINE`
+  from the chosen member, and a tie on the revealing event does differ there (measured 19 vs 10
+  across the two rolls). The stacked branch therefore orders a stamp tie by the stream position
+  first (`BarrierFailedAt.failPos`, forced by `Barrier5c`; only the same event ties it), then by
+  the deadline missed (`BarrierFailedAt.failDue`, forced by `Barrier5b`), and roll order breaks
+  only a tie on all three, which then names the same anchor, residual and deadline either way. The
+  anchor's VALUE and the number of `LEST` firings are unchanged by it. (The first build's comment said "orders by the missed deadline" without the tie
   qualifier; the pass measured deadlines 5 and 6 under one `WAIT UNTIL 10`, both rolls, and found
   the residual identical, `probes/gate/g7-stamp-tie.l4`.) `run-blame.l4`'s `staggered signing` pins
   it: Carol, last on the roll with five days, fails first, and the landlord's reparation is anchored
@@ -3261,7 +3278,11 @@ Raised and refuted by both checkers in round 2: none.
 
 #### Stacking B on C (2026-09-16) — `every/anchors` rebased onto `every/blame-set`, branch `every/anchors-on-blame`
 
-Witness `jl4/examples/ok/every/run-stack.l4`. B is the anchored `WITHIN` (three commits, this
+Witness `jl4/examples/ok/every/run-stack.l4`. Line numbers in this block are on the branch at the
+commit that applies round 1 of its adversarial pass (subject `lang(every): apply round 1 of the
+stack's adversarial pass …`; its ledger is the last paragraph of this block), which is the last
+commit to touch `Machine.hs` and `ContractFrame.hs`; the earlier stacking commit's numbers were
+superseded by that round and are not repeated. B is the anchored `WITHIN` (three commits, this
 section's block above); C is the blame set (§6.1.1, three commits). Both were cut from the same
 `origin/unstable` (`0b640727`) and both rewrote the barrier's failure path, so `git rebase --onto
 <C's HEAD> origin/unstable` conflicted in three files: `Machine.hs` (the `Barrier1` failpoint
@@ -3274,20 +3295,25 @@ arm, `barrierFinish`, `barrierFail`'s signature and haddock, the `Contract5` bre
 `-Werror` at the first attempt, before any repair.
 
 **How each hunk was resolved — both intents kept.** The `Barrier1` failpoint arm matches the
-sentinel with B's `sentinelArgs` (two or three arguments) and pushes C's `Barrier5` frame, now
-carrying the sentinel's third argument, the member's absolute deadline
-(`Machine.hs:1842-1846`; `BarrierFailStampFrame.dueRef`, `ContractFrame.hs:417`). `Barrier5`
-forces the anchor as C had it and records a `BarrierFailedAt` that carries B's deadline reference
-beside C's anchor (`failDueRef`, `ContractFrame.hs:384`). `barrierFinish` keeps C's shape —
-failures first, `earliestFailure` picks one, `lapsed` → `FULFILLED`, then pending, then the join —
-and hands `barrierFail` the CHOSEN failure's anchor, residual and deadline
-(`Machine.hs:2537`); its join tail is B's round-1 `barrierJoined` with `dueLatest`
-(`Machine.hs:2608-2618`), and the `tLast = Nothing` arm is B's internal error, which C's
-`lapsed` flag keeps unreachable (a lapsed `MAY` no longer returns through the join tail).
-`barrierFail` has B's four-argument signature and C's haddock about what the `LEST` names
-(`Machine.hs:2667`). `startBarrier`'s frame literal has both tracks' fields (`dueLatest`,
-`failures`, `lapsed`; `Machine.hs:2475-2476`). The `Contract5` breach line is C's `singleBlame`
-form with B's `reofferResolve False` (`Machine.hs:1696-1697`). `ContractFrame.hs` keeps all four
+sentinel with B's `sentinelArgs` (at the stacking commit two or three arguments; since round 1
+three or four, the stream position added — below) and pushes C's `Barrier5` frame, now carrying
+the sentinel's last argument, the member's absolute deadline
+(`Machine.hs:1848-1851`; `BarrierFailStampFrame.dueRef`, `ContractFrame.hs:484`). `Barrier5`
+forces the anchor as C had it and the chain ends in a `BarrierFailedAt` that carries B's deadline
+reference beside C's anchor (`failDueRef`, `ContractFrame.hs:445`). `barrierFinish` keeps C's
+shape — failures first, `earliestFailure` picks one, `lapsed` → `FULFILLED`, then pending, then
+the join — and hands `barrierFail` the CHOSEN failure's anchor, residual and deadline
+(`Machine.hs:2572`); its join tail is B's round-1 `barrierJoined` with `dueLatest`
+(`Machine.hs:2652-2661`), and the `tLast = Nothing` arm is B's internal error, which C's
+`lapsed` flag keeps unreachable (C's `Barrier1` records a lapsed `MAY` instead of returning it, so
+without the flag an all-`MAY`-lapsed barrier would reach this arm with no completion; on both
+parents a lapsed `MAY` fell through `Barrier1`'s catch-all and returned the barrier at once, never
+reaching the join tail — an earlier version of this sentence said it "no longer returns through
+the join tail", which described a history that did not exist). `barrierFail` has B's
+four-argument signature and C's haddock about what the `LEST` names (`Machine.hs:2711`).
+`startBarrier`'s frame literal has both tracks' fields (`dueLatest`, `failures`, `lapsed`;
+`Machine.hs:2501-2502`). The `Contract5` breach line is C's `singleBlame` form with B's
+`reofferResolve False` (`Machine.hs:1699-1700`). `ContractFrame.hs` keeps all four
 new records (`BarrierFailStampFrame`, `BreachByFrame`, `BarrierDueFrame`, `BarrierEmptyFrame`).
 `EVERY.md`'s "Runs" list is B's three widened bullets followed by C's blame bullet; its "coarser
 than it looks" list is C's corrected `LEST BREACH` bullet (B's copy still said R-T3 was unbuilt)
@@ -3296,36 +3322,41 @@ and the clock bullet with B's `OF THE DEADLINE` workaround sentence appended.
 **The interaction, as measured** (probe `probes/interaction.l4` in the session scratch, then the
 witness; binary built from this tree, `JL4_LIBRARY_PATH` pinned to its own libraries). C decides
 WHICH failure a barrier's `LEST` is anchored at — the earliest by R-Q5, `earliestFailure`
-(`Machine.hs:2580`) — and B decides what `THE DEADLINE` reads inside that `LEST`. Stacked, the
-rule is: **`THE DEADLINE` under a barrier's `LEST` is the act deadline of the member whose failure
-the `LEST` is anchored at — the earliest failure — and it is order-independent.** Measured, with
-Carol last on the roll and due at 5, Bob due at 14, Alice signing at 1:
+(`Machine.hs:2619-2641`) — and B decides what `THE DEADLINE` reads inside that `LEST`. Stacked,
+the rule is: **`THE DEADLINE` under a barrier's `LEST` is the act deadline of the member whose
+failure the `LEST` is anchored at — the earliest failure — and it is order-independent.** Measured,
+with Carol last on the roll and due at 5, Bob due at 14, Alice signing at 1:
 
 - a `LEST … WITHIN 5 OF THE DEADLINE`, Carol's miss revealed at 8 and Bob's at 20: the refund is
   due 5 + 5 = **10** on `LIST alice, bob, carol` and on the reversed roll (timely at 10, `BREACHED`
   reporting 10 at 11). Were it the first non-actor on the roll (Bob, 14) the refund would be due 19
   and both refunds timely.
 - a **tie** — both misses revealed by one `WAIT UNTIL 20` — is where the two tracks' rules pulled
-  apart. C's tie-break was roll order, harmless for C because the anchor (the revealing stamp) and
-  the residual are the same member-for-member; B reads a deadline from the chosen member, and the
-  merged tree as first resolved reported **19 on `tenants` and 10 on `tenants, reversed`** for the
-  same events. Fixed in this commit by a second ordering key: a tie on the anchor is broken by the
-  deadline missed (`BarrierFailedAt.failDue`, forced by the new `Barrier5b` frame,
-  `Machine.hs:1892-1903`, `ContractFrame.hs:91`; `earliestFailure`, `Machine.hs:2580-2589`), and
-  roll order breaks only a tie on both, which then names the same deadline either way. After the
-  fix: **10 on both rolls.** C's two invariants stand: the `LEST` fires once, and the anchor's
-  value is still the revealing event's stamp (20).
+  apart. C's tie-break was roll order, harmless for C **for `MUST`/`DO`/`MAY`** because there a
+  stamp tie is the same revealing event, so the anchor and the residual are the same
+  member-for-member (NOT harmless for `SHANT` — round 1, below); B reads a deadline from the
+  chosen member, and the merged tree as first resolved reported **19 on `tenants` and 10 on
+  `tenants, reversed`** for the same events. Fixed at the stacking commit by a second ordering
+  key: a tie on the anchor is broken by the deadline missed (`BarrierFailedAt.failDue`, forced by
+  the `Barrier5b` frame, `Machine.hs:1915-1918`, `ContractFrame.hs:99`; `earliestFailure`,
+  `Machine.hs:2619-2641`), and roll order breaks only a tie on every key, which then names the
+  same deadline either way. After the fix: **10 on both rolls.** C's two invariants stand: the
+  `LEST` fires once, and the anchor's value is still the revealing event's stamp (20).
 - a `SHANT` barrier: Carol smokes at 3 (R-Q5's failure time), Bob at 10; the `LEST` is anchored at
   Carol's violation and `THE DEADLINE` is her window's end, 5 (what a single `SHANT`'s `LEST` is
   handed): refund due **10**, both rolls. The primary key stays the anchor because for `SHANT` the
-  deadline is not the failure time; the two keys cannot disagree between a `MUST` and a `SHANT`
-  member of one barrier, since a barrier's members share one modal.
+  deadline is not the failure time — and the deadline does not order `SHANT` failures at all: Bob
+  (window 14) smoking at 2 and Carol (window 5) at 4 anchors at Bob, refund due 19, both rolls
+  (round 1 probe `R1-2-shant-order.l4`; `run-stack.l4` §4 cannot show this, since there stamp
+  order and window order agree). The keys cannot disagree between a `MUST` and a `SHANT` member of
+  one barrier, since a barrier's members share one modal.
 - a `RAND` of two anchored continuations both breached (`WITHIN 5 OF THE DEADLINE` → 15, `WITHIN 3
 OF THE JOIN` → 7, both revealed at 20): C's compound anchors at the left operand and names both
   entries, each with the deadline B's `Contract5` computed (`Machine.hs:1605`): **15, then 7**.
 
 **Goldens.** New: `ok/every/tests/run-stack.{golden,ep.golden,nlg.golden,schema.golden}` (read;
-the `.golden` carries exactly the ten numbers above). Moved, and NOT a resolution error:
+the `.golden` carries exactly the ten numbers above, and since round 1 the five of §4b below).
+Moved, and NOT a resolution error:
 `ok/every/tests/run-anchors.golden`, one block — B's fork witness `receipts` (both landlord
 deliveries breach at 17) now prints `and the breach names, in order` with two entries at 16, which
 is C's blame list on a `RAND` of per-member obligations (the landlord twice, once per receipt: no
@@ -3335,11 +3366,106 @@ was extended in place (`run-anchors.ep.golden` moved with it). Nothing else move
 
 **Not verified here.** The full `etc/verify-branch.sh` (the `--quick` gate and `jl4-test` were
 run); the §3.2.1 evaluation differential (neither track's `Print.hs` change touches
-`prettyLayout`'s module printing, and this commit touches no printer); a barrier whose members
-have no `WITHIN` at all under a `LEST` (`failDue` is `Nothing` for every member, so the tie-break
-never applies and roll order decides, as on C alone). This branch is the drop-in for
-`every/anchors` ONCE `every/blame-set` has merged; if B lands first instead, this branch is not the
-one to use.
+`prettyLayout`'s module printing, and neither stacking commit touches a printer); a barrier whose
+members have no `WITHIN` at all under a `LEST` (`failDue` is `Nothing` for every member, so the
+deadline key never applies; since round 1 the stream key still does, and roll order decides only
+a same-event tie, as it did on C alone). This branch is the drop-in for `every/anchors` ONCE
+`every/blame-set` has merged; if B lands first instead, this branch is not the one to use.
+
+**Round 1 of the adversarial pass (2026-09-16) — what it found, what was applied.** Two refuters
+voted on each finding; every finding below was confirmed by both. Raised and refuted by both:
+none.
+
+- **A same-stamp `SHANT` tie was broken by the window's end (stack) or the roll (C), not by the
+  stream — a timely reparation vanished and the verdict flipped.** BLOCKER, applied. For `SHANT`
+  the sentinel's anchor is the member's own violating event's stamp (`Contract10`'s `DMustNot`
+  arm, `Machine.hs:1744-1748`), so two members violated at one stamp by two events are two
+  failures with two DIFFERENT residual streams; the stacking commit's premise that "a tie is the
+  same event, hence the same anchor and the same residual" was `MUST`-shaped and false for
+  `SHANT`. Measured before the fix (probe `B-shant.l4`): Bob smokes 3, the landlord refunds 3,
+  Carol smokes 3, `WAIT UNTIL 20`, `LEST … WITHIN 5 OF THE DEADLINE` → `BREACHED` at 20 reporting
+  10 on BOTH rolls — Carol chosen by her window end (5 < 14) although Bob's violation was first in
+  the stream, and the refund that followed it dropped from her residual; with Alice and Bob (both
+  window 14) and the refund between them, `FULFILLED` on `tenants` and `BREACHED` at 19 reversed —
+  the roll deciding, on a branch that claimed order-independence. On C's own binary the second
+  shape (`H-shant-C.l4`, unanchored `WITHIN 5`) was already `FULFILLED` / `BREACHED` by roll, so
+  "harmless for C" was false as measured, and the stack's deadline key had turned C's `tenants`
+  verdict from `FULFILLED` to `BREACHED`. **The fix:** the scan counts the events it takes
+  (`ScrutinizeEvents.seen` and the eleven records it is threaded through, `ContractFrame.hs:134`
+  … `:302`; `seen = 0` at the arming, `Machine.hs:1129`; `seen + 1` at `Contract1`,
+  `Machine.hs:1540-1545`; carried through `ResolvePartyFrame.seen`, `ContractFrame.hs:551`), the
+  hand-off gives a barrier sentinel that position as its third argument, before the deadline
+  (`continueWithFollowup`, `Machine.hs:2128-2137`; `sentinelArgs`, `Machine.hs:2458-2462`), the
+  new `Barrier5c` frame forces it between the anchor and the deadline (`Machine.hs:1900-1918`;
+  `BarrierFailPosFrame`, `ContractFrame.hs:490`; `BarrierFailedAt.failPos`, `ContractFrame.hs:435`),
+  and `earliestFailure` orders a stamp tie by the stream position before the deadline
+  (`Machine.hs:2619-2641`): only the same event ties the position, so the deadline key applies
+  exactly where the stacking commit meant it to — two deadlines one event revealed — and roll
+  order only where every key ties, which then names the same anchor, residual and deadline either
+  way. Witness: `run-stack.l4` §4b (five traces): the dropped-refund shape is now `FULFILLED` on
+  both rolls; Bob 3 / Carol 3 / refund 11 → `FULFILLED` (`THE DEADLINE` is Bob's 14, refund due
+  19), refund 20 → `BREACHED` reporting 19 on both rolls. `H-shant-C.l4` on the round-1 binary:
+  `FULFILLED` on both rolls. Every `MUST` case is unchanged: `probes/interaction.l4` is identical
+  to the stacking commit's run, and `run-anchors`, `run-blame`, `run-barrier`, `run-fork`,
+  `run-modals` are byte-identical to it. A design choice the reviewer may reverse: the ruling
+  R-Q5 fixes only the failure TIME, and no ruling addresses two violating events at one stamp; the
+  stream is the key chosen because it is the only one under which the `LEST`'s residual is the
+  true residual after the earliest failure (the alternatives — window end, roll — both hand the
+  `LEST` a stream with events before the chosen failure cut out). The no-`LEST` path
+  (`BarrierBreached`) has no residual to hand on and carries no position; a same-stamp tie there
+  still falls to roll order, which decides only which failure is the anchor of a breach that names
+  every failure regardless.
+- **The written claim "a tie is the same event, hence the same anchor and the same residual" /
+  "harmless for C" was unqualified and false for `SHANT`.** BLOCKER, applied: the `barrierFinish`
+  haddock (`Machine.hs:2529-2554`), the `BarrierFailedAt` haddock (`ContractFrame.hs:451-463`),
+  §6.1.1's with-a-`LEST` bullet, the tie bullet above, `EVERY.md` (the "Inside the continuation"
+  barrier bullet, the `LEST` paragraph, the blame-set bullet under "Runs") now scope the
+  same-event reasoning to `MUST`/`DO`/`MAY` and state the `SHANT` rule as built. The
+  `barrierFinish` haddock's "orders by the missed deadline UP TO TIES" (a separate finding, minor)
+  is scoped the same way, with the measurement that the window end does not order `SHANT`
+  failures.
+- **§5.1.1.1's and §6.1.1's `file:line` cites are stale on this branch while their headers
+  asserted currency** (raised twice, as minor and as major). Applied as one sentence per header,
+  not a re-cite: §5.1.1.1's numbers are on `82c61419`, §6.1.1's on `cedbf7e6`, each header now
+  says so, says the numbers are NOT current here, and points at this block for live cites. A
+  re-cite would go stale at the next commit that touches `Machine.hs`; a sha does not. (The
+  `Parser.hs` cites in §5.1.1.1 happen to hold here, as one refuter measured; the header says so.)
+- **Two `earliest failure` tie rules in one tree: a barrier breaks a stamp tie by the stream and
+  the deadline, `RAND`/`ROR` by operand side.** Minor; NOT applied, recorded: `RBinOp2`'s
+  `leftAnchored` (`Machine.hs:2018-2021`) keys only on `breachTime` (`Machine.hs:2079-2080`), tie
+  → left for `RAND`, right for `ROR`, and never reads a deadline. The barrier's extra keys exist
+  because the `LEST` reads `THE DEADLINE` and the residual from the chosen member; nothing reads
+  either from a compound's anchor — `MkLifecycle` is built at five sites (`Machine.hs:1747`,
+  `:1773`, `:2682`, `:2720`, `:2737`: the single-party `LEST` and `HENCE`, the barrier's `HENCE`,
+  `LEST` and state-missed `LEST`) and none is a compound, and `rebindLifecycle`
+  (`Machine.hs:2807-2813`) rebinds a `ValROp`'s environment from the ENCLOSING hand-off, not from
+  the compound's own breach. Operand side is also fixed in the source text where a roll is a
+  runtime list (`tenants` vs `tenants, reversed` for one rule), so the compound's tie is not
+  arbitrary in the way the barrier's was. The difference is therefore confined to which entry the
+  compound's printed header and its JSON `anchor` scalar name (`run-stack.l4` §5: the landlord's
+  15 over Bob's 7, both revealed at 20), and is left as C built it, on purpose.
+- **`barrierStateMissed` hands the `LEST` the whole stream from the arming, so a reparation
+  performed BEFORE the state deadline was missed discharges it.** Minor, pre-existing on
+  `0b640727` (`git show 0b640727:jl4-core/src/L4/EvaluateLazy/Machine.hs`, lines 2284-2292 there;
+  here `Machine.hs:2729-2737`, `App1 [tRef, ctx.events]`). NOT applied, documented: measured
+  (probe `R1-5-statemissed.l4`, the `bounded` rule: act `WITHIN`,
+  `ONCE ALL HAVE WITHIN 10 OF THE ARMING`, `LEST … WITHIN 5 OF THE DEADLINE`) a refund at 1 —
+  before any member has acted — then
+  Carol 3, Alice 4, Bob 12 (late for the 10), `WAIT UNTIL 20` → `FULFILLED`; with no refund →
+  `BREACHED` reporting 15. The member-failure path does not do this (`barrierFail` gets the stream
+  from the revealing event on). The obvious substitute, the join's residual `joinEvents` (in hand
+  at `Barrier4`, `Machine.hs:1954-1964`), is wrong in the other direction: it starts after the
+  LAST completion, which is after the state deadline, so a refund at 11 — after the trigger at
+  10, before Bob's 12 — would be invisible. The right stream starts at the first event after the
+  state deadline, which no frame computes today (it needs a stamp-walk of `ctx.events`), and it
+  is §5.2-adjacent work, out of this stack's scope. `EVERY.md` now states the limit under "Runs,
+  but not yet as the design says", next to the same-instant bullet.
+- **The stacking paragraph's `barrierJoined` and `earliestFailure` cite ranges were off by a line
+  or stopped mid-function**, and its "(a lapsed `MAY` no longer returns through the join tail)"
+  parenthetical described a history neither parent had (on both, a lapsed `MAY`'s `ValFulfilled`
+  fell through `Barrier1`'s catch-all and returned the barrier at once, never reaching the join
+  tail — `0b640727` `Machine.hs:1764-1766`, `82c61419` `Machine.hs:1836-1838`). Minor, both
+  applied in place above, and the whole block re-cited on the round-1 tree.
 
 ### 11.0.2 The roll, said outright: `EVERY Cast v IN xs` — RULED 2026-09-08 (Meng), BUILT
 
