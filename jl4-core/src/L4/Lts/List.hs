@@ -388,12 +388,16 @@ reasonText r
 -- | One step of the log, clock first, in words. The step's own vocabulary
 -- ('StepOutcome') names machine frames; this names what happened.
 --
--- A party or an action the machine had not fully looked at when the step
--- was logged is keyed by its partly-evaluated layout ('NormKey.nkBearer':
--- "unforced fields and all"), which prints a heap reference such as
--- @Tenant OF &229\@file.l4@. That is the log's limit, not the reader's
--- business: the reference is elided to @…@ here, and the member ordinal
--- (@member 2 of 3@) is what tells the members of a cast apart.
+-- A party is written as the rest of the list writes it — @Tenant OF
+-- "Alice"@ — when the log had its name ('NormKey.nkBearerName',
+-- 'EventKey.ekPartyName': recorded once the machine had forced the
+-- party's fields, which the party comparison does). A party or an action
+-- the machine had not fully looked at when the step was logged is keyed by
+-- its partly-evaluated layout ('NormKey.nkBearer': "unforced fields and
+-- all"), which prints a heap reference such as @Tenant OF &229\@file.l4@.
+-- That is the log's limit, not the reader's business: the reference is
+-- elided to @…@ here, and the member ordinal (@member 2 of 3@) is what
+-- tells the members of a cast apart on such a step.
 renderStep :: DeonticStep -> Text
 renderStep s = Text.unwords $ catMaybes
   [ Just (maybe "at —:" (\ c -> "at " <> prettyRatio c <> ":") s.dsClock)
@@ -416,9 +420,9 @@ renderStep s = Text.unwords $ catMaybes
     eventWords e = (<> ";") case (e.ekParty, e.ekAction) of
       (Nothing, Nothing) -> "the event at " <> prettyRatio e.ekStamp
       (_, Just a) | isClockSentinel a -> "the clock runs to " <> prettyRatio e.ekStamp <> " with nothing happening"
-      (p, a) -> maybe "someone" elide p <> " does " <> maybe "something" elide a <> " at " <> prettyRatio e.ekStamp
+      (p, a) -> fromMaybe "someone" (partyText e.ekPartyName p) <> " does " <> maybe "something" elide a <> " at " <> prettyRatio e.ekStamp
     normWords k = Text.unwords $ catMaybes
-      [ Just (maybe "(party not yet known)" elide k.nkBearer)
+      [ Just (fromMaybe "(party not yet known)" (partyText k.nkBearerName k.nkBearer))
       , Just (modalWord k.nkModal)
       , (\ m -> "(member " <> textShow m.moIndex <> " of " <> textShow m.moTotal <> ")") <$> k.nkMember
       , Just "—" ]
@@ -429,7 +433,7 @@ renderStep s = Text.unwords $ catMaybes
       GuardFailed      -> "the act matched but its condition did not hold; passed over"
       Matched br       -> "done; " <> branchWords br
       Expired br d     -> "deadline " <> prettyRatio d <> " passed without the act; " <> branchWords br
-      Breached b       -> "BREACH declared" <> maybe "" ((" by " <>) . elide) b.bsBlame
+      Breached b       -> "BREACH declared" <> maybe "" (" by " <>) (partyText b.bsBlameName b.bsBlame)
       Joined op note   -> opWords op <> ": " <> joinResultWords note
       JoinReleased     -> "everyone has acted; the shared next step begins"
       JoinExpired br d -> "everyone has acted, but after the group's deadline " <> prettyRatio d <> "; " <> branchWords br
@@ -444,7 +448,7 @@ renderStep s = Text.unwords $ catMaybes
       ValROr  -> "either part"
     joinResultWords note = case note.jnResult of
       JoinFulfilled  -> "fulfilled" <> sideWords note
-      JoinBreached b -> "breached" <> maybe "" ((" by " <>) . elide) b.bsBlame <> sideWords note
+      JoinBreached b -> "breached" <> maybe "" (" by " <>) (partyText b.bsBlameName b.bsBlame) <> sideWords note
       JoinPending    -> "still open"
     sideWords note = case note.jnWinner of
       Nothing -> ""
@@ -458,6 +462,11 @@ renderStep s = Text.unwords $ catMaybes
     scrutinyWords = \ case
       Reoffered -> Just "[the same event, offered a second time]"
       _         -> Nothing
+
+-- | A party as a step names it: its rendered name when the log had it,
+-- else its ledger key with the heap references elided, else nothing.
+partyText :: Maybe Text -> Maybe Text -> Maybe Text
+partyText name key = name `mplus` fmap elide key
 
 -- | Elide heap references (@&229\@file.l4@) in a machine-keyed text,
 -- keeping the punctuation around them.
@@ -592,9 +601,9 @@ stepJson s = Aeson.object $ catMaybes
   where
     eventJson e
       | Just a <- e.ekAction, isClockSentinel a = Aeson.object ["at" .= ratio e.ekStamp, "kind" .= ("clock" :: Text)]
-      | otherwise = Aeson.object ["at" .= ratio e.ekStamp, "kind" .= ("act" :: Text), "party" .= fmap elide e.ekParty, "action" .= fmap elide e.ekAction]
+      | otherwise = Aeson.object ["at" .= ratio e.ekStamp, "kind" .= ("act" :: Text), "party" .= partyText e.ekPartyName e.ekParty, "action" .= fmap elide e.ekAction]
     normKeyJson k = Aeson.object $
-      [ "party" .= fmap elide k.nkBearer, "modal" .= modalWord k.nkModal, "activation" .= k.nkActivation ]
+      [ "party" .= partyText k.nkBearerName k.nkBearer, "modal" .= modalWord k.nkModal, "activation" .= k.nkActivation ]
       <> maybe [] (\ m -> ["member" .= m.moIndex, "of" .= m.moTotal]) k.nkMember
     -- one token per 'StepOutcome' constructor; the sentence is 'outcomeWords'
     outcomeJson = \ case
@@ -604,7 +613,7 @@ stepJson s = Aeson.object $ catMaybes
       GuardFailed      -> Aeson.object ["what" .= ("guardFailed" :: Text)]
       Matched br       -> Aeson.object ["what" .= ("matched" :: Text), "then" .= branchToken br]
       Expired br d     -> Aeson.object ["what" .= ("expired" :: Text), "deadline" .= ratio d, "then" .= branchToken br]
-      Breached b       -> Aeson.object ["what" .= ("breached" :: Text), "by" .= fmap elide b.bsBlame]
+      Breached b       -> Aeson.object ["what" .= ("breached" :: Text), "by" .= partyText b.bsBlameName b.bsBlame]
       Joined op note   -> Aeson.object ["what" .= ("joined" :: Text), "operator" .= (case op of ValRAnd -> "and"; ValROr -> "or" :: Text), "result" .= joinResultToken note]
       JoinReleased     -> Aeson.object ["what" .= ("joinReleased" :: Text)]
       JoinExpired br d -> Aeson.object ["what" .= ("joinExpired" :: Text), "deadline" .= ratio d, "then" .= branchToken br]

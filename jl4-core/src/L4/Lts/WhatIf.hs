@@ -351,17 +351,36 @@ tryCandidate rig tr pos cand = case cand.cdHypothetical of
 -- with the reason, read from the machine's steps rather than decided here.
 --
 -- Which step's reason: the candidate's own obligation is the one at the
--- candidate's site ('LiveNorm.lnSite' against 'NormKey.nkSite'). Under an
--- @RAND@\/@ROR@ the other side's obligation scrutinises the same event and
--- logs its own pass-over first, in the machine's order, so the first reason
--- in the log is the wrong norm's. Under an @EVERY@ the members share a
--- site and differ in bearer, and the bearer keys are not comparable
--- ('nkBearer' is the ledger key, 'lnBearer' a pretty layout), so among the
--- site's steps the most specific reason wins: a guard that came out false
--- can only be the candidate's own obligation's (the others do not get as
--- far as the guard), a wrong act likewise, a wrong party is what the other
--- members log. No step at the site at all falls back to the first reason
--- in the log; no reason anywhere is 'NoTaker'.
+-- candidate's site ('LiveNorm.lnSite' against 'NormKey.nkSite') with the
+-- candidate's bearer ('LiveNorm.lnBearer' against 'NormKey.nkBearerName',
+-- which the machine records in the same rendering where the party
+-- comparison has forced the party's fields). The name is known on the
+-- candidate's own pass-over step for a narrower reason than "the
+-- comparison ran": the hypothetical act is BY the candidate's bearer, so
+-- its own obligation's party comparison MATCHED, and a match forces every
+-- field. A mismatch does not: the equality stops at the first field that
+-- differs, so another member whose party differs from the actor's in an
+-- earlier field is logged with no name on that step (measured,
+-- @LtsListSpec@ case 7) — but that step is not the candidate's, and the
+-- filter here only needs the candidate's own to be named.
+-- Under an @RAND@\/@ROR@ the other side's obligation scrutinises the same
+-- event and logs its own pass-over first, in the machine's order, so the
+-- first reason in the log is the wrong norm's; the site tells them apart.
+-- Under an @EVERY@ the members share a site and differ in bearer; the
+-- bearer tells them apart. (Until the name was recorded, the members were
+-- told apart by ranking the reasons at the site by specificity — a guard
+-- that came out false could only be the candidate's own — which was a
+-- heuristic standing in for a comparison the log could not make.)
+--
+-- A candidate whose party the residual holds unforced ('UnforcedParty')
+-- has no rendered name to compare, and every step at its site is taken to
+-- be its own: such an obligation is not an @EVERY@ member (the roll call
+-- forces every member), so its site has one bearer. No step with the
+-- bearer's name at the site falls back to the site's first reason in the
+-- machine's order (not expected to happen: the name is recorded before
+-- any pass-over that is not a party mismatch); no step at the site at all
+-- falls back to the first reason in the log; no reason anywhere is
+-- 'NoTaker'.
 --
 -- A 'Joined' step does not count as the act being taken: it is the
 -- compound reporting where it stands after both sides looked, and under an
@@ -388,20 +407,16 @@ confirmAct kind steps verdict = case (kind, verdict) of
       ActionMismatch  -> False
       GuardFailed     -> False
     reasonFor n =
-      let own = [ s | s <- steps, Just k <- [s.dsNorm], k.nkSite == n.lnSite ]
-          ranked = sortOn rank (mapMaybe reason own)
-      in fromMaybe NoTaker (listToMaybe (ranked <> mapMaybe reason steps))
+      let atSite = [ (k, s) | s <- steps, Just k <- [s.dsNorm], k.nkSite == n.lnSite ]
+          own = case n.lnBearer of
+            KnownParty name -> [ s | (k, s) <- atSite, k.nkBearerName == Just name ]
+            UnforcedParty _ -> map snd atSite
+      in fromMaybe NoTaker (listToMaybe (mapMaybe reason own <> mapMaybe reason (map snd atSite) <> mapMaybe reason steps))
     reason s = case s.dsOutcome of
       GuardFailed    -> Just GuardFalse
       ActionMismatch -> Just WrongAct
       PartyMismatch  -> Just WrongParty
       _              -> Nothing
-    rank :: PassOver -> Int
-    rank = \ case
-      GuardFalse -> 0
-      WrongAct   -> 1
-      WrongParty -> 2
-      NoTaker    -> 3
 
 -- | The tick's self-check; see 'tryCandidate'. Only a 'TickPast' is held to
 -- it; an act is the machine's to route however it likes.

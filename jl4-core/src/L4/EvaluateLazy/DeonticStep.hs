@@ -130,6 +130,24 @@ data NormKey = MkNormKey
     -- constructor party is allocated as a value and is known). Under an
     -- @EVERY@ the roll call forces every member, so members always know
     -- theirs.
+    --
+    -- This is the key the cast register ('DeonticLog.dlMembers') is looked
+    -- up by, which is why it stays beside 'nkBearerName' rather than being
+    -- replaced by it: the register is written at the roll call, before any
+    -- field has been forced, and only this key exists then.
+  , nkBearerName :: !(Maybe Text)
+    -- ^ the party as the list writes it: the forced value rendered through
+    -- the same printer "L4.Lts.Marking" renders 'lnBearer' with
+    -- ('L4.Print.prettyLayout' on a @Value NF@ — @Tenant OF "Alice"@, not
+    -- @Tenant OF &161\@main.l4@), so the two compare by equality. Recorded
+    -- where the machine has forced the party's FIELDS, not just its head:
+    -- the party equality at @Contract7@ forces them (all of them on a
+    -- match, up to the first difference on a mismatch), so it is read at
+    -- @Contract8@ and carried into every later step of the same scrutiny;
+    -- the expiry path reads it at @ResolveParty@. Still a peek, never a
+    -- force: 'Nothing' while any field is a thunk, which is the case for a
+    -- 'Waiting' step before any event has been compared. Where it is
+    -- 'Nothing', 'nkBearer' is what there is.
   , nkModal      :: !DeonticModal
     -- ^ all four, including @DDo@
   , nkMember     :: !(Maybe MemberOf)
@@ -182,9 +200,13 @@ isBarrier = \ case
 -- left as 'Nothing' otherwise, because forcing them for the log would change
 -- evaluation.
 data EventKey = MkEventKey
-  { ekStamp  :: !Rational
-  , ekParty  :: !(Maybe Text)   -- ^ keyed as 'nkBearer' is
-  , ekAction :: !(Maybe Text)   -- ^ the action value, pretty-printed
+  { ekStamp     :: !Rational
+  , ekParty     :: !(Maybe Text)   -- ^ keyed as 'nkBearer' is
+  , ekPartyName :: !(Maybe Text)
+    -- ^ rendered as 'nkBearerName' is, when the party's fields had been
+    -- forced (the equality at @Contract7@ forces the event's party
+    -- alongside the obligation's); 'Nothing' otherwise
+  , ekAction    :: !(Maybe Text)   -- ^ the action value, pretty-printed
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
@@ -323,7 +345,8 @@ data Side = LeftSide | RightSide | BothSides
 
 -- | The blame a compound breach carries, as far as the machine has forced it.
 data BreachSummary = MkBreachSummary
-  { bsBlame    :: !(Maybe Text)     -- ^ the blamed party, keyed as 'nkBearer'
+  { bsBlame     :: !(Maybe Text)     -- ^ the blamed party, keyed as 'nkBearer'
+  , bsBlameName :: !(Maybe Text)     -- ^ the blamed party, rendered as 'nkBearerName' when its fields were forced
   , bsStamp    :: !(Maybe Rational) -- ^ when the breach materialised; 'Nothing' for an @ExplicitBreach@
   , bsDeadline :: !(Maybe Rational) -- ^ the deadline missed; equal to 'bsStamp' for a violated prohibition
   }
