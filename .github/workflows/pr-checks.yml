@@ -317,6 +317,34 @@ jobs:
   # that ships a corpus without its goldens is green and the golden suite goes red
   # on somebody else's branch instead. That happened twice in one day (PR #202,
   # the BNA; PR #212, the Jersey charities cleanroom). Node-only, ~1 s, no build.
+  canon-mirror:
+    name: Canon Mirror
+    runs-on: ubuntu-latest
+    # NO `paths:` FILTER AND NO BUILD, on purpose, for two separate reasons.
+    #
+    # No build: this is a tree diff against a public repository at a pinned SHA.
+    # It needs git and node and nothing else, so it costs seconds and can gate
+    # every PR without waiting on the Haskell job.
+    #
+    # No filter: the thing it checks is whether jl4/examples/canon/ still equals
+    # legalese/canon at etc/canon-pin.json's SHA. A PR that hand-edits the mirror
+    # touches jl4/examples/**; a PR that bumps the pin touches etc/**; a PR that
+    # does neither can still be the one that lands while canon moved underneath.
+    # A filter would make the check's own coverage depend on which files a PR
+    # happened to touch, which is the failure mode the two jobs below were added
+    # to avoid.
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+      # The checker must still be able to fail, so its own mutations run first.
+      # A mirror check that cannot go red would report every mirror clean.
+      - name: The mirror checker can still tell right from wrong
+        run: node etc/sync-canon.mjs --selftest
+      - name: The vendored mirror equals canon at the pin
+        run: node etc/sync-canon.mjs --check
+
   corpus-goldens:
     name: Corpus Goldens Present
     runs-on: ubuntu-latest

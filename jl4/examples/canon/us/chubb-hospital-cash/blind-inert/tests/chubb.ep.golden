@@ -1,0 +1,763 @@
+IMPORT prelude
+
+§ `Codex Insurance Limited — hospitalization policy`
+
+-- ===========================================================================
+-- CODEX INSURANCE LIMITED ("us") and ________________ ("You").
+--
+-- WHAT THIS MODULE IS. A clause-by-clause encoding of the policy as supplied.
+-- It is written in the INERT STYLE: every operative clause is quoted VERBATIM
+-- as an inert string sitting inside the rule that encodes it, so a reviewer can
+-- read the source text and the logic side by side without leaving the file.
+-- An inert string is grammatical scaffolding: TRUE in an AND chain, FALSE in an
+-- OR chain, so it never changes an answer, it only shows its work.
+--
+-- WHAT THE POLICY DOES NOT CONTAIN, AND WHAT FOLLOWS. The supplied text has NO
+-- INSURING CLAUSE. Nothing in it says what benefit is payable, in what amount,
+-- or on what trigger; Sections 1-3 state only CONDITIONS and EXCLUSIONS, and
+-- the two cross-references to the schedule ("Section 5") point at text that is
+-- not in the document. `a benefit is payable on this claim` therefore answers
+-- the only question this text can answer: whether every condition the policy
+-- makes operative is met and no exclusion bites, ON THE ASSUMPTION that the
+-- claim would otherwise attract a benefit. It is a NECESSARY-conditions test.
+-- A TRUE here means "the policy does not defeat this claim", not "the insurer
+-- owes $X".
+--
+-- TIME. The benchmark harness expresses every time in a claim as a NUMBER OF
+-- MONTHS RELATIVE TO THE EFFECTIVE DATE, so month 0 is the effective date,
+-- month 6 is the 6th month anniversary, and month 12 is the first anniversary.
+-- No calendar arithmetic is done or needed. A time that never happened is
+-- NOTHING; a time that happened is JUST that month.
+--
+-- WHAT IS NOT ENCODED, AND WHY. Two clauses bear on the policy but not on
+-- whether a benefit is payable, and are recorded here rather than modelled:
+--
+--   3.3.1 "Your Policy is governed by the laws of New York." A choice of law.
+--         It selects the interpretive regime; it does not add or remove a
+--         condition of payment. NOT OPERATIVE on coverage.
+--   3.4.1 "All payments by You to Us and by Us to You or someone else under
+--         your policy must be in United States currency." A denomination rule
+--         for payments. It governs the CURRENCY of a benefit once payable, not
+--         WHETHER one is payable. NOT OPERATIVE on coverage.
+--
+-- Two more are operative only indirectly and are encoded as named observations
+-- that the top-level decision deliberately does NOT consume; see their notes:
+--   3.2.1 last sentence (the sixty-day bar on seeking recovery), and
+--   3.5.1 (premium payable in one lump sum at signing).
+-- ===========================================================================
+
+
+§§ `The facts the policy makes operative`
+
+-- Section 1.1 speaks of "the hospitalization for sickness or accidental
+-- injury on which the claim for such benefit is premised", and Section 2.1 of
+-- "any event causing sickness or accidental injury". The policy therefore
+-- recognises exactly two grounds of hospitalization, and a third possibility
+-- it says nothing about. Modelled as a closed enumeration so that a claim
+-- premised on neither is representable and visible, rather than smuggled in
+-- as a free-text cause.
+DECLARE `Ground of hospitalization` IS ONE OF
+    Sickness
+    `Accidental injury`
+    `Neither sickness nor accidental injury`
+
+-- Section 2.1 excludes an event "arising DIRECTLY OR INDIRECTLY out of" four
+-- named activities. Because the arising may be indirect, one event may arise
+-- out of more than one of them at once (a fire fighter who skydives off duty
+-- and is hospitalized for an injury traceable to both), so the fact recorded
+-- is a LIST of the activities the event arose out of — not a single cause.
+-- The fifth constructor is the residual: a cause the policy does not name.
+DECLARE Cause IS ONE OF
+    Skydiving
+    `Service in the military`
+    `Service as a fire fighter`
+    `Service in the police`
+    `A cause not named in Section 2.1`
+
+-- The complete fact schema. Every field is a fact the policy text makes
+-- operative; nothing here is a conclusion. A caller supplies one Claim and
+-- nothing else.
+DECLARE Claim
+    HAS `this agreement is signed`                                                          IS A BOOLEAN
+        `the month the applicable premium for the policy period was paid`                   IS A MAYBE NUMBER
+        `the month of the hospitalization on which the claim is premised`                   IS A NUMBER
+        `the hospitalization on which the claim is premised was for`                        IS A `Ground of hospitalization`
+        `your age in years at the time of the hospitalization`                              IS A NUMBER
+        `the event causing the sickness or accidental injury arose directly or indirectly out of` IS A LIST OF Cause
+        `the month in which there was fraud`                                                IS A MAYBE NUMBER
+        `the month in which there was a misrepresentation or material withholding of information provided by you to the Company` IS A MAYBE NUMBER
+        `the month in which a wellness visit for yourself occurred`                         IS A MAYBE NUMBER
+        `that wellness visit was with a qualified medical provider`                         IS A BOOLEAN
+        `the month in which written confirmation from that medical provider was supplied to us` IS A MAYBE NUMBER
+        `a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy` IS A BOOLEAN
+        `the month on which the parties were unable to settle the dispute or difference`    IS A MAYBE NUMBER
+        `the month in which arbitration was commenced`                                      IS A MAYBE NUMBER
+        `a valid arbitration award has been issued`                                         IS A BOOLEAN
+        `the month in which written proof of claim was submitted to us`                     IS A MAYBE NUMBER
+        `the month in which you seek to recover on this Policy`                             IS A MAYBE NUMBER
+
+
+§§ `The clocks the policy sets`
+
+-- Section 1.3, second deadline: "no later than the 6th month anniversary of
+-- the effective date of this policy".
+`the 6th month anniversary of the effective date` MEANS 6
+
+-- Section 1.3, first deadline: "No later than the 7th month anniversary of
+-- the effective date of this policy".
+`the 7th month anniversary of the effective date` MEANS 7
+
+-- Section 3.6: "will last for a period of one year from that date". Twelve
+-- months from the effective date.
+`the length of the policy term in months` MEANS 12
+
+-- Section 2.1(5): "equal to or greater than 80 years of age".
+`the excluded age in years` MEANS 80
+
+-- Section 3.2.1: "such arbitration to be commenced within three (3) months
+-- from the day such parties are unable to settle the dispute or difference".
+`the months within which arbitration must be commenced` MEANS 3
+
+-- Section 3.2.1: "the expiration of sixty (60) days after written proof of
+-- claim has been submitted to Us". Sixty days is expressed here as two months
+-- because the harness's only unit of time is the month; see the ambiguity note.
+`the months standing for the sixty days in Section 3.2.1` MEANS 2
+
+
+§§ `Reading a time off the claim`
+
+-- A month that may never have arrived, tested against a deadline. NOTHING —
+-- the thing never happened — never satisfies a deadline.
+GIVEN `event month` IS A MAYBE NUMBER
+      deadline      IS A NUMBER
+GIVETH A BOOLEAN
+`happened on or before` `event month` deadline MEANS
+    CONSIDER `event month`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST m  THEN m AT MOST deadline
+
+-- Section 1.1 fixes ONE instant at which the whole in-effect test is taken:
+-- "at the time of the hospitalization ... on which the claim for such benefit
+-- is premised". Every temporal test below is taken as at this month.
+GIVEN claim IS A Claim
+GIVETH A NUMBER
+`the month of the hospitalization` claim MEANS
+    claim's `the month of the hospitalization on which the claim is premised`
+
+
+§ `POLICY IN EFFECT AND CONDITIONS`
+
+§§ `1.1 — the policy must be in effect at the time of the hospitalization`
+
+GIVEN ground IS A `Ground of hospitalization`
+GIVETH A BOOLEAN
+`is sickness or accidental injury` ground MEANS
+    CONSIDER ground
+    WHEN Sickness                                THEN TRUE
+    WHEN `Accidental injury`                     THEN TRUE
+    WHEN `Neither sickness nor accidental injury` THEN FALSE
+
+-- The definite description in 1.1 presupposes that the claim is premised on a
+-- hospitalization FOR SICKNESS OR ACCIDENTAL INJURY. Made explicit as its own
+-- limb: the policy nowhere provides for a hospitalization that is neither.
+@ref Section 1.1
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`the claim is premised on a hospitalization for sickness or accidental injury` claim MEANS
+        "1.1 The payment of any benefit under this policy is conditioned on the policy being in effect at the time of the hospitalization for sickness or accidental injury on which the claim for such benefit is premised."
+    AND `is sickness or accidental injury` (claim's `the hospitalization on which the claim is premised was for`)
+
+@ref Section 1.1(1)
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`1.1(1) — this agreement is signed` claim MEANS
+        "1. This agreement is signed,"
+    AND claim's `this agreement is signed`
+
+-- "has been paid" is a present-perfect state, and 1.1 takes every limb as at
+-- the time of the hospitalization: a premium paid AFTER the hospitalization
+-- does not put the policy in effect at the hospitalization.
+@ref Section 1.1(2)
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`1.1(2) — the applicable premium for the policy period has been paid` claim MEANS
+        "2. The applicable premium for the policy period has been paid, and"
+    AND `happened on or before` (claim's `the month the applicable premium for the policy period was paid`)
+                                (`the month of the hospitalization` claim)
+
+@ref Section 1.1(3)
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`1.1(3) — the Section 1.3 condition is still pending or has been satisfied in a timely fashion` claim MEANS
+        "3. The condition set out in Section 1.3 is still pending or has been satisfied in a timely fashion, and"
+    OR  `the Section 1.3 condition is still pending at the time of the hospitalization` claim
+    OR  `the Section 1.3 condition has been satisfied in a timely fashion by the time of the hospitalization` claim
+
+@ref Section 1.1(4)
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`1.1(4) — the policy has not been canceled` claim MEANS
+        "4. The policy has not been canceled."
+    AND NOT `cancelation is deemed to have occurred on or before the hospitalization` claim
+
+-- The four limbs of 1.1 are conjunctive: items 2 and 3 each end ", and".
+@ref Section 1.1
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `the policy is in effect at the time of the hospitalization` claim IF
+        "The policy will be in effect if:"
+    AND `1.1(1) — this agreement is signed` claim
+    AND `1.1(2) — the applicable premium for the policy period has been paid` claim
+    AND `1.1(3) — the Section 1.3 condition is still pending or has been satisfied in a timely fashion` claim
+    AND `1.1(4) — the policy has not been canceled` claim
+
+
+§§ `1.2 — cancelation`
+
+-- FOUR independent grounds, each with its own moment of effect, because 1.1
+-- asks whether the policy stood canceled AT THE HOSPITALIZATION:
+--
+--   (a) fraud                      — effective when the fraud occurred;
+--   (b) misrepresentation or       — effective when it occurred;
+--       material withholding
+--   (c) the Section 1.3 condition  — the earliest moment at which it can be
+--       not satisfied in a           SAID not to have been satisfied in a
+--       timely fashion               timely fashion is the 7th month
+--                                    anniversary, so cancelation on this
+--                                    ground takes effect at month 7;
+--   (d) expiry of the term         — "automatically canceled at midnight ...
+--                                    on the last day of the policy term",
+--                                    i.e. at month 12.
+--
+-- (a) and (b) are given a month by the fact schema rather than being treated
+-- as timeless voidings; see the ambiguity note on retroactivity.
+@ref Section 1.2
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`cancelation is deemed to have occurred on or before the hospitalization` claim MEANS
+        "1.2 Cancelation will be deemed to have occurred if there is fraud, or any misrepresentation or material withholding of any information provided by you to the Company in connection with any communication or information relating to this policy, or if the condition set out in Section 1.3 has not been satisfied in a timely fashion."
+    OR  `1.2(a) — there is fraud` claim
+    OR  `1.2(b) — misrepresentation or material withholding of information` claim
+    OR  `1.2(c) — the Section 1.3 condition has not been satisfied in a timely fashion` claim
+    OR  `1.2(d) — automatic cancelation on the last day of the policy term` claim
+
+@ref Section 1.2
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`1.2(a) — there is fraud` claim MEANS
+        "Cancelation will be deemed to have occurred if there is fraud,"
+    OR  `happened on or before` (claim's `the month in which there was fraud`)
+                                (`the month of the hospitalization` claim)
+
+@ref Section 1.2
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`1.2(b) — misrepresentation or material withholding of information` claim MEANS
+        "or any misrepresentation or material withholding of any information provided by you to the Company in connection with any communication or information relating to this policy,"
+    OR  `happened on or before` (claim's `the month in which there was a misrepresentation or material withholding of information provided by you to the Company`)
+                                (`the month of the hospitalization` claim)
+
+@ref Section 1.2
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`1.2(c) — the Section 1.3 condition has not been satisfied in a timely fashion` claim MEANS
+        "or if the condition set out in Section 1.3 has not been satisfied in a timely fashion."
+    AND ((`the month of the hospitalization` claim) AT LEAST `the 7th month anniversary of the effective date`)
+    AND NOT `the Section 1.3 condition has been satisfied in a timely fashion` claim
+
+-- "It will also be automatically canceled at midnight, US Eastern time then in
+-- effect, on the last day of the policy term described in Section 5 below."
+-- Section 5 is absent from the supplied text; Section 3.6 is the clause that
+-- actually describes the term, and is used. See the dangling-reference note.
+@ref Section 1.2 with Section 3.6
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`1.2(d) — automatic cancelation on the last day of the policy term` claim MEANS
+        "It will also be automatically canceled at midnight, US Eastern time then in effect, on the last day of the policy term described in Section 5 below."
+    AND ((`the month of the hospitalization` claim) AT LEAST `the length of the policy term in months`)
+
+
+§§ `1.3 — the wellness-visit condition`
+
+-- 1.3 imposes ONE condition with TWO deadlines, and both must hold for the
+-- condition to have been "satisfied in a timely fashion":
+--   * the wellness visit — for yourself, with a QUALIFIED medical provider —
+--     must occur no later than month 6; and
+--   * written confirmation of it, FROM THE MEDICAL PROVIDER IN QUESTION, must
+--     reach us no later than month 7.
+@ref Section 1.3
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`the Section 1.3 condition has been satisfied in a timely fashion` claim MEANS
+        "1.3 No later than the 7th month anniversary of the effective date of this policy, you will supply us with written confirmation from the medical provider in question of a wellness visit for yourself with a qualified medical provider occurring no later than the 6th month anniversary of the effective date of this policy."
+    AND `happened on or before` (claim's `the month in which a wellness visit for yourself occurred`)
+                                `the 6th month anniversary of the effective date`
+    AND claim's `that wellness visit was with a qualified medical provider`
+    AND `happened on or before` (claim's `the month in which written confirmation from that medical provider was supplied to us`)
+                                `the 7th month anniversary of the effective date`
+
+-- 1.1(3) asks whether the condition "HAS BEEN satisfied", as at the
+-- hospitalization. Timely satisfaction that only arrives afterwards has not
+-- yet happened at the moment the in-effect test is taken.
+@ref Section 1.1(3) with Section 1.3
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`the Section 1.3 condition has been satisfied in a timely fashion by the time of the hospitalization` claim MEANS
+        `the Section 1.3 condition has been satisfied in a timely fashion` claim
+    AND `happened on or before` (claim's `the month in which written confirmation from that medical provider was supplied to us`)
+                                (`the month of the hospitalization` claim)
+
+-- "Still pending" = the 7-month deadline has not yet passed and the condition
+-- has not yet been performed. Before month 7 there is nothing to complain of;
+-- from month 7 the condition is either satisfied or breached, never pending.
+@ref Section 1.1(3)
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`the Section 1.3 condition is still pending at the time of the hospitalization` claim MEANS
+        "The condition set out in Section 1.3 is still pending"
+    AND NOT ((`the month of the hospitalization` claim) AT LEAST `the 7th month anniversary of the effective date`)
+    AND NOT `the Section 1.3 condition has been satisfied in a timely fashion by the time of the hospitalization` claim
+
+
+§ `GENERAL EXCLUSIONS`
+
+§§ `2.1`
+
+GIVEN cause IS A Cause
+GIVETH A BOOLEAN
+`is an activity named in Section 2.1` cause MEANS
+    CONSIDER cause
+    WHEN Skydiving                          THEN TRUE
+    WHEN `Service in the military`          THEN TRUE
+    WHEN `Service as a fire fighter`        THEN TRUE
+    WHEN `Service in the police`            THEN TRUE
+    WHEN `A cause not named in Section 2.1` THEN FALSE
+
+-- Limbs 1-4 are causal: the EVENT must arise, directly or indirectly, out of
+-- the named activity. "Indirectly" is why the fact is a list of every activity
+-- the event arose out of, and why any one of them suffices.
+@ref Section 2.1(1)-(4)
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`2.1(1)-(4) — the event arose directly or indirectly out of an excluded activity` claim MEANS
+        "1. Skydiving; or"
+    OR  "2. Service in the military; or"
+    OR  "3. Service as a fire fighter; or"
+    OR  "4. Service in the police; or"
+    OR  any `is an activity named in Section 2.1`
+            (claim's `the event causing the sickness or accidental injury arose directly or indirectly out of`)
+
+-- Limb 5 does NOT fit the chapeau: age is not something an event can "arise
+-- out of", and the limb carries its own "If". Read as a free-standing
+-- exclusion that bites on the age at hospitalization whatever the cause.
+@ref Section 2.1(5)
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`2.1(5) — your age at the time of the hospitalization is 80 or greater` claim MEANS
+        "5. If your age at the time of the hospitalization is equal to or greater than 80 years of age."
+    OR  ((claim's `your age in years at the time of the hospitalization`) AT LEAST `the excluded age in years`)
+
+@ref Section 2.1
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`a general exclusion in Section 2.1 applies to this claim` claim MEANS
+        "2.1 Your policy will not apply to, and no benefit will be paid with respect to, any event causing sickness or accidental injury arising directly or indirectly out of:"
+    OR  `2.1(1)-(4) — the event arose directly or indirectly out of an excluded activity` claim
+    OR  `2.1(5) — your age at the time of the hospitalization is 80 or greater` claim
+
+
+§ `GENERAL CONDITIONS`
+
+§§ `3.1 — Where does Your Policy apply?`
+
+-- Operative, but only negatively: it forecloses any geographic or
+-- time-of-day limitation on cover, so there is no place or hour at which a
+-- hospitalization falls outside the policy. Encoded as a limb of the
+-- top-level decision that is unconditionally satisfied, so that a reviewer
+-- can see the clause was read and what it does.
+@ref Section 3.1.1
+GIVETH A BOOLEAN
+`3.1.1 — the Policy insures You twenty-four hours a day anywhere in the world` MEANS
+        "3.1.1 Your Policy insures You twenty-four (24) hours a day anywhere in the world."
+    AND TRUE
+
+
+§§ `3.2 — Arbitration`
+
+-- Two limbs of 3.2.1 are conditions on OUR LIABILITY, and so are operative on
+-- whether a benefit is payable:
+--   * failure to commence arbitration within three months of the impasse
+--     EXTINGUISHES "any cause of action and any right to make a claim"; and
+--   * where there is a dispute, "the issuance of a valid arbitration award
+--     shall ALSO be a CONDITION PRECEDENT TO OUR LIABILITY".
+-- Both bite only "where there is a dispute or disagreement"; on an undisputed
+-- claim they are vacuous.
+
+-- The three months run from "the day such parties are unable to settle". If
+-- that day has not arrived, the clock has not started and nothing is
+-- extinguished yet.
+@ref Section 3.2.1
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`arbitration was not commenced within three months of the impasse` claim MEANS
+    CONSIDER claim's `the month on which the parties were unable to settle the dispute or difference`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST u  THEN
+        NOT (`happened on or before` (claim's `the month in which arbitration was commenced`)
+                                     (u PLUS `the months within which arbitration must be commenced`))
+
+@ref Section 3.2.1
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`your right to make a claim has been extinguished` claim MEANS
+        "such arbitration to be commenced within three (3) months from the day such parties are unable to settle the dispute or difference. If You fail to commence arbitration in accordance with this clause, it is agreed that any cause of action and any right to make a claim that You have or may have against Us shall be extinguished completely."
+    AND claim's `a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy`
+    AND `arbitration was not commenced within three months of the impasse` claim
+
+@ref Section 3.2.1
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`the arbitration-award condition precedent is satisfied` claim MEANS
+        "Where there is a dispute or disagreement, the issuance of a valid arbitration award shall also be a condition precedent to our liability under this Policy."
+    OR  NOT (claim's `a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy`)
+    OR  claim's `a valid arbitration award has been issued`
+
+@ref Section 3.2.1
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`the conditions precedent in Section 3.2.1 are satisfied` claim MEANS
+        "3.2.1 If any dispute or disagreement arises regarding any matter pertaining to or concerning this Policy, the dispute or disagreement must be referred to arbitration in accordance with the provisions of the Arbitration Act (Cap. 10) and any statutory modification or re-enactment thereof then in force,"
+    AND NOT `your right to make a claim has been extinguished` claim
+    AND `the arbitration-award condition precedent is satisfied` claim
+
+-- The last sentence of 3.2.1 is a bar on WHEN you may sue, not on WHETHER the
+-- benefit is payable: it postpones recovery for sixty days after written proof
+-- of claim, and says nothing about entitlement. It is therefore encoded as its
+-- own decision and deliberately NOT consumed by the top-level payability test;
+-- folding it in would turn "not yet enforceable" into "not covered".
+@ref Section 3.2.1
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`sixty days have expired since written proof of claim was submitted` claim MEANS
+    CONSIDER claim's `the month in which you seek to recover on this Policy`
+    WHEN NOTHING THEN TRUE
+    WHEN JUST s  THEN
+        CONSIDER claim's `the month in which written proof of claim was submitted to us`
+        WHEN NOTHING THEN FALSE
+        WHEN JUST p  THEN s AT LEAST (p PLUS `the months standing for the sixty days in Section 3.2.1`)
+
+@ref Section 3.2.1
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`you may seek to recover on this Policy` claim MEANS
+        "In no case shall You seek to recover on this Policy before the expiration of sixty (60) days after written proof of claim has been submitted to Us in accordance with the provisions of this Policy."
+    AND `sixty days have expired since written proof of claim was submitted` claim
+
+
+§§ `3.3 — Laws of New York; 3.4 — US Currency`
+
+-- 3.3.1 "Your Policy is governed by the laws of New York." NOT OPERATIVE on
+-- whether a benefit is payable: a choice-of-law clause selects the body of law
+-- that construes the policy, and adds no condition of payment. Not encoded.
+--
+-- 3.4.1 "All payments by You to Us and by Us to You or someone else under your
+-- policy must be in United States currency." NOT OPERATIVE on whether a
+-- benefit is payable: it fixes the currency of a payment once one is due.
+-- Not encoded.
+
+
+§§ `3.5 — Premium`
+
+-- 3.5.1 prescribes the MANNER and TIME of payment ("in one lump sum at the
+-- signing"), while 1.1(2) makes only the FACT of payment a condition of the
+-- policy being in effect. Encoded as its own observation and NOT consumed by
+-- the top-level decision: a premium paid late or in instalments has still
+-- "been paid" for 1.1(2) once it is in. See the ambiguity note.
+@ref Section 3.5.1
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`the premium was paid in one lump sum at the signing of the policy` claim MEANS
+        "3.5.1 The premium described in Section 5 below shall be paid in one lump sum at the signing of the policy."
+    AND `happened on or before` (claim's `the month the applicable premium for the policy period was paid`) 0
+
+
+§§ `3.6 — Policy Term`
+
+-- "The term of this policy will begin on the date accepted by Us as signified
+-- by our signature of the policy (the effective date) and will last for a
+-- period of one year from that date, unless previously canceled pursuant to
+-- Section 1 above." Operative twice over: it supplies the term that 1.2's
+-- automatic cancelation runs to (see `the length of the policy term in
+-- months`), and it fixes the effective date as the origin of every month
+-- count in this module. A hospitalization before the effective date is
+-- outside the term at its other end.
+@ref Section 3.6
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+`the hospitalization is within the policy term` claim MEANS
+        "The term of this policy will begin on the date accepted by Us as signified by our signature of the policy (the effective date) and will last for a period of one year from that date, unless previously canceled pursuant to Section 1 above."
+    AND ((`the month of the hospitalization` claim) AT LEAST 0)
+    AND NOT ((`the month of the hospitalization` claim) AT LEAST `the length of the policy term in months`)
+
+
+§ `The decision`
+
+-- THE ONE QUESTION THIS MODULE ANSWERS. Read it as: nothing in the policy as
+-- supplied defeats this claim. The four limbs are, in the policy's own order:
+--   * the claim is premised on the kind of hospitalization the policy speaks
+--     of at all (1.1);
+--   * the policy was in effect at the time of that hospitalization (1.1, and
+--     through 1.1(3)-(4) the whole of 1.2 and 1.3);
+--   * no general exclusion bites (2.1);
+--   * every condition precedent to our liability is satisfied (3.2.1), and
+--     3.1.1 removes any limit of place or hour.
+-- The term limb (3.6) is stated separately as well as through 1.2(d), because
+-- 1.2(d) closes the term at its far end only.
+@export Decide whether a benefit is payable on a claim under the Codex hospitalization policy
+@ref Sections 1.1, 1.2, 1.3, 2.1, 3.1.1, 3.2.1, 3.6
+GIVEN claim IS A Claim
+GIVETH A BOOLEAN
+DECIDE `a benefit is payable on this claim` claim IF
+        `the claim is premised on a hospitalization for sickness or accidental injury` claim
+    AND `the hospitalization is within the policy term` claim
+    AND `3.1.1 — the Policy insures You twenty-four hours a day anywhere in the world`
+    AND `the policy is in effect at the time of the hospitalization` claim
+    AND NOT `a general exclusion in Section 2.1 applies to this claim` claim
+    AND `the conditions precedent in Section 3.2.1 are satisfied` claim
+
+
+§ `The nine benchmark scenarios`
+
+-- ===========================================================================
+-- WHAT THIS SECTION IS. The nine coverage questions of Kant et al. 2025
+-- (arXiv 2502.17638, Appendix A.2), asked of the encoding above and recorded
+-- as assertions so that any future edit to the rules has to answer for them.
+--
+-- EACH ASSERTION RECORDS WHAT THIS ENCODING COMPUTES, NOT WHAT THE PAPER'S
+-- ANSWER KEY SAYS. The two agree on eight of the nine. They disagree on Q4,
+-- and the assertion below states OUR answer with the disagreement named at
+-- the point where it bites; see the note there. The encoding was NOT bent to
+-- reproduce the key.
+--
+-- THE STANDING PREAMBLE. Every one of the paper's queries is preceded by:
+-- "Assuming all other conditions are met and no other exclusions apply
+-- (where by 'other,' I mean anything not referenced in the query that
+-- follows)". That instruction is applied MECHANICALLY here: `a benchmark
+-- claim` fixes every fact to the value that lets the policy apply, and each
+-- scenario then overrides ONLY the facts its own query actually mentions.
+-- Where a query is silent about a fact the policy makes operative, the
+-- favourable default stands — that is the benchmark's own rule, not a
+-- convenience of ours, and on Q4 it is the whole of the disagreement.
+--
+-- TIME. As throughout this module, every month is measured from the
+-- effective date.
+-- ===========================================================================
+
+-- The favourable-default claim constructor. Only the eight facts some query
+-- speaks to are parameters; the remaining nine fields are pinned here to the
+-- value the preamble stipulates.
+--   hm = the month of the hospitalization
+--   gr = the ground of the hospitalization
+--   ag = age in years at the hospitalization
+--   cs = the activities the event arose directly or indirectly out of
+--   vm = the month the wellness visit occurred
+--   cm = the month written confirmation of it was supplied to us
+--   fm = the month in which there was fraud
+--   mm = the month in which there was misrepresentation or withholding
+GIVEN hm IS A NUMBER
+      gr IS A `Ground of hospitalization`
+      ag IS A NUMBER
+      cs IS A LIST OF Cause
+      vm IS A MAYBE NUMBER
+      cm IS A MAYBE NUMBER
+      fm IS A MAYBE NUMBER
+      mm IS A MAYBE NUMBER
+GIVETH A Claim
+`a benchmark claim` hm gr ag cs vm cm fm mm MEANS
+  Claim WITH
+    `this agreement is signed`                                                          IS TRUE
+    `the month the applicable premium for the policy period was paid`                   IS JUST 0
+    `the month of the hospitalization on which the claim is premised`                   IS hm
+    `the hospitalization on which the claim is premised was for`                        IS gr
+    `your age in years at the time of the hospitalization`                              IS ag
+    `the event causing the sickness or accidental injury arose directly or indirectly out of` IS cs
+    `the month in which there was fraud`                                                IS fm
+    `the month in which there was a misrepresentation or material withholding of information provided by you to the Company` IS mm
+    `the month in which a wellness visit for yourself occurred`                          IS vm
+    `that wellness visit was with a qualified medical provider`                          IS TRUE
+    `the month in which written confirmation from that medical provider was supplied to us` IS cm
+    `a dispute or disagreement has arisen regarding a matter pertaining to or concerning this Policy` IS FALSE
+    `the month on which the parties were unable to settle the dispute or difference`    IS NOTHING
+    `the month in which arbitration was commenced`                                      IS NOTHING
+    `a valid arbitration award has been issued`                                         IS TRUE
+    `the month in which written proof of claim was submitted to us`                     IS JUST 0
+    `the month in which you seek to recover on this Policy`                             IS NOTHING
+
+-- The all-favourable baseline: a claim that references nothing at all. If
+-- this were ever FALSE, every scenario below would be vacuous, because each
+-- of them is this claim with one or two facts changed.
+baseline MEANS `a benchmark claim` 3 Sickness 40 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 2) NOTHING NOTHING
+#ASSERT `a benefit is payable on this claim` baseline
+
+
+§§ `Q1 — burns suffered on fire-fighting duty`
+
+-- "will my policy apply if I was hospitalized by burns suffered while doing
+--  my duty as a firefighter?"  Burns are an accidental injury; the event
+--  arose out of service as a fire fighter, so 2.1(3) bites.
+-- ENCODING: No.  PAPER'S KEY: No.  AGREE.
+q1 MEANS `a benchmark claim` 3 `Accidental injury` 40 (LIST `Service as a fire fighter`) (JUST 1) (JUST 2) NOTHING NOTHING
+#ASSERT NOT (`a benefit is payable on this claim` q1)
+
+
+§§ `Q2 — aged 78 at the hospitalization`
+
+-- "will my policy apply if I am 78 years old at the time of hospitalization?"
+--  2.1(5) bars a claimant of 80 or more; 78 is under the bar.  Note this
+--  reads limb 5 as a free-standing status exclusion rather than through the
+--  causal chapeau — a fork, because limb 5 alone begins "If" and does not
+--  parse under "arising directly or indirectly out of".
+-- ENCODING: Yes.  PAPER'S KEY: Yes.  AGREE.
+q2 MEANS `a benchmark claim` 3 Sickness 78 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 2) NOTHING NOTHING
+#ASSERT `a benefit is payable on this claim` q2
+
+
+§§ `Q3 — pneumonia at month 5, aged 65`
+
+-- "will my policy apply if I was hospitalized for pneumonia 5 months after
+--  the policy's effective date, and my age at the time of hospitalization is
+--  65?"  At month 5 the Section 1.3 condition is still pending, so 1.1(3) is
+--  met on its first disjunct.  This is the harmonised reading of 1.2: read
+--  literally, 1.2 deems cancelation whenever the condition "has not been
+--  satisfied in a timely fashion", with no pendency carve-out, and 1.1(4)
+--  would then fail on the very same month-5 fact that 1.1(3) passes on.
+-- ENCODING: Yes.  PAPER'S KEY: Yes.  AGREE (on the harmonised reading).
+q3 MEANS `a benchmark claim` 5 Sickness 65 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 2) NOTHING NOTHING
+#ASSERT `a benefit is payable on this claim` q3
+
+
+§§ `Q4 — a fall abroad; confirmation supplied at month 8`
+
+-- "will my policy apply if I was hospitalized due to a fall while traveling
+--  abroad and I had given confirmation of my wellness visit 8 months after
+--  the policy's effective date?"
+--
+-- *** THIS IS THE ONE ITEM ON WHICH THIS ENCODING AND THE PAPER'S PUBLISHED
+-- *** ANSWER KEY DISAGREE.  ENCODING: Yes.  PAPER'S KEY: No.
+--
+-- The query never says WHEN the hospitalization occurred, and Section 1.1
+-- makes that the operative moment: every limb of the in-effect test is taken
+-- "at the time of the hospitalization".  The month of the hospitalization is
+-- therefore an unreferenced fact, and the benchmark's own preamble says to
+-- take unreferenced facts favourably — here, month 3.  Before month 7 the
+-- Section 1.3 condition is still pending, 1.1(3) is met on its first
+-- disjunct, and no cancelation has yet been deemed, however late the
+-- confirmation eventually arrives.
+--
+-- The best case for the key is grammatical, not textual: the query's
+-- pluperfect ("I WAS hospitalized ... and I HAD GIVEN confirmation ... 8
+-- months after") sequences the confirmation before the hospitalization,
+-- which would put the hospitalization after month 8.  That argument comes
+-- from the tense of the question rather than from the policy, and it points
+-- the opposite way to the preamble the benchmark itself states.
+--
+-- The honest answer is "it depends when you were hospitalized", which the
+-- benchmark's two-valued key cannot express.  The sensitivity run below
+-- measures the dependence rather than arguing about it.  Registered as the
+-- Q4 fork in jl4/examples/legal/chubb/denovo/fork-register.json (the
+-- hospitalization-date fork), and discussed at FOUNDATION.md sections 1.3
+-- and 4.2 entries A3 and A15.
+q4 MEANS `a benchmark claim` 3 `Accidental injury` 40 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 8) NOTHING NOTHING
+#ASSERT `a benefit is payable on this claim` q4
+
+-- Sensitivity: the SAME claim with the hospitalization at month 9 instead —
+-- i.e. after the month-7 confirmation deadline has passed and 1.2 has deemed
+-- a cancelation.  The item flips.  Nothing else about the claim changes, so
+-- this isolates the missing fact as the whole of the disagreement.
+`q4 with the hospitalization at month 9` MEANS `a benchmark claim` 9 `Accidental injury` 40 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 8) NOTHING NOTHING
+#ASSERT NOT (`a benefit is payable on this claim` `q4 with the hospitalization at month 9`)
+
+
+§§ `Q5 — punching one's own face`
+
+-- "will my policy apply if I was hospitalized for punching my own face to
+--  show off for my friends and I did not commit fraud or misrepresentation?"
+--
+-- Section 2.1 contains NO self-harm exclusion — the drafter enumerated
+-- skydiving, military, fire, police and age and omitted intentional
+-- self-injury — so the only route to "No" runs through 1.1's phrase
+-- "hospitalization for sickness or accidental injury", a term the document
+-- never defines.  The answer is therefore SET IN THE FACT RECORD, by
+-- choosing the third constructor of `Ground of hospitalization`, and not
+-- derived by any rule.  The sensitivity run below shows exactly that.
+-- ENCODING: No.  PAPER'S KEY: No.  AGREE — but this agreement is about
+-- marshalling, not about the rules, and the label itself is contested: under
+-- New York law (Section 3.3.1) the test is whether the resulting INJURY was
+-- unintended, and a stunt punch is a deliberate act with an unintended
+-- fracture.
+q5 MEANS `a benchmark claim` 3 `Neither sickness nor accidental injury` 40 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 2) NOTHING NOTHING
+#ASSERT NOT (`a benefit is payable on this claim` q5)
+
+-- Sensitivity: the same claim characterised instead as an accidental injury.
+-- The item flips, with no rule changed — the whole of Q5 is the constructor.
+`q5 read as an accidental injury` MEANS `a benchmark claim` 3 `Accidental injury` 40 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 2) NOTHING NOTHING
+#ASSERT `a benefit is payable on this claim` `q5 read as an accidental injury`
+
+
+§§ `Q6 — skydiving injury, aged 79, confirmation at month 6.5`
+
+-- "will my policy apply if I was hospitalized due to an injury sustained
+--  while skydiving, my age at the time of hospitalization was 79, and proof
+--  of my wellness visit was provided 6.5 months after the policy's effective
+--  date?"  2.1(1) bites on the skydiving alone.  The other two facts are
+--  both favourable — 79 is under the 80 bar, and month 6.5 is within the
+--  month-7 confirmation deadline — so the item is decided by one limb.
+-- ENCODING: No.  PAPER'S KEY: No.  AGREE.
+q6 MEANS `a benchmark claim` 3 `Accidental injury` 79 (LIST Skydiving) (JUST 1) (JUST 6.5) NOTHING NOTHING
+#ASSERT NOT (`a benefit is payable on this claim` q6)
+
+
+§§ `Q7 — heart attack, confirmation at month 2, aged 75`
+
+-- "will my policy apply if I was hospitalized for a heart attack, proof of
+--  the wellness visit was submitted 2 months after the policy's effective
+--  date, and my age at the time of hospitalization was 75?"  Nothing fires:
+--  a heart attack is a sickness, month 2 is timely, 75 is under the bar.
+-- ENCODING: Yes.  PAPER'S KEY: Yes.  AGREE.
+q7 MEANS `a benchmark claim` 3 Sickness 75 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 2) NOTHING NOTHING
+#ASSERT `a benefit is payable on this claim` q7
+
+
+§§ `Q8 — injured in a military training exercise`
+
+-- "will my policy apply if I was hospitalized after being injured in a
+--  military training exercise, the hospitalization occurred within the
+--  policy term, and I did not commit fraud?"  2.1(2) bites.  The two
+--  volunteered facts are both favourable and neither is load-bearing.
+-- ENCODING: No.  PAPER'S KEY: No.  AGREE.
+q8 MEANS `a benchmark claim` 3 `Accidental injury` 40 (LIST `Service in the military`) (JUST 1) (JUST 2) NOTHING NOTHING
+#ASSERT NOT (`a benefit is payable on this claim` q8)
+
+
+§§ `Q9 — bitten by one's son while serving as a police officer`
+
+-- "will my policy apply if I was hospitalized due to my son biting me in the
+--  ankle, proof of my wellness visit was provided 6 months after the
+--  effective date, and I was serving as a police officer at the time of
+--  hospitalization?"
+--
+-- 2.1 asks what the EVENT arose out of, not what the insured WAS.  A son's
+-- bite does not arise, directly or indirectly, out of service in the police,
+-- so the cause list carries the residual constructor and 2.1(4) is not
+-- engaged.  Note that this needs limbs 1-4 read CAUSALLY while Q2 needs limb
+-- 5 read as a flat STATUS bar — the two readings cannot both be had from a
+-- uniform lowering of a list the drafter presented under one chapeau.
+-- ENCODING: Yes.  PAPER'S KEY: Yes.  AGREE.
+q9 MEANS `a benchmark claim` 3 `Accidental injury` 40 (LIST `A cause not named in Section 2.1`) (JUST 1) (JUST 6) NOTHING NOTHING
+#ASSERT `a benefit is payable on this claim` q9
+
+-- Sensitivity: the same claim with the event instead arising out of service
+-- in the police.  The item flips.  Q9 is decided by the causal marshalling
+-- of the bite, not by any rule in Section 2.1.
+`q9 arising out of service in the police` MEANS `a benchmark claim` 3 `Accidental injury` 40 (LIST `Service in the police`) (JUST 1) (JUST 6) NOTHING NOTHING
+#ASSERT NOT (`a benefit is payable on this claim` `q9 arising out of service in the police`)

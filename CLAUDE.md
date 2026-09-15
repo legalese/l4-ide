@@ -207,8 +207,12 @@ will not see it: no paths filter matches a `.l4` under `jl4/examples/`, so the H
 run on your PR, and the failure surfaces on the next person's branch instead.
 
 **Which globs, exactly** (`jl4/tests/Main.hs:78-90`, kept in step by `etc/check-corpus-goldens.mjs:32-43`):
-`ok/**`, `legal/**`, `not-ok/tc/**`, `not-ok/nlg/**`, `not-ok/export-*.l4`, `lsp/semantic-tokens/**`,
-`lsp/hover/**`, and `jl4-core/libraries/*.l4`. **`jl4/examples/docassemble/` and
+`ok/**`, `legal/**`, **`canon/**`**, `not-ok/tc/**`, `not-ok/nlg/**`, `not-ok/export-_.l4`,
+`lsp/semantic-tokens/**`, `lsp/hover/**`, and `jl4-core/libraries/_.l4`. **`canon/**` is the
+VENDORED MIRROR** of blessed directories in `legalese/canon`, at the SHA in
+`etc/canon-pin.json` — do not edit it or bless its goldens by hand; edit in canon and
+`node etc/sync-canon.mjs --bump <sha>`. The `Canon Mirror` CI job fails when the mirror and
+canon at the pin disagree. **`jl4/examples/docassemble/` and
 `jl4/examples/openfisca/` are in NO glob**, which is why their `.l4` files carry no `tests/`
 directory and adding one there needs no goldens. State this rule with its scope: an earlier
 unqualified reading of this paragraph sent a session hunting a golden trap in `docassemble/` that
@@ -321,7 +325,7 @@ cannot lower. It used to have no test of its own at all, which is how it accumul
 could not render its own corpus back into parseable source (smucclaw/l4-ide#932).
 
 The round-trip block in `jl4/tests/Main.hs` runs over **every file the golden suite type-checks** —
-`ok/**`, `legal/**` and `jl4-core/libraries/*.l4`, 300 files — and asserts three things per file:
+`ok/**`, `legal/**`, `canon/**` and `jl4-core/libraries/*.l4` — and asserts three things per file:
 no inference-variable gensym reaches the output, the printed text re-parses, and the printed text
 re-type-checks. **There are no exclusions and no known-failure list**; if you need one, that is the
 signal to fix the printer instead.

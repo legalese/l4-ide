@@ -1,7 +1,9 @@
 # The regression corpus spans two repos: `jl4/examples/legal` and canon's blessed dirs
 
-**Status:** RULED 2026-09-15 (Meng), NOT BUILT. Nothing below changes a workflow, a test harness or
-a file under `jl4/examples/` yet. The measurements are from `unstable` `388f8605` and canon
+**Status:** RULED 2026-09-15 (Meng). §3B **BUILT 2026-09-15** — see the Built / Not built lists at
+§3B; §4's migration is **not** built and nothing is deleted yet. ~~Nothing below changes a workflow,
+a test harness or a file under `jl4/examples/` yet.~~ That sentence was true when written and is
+now false: §3B added a CI job, a golden glob and 85 files under `jl4/examples/canon/`. The measurements are from `unstable` `388f8605` and canon
 `mengwong/drafts` `299dd490`, taken the evening of 2026-09-15.
 
 ## 1. The ruling, verbatim
@@ -37,9 +39,15 @@ canon stay where they are.
 - **canon is public** (`gh api repos/legalese/canon` → `visibility: public`), so CI can check it
   out at a pinned SHA with no token.
 - **canon's encoding dirs already carry the four jl4-test goldens per file** (`tests/<stem>.{golden,
-ep.golden,nlg.golden,schema.golden}`) — `sg/child-support/encodings/legalese` 5 `.l4` / 24
-  goldens, `sg/succession/encodings/legalese` 5 / 24, both chubb encodings 1 / 4 each,
+ep.golden,nlg.golden,schema.golden}`) — `sg/child-support/encodings/legalese` ~~5~~ **6** `.l4` / 24
+  goldens, `sg/succession/encodings/legalese` ~~5~~ **6** / 24, both chubb encodings 1 / 4 each,
   `sg/penal-code-1871` 1 / 4. `il/ofek-hadash-2008` (9 `.l4`) and `sg/pdpa-2012` carry none.
+  **Corrected 2026-09-15 while building §3B:** each of those two dirs keeps a SIXTH `.l4`
+  one level down, in `cases/`, which the original count missed. The GOLDEN count was right all
+  along — 24 is 6 stems × 4 — so the two halves of that sentence disagreed with each other and
+  the `.l4` half was the wrong one. Across the five blessed dirs: **15 `.l4`, 60 goldens**,
+  exactly four per file. The miscount is the reason §3B.2's hoist exists at all, so it is
+  corrected here rather than quietly fixed.
 - **Not every canon dir checks green with today's binary.** With the `unstable` `388f8605` `l4`
   and its embedded prelude, every encoding dir under `subjects/{sg,us,il,contracts,doctrine}`
   passes `l4 check` except `sg/succession/encodings/cleanroom-2026-08`, where `family-cases.l4`
@@ -96,6 +104,62 @@ about. Meng to confirm on return; recorded here so the two shapes are not re-der
 
 ### 3B. Vendored at a pin (chosen)
 
+**Built 2026-09-15**, on `mengwong/canon-vendor`, cut from `unstable` `388f8605`. What follows
+replaces this section's earlier "proposed" standing; the numbered design below is unchanged and is
+what was implemented, with the two departures named under _What review changed_.
+
+**Built:**
+
+- **`etc/canon-pin.json`** — repo, 40-hex SHA, and the five blessed dirs as `{from, to}`. It also
+  carries, in its own header, why each _unblessed_ dir is unblessed, so the next person does not
+  re-derive it.
+- **`etc/sync-canon.mjs`** — `--pull` (shallow-fetches canon at the pin into a temp dir and
+  rewrites the mirror), `--check` (tree diff, what CI runs), `--bump <sha>`, `--selftest`
+  (16 cases: hoist, collision refusal, allowlist, the three mutations — hand-edited mirror, pin
+  moved without pull, stale canon golden — plus a blessed dir absent at the pin and a malformed
+  pin).
+- **`jl4/examples/canon/`** — 85 files: 15 `.l4`, 60 goldens, 5 `encoding.json`, 5
+  `SOURCE-LICENSE.md`. Plus a `README.md` of this repo's own, exempt from `--check` by name.
+- **The golden glob.** `canon/**` joins `legal/**` in `jl4/tests/Main.hs` and
+  `etc/check-corpus-goldens.mjs`, which CLAUDE.md §3.1 requires to stay in step. Measured after:
+  `check-corpus-goldens` reports **470 corpus files, each with all four goldens**.
+- **`canon/**`joins the`prettyLayout` round-trip too\*\* (§3B.2 did not say either way; GM's view
+  and this implementation's). The block's own comment defines its corpus as "exactly the files the
+  'ok files' block typechecks", so excluding canon would have falsified that sentence.
+- **One CI job, `Canon Mirror`** — `--selftest` then `--check`, no path filter and no build,
+  because what it checks is whether the mirror still equals canon at the pin, which no `paths:`
+  filter can predict.
+- **Docs**: `jl4/examples/canon/README.md`, a new `jl4/examples/legal/README.md` stating the split,
+  and CLAUDE.md §3.1's glob list.
+
+**Not built, and each is a place this document still describes more than the tree does:**
+
+- **`--push-goldens`** (§3B.3). The mirror reads canon's goldens and never writes them back, so
+  re-blessing after an output change is a canon-side edit plus a pin bump. The consequence is
+  handled rather than hidden: `--check` reports a differing golden **separately and non-fatally**,
+  because making it fatal would reintroduce exactly the cross-repo blessing deadlock §5 says
+  vendoring was chosen to avoid. §6's open question — whether canon or l4-ide owns the goldens —
+  is therefore still open, and this implementation assumes canon owns them.
+- **The migration (§4).** Nothing is deleted: `legal/chubb` and `legal/sg-succession` still exist
+  and are still globbed, so those two subjects are duplicated _within this repository_ until §4
+  runs. That is deliberate — ship the mechanism, see it green, then move.
+- **The merge-queue requirement.** `Canon Mirror` is not a required check in the ruleset.
+- **The pin is on a shelf, not on canon `main`**, which §3A.4/§3B.6 require. None of the five
+  blessed dirs is on `main` yet, so the requirement cannot be met today; the pin's header says the
+  target is `main` and `--pull` fails loudly if the shelf SHA is rebased away.
+
+**What review changed** (two read-only adversarial refuters, plus GM's own reading):
+
+- **The wrinkle was real and the reason for it was not.** Two blessed dirs keep a cases file at
+  `cases/x.l4` with its goldens in the dir-level `tests/`. The obvious diagnosis — that a nested
+  file cannot resolve its sibling imports — is **false**: measured at the pin, both layouts pass
+  `l4 check`. The hoist is needed for **goldens only**, because
+  `takeDirectory inputFile </> "tests"` would look in `cases/tests/`, and canon has no
+  `cases/tests/` directory anywhere. Had the change shipped on the import rationale it would have
+  been right for the wrong reason and the next person would have re-derived it wrongly.
+- **§2's count and §4's paths were both wrong** and are corrected in place above rather than
+  silently — see the two _Corrected 2026-09-15_ notes.
+
 1. **The same pin.** `etc/canon-pin.json`: `{ "repo": "legalese/canon", "sha": "<40 hex>",
 "blessed": [ { "from": "subjects/sg/child-support/encodings/legalese", "to": "sg/child-support" }, ... ] }`.
 2. **A mirror in the tree.** `jl4/examples/canon/<to>/` holds a verbatim copy of each blessed dir
@@ -122,7 +186,13 @@ about. Meng to confirm on return; recorded here so the two shapes are not re-der
 
 ## 4. The migration, once §3B is green in CI
 
-- `legal/chubb` → deleted; its mirror is `canon/us/chubb-hospital-cash/blind-inert-2026-08/`. `etc/go/subjects/chubb` → that path.
+- `legal/chubb` → deleted; its mirror is ~~`canon/us/chubb-hospital-cash/blind-inert-2026-08/`~~
+  **`jl4/examples/canon/us/chubb-hospital-cash/blind-inert/`**. `etc/go/subjects/chubb` → that path.
+  **Corrected 2026-09-15:** this section was written before the blessed list was confirmed, and
+  names a path the pin does not produce. The `to` values in `etc/canon-pin.json` are the
+  confirmed ones and drop the date suffix — `blind-inert`, `blind-guarded`, `sg/child-support`,
+  `sg/succession`, `sg/penal-code-1871`. Said here rather than silently rewritten, because a
+  migration section that quietly agrees with the code teaches nobody which one moved.
 - `legal/sg-succession` → `sg-succession-cases.l4` and `sg-succession-wizard.l4` land in canon's
   `sg/succession/encodings/legalese/` first (with goldens, same commit); then the dir is deleted;
   `etc/go/subjects/sg-succession` → the mirror path; the three spec citations retarget to the

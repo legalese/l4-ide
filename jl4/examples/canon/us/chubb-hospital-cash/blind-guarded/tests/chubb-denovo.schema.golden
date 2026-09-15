@@ -1,0 +1,147 @@
+{
+    "$defs": {
+        "Cause": {
+            "enum": [
+                "skydiving",
+                "service in the military",
+                "service as a fire fighter",
+                "service in the police",
+                "a cause not named in clause 2.1"
+            ],
+            "type": "string"
+        },
+        "Claim": {
+            "properties": {
+                "a dispute or disagreement has arisen": {
+                    "type": "boolean"
+                },
+                "a valid arbitration award has been issued": {
+                    "type": "boolean"
+                },
+                "age at the time of the hospitalization": {
+                    "type": "number"
+                },
+                "month arbitration was commenced": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "month of the hospitalization": {
+                    "type": "number"
+                },
+                "month recovery on the policy is sought": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "month the parties were unable to settle the dispute": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "month the wellness visit occurred": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "month written confirmation of the visit was supplied": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "month written proof of claim was submitted": {
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "the applicable premium for the policy period has been paid": {
+                    "type": "boolean"
+                },
+                "the event arose directly or indirectly out of": {
+                    "items": {
+                        "$ref": "#/$defs/Cause"
+                    },
+                    "type": "array"
+                },
+                "the hospitalization was for": {
+                    "$ref": "#/$defs/Hospitalization Ground"
+                },
+                "there is a material withholding of information provided to the Company": {
+                    "type": "boolean"
+                },
+                "there is a misrepresentation of information provided to the Company": {
+                    "type": "boolean"
+                },
+                "there is fraud": {
+                    "type": "boolean"
+                },
+                "this agreement is signed": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "the hospitalization was for",
+                "month of the hospitalization",
+                "age at the time of the hospitalization",
+                "the event arose directly or indirectly out of",
+                "this agreement is signed",
+                "the applicable premium for the policy period has been paid",
+                "there is fraud",
+                "there is a misrepresentation of information provided to the Company",
+                "there is a material withholding of information provided to the Company",
+                "a dispute or disagreement has arisen",
+                "a valid arbitration award has been issued"
+            ],
+            "type": "object"
+        },
+        "Hospitalization Ground": {
+            "enum": [
+                "sickness",
+                "accidental injury",
+                "neither sickness nor accidental injury"
+            ],
+            "type": "string"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+        "c": {
+            "$ref": "#/$defs/Claim"
+        }
+    },
+    "required": [
+        "c"
+    ],
+    "title": "benefit is payable",
+    "type": "object"
+}
