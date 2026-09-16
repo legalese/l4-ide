@@ -89,6 +89,16 @@ Toolchain: `l4` is on PATH. Run checks with `JL4_LIBRARY_PATH=<repo>/jl4-core/li
 IMPORTANT L4 GOTCHAS: a file cannot `IMPORT` a library sharing its own basename. Each `#EVAL` line must carry a bare token `q1`..`q9` so the scorer can find it; name any extra probes `Q4b` or `S4` so they do not collide.
 ```
 
+> **Note, 2026-09-16 — the carve-out above names a directory that no longer holds an
+> encoding.** The chubb modules moved to
+> `jl4/examples/canon/us/chubb-hospital-cash/`; `jl4/examples/legal/chubb/` now holds only
+> the source deposit. **The quoted bytes are not edited** — they are what encoders were
+> actually given, and §2 is this file's record of that. Nothing leaks: the permitted set is
+> the skill, `doc/reference/` and `.l4` under `jl4-core/libraries/`, none of which reaches
+> `jl4/examples/`, and the "but NOT" clause was always a reminder rather than the fence.
+> A re-run under this protocol should carry the canon path in the clause, as
+> `bench/PREREGISTRATION-go.md` §6 now does.
+
 with rules 3–5 requiring `policy.l4` + `apply.l4`, permitting typecheck only ("You may NOT run
 the nine evaluations"), and requiring `NOTES.md`. `l4-guided` = `l4-unguided` minus the schema
 prohibition, plus the same "Use ALL OF, and ONLY, the `Claim` fields" sentence as

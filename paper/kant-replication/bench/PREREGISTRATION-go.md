@@ -130,10 +130,17 @@ is recorded in PROVENANCE.md.
 > The chubb oracle encodings were vendored into the `legalese/canon` mirror and now live
 > under `jl4/examples/canon/us/chubb-hospital-cash/`. `jl4/examples/legal/chubb/**` was
 > written to fence those encodings off; after the move it fences off only the source
-> deposit, so a sandbox obeying rule 1 to the letter could have read the oracle at its new
-> path. The canon path is therefore ADDED, and the original kept (the deposit is still
+> deposit. The canon path is therefore ADDED, and the original kept (the deposit is still
 > there). This preserves the blind this file already specified rather than revising it;
 > no run exists under this protocol, so nothing measured is affected.
+>
+> **Corrected 2026-09-16, same day:** an earlier wording of this note said a sandbox
+> obeying rule 1 to the letter could have read the oracle at its new path. That
+> overstated it. Rule 1's first clause is a blanket — "Do NOT read anything outside your
+> trial directory" (`PROVENANCE.md:50`) — and the oracle was outside every trial
+> directory at either path, so the fence itself held. What went stale is the
+> ENUMERATION, which is defence-in-depth, and the carve-out at `PROVENANCE.md:85`. This
+> entry is still worth adding for the same reason the enumeration exists.
 
 ## 7. What this experiment cannot show
 
