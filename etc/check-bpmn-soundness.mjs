@@ -36,6 +36,16 @@
 // the file UNSOUND, because a file that lies about its own shape is not one any
 // verdict should be read off.
 //
+// A PARTIAL IMPLEMENTATION THAT TURNS A REFUSAL INTO A WRONG ANSWER IS A
+// REGRESSION, even though it is strictly more done — and "more done" is what
+// makes it tempting to ship. This file has the instance: the reader learned to
+// nest one commit before `expandScopes` existed, and in between, a file with a
+// sub-process stopped saying "NOT CHECKED: this checker plays one process only"
+// and started saying "UNBOUNDED or TOO LARGE", which is false and tells a
+// reader nothing they can act on. The refusal was restored and the expansion
+// landed whole. If you are part-way through teaching this checker a new
+// construct, leave the refusal standing until the new path is complete.
+//
 // PROPER COMPLETION IS DELIBERATELY NOT AN ERROR HERE. A classic WF-net demands
 // exactly one token in one sink; BPMN instead completes when every token has
 // been consumed, and consuming several at several end events is legal. The
@@ -385,6 +395,17 @@ function readBpmn(xml) {
 //          legalese/l4-ide#395 fixed, reproduced inside the checker that exists
 //          to catch it.
 //   n = 2  is the least n that tells them apart.
+//
+// WHAT "SOUND AT 0 INSTANCES" DOES NOT MEAN, because the two claims want to
+// collapse and they have different evidence and different owners. Soundness
+// here is about TOKEN FLOW: the net completes, nothing strands, nothing
+// deadlocks. Whether an empty cast is drawn CORRECTLY is a different claim
+// entirely, and it is settled by the shape rather than by this gate — the
+// fork's continuation sits inside the instance, so zero instances give zero
+// continuations, while a barrier's sits outside and still fires once. That is a
+// question about what the diagram MEANS, answered in the exporter and in the
+// quantifier spec, and this checker cannot see it. "We explored n = 0" must
+// never be read as "the empty-cast case is verified".
 const INSTANCE_COUNTS = [0, 2];
 
 // Does this end event throw rather than end? An escalation end inside a scope
