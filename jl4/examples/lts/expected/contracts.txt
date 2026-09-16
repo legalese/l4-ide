@@ -86,7 +86,7 @@ y — after 1 event, the clock stands at 4 (the #TRACE on line 86)
     - B does payment OF 2 now (at 4) → fulfilled
 
   What would put someone in breach:
-    - nothing happens by 9 (the clock reaches 10) → B is in breach: MUST payment (EXACTLY n) was due by 9; the clock reached 10 without it
+    - nothing happens by 9 (the clock reaches 10) → B is in breach: MUST payment n was due by 9; the clock reached 10 without it
 
   Next deadline: 9 (B: payment OF 2)
 

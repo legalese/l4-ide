@@ -211,7 +211,12 @@
     "owed": [],
     "passedOver": [],
     "standing": {
-      "breach": {},
+      "breach": {
+        "anchor": 0,
+        "names": [
+          {}
+        ]
+      },
       "status": "breached"
     },
     "steps": [
@@ -365,7 +370,14 @@
       {
         "clock": null,
         "outcome": {
+          "anchor": 0,
           "by": null,
+          "names": [
+            {
+              "party": null,
+              "reason": null
+            }
+          ],
           "what": "breached"
         },
         "scrutiny": "noEvent"
@@ -694,6 +706,12 @@
     "passedOver": [],
     "standing": {
       "breach": {
+        "anchor": 0,
+        "names": [
+          {
+            "party": "Tenant OF \"Bob\""
+          }
+        ],
         "party": "Tenant OF \"Bob\""
       },
       "status": "breached"
@@ -854,7 +872,14 @@
       {
         "clock": null,
         "outcome": {
+          "anchor": 0,
           "by": "Tenant OF …",
+          "names": [
+            {
+              "party": "Tenant OF …",
+              "reason": null
+            }
+          ],
           "what": "breached"
         },
         "scrutiny": "noEvent"

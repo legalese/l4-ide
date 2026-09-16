@@ -4,8 +4,16 @@
     "breaching": [
       {
         "breach": {
+          "anchor": 0,
           "due": 14,
           "missed": "MUST return",
+          "names": [
+            {
+              "due": 14,
+              "missed": "MUST return",
+              "party": "B"
+            }
+          ],
           "party": "B",
           "reason": "revealed when the clock ran on with nothing happening",
           "seenAt": 15
@@ -507,8 +515,16 @@
     "breaching": [
       {
         "breach": {
+          "anchor": 0,
           "due": 9,
-          "missed": "MUST payment (EXACTLY n)",
+          "missed": "MUST payment n",
+          "names": [
+            {
+              "due": 9,
+              "missed": "MUST payment n",
+              "party": "B"
+            }
+          ],
           "party": "B",
           "reason": "revealed when the clock ran on with nothing happening",
           "seenAt": 10
@@ -721,8 +737,16 @@
     "passedOver": [],
     "standing": {
       "breach": {
+        "anchor": 0,
         "due": 2,
         "missed": "MUST payment n PROVIDED (n EQUALS 7)",
+        "names": [
+          {
+            "due": 2,
+            "missed": "MUST payment n PROVIDED (n EQUALS 7)",
+            "party": "S"
+          }
+        ],
         "party": "S",
         "reason": "revealed by B doing payment OF 6",
         "seenAt": 3
@@ -789,8 +813,16 @@
     "passedOver": [],
     "standing": {
       "breach": {
+        "anchor": 0,
         "due": 2,
         "missed": "MUST payment n PROVIDED (n EQUALS 7)",
+        "names": [
+          {
+            "due": 2,
+            "missed": "MUST payment n PROVIDED (n EQUALS 7)",
+            "party": "S"
+          }
+        ],
         "party": "S",
         "reason": "revealed by S doing payment OF 7",
         "seenAt": 3
