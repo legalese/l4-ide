@@ -281,15 +281,15 @@ data EvalState =
       -- cache-serve time via 'validFor'.
     , tracePolicy :: !TracePolicy  -- controls trace collection and output
     , safeMode   :: !Bool          -- when True, HTTP operations return errors
-    , reofferedEvents :: !(IORef (Map Address Rational))
+    , reofferedEvents :: !(IORef (Map Address Reoffered))
       -- ^ the EVENT copies an expiring obligation has re-offered to its
       -- HENCE/LEST continuation, each keyed by its store address and
-      -- carrying the absolute deadline whose expiry minted it (see the
-      -- Contract5 expiry NOTE in 'backwardContractFrame'). A marked copy
-      -- that reveals a further expiry is re-offered again only while the
-      -- deadline strictly advances; when it does not, the copy is consumed,
-      -- which bounds evaluation for recursive continuations with
-      -- non-positive deadlines.
+      -- carrying its 'Reoffered' mark: the latest deadline it has revealed
+      -- the expiry of, and how many hand-offs in a row failed to pass it
+      -- (see the Contract5 expiry NOTE in 'backwardContractFrame'). The
+      -- mark never withholds an event from a layer; it only lets the
+      -- machine refuse a chain whose deadlines have stopped advancing,
+      -- loudly, instead of walking it forever.
     , deonticLog :: !(Maybe DeonticLog)
       -- ^ LTS-VISUALISER §4.3 (P2b): the deontic step log, OPTIONAL and off
       -- by default exactly as 'evalTrace' is (ruling R5, §8). 'Nothing' means
@@ -761,21 +761,51 @@ putTemporalContext ctx = do
   r <- asks (.temporalContext)
   liftIO (writeIORef r ctx)
 
--- | Record that an EVENT value (identified by its store address) has been
--- re-offered to a HENCE/LEST continuation after revealing the expiry of
--- the given absolute deadline. See the Contract5 expiry NOTE in
--- 'backwardContractFrame'.
-markReoffered :: Reference -> Rational -> Eval ()
-markReoffered rf deadline = do
+-- | Record that an EVENT value (identified by its store address) is a copy
+-- re-offered to a HENCE/LEST continuation, with its 'Reoffered' mark. See
+-- the Contract5 expiry NOTE in 'backwardContractFrame'.
+markReoffered :: Reference -> Reoffered -> Eval ()
+markReoffered rf mark = do
   r <- asks (.reofferedEvents)
-  liftIO (modifyIORef' r (Map.insert rf.address deadline))
+  liftIO (modifyIORef' r (Map.insert rf.address mark))
 
--- | Is this EVENT value a re-offered copy, and if so at which deadline's
--- expiry was it minted? (see 'markReoffered')
-isReoffered :: Reference -> Eval (Maybe Rational)
+-- | Is this EVENT value a re-offered copy, and if so what is its mark?
+-- (see 'markReoffered')
+isReoffered :: Reference -> Eval (Maybe Reoffered)
 isReoffered rf = do
   r <- asks (.reofferedEvents)
   liftIO (Map.lookup rf.address <$> readIORef r)
+
+-- | How many hand-offs in a row a re-offered event may make to a
+-- continuation whose deadline is no later than one it has already revealed
+-- the expiry of, before the machine refuses the chain as one that cannot
+-- end ('stalledChainRefusal'). Deliberately generous: a stalled layer costs
+-- about a microsecond, and the number decides only how soon an ill-founded
+-- chain is reported, not whether — a chain of DISTINCT layers is finite by
+-- its syntax and never comes near it. See the Contract5 expiry NOTE.
+maximumStalledReoffers :: Int
+maximumStalledReoffers = 1_000
+
+-- | What the machine says when a re-offered event has walked
+-- 'maximumStalledReoffers' continuations in a row without the deadline
+-- advancing: a continuation that names itself (or reaches itself) and is
+-- already past its deadline when it is entered — a LEST with a
+-- non-positive @WITHIN@ (its clock is the missed deadline), a kept SHANT's
+-- HENCE with a negative one (its clock is the revealing stamp), or an
+-- anchored deadline no later than the one just missed.
+stalledChainRefusal :: Rational -> Rational -> Text
+stalledChainRefusal highWater stamp = Text.unwords
+  [ "A chain of HENCE or LEST continuations has stalled: the event at " <> prettyRatio stamp
+  , "has been handed on " <> Text.textShow maximumStalledReoffers <> " times in a row to"
+  , "continuations whose deadlines never advanced past " <> prettyRatio highWater <> ","
+  , "a deadline it had already revealed the expiry of, so no continuation this"
+  , "chain reaches can ever be open to it. A continuation that names itself and"
+  , "is already past its deadline when it is entered - a negative WITHIN, a"
+  , "LEST's WITHIN 0, or an anchored deadline no later than the one just"
+  , "missed - is such a chain. Give it a positive WITHIN, anchor it later than"
+  , "the missed deadline, or end the chain with BREACH."
+  , "(EVERY-EACH-QUANTIFIER-SPEC section 5.2.1.)"
+  ]
 
 -----------------------------------------------------------------------------
 -- STATE-AS-LEDGER: the ledger operations as direct 'Eval' actions.
@@ -1893,35 +1923,41 @@ backwardContractFrame val = \ case
       -- Every one of those layers is a real obligation whose window the
       -- event is past, and the event must reach the first layer whose
       -- window it is NOT past: that is the layer it can perform, or fail
-      -- (spec §5.2, R-Q5). So a re-offered copy is marked with the
-      -- absolute deadline whose expiry minted it ('markReoffered'; read
-      -- back at Contract1 as 'ev'reoffered'), and when the copy reveals a
-      -- further expiry it is re-offered AGAIN provided that deadline is
-      -- strictly later than the one that minted it — which every positive
-      -- WITHIN under the deadline anchor makes true. The chain of deadlines
-      -- a single event walks is then strictly increasing and bounded above
-      -- by the event's stamp, so it is finite whenever the durations are
-      -- bounded away from zero. When the deadline does NOT advance — a
-      -- non-positive WITHIN, or an anchored deadline that did not move —
-      -- unconditional re-offering would loop forever, so the copy is
-      -- consumed instead (the pre-re-offer behavior): the continuation is
-      -- applied to the events after it. Each real event then funds at
-      -- most one extra scrutiny per deadline it is past, and the event
-      -- list strictly shrinks on every other step. The one chain this does
-      -- not bound is a Zeno chain — durations shrinking geometrically, so
-      -- the deadlines advance forever without reaching the stamp — which
-      -- is left to the machine's 'StackOverflow' guard
+      -- (spec §5.2, R-Q5). So a re-offered copy is ALWAYS handed on to the
+      -- next layer, whatever that layer's deadline: a chain of DISTINCT
+      -- layers is finite by its syntax, and withholding the copy from any
+      -- of them is a wrong answer (round 2 of the adversarial pass of
+      -- 2026-09-16: a middle layer anchored at or before the missed
+      -- deadline, or a @WITHIN 0@, swallowed the next layer's timely
+      -- performance, and the verdict at an instant depended on how many
+      -- events the trace carried). The only chain that does not end is
+      -- one that reaches ITSELF without the deadline advancing — a
+      -- self-naming LEST with a non-positive WITHIN, or anchored at an
+      -- instant no later than the deadline just missed — whose every
+      -- incarnation is already past when it is entered. That is an
+      -- ill-founded contract, and the machine refuses it by name rather
+      -- than walking it forever: the copy carries a 'Reoffered' mark
+      -- ('markReoffered', read back at Contract1 as 'ev'reoffered') with
+      -- the latest deadline it has revealed the expiry of and the number
+      -- of hand-offs in a row that failed to pass that mark; past
+      -- 'maximumStalledReoffers' of those the walk stops with
+      -- 'stalledChainRefusal'. A chain whose deadlines advance is finite
+      -- whenever the durations are bounded away from zero (the deadlines
+      -- are increasing and bounded above by the stamp); the one chain
+      -- neither bound catches is a Zeno chain — durations shrinking
+      -- geometrically, so the deadlines advance forever without reaching
+      -- the stamp — which is left to the machine's 'StackOverflow' guard
       -- ('maximumFrameDepth': every nested hand-off leaves a
       -- 'RestoreCurrentParty' frame on the stack, so a 1,500,000-layer
       -- chain of cheap steps reports the overflow in about a second); a
       -- halving chain's rationals grow a bit per layer, so it hangs long
       -- before that guard is reached — as ordinary non-terminating
       -- recursion (@f x MEANS f (x PLUS 1)@, a tail call that pushes no
-      -- frame) hangs too. Until the adversarial pass of 2026-09-16 a copy was
-      -- re-offered AT MOST ONCE and consumed on its second expiry, which
-      -- dropped a timely performance of the third layer of a chain and made
-      -- the verdict at an instant depend on how many events the stream
-      -- carried (spec §5.2.1, the round-1 entry).
+      -- frame) hangs too. Until round 2 of the adversarial pass a copy
+      -- whose deadline had not advanced was CONSUMED — applied to the
+      -- events after it — which dropped it before the first layer whose
+      -- window it was not past; until round 1 it was consumed on its
+      -- second expiry, whatever the deadline did (spec §5.2.1).
       --
       -- STATE-AS-LEDGER (M4) integration: rather than calling 'continueWithFollowup'
       -- directly (as the re-offer logic did before the ledger landed),
@@ -1945,9 +1981,11 @@ backwardContractFrame val = \ case
         -- P2b: the 'Expired' step. It is built here, where the deadline and
         -- the revealing event are in hand, but LOGGED at the ResolveParty
         -- frame for the routed cases, because that is where the party gets
-        -- forced and the key wants the bearer. Consumed-vs-witnessed follows
-        -- the re-offer rule above: a first look is re-offered onward
-        -- ('WitnessedOnly'); a second look is 'Reoffered' and consumed.
+        -- forced and the key wants the bearer. The scrutiny follows the
+        -- re-offer rule above: a fresh event's look is 'WitnessedOnly' (it
+        -- is re-offered onward), a re-offered copy's look is 'Reoffered' —
+        -- and since round 2 of the LEST pass (spec §5.2.1, 2026-09-16) the
+        -- copy is handed on again either way, never consumed.
         let expiredStep :: DS.Branch -> Maybe Text -> Eval (Maybe DeonticStep)
             expiredStep branch mBearer = asks (.deonticLog) >>= \ case
               Nothing -> pure Nothing
@@ -1964,26 +2002,26 @@ backwardContractFrame val = \ case
             clockAt isHence stampR = if isHence then stampR else deadlineR
             reofferResolve isHence followup' branch = do
               pending <- expiredStep branch Nothing
-              case ev'reoffered of
-                Just minted | deadline <= minted -> do
-                  -- this event is a re-offered copy and the deadline it has
-                  -- now revealed the expiry of is no later than the one
-                  -- that minted it: the chain is not advancing, so consume
-                  -- it (see NOTE above). The failure time is the deadline
-                  -- whether the event that revealed the miss was fresh or
-                  -- already marked.
-                  t <- allocateValue ev'time
-                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events, time = clockAt isHence t, pending, seen, lifecycle = lifecycleAt isHence t})
-                  maybeEvaluate env party
-                _ -> do
-                  -- a fresh event, or a copy whose chain of deadlines is
-                  -- still advancing: re-offer it, marked with THIS deadline
-                  ev'timeR <- allocateValue ev'time
-                  evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
-                  markReoffered evR deadline
-                  eventsR <- allocateValue (ValCons evR events)
-                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = clockAt isHence ev'timeR, pending, seen, lifecycle = lifecycleAt isHence ev'timeR})
-                  maybeEvaluate env party
+              -- The mark the copy carries on: a fresh event starts the walk
+              -- at this deadline; a copy that has revealed an earlier
+              -- expiry advances its high-water mark when this deadline
+              -- passes it, and otherwise counts one more stalled hand-off
+              -- — refused, by name, once there have been too many in a row
+              -- (see NOTE above). The failure time is the deadline whether
+              -- the event that revealed the miss was fresh or already
+              -- marked.
+              mark <- case ev'reoffered of
+                Nothing -> pure MkReoffered {highWater = deadline, stalled = 0}
+                Just m
+                  | deadline > m.highWater -> pure MkReoffered {highWater = deadline, stalled = 0}
+                  | m.stalled >= maximumStalledReoffers -> userException (UserError (stalledChainRefusal m.highWater stamp))
+                  | otherwise -> pure m {stalled = m.stalled + 1}
+              ev'timeR <- allocateValue ev'time
+              evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
+              markReoffered evR mark
+              eventsR <- allocateValue (ValCons evR events)
+              pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = clockAt isHence ev'timeR, pending, seen, lifecycle = lifecycleAt isHence ev'timeR})
+              maybeEvaluate env party
         case act.modal of
           DMustNot ->
             -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline

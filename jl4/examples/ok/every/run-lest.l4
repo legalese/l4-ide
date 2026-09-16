@@ -26,8 +26,11 @@ IMPORT prelude
 -- carries the deadline it missed (spec §3.4). Because a LEST counts from
 -- the deadline, one event can be past several LEST layers at once; it is
 -- offered to each in turn until it reaches a layer whose window is still
--- open (§9), and the clock a continuation is applied to is also what THE
--- ARMING names inside it (§10).
+-- open (§9) — including a layer whose deadline is no later than the one
+-- before it (§11) — and the clock a continuation is applied to is also
+-- what THE ARMING names inside it (§10). The one chain that walk cannot
+-- end, a continuation that reaches itself with its deadline already past,
+-- is refused by name (§12).
 
 DECLARE Actor IS ONE OF
     Landlord HAS name IS A STRING
@@ -97,7 +100,8 @@ GIVETH A DEONTIC Actor Action
 -- itself the first thing after the deadline can discharge it: at 14 it is
 -- timely (14 ≤ 15). At 18 the same refund reveals Alice's miss, is
 -- re-offered, reveals the refund's own expiry too — the deadline anchor is
--- what makes that possible — and is then consumed: the breach reports 15.
+-- what makes that possible — and, the refund having no LEST of its own,
+-- the walk ends there: the breach reports 15.
 #TRACE `sign or refund` AT 0 WITH
   PARTY theLandlord DOES Refund theLandlord AT 14
 
@@ -474,3 +478,82 @@ GIVETH A DEONTIC Actor Action
   PARTY alice DOES Sign alice AT 4
   PARTY theLandlord DOES Refund theLandlord AT 6
   (`WAIT UNTIL` 8)
+
+
+§ `11. a layer whose deadline does not advance is walked, not skipped`
+
+-- Three layers: Alice must sign by 10; failing that, by 5 OF THE ARMING —
+-- the enclosing obligation's arming, 0, so a window that had already
+-- closed when the layer was entered; failing that, the landlord refunds
+-- WITHIN 10 of that layer's deadline, 5, so by 15. A refund at 12 is the
+-- first thing after 10: it reveals Alice's miss, is handed to the second
+-- layer, reveals that miss too — at a deadline EARLIER than the one it had
+-- just revealed — and is handed on again to the third, which it performs
+-- in time. A WAIT at 11 before it changes nothing. At 20 the same refund
+-- is late for the third layer, with or without the WAIT: the breach
+-- reports 15. (Until round 2 of the adversarial pass of 2026-09-16 a copy
+-- whose deadline had not advanced was consumed at the second layer, so
+-- the refund at 12 alone left the third layer as an untouched residual
+-- and the refund at 20 alone did the same, while the traces with the WAIT
+-- gave FULFILLED and the breach — one instant, two verdicts.)
+GIVETH A DEONTIC Actor Action
+`stuck in the middle` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    HENCE FULFILLED
+    LEST  (PARTY alice MUST Sign (EXACTLY alice) WITHIN 5 OF THE ARMING
+           HENCE FULFILLED
+           LEST  (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 10))
+
+#TRACE `stuck in the middle` AT 0 WITH
+  PARTY theLandlord DOES Refund theLandlord AT 12
+
+#TRACE `stuck in the middle` AT 0 WITH
+  (`WAIT UNTIL` 11)
+  PARTY theLandlord DOES Refund theLandlord AT 12
+
+#TRACE `stuck in the middle` AT 0 WITH
+  PARTY theLandlord DOES Refund theLandlord AT 20
+
+#TRACE `stuck in the middle` AT 0 WITH
+  (`WAIT UNTIL` 11)
+  PARTY theLandlord DOES Refund theLandlord AT 20
+
+-- A `WITHIN 0` second chance — sign forthwith — is the same shape with the
+-- deadline EQUAL to the one before it (10, 10, then 15): the refund at 12
+-- reaches the third layer, with or without the WAIT; at 20 it is late.
+GIVETH A DEONTIC Actor Action
+`forthwith` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    HENCE FULFILLED
+    LEST  (PARTY alice MUST Sign (EXACTLY alice) WITHIN 0
+           HENCE FULFILLED
+           LEST  (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5))
+
+#TRACE `forthwith` AT 0 WITH
+  PARTY theLandlord DOES Refund theLandlord AT 12
+
+#TRACE `forthwith` AT 0 WITH
+  (`WAIT UNTIL` 11)
+  PARTY theLandlord DOES Refund theLandlord AT 12
+
+#TRACE `forthwith` AT 0 WITH
+  PARTY theLandlord DOES Refund theLandlord AT 20
+
+
+§ `12. a chain that cannot end is refused, by name`
+
+-- A LEST that names itself with `WITHIN 0` counts every incarnation from
+-- the deadline the last one missed, so every incarnation is due at 0 and
+-- already past when it is entered: the event at 50 can never reach a layer
+-- whose window is open. Walking such a chain forever is the only thing
+-- the §11 rule cannot do, so after a thousand hand-offs in a row without
+-- the deadline advancing the machine refuses the contract and says why.
+-- (deontic-breach-semantics.l4 (f) pins the negative-WITHIN form.)
+GIVETH A DEONTIC Actor Action
+`forthwith, forever` MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 0
+    HENCE FULFILLED
+    LEST  `forthwith, forever`
+
+#TRACE `forthwith, forever` AT 0 WITH
+  PARTY theLandlord DOES Refund theLandlord AT 50

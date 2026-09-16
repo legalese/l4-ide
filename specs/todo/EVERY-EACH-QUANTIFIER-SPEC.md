@@ -2340,7 +2340,8 @@ NOT re-cited by later commits, which say so in their own ledger entries.
 absolute deadline (`Machine.hs:1612`) and allocated it as `deadlineR` for `THE DEADLINE` (`:1718`).
 The change is that under `LEST` the continuation's CLOCK is that same reference: `clockAt`
 (`:1723`) picks `deadlineR` for a `LEST` hand-off and the revealing event's stamp for a `HENCE`
-hand-off, on both the re-offer branch and the consume branch (`:1733`, `:1742`), and `ResolveParty`
+hand-off, on both the re-offer branch and the consume branch (`:1733`, `:1742`; one branch since
+round 2, `:1760-1779` on the round-2 commit), and `ResolveParty`
 carries it to `continueWithFollowup` as the `time` the continuation is applied to (`:1851`;
 `ResolvePartyFrame.time`, `ContractFrame.hs:591`). So `WITHIN d` and `WITHIN d OF THE DEADLINE`
 under a `LEST` read one reference and cannot drift apart (item 4 of the build brief: they coincide
@@ -2386,41 +2387,60 @@ layer drops it before it reaches the third, the one it was timely for. The verdi
 how many events the trace carried (three chances due at 3, 6 and 9: `WAIT UNTIL 100` alone left
 a residual, the same `WAIT` followed by a signature at 101 breached — one instant past every window,
 two verdicts), and a residual reached that way printed its full `WITHIN` with a deadline already in
-the past (R1-3). The rule since the round-1 fix commit: a re-offered copy is marked
-with the absolute deadline whose expiry minted it (`markReoffered`, `reofferedEvents` is now a
-`Map Address Rational`, `ev'reoffered :: Maybe Rational` through the five scrutiny frames), and a
-marked copy that reveals a further expiry is **re-offered again while the deadline strictly
-advances** — every positive `WITHIN` under the deadline anchor, and any anchored deadline that
-moved forward — and **consumed only when it does not** (a non-positive `WITHIN`, or an anchor that
-did not move: the one case in which unconditional re-offering would loop). The deadlines one event
-walks are then strictly increasing and every one of them lies below its stamp, so the walk is
-finite whenever the durations are bounded away from zero; measured, a self-naming `WITHIN 1` walked
-100,000 incarnations in 0.15 s. The residual class is a Zeno chain — durations shrinking
-geometrically, `x d MEANS … WITHIN d LEST x (d DIVIDED BY 2)` — whose deadlines advance forever
-without reaching the stamp. It is left to the machine's frame-depth guard (`maximumFrameDepth`,
-1,000,000: every nested hand-off leaves a `RestoreCurrentParty` frame on the stack — measured, a
-`WITHIN 1` chain walked to 1,500,000 reports `Stack overflow: Recursion depth of 1000000 exceeded`
-in 1.3 s); the halving Zeno chain itself did not reach that guard in 120 s because its rationals
+the past (R1-3). The round-1 rule marked a re-offered copy with the absolute deadline whose
+expiry minted it and re-offered it again **only while the deadline strictly advanced**, consuming
+it otherwise (a non-positive `WITHIN`, or an anchor that did not move) on the argument that this
+was the one case in which unconditional re-offering would loop. Round 2 (R2-1, a blocker found
+twice again) showed that argument was too wide: a chain of DISTINCT layers is finite by its syntax
+whatever its deadlines do, and consuming the copy at a layer whose deadline had not advanced — a
+`WITHIN 5 OF THE ARMING` under a `WITHIN 10`, or a `WITHIN 0` — dropped it before the next layer,
+whose window was still open at the copy's stamp: a refund at 12 under layers due 10, 5, 15 left
+the third layer as an untouched residual alone and gave `FULFILLED` after a `WAIT` at 11, the
+round-1 signature exactly. **The rule since the round-2 fix commit: a re-offered copy is always
+handed on to the next layer, whatever that layer's deadline.** The mark it carries
+(`Reoffered`, `ContractFrame.hs:168-174`: `highWater`, the latest deadline the copy has revealed
+the expiry of, and `stalled`, the hand-offs in a row that failed to pass it; `reofferedEvents`
+is a `Map Address Reoffered`, `ev'reoffered :: Maybe Reoffered` through the five scrutiny frames)
+no longer withholds the event from anything; it exists only so that the one chain the walk cannot
+end — a continuation that reaches ITSELF with its deadline already past when it is entered: a
+self-naming `LEST` with `WITHIN 0` or a negative `WITHIN`, a kept `SHANT`'s `HENCE` with a
+negative one, an anchored deadline that never moves — is refused **by name** rather than walked
+forever: past `maximumStalledReoffers` (1,000, `Machine.hs:570`) consecutive stalled hand-offs
+`reofferResolve` (`:1760-1779`) raises `stalledChainRefusal` (`:580`), a `UserError` that names
+the stamp, the high-water deadline, the three shapes and the three repairs. The bound is
+deliberately generous and decides only how soon an ill-founded chain is reported, not whether: a
+stalled layer costs about a microsecond, and no finite chain of distinct layers comes near it
+(the build notes' round-1 objection to a cap — "a silently wrong answer" — was to a SILENT cap;
+this one is loud, and the consume branch it replaces was the silent one). A chain whose deadlines
+advance is finite whenever the durations are bounded away from zero (the high-water mark is
+increasing and bounded above by the stamp); measured, a self-naming `WITHIN 1` walked 100,000
+incarnations in 0.15 s. The residual class is a Zeno chain — durations shrinking geometrically,
+`x d MEANS … WITHIN d LEST x (d DIVIDED BY 2)` — whose deadlines advance forever without reaching
+the stamp. It is left to the machine's frame-depth guard (`maximumFrameDepth`, 1,000,000: every
+nested hand-off leaves a `RestoreCurrentParty` frame on the stack — measured, a `WITHIN 1` chain
+walked to 1,500,000 reports `Stack overflow: Recursion depth of 1000000 exceeded` in about 1.5 s
+and 286 MB); the halving Zeno chain itself did not reach that guard in 120 s because its rationals
 grow a bit per layer, so it is a hang in practice — the class ordinary non-terminating recursion
 is already in (`f x MEANS f (x PLUS 1)` is a tail call that pushes no frame; measured, no answer
-in 60 s). Witness §9 (`sign,
-or try again`: `WAIT UNTIL 100` alone is the thirty-fourth incarnation with two days left, and the
-signature at 101 fulfils it; `third chance` and `three chances` pin the chain with one event and
-with two). The corpus's recursive witness, `deontic-breach-semantics.l4` (f), a negative `WITHIN`,
-still prints the same residual: its chain does not advance, so its event is consumed at the second
-layer as before. `nested peel` (layers due 2, 5, 15) is now walked to its end by the `WAIT` at 20 —
+in 60 s). Witness §9 (`sign, or try again`: `WAIT UNTIL 100` alone is the thirty-fourth
+incarnation with two days left, and the signature at 101 fulfils it; `third chance` and `three
+chances` pin the chain with one event and with two); §11 (`stuck in the middle`, layers due 10,
+5, 15, and `forthwith`, due 10, 10, 15: a refund at 12 is `FULFILLED` and at 20 `BREACHED`
+reporting 15, each with one event and with a `WAIT` at 11 before it); §12 (`forthwith, forever`,
+a self-naming `WITHIN 0`: the refusal). The corpus's recursive witness,
+`deontic-breach-semantics.l4` (f), a negative `WITHIN`, now prints the refusal where the build
+commit and round 1 printed the recursive obligation as a residual — its chain never advances past
+-1, so there was never a layer its event could reach, and the residual was the silent form of the
+same fact. `nested peel` (layers due 2, 5, 15) is walked to its end by the `WAIT` at 20 —
 `BREACHED` dated 20 reporting 15 where the build commit had dated it 30 — and a delivery at 12,
-timely for layer 3, is `FULFILLED` (a new trace).
+timely for layer 3, is `FULFILLED`.
 
-**The consume branch** (a marked event whose chain has stopped advancing, `:1733`) anchors at the
-deadline like the re-offer branch: the failure time is the deadline whether the event that revealed
-the miss was fresh or already re-offered. Since the round-1 fix it is reached only by a
-non-advancing chain, so the residual it leaves is armed at the consumed layer's deadline and has
-met no event; it prints its source `WITHIN`, as any residual that met no event does, and the
-consumed event never reaches a later layer. That is the documented limit of the guard, not a
-number a ruling decides: the alternative — keep the marked event's stamp — would make the same
-miss count from two instants depending on how the revealing event arrived, and no corpus file
-reaches the branch with a positive `WITHIN` any more.
+**The consume branch is gone** (round 2). Until the round-2 fix commit `reofferResolve` had a
+second arm that applied the continuation to the events AFTER a marked copy whose deadline had not
+advanced, and §5.2.1 called what it dropped "the documented limit of the guard". It was a wrong
+answer with a witness (above), and the guard it served needed no consumption: a chain that stalls
+is refused instead. What R1-3 observed — a residual reached that way printing its source `WITHIN`
+with a deadline already past — cannot arise any more, because no residual is reached that way.
 
 **The state-layer stream (R1-5 from the stack's round 1, applied here).** `barrierStateMissed`
 (`:2852`) no longer hands the `LEST` the whole stream from the arming. It walks the barrier's stream
@@ -2491,17 +2511,44 @@ the join`, 33). §3.4 says a `SHANT` barrier "achieves at the deadline", and R-Q
   Carol signs at 3, Alice at 4, `WAIT UNTIL 20`, Bob never → `BREACHED` reporting 19; a refund at
   17 → `FULFILLED`; the same rule with no act `WITHIN` → 15.
 
+- **A `LEST` clock earlier than the failed obligation's own arming** (round 2, R2-2 fresh). An
+  anchored `WITHIN` may already be past when its obligation is entered (`Contract5`'s comment calls
+  that "right and not an error"), and its `LEST` counts from that deadline like any other, so the
+  reparation can fall due before the obligation it repairs existed. The probe
+  (`probes/round2/past-anchor.l4`):
+
+  ```l4
+  PARTY alice MUST Sign (EXACTLY alice) WITHIN 100
+  HENCE (PARTY bob MUST Approve (EXACTLY bob) WITHIN 5 OF 0
+         HENCE FULFILLED
+         LEST (PARTY bob MUST Refund (EXACTLY bob) WITHIN 10))
+  ```
+
+  Alice signs at 20 (Bob's obligation is entered at 20 with its deadline at 5), a `WAIT` at 21 →
+  `BREACHED` at 21 reporting **15**, five days before either of Bob's obligations was entered;
+  with `WITHIN 30` the residual at 21 reads `WITHIN 14`. Literal to R-Q5 (t_ref = the deadline)
+  and not a wrong answer under it, but a consequence nothing had written down. **Open to Meng's
+  ruling**: whether a `LEST`'s clock should be `max(missed deadline, the failed obligation's
+arming)` when the anchored deadline predates the arming. No code change; `README.md`'s
+  anchored-deadline paragraph now states the literal behaviour and that the question is open. If
+  moved: `clockAt` (`Machine.hs:1723` on round 1) takes `max deadline time'`, no corpus golden
+  moves (no corpus file has an unanchored `LEST` under a past-anchored obligation), and the
+  barrier path's sentinel anchor needs the same floor.
+
 - Which member a barrier anchors at (the stack settled it); `AFTER`/`BEFORE`; `SOME m OF`.
 
 **Goldens.** Read before promotion, each with the reason the diff is right:
 
 - NEW `ok/every/tests/run-lest.{golden,ep.golden,nlg.golden,schema.golden}` — the 33 results
-  hand-computed in the witness's comments before the run, and matched; the pre-change numbers the
+  hand-computed in the witness's comments before the run, and matched (39 after round 1, 47 after
+  round 2, each addition hand-computed the same way); the pre-change numbers the
   comments quote were measured on the parent's binary.
 - `ok/tests/deontic-breach-semantics.golden`: `anchor at reveal` — renamed `anchor at the
 deadline` — residual `WITHIN 3` → `BREACHED` at 7 reporting 5 (the `LEST` counts from 2, is due
   at 5, and the re-offered Bob@7 reveals that too); `nested peel` `FULFILLED` → `BREACHED` at 30
-  reporting 15 (layers due at 2, 5, 15; Bob's delivery at 35 is never reached). Comments rewritten;
+  reporting 15 (layers due at 2, 5, 15; Bob's delivery at 35 is never reached); after round 2,
+  `recursive lest` (f) residual → the `stalledChainRefusal` text (the chain never advances past
+  -1, and the residual was that fact printed silently). Comments rewritten;
   `.ep.golden` moves with them.
 - `ok/every/tests/run-blame.golden`: `staggered signing`'s refund deadline 11 → 8 (Carol's 5 + 3,
   not the revealing 8 + 3); the refund at 12 still late. Comment rewritten; `.ep.golden` moves.
@@ -2531,7 +2578,12 @@ table (the blame-set row, built 2026-09-15 by the parent branch, moved to the bu
 there). `skills/writing-l4-rules/references/regulative.md`: the unanchored default, which the
 skill had never stated, added beside the anchored form. Three doc `.l4` files' outputs move
 (`what-follows.l4`, `regulative-layer-whole-example.l4`, `courses/advanced/module-a2-cross-cutting-examples.l4`);
-only the first has its residuals pasted on a page.
+only the first has its residuals pasted on a page. Round 2: `README.md`'s chain-walk sentence now
+states that a non-advancing layer makes no difference either, and the one limit — a self-naming
+`LEST` whose window is never open is refused by name; its anchored-deadline paragraph states the
+past-anchor consequence and that the floor is open (R2-2 fresh); the skill's `LEST`-clock
+paragraph gains the walk and the refusal; `LTS-VISUALISER.md` §4.4's annotation says the walk is
+unconditional and can end in a refusal. No doc `.l4` output moves in round 2.
 
 **For downstream re-pinning (item 9 of the build brief).** The clocks that move: the unanchored
 `LEST` deadline under a missed `MUST`/`DO`/`MAY` — single-party, fork member, and barrier
@@ -2545,7 +2597,10 @@ deadline). Unchanged: `memberDue`, `joinStateDue`, `MAY`-lapse routing (an expir
 fork spawns no continuation; under a barrier with no `LEST`, `FULFILLED`), the breach stamp, every
 `HENCE` clock and every `HENCE` continuation's `THE ARMING` (`JoinExpired`'s included), `THE
 DEADLINE`, the `SHANT` `LEST` (and its continuation's `THE ARMING`, the violating stamp as
-before), and the number of times a barrier's `LEST` fires (once).
+before), and the number of times a barrier's `LEST` fires (once). Round 2 adds one outcome, not
+a clock: a walk down a chain of continuations can now end in an evaluation error
+(`stalledChainRefusal`) where before it ended in a residual — only for a continuation that reaches
+itself with its deadline already past, never for a chain of distinct layers.
 
 **Not verified here.** The full `etc/verify-branch.sh` as one run (the Verify stage's); the §3.2.1
 evaluation differential (no printer is touched); `jl4-service-test`, `jl4-lsp-test`,
@@ -2560,11 +2615,13 @@ has both verdicts on each):
 - R1-1 (semantics and completeness, a blocker found twice): the at-most-once re-offer rule dropped a
   timely performance of the third layer of a `LEST` chain and made the verdict at an instant depend
   on the event count. Fixed: a re-offered copy is marked with its minting deadline and re-offered
-  again while the deadline strictly advances (the termination paragraph above). Goldens:
+  again while the deadline strictly advances (the termination paragraph above; round 2 removed
+  the "while the deadline advances" condition, below). Goldens:
   `run-lest.golden` §9 (`WITHIN 3` → `WITHIN 2`; residual → `FULFILLED`), `deontic-breach-semantics.golden`
   `nested peel` (dated 30 → dated 20), `run-lest.l4` gains `third chance`, `three chances`, §10.
-- R1-3 (semantics): a consume-branch residual printed a stale `WITHIN`. Falls away with R1-1 for
-  every positive `WITHIN`; the non-advancing case is documented (the consume paragraph above).
+- R1-3 (semantics): a consume-branch residual printed a stale `WITHIN`. Fell away with R1-1 for
+  every positive `WITHIN`; round 1 documented the non-advancing case as a limit, and round 2
+  removed the branch (R2-1 below), so it cannot arise at all.
 - R1-2 (semantics): the README row and the skill line stated the state-layer rule for a "late
   group" without the "everyone acted" limit. Both qualified; the S2 case (19 not 15) recorded under
   "What is NOT moved" and routed to Meng.
@@ -2589,6 +2646,28 @@ has both verdicts on each):
 - R1-5 (completeness): `regulative-rules.md:187` taught that a chained inner window starts from the
   event that triggered it; rewritten for `HENCE` at the act, `LEST` at the failure, and the
   anchored form.
+
+Round 2: four findings raised, none refuted by both checkers, all four applied
+(`scratchpad/every-lest/FINDINGS-round2.md` has both verdicts on each):
+
+- R2-1 (fix-landed and fresh-attack, a blocker found twice): round 1's consume branch still dropped
+  a re-offered copy at a layer whose deadline had not advanced (`WITHIN 5 OF THE ARMING` under a
+  `WITHIN 10`; `WITHIN 0`), before the next layer it was timely for, so the verdict at an instant
+  again depended on the event count. Fixed: the copy is always handed on; the mark became
+  `Reoffered` (high-water deadline plus a stalled count) and a chain that stalls for
+  `maximumStalledReoffers` (1,000) hand-offs in a row is refused by name (`stalledChainRefusal`)
+  instead of consumed (the termination paragraph above). Goldens: `run-lest.golden` gains §11
+  (`stuck in the middle` ×4, `forthwith` ×3) and §12 (`forthwith, forever`);
+  `deontic-breach-semantics.golden` (f) residual → the refusal; `.ep`/`.nlg` with them. The
+  "would loop forever" sentences in the `Contract5` NOTE and here narrowed to a continuation that
+  reaches itself; `README.md:247`'s claim made true and given its one limit.
+- R2-2 (fix-landed): §5.2.1 said "33 directives, nine sections" and "the 33 results" after round 1
+  had made it 39 in ten; both now give the count per round (47 in twelve after round 2).
+- R2-2 (fresh-attack): a `LEST` under an anchored `WITHIN` already past at arming counts from a
+  deadline earlier than the failed obligation's own entry (`WITHIN 5 OF 0` entered at 20, its
+  `LEST` with `WITHIN 10` due at 15); literal to R-Q5, written nowhere. Recorded under "What is
+  NOT moved" as open to Meng (the `max(deadline, arming)` floor), and stated in `README.md`'s
+  anchored-deadline paragraph. No code change.
 
 ### 5.3 Temporal Forking (MAY Exercise)
 
@@ -3276,13 +3355,17 @@ whose `LEST` slot holds the failpoint sentinel — carries that same reference t
 barrier's `LEST` counts from the earliest-failing member's deadline with no change of its own.
 `THE DEADLINE` under a `LEST` and the unanchored default are one reference. The state-layer `LEST`
 (`barrierStateMissed`) is now handed the events after the state deadline, not the whole stream
-(the stack's round-1 finding R1-5, below). §5.2.1 has the mechanism, the decisions (the consume
-branch anchors at the deadline; a kept `SHANT`'s `HENCE` is NOT moved and is recorded as open),
-the goldens that moved with one reason each, the docs, and the clocks downstream re-pins against.
-Its own adversarial pass (round 1, the same day) replaced the at-most-once re-offer rule: an event
-past several `LEST` windows is now offered to each layer in turn while the deadline advances, so a
-chain's third chance sees the performance it was written for; `THE ARMING` of a `LEST` continuation
-is named as a clock that moved; §5.2.1's last paragraph lists the fourteen findings.
+(the stack's round-1 finding R1-5, below). §5.2.1 has the mechanism, the decisions (a kept
+`SHANT`'s `HENCE` is NOT moved and is recorded as open; so is the clock of a `LEST` under an
+anchored deadline that predates its obligation's arming), the goldens that moved with one reason
+each, the docs, and the clocks downstream re-pins against. Its own adversarial pass (two rounds,
+the same day) replaced the at-most-once re-offer rule: an event past several `LEST` windows is now
+offered to every layer in turn, unconditionally (round 1 stopped at a layer whose deadline had not
+advanced; round 2 found that dropped a timely performance too), so a chain's third chance sees the
+performance it was written for; the one chain that cannot end — a continuation that reaches itself
+with its deadline already past — is refused by name after a bounded number of stalled hand-offs;
+`THE ARMING` of a `LEST` continuation is named as a clock that moved; §5.2.1's last paragraph lists
+the fourteen round-1 and four round-2 findings.
 
 **Not built, and each one is a place a run gives a coarser answer than this document specifies:**
 

@@ -1,11 +1,11 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-run-lest.l4:70:1-71:20:
+run-lest.l4:73:1-74:20:
   PARTY Landlord OF "Ms Ng" MUST Refund (EXACTLY theLandlord) WITHIN 1 HENCE FULFILLED
-run-lest.l4:73:1-75:50:
+run-lest.l4:76:1-78:50:
   FULFILLED
-run-lest.l4:77:1-79:50:
+run-lest.l4:80:1-82:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -19,9 +19,9 @@ run-lest.l4:77:1-79:50:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       15
-run-lest.l4:89:1-90:20:
+run-lest.l4:92:1-93:20:
   PARTY Landlord OF "Ms Ng" MUST Refund (EXACTLY theLandlord) WITHIN 1 HENCE FULFILLED
-run-lest.l4:92:1-94:50:
+run-lest.l4:95:1-97:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -35,9 +35,9 @@ run-lest.l4:92:1-94:50:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       15
-run-lest.l4:101:1-102:50:
+run-lest.l4:105:1-106:50:
   FULFILLED
-run-lest.l4:104:1-105:50:
+run-lest.l4:108:1-109:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -51,7 +51,7 @@ run-lest.l4:104:1-105:50:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       15
-run-lest.l4:114:1-115:21:
+run-lest.l4:118:1-119:21:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -65,9 +65,9 @@ run-lest.l4:114:1-115:21:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       15
-run-lest.l4:137:1-141:20:
+run-lest.l4:141:1-145:20:
   FULFILLED
-run-lest.l4:143:1-147:20:
+run-lest.l4:147:1-151:20:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -81,7 +81,7 @@ run-lest.l4:143:1-147:20:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       10
-run-lest.l4:149:1-153:20:
+run-lest.l4:153:1-157:20:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -95,7 +95,7 @@ run-lest.l4:149:1-153:20:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       10
-run-lest.l4:160:1-163:50:
+run-lest.l4:164:1-167:50:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -109,7 +109,7 @@ run-lest.l4:160:1-163:50:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       10
-run-lest.l4:165:1-168:50:
+run-lest.l4:169:1-172:50:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -123,7 +123,7 @@ run-lest.l4:165:1-168:50:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       10
-run-lest.l4:181:1-185:20:
+run-lest.l4:185:1-189:20:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -137,9 +137,9 @@ run-lest.l4:181:1-185:20:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       10
-run-lest.l4:204:1-207:50:
+run-lest.l4:208:1-211:50:
   FULFILLED
-run-lest.l4:209:1-212:50:
+run-lest.l4:213:1-216:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -153,9 +153,9 @@ run-lest.l4:209:1-212:50:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       19
-run-lest.l4:229:1-231:49:
-  FULFILLED
 run-lest.l4:233:1-235:49:
+  FULFILLED
+run-lest.l4:237:1-239:49:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -169,9 +169,9 @@ run-lest.l4:233:1-235:49:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       8
-run-lest.l4:243:1-245:49:
+run-lest.l4:247:1-249:49:
   FULFILLED
-run-lest.l4:267:1-272:20:
+run-lest.l4:271:1-276:20:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -185,11 +185,11 @@ run-lest.l4:267:1-272:20:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       15
-run-lest.l4:278:1-283:20:
+run-lest.l4:282:1-287:20:
   FULFILLED
-run-lest.l4:286:1-290:50:
+run-lest.l4:290:1-294:50:
   FULFILLED
-run-lest.l4:292:1-296:50:
+run-lest.l4:296:1-300:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -203,7 +203,7 @@ run-lest.l4:292:1-296:50:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       15
-run-lest.l4:309:1-314:20:
+run-lest.l4:313:1-318:20:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -217,11 +217,11 @@ run-lest.l4:309:1-314:20:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       15
-run-lest.l4:328:1-329:19:
+run-lest.l4:332:1-333:19:
   PARTY Landlord OF "Ms Ng" MUST Refund (EXACTLY theLandlord) WITHIN 2 HENCE FULFILLED
-run-lest.l4:331:1-333:50:
-  FULFILLED
 run-lest.l4:335:1-337:50:
+  FULFILLED
+run-lest.l4:339:1-341:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -235,36 +235,36 @@ run-lest.l4:335:1-337:50:
       MUST Refund (EXACTLY theLandlord)
     before their deadline, which was at
       10
-run-lest.l4:346:1-347:20:
+run-lest.l4:350:1-351:20:
   PARTY Landlord OF "Ms Ng" MUST Refund (EXACTLY theLandlord) WITHIN 1 HENCE FULFILLED
-run-lest.l4:364:1-365:19:
+run-lest.l4:368:1-369:19:
   PARTY Tenant OF "Alice" MUST Sign (EXACTLY alice) WITHIN 13 HENCE FULFILLED LEST (BREACH BY alice BECAUSE "the second chance was missed too")
-run-lest.l4:367:1-369:36:
-  FULFILLED
 run-lest.l4:371:1-373:36:
+  FULFILLED
+run-lest.l4:375:1-377:36:
   DEONTIC BREACHED:
     BREACH
     BY Tenant OF "Alice"
     BECAUSE "the second chance was missed too"
-run-lest.l4:397:1-398:21:
+run-lest.l4:401:1-402:21:
   PARTY Tenant OF "Alice" MUST Sign (EXACTLY alice) WITHIN 2 HENCE FULFILLED LEST `sign, or try again`
-run-lest.l4:400:1-402:37:
+run-lest.l4:404:1-406:37:
   FULFILLED
-run-lest.l4:418:1-419:37:
+run-lest.l4:422:1-423:37:
   FULFILLED
-run-lest.l4:421:1-423:37:
+run-lest.l4:425:1-427:37:
   FULFILLED
-run-lest.l4:437:1-438:21:
+run-lest.l4:441:1-442:21:
   DEONTIC BREACHED:
     BREACH
     BY Tenant OF "Alice"
     BECAUSE "all three chances missed"
-run-lest.l4:440:1-442:37:
+run-lest.l4:444:1-446:37:
   DEONTIC BREACHED:
     BREACH
     BY Tenant OF "Alice"
     BECAUSE "all three chances missed"
-run-lest.l4:460:1-463:20:
+run-lest.l4:464:1-467:20:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -278,7 +278,7 @@ run-lest.l4:460:1-463:20:
       MUST Approve (EXACTLY bob)
     before their deadline, which was at
       13
-run-lest.l4:473:1-476:19:
+run-lest.l4:477:1-480:19:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -292,3 +292,55 @@ run-lest.l4:473:1-476:19:
       MUST Approve (EXACTLY bob)
     before their deadline, which was at
       7
+run-lest.l4:507:1-508:50:
+  FULFILLED
+run-lest.l4:510:1-512:50:
+  FULFILLED
+run-lest.l4:514:1-515:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      15
+run-lest.l4:517:1-519:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      15
+run-lest.l4:532:1-533:50:
+  FULFILLED
+run-lest.l4:535:1-537:50:
+  FULFILLED
+run-lest.l4:539:1-540:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund (EXACTLY theLandlord)
+    before their deadline, which was at
+      15
+run-lest.l4:558:1-559:50:
+  A chain of HENCE or LEST continuations has stalled: the event at 50 has been handed on 1000 times in a row to continuations whose deadlines never advanced past 0, a deadline it had already revealed the expiry of, so no continuation this chain reaches can ever be open to it. A continuation that names itself and is already past its deadline when it is entered - a negative WITHIN, a LEST's WITHIN 0, or an anchored deadline no later than the one just missed - is such a chain. Give it a positive WITHIN, anchor it later than the missed deadline, or end the chain with BREACH. (EVERY-EACH-QUANTIFIER-SPEC section 5.2.1.)

@@ -29,9 +29,11 @@
 --   the source range of the 'L4.Syntax.RAction', the activation ordinal
 --   (the /n/-th time this trace entered that site), and the bearer. Under an
 --   @EVERY@ the members share a site and differ in bearer and ordinal.
--- * An event can appear twice, once as 'WitnessedOnly' by an expiring
---   obligation and once as 'Reoffered' to the continuation (§4.4). The
---   animator must not draw that as two events. A barrier's STATE-layer
+-- * An event can appear more than once: 'WitnessedOnly' by the obligation
+--   whose expiry it revealed, then 'Reoffered' by each continuation it was
+--   handed to in turn (§4.4; an event past @k@ LEST windows appears @k+1@
+--   times, EVERY-EACH-QUANTIFIER-SPEC §5.2.1). The animator must not draw
+--   that as several events. A barrier's STATE-layer
 --   @LEST@ (@ONCE ALL HAVE WITHIN d@ missed, 'JoinExpired') is handed the
 --   members' own stream from the first event past the state deadline on
 --   (@BarrierTrim@, 2026-09-16), UNMARKED: an event a member 'Consumed' —
@@ -215,9 +217,13 @@ data Scrutiny
     -- (a mismatch, a failed guard) or revealed an expiry and was re-offered
     -- to the continuation
   | Reoffered
-    -- ^ this is the continuation's look at a re-offered event — including
-    -- the second look that revealed a second expiry, which the at-most-once
-    -- rule consumed rather than re-offering again
+    -- ^ this is a continuation's look at a re-offered copy of an event —
+    -- every layer's look, since a copy is handed on to each expired layer
+    -- in turn (EVERY-EACH-QUANTIFIER-SPEC §5.2.1, 2026-09-16: an event past
+    -- @k@ LEST windows is looked at @k+1@ times, the last look by the first
+    -- layer whose window it is not past), including a look that reveals
+    -- another expiry; a chain whose deadlines stop advancing is refused by
+    -- the machine, never consumed
   | NoEvent
     -- ^ the step had no event: the stream ran out, or a join reduced
   deriving stock (Eq, Show, Generic)

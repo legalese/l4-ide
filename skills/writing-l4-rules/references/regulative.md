@@ -211,7 +211,13 @@ acted but the last of them late (a member who never acts fails on its OWN
 `WITHIN` when it has one, so the reparation counts from that act deadline
 even when the group deadline was earlier) — not from the later event that
 revealed it (built 2026-09-16, `run-lest.l4`; a party who misses a deadline
-and goes quiet does not postpone its own cure period).
+and goes quiet does not postpone its own cure period). One event can
+therefore be past several `LEST` windows at once; it is handed to each in
+turn until it reaches the first whose window is open, whatever the
+deadlines in between did. A `LEST` that names itself with a window that is
+never open — `WITHIN 0`, a negative `WITHIN`, or an anchored deadline that
+never moves — is refused at run time as a chain that cannot end; give a
+recursive `LEST` a positive `WITHIN`.
 
 `WITHIN d OF anchor` anchors the deadline (built 2026-09-15): `OF THE JOIN`,
 `OF THE DEADLINE` or `OF THE ARMING` name the enclosing obligation's completion,

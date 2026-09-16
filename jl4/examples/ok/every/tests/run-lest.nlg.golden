@@ -37,3 +37,11 @@ executing contract `three chances` at 0 with the following events:  `WAIT UNTIL`
 executing contract `three chances` at 0 with the following events:  `WAIT UNTIL` with 100 party `alice` did `Sign` with `alice` at 101
 executing contract `arming under lest` at 0 with the following events:  `WAIT UNTIL` with 14 party `theLandlord` did `Refund` with `theLandlord` at 16 `WAIT UNTIL` with 16
 executing contract `arming under hence` at 0 with the following events:  party `alice` did `Sign` with `alice` at 4 party `theLandlord` did `Refund` with `theLandlord` at 6 `WAIT UNTIL` with 8
+executing contract `stuck in the middle` at 0 with the following events:  party `theLandlord` did `Refund` with `theLandlord` at 12
+executing contract `stuck in the middle` at 0 with the following events:  `WAIT UNTIL` with 11 party `theLandlord` did `Refund` with `theLandlord` at 12
+executing contract `stuck in the middle` at 0 with the following events:  party `theLandlord` did `Refund` with `theLandlord` at 20
+executing contract `stuck in the middle` at 0 with the following events:  `WAIT UNTIL` with 11 party `theLandlord` did `Refund` with `theLandlord` at 20
+executing contract `forthwith` at 0 with the following events:  party `theLandlord` did `Refund` with `theLandlord` at 12
+executing contract `forthwith` at 0 with the following events:  `WAIT UNTIL` with 11 party `theLandlord` did `Refund` with `theLandlord` at 12
+executing contract `forthwith` at 0 with the following events:  party `theLandlord` did `Refund` with `theLandlord` at 20
+executing contract `forthwith, forever` at 0 with the following events:  party `theLandlord` did `Refund` with `theLandlord` at 50

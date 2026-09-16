@@ -17,8 +17,9 @@
 --       example; it was written MUST pay EXACTLY 100 until R1 retired the
 --       keyword, and a literal in pattern position always meant this).
 --   (f) recursive LEST with a non-positive computed WITHIN terminates:
---       the deadline-revealing event is re-offered again only while the
---       deadline it reveals the expiry of keeps advancing.
+--       the deadline-revealing event is handed on to every layer it is
+--       past, and a chain whose deadline stops advancing is refused, by
+--       name, after a bounded number of hand-offs in a row.
 --   MAY expiry routes to LEST (default FULFILLED) per the README
 --   default-consequence matrix; HENCE fires only on exercise. The HENCE
 --   and LEST continuations here differ in party AND action so the golden
@@ -120,11 +121,11 @@ GIVETH A DEONTIC Person Action
 
 -- The continuation's clock anchors at the missed deadline (2), so its own
 -- deadline is 5. The re-offered event (Bob at 7, wrong party) is already
--- past it: it reveals a second expiry, is consumed rather than re-offered
--- again, and — the LEST having no LEST of its own — the answer is a breach
--- dated 7 with deadline 5. (Until 2026-09-16 the clock anchored at the
--- revealing stamp, 7, the re-offered event decremented the WITHIN by zero
--- and the residual read WITHIN 3.)
+-- past it: it reveals a second expiry, and — the LEST having no LEST of its
+-- own to hand it on to — the answer is a breach dated 7 with deadline 5.
+-- (Until 2026-09-16 the clock anchored at the revealing stamp, 7, the
+-- re-offered event decremented the WITHIN by zero and the residual read
+-- WITHIN 3.)
 #TRACE `anchor at the deadline` AT 0 WITH
   PARTY Bob DOES deliver AT 7
 
@@ -136,9 +137,9 @@ GIVETH A DEONTIC Person Action
 
 -- One event past several layers is offered to each in turn. WAIT@20
 -- expires layer 1 (deadline 2) and is re-offered to layer 2, which counts
--- from 2 and is due at 5; the same WAIT@20 expires that too and — the
--- deadline having advanced, 5 after 2 — is re-offered again to layer 3,
--- which counts from 5 and is due at 15; it expires that as well, and layer
+-- from 2 and is due at 5; the same WAIT@20 expires that too and is
+-- re-offered again to layer 3, which counts from 5 and is due at 15; it
+-- expires that as well, and layer
 -- 3 has no LEST: a breach dated 20 (the event that revealed it) with
 -- deadline 15. WAIT@30 and Bob's delivery at 35 are never reached. (Until
 -- 2026-09-16 each layer counted from the revealing stamp — deadlines 2, 23,
@@ -263,13 +264,17 @@ GIVETH A DEONTIC Person Action
 
 -- The LEST recursively re-invokes the same obligation, whose computed WITHIN
 -- is negative, so each incarnation's deadline is already past at its own
--- anchor (the previous incarnation's missed deadline: -1, then -2). The
--- revealing event (Bob's delivery — wrong party, wrong action) is
--- re-offered to the first LEST incarnation; when it reveals a second expiry
--- there, at a deadline (-2) NO LATER than the one that minted it (-1), the
--- chain is not advancing and the event is consumed instead of being
--- re-offered again, so evaluation terminates with the recursive obligation
--- as the residual (without that rule this trace looped forever). A chain
--- whose deadlines DO advance is walked to its end — see `nested peel`.
+-- anchor (the previous incarnation's missed deadline: -1, then -2, -3, …).
+-- The revealing event (Bob's delivery — wrong party, wrong action) is
+-- handed on to each incarnation in turn, as any event past a layer's
+-- window is (it must reach the first layer whose window is open — see
+-- `nested peel`, and run-lest.l4 §11), but here no such layer exists: the
+-- deadlines never advance past -1, the first one it revealed the expiry
+-- of. After a thousand such hand-offs in a row the machine refuses the
+-- contract and says why, so evaluation terminates. (Until round 2 of the
+-- adversarial pass of 2026-09-16 the event was silently consumed at the
+-- second incarnation and the recursive obligation printed as a residual;
+-- that same consumption dropped a timely performance whenever a layer with
+-- a non-advancing deadline stood between two others.)
 #TRACE `recursive lest` AT 0 WITH
   PARTY Bob DOES deliver AT 7

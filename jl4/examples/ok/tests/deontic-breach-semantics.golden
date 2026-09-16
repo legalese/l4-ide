@@ -1,17 +1,17 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-deontic-breach-semantics.l4:44:1-45:22:
+deontic-breach-semantics.l4:45:1-46:22:
   DEONTIC BREACHED:
     BREACH
     BY Alice BECAUSE "missed first"
     BY Bob BECAUSE "missed second"
-deontic-breach-semantics.l4:54:1-55:22:
+deontic-breach-semantics.l4:55:1-56:22:
   DEONTIC BREACHED:
     BREACH
     BY Alice BECAUSE "missed first"
     BY Bob BECAUSE "missed second"
-deontic-breach-semantics.l4:70:1-71:22:
+deontic-breach-semantics.l4:71:1-72:22:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -32,7 +32,7 @@ deontic-breach-semantics.l4:70:1-71:22:
           MUST deliver
         before their deadline, which was at
           10
-deontic-breach-semantics.l4:73:1-74:22:
+deontic-breach-semantics.l4:74:1-75:22:
   DEONTIC BREACHED:
     BREACH
     BY Bob
@@ -41,16 +41,16 @@ deontic-breach-semantics.l4:73:1-74:22:
       before their deadline, which was at
         10
     BY Alice BECAUSE "missed payment"
-deontic-breach-semantics.l4:84:1-85:21:
+deontic-breach-semantics.l4:85:1-86:21:
   DEONTIC BREACHED:
     BREACH
     BY Alice
     BECAUSE "missed payment" OR PARTY Bob MUST deliver WITHIN 3 HENCE FULFILLED
-deontic-breach-semantics.l4:99:1-100:30:
+deontic-breach-semantics.l4:100:1-101:30:
   FULFILLED
-deontic-breach-semantics.l4:110:1-111:30:
+deontic-breach-semantics.l4:111:1-112:30:
   FULFILLED
-deontic-breach-semantics.l4:126:1-127:30:
+deontic-breach-semantics.l4:127:1-128:30:
   DEONTIC BREACHED:
     party
       Bob
@@ -64,7 +64,7 @@ deontic-breach-semantics.l4:126:1-127:30:
       MUST pay 2
     before their deadline, which was at
       5
-deontic-breach-semantics.l4:148:1-151:31:
+deontic-breach-semantics.l4:149:1-152:31:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -78,15 +78,15 @@ deontic-breach-semantics.l4:148:1-151:31:
       MUST deliver
     before their deadline, which was at
       15
-deontic-breach-semantics.l4:156:1-157:31:
+deontic-breach-semantics.l4:157:1-158:31:
   FULFILLED
-deontic-breach-semantics.l4:167:1-168:30:
+deontic-breach-semantics.l4:168:1-169:30:
   FULFILLED
-deontic-breach-semantics.l4:180:1-181:32:
+deontic-breach-semantics.l4:181:1-182:32:
   FULFILLED
-deontic-breach-semantics.l4:184:1-185:19:
+deontic-breach-semantics.l4:185:1-186:19:
   PARTY Alice MUST pay 100 WITHIN 0 HENCE FULFILLED
-deontic-breach-semantics.l4:188:1-189:19:
+deontic-breach-semantics.l4:189:1-190:19:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -100,7 +100,7 @@ deontic-breach-semantics.l4:188:1-189:19:
       MUST pay 100
     before their deadline, which was at
       5
-deontic-breach-semantics.l4:198:1-199:31:
+deontic-breach-semantics.l4:199:1-200:31:
   DEONTIC BREACHED:
     party
       Alice
@@ -114,15 +114,15 @@ deontic-breach-semantics.l4:198:1-199:31:
       MUST NOT smoke
     before their deadline, which was at
       30
-deontic-breach-semantics.l4:202:1-203:20:
+deontic-breach-semantics.l4:203:1-204:20:
   FULFILLED
-deontic-breach-semantics.l4:214:1-215:33:
+deontic-breach-semantics.l4:215:1-216:33:
   FULFILLED
-deontic-breach-semantics.l4:235:1-236:31:
+deontic-breach-semantics.l4:236:1-237:31:
   FULFILLED
-deontic-breach-semantics.l4:240:1-241:33:
+deontic-breach-semantics.l4:241:1-242:33:
   PARTY Bob MUST deliver WITHIN 10 HENCE FULFILLED
-deontic-breach-semantics.l4:249:1-250:19:
+deontic-breach-semantics.l4:250:1-251:19:
   FULFILLED
-deontic-breach-semantics.l4:272:1-273:30:
-  PARTY Alice MUST pay 1 WITHIN (0 MINUS 1) HENCE FULFILLED LEST `recursive lest`
+deontic-breach-semantics.l4:277:1-278:30:
+  A chain of HENCE or LEST continuations has stalled: the event at 7 has been handed on 1000 times in a row to continuations whose deadlines never advanced past -1, a deadline it had already revealed the expiry of, so no continuation this chain reaches can ever be open to it. A continuation that names itself and is already past its deadline when it is entered - a negative WITHIN, a LEST's WITHIN 0, or an anchored deadline no later than the one just missed - is such a chain. Give it a positive WITHIN, anchor it later than the missed deadline, or end the chain with BREACH. (EVERY-EACH-QUANTIFIER-SPEC section 5.2.1.)

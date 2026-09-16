@@ -1028,7 +1028,9 @@ meets the stream (`armNormKey`, `:430`) — because the `ValObligation` a member
 for its membership and adding one is a value-type change P2b declined. With the log off the
 machine computes nothing for it, but it does carry state it never reads: a lazy `norm :: NormKey`
 through the eleven `Contract*` frame records and `QuantCtx` (`ContractFrame.hs:88` onward), which
-nothing forces; the `ev'reoffered :: Bool` the machine already computed at `Contract2`, now
+nothing forces; the re-offer mark `ev'reoffered` the machine already looked up at `Contract1` (a
+`Bool` as P2b built it; the EVERY wave's LEST pass of 2026-09-16 re-typed it to the mark a
+re-offered copy carries — §4.4 below, `ContractFrame.hs` `data Reoffered`), now
 carried through six more records past `Contract5`, the only frame that consults it
 (`ContractFrame.hs:143-188`); and a `pending :: Maybe DeonticStep` on `ResolvePartyFrame`
 (`:324`), always `Nothing` when the log is off. One hot-path arm was also **restructured**, not
@@ -1129,11 +1131,15 @@ Expiry re-offers the revealing event to the continuation, at most once, marked b
 again in `ContractFrame.hs:68-75`). It exists to keep recursive `HENCE`/`LEST` continuations with
 non-positive deadlines terminating — the motivating case in the comment being
 `x MEANS PARTY p MUST a WITHIN d LEST x`. _(Superseded 2026-09-16 by the `every/lest-anchor`
-branch's round-1 fix: since a `LEST` counts from the missed deadline, one event can be past several
-`LEST` windows, and it is now re-offered to each layer in turn while the deadline strictly
-advances, consumed only when it does not — `EVERY-EACH-QUANTIFIER-SPEC.md` §5.2.1, "The termination
-argument, re-read". An animator must model an event scrutinised k+1 times for k expired layers, not
-at most twice.)_
+branch's adversarial pass: since a `LEST` counts from the missed deadline, one event can be past
+several `LEST` windows, and it is now re-offered to every layer in turn, unconditionally (round 1
+re-offered it only while the deadline strictly advanced and consumed it otherwise; round 2 found
+that dropped a timely performance behind a `WITHIN 0` or an already-past anchored layer). The
+only chain that does not end — a continuation that reaches itself with its deadline already
+past — is refused by name after a bounded number of stalled hand-offs, not consumed —
+`EVERY-EACH-QUANTIFIER-SPEC.md` §5.2.1, "The termination argument, re-read". An animator must
+model an event scrutinised k+1 times for k expired layers, not at most twice, and a refusal as a
+possible end of the walk.)_
 
 A naive "one event, one animation frame" misrepresents this. `dsScrutiny` is the explicit
 **witness-versus-consume** distinction, and the scrubber must be able to show the same event
