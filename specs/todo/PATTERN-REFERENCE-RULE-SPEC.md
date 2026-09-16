@@ -1,10 +1,13 @@
 # Pattern names refer when they can — retiring `EXACTLY`
 
-**Status: RULED 2026-09-16 (Meng), NOT BUILT.** Every claim below about the tree was checked
-against `legalese/l4-ide` `unstable` @ `11b7534b` on 2026-09-16 unless a different tree is named
-beside it. The measurements in Appendix A were taken at `95dcd92d` (the `fix/with-supply-two-binders`
-branch, merged as #392) by the 2026-09-16 design memo that preceded this spec; the build re-measures
-at this base in Phase A and replaces them. Nothing in §4 onward exists in the tree.
+**Status: BUILT `41809c4d`, 2026-09-16T04:10Z; not merged.** §1's ruling is Meng's and is unchanged
+since he gave it on 2026-09-16. R1–R7, the corpus sweep, the printer change and the docs/skill
+rewrite (§4 onward) are built and committed on `lang/action-binder-reference`, verified green by
+`etc/verify-branch.sh` (full, not `--quick`) at this commit — nothing below describes a plan. Every
+claim about the tree was checked against `41809c4d` (base `unstable` @ `11b7534b`) on 2026-09-16
+unless a different tree is named beside it. Appendix A's measurements were re-taken at `11b7534b` in
+Phase A and supersede the `95dcd92d` design-memo numbers this section carried before the build; A.1
+records the small delta (canon vendoring landed between the memo and this base).
 
 Branch: `lang/action-binder-reference`, worktree `~/src/legalese/l4wt/exactly-lexical`.
 
@@ -248,7 +251,9 @@ the member's own does.
 
 When R1 takes the third row — a pattern name referring to a top-level, section-level, `ASSUME`d or
 imported term — the checker emits a `CheckInfo`-severity notice naming what was referred to and
-where it is defined, in the `SuspiciousBinderPattern` shape (`SInfo`). It asks the drafter for
+where it is defined, in the `ActionPatternReference` shape (`SInfo`; `jl4-core/src/L4/TypeCheck/Types.hs:205-217` —
+not `SuspiciousBinderPattern`, an older, unrelated shape this section named before the
+implementation settled). It asks the drafter for
 nothing. Its job is the one thing no marker-free design can make loud: a top-level name added
 later that captures what used to be a wildcard. It does not fire for lexical locals (that reading
 is unambiguous and the corpus is unanimous) and not for constructors. The build reports how many
@@ -266,6 +271,33 @@ remain over the whole corpus, every one of them a name that really could have be
 (Two of the difference are not this narrowing: restoring`ok/regulative-exactly-later-argument.l4`
 to the keyword turns two of its notices into deprecation warnings.) That is the count for Meng's
 severity question in §10.2.
+
+**Phase D's raw count, which the golden-grep figure above undercounts and explains why.** Before
+the arity-0 fix, `l4 check` over every one of the 1066 tracked `.l4` files (not only the goldened
+subset — `etc/`'s scratch `count-notices.sh`, on the pre-fix snapshot `l4-diff`) found **72** R5
+notices across 21 files, and **1** deprecation warning (the kept `not-ok/tc/every-unbound-variable.l4`
+fixture; at that point in the build `ok/regulative-exactly-later-argument.l4` had not yet had its
+keyword restored, so its would-be deprecation warnings were still counted as R5 notices — 7 of the
+72). Per file: `doc/reference/regulative/every-example.l4` 4 · `every-run-example.l4` 3 ·
+`doc/tutorials/obligations/several-parties.l4` 3 · `jl4/examples/legal/ceo-performance-award.l4` 3 ·
+`jl4/examples/legal/promissory-note.l4` 3 · `jl4/examples/not-ok/tc/every-join-under-party.l4` 1 ·
+`jl4/examples/ok/every/barrier.l4` 1 · `fork.l4` 2 · `nested.l4` 2 · `rand.l4` 1 · `run-barrier.l4` 1 ·
+`run-fork.l4` 2 · `run-in.l4` 1 · `jl4/examples/ok/regulative-exactly-later-argument.l4` 7 ·
+`jl4/examples/ok/regulative-reference-outer.l4` 2 · `jl4/experiments/jerseyCharities2-tests.l4` 13 ·
+`jl4/experiments/jerseyCharities2.l4` 13 · `promissory-note-amount.l4` 3 · `promissory-note-list.l4` 1 ·
+`promissory-note-tracking.l4` 3 · `safe-post-new.l4` 3.
+
+Of the 72, **13** are the applied-call-head reading this section's own "NARROWED" fix removes, and
+the fix's effect is wider than the 3 (ceo-performance-award) already counted above: re-checked
+directly against the branch binary (`41809c4d`), `jl4/experiments/jerseyCharities2.l4` and its
+`-tests` twin each drop from 13 notices to 8 (5 removed each; sites `:858 :912 :913 :921 :1031`,
+e.g. `commencement` inside `(addDays commencement 28)`, itself one argument of an outer
+`RequiredStepsNotice` application), and `ceo-performance-award.l4` drops from 3 to 0 — 5+5+3=13,
+confirmed by direct measurement, not by repeating the earlier count. Neither `jerseyCharities2.l4`
+nor its `-tests` twin is under a goldened glob (`jl4/experiments/` is in none of `jl4-test`'s globs,
+CLAUDE.md §3.1), which is why their 26 combined notices never reached the `*.golden` grep this
+section's "19" is based on: the raw, whole-corpus count and the golden-text count are measuring
+different populations, not disagreeing about the same one.
 
 ### R6. `CONSIDER` is measured first and extended only if its numbers look like the deontic ones
 
@@ -346,6 +378,52 @@ Note what is **not** carved out. Extending R1 row 4 to every function-typed refe
 kept those files running, by making the name a silent wildcard — which is the trade §2 exists to
 refuse. The selector carve-out survives on evidence (26 corpus sites, all deliberate wildcards),
 not on the fact that a selector is a function.
+
+**What review changed.** Three findings from the Phase E review were reproduced against the
+pre-fix snapshot (`l4-diff`) and fixed in Phase F; each is verified here against the built tree,
+not just described:
+
+- **HIGH — the `EXACTLY` deprecation warning recommended a replacement that silently changes the
+  rule's meaning, for an operand naming both a constructor and a term.** Reproduced with
+  `jl4/examples/ok/regulative-exactly-constructor-overload.l4` (`GIVEN red` supplied as `green`):
+  `paint (EXACTLY red)` is `FULFILLED`, but the warning's own recommended edit, `paint red`, reads
+  under R1's first row as the _constructor_ pattern and is not — the §2 defect, reintroduced by the
+  migration advice itself. Fixed by telling the two constructor readings apart:
+  `ActionNameReading` gained `ReadsAsConstructorShadowingTerm` (`jl4-core/src/L4/TypeCheck.hs:2263-2287`),
+  returned by `actionNameReading` (`TypeCheck.hs:2306-2321`) exactly when a name has both a
+  `Constructor` candidate and a non-selector value candidate — pattern semantics are unchanged,
+  since `inferPattern` still treats it as `ReadsAsConstructor`. `DeprecatedExactlyInfo`'s
+  `replacement :: Maybe Text` became `advice :: ExactlyAdvice` (`jl4-core/src/L4/TypeCheck/Types.hs:323-363`)
+  with three cases — `DropTheKeyword` / `KeepItUnresolved` / `KeepItShadowedByConstructor` — the
+  third naming the collision and asking for a rename, with its own message
+  (`TypeCheck.hs:6457-6465`). Golden: `jl4/examples/ok/tests/regulative-exactly-constructor-overload.golden`.
+- **MEDIUM — the printer re-emitted a pinned name bare even where the same overload made that a
+  different pattern.** `printActionPattern` printed `paint (EXACTLY red)` as `paint red`, changing
+  which colour discharges the obligation on re-parse — a residual round-tripping into a different
+  meaning while the round-trip property (parse → print → parse → type-check) stayed green, the
+  same §3.2.1 shape the evaluation differential exists to catch by hand. Fixed by provenance
+  rather than by scope: `printPinned` (`jl4-core/src/L4/Print.hs:1043-1052`) keeps the keyword,
+  parenthesised, for any `PatExpr` whose own annotation carries the `EXACTLY` token, and prints
+  bare only for one the checker itself synthesised — sound because R1 only synthesises a `PatExpr`
+  for a name it has already resolved to a non-constructor, so the bare print re-parses to the same
+  reference. `exactlyKeywordRange` moved from `TypeCheck.hs` to `jl4-core/src/L4/Syntax.hs:809-828`
+  so the checker and the printer read one definition.
+- **MEDIUM — R1 turned a wildcard into an equality test against a value that has no equality, for
+  function-typed slots.** `GIVEN g IS A FUNCTION FROM NUMBER TO NUMBER` with `MUST apply g`: base
+  made `g` a silent wildcard and answered `FULFILLED`; R1 as first built type-checked the file
+  clean and then died at the first `#TRACE` with "trying to check equality on types that do not
+  support it," naming neither `g` nor the slot. Fixed with a new check-time error,
+  `ActionPatternNotComparable (Expr Name) (Type' Resolved)` (`TypeCheck/Types.hs:219-225`, `rangeOf`
+  at `:586`), raised in `inferPattern`'s `PatExpr` case (`TypeCheck.hs:3907-3926`) when the pinned
+  expression's inferred type is a function type and the position is `InActionArgument` — covering
+  both an author-written `EXACTLY g` and the reference R1 synthesises, since both produce the same
+  `PatExpr`. Fixture: `jl4/examples/not-ok/tc/action-pinned-function.l4`.
+
+Two more Phase E findings are recorded next to the rule tables they correct, rather than repeated
+here, per `CLAUDE.md`'s "a decision is recorded in its owning document": R1's selector carve-out is
+an argument-position-only rule (above, "CORRECTED"), and R5 fires at arity 0 only (§4 R5,
+"NARROWED"). All five are why the CORRECTED/EXTENDED/NARROWED markers are spread through §4, §5 and
+§6 instead of collected in one diff.
 
 ---
 
@@ -489,48 +567,77 @@ LSP golden covers a regulative rule at all); hover is a SHOULD if it is cheap in
 ## 10. Open, for Meng
 
 1. **Keyword removal.** When, after the deprecation has shipped on at least one shelf cut.
-2. **R5 severity**, once the count over the corpus is known.
-3. **R6 fallout**, only if the `CONSIDER` measurement finds a deliberate shadowing site.
-4. **R5 field opening** (`IMPLICIT-PROPS-DESIGN.md` §11.7, in build on `lang/r5-field-opening`).
+2. **R5 severity.** The count is now known — **19** notices over the swept corpus by the
+   golden-text measure (§4 R5), or 59 by the broader whole-corpus `l4 check` measure that also
+   reaches the two non-goldened `jerseyCharities2` files (§4 R5, "Phase D's raw count"). Meng's to
+   set (`SInfo` today); nothing in the build depends on which way this goes.
+3. **R5 field opening** (`IMPLICIT-PROPS-DESIGN.md` §11.7, in build on `lang/r5-field-opening`).
    An opened field spelled like the action's own slot — `amount` in `Pay t landlord amount` inside
    a rule that opens a record with an `amount` — would flip from wildcard to reference under R1 if
    opened fields are lexical locals. Rule when R5 lands; this spec takes no position.
-5. **Semantic tokens** for binder vs reference (§8).
+4. **Semantic tokens** for binder vs reference (§8). Hover was not added either (checked: the only
+   LSP change on this branch, `jl4-lsp/src/LSP/L4/Rules.hs`, is the `Deprecated` tag on
+   `DeprecatedExactly`, R3's own diagnostic — nothing about which reading R1 took). Still open.
+
+**Settled by the build, and removed from this list rather than left to look open:** R6 fallout —
+"only if the `CONSIDER` measurement finds a deliberate shadowing site" (the condition this item was
+conditioned on). The measurement (Appendix A.5) found none: all 22 colliding `CONSIDER` binders are
+deliberate wildcards (§4 R6), so the criterion applied cleanly and decided DEONTIC-ONLY with nothing
+left over for Meng to rule on.
 
 ---
 
-## Appendix A. Measurements (memo, 2026-09-16, at `95dcd92d`; to be replaced at `11b7534b`)
+## Appendix A. Measurements (re-taken at `11b7534b`, superseding the `95dcd92d` memo)
 
-Method: `exactly_survey.py` — for every tracked `.l4` containing a modal, `l4 ast`, walked with a
-scope model mirroring §2: an argument that is a bare `PatApp n []` is a binder unless `n` is a
-constructor in scope; scope frames = module top-level (`MEANS`/`ASSUME`/`DECLARE` and selectors),
-section GIVENs, the rule's GIVENs and app-form params, WHERE/LET locals, lambda params, CONSIDER
-binders, EVERY variables, an outer action's binders for PROVIDED/HENCE. 176 of 191 candidate
-files parsed; the 15 that did not are rejected by `l4 ast` itself (13 under `jl4/experiments/`,
-2 layout fixtures). The build commits the tool under `etc/` so these can be re-derived.
+Method: `etc/survey-pattern-binders.py --mode deontic`, now committed under `etc/` (the memo's own
+`exactly_survey.py`, ported and hardened per the tool's own docstring). Unlike the memo, it does
+**not** prefilter files by a `MUST`/`MAY`/`SHANT`/`DO` grep — a multi-clause `DECIDE` that desugars
+to a regulative pattern carries no such literal token — so it walks `l4 ast` over every one of the
+**1066** tracked `.l4` files (`git ls-files '*.l4'`), against the base binary (`l4-base`, `11b7534b`;
+no code changes on top of it at this base), with the scope model in the tool's own module docstring:
+module top level (`MEANS`/`ASSUME`/`DECLARE` and selectors, including nested `SECTION`s and one
+level of `IMPORT`), section `GIVEN`s, a rule's own `GIVEN`/app-form params, `WHERE`/`LET` locals,
+lambda params, `CONSIDER`/`EVERY` binders, and an outer action's own binders for `PROVIDED`/`HENCE`.
+
+**53** of the 1066 did not yield a survey record — the full list is in the tool's own JSON output
+(`files_failed`). They are not all the same kind of failure: **25** are the survey script's own
+regex-based re-parse of `l4 ast`'s dump choking on a construct it does not handle (multi-line
+strings and a few bracket forms — `PARSE FAIL` in the tool's stderr, one line per file, confirmed by
+count); the remaining **28** are `l4 ast` itself returning nothing usable — deliberate `not-ok`/
+parse-error fixtures, layout fixtures, and files with a third-party import the survey does not
+resolve (`llm.l4` and its two importers). Three further files carry a one-level unresolved import
+the survey notes but does not fail on: `llm` (`jl4/examples/advanced/legislative-ingestion.l4`,
+`jl4/examples/ok/ai-simple.l4`) and `jerseyCharities2` (`jl4/experiments/jerseyCharities2-tests.l4`).
 
 ### A.1 Headline
 
 | measure                                                                      |       count |
 | ---------------------------------------------------------------------------- | ----------: |
-| deontic action patterns (all modals)                                         |         755 |
-| — with ≥1 argument                                                           |         227 |
-| head is a constructor                                                        |         704 |
+| deontic action patterns (all modals)                                         |         757 |
+| — with ≥1 argument                                                           |         229 |
+| head is a constructor                                                        |         706 |
 | head is `EXACTLY` (whole action)                                             |          35 |
 | head is a bare name referencing a GIVEN / top-level (the `34a7c1c5` path)    |      4 / 11 |
-| argument-position bare-name binders                                          |          83 |
+| head is a bare-name wildcard binder (matches nothing in scope)               |           1 |
+| argument-position bare-name binders                                          |          85 |
 | argument-position `EXACTLY` references                                       |         114 |
 | — of which `EXACTLY <name in scope>` / `EXACTLY (expr)` / the not-ok fixture | 107 / 6 / 1 |
-| binders colliding with an in-scope term                                      |          60 |
+| binders colliding with an in-scope term                                      |          62 |
 | — with a field selector only (deliberate wildcards)                          |          26 |
-| — with a local or module name (the hazard)                                   |          34 |
+| — with a local or module name (the hazard)                                   |          36 |
 | binders colliding with an **imported** name                                  |           0 |
 
-### A.2 The 34, by innermost colliding scope
+Every one of these is +2 (patterns, args, binders, collisions, hazard) or unchanged from the memo's
+`95dcd92d` numbers, and the entire delta traces to one file,
+`jl4/examples/canon/sg/child-support/sg-childcare-leave.l4`, vendored into the tree by PR #398
+("canon-vendor", merged as `11b7534b`) after the memo ran. See A.3.
 
-GIVEN 17 · WHERE local 6 · top-level MEANS 6 · outer action binder 3 · CONSIDER binder 1 ·
-EVERY variable 1. Of these, 33 are the hazard (the file makes the reference intent plain), 0 are
-deliberate shadowing, 1 is the `EVERY` error's own negative fixture.
+### A.2 The 36, by innermost colliding scope
+
+GIVEN 18 · WHERE local 6 · top-level MEANS/DECIDE 6 · outer action binder 4 · CONSIDER binder 1 ·
+EVERY variable 1. Of these, 35 are the hazard (the file makes the reference intent plain), 0 are
+deliberate shadowing, 1 is the `EVERY` error's own negative fixture. (Memo: GIVEN 17, outer action
+binder 3, 34 total — both buckets gain exactly the one new file's two sites; see A.3.)
 
 ### A.3 The hazard sites
 
@@ -546,18 +653,26 @@ WHERE local; **goldened**); `jl4/experiments/promissory-note-amount.l4` :84 :97 
 `serviceType`, `provider`, `loanAmount`, `lender`); `not-ok/tc/every-rebinds-variable.l4:13`
 (`t`, the fixture).
 
+**NEW since the memo** (landed by PR #398's canon vendoring, present only at `11b7534b`):
+`jl4/examples/canon/sg/child-support/sg-childcare-leave.l4` :259 :262 (`days` colliding with its
+rule's own `GIVEN`; `days` again, this time colliding with an outer action's own binder as well as
+the `GIVEN`). Both read, on inspection, as the same hazard as the other 34 — the file's own drafter
+plainly meant the `GIVEN` value, not a fresh wildcard.
+
 ### A.4 The 26 selector-spelled wildcards
 
-Every one read is a deliberate wildcard named after the slot, usually refined by `PROVIDED`:
-`Pay Alice \`Ms Ng\` amount` (`doc/tutorials/obligations/several-parties.l4:201`),
+Unchanged in both count and membership at `11b7534b` (checked against the full `selector_sites`
+list, not just the count). Every one read is a deliberate wildcard named after the slot, usually
+refined by `PROVIDED`: `Pay Alice \`Ms Ng\` amount` (`doc/tutorials/obligations/several-parties.l4:201`),
 `Deliver (EXACTLY theLandlord) what`and`Pay (EXACTLY t) (EXACTLY theLandlord) amount`
 (`doc/reference/regulative/every-example.l4:23,40,63`), `ok/every/\*.l4`, `maintain eligible
 service status Service Status PROVIDED …`, `Convert SAFE issue PROVIDED issue EQUALS …`.
 
 ### A.5 `CONSIDER` binders (Phase A1, base `11b7534b`, run stamp 2026-09-16T04:10Z)
 
-Tool: `etc/survey-pattern-binders.py`, `--mode consider`, over all 1066 tracked `.l4` files
-(53 rejected by `l4 ast` itself, as in A.1).
+Tool: `etc/survey-pattern-binders.py`, `--mode consider`, over the same 1066 tracked `.l4` files
+(the same 53 files fail to yield a record, for the same two reasons as A.1 — confirmed identical
+file lists between the two modes' runs).
 
 | measure                                                      |                  count |
 | ------------------------------------------------------------ | ---------------------: |
@@ -574,9 +689,20 @@ All 22 are deliberate wildcards; see §4 R6 for the reading of each and the deci
 
 ### A.6 Literals and expressions in pattern position
 
-Probe `lit3.l4` (2026-09-16, `lang/r5-field-opening` binary): `MUST pay 100` pending on `pay 1`,
-`FULFILLED` on `pay 100`; `CONSIDER 5 WHEN 3` → `"other"`, `CONSIDER 3 WHEN 3` → `"three"`.
-Probe `lit.l4`: `MUST pay (price PLUS 50)` → parser error `unexpected PLUS` at the operator.
+Re-measured 2026-09-16 on **this branch's own binary** (`41809c4d`, copied from the phase-F snapshot
+`l4-fix2`/`jl4-test-fix2` to `work-g/l4`; not the `lang/r5-field-opening` worktree the first
+measurement used). Probe `lit3.l4`: `MUST pay 100` pending on `pay 1`, `FULFILLED` on `pay 100`;
+`CONSIDER 5 WHEN 3` → `"other"`, `CONSIDER 3 WHEN 3` → `"three"` — unchanged from the earlier probe,
+as expected (R1/R2 do not touch literal patterns).
+
+The arithmetic case changed, because R2 is what makes it change: probe `r2.l4`'s
+`MUST pay (price PLUS 50)` (`GIVEN price IS A NUMBER`) now **type-checks** (`Check succeeded`,
+where the pre-R2 binary gave the parser error `unexpected PLUS`) and evaluates correctly —
+`PARTY Tenant DOES pay 150` fulfils it when `price = 100`, `PARTY Tenant DOES pay 100` leaves it
+pending. The other three R2 acceptance-case probes in the same file check and run as R2 specifies:
+`MUST payM (Money 1000 "USD")` (already a constructor pattern) is unaffected;
+`MUST Receipt landlord t (amount MINUS 5)` resolves the same way as the `pay` case;
+`MUST Deliver (p's landlord) what` checks clean.
 
 ---
 
