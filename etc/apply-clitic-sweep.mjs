@@ -57,8 +57,10 @@ import {
   mkdirSync,
   rmSync,
   symlinkSync,
+  realpathSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 import { join, extname, resolve, dirname, sep } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import {
@@ -172,23 +174,96 @@ export function sweepText(text, renames, ext = null) {
   return { text: out, edits: n };
 }
 
-// A rename is HELD BACK when its target name is already bound to something
-// else. MEASURED: canon's `is the natural father` wanted to become `the natural
-// father`, which already existed as a top-level MEANS fixture — a Person value
-// used by #ASSERT — so the field would have collided with it and the fixture's
+// A rename is HELD BACK when its target name is ALREADY BOUND to something else.
+// MEASURED: canon's `is the natural father` wanted to become `the natural
+// father`, which already existed as a top-level MEANS fixture -- a Person value
+// used by #ASSERT -- so the field would have collided with it and the fixture's
 // own body would have read "`the natural father` IS TRUE" inside the definition
 // of `the natural father`. Forcing it invents; the resolution was to rename the
 // FIXTURE first, which is a judgement about that corpus and not a sweep's call.
+//
+// BINDING, NOT OCCURRENCE. The first version matched only four keywords --
+// MEANS, IS A, IS AN, IS THE -- and sailed past `DECIDE \`x\` IF ...`,
+// `DECLARE \`x\``, and `GIVETH \`x\``, each an ordinary binding whose collision is
+// exactly the harm this function exists to prevent. Widening to "the name
+// appears backticked anywhere" was measured and is too blunt: `a Singapore
+// citizen` already appears backticked in a sibling corpus that #386 swept, so
+// every legitimate rename would be held. What distinguishes a binding is its
+// POSITION -- the name at the head of a form, or immediately after a binding
+// keyword -- so that is what is matched.
+const BINDS_AFTER = "DECIDE|DECLARE|GIVETH|GIVEN|ASSUME|HAS";
+// `IF` and `GIVETH` were in this list and are not any more. Measured over
+// jl4/examples and jl4-core/libraries: a backticked name at the head of a line
+// followed directly by `IF` occurs 0 times, and by `GIVETH` 0 times -- the real
+// forms are `DECIDE `x` IF` and `GIVETH `x``, both keyword-led, both matched by
+// BINDS_AFTER. Mutating them away reddened no selftest case, which is the tell:
+// a widening that no corpus form justifies and no case exercises can only
+// produce false holds, and a false hold blocks a rename that should proceed.
+const BINDS_BEFORE = "MEANS|IS\\s+(?:A|AN|THE)\\b";
+
+export function bindingRe(name) {
+  const n = name.replace(RX_SPECIAL, "\\$&");
+  return new RegExp(
+    // `name` at the head of a line, then a binding operator (possibly wrapped)
+    `(?:^|\\n)[ \\t]*\`${n}\`\\s*(?:\\n\\s*)?(?:${BINDS_BEFORE})` +
+      // ... or immediately after a binding keyword
+      `|(?:${BINDS_AFTER})\\s+\`${n}\``,
+  );
+}
+
+// The corpus searched for hazards is wider than the first version's on the axis
+// that was simply wrong, and DELIBERATELY NOT wider on the axis that looked
+// wrong and is not.
+//
+//   TYPE -- fixed. `collect` reads the detector's EXTS (.l4/.md), but the sweep
+//   WRITES .json/.mjs/.js/.ts/..., so a binding sitting in a deposit or a
+//   generator was structurally invisible to the hazard check. It now searches at
+//   WRITE_EXTS.
+//
+//   SCOPE -- left as the directories you name, and that is a judgement worth
+//   recording because the obvious "search the whole repository" is WRONG. It was
+//   built and measured: repo-wide, `has renounced the right to such grant` ->
+//   `renounced the right to such grant` is HELD, because the target is bound in
+//   `jl4/examples/legal/sg-succession/sg-paa.l4` -- a different corpus that #386
+//   already swept. That is not a collision, it is the same field in another copy,
+//   and holding it back would have blocked a rename the real sweep applied. L4
+//   names are scoped per module and reached through imports; a binding in an
+//   unrelated corpus is not in scope and never could be.
+//
+//   So the corpus you pass IS the collision domain, and you are asserting it by
+//   passing it. The run prints how many files it searched so that assertion is
+//   visible rather than implied.
+export function hazardCorpus(dirs = []) {
+  const seen = new Set();
+  const out = [];
+  for (const r of dirs) {
+    let files;
+    try {
+      files = writeWalk(r);
+    } catch {
+      continue;
+    }
+    for (const f of files) {
+      let key;
+      try {
+        key = realpathSync(f);
+      } catch {
+        key = f;
+      }
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ file: f, text: readFileSync(f, "utf8") });
+    }
+  }
+  return out;
+}
+
 export function hazards(renames, corpus) {
   const held = [];
   const safe = [];
   for (const [from, to] of renames) {
-    const decl = new RegExp(
-      "`" +
-        to.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") +
-        "`\\s+(MEANS|IS\\s+A|IS\\s+AN|IS\\s+THE)",
-    );
-    const site = corpus.find((c) => decl.test(c.text));
+    const re = bindingRe(to);
+    const site = corpus.find((c) => re.test(c.text));
     if (site)
       held.push([
         from,
@@ -285,33 +360,49 @@ export function plan(dirs) {
     if (!to) unrenamable.push(name);
     else renames.push([name, to]);
   }
-  const { held, safe } = hazards(renames, corpus);
-  return { corpus, names, safe, held, unrenamable, derefOnly };
+  const domain = hazardCorpus(dirs);
+  const { held, safe } = hazards(renames, domain);
+  return {
+    corpus,
+    names,
+    safe,
+    held,
+    unrenamable,
+    derefOnly,
+    domain: domain.length,
+  };
 }
 
 // ---------------------------------------------------------------------------
-// Selftest. Every case is a bug this file HAD — every one of the numbers below
-// is a defect a refuter found in the first version of this file, not a
-// hypothetical. Each has been SEEN TO FAIL, measured 2026-09-16 by mutating a
-// scratch copy one rule at a time:
+// Selftest. Every case is a bug this file HAD -- each number below is a defect a
+// refuter found in an earlier version of this file, not a hypothetical. Each has
+// been SEEN TO FAIL, measured 2026-09-16 by mutating a scratch copy one rule at
+// a time:
 //
-//   sweep BARE TEXT (undelimited)         5 cases redden
-//   drop the plain-backtick form          4
-//   drop the escaped-backtick form        2
-//   drop the quoted form entirely         2
-//   allow the quoted form in .l4/.md      2
-//   apply renames in sequence, not once   2
-//   drop the declaration requirement      2
-//   drop the `tests/` exclusion           1
-//   follow symlinks                       1
+//   sweep BARE TEXT (undelimited)             5 cases redden
+//   drop the keyword-led binding form         5
+//   drop the plain-backtick form              4
+//   drop the escaped-backtick form            2
+//   drop the quoted form entirely             2
+//   allow the quoted form in .l4/.md          2
+//   apply renames in sequence, not one pass   2
+//   drop the declaration requirement          2
+//   hazard corpus back to .l4/.md only        1
+//   revert realpath in the CLI guard          1
+//   drop the `tests/` exclusion               1
+//   follow symlinks                           1
+//
+// NO ROW IS ZERO, and that is the property being maintained rather than a happy
+// accident. A zero says a guard is justified by a comment and exercised by
+// nothing -- which is how `IF` and `GIVETH` were found sitting in BINDS_BEFORE,
+// matching no corpus form and protected by no case. They were removed.
 //
 // A MEASUREMENT NOTE, because the harness lies if you skip it. The mutant must
-// be run where `REPO` still resolves to this repository: `REPO` is derived from
+// run where `REPO` still resolves to this repository: `REPO` comes from
 // `import.meta.url`, so a copy executed out of /tmp reports 4 phantom isMirror
 // failures that have nothing to do with the mutation. The numbers above are
 // differences against an UNMUTATED copy run from the same place, not raw counts.
-// An instrument that reports 6 where the answer is 2 is worse than no
-// instrument, because it reads as thoroughness.
+// An instrument that reports 6 where the answer is 2 reads as thoroughness.
 // ---------------------------------------------------------------------------
 const R = [["is a Singapore citizen", "a Singapore citizen"]];
 
@@ -486,6 +577,53 @@ function selftest() {
       `an uncontested rename must be safe, got ${h2.held.length} held`,
     );
 
+  // H1: every binding FORM must hold, not just the four keywords the first
+  // version knew. `DECIDE ... IF`, `DECLARE` and `GIVETH` are ordinary bindings
+  // and colliding with one is the harm this function exists to prevent.
+  for (const [label, text] of [
+    ["MEANS", "`bankrupt` MEANS TRUE"],
+    ["HAS ... IS A", "DECLARE P\n    HAS `bankrupt` IS A BOOLEAN"],
+    ["MEANS on the next line", "`bankrupt`\n    MEANS TRUE"],
+    ["DECIDE ... IF", "DECIDE `bankrupt` IF x"],
+    ["DECLARE", "DECLARE `bankrupt`"],
+    ["GIVETH", "GIVETH `bankrupt`"],
+    ["a binding inside a .json", '{ "rule": "DECIDE `bankrupt` IF x" }'],
+  ]) {
+    const r = hazards([["is bankrupt", "bankrupt"]], [{ file: "x", text }]);
+    if (r.held.length !== 1) fail("bindingRe", `must hold on: ${label}`);
+  }
+  // ... and a mere MENTION must not hold, or every rename is blocked forever.
+  const mention = hazards(
+    [["is bankrupt", "bankrupt"]],
+    [{ file: "x", text: "see `bankrupt` for details" }],
+  );
+  if (mention.held.length !== 0)
+    fail("bindingRe", "a mere mention is not a binding and must not hold");
+
+  // V1: the CLI guard must survive being invoked through a SYMLINK. Node
+  // resolves the main entry to its realpath while argv[1] keeps the spelling, so
+  // comparing them naively made the tool print nothing and exit 0 -- which reads
+  // as clean. This repo ships tooling behind a symlink, so it is not theoretical.
+  {
+    const t3 = mkdtempSync(join(tmpdir(), "clitic-link-"));
+    try {
+      const link = join(t3, "aliased.mjs");
+      symlinkSync(fileURLToPath(import.meta.url), link, "file");
+      // Spawn with NO ARGUMENTS, which prints usage and exits 2. Spawning
+      // `--selftest` would re-enter this very check and recurse forever -- it
+      // did, once. What is being proved is only that the CLI BLOCK RAN at all.
+      const r = spawnSync(process.execPath, [link], { encoding: "utf8" });
+      if (r.status !== 2 || !/usage: apply-clitic-sweep/.test(r.stderr))
+        fail(
+          "isMainModule",
+          `through a symlink the CLI must still run; got status ${r.status}, ` +
+            `stderr ${JSON.stringify(r.stderr)}`,
+        );
+    } finally {
+      rmSync(t3, { recursive: true, force: true });
+    }
+  }
+
   // The mirror refusal, in every spelling that once bypassed it. The
   // parent-directory rows are the ones that made this a bug and not a nicety:
   // `.` and `jl4/examples` contain the mirror without being it, and they are
@@ -602,7 +740,7 @@ function selftest() {
     return 1;
   }
   console.log(
-    `apply-clitic-sweep selftest: ${SELFTEST.length} text + ${ORDER_CASES.length} order cases + 25 structural checks pass`,
+    `apply-clitic-sweep selftest: ${SELFTEST.length} text + ${ORDER_CASES.length} order cases + 34 structural checks pass`,
   );
   return 0;
 }
@@ -613,7 +751,26 @@ export function isMirror(p) {
 }
 
 // ---------------------------------------------------------------------------
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+// REALPATH BOTH SIDES. Node resolves the main entry to its realpath, while
+// `argv[1]` keeps whatever spelling was typed, so invoking this file THROUGH A
+// SYMLINK made the two differ and the CLI simply did not run: no output, exit 0.
+// A checker that prints nothing and returns success is the worst failure mode
+// available -- it reads as "clean" -- and this repo ships tooling behind a
+// symlink (`.claude/skills/writing-l4-rules`). Introduced by the main-module
+// guard; the byte-identity measurement that accompanied it covered --selftest,
+// three --dir shapes and the usage path, and not this one.
+function isMainModule() {
+  try {
+    return (
+      import.meta.url ===
+      pathToFileURL(realpathSync(process.argv[1] ?? "")).href
+    );
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
   const argv = process.argv.slice(2);
   const mode = argv.includes("--check")
     ? "check"
@@ -645,7 +802,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     process.exit(2);
   }
 
-  const { safe, held, unrenamable, derefOnly } = plan(dirs);
+  const { safe, held, unrenamable, derefOnly, domain } = plan(dirs);
 
   if (!safe.length && !held.length) {
     console.log(`apply-clitic-sweep: nothing to rename in ${dirs.join(", ")}`);
@@ -675,6 +832,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     `\n${mode === "apply" ? "" : "PENDING — "}${edits} replacement(s) in ${touched.length} file(s)`,
   );
   for (const [from, to] of safe) console.log(`  \`${from}\` -> \`${to}\``);
+  console.log(
+    `\ncollision domain: ${domain} file(s) under ${dirs.join(", ")} — a name bound\n` +
+      `outside that is not searched for, because L4 names are scoped per module.`,
+  );
 
   if (refused.length) {
     console.error(

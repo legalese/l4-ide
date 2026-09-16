@@ -59,7 +59,7 @@
 // is the companion that answers "is there anything to sweep?".
 // Exit:   0 clean · 1 findings · 2 usage
 
-import { readFileSync, readdirSync, lstatSync } from "node:fs";
+import { readFileSync, readdirSync, lstatSync, realpathSync } from "node:fs";
 import { join, extname } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -428,7 +428,26 @@ function selftest() {
 // clitic-verb name IS, shared, rather than two that agree today. Without this
 // guard, importing the module would run the CLI and exit 2 on the importer's
 // own argv.
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+// REALPATH BOTH SIDES. Node resolves the main entry to its realpath, while
+// `argv[1]` keeps whatever spelling was typed, so invoking this file THROUGH A
+// SYMLINK made the two differ and the CLI simply did not run: no output, exit 0.
+// A checker that prints nothing and returns success is the worst failure mode
+// available -- it reads as "clean" -- and this repo ships tooling behind a
+// symlink (`.claude/skills/writing-l4-rules`). Introduced by the main-module
+// guard; the byte-identity measurement that accompanied it covered --selftest,
+// three --dir shapes and the usage path, and not this one.
+function isMainModule() {
+  try {
+    return (
+      import.meta.url ===
+      pathToFileURL(realpathSync(process.argv[1] ?? "")).href
+    );
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
   const argv = process.argv.slice(2);
   if (argv.length === 0) {
     console.error(
