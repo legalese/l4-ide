@@ -1,0 +1,21 @@
+IMPORT daydate
+
+DECLARE Actor IS ONE OF
+    Customer HAS name IS A STRING
+    Shop     HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Deliver HAS who IS AN Actor
+    Order   HAS who IS AN Actor
+
+buyer MEANS Customer OF "Alice"
+shop  MEANS Shop OF "Acme"
+
+
+GIVETH A DEONTIC Actor Action
+contract MEANS
+    PARTY  shop
+    MUST   Deliver shop
+    WITHIN 30
+    HENCE  (PARTY buyer MAY Order buyer AFTER 3 OF THE JOIN WITHIN 30 HENCE FULFILLED)
+    LEST   (PARTY buyer MUST Order buyer AFTER 3 BEFORE (YMD 2026 6 30))

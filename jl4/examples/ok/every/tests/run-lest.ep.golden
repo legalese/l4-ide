@@ -1,0 +1,559 @@
+IMPORT prelude
+-- EVERY-EACH-QUANTIFIER-SPEC §5.2 (RULED 2026-09-07 — R-Q7 for the anchor,
+-- R-Q5 for the failure time; BUILT 2026-09-16): where an UNANCHORED WITHIN
+-- inside a LEST counts from.
+--
+-- It counts from the FAILURE TIME, fixed by the layer the LEST attaches to
+-- and then by the modal:
+--
+--   act layer, MUST / DO / MAY     the deadline that was missed;
+--   act layer, SHANT               the violating event's own stamp;
+--   state layer (ONCE … WITHIN)    the state's deadline.
+--
+-- Not from the event that revealed the miss, which is where it counted
+-- until 2026-09-16. Under that rule a party who missed a deadline and then
+-- stayed silent had no cure deadline until somebody else acted; under this
+-- one silence changes nothing (§2).
+--
+-- There is ONE mechanism. A single obligation chooses its LEST's clock at
+-- its own expiry (Machine.hs, Contract5: the deadline; Contract10: the
+-- violating stamp), and a barrier member IS a single obligation, so the
+-- barrier's LEST counts from the earliest-failing member's deadline with no
+-- rule of its own. `WITHIN d` and `WITHIN d OF THE DEADLINE` under a LEST
+-- therefore name one instant for every failure but a SHANT violation, and
+-- §1, §3 and §6 pin the two spellings side by side. The breach's own date
+-- is NOT moved: a breach is still dated at the event that revealed it, and
+-- carries the deadline it missed (spec §3.4). Because a LEST counts from
+-- the deadline, one event can be past several LEST layers at once; it is
+-- offered to each in turn until it reaches a layer whose window is still
+-- open (§9) — including a layer whose deadline is no later than the one
+-- before it (§11) — and the clock a continuation is applied to is also
+-- what THE ARMING names inside it (§10). The one chain that walk cannot
+-- end, a continuation that reaches itself with its deadline already past,
+-- is refused by name (§12).
+
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Refund  HAS who    IS AN Actor
+    Smoke   HAS who    IS AN Actor
+    Approve HAS who    IS AN Actor
+
+theLandlord MEANS Landlord OF "Ms Ng"
+alice       MEANS Tenant OF "Alice"
+bob         MEANS Tenant OF "Bob"
+carol       MEANS Tenant OF "Carol"
+tenants     MEANS LIST alice, bob, carol
+`tenants, reversed` MEANS LIST carol, bob, alice
+
+-- Carol, LAST on the roll, has the EARLIEST deadline (5); Bob and Alice
+-- have 14.
+GIVEN t IS AN Actor
+GIVETH A NUMBER
+`days allowed to` t MEANS IF t EQUALS carol THEN 5 ELSE 14
+
+
+§ `1. a single obligation: the spec's own probe`
+
+-- Alice must sign by 10; if she does not, the landlord must refund within 5.
+-- The miss comes to light at 14 (a WAIT). The refund's five days count from
+-- 10, the deadline Alice missed, so the refund is due at 15: at 14 one day
+-- remains; a refund at 15 is timely; a refund at 18 is late and the breach
+-- reports 15. (Until 2026-09-16 the five days counted from 14, the refund
+-- was due at 19, and the refund at 18 was FULFILLED.)
+GIVETH A DEONTIC Actor Action
+`sign or refund` MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE FULFILLED
+    LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
+
+#TRACE `sign or refund` AT 0 WITH
+  (`WAIT UNTIL` 14)
+
+#TRACE `sign or refund` AT 0 WITH
+  (`WAIT UNTIL` 14)
+  PARTY theLandlord DOES Refund theLandlord AT 15
+
+#TRACE `sign or refund` AT 0 WITH
+  (`WAIT UNTIL` 14)
+  PARTY theLandlord DOES Refund theLandlord AT 18
+
+-- The same clock said out loud: `OF THE DEADLINE` names the instant the
+-- unanchored form now counts from. Same residual, same breach.
+GIVETH A DEONTIC Actor Action
+`sign or refund, anchored` MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE FULFILLED
+    LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
+
+#TRACE `sign or refund, anchored` AT 0 WITH
+  (`WAIT UNTIL` 14)
+
+#TRACE `sign or refund, anchored` AT 0 WITH
+  (`WAIT UNTIL` 14)
+  PARTY theLandlord DOES Refund theLandlord AT 18
+
+-- The revealing event is still re-offered to the LEST, so a refund that is
+-- itself the first thing after the deadline can discharge it: at 14 it is
+-- timely (14 ≤ 15). At 18 the same refund reveals Alice's miss, is
+-- re-offered, reveals the refund's own expiry too — the deadline anchor is
+-- what makes that possible — and, the refund having no LEST of its own,
+-- the walk ends there: the breach reports 15.
+#TRACE `sign or refund` AT 0 WITH
+  PARTY theLandlord DOES Refund theLandlord AT 14
+
+#TRACE `sign or refund` AT 0 WITH
+  PARTY theLandlord DOES Refund theLandlord AT 18
+
+
+§ `2. silence does not postpone the cure period`
+
+-- Nothing at all happens until 100. The refund fell due at 15 regardless,
+-- and the WAIT that reveals Alice's miss reveals the landlord's too: the
+-- breach reports 15. (Until 2026-09-16 the refund's clock started at 100
+-- and the answer was a residual with five days on it.)
+#TRACE `sign or refund` AT 0 WITH
+  (`WAIT UNTIL` 100)
+
+
+§ `3. a barrier: the LEST counts from the earliest-failing member's deadline`
+
+-- run-stack.l4 §1–3 pin this rule with `WITHIN 5 OF THE DEADLINE`; here the
+-- WITHIN is unanchored and the numbers are the same. Alice signs at 1. Carol
+-- misses 5 (revealed at 8), Bob misses 14 (revealed at 20). The LEST is
+-- anchored at Carol's failure — her deadline, 5 — so the refund is due at
+-- 10: at 10 FULFILLED, at 11 BREACHED reporting 10, on both rolls. Were the
+-- clock the revealing event's (8) the refund would be due 13 and both
+-- refunds timely.
+GIVEN roll IS A LIST OF Actor
+GIVETH A DEONTIC Actor Action
+`staggered` roll MEANS
+    EVERY Tenant t IN roll
+        MUST   Sign t
+        WITHIN `days allowed to` t
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
+
+#TRACE `staggered` tenants AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  (`WAIT UNTIL` 8)
+  PARTY theLandlord DOES Refund theLandlord AT 10
+  (`WAIT UNTIL` 20)
+
+#TRACE `staggered` tenants AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  (`WAIT UNTIL` 8)
+  PARTY theLandlord DOES Refund theLandlord AT 11
+  (`WAIT UNTIL` 20)
+
+#TRACE `staggered` `tenants, reversed` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  (`WAIT UNTIL` 8)
+  PARTY theLandlord DOES Refund theLandlord AT 11
+  (`WAIT UNTIL` 20)
+
+-- Both misses revealed by one WAIT UNTIL 20: the anchor is Carol's 5, not
+-- Bob's 14 and not the 20 that revealed them, so the refund was due at 10
+-- on both rolls. The revealing WAIT, re-offered to the LEST, already lies
+-- past that: the breach reports 10, dated at the WAIT (20), and the refund
+-- at 21 is never reached.
+#TRACE `staggered` tenants AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  (`WAIT UNTIL` 20)
+  PARTY theLandlord DOES Refund theLandlord AT 21
+
+#TRACE `staggered` `tenants, reversed` AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  (`WAIT UNTIL` 20)
+  PARTY theLandlord DOES Refund theLandlord AT 21
+
+-- The anchored twin, on the first trace: the same 10.
+GIVEN roll IS A LIST OF Actor
+GIVETH A DEONTIC Actor Action
+`staggered, anchored` roll MEANS
+    EVERY Tenant t IN roll
+        MUST   Sign t
+        WITHIN `days allowed to` t
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
+
+#TRACE `staggered, anchored` tenants AT 0 WITH
+  PARTY alice DOES Sign alice AT 1
+  (`WAIT UNTIL` 8)
+  PARTY theLandlord DOES Refund theLandlord AT 11
+  (`WAIT UNTIL` 20)
+
+
+§ `4. a fork: each member's LEST counts from that member's own deadline`
+
+-- Under UPON EACH every member carries its own LEST. Bob and Carol never
+-- sign. Carol's refund is due 5 + 5 = 10, Bob's 14 + 5 = 19: two refunds are
+-- owed, and each member's reparation sees only what followed its own miss.
+-- Refunds at 10 and 19 discharge both; a second refund at 20 instead is late
+-- for Bob's, and the breach reports 19.
+GIVETH A DEONTIC Actor Action
+`each signs or refund` MEANS
+    EVERY Tenant t IN LIST bob, carol
+        MUST   Sign t
+        WITHIN `days allowed to` t
+        UPON   EACH
+        HENCE  FULFILLED
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
+
+#TRACE `each signs or refund` AT 0 WITH
+  (`WAIT UNTIL` 8)
+  PARTY theLandlord DOES Refund theLandlord AT 10
+  PARTY theLandlord DOES Refund theLandlord AT 19
+
+#TRACE `each signs or refund` AT 0 WITH
+  (`WAIT UNTIL` 8)
+  PARTY theLandlord DOES Refund theLandlord AT 10
+  PARTY theLandlord DOES Refund theLandlord AT 20
+
+
+§ `5. SHANT: the clock is the violation itself, and THE DEADLINE is something else`
+
+-- A prohibition fails at the act, not at a deadline (R-Q5). Alice smokes at
+-- 3; the landlord's five days to refund count from 3 and end at 8: a refund
+-- at 8 is timely, at 9 the breach reports 8. This is the one failure where
+-- the unanchored clock and `OF THE DEADLINE` part company: THE DEADLINE in a
+-- SHANT's LEST is the window's end, 14, so the anchored twin is due at 19
+-- and a refund at 9 is timely there.
+GIVETH A DEONTIC Actor Action
+`no smoking` MEANS
+    PARTY alice SHANT Smoke alice WITHIN 14
+    HENCE FULFILLED
+    LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
+
+#TRACE `no smoking` AT 0 WITH
+  PARTY alice DOES Smoke alice AT 3
+  PARTY theLandlord DOES Refund theLandlord AT 8
+
+#TRACE `no smoking` AT 0 WITH
+  PARTY alice DOES Smoke alice AT 3
+  PARTY theLandlord DOES Refund theLandlord AT 9
+
+GIVETH A DEONTIC Actor Action
+`no smoking, anchored` MEANS
+    PARTY alice SHANT Smoke alice WITHIN 14
+    HENCE FULFILLED
+    LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
+
+#TRACE `no smoking, anchored` AT 0 WITH
+  PARTY alice DOES Smoke alice AT 3
+  PARTY theLandlord DOES Refund theLandlord AT 9
+
+
+§ `6. the state layer: the LEST sees only what followed the state deadline`
+
+-- Everyone signs, but the last signature lands after the ONCE line's
+-- deadline of 10. The LEST is anchored at 10 and `THE DEADLINE` names it —
+-- that was already so — and it is now handed the events after 10 only.
+-- A refund at 1, before anyone had acted, no longer discharges it: the
+-- refund is due at 15, and the WAIT at 20 reveals its expiry, reporting 15.
+-- (Until 2026-09-16 this LEST was handed the whole stream from the arming
+-- and the refund at 1 made it FULFILLED.)
+GIVEN roll IS A LIST OF Actor
+GIVETH A DEONTIC Actor Action
+`bounded` roll MEANS
+    EVERY Tenant t IN roll
+        MUST   Sign t
+        WITHIN 14
+        ONCE   ALL HAVE WITHIN 10
+        HENCE  FULFILLED
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
+
+#TRACE `bounded` tenants AT 0 WITH
+  PARTY theLandlord DOES Refund theLandlord AT 1
+  PARTY carol DOES Sign carol AT 3
+  PARTY alice DOES Sign alice AT 4
+  PARTY bob   DOES Sign bob   AT 12
+  (`WAIT UNTIL` 20)
+
+-- A refund at 11 — after the state deadline, before Bob's late signature —
+-- is in the stream the LEST sees, and discharges it. (The join's own
+-- residual, what followed the LAST signature, would have missed it: that
+-- stream starts after 12.)
+#TRACE `bounded` tenants AT 0 WITH
+  PARTY carol DOES Sign carol AT 3
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Refund theLandlord AT 11
+  PARTY bob   DOES Sign bob   AT 12
+  (`WAIT UNTIL` 20)
+
+-- Boundary and breach: a refund at 15 is timely, at 16 the breach reports 15.
+#TRACE `bounded` tenants AT 0 WITH
+  PARTY carol DOES Sign carol AT 3
+  PARTY alice DOES Sign alice AT 4
+  PARTY bob   DOES Sign bob   AT 12
+  PARTY theLandlord DOES Refund theLandlord AT 15
+
+#TRACE `bounded` tenants AT 0 WITH
+  PARTY carol DOES Sign carol AT 3
+  PARTY alice DOES Sign alice AT 4
+  PARTY bob   DOES Sign bob   AT 12
+  PARTY theLandlord DOES Refund theLandlord AT 16
+
+-- The anchored twin, on the refund-at-1 trace: the same 15.
+GIVEN roll IS A LIST OF Actor
+GIVETH A DEONTIC Actor Action
+`bounded, anchored` roll MEANS
+    EVERY Tenant t IN roll
+        MUST   Sign t
+        WITHIN 14
+        ONCE   ALL HAVE WITHIN 10
+        HENCE  FULFILLED
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
+
+#TRACE `bounded, anchored` tenants AT 0 WITH
+  PARTY theLandlord DOES Refund theLandlord AT 1
+  PARTY carol DOES Sign carol AT 3
+  PARTY alice DOES Sign alice AT 4
+  PARTY bob   DOES Sign bob   AT 12
+  (`WAIT UNTIL` 20)
+
+
+§ `7. MAY and DO: a lapse fails at the deadline, as a MUST does`
+
+-- A permission not exercised by 5 routes to the LEST (README's default
+-- matrix), and the LEST counts from 5: at 8 the refund has two days left;
+-- at 10 it is timely; at 11 the breach reports 10.
+GIVETH A DEONTIC Actor Action
+`may approve or refund` MEANS
+    PARTY alice MAY Approve alice WITHIN 5
+    HENCE FULFILLED
+    LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
+
+#TRACE `may approve or refund` AT 0 WITH
+  (`WAIT UNTIL` 8)
+
+#TRACE `may approve or refund` AT 0 WITH
+  (`WAIT UNTIL` 8)
+  PARTY theLandlord DOES Refund theLandlord AT 10
+
+#TRACE `may approve or refund` AT 0 WITH
+  (`WAIT UNTIL` 8)
+  PARTY theLandlord DOES Refund theLandlord AT 11
+
+-- DO is the bare form and behaves as MUST: at 14 one day remains.
+GIVETH A DEONTIC Actor Action
+`do sign or refund` MEANS
+    PARTY alice DO Sign alice WITHIN 10
+    HENCE FULFILLED
+    LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
+
+#TRACE `do sign or refund` AT 0 WITH
+  (`WAIT UNTIL` 14)
+
+
+§ `8. a chain: the second chance runs from the first deadline`
+
+-- The tutorial's late fee. Alice must sign by 7; missing that, she has
+-- fourteen more days — from 7, so until 21, whatever day the miss came to
+-- light. At 8 thirteen days remain; a signature at 21 is timely; at 22 the
+-- inner LEST BREACH is the answer.
+GIVETH A DEONTIC Actor Action
+`sign, with a second chance` MEANS
+    PARTY alice MUST Sign alice WITHIN 7
+    HENCE FULFILLED
+    LEST  (PARTY alice MUST Sign alice WITHIN 14
+           HENCE FULFILLED
+           LEST BREACH BY alice BECAUSE "the second chance was missed too")
+
+#TRACE `sign, with a second chance` AT 0 WITH
+  (`WAIT UNTIL` 8)
+
+#TRACE `sign, with a second chance` AT 0 WITH
+  (`WAIT UNTIL` 8)
+  PARTY alice DOES Sign alice AT 21
+
+#TRACE `sign, with a second chance` AT 0 WITH
+  (`WAIT UNTIL` 8)
+  PARTY alice DOES Sign alice AT 22
+
+
+§ `9. a LEST that names itself still terminates`
+
+-- Each incarnation counts from the previous one's missed deadline: the
+-- windows are (0,3], (3,6], (6,9], … The WAIT at 100 reveals the expiry of
+-- every incarnation whose deadline is below 100 — thirty-three of them —
+-- and is re-offered to each in turn, because each one's deadline is later
+-- than the last; it reaches the thirty-fourth, armed at 99 and due at 102,
+-- which it does not expire, and that incarnation is the residual with two
+-- days left. A signature at 101 after it falls in that same window and
+-- fulfils it. Evaluation terminates because the deadlines an event walks
+-- strictly increase and stop below its stamp. (Until the adversarial pass
+-- of 2026-09-16 an event was re-offered AT MOST once and consumed on its
+-- second expiry, so the WAIT reached only the third incarnation, which then
+-- printed WITHIN 3 with its deadline 91 days in the past, and the signature
+-- at 101 — timely for the incarnation live at 101 — was dropped.)
+GIVETH A DEONTIC Actor Action
+`sign, or try again` MEANS
+    PARTY alice MUST Sign alice WITHIN 3
+    HENCE FULFILLED
+    LEST  `sign, or try again`
+
+#TRACE `sign, or try again` AT 0 WITH
+  (`WAIT UNTIL` 100)
+
+#TRACE `sign, or try again` AT 0 WITH
+  (`WAIT UNTIL` 100)
+  PARTY alice DOES Sign alice AT 101
+
+-- Three layers, and ONE event past the first two: the signature at 100 is
+-- offered to the first (due 3), the second (due 6) and the third (due 106),
+-- which it performs in time. Whether somebody else's event came earlier
+-- makes no difference to the verdict.
+GIVETH A DEONTIC Actor Action
+`third chance` MEANS
+    PARTY alice MUST Sign alice WITHIN 3
+    HENCE FULFILLED
+    LEST  (PARTY alice MUST Sign alice WITHIN 3
+           HENCE FULFILLED
+           LEST  (PARTY alice MUST Sign alice WITHIN 100
+                  HENCE FULFILLED
+                  LEST  BREACH BY alice BECAUSE "all three chances missed"))
+
+#TRACE `third chance` AT 0 WITH
+  PARTY alice DOES Sign alice AT 100
+
+#TRACE `third chance` AT 0 WITH
+  PARTY bob DOES Approve bob AT 7
+  PARTY alice DOES Sign alice AT 100
+
+-- The same three layers with every window missed (due 3, 6, 9): one event
+-- at 100, or two, is the same breach.
+GIVETH A DEONTIC Actor Action
+`three chances` MEANS
+    PARTY alice MUST Sign alice WITHIN 3
+    HENCE FULFILLED
+    LEST  (PARTY alice MUST Sign alice WITHIN 3
+           HENCE FULFILLED
+           LEST  (PARTY alice MUST Sign alice WITHIN 3
+                  HENCE FULFILLED
+                  LEST  BREACH BY alice BECAUSE "all three chances missed"))
+
+#TRACE `three chances` AT 0 WITH
+  (`WAIT UNTIL` 100)
+
+#TRACE `three chances` AT 0 WITH
+  (`WAIT UNTIL` 100)
+  PARTY alice DOES Sign alice AT 101
+
+
+§ `10. THE ARMING of a LEST continuation is the failure time`
+
+-- A continuation is applied to the clock its LEST counts from, and that is
+-- what THE ARMING names one level further down. Alice misses 10; the
+-- landlord's refund counts from 10, and Bob's approval, anchored OF THE
+-- ARMING of the refund obligation, is due at 10 + 3 = 13 — not at the WAIT
+-- that revealed the miss (14) plus 3. The refund at 16 fires the HENCE; the
+-- WAIT at 16 then reveals that Bob's window closed at 13.
+GIVETH A DEONTIC Actor Action
+`arming under lest` MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE FULFILLED
+    LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 20
+           HENCE (PARTY bob MUST Approve bob WITHIN 3 OF THE ARMING))
+
+#TRACE `arming under lest` AT 0 WITH
+  (`WAIT UNTIL` 14)
+  PARTY theLandlord DOES Refund theLandlord AT 16
+  (`WAIT UNTIL` 16)
+
+-- Under HENCE nothing moved: the continuation is applied at the act, so
+-- THE ARMING read two levels down under a HENCE is that act's stamp.
+GIVETH A DEONTIC Actor Action
+`arming under hence` MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE (PARTY theLandlord MUST Refund theLandlord WITHIN 20
+           HENCE (PARTY bob MUST Approve bob WITHIN 3 OF THE ARMING))
+
+#TRACE `arming under hence` AT 0 WITH
+  PARTY alice DOES Sign alice AT 4
+  PARTY theLandlord DOES Refund theLandlord AT 6
+  (`WAIT UNTIL` 8)
+
+
+§ `11. a layer whose deadline does not advance is walked, not skipped`
+
+-- Three layers: Alice must sign by 10; failing that, by 5 OF THE ARMING —
+-- the enclosing obligation's arming, 0, so a window that had already
+-- closed when the layer was entered; failing that, the landlord refunds
+-- WITHIN 10 of that layer's deadline, 5, so by 15. A refund at 12 is the
+-- first thing after 10: it reveals Alice's miss, is handed to the second
+-- layer, reveals that miss too — at a deadline EARLIER than the one it had
+-- just revealed — and is handed on again to the third, which it performs
+-- in time. A WAIT at 11 before it changes nothing. At 20 the same refund
+-- is late for the third layer, with or without the WAIT: the breach
+-- reports 15. (Until round 2 of the adversarial pass of 2026-09-16 a copy
+-- whose deadline had not advanced was consumed at the second layer, so
+-- the refund at 12 alone left the third layer as an untouched residual
+-- and the refund at 20 alone did the same, while the traces with the WAIT
+-- gave FULFILLED and the breach — one instant, two verdicts.)
+GIVETH A DEONTIC Actor Action
+`stuck in the middle` MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE FULFILLED
+    LEST  (PARTY alice MUST Sign alice WITHIN 5 OF THE ARMING
+           HENCE FULFILLED
+           LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 10))
+
+#TRACE `stuck in the middle` AT 0 WITH
+  PARTY theLandlord DOES Refund theLandlord AT 12
+
+#TRACE `stuck in the middle` AT 0 WITH
+  (`WAIT UNTIL` 11)
+  PARTY theLandlord DOES Refund theLandlord AT 12
+
+#TRACE `stuck in the middle` AT 0 WITH
+  PARTY theLandlord DOES Refund theLandlord AT 20
+
+#TRACE `stuck in the middle` AT 0 WITH
+  (`WAIT UNTIL` 11)
+  PARTY theLandlord DOES Refund theLandlord AT 20
+
+-- A `WITHIN 0` second chance — sign forthwith — is the same shape with the
+-- deadline EQUAL to the one before it (10, 10, then 15): the refund at 12
+-- reaches the third layer, with or without the WAIT; at 20 it is late.
+GIVETH A DEONTIC Actor Action
+`forthwith` MEANS
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE FULFILLED
+    LEST  (PARTY alice MUST Sign alice WITHIN 0
+           HENCE FULFILLED
+           LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5))
+
+#TRACE `forthwith` AT 0 WITH
+  PARTY theLandlord DOES Refund theLandlord AT 12
+
+#TRACE `forthwith` AT 0 WITH
+  (`WAIT UNTIL` 11)
+  PARTY theLandlord DOES Refund theLandlord AT 12
+
+#TRACE `forthwith` AT 0 WITH
+  PARTY theLandlord DOES Refund theLandlord AT 20
+
+
+§ `12. a chain that cannot end is refused, by name`
+
+-- A LEST that names itself with `WITHIN 0` counts every incarnation from
+-- the deadline the last one missed, so every incarnation is due at 0 and
+-- already past when it is entered: the event at 50 can never reach a layer
+-- whose window is open. Walking such a chain forever is the only thing
+-- the §11 rule cannot do, so after a thousand hand-offs in a row without
+-- the deadline advancing the machine refuses the contract and says why.
+-- (deontic-breach-semantics.l4 (f) pins the negative-WITHIN form.)
+GIVETH A DEONTIC Actor Action
+`forthwith, forever` MEANS
+    PARTY alice MUST Sign alice WITHIN 0
+    HENCE FULFILLED
+    LEST  `forthwith, forever`
+
+#TRACE `forthwith, forever` AT 0 WITH
+  PARTY theLandlord DOES Refund theLandlord AT 50

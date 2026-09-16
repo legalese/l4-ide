@@ -147,10 +147,10 @@ Look at what is owed on day 8, when the miss has just come to light:
 
 ```
 Result:
-  PARTY Alice MUST Pay Alice `Ms Ng` 1550 WITHIN 14 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent and the late fee were not paid")
+  PARTY Alice MUST Pay Alice `Ms Ng` 1550 WITHIN 13 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent and the late fee were not paid")
 ```
 
-The original obligation is gone; the second chance is what stands, with fourteen days on its clock. **Where does the second clock start?** At day 8 — the first event after the deadline, the moment the miss came to light — and not at day 7, the deadline itself. Fourteen days from day 8 is day 22. That difference is not fixed at one day. L4 learns that a deadline has passed only when the next event arrives, and the next obligation begins then — so a late payment that is itself the next event is on time by its own clock. That is why every miss on this page is recorded as ``(`WAIT UNTIL` 8)`` before anything else: it pins the second clock to the day after the deadline. Even so, the window ends on day 22, one day later than a lease saying "fourteen more days from the seventh" would have it; to end it on day 21, write `WITHIN 13`, and say why in a comment.
+The original obligation is gone; the second chance is what stands, with thirteen days left on its clock. **Where does the second clock start?** At day 7 — the deadline Alice missed — and not at day 8, the day the miss came to light. Fourteen days from day 7 is day 21, which is what a lease saying "fourteen more days from the seventh" means; on day 8, one of those days has already gone. L4 only _learns_ that a deadline has passed when the next event arrives, but the second obligation is counted from the deadline regardless of when that is, so a tenant who misses the seventh and then goes quiet does not gain a day for every day of silence. The ``(`WAIT UNTIL` 8)`` that every miss on this page begins with is there to show the miss on the screen before anything else happens; it does not set the clock.
 
 Alice pays the plain rent on day 15, forgetting the fee:
 
@@ -162,10 +162,10 @@ Alice pays the plain rent on day 15, forgetting the fee:
 
 ```
 Result:
-  PARTY Alice MUST Pay Alice `Ms Ng` 1550 WITHIN 7 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent and the late fee were not paid")
+  PARTY Alice MUST Pay Alice `Ms Ng` 1550 WITHIN 6 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent and the late fee were not paid")
 ```
 
-Not the payment the second chance asks for, so it is passed over, and she has seven days left to make the right one. And if nobody does anything for a month, both chances are gone and the sentence on the screen is the inner one:
+Not the payment the second chance asks for, so it is passed over, and she has six days left — until day 21 — to make the right one. And if nobody does anything for a month, both chances are gone and the sentence on the screen is the inner one:
 
 ```l4
 #TRACE `rent, with a late fee` AT 0 WITH
@@ -354,7 +354,7 @@ Result:
   FULFILLED
 ```
 
-His payment on day 20 is the event that reveals Alice's default, and it is then offered to the obligation that the default brings into being — his own — which it satisfies. Step 2's rule about the second clock is at work here: Mr Lim's fourteen days begin at day 20, the moment the default came to light, and his payment is on time by that clock. In a real record of events that is a reason to write down the day a deadline passed, as this page's other examples do with `WAIT UNTIL`: otherwise a late payment that is the first thing recorded is never late.
+His payment on day 20 is the event that reveals Alice's default, and it is then offered to the obligation that the default brings into being — his own — which it satisfies. Step 2's rule about the second clock is at work here: Mr Lim's fourteen days begin at day 7, the deadline Alice missed, and end on day 21, so his payment on day 20 is on time by one day. Had he paid on day 22 instead, the same payment would have revealed Alice's default _and_ his own, and the breach would be his. The day a deadline passed does not have to be written down for the clock to be right; this page's other examples do it with `WAIT UNTIL` so that the miss is visible on the screen before the next thing happens.
 
 And if neither of them pays, the breach is Mr Lim's, because the last obligation standing was his:
 
@@ -451,14 +451,14 @@ The three things the screen can say are the same as for one obligation, but they
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `FULFILLED`                               | the whole chain reached a `FULFILLED`, by whatever route: paid on time, or paid late with the fee, or paid by the guarantor        |
 | `DEONTIC BREACHED:` and then who, and why | some link ended in `BREACH`; the `BY` and the `BECAUSE` are the ones written against that link, so they tell you which link it was |
-| an obligation, written out                | the link the chain has reached, and nothing about the links before it; its `WITHIN` is measured from the event that reached it     |
+| an obligation, written out                | the link the chain has reached, and nothing about the links before it; its `WITHIN` is what is left of its own window              |
 
 ---
 
 ## What You Learned
 
 - **`HENCE` and `LEST` can each name another obligation.** A lease is a chain of them, and every chain ends at a `FULFILLED` or a `BREACH`.
-- **The next clock starts at the event that reached it**: for `HENCE`, the act that discharged the previous link; for `LEST`, the first event after the deadline — the moment the default came to light — which is not the deadline itself.
+- **The next clock starts where the previous link ended**: for `HENCE`, at the act that discharged it; for `LEST`, at the deadline that was missed — not at the later event that brought the miss to light.
 - **An act can accept any amount**: leave the amount as a blank, test it with `PROVIDED`, and hand it on to a rule that gives the next obligation, so that the same obligation can be used from more than one place.
 - **A named figure and a literal figure are required the same way.** A name in an act requires the value it names, whether that name sits on the whole act or on one figure inside it; there is no special keyword for it any more.
 - **Two guarantees, one word apart.** A guarantor who pays only after the tenant's default is a `LEST`. A guarantor the landlord may go to first is a `ROR`. Which one the source text says is a question of law, and the encoding has to answer it.

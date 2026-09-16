@@ -1,0 +1,16 @@
+-- One closing edge: WITHIN d [OF anchor] or BEFORE date, never both. The
+-- closing slot is one hole (EVERY-EACH-QUANTIFIER-SPEC §5.1.2), so a second
+-- closing edge is a PARSE error that names the rule, rather than the list
+-- of every token that may follow a WITHIN (adversarial pass of 2026-09-16,
+-- R1-5).
+
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+
+DECLARE Action IS ONE OF
+    Pay
+    Deliver
+
+GIVETH A DEONTIC Actor Action
+bad MEANS PARTY Buyer MUST Pay WITHIN 30 BEFORE (YMD 2026 6 30)

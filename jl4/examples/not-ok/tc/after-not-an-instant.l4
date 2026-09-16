@@ -1,0 +1,14 @@
+-- The expression after AFTER is a duration (a NUMBER) or an instant (a
+-- DATE); a STRING is neither, and the refusal names both
+-- (EVERY-EACH-QUANTIFIER-SPEC §5.1.2).
+
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+
+DECLARE Action IS ONE OF
+    Pay
+    Deliver
+
+GIVETH A DEONTIC Actor Action
+bad MEANS PARTY Buyer MUST Pay AFTER "next Tuesday" WITHIN 5

@@ -893,9 +893,14 @@ parensIfOpenTailed e
       _             -> False
 
 prettyObligation
-  :: (LayoutPrinter a, LayoutPrinter t, LayoutPrinter j, LayoutPrinter f, LayoutPrinter l)
-  => Doc ann -> a ->  Maybe t -> Maybe j -> Maybe f -> Maybe l -> Doc ann
+  :: (LayoutPrinter a, LayoutPrinter j, LayoutPrinter f, LayoutPrinter l)
+  => Doc ann -> a -> [Doc ann] -> Maybe j -> Maybe f -> Maybe l -> Doc ann
 -- | @group (hang 2 …)@: an obligation prints on ONE line whenever it can.
+--
+-- The window's edges arrive already rendered, keyword and all (the third
+-- argument: 'windowClauses' for a source deonton, 'residualWindow' for a
+-- run-time residual), because the closing edge has two keywords since
+-- 2026-09-16 and only the node knows which.
 --
 -- Two constraints meet here. (1) 'L4.Parser.obligation' takes the PARTY
 -- keyword's own column as the threshold for the action pattern and the
@@ -910,20 +915,58 @@ prettyObligation
 -- fits, so the obligation collapses to a single well-formed line. When an
 -- operand contains a hard break of its own (a nested CONSIDER, say) flattening
 -- fails and 'hang' satisfies (1) by indenting relative to PARTY.
-prettyObligation subjectDoc a t j f l =
+prettyObligation subjectDoc a window j f l =
   Prettyprinter.group $ hang 2 $ vsep $
     [ subjectDoc
     , printWithLayout a
     ]
-    <> mprint "WITHIN" t
+    <> window
     <> foldMap (\ x -> [printWithLayout x]) j   -- the join line prints its own keyword
     <> mprint "HENCE" f
     <> mprint "LEST" l
+
+-- | The window's two edges as written: @AFTER d [OF anchor]@, then
+-- @WITHIN d [OF anchor]@ or @BEFORE date@ (EVERY-EACH-QUANTIFIER-SPEC
+-- §5.1.2), each keyword printed by the node that owns it.
+windowClauses :: LayoutPrinterWithName n => Maybe (Opening n) -> Maybe (Deadline n) -> [Doc ann]
+windowClauses o t = foldMap (\ x -> [openingClause x]) o <> foldMap (\ x -> [closingClause x]) t
+
+-- | @AFTER d [OF anchor]@ — the offset bracketed like any other clause body.
+openingClause :: LayoutPrinterWithName n => Opening n -> Doc ann
+openingClause (MkOpening _ d ma) = hsep $ [ "AFTER", parensIfNeeded d ] <> anchorDoc ma
+
+-- | @WITHIN d [OF anchor]@ or @BEFORE date@ — the body bracketed like any
+-- other clause body, exactly as @mprint "WITHIN"@ printed the one form.
+closingClause :: LayoutPrinterWithName n => Deadline n -> Doc ann
+closingClause = \ case
+  MkDeadline _ d ma -> hsep $ [ "WITHIN", parensIfNeeded d ] <> anchorDoc ma
+  MkBefore _ e      -> hsep [ "BEFORE", parensIfNeeded e ]
 
 -- | A run-time obligation carries no join line (phase 1: an EVERY never
 -- reaches the machine); this pins the printer's type for that call site.
 noJoin :: Maybe (Join Resolved)
 noJoin = Nothing
+
+-- | The window of a run-time residual ('L4.Evaluate.ValueLazy.ValObligation').
+-- Before the first event each edge is its source form ('Left'), printed as
+-- written. After it each is a number relative to the residual's clock
+-- ('Right'): the closing edge is the REMAINING due, printed @WITHIN n@ as it
+-- always was; the opening edge is the time still to run until the window
+-- opens, printed @AFTER n@ while positive and not at all once the window is
+-- open — so the residual reads as the bare re-anchored window it now is
+-- (@AFTER 1 WITHIN 30@ at instant 12 is @[13, 43]@), and an @AFTER@ alone
+-- prints as an open permission once its instant has passed.
+residualWindow
+  :: LayoutPrinter v
+  => Either (Maybe (Opening Resolved)) (Maybe v) -> Either (Maybe (Deadline Resolved)) v -> [Doc ann]
+residualWindow o t =
+  (case o of
+     Left oe        -> foldMap (\ x -> [openingClause x]) oe
+     Right Nothing  -> []
+     Right (Just v) -> [ "AFTER" <+> parensIfNeeded v ])
+  <> (case t of
+     Left te  -> foldMap (\ x -> [closingClause x]) te
+     Right tv -> [ "WITHIN" <+> parensIfNeeded tv ])
 
 -- | @PARTY p MUST … WITHIN … ONCE ALL HAVE HENCE … LEST …@ — the source form
 -- of a deonton, shared by the 'Regulative' expression printer and by the
@@ -932,36 +975,48 @@ noJoin = Nothing
 -- what the drafter wrote — this is the layout printer, not the exact printer,
 -- so @WHO elem t tenants@ comes back as @WHO (elem OF t, tenants)@.
 instance LayoutPrinterWithName n => LayoutPrinter (Deonton n) where
-  printWithLayout (MkDeonton _ s a t j f l) = prettyObligation (printWithLayout s) a t j f l
+  printWithLayout (MkDeonton _ s a o t j f l) = prettyObligation (printWithLayout s) a (windowClauses o t) j f l
 
 -- | @ONCE ALL HAVE [WITHIN d]@ (the barrier) / @UPON EACH [WITHIN d]@ (the
 -- fork). R-Q1 RULED 2026-09-07.
 instance LayoutPrinterWithName n => LayoutPrinter (Join n) where
   printWithLayout = \ case
-    JoinOnce _ th due  -> hsep $ [ "ONCE", printWithLayout th ] <> mprint "WITHIN" due
-    JoinUpon _ ue due  -> hsep $ [ printWithLayout ue ] <> mprint "WITHIN" due
+    JoinOnce _ th due  -> hsep $ [ "ONCE", printWithLayout th ] <> foldMap (\ d -> [closingClause d]) due
+    JoinUpon _ ue due  -> hsep $ [ printWithLayout ue ] <> foldMap (\ d -> [closingClause d]) due
 
 instance LayoutPrinter (Threshold n) where
   printWithLayout = \ case
     AllHave _ -> "ALL HAVE"
 
--- | @d [OF anchor]@ — the body of a @WITHIN@ in either position; the keyword
--- is printed by the caller ('mprint').
+-- | @d [OF anchor]@ — the BODY of a @WITHIN@ in either position, or the
+-- date of a @BEFORE@; the keyword is printed by 'closingClause', which is
+-- what every source printer goes through.
 --
 -- Two renderings, so that the deadline prints byte-for-byte as the bare
--- expression did in each of its two uses. 'parensIfNeeded' — what 'mprint'
--- applies to a clause body — brackets the duration exactly as it bracketed
--- the bare expression, which also keeps an applied duration re-parseable:
--- in the WITHIN slot @OF@ introduces the anchor, so @(f OF x) OF THE JOIN@ is
--- what 'L4.Parser.deadline' wants. 'printWithLayout' — what the service's
--- residual string calls directly — leaves the duration unbracketed, as
--- @prettyLayout@ of the bare expression was. The state graph's
--- @labelDeadline@ goes through 'parensIfNeeded' ('L4.StateGraph.edgeText'):
--- its label is the source form, and an applied duration is only that when
--- bracketed.
+-- expression did in each of its two uses. 'parensIfNeeded' brackets the
+-- duration exactly as it bracketed the bare expression, which also keeps an
+-- applied duration re-parseable: in the WITHIN slot @OF@ introduces the
+-- anchor, so @(f OF x) OF THE JOIN@ is what 'L4.Parser.deadline' wants.
+-- 'printWithLayout' — what the service's residual string calls directly —
+-- leaves the duration unbracketed, as @prettyLayout@ of the bare expression
+-- was. The state graph's @labelDeadline@ goes through 'parensIfNeeded'
+-- ('L4.StateGraph.edgeText'): its label is the source form, and an applied
+-- duration is only that when bracketed. A @BEFORE@ renders as its date alone
+-- here: both callers print the keyword themselves
+-- ('L4.StateGraph.extractDeonton', 'serializeDue').
 instance LayoutPrinterWithName n => LayoutPrinter (Deadline n) where
-  printWithLayout (MkDeadline _ d ma) = hsep $ [ printWithLayout d ] <> anchorDoc ma
-  parensIfNeeded  (MkDeadline _ d ma) = hsep $ [ parensIfNeeded d ]  <> anchorDoc ma
+  printWithLayout = \ case
+    MkDeadline _ d ma -> hsep $ [ printWithLayout d ] <> anchorDoc ma
+    MkBefore _ e      -> printWithLayout e
+  parensIfNeeded = \ case
+    MkDeadline _ d ma -> hsep $ [ parensIfNeeded d ]  <> anchorDoc ma
+    MkBefore _ e      -> parensIfNeeded e
+
+-- | @d [OF anchor]@ — the body of an @AFTER@, keyword-less like the
+-- 'Deadline' instance and for the same two callers.
+instance LayoutPrinterWithName n => LayoutPrinter (Opening n) where
+  printWithLayout (MkOpening _ d ma) = hsep $ [ printWithLayout d ] <> anchorDoc ma
+  parensIfNeeded  (MkOpening _ d ma) = hsep $ [ parensIfNeeded d ]  <> anchorDoc ma
 
 anchorDoc :: LayoutPrinterWithName n => Maybe (Anchor n) -> [Doc ann]
 anchorDoc = foldMap (\ a -> [ "OF", printWithLayout a ])
@@ -1204,11 +1259,10 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
       [ "DEONTIC BREACHED:"
       , indent 2 $ printWithLayout reason
       ]
-    Lazy.ValObligation _env p a t f l -> case t of
+    Lazy.ValObligation _env p a o t f l ->
       -- A run-time obligation always binds one party (phase 1: an EVERY
       -- never reaches the machine), so there is no join line to print.
-      Left te -> prettyObligation ("PARTY" <+> printWithLayout p) a te noJoin (Just f) l
-      Right tv -> prettyObligation ("PARTY" <+> printWithLayout p) a (Just tv) noJoin (Just f) l
+      prettyObligation ("PARTY" <+> printWithLayout p) a (residualWindow o t) noJoin (Just f) l
     Lazy.ValROp _env op l r -> hsep
       [ printWithLayout l
       , case op of ValROr -> "OR"; ValRAnd -> "AND"

@@ -36,6 +36,11 @@
 --  16. a barrier with no LEST whose MAY member lets its permission lapse —
 --      JoinStalled;
 --  17. a barrier with no LEST whose MUST member misses — JoinFailed ToBreach;
+--  18. a barrier whose last completion comes after the ONCE … WITHIN, and
+--      whose LEST is an obligation — the state layer's LEST looks at the
+--      members' own completion again, unmarked;
+--  19. an act before the window's opening edge (AFTER) — a nullity, logged
+--      as EarlyAct and passed over; then the act in the window;
 --
 -- plus: the log-off path returns the same results as the log-on path, and
 -- a directive with no regulative content logs nothing.
@@ -421,6 +426,51 @@ barrierBreachSrc = Text.unlines $ everyPrologue <>
   , "  PARTY theLandlord DOES Deliver theLandlord AT 20"
   ]
 
+-- 18. the join-line deadline missed, with a LEST that is an obligation: the
+--     state layer's LEST is handed the members' stream from the first event
+--     past the state deadline on (Machine's BarrierTrim, EVERY-EACH-QUANTIFIER-SPEC
+--     §5.2, 2026-09-16), and nothing marks that hand-off
+joinLestSrc :: Text.Text
+joinLestSrc = Text.unlines $ everyPrologue <>
+  [ "GIVETH A DEONTIC Actor Action"
+  , "`sign by day 5` MEANS"
+  , "    EVERY Tenant t IN tenants"
+  , "        MUST   Sign t"
+  , "        WITHIN 14"
+  , "        ONCE   ALL HAVE WITHIN 5"
+  , "        HENCE  FULFILLED"
+  , "        LEST   (PARTY theLandlord MUST Deliver theLandlord WITHIN 10)"
+  , ""
+  , "#TRACE `sign by day 5` AT 0 WITH"
+  , "  PARTY alice DOES Sign alice AT 1"
+  , "  PARTY bob   DOES Sign bob   AT 9"
+  , "  PARTY theLandlord DOES Deliver theLandlord AT 12"
+  ]
+
+-- 19. the window's opening edge (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X6):
+--     an act before the window opens is a nullity — logged, since 2026-09-17,
+--     as EarlyAct carrying the opening; the obligation stands and the act in
+--     the window is the match. The SHANT reads the same way: an early act
+--     is not a violation.
+earlyActSrc :: Text.Text
+earlyActSrc = Text.unlines $ prologue <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  PARTY Alice MUST deliver AFTER 5 WITHIN 10"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "d MEANS"
+  , "  PARTY Alice SHANT deliver AFTER 5 WITHIN 10"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY Alice DOES deliver AT 2"
+  , "  PARTY Alice DOES deliver AT 7"
+  , ""
+  , "#TRACE d AT 0 WITH"
+  , "  PARTY Alice DOES deliver AT 2"
+  , "  PARTY Bob DOES deliver AT 16"
+  ]
+
 -- Off-path proof: every fixture, both ways, same rendered result.
 allSrcs :: [(String, Text.Text)]
 allSrcs =
@@ -428,7 +478,8 @@ allSrcs =
   , ("or", orSrc), ("barrier", barrierSrc), ("fork", forkSrc), ("join-deadline", joinDeadlineSrc)
   , ("or-left", orLeftSrc), ("waiting", waitingSrc), ("barrier-waiting", barrierWaitingSrc)
   , ("prohibition", prohibitionSrc), ("guard", guardSrc), ("action-mismatch", actionMismatchSrc)
-  , ("barrier-fail", barrierFailSrc), ("barrier-stall", barrierStallSrc), ("barrier-breach", barrierBreachSrc) ]
+  , ("barrier-fail", barrierFailSrc), ("barrier-stall", barrierStallSrc), ("barrier-breach", barrierBreachSrc)
+  , ("join-lest", joinLestSrc), ("early-act", earlyActSrc) ]
 
 -- | The 'Breached' step an explicit @BREACH@ with no @BY@ logs.
 bareBreach :: Row
@@ -612,7 +663,13 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
       [ Row (Just "Tenant OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) (Just (MemberSatisfied 1 2))
       , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
       , Row (Just "Tenant OF ") 2 (Just DMust) (Expired ToLest 14) WitnessedOnly (Just 20) (Just 1) Nothing
-      , Row Nothing 1 (Just DMust) (JoinFailed ToLest) NoEvent Nothing (Just 20) Nothing
+        -- clocked at the failing member's missed deadline, not at the stamp
+        -- the miss was seen at: the barrier's LEST is armed at R-Q5's
+        -- failure time (EVERY-EACH-QUANTIFIER-SPEC §5.2, 2026-09-16), and
+        -- this row reads the clock the LEST is pushed with. Pinned from the
+        -- runtime on 2026-09-17, when that change was rebased over this
+        -- log; it read 20 before it.
+      , Row Nothing 1 (Just DMust) (JoinFailed ToLest) NoEvent Nothing (Just 14) Nothing
       , bareBreach
       ]
 
@@ -633,9 +690,53 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
       [ Row (Just "Tenant OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) (Just (MemberSatisfied 1 2))
       , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
       , Row (Just "Tenant OF ") 2 (Just DMust) (Expired ToBreach 14) WitnessedOnly (Just 20) (Just 1) Nothing
-        -- clocked at the stamp the member's miss was seen at, as case 15's
-        -- JoinFailed ToLest is: the member's DeadlineMissed carries it
+        -- clocked at the stamp the member's miss was seen at: the member's
+        -- DeadlineMissed carries it (a breach is dated at the revealing
+        -- event; §5.2 moved the LEST's clock, not this stamp — so this row
+        -- and case 15's JoinFailed ToLest read different clocks since
+        -- 2026-09-17)
       , Row Nothing 1 (Just DMust) (JoinFailed ToBreach) NoEvent Nothing (Just 20) Nothing
+      ]
+
+  it "18. a join-line deadline whose LEST is an obligation: the LEST looks at the last completion again, UNMARKED (§4.4's mark is the act layer's), then takes its own event" $ do
+    rs <- runLogged joinLestSrc
+    let ss = stepsOf 0 rs
+    -- Bob's Sign at 9 is Consumed by member 2 and then, being the first
+    -- event past the state deadline 5, is the head of the stream the LEST
+    -- is handed (BarrierTrim): the landlord's obligation logs its look at
+    -- it as a plain PartyMismatch, WitnessedOnly — NOT Reoffered. Two rows
+    -- for one event, paired by stamp, party and action, not by the mark.
+    -- Pinned from the runtime on 2026-09-17 (adversarial round 1 of the
+    -- third rebase, S3); before the trim the LEST was handed the whole
+    -- stream, so alice's Sign at 1 was looked at again too.
+    map row ss `shouldBe`
+      [ Row (Just "Tenant OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) (Just (MemberSatisfied 1 2))
+      , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
+      , Row (Just "Tenant OF ") 2 (Just DMust) (Matched ToHence) Consumed (Just 9) (Just 9) (Just (MemberSatisfied 2 2))
+      , Row Nothing 1 (Just DMust) (JoinExpired ToLest 5) NoEvent Nothing (Just 9) Nothing
+      , Row (Just "Landlord OF ") 1 (Just DMust) PartyMismatch WitnessedOnly (Just 9) (Just 9) Nothing
+      , Row (Just "Landlord OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 12) (Just 12) Nothing
+      ]
+    -- the same event, twice, and neither look carries the mark
+    length [ s | s <- ss, Just e <- [s.dsEvent], e.ekStamp == 9 ] `shouldBe` 2
+    [ s.dsScrutiny | s <- ss, s.dsScrutiny == Reoffered ] `shouldBe` []
+
+  it "19. an act before the window opens is EarlyAct, WitnessedOnly, carrying the opening; the obligation stands, and the act in the window matches" $ do
+    rs <- runLogged earlyActSrc
+    -- MUST: the early act at 2 is a nullity (R-X6), logged with the
+    -- opening at 5; the act at 7 is the match. Pinned from the runtime on
+    -- 2026-09-17 (adversarial round 1 of the third rebase, S2): before it
+    -- the early act logged nothing, and a what-if reading the log took
+    -- the act as one no obligation in force had looked at.
+    map row (stepsOf 0 rs) `shouldBe`
+      [ Row (Just "Alice") 1 (Just DMust) (EarlyAct 5)      WitnessedOnly (Just 2) (Just 2) Nothing
+      , Row (Just "Alice") 1 (Just DMust) (Matched ToHence) Consumed      (Just 7) (Just 7) Nothing
+      ]
+    -- SHANT: the early act is not a violation; the prohibition then runs
+    -- its window [5, 15] out, revealed by Bob's event at 16 — kept, to HENCE
+    map row (stepsOf 1 rs) `shouldBe`
+      [ Row (Just "Alice") 1 (Just DMustNot) (EarlyAct 5)          WitnessedOnly (Just 2)  (Just 2) Nothing
+      , Row (Just "Alice") 1 (Just DMustNot) (Expired ToHence 15)  WitnessedOnly (Just 16) (Just 2) Nothing
       ]
 
   it "the log-off path is unchanged: every fixture renders the same result both ways" $

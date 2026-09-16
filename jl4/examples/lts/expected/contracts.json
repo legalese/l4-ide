@@ -220,12 +220,27 @@
       "PARTY B DOES payment OF 10 AT 9"
     ],
     "format": 1,
-    "line": 33,
+    "line": 37,
     "nextDeadline": null,
     "owed": [],
     "passedOver": [],
     "standing": {
-      "status": "fulfilled"
+      "breach": {
+        "anchor": 0,
+        "due": 8,
+        "missed": "MUST payment fine",
+        "names": [
+          {
+            "due": 8,
+            "missed": "MUST payment fine",
+            "party": "B"
+          }
+        ],
+        "party": "B",
+        "reason": "revealed by B doing payment OF 10",
+        "seenAt": 9
+      },
+      "status": "breached"
     },
     "steps": [
       {
@@ -286,9 +301,9 @@
         "scrutiny": "reoffered"
       },
       {
-        "clock": 9,
+        "clock": 6,
         "event": {
-          "action": "payment OF …",
+          "action": null,
           "at": 9,
           "kind": "act",
           "party": "B"
@@ -299,10 +314,11 @@
           "party": "B"
         },
         "outcome": {
-          "then": "hence",
-          "what": "matched"
+          "deadline": 8,
+          "then": "breach",
+          "what": "expired"
         },
-        "scrutiny": "consumed"
+        "scrutiny": "witnessedOnly"
       }
     ],
     "untried": []
@@ -319,7 +335,7 @@
       "PARTY S DOES delivery AT 20"
     ],
     "format": 1,
-    "line": 58,
+    "line": 62,
     "nextDeadline": null,
     "owed": [],
     "passedOver": [],
@@ -362,7 +378,7 @@
       "PARTY B DOES baz OF bar AT 1"
     ],
     "format": 1,
-    "line": 69,
+    "line": 73,
     "nextDeadline": null,
     "owed": [],
     "passedOver": [],
@@ -437,7 +453,7 @@
     "discharging": [],
     "events": [],
     "format": 1,
-    "line": 81,
+    "line": 85,
     "nextDeadline": null,
     "owed": [],
     "passedOver": [],
@@ -482,7 +498,7 @@
       "PARTY S DOES delivery AT 4"
     ],
     "format": 1,
-    "line": 83,
+    "line": 87,
     "nextDeadline": null,
     "owed": [],
     "passedOver": [],
@@ -560,7 +576,7 @@
       "PARTY B DOES payment OF 4 AT 4"
     ],
     "format": 1,
-    "line": 86,
+    "line": 90,
     "nextDeadline": {
       "at": 9,
       "whose": [
@@ -631,7 +647,7 @@
       "PARTY B DOES payment OF 4 AT 26"
     ],
     "format": 1,
-    "line": 89,
+    "line": 93,
     "nextDeadline": null,
     "owed": [],
     "passedOver": [],
@@ -684,7 +700,7 @@
       "PARTY B DOES payment OF 5 AT 26"
     ],
     "format": 1,
-    "line": 93,
+    "line": 97,
     "nextDeadline": null,
     "owed": [],
     "passedOver": [],
@@ -737,7 +753,7 @@
       "PARTY B DOES payment OF 6 AT 3"
     ],
     "format": 1,
-    "line": 102,
+    "line": 106,
     "nextDeadline": null,
     "owed": [],
     "passedOver": [],
@@ -813,7 +829,7 @@
       "PARTY S DOES payment OF 7 AT 3"
     ],
     "format": 1,
-    "line": 106,
+    "line": 110,
     "nextDeadline": null,
     "owed": [],
     "passedOver": [],

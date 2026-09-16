@@ -1,0 +1,510 @@
+[
+  {
+    "advancing": [],
+    "breaching": [
+      {
+        "breach": {
+          "anchor": 0,
+          "due": 43,
+          "missed": "MUST order",
+          "names": [
+            {
+              "due": 43,
+              "missed": "MUST order",
+              "party": "Buyer"
+            }
+          ],
+          "party": "Buyer",
+          "reason": "revealed when the clock ran on with nothing happening",
+          "seenAt": 44
+        },
+        "event": {
+          "at": 44,
+          "deadline": 43,
+          "kind": "tick",
+          "whose": [
+            {
+              "action": "order",
+              "modal": "MUST",
+              "party": "Buyer"
+            }
+          ]
+        }
+      }
+    ],
+    "clock": 12,
+    "contract": "`cooling off`",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY Seller DOES deliver AT 10",
+      "PARTY Buyer DOES order AT 12"
+    ],
+    "format": 1,
+    "line": 21,
+    "nextDeadline": {
+      "at": 43,
+      "whose": [
+        {
+          "action": "order",
+          "modal": "MUST",
+          "party": "Buyer"
+        }
+      ]
+    },
+    "owed": [
+      {
+        "action": "order",
+        "dueBy": 43,
+        "kind": "owed",
+        "modal": "MUST",
+        "opensAt": 13,
+        "party": "Buyer",
+        "remaining": 31
+      }
+    ],
+    "passedOver": [
+      {
+        "event": {
+          "action": "order",
+          "at": 12,
+          "kind": "act",
+          "party": "Buyer"
+        },
+        "opensAt": 13,
+        "reason": "tooEarly",
+        "why": "the window has not opened yet (it opens at 13; an act before then counts for nothing)"
+      }
+    ],
+    "standing": {
+      "status": "inProgress"
+    },
+    "steps": [
+      {
+        "clock": 10,
+        "event": {
+          "action": "deliver",
+          "at": 10,
+          "kind": "act",
+          "party": "Seller"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Seller"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 12,
+        "event": {
+          "action": "order",
+          "at": 12,
+          "kind": "act",
+          "party": "Buyer"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Buyer"
+        },
+        "outcome": {
+          "opensAt": 13,
+          "what": "earlyAct"
+        },
+        "scrutiny": "witnessedOnly"
+      },
+      {
+        "clock": 12,
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Buyer"
+        },
+        "outcome": {
+          "what": "waiting"
+        },
+        "scrutiny": "noEvent"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 41,
+    "contract": "`cooling off`",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY Seller DOES deliver AT 10",
+      "PARTY Buyer DOES order AT 41"
+    ],
+    "format": 1,
+    "line": 26,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "status": "fulfilled"
+    },
+    "steps": [
+      {
+        "clock": 10,
+        "event": {
+          "action": "deliver",
+          "at": 10,
+          "kind": "act",
+          "party": "Seller"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Seller"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 41,
+        "event": {
+          "action": "order",
+          "at": 41,
+          "kind": "act",
+          "party": "Buyer"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Buyer"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 44,
+    "contract": "`cooling off`",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY Seller DOES deliver AT 10",
+      "PARTY Buyer DOES order AT 44"
+    ],
+    "format": 1,
+    "line": 31,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "breach": {
+        "anchor": 0,
+        "due": 43,
+        "missed": "MUST order",
+        "names": [
+          {
+            "due": 43,
+            "missed": "MUST order",
+            "party": "Buyer"
+          }
+        ],
+        "party": "Buyer",
+        "reason": "revealed by Buyer doing order",
+        "seenAt": 44
+      },
+      "status": "breached"
+    },
+    "steps": [
+      {
+        "clock": 10,
+        "event": {
+          "action": "deliver",
+          "at": 10,
+          "kind": "act",
+          "party": "Seller"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Seller"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 10,
+        "event": {
+          "action": "order",
+          "at": 44,
+          "kind": "act",
+          "party": "Buyer"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Buyer"
+        },
+        "outcome": {
+          "deadline": 43,
+          "then": "breach",
+          "what": "expired"
+        },
+        "scrutiny": "witnessedOnly"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 41,
+    "contract": "`two offsets`",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY Seller DOES deliver AT 10",
+      "PARTY Buyer DOES order AT 41"
+    ],
+    "format": 1,
+    "line": 43,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "breach": {
+        "anchor": 0,
+        "due": 40,
+        "missed": "MUST order",
+        "names": [
+          {
+            "due": 40,
+            "missed": "MUST order",
+            "party": "Buyer"
+          }
+        ],
+        "party": "Buyer",
+        "reason": "revealed by Buyer doing order",
+        "seenAt": 41
+      },
+      "status": "breached"
+    },
+    "steps": [
+      {
+        "clock": 10,
+        "event": {
+          "action": "deliver",
+          "at": 10,
+          "kind": "act",
+          "party": "Seller"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Seller"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 10,
+        "event": {
+          "action": "order",
+          "at": 41,
+          "kind": "act",
+          "party": "Buyer"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Buyer"
+        },
+        "outcome": {
+          "deadline": 40,
+          "then": "breach",
+          "what": "expired"
+        },
+        "scrutiny": "witnessedOnly"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 1000,
+    "contract": "vested",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY Seller DOES deliver AT 10",
+      "PARTY Buyer DOES order AT 1000"
+    ],
+    "format": 1,
+    "line": 54,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "status": "fulfilled"
+    },
+    "steps": [
+      {
+        "clock": 10,
+        "event": {
+          "action": "deliver",
+          "at": 10,
+          "kind": "act",
+          "party": "Seller"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Seller"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      },
+      {
+        "clock": 1000,
+        "event": {
+          "action": "order",
+          "at": 1000,
+          "kind": "act",
+          "party": "Buyer"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MAY",
+          "party": "Buyer"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 740135,
+    "contract": "`by june`",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY Buyer DOES pay OF 100 AT DATE_SERIAL OF (YMD OF 2026, 6, 4)"
+    ],
+    "format": 1,
+    "line": 64,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "status": "fulfilled"
+    },
+    "steps": [
+      {
+        "clock": 740135,
+        "event": {
+          "action": "pay OF …",
+          "at": 740135,
+          "kind": "act",
+          "party": "Buyer"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Buyer"
+        },
+        "outcome": {
+          "then": "hence",
+          "what": "matched"
+        },
+        "scrutiny": "consumed"
+      }
+    ],
+    "untried": []
+  },
+  {
+    "advancing": [],
+    "breaching": [],
+    "clock": 740132,
+    "contract": "`by june`",
+    "deadlineNotKnown": [],
+    "discharging": [],
+    "events": [
+      "PARTY Buyer DOES pay OF 100 AT DATE_SERIAL OF (YMD OF 2026, 7, 1)"
+    ],
+    "format": 1,
+    "line": 67,
+    "nextDeadline": null,
+    "owed": [],
+    "passedOver": [],
+    "standing": {
+      "breach": {
+        "anchor": 0,
+        "due": 740161,
+        "missed": "MUST pay 100",
+        "names": [
+          {
+            "due": 740161,
+            "missed": "MUST pay 100",
+            "party": "Buyer"
+          }
+        ],
+        "party": "Buyer",
+        "reason": "revealed by Buyer doing pay OF 100",
+        "seenAt": 740162
+      },
+      "status": "breached"
+    },
+    "steps": [
+      {
+        "clock": 740132,
+        "event": {
+          "action": null,
+          "at": 740162,
+          "kind": "act",
+          "party": "Buyer"
+        },
+        "norm": {
+          "activation": 1,
+          "modal": "MUST",
+          "party": "Buyer"
+        },
+        "outcome": {
+          "deadline": 740161,
+          "then": "breach",
+          "what": "expired"
+        },
+        "scrutiny": "witnessedOnly"
+      }
+    ],
+    "untried": []
+  }
+]

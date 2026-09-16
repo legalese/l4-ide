@@ -9,8 +9,9 @@ File: anchor-no-deadline.l4
   Code: <none>
   Message:
     OF THE DEADLINE names the deadline of the obligation this one is the
-    continuation of, but that obligation has no WITHIN — not on its act, and
-    not on its join line — so it has no deadline to count from.
+    continuation of, but that obligation has no closing edge — no WITHIN or
+    BEFORE on its act, and no WITHIN on its join line — so it has no deadline
+    to count from.
 
-    Give the enclosing obligation a WITHIN, or anchor this one elsewhere:
-    OF THE JOIN (under HENCE), OF THE ARMING, or an instant.
+    Give the enclosing obligation a WITHIN or a BEFORE, or anchor this one
+    elsewhere: OF THE JOIN (under HENCE), OF THE ARMING, or an instant.

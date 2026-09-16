@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: after-not-an-instant.l4
+  Hidden: no
+  Range: 14:38-14:52
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    AFTER opens the window: after a duration (a NUMBER, counted from the anchor
+    or from the obligation's own clock) or after an instant (a DATE). Its
+    argument is here of type
+
+      STRING

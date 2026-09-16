@@ -107,7 +107,11 @@ data Clause
   | CIf [(Text, Clause)] (Maybe Clause)        -- ^ if c1 then …; else if c2 …; else …
   | CCases Text [(Text, Clause)]               -- ^ consider <subject>: when <pattern> -> …
   | CDeontic Text Text Text                    -- ^ party, modal, action
-             (Maybe Text)                      -- ^ deadline
+             (Maybe Text)                      -- ^ the window, with its own prepositions: "within 30",
+                                               --   "within 30 of the join", "after 3, within 30 of that"
+                                               --   (the re-anchored window, EVERY-EACH-QUANTIFIER-SPEC
+                                               --   §5.1.2.2), "after 3", "before 30 June" (§5.1.2);
+                                               --   'Nothing' for none worth stating
              (Maybe Text)                      -- ^ provided-that
              (Maybe Clause)                    -- ^ hence (on compliance)
              (Maybe Clause)                    -- ^ lest (on breach)
@@ -1091,7 +1095,7 @@ patternText = \case
 -- ----------------------------------------------------------------------------
 
 deonticClause :: Deonton Resolved -> Clause
-deonticClause (MkDeonton _ subj (MkAction _ modal actPat mprov) mdue _join mhence mlest) =
+deonticClause (MkDeonton _ subj (MkAction _ modal actPat mprov) mopens mdue _join mhence mlest) =
   -- The @ONCE …@ join line is not rendered by this export: 'CDeontic' has no
   -- slot for it. That was written when the barrier/fork distinction had no
   -- run-time meaning at all; it now has one (phase 2, 2026-09-08), so the
@@ -1101,19 +1105,33 @@ deonticClause (MkDeonton _ subj (MkAction _ modal actPat mprov) mdue _join mhenc
     (subjectProse subj)
     (modalWord modal)
     (patternText actPat)
-    (dueText mdue)
+    (windowText mopens mdue)
     (fmap inlineProse mprov)
     (mhence >>= henceClause)
     (fmap consequence mlest)
  where
+  -- The window as one phrase (EVERY-EACH-QUANTIFIER-SPEC §5.1.2): the
+  -- opening edge, "after 3" / "after 3 of the join" / "after 30 June", then
+  -- the closing edge, "within 30 of the join" / "before 30 June" — and,
+  -- beside an opening edge, a bare "within 30" reads "within 30 of that",
+  -- because it counts from the instant the window opened (re-anchor,
+  -- §5.1.2.2). A zero duration with no anchor is not a deadline worth
+  -- stating; with an anchor it is ("within 0 of 30 June" is /by 30 June/).
+  windowText mo md =
+    case catMaybes [ fmap openingText mo, md >>= dueText (isJust mo) ] of
+      []     -> Nothing
+      phrases -> Just (Text.intercalate ", " phrases)
+  openingText (MkOpening _ d ma) =
+    "after " <> inlineProse d <> maybe "" (\ a -> " of " <> anchorProse a) ma
   -- The duration as prose, then the anchor when there is one (R-Q7,
-  -- §5.1.1): "5 of the join", "5 of the deadline", "5 of closingDate". A
-  -- zero duration with no anchor is not a deadline worth stating; with an
-  -- anchor it is ("0 of 30 June" is /by 30 June/).
-  dueText (Just (MkDeadline _ d ma))
-    | not (isZeroLit d) || isJust ma =
-        Just (inlineProse d <> maybe "" (\ a -> " of " <> anchorProse a) ma)
-  dueText _ = Nothing
+  -- §5.1.1): "5 of the join", "5 of the deadline", "5 of closingDate".
+  dueText afterOpening = \ case
+    MkDeadline _ d ma
+      | not (isZeroLit d) || isJust ma ->
+          Just ("within " <> inlineProse d
+                <> maybe (if afterOpening then " of that" else "") (\ a -> " of " <> anchorProse a) ma)
+      | otherwise -> Nothing
+    MkBefore _ e -> Just ("before " <> inlineProse e)
   anchorProse = \ case
     AnchorJoin _     -> "the join"
     AnchorDeadline _ -> "the deadline"

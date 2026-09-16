@@ -13,9 +13,11 @@
 -- call site checks that @Maybe@ before it computes anything. With the log
 -- off, the work the machine does for it is carrying state it never reads:
 -- a lazy 'NormKey' through the contract frames (never forced), the
--- @ev'reoffered :: Bool@ the machine already computed at @Contract2@ through
--- six more frames past the one that consults it, and a @pending :: Maybe
--- DeonticStep@ (always 'Nothing' when off) on the @ResolveParty@ frame.
+-- re-offer mark @ev'reoffered@ the machine already looked up at @Contract1@
+-- (a @Bool@ when P2b was built; the EVERY wave's LEST pass re-typed it, see
+-- 'Reoffered') through six more frames past the one that consults it, and
+-- a @pending :: Maybe DeonticStep@ (always 'Nothing' when off) on the
+-- @ResolveParty@ frame.
 --
 -- == What a consumer can rely on
 --
@@ -27,9 +29,20 @@
 --   the source range of the 'L4.Syntax.RAction', the activation ordinal
 --   (the /n/-th time this trace entered that site), and the bearer. Under an
 --   @EVERY@ the members share a site and differ in bearer and ordinal.
--- * An event can appear twice, once as 'WitnessedOnly' by an expiring
---   obligation and once as 'Reoffered' to the continuation (§4.4). The
---   animator must not draw that as two events.
+-- * An event can appear more than once: 'WitnessedOnly' by the obligation
+--   whose expiry it revealed, then 'Reoffered' by each continuation it was
+--   handed to in turn (§4.4; an event past @k@ LEST windows appears @k+1@
+--   times, EVERY-EACH-QUANTIFIER-SPEC §5.2.1). The animator must not draw
+--   that as several events. A barrier's STATE-layer
+--   @LEST@ (@ONCE ALL HAVE WITHIN d@ missed, 'JoinExpired') is handed the
+--   members' own stream from the first event past the state deadline on
+--   (@BarrierTrim@, 2026-09-16), UNMARKED: an event a member 'Consumed' —
+--   the completion that landed after the deadline — appears again under
+--   the @LEST@'s obligation as a fresh look ('WitnessedOnly' on a
+--   mismatch, 'Consumed' on a match), not as 'Reoffered'. The re-offer
+--   mark is the act layer's (@Contract5@); nothing marks the state layer's
+--   hand-off. A consumer counting events must pair those looks by stamp,
+--   party and action, not by the mark (pinned by DeonticStepSpec case 18).
 --
 -- == Loud and silent
 --
@@ -204,9 +217,13 @@ data Scrutiny
     -- (a mismatch, a failed guard) or revealed an expiry and was re-offered
     -- to the continuation
   | Reoffered
-    -- ^ this is the continuation's look at a re-offered event — including
-    -- the second look that revealed a second expiry, which the at-most-once
-    -- rule consumed rather than re-offering again
+    -- ^ this is a continuation's look at a re-offered copy of an event —
+    -- every layer's look, since a copy is handed on to each expired layer
+    -- in turn (EVERY-EACH-QUANTIFIER-SPEC §5.2.1, 2026-09-16: an event past
+    -- @k@ LEST windows is looked at @k+1@ times, the last look by the first
+    -- layer whose window it is not past), including a look that reveals
+    -- another expiry; a chain whose deadlines stop advancing is refused by
+    -- the machine, never consumed
   | NoEvent
     -- ^ the step had no event: the stream ran out, or a join reduced
   deriving stock (Eq, Show, Generic)
@@ -224,6 +241,16 @@ data StepOutcome
     -- ^ @Contract11@, the action pattern did not match; next event
   | GuardFailed
     -- ^ @Contract10@, the @PROVIDED@ came out false; next event
+  | EarlyAct !Rational
+    -- ^ @Contract10@, the act by this party, the pattern and the @PROVIDED@
+    -- all matched — but before the window's opening edge (@AFTER@,
+    -- EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X6): a NULLITY, neither
+    -- performance nor a violation. The obligation stands unchanged and the
+    -- next event is tried; the run's note reports the act. Carries the
+    -- instant the window opens, on the contract clock. Logged since
+    -- 2026-09-17 (adversarial round 1 of the third rebase, S2): without it
+    -- the log had no record of the look, and a what-if read the act as
+    -- taken by nobody
   | Matched !Branch
     -- ^ @Contract10@, the action matched and the guard held; routed per modal
     -- (a @SHANT@ routes to @LEST@, or to a breach when it has none)

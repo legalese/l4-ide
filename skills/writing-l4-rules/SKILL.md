@@ -231,7 +231,10 @@ When the source text says "must", "may", "shall not", or mentions a deadline, us
 ```
 PARTY   actor
 MUST    action                 -- or MAY / SHANT / DO
+AFTER   opening [OF anchor]    -- optional: when the window OPENS — a NUMBER (duration) or a DATE; an early act is a nullity, reported
 WITHIN  deadline [OF anchor]   -- NUMBER (often derived from a DATE/TIME/DATETIME); anchor: THE JOIN | THE DEADLINE | THE ARMING | a NUMBER/DATE instant
+                               -- beside an AFTER, a bare WITHIN counts from the instant the window opened: AFTER 3 WITHIN 30 is [a+3, a+33]
+                               -- (or BEFORE date: the absolute closing edge; WITHIN takes a duration, BEFORE a date)
 HENCE   nextState              -- optional; consequence on success
 LEST    penaltyState           -- optional; consequence on failure
 ```

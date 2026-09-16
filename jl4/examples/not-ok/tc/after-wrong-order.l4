@@ -1,0 +1,15 @@
+-- The opening edge is written first: AFTER 3 WITHIN 30, never WITHIN 30
+-- AFTER 3. One order is parsed; the other is a PARSE error naming the order
+-- (EVERY-EACH-QUANTIFIER-SPEC §5.1.2; "order carries meaning" was put and
+-- rejected on 2026-09-16).
+
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+
+DECLARE Action IS ONE OF
+    Pay
+    Deliver
+
+GIVETH A DEONTIC Actor Action
+bad MEANS PARTY Buyer MUST Pay WITHIN 30 AFTER 3

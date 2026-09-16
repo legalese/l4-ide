@@ -118,9 +118,9 @@ GIVETH A DEONTIC Actor Action
 Two things about combining that are true today and that a reader should carry:
 
 - **A follow-on belongs to one obligation.** There is no `HENCE` for a `RAND` or a `ROR` as a whole. "When all have signed, then this, once" has no single place to be written, and a follow-on nested inside one side of a choice stays inside that side and joins the race. [Several Parties](../../tutorials/obligations/several-parties.md), Steps 2 and 4, shows both.
-- **A breach from a group names one person.** When several sides of a `RAND` or `ROR` fail together, the screen reports a single side — the first written for `RAND`, the last for `ROR` — rather than everyone who failed. The rule is written into L4 itself, as a tie-break between two breaches, and the tutorials call it the honest defect.
+- **A breach from a group names everyone who failed.** When several sides of a `RAND` or `ROR` fail together, the screen carries one line per failing side — whom, and why — in the order the rule wrote them, so nothing about one person's failure is read off another's. (Until 2026-09-15 it reported a single side, the first written for `RAND` and the last for `ROR`, which the tutorials called the honest defect; [Several Parties](../../tutorials/obligations/several-parties.md), Step 1, shows the set.)
 
-**Built:** chains, `RAND`, `ROR`, and a rule that gives an obligation and uses itself (instalments). **Not built:** a follow-on for a group, and a breach that names a set. Both are Question 5.
+**Built:** chains, `RAND`, `ROR`, a rule that gives an obligation and uses itself (instalments), and a breach that names every side that failed. **Not built:** a follow-on for a group, which is Question 5.
 
 ---
 
@@ -143,7 +143,7 @@ The rules of the clock are few and worth having in one place:
 - the deadline day itself is in time (`WITHIN 7` includes day 7);
 - time passes only through events, so ``(`WAIT UNTIL` 8)`` is how to say "day 8 came and nobody did anything";
 - an event that does not fit the obligation is passed over, but the clock still moves to its time;
-- a chain's next clock starts at the event that reached it — for `HENCE`, the act; for `LEST`, the first event _after_ the deadline, which is the moment the default comes to light, and not the deadline itself.
+- a chain's next clock starts where the previous link ended — for `HENCE`, at the act that discharged it; for `LEST`, at the deadline that was missed (for a prohibition, at the forbidden act), and not at the later event that brought the miss to light.
 
 **How an event matches an act** is the part of this question that carries the most weight, because it is where a fact from the world enters the obligation. Two ways:
 
@@ -281,21 +281,21 @@ Set the five side by side, and say what separate means: an answer to one questio
 
 The lease made the point concretely. The declarations at the top of the page never changed. The rent obligation in Question 1 was reused unchanged in the trace in Question 3; the chain in Question 2 kept its first three lines and rewrote its last two, which is where a chain lives. The `RAND` and the `ROR` in Question 2 would take a shape-matched side as readily as an exact one — [Several Parties](../../tutorials/obligations/several-parties.md), Step 5, puts shapes with blanks under a `ROR`. And the performer check in Question 4 applied identically to every obligation, chain, race and trace on the page, because it is a fact about the cast and the acts, not about any obligation.
 
-One place where two questions meet deserves to be named, because it is where readers most often feel the pieces do not fit. Question 2's `RAND` and `ROR` combine obligations you have written out one by one; Question 5's pieces are for an obligation that is the same for everyone in a group. The six arrangements of one debt in [Several Parties](../../tutorials/obligations/several-parties.md) — each owes a share; all must act then one thing; any one may pay the whole; one pays and the others repay; any amounts to a total; a guarantor — are all combinations of Question 2's two ways of combining, and the last column of that page's table is exactly the list of things Question 5 adds: a follow-on for the group, one deadline on a total, a breach that names a set.
+One place where two questions meet deserves to be named, because it is where readers most often feel the pieces do not fit. Question 2's `RAND` and `ROR` combine obligations you have written out one by one; Question 5's pieces are for an obligation that is the same for everyone in a group. The six arrangements of one debt in [Several Parties](../../tutorials/obligations/several-parties.md) — each owes a share; all must act then one thing; any one may pay the whole; one pays and the others repay; any amounts to a total; a guarantor — are all combinations of Question 2's two ways of combining, and the last column of that page's table is exactly the list of things Question 5 adds: a follow-on for the group, and one deadline on a total (a breach that names everyone who failed, once on that list, has been built since 2026-09-15).
 
 ---
 
 ## Built, and proposed
 
-| Built, in the current release                                                                                                                 | Proposed, not landed (2026-09-08)                                                             |
-| --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| the five-part obligation; `MUST`, `MAY`, `SHANT`, `DO`; `WITHIN`; `FULFILLED`, `BREACH BY … BECAUSE …`                                        | `ONCE` with a count or a total; `SOME m OF` ≡ `AT LEAST m OF`                                 |
-| chains through `HENCE` and `LEST`; a rule that gives an obligation, including one that uses itself                                            | a follow-on attached to a `RAND` or `ROR` as a whole                                          |
-| `RAND`, `ROR`, and how they group without brackets                                                                                            | a breach that names every party who failed                                                    |
-| `#TRACE`, `AT`, `DOES`, `WAIT UNTIL`; the inclusive deadline; the clock rules for `HENCE` and `LEST`                                          | a `LEST` clock counted from the missed deadline rather than from the event that revealed it   |
-| a name in an act requiring the value it names, on the whole act or on one figure; a shape with a blank; `PROVIDED`; handing a blank to a rule |                                                                                               |
-| `EVERY` for a group, with `ONCE ALL HAVE` (barrier) or `UPON EACH` (fork), the group given as a list after `IN`                               |                                                                                               |
-| the cast as a fixed list; the performer convention and check; one act in both directions; open-doer acts; procurement                         | an obligation that says whom it is owed to (the layer has a party and an act, but no obligee) |
+| Built, in the current release                                                                                                                                             | Proposed, not landed (2026-09-08)                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| the five-part obligation; `MUST`, `MAY`, `SHANT`, `DO`; `WITHIN`; `FULFILLED`, `BREACH BY … BECAUSE …`                                                                    | `ONCE` with a count or a total; `SOME m OF` ≡ `AT LEAST m OF`                                 |
+| chains through `HENCE` and `LEST`; a rule that gives an obligation, including one that uses itself                                                                        | a follow-on attached to a `RAND` or `ROR` as a whole                                          |
+| `RAND`, `ROR`, and how they group without brackets; a breach that names every party who failed (since 2026-09-15)                                                         |                                                                                               |
+| `#TRACE`, `AT`, `DOES`, `WAIT UNTIL`; the inclusive deadline; the clock rules for `HENCE` and `LEST` (the `LEST` clock counted from the missed deadline since 2026-09-16) |                                                                                               |
+| a name in an act requiring the value it names, on the whole act or on one figure; a shape with a blank; `PROVIDED`; handing a blank to a rule                             |                                                                                               |
+| `EVERY` for a group, with `ONCE ALL HAVE` (barrier) or `UPON EACH` (fork), the group given as a list after `IN`                                                           |                                                                                               |
+| the cast as a fixed list; the performer convention and check; one act in both directions; open-doer acts; procurement                                                     | an obligation that says whom it is owed to (the layer has a party and an act, but no obligee) |
 
 The last row of the right-hand column is one the design documents record as the next axis after this one, and it is not on this page: an L4 obligation says who is bound and to do what, but not to whom it is owed, so "payment to any one of several creditors discharges the debt" cannot yet be written at all.
 

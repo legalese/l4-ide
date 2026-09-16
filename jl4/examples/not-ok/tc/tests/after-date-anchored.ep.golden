@@ -1,0 +1,16 @@
+-- AFTER <date> is the instant the window opens; it has nothing to count
+-- from, so an anchor on it is refused (EVERY-EACH-QUANTIFIER-SPEC §5.1.2).
+IMPORT daydate
+
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+
+DECLARE Action IS ONE OF
+    Pay
+    Deliver
+
+GIVETH A DEONTIC Actor Action
+bad MEANS
+    PARTY Seller MUST Deliver WITHIN 10
+    HENCE (PARTY Buyer MUST Pay AFTER (YMD 2026 6 1) OF THE JOIN WITHIN 5)

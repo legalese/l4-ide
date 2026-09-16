@@ -1,0 +1,20 @@
+-- Fixture for the `l4 run --json` notes test: the first #TRACE acts at 2,
+-- before its window opens at 3 (AFTER 3), so the run reports a note beside
+-- a live residual (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X6); the second acts
+-- in time and raises none, so its JSON object carries no "notes" key.
+
+DECLARE Person IS ONE OF Alice, Bob
+DECLARE Action IS ONE OF
+  pay HAS amount IS A NUMBER
+
+payObligation MEANS
+  PARTY Alice
+  MUST pay 100
+  AFTER 3
+  WITHIN 10
+
+#TRACE payObligation AT 0 WITH
+  PARTY Alice DOES pay 100 AT 2
+
+#TRACE payObligation AT 0 WITH
+  PARTY Alice DOES pay 100 AT 5

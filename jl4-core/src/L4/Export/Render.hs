@@ -141,7 +141,7 @@ renderText cfg doc =
 
   deonLines p m a due prov h l =
     let head' = sb p <> " " <> m <> " " <> sb a
-                  <> maybe "" (\d -> " within " <> sb d) due
+                  <> maybe "" (\d -> " " <> sb d) due
                   <> maybe "" (\x -> ", provided that " <> sb x) prov
         conseq = catMaybes [ fmap (("on compliance, ",)) h, fmap (("on breach, ",)) l ]
     in if null conseq
@@ -304,7 +304,7 @@ renderHtml cfg doc =
 
   deonticHtml party modal act due prov hence lest =
     let base = prose party <> " <strong>" <> esc modal <> "</strong> " <> prose act
-                 <> maybe "" (\d -> " within " <> prose d) due
+                 <> maybe "" (\d -> " " <> prose d) due
                  <> maybe "" (\p -> ", provided that " <> prose p) prov
         conseq = catMaybes [ fmap (("On compliance, ",)) hence, fmap (("On breach, ",)) lest ]
     in case conseq of
@@ -431,7 +431,7 @@ renderAkn doc =
 
   deonticAkn party modal act due prov hence lest =
     p (xt party <> " " <> xt modal <> " " <> xt act
-        <> maybe "" (\d -> " within " <> xt d) due
+        <> maybe "" (\d -> " " <> xt d) due
         <> maybe "" (\x -> ", provided that " <> xt x) prov
         <> (if null conseq then "." else ":"))
       <> (if null conseq then "" else blockList (map (\(lab, c) -> item (p lab <> clauseAkn c)) conseq))

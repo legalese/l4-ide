@@ -222,13 +222,14 @@ instance Linearize (Expr Resolved) where
     MultiWayIf _ conds o -> hcat $
       foldMap (\(MkGuardedExpr _ c f) -> ["if", lin c, "then", lin f]) conds
       <> ["otherwise", lin o ]
-    Regulative _ (MkDeonton _ subj (MkAction _ modal rule mprovided) mdeadline mjoin mfollowup mlest) -> hcat $
+    Regulative _ (MkDeonton _ subj (MkAction _ modal rule mprovided) mopens mdeadline mjoin mfollowup mlest) -> hcat $
       linSubject subj
       <> [ text (deonticModalText modal)
          , lin rule
          ]
       <> maybe [] (\ provided -> [ text "provided that", lin provided ]) mprovided
-      <> maybe [] linDeadline mdeadline
+      <> maybe [] linOpening mopens
+      <> maybe [] (linClosing (isJust mopens)) mdeadline
       <> maybe [] linJoin mjoin
       <> maybe [] (\ followup -> [ text "hence",  lin followup ]) mfollowup
       <> maybe [] (\ lest -> [ text "lest",  lin lest ]) mlest
@@ -242,9 +243,21 @@ instance Linearize (Expr Resolved) where
           JoinUpon _ _ mdue -> [ text "upon", text "each" ] <> linJoinDue mdue
         linJoinDue = maybe [] linDeadline
         -- @within d@, then the anchor: the lifecycle words as prose, or the
-        -- expression (R-Q7, §5.1.1)
-        linDeadline (MkDeadline _ d ma) =
-          [ text "within", lin d ]
+        -- expression (R-Q7, §5.1.1); @before date@ for the absolute edge
+        -- (R-X5, §5.1.2). Only the WITHIN form sits on a join line.
+        linDeadline = linClosing False
+        -- The closing edge of an act. Beside an @after@, a bare @within@
+        -- counts from the instant the window opened (re-anchor, §5.1.2.2),
+        -- and the English says so: "after 3 days, within 30 days of that".
+        linClosing afterOpening = \ case
+          MkDeadline _ d ma ->
+            [ text "within", lin d ]
+            <> maybe (if afterOpening then [ text "of", text "that" ] else [])
+                     (\ a -> [ text "of" ] <> linAnchor a) ma
+          MkBefore _ e -> [ text "before", lin e ]
+        -- @after d [of anchor]@ — the window's opening edge
+        linOpening (MkOpening _ d ma) =
+          [ text "after", lin d ]
           <> maybe [] (\ a -> [ text "of" ] <> linAnchor a) ma
         linAnchor = \ case
           AnchorJoin _     -> [ text "the", text "join" ]

@@ -4,8 +4,9 @@ IMPORT daydate
 -- 2026-09-15): the ANCHORED deadline, `WITHIN d OF anchor`.
 --
 -- Unanchored, a WITHIN counts from where the language puts it: under HENCE,
--- the join's firing (§5.1); under LEST, today, the event that revealed the
--- miss (§5.2 owes the missed deadline). Anchored, it is ABSOLUTE — the
+-- the join's firing (§5.1); under LEST, the failure time — the missed
+-- deadline for MUST/DO/MAY, the violating stamp for SHANT (§5.2, built
+-- 2026-09-16; run-lest.l4 pins it). Anchored, it is ABSOLUTE — the
 -- anchor's instant plus d — and the anchor is one of
 --
 --   OF THE JOIN        the instant the ENCLOSING obligation's join fired
@@ -78,12 +79,13 @@ GIVETH A DEONTIC Actor Action
 
 § `OF THE DEADLINE under LEST: the cure period runs from the missed deadline`
 
--- Alice misses day 10. The miss is revealed by her late signature at day 14,
--- and today's UNANCHORED rule would start her cure period there (§5.2 records
--- that as the change still owed). Anchored, the cure period runs from the
--- deadline she missed: 10 + 5 = 15, whatever day the miss came to light. Her
--- signature at 14 is re-offered to the LEST and discharges it; a signature at
--- 16 does not, and the breach reports 15.
+-- Alice misses day 10. The miss is revealed by her late signature at day 14.
+-- Anchored, the cure period runs from the deadline she missed: 10 + 5 = 15,
+-- whatever day the miss came to light. Her signature at 14 is re-offered to
+-- the LEST and discharges it; a signature at 16 does not, and the breach
+-- reports 15. (Until 2026-09-16 the UNANCHORED rule started her cure period
+-- at the revealing event instead, 14 + 5 = 19; §5.2 made the two agree, and
+-- run-lest.l4 pins the unanchored form to these same numbers.)
 GIVETH A DEONTIC Actor Action
 `cure from the deadline` MEANS
     PARTY alice MUST Sign alice WITHIN 10

@@ -1,0 +1,21 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: before-a-duration.l4
+  Hidden: no
+  Range: 13:39-13:41
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    BEFORE closes the window at an instant, so it is expected to be of type
+
+      DATE
+
+    but is here of type
+
+      NUMBER
+
+    A NUMBER is a duration, and a duration is WITHIN's: write WITHIN d for a
+    deadline d after the clock starts, or WITHIN d OF <anchor> to count it
+    from somewhere else.

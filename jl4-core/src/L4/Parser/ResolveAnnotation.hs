@@ -552,14 +552,15 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
     Inert ann txt ctx -> pure $ Inert ann txt ctx
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Deonton n) where
-  addNlg (MkDeonton ann' subj event deadline mjoin followup lest) = do
+  addNlg (MkDeonton ann' subj event opens deadline mjoin followup lest) = do
     subj' <- addNlg subj
     event' <- addNlg event
+    opens' <- traverse addNlg opens
     deadline' <- traverse addNlg deadline
     join' <- traverse addNlg mjoin
     followup' <- traverse addNlg followup
     lest' <- traverse addNlg lest
-    pure $  MkDeonton ann' subj' event' deadline' join' followup' lest'
+    pure $  MkDeonton ann' subj' event' opens' deadline' join' followup' lest'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Join n) where
   addNlg = \ case
@@ -567,7 +568,12 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Join n) where
     JoinUpon ann ue due -> JoinUpon ann ue <$> traverse addNlg due
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Deadline n) where
-  addNlg (MkDeadline ann d ma) = MkDeadline ann <$> addNlg d <*> traverse addNlg ma
+  addNlg = \ case
+    MkDeadline ann d ma -> MkDeadline ann <$> addNlg d <*> traverse addNlg ma
+    MkBefore ann e      -> MkBefore ann <$> addNlg e
+
+instance (HasSrcRange n, HasNlg n) => HasNlg (Opening n) where
+  addNlg (MkOpening ann d ma) = MkOpening ann <$> addNlg d <*> traverse addNlg ma
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Anchor n) where
   addNlg = \ case
@@ -843,10 +849,11 @@ instance HasDesc (NamedExpr n) where
   addDesc (MkNamedExpr ann n e) = MkNamedExpr ann n <$> addDesc e
 
 instance HasDesc (Deonton n) where
-  addDesc (MkDeonton ann subj act due mjoin hence lest) =
+  addDesc (MkDeonton ann subj act opens due mjoin hence lest) =
     MkDeonton ann
       <$> addDesc subj
       <*> addDesc act
+      <*> traverse addDesc opens
       <*> traverse addDesc due
       <*> traverse addDesc mjoin
       <*> traverse addDesc hence
@@ -858,7 +865,12 @@ instance HasDesc (Join n) where
     JoinUpon ann ue due -> JoinUpon ann ue <$> traverse addDesc due
 
 instance HasDesc (Deadline n) where
-  addDesc (MkDeadline ann d ma) = MkDeadline ann <$> addDesc d <*> traverse addDesc ma
+  addDesc = \ case
+    MkDeadline ann d ma -> MkDeadline ann <$> addDesc d <*> traverse addDesc ma
+    MkBefore ann e      -> MkBefore ann <$> addDesc e
+
+instance HasDesc (Opening n) where
+  addDesc (MkOpening ann d ma) = MkOpening ann <$> addDesc d <*> traverse addDesc ma
 
 instance HasDesc (Anchor n) where
   addDesc = \ case
@@ -1519,15 +1531,16 @@ instance (HasSrcRange n, HasRef n) => HasRef (Expr n) where
       pure $ f ann' e1' e2'
 
 instance (HasSrcRange n, HasRef n) => HasRef (Deonton n) where
-  addRef (MkDeonton ann subj event deadline mjoin followup lest) = do
+  addRef (MkDeonton ann subj event opens deadline mjoin followup lest) = do
     -- 'Deonton' has no 'HasSrcRange' handle of its own here; attach via children.
     subj' <- addRef subj
     event' <- addRef event
+    opens' <- traverse addRef opens
     deadline' <- traverse addRef deadline
     join' <- traverse addRef mjoin
     followup' <- traverse addRef followup
     lest' <- traverse addRef lest
-    pure $ MkDeonton ann subj' event' deadline' join' followup' lest'
+    pure $ MkDeonton ann subj' event' opens' deadline' join' followup' lest'
 
 instance (HasSrcRange n, HasRef n) => HasRef (Join n) where
   addRef = \ case
@@ -1535,7 +1548,12 @@ instance (HasSrcRange n, HasRef n) => HasRef (Join n) where
     JoinUpon ann ue due -> JoinUpon ann ue <$> traverse addRef due
 
 instance (HasSrcRange n, HasRef n) => HasRef (Deadline n) where
-  addRef (MkDeadline ann d ma) = MkDeadline ann <$> addRef d <*> traverse addRef ma
+  addRef = \ case
+    MkDeadline ann d ma -> MkDeadline ann <$> addRef d <*> traverse addRef ma
+    MkBefore ann e      -> MkBefore ann <$> addRef e
+
+instance (HasSrcRange n, HasRef n) => HasRef (Opening n) where
+  addRef (MkOpening ann d ma) = MkOpening ann <$> addRef d <*> traverse addRef ma
 
 instance (HasSrcRange n, HasRef n) => HasRef (Anchor n) where
   addRef = \ case

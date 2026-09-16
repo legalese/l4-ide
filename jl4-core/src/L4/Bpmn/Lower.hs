@@ -324,7 +324,7 @@ stateGraphToBpmn opts sg =
       ]
 
     taskFindings = case (obligation, taskNodes) of
-      (Just t, tn : _) -> modalityFinding tn t.transLabel <> guardFindings tn t.transLabel
+      (Just t, tn : _) -> modalityFinding tn t.transLabel <> guardFindings tn t.transLabel <> openingFindings tn t.transLabel
       _ -> []
 
     quantifierFindings = case (obligation, taskNodes) of
@@ -1445,7 +1445,8 @@ restateRule l =
       [ fmap subjectWords l.labelParty
       , fmap modalWord l.labelModal
       , Just l.labelAction
-      , fmap ("WITHIN " <>) l.labelDeadline
+      , fmap ("AFTER " <>) l.labelOpening
+      , fmap closingClause l.labelDeadline
       , fmap ("PROVIDED " <>) l.labelGuard
       , joinWords <$> (l.labelQuantifier >>= (.quantJoin))
       ]
@@ -1454,6 +1455,15 @@ restateRule l =
     Just _ -> p
     Nothing -> "PARTY " <> p
 
+-- | The window's closing edge as a clause: a @WITHIN@'s label is its body,
+-- a @BEFORE@'s carries its own keyword ('L4.StateGraph.extractDeonton'), and
+-- the join line's deadline is rendered the same way, so a date is never
+-- restated as a duration.
+closingClause :: Text -> Text
+closingClause d
+  | "BEFORE " `Text.isPrefixOf` d = d
+  | otherwise                     = "WITHIN " <> d
+
 -- | A join line as the source spells it.
 joinWords :: JoinLabel -> Text
 joinWords j =
@@ -1461,7 +1471,7 @@ joinWords j =
       Barrier th -> "ONCE " <> th
       Fork -> "UPON EACH"
   )
-    <> maybe "" (" WITHIN " <>) j.joinDeadline
+    <> maybe "" ((" " <>) . closingClause) j.joinDeadline
 
 -- | What the @\<documentation\>@ of an @EVERY@'s task adds after the restated
 -- rule: what the multi-instance marker means here, and — for a fork — what it
@@ -1501,8 +1511,19 @@ quantifierDoc l = case l.labelQuantifier of
           " UPON EACH: in the source, what follows fires once per member as \
           \that member completes. A multi-instance activity fires its outgoing \
           \flow once, after the last instance, so what follows is drawn once \
-          \(P-FORK), and the timer on this activity cancels every instance \
-          \(P-FORK-CANCEL)."
+          \(P-FORK)"
+            <> case l.labelModal of
+              -- The note this clause cites is not filed for a prohibition —
+              -- there the timer is the compliance arm, and cancelling every
+              -- instance when it fires is right ('quantifierNotes') — so the
+              -- <documentation> must not send the reader to look for it
+              -- (adversarial pass of 2026-09-16, R1-4).
+              Just DMustNot ->
+                "; the timer on this activity is the compliance arm, and \
+                \cancelling every instance when it fires is right."
+              _ ->
+                ", and the timer on this activity cancels every instance \
+                \(P-FORK-CANCEL)."
 
 -- | How an @EVERY@'s activity completes. Keyed on the MODAL as well as on the
 -- quantifier: the positional pattern in 'L4.StateGraph.extractDeonton' guards
@@ -1630,7 +1651,12 @@ boundaryDoc (Just DMustNot) Nothing =
   \performed, so this is the HENCE arm — but the rule sets no WITHIN, so \
   \nothing reaches it: a prohibition with no deadline is discharged by neither \
   \the clock nor the act"
-boundaryDoc _ (Just d) = "LEST: the obligation is not discharged within " <> d
+-- a BEFORE's label carries its own keyword ('closingClause'), so the
+-- preposition is the label's, not ours: "not discharged BEFORE date", never
+-- "within BEFORE date" (adversarial pass of 2026-09-16, G8)
+boundaryDoc _ (Just d)
+  | "BEFORE " `Text.isPrefixOf` d = "LEST: the obligation is not discharged " <> d
+  | otherwise                     = "LEST: the obligation is not discharged within " <> d
 boundaryDoc _ Nothing =
   "LEST: the obligation is not discharged — but the rule sets no WITHIN, and \
   \for every modal but SHANT this arm is reached only by the deadline passing, \
@@ -1694,10 +1720,26 @@ boundaryTrigger opts modal elemId lestLabel = \case
       )
     Unparsed -> (WhenCondition raw, [unparsedNote raw])
  where
-  -- The shapes 'parseDuration' cannot read, each said as what it is
+  -- The three shapes 'parseDuration' cannot read, each said as what it is
   -- (adversarial pass of 2026-09-16, R1-2: an anchored deadline used to be
   -- reported as a missing unit, which is not what is wrong with it).
   unparsedNote raw
+    -- A BEFORE date (R-X5, EVERY-EACH-QUANTIFIER-SPEC §5.1.2) is an instant,
+    -- not a duration with a unit to read; the label carries the keyword so
+    -- this arm can see it ('L4.StateGraph.extractDeonton').
+    | "BEFORE " `Text.isPrefixOf` raw =
+        note
+          "P-DEADLINE"
+          Blocking
+          ( "Deadline "
+              <> quoted raw
+              <> " is a date, an absolute instant, and this exporter draws a \
+                 \timer only from a duration \8212 it does not compute a \
+                 \timeDate from L4's calendar \8212 so the boundary event \
+                 \carries the text verbatim as a condition rather than a timer."
+          )
+          "the deadline as a machine-checkable timer; the date survives only \
+          \in the condition's text"
     -- An anchored WITHIN (R-Q7, §5.1.1): the unit may well be readable; what
     -- this exporter cannot do is resolve the anchor.
     | Just anchor <- deadlineAnchor raw =
@@ -1801,9 +1843,13 @@ isNat t = not (Text.null t) && Text.all isDigit t
 -- brackets count for nothing ('labelWords'). Without that, @WITHIN `days OF
 -- grace`@ was reported as anchored at @grace`@ (adversarial pass of
 -- 2026-09-16, round 2, R2-SEM-2).
+-- A @BEFORE@ has no anchor: it is a date, not a duration from anything.
 deadlineAnchor :: Text -> Maybe Text
-deadlineAnchor raw = go (0 :: Int) (labelWords (Text.strip raw))
+deadlineAnchor raw
+  | "BEFORE " `Text.isPrefixOf` t = Nothing
+  | otherwise = go (0 :: Int) (labelWords t)
  where
+  t = Text.strip raw
   go _ [] = Nothing
   go 0 ("OF" : rest@(_ : _)) = Just (Text.unwords rest)
   go d (w : rest) = go (d + bracketDepth w) rest
@@ -1864,6 +1910,12 @@ numberWithUnit t = do
 --------------------------------------------------------------------------------
 -- Findings raised while building nodes
 --------------------------------------------------------------------------------
+
+-- TODO (owed by the lts-diagrams session, on the blame set's merge;
+-- EVERY-EACH-QUANTIFIER-SPEC §6.1.1, LTS-VISUALISER.md §4.9): an F-class
+-- note that a barrier's error end event names NO party — every breach ends in
+-- the one shared Error_breach, <endEvent name="Breach"> (L4.Bpmn.Emit) — where
+-- the source now names the set of members who failed (R-T3).
 
 -- | What an @EVERY@ costs in BPMN, in notes that fire independently.
 --
@@ -2065,6 +2117,89 @@ modalityFinding n l =
       , "the deontic modality, which survives in the label and the \
         \<documentation> but has no notational force"
       )
+
+-- | The window's opening edge (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, 2026-09-16)
+-- is not drawn: the task is enabled as soon as the token reaches it, and
+-- an act before the window opens — a nullity in L4 (R-X6) — is a completion
+-- in BPMN. That much is true of every @AFTER@.
+--
+-- What the opening does to the CLOSING edge depends on the closing edge's
+-- shape, and the note says which shape it met (adversarial pass of
+-- 2026-09-16, R1-1; before it, every @AFTER@ got the re-anchor sentence):
+--
+-- * a bare @WITHIN@ on the act counts from the instant the window opens
+--   (re-anchor, §5.1.2.2), not from the task's start — so the boundary
+--   timer, drawn from the task's start, is measured from the wrong point;
+--
+-- * a @BEFORE@ is an absolute instant the opening does not move;
+--
+-- * an anchored @WITHIN@ (@OF THE JOIN@, @OF THE DEADLINE@, @OF THE ARMING@,
+--   @OF instant@) counts from its anchor, not from the opening (§5.1.2.2);
+--   what the boundary event makes of the anchor is @P-DEADLINE@'s to say;
+--
+-- * a join line's @WITHIN@ demoted to the member — the act has an @AFTER@
+--   and no @WITHIN@ of its own, so 'memberDeadline' is the join's — bounds
+--   every member from the @EVERY@'s arming and does not re-anchor on the
+--   act's opening (R-T2; @memberDueExpr@ hands it over @OF THE ARMING@).
+--   The multi-instance activity is enabled at that arming, so a timer drawn
+--   from it is measured from the right point;
+--
+-- * no closing edge: the window opens and never closes.
+openingFindings :: FlowNode -> TransitionLabel -> [FidelityNote]
+openingFindings n l = case l.labelOpening of
+  Nothing -> []
+  Just o ->
+    [ MkFidelityNote
+        { code = "P-WINDOW-OPENING"
+        , severity = Blocking
+        , element = n.nodeId
+        , range = Nothing
+        , message =
+            "This obligation's window opens AFTER \8216"
+              <> o
+              <> "\8217, and BPMN has no way to hold a task closed until then: \
+                 \the activity is enabled as soon as it is reached, so an act \
+                 \the rule would treat as a nullity (performed before the window \
+                 \opened) reads here as a completion. "
+              <> closingSentence
+        , lost = closingLost
+        }
+    ]
+ where
+  openingOnly = "the opening edge; it survives only in the <documentation>"
+  (closingSentence, closingLost) = case l.labelDeadline of
+    Just d
+      | "BEFORE " `Text.isPrefixOf` d ->
+          ( "The closing edge is a BEFORE date, an absolute instant the \
+            \opening does not move; the boundary event carries it as written."
+          , openingOnly
+          )
+      | Just a <- deadlineAnchor d ->
+          ( "The closing edge is anchored OF "
+              <> a
+              <> " and counts from that anchor, not from the opening; what \
+                 \the boundary event makes of the anchor is P-DEADLINE's to say."
+          , openingOnly
+          )
+      | otherwise ->
+          ( "A bare WITHIN beside the AFTER counts from the instant the \
+            \window opens, so the boundary timer, if one is drawn, is \
+            \measured from the wrong point too."
+          , "the opening edge, and the point the closing edge is measured from; \
+            \both survive only in the <documentation>"
+          )
+    Nothing
+      | Just _ <- memberDeadline l ->
+          ( "The closing edge is the join line's WITHIN, which bounds every \
+            \member from the EVERY's arming and does not re-anchor on the \
+            \act's opening; the activity is enabled at that arming, so the \
+            \boundary timer is measured from the right point."
+          , openingOnly
+          )
+      | otherwise ->
+          ( "There is no closing edge: the window opens and never closes."
+          , openingOnly
+          )
 
 guardFindings :: FlowNode -> TransitionLabel -> [FidelityNote]
 guardFindings n l = case l.labelGuard of
