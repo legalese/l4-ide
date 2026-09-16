@@ -12,10 +12,21 @@ executing contract `after anchored` at 0 with the following events:  party `shop
 executing contract `after anchored` at 0 with the following events:  party `shop` did `Deliver` with `shop` at 10 party `buyer` did `Order` with `buyer` at 44
 executing contract `both anchored` at 0 with the following events:  party `shop` did `Deliver` with `shop` at 10 party `buyer` did `Order` with `buyer` at 41
 executing contract `two origins` at 0 with the following events:  party `shop` did `Deliver` with `shop` at 10 party `buyer` did `Order` with `buyer` at 12
+executing contract `bare after, deadline within` at 0 with the following events:  party `shop` did `Deliver` with `shop` at 10 party `buyer` did `Order` with `buyer` at 20
+executing contract `bare after, deadline within` at 0 with the following events:  party `shop` did `Deliver` with `shop` at 10 party `buyer` did `Order` with `buyer` at 32
+executing contract `bare after, deadline within` at 0 with the following events:  party `shop` did `Deliver` with `shop` at 10 party `buyer` did `Order` with `buyer` at 33
+executing contract `bare after, instant within` at 0 with the following events:  party `buyer` did `Order` with `buyer` at 100
+executing contract `bare after, instant within` at 0 with the following events:  party `buyer` did `Order` with `buyer` at 206
 executing contract `cure from the deadline` at 0 with the following events:  party `buyer` did `Order` with `buyer` at 32
 executing contract `cure from the deadline` at 0 with the following events:  party `buyer` did `Order` with `buyer` at 33
 executing contract `cure, bare` at 0 with the following events:  party `buyer` did `Order` with `buyer` at 63
 executing contract `cure, bare` at 0 with the following events:  party `buyer` did `Order` with `buyer` at 64
+executing contract `cure after violation, bare` at 0 with the following events:  party `buyer` did `Smoke` with `buyer` at 5 party `buyer` did `Order` with `buyer` at 7
+executing contract `cure after violation, bare` at 0 with the following events:  party `buyer` did `Smoke` with `buyer` at 5 party `buyer` did `Order` with `buyer` at 38
+executing contract `cure after violation, bare` at 0 with the following events:  party `buyer` did `Smoke` with `buyer` at 5 party `buyer` did `Order` with `buyer` at 39
+executing contract `cure after violation, from the deadline` at 0 with the following events:  party `buyer` did `Smoke` with `buyer` at 5 party `buyer` did `Order` with `buyer` at 20
+executing contract `cure after violation, from the deadline` at 0 with the following events:  party `buyer` did `Smoke` with `buyer` at 5 party `buyer` did `Order` with `buyer` at 33
+executing contract `cure after violation, deadline within` at 0 with the following events:  party `buyer` did `Smoke` with `buyer` at 5 party `buyer` did `Order` with `buyer` at 20
 executing contract `vests` at 0 with the following events:  party `shop` did `Deliver` with `shop` at 10 party `buyer` did `Order` with `buyer` at 1000
 executing contract `vests` at 0 with the following events:  party `shop` did `Deliver` with `shop` at 10 party `buyer` did `Order` with `buyer` at 12
 executing contract `vests` at 0 with the following events:  party `shop` did `Deliver` with `shop` at 10
@@ -45,6 +56,11 @@ executing contract `no smoking later` at 0 with the following events:  party `bu
 executing contract `window of` with 30 and 5 at 0 with the following events:  party `alice` did `Sign` with `alice` at 8 party `theLandlord` did `Deliver` with `theLandlord` at 20
 executing contract `window of` with 30 and 5 at 0 with the following events:  party `alice` did `Sign` with `alice` at 8 party `theLandlord` did `Deliver` with `theLandlord` at 10
 executing contract `window of, bare` with 30 and 5 at 0 with the following events:  party `alice` did `Sign` with `alice` at 8 party `theLandlord` did `Deliver` with `theLandlord` at 43
+executing contract `window of, arming` with 30 and 5 at 0 with the following events:  party `alice` did `Sign` with `alice` at 8 party `theLandlord` did `Deliver` with `theLandlord` at 20
+executing contract `window of, two anchors` with 30 and 5 at 0 with the following events:  party `alice` did `Sign` with `alice` at 8 party `theLandlord` did `Deliver` with `theLandlord` at 20
+executing contract `window before` with 40 at `DATE_SERIAL` with `YMD` with 2026, 6 and 1 with the following events:  party `buyer` did `Order` with `buyer` at `DATE_SERIAL` with `YMD` with 2026, 6 and 20
+executing contract `fork bounded, empty` at 0 with the following events:  party `alice` did `Sign` with `alice` at 2 party `bob` did `Sign` with `bob` at 4
+executing contract `stalled window` at 0 with the following events:  party `buyer` did `Order` with `buyer` at 100
 party `buyer` may `Order` has is exactly `buyer` after 3 within 30 of that
 party `buyer` may `Order` has is exactly `buyer` after 3 of the arming within 30 of the arming
 party `buyer` must `Order` has is exactly `buyer` after 3 before `YMD` with 2026, 6 and 30

@@ -33,7 +33,7 @@ import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as LspQueryPlan
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 
-import L4.EvaluateLazy (EvalConfig, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyEvalException, prettyAssertionOutcome, prettyRefusal)
+import L4.EvaluateLazy (EvalConfig, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), AssertionOutcome(..), ReductionOutcome(..), Refusal(..), prettyEvalException, prettyAssertionOutcome, prettyRefusal, prettyNotes)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.TracePolicy (replDefaultPolicy)
@@ -642,8 +642,11 @@ configureTraceSink st argInput = do
 formatResults :: [EvalDirectiveResult] -> Text
 formatResults results = Text.unlines $ map formatResult results
 
+-- The run's notes (an early act, R-X6; an empty window) follow the value,
+-- one @NOTE:@ line each, as they do in every other renderer; nothing when
+-- there are none.
 formatResult :: EvalDirectiveResult -> Text
-formatResult (MkEvalDirectiveResult _range res _trace _ledger _notes) = case res of
+formatResult (MkEvalDirectiveResult _range res _trace _ledger ns) = (<> prettyNotes ns) case res of
   Assertion Holds            -> "True (assertion passed)"
   Assertion Fails            -> "False (assertion failed)"
   Assertion a@(FailsBecause _) -> "False (" <> prettyAssertionOutcome a <> ")"

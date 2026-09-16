@@ -254,9 +254,13 @@ program may not name a value `AFTER` (a backticked name is unaffected).
   OPENED (the window `[a+3, a+33]`; a bare `WITHIN` beside an `AFTER` re-anchors).
 - `AFTER 3 WITHIN 30 OF THE JOIN` — the statutory two-offset window, "not less than 3 nor more
   than 30 days after delivery": both edges from the anchor named, `[a+3, a+30]`. A window that
-  closes before it opens, `AFTER 30 WITHIN 5 OF THE JOIN`, is a check error with literal offsets.
+  closes before it opens, `AFTER 30 WITHIN 5 OF THE JOIN`, is a check error with literal offsets
+  (the check fires only where the `AFTER` cannot open before the `WITHIN`'s anchor; a bare
+  `AFTER` beside `WITHIN 2 OF THE DEADLINE` under a `HENCE` is `[join+3, deadline+2]`, open, and
+  runs).
 - `AFTER 3 OF THE DEADLINE WITHIN 30` — either edge may name an anchor; under a `LEST` the
-  bare form already counts from the missed deadline.
+  bare form already counts from the failure time, which for a missed `MUST` is that deadline and
+  for a `SHANT` is the violating act's stamp (there the two spellings differ).
 - `AFTER 3` alone — a right that vests and never expires.
 - `AFTER (YMD 2026 6 10)`, `BEFORE (YMD 2026 6 30)` — the absolute forms. `WITHIN` takes a
   duration and `BEFORE` a date; `WITHIN (YMD …)` and `BEFORE 30` are check errors that name the
@@ -267,8 +271,9 @@ program may not name a value `AFTER` (a backticked name is unaffected).
   as `WITHIN 0 OF date`.
 
 An act before the window opens is a **nullity with a diagnostic** (R-X6): not performance, not a
-breach; the obligation stays live with its deadline untouched, and `l4 run` prints a `NOTE:`
-beside the result. For a `SHANT` the early act is not a violation. See
+breach; the obligation stays live with its clock untouched (its deadline, when it has one — an
+`AFTER` alone has no closing edge), and `l4 run` prints a `NOTE:` beside the result (`--json`: a
+`"notes"` array on the directive). For a `SHANT` the early act is not a violation. See
 `doc/reference/regulative/AFTER.md` and `jl4/examples/ok/every/run-after.l4`.
 
 ---

@@ -160,12 +160,17 @@ evalDirectiveCrashed r = case r.result of
 ----------------------------------------------------------------------------
 
 evalResultToJson :: EvalDirectiveResult -> Aeson.Value
-evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _} =
+evalResultToJson MkEvalDirectiveResult{range = mRange, result, trace = _, notes = ns} =
   Aeson.object $
     [ Key.fromString "range" Aeson..= fmap prettySrcRange mRange
     , Key.fromString "kind"  Aeson..= kindText
     , Key.fromString "value" Aeson..= valueJson
     ] <> errorField
+    -- what the run reported without failing (an early act, R-X6; an empty
+    -- window), only when there is any, so the object of a directive with
+    -- none is unchanged. A JSON consumer that read only "value" was handed
+    -- the silent nullity R-X6 forbids (adversarial pass of 2026-09-16, G1).
+    <> [ Key.fromString "notes" Aeson..= ns | not (null ns) ]
   where
     (kindText, valueJson, errorField) = case result of
       Assertion Holds         -> ("assertion" :: Text, Aeson.Bool True, [])

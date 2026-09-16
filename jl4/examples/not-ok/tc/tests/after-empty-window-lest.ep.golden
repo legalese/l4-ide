@@ -1,0 +1,21 @@
+-- Under the LEST of a MUST, a bare AFTER counts from the failure time, which
+-- is the missed deadline (EVERY-EACH-QUANTIFIER-SPEC §5.2) — the very instant
+-- WITHIN … OF THE DEADLINE names. So AFTER 3 WITHIN 2 OF THE DEADLINE there
+-- is [deadline+3, deadline+2]: closes before it opens, refused with both
+-- offsets literal (§5.1.2.2). Under a SHANT's LEST the failure time is the
+-- violating act's stamp, an earlier instant, and the same literals are not
+-- compared (ok/every/run-after.l4, `cure after violation, deadline within`).
+
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+
+DECLARE Action IS ONE OF
+    Pay
+    Deliver
+
+GIVETH A DEONTIC Actor Action
+bad MEANS
+    PARTY Seller MUST Deliver WITHIN 10
+    HENCE FULFILLED
+    LEST (PARTY Buyer MUST Pay AFTER 3 WITHIN 2 OF THE DEADLINE)

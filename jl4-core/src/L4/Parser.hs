@@ -2589,21 +2589,30 @@ obligation = do
       <*> optionalWithHole (lest current)
 
 -- | After the closing-edge slot, an @AFTER@ can only be the opening edge
--- written in the wrong place (@WITHIN 30 AFTER 3@), or a second one. Fail
--- there with the order spelled out, rather than with megaparsec's list of
--- what may follow a @WITHIN@. Consumes nothing and records no hole. The
--- look-ahead is 'hidden' so that @AFTER@ does not join the list of tokens
--- expected after a @WITHIN@ in every other parse error — it is not accepted
--- there, so listing it would be a lie (and would move the two
--- @every-join-misindented@ goldens, which quote that list).
+-- written in the wrong place (@WITHIN 30 AFTER 3@), or a second one; a
+-- @WITHIN@ or @BEFORE@ there can only be a second closing edge (@WITHIN 30
+-- BEFORE date@ — 'closingEdge' is one slot, and the join line's @WITHIN@
+-- follows @ONCE@\/@UPON@, never the act's edge directly). Fail there with
+-- the rule spelled out, rather than with megaparsec's list of what may
+-- follow a @WITHIN@. Consumes nothing and records no hole. Both look-aheads
+-- are 'hidden' so that neither word joins the list of tokens expected
+-- after a @WITHIN@ in every other parse error — they are not accepted
+-- there, so listing them would be a lie (and would move the two
+-- @every-join-misindented@ goldens, which quote that list). The second
+-- look-ahead was added by the adversarial pass of 2026-09-16 (R1-5).
 edgeOrderGuard :: AnnoParser ()
 edgeOrderGuard = wrapAnnoParser $ WithAnno [] <$> do
   misplaced <- optional (lookAhead (hidden (spacedKeyword_ TKAfter)))
-  for_ misplaced \ _ -> fancyFailure (Set.singleton (ErrorFail msg))
+  for_ misplaced \ _ -> fancyFailure (Set.singleton (ErrorFail orderMsg))
+  secondCloser <- optional (lookAhead (hidden (spacedKeyword_ TKWithin <|> spacedKeyword_ TKBefore)))
+  for_ secondCloser \ _ -> fancyFailure (Set.singleton (ErrorFail oneCloserMsg))
   where
-    msg = "AFTER, the window's opening edge, comes first and once: \
+    orderMsg = "AFTER, the window's opening edge, comes first and once: \
           \PARTY p MUST act AFTER 3 WITHIN 30 - one AFTER, then WITHIN or BEFORE. \
           \This AFTER comes too late: after the closing edge, or after another AFTER."
+    oneCloserMsg = "One closing edge: WITHIN d [OF anchor] or BEFORE date, not both and not twice. \
+          \The window is [AFTER d1] then one of WITHIN d2 / BEFORE date; \
+          \this second closing edge has nothing to close."
 
 -- | The subject of a deonton (EVERY-EACH-QUANTIFIER-SPEC §2.4, RULED 2026-09-07;
 -- the @IN@ roll RULED and built 2026-09-08, §11.0.2):

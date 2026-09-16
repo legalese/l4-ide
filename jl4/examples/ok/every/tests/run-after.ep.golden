@@ -166,12 +166,59 @@ GIVETH A DEONTIC Actor Action
   PARTY shop DOES Deliver shop AT 10
   PARTY buyer DOES Order buyer AT 12
 
+-- A bare AFTER counts from the obligation's own clock — the join, under a
+-- HENCE — whatever the WITHIN names. Beside WITHIN 2 OF THE DEADLINE it is
+-- [join+3, deadline+2] = [13, 32]: two origins, and the window is open even
+-- though 3 > 2. The checker compares a bare AFTER's literal offset only
+-- against an anchor its clock can never precede (OF THE ARMING; OF THE JOIN
+-- under HENCE; OF THE DEADLINE under a MUST's LEST), so this one checks and
+-- runs: 20 and 32 in time, 33 late at 32. (The first cut refused it as
+-- empty; adversarial pass of 2026-09-16, F1/R1-1.)
+GIVETH A DEONTIC Actor Action
+`bare after, deadline within` MEANS
+    PARTY shop MUST Deliver (EXACTLY shop) WITHIN 30
+    HENCE (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 WITHIN 2 OF THE DEADLINE
+           HENCE FULFILLED)
+    LEST BREACH
 
-§ `Under a LEST, the anchor is the missed deadline`
+#TRACE `bare after, deadline within` AT 0 WITH
+  PARTY shop DOES Deliver shop AT 10
+  PARTY buyer DOES Order buyer AT 20
 
--- The delivery is never made; its deadline is 30 (§5.2). The cure window
--- opens 3 after that deadline and runs 30 from where it opened: [33, 63].
--- 32 is early, 33 is in time — with THE DEADLINE named, and with it left off.
+#TRACE `bare after, deadline within` AT 0 WITH
+  PARTY shop DOES Deliver shop AT 10
+  PARTY buyer DOES Order buyer AT 32
+
+#TRACE `bare after, deadline within` AT 0 WITH
+  PARTY shop DOES Deliver shop AT 10
+  PARTY buyer DOES Order buyer AT 33
+
+-- The same with an instant as the anchor, at top level: the AFTER counts
+-- from the arming (0), the WITHIN from the instant named — [30, 205]. An
+-- instant bears no relation to the clock, so the checker never compares
+-- against one: 100 in time, 206 late at 205.
+closingDate MEANS 200
+
+GIVETH A DEONTIC Actor Action
+`bare after, instant within` MEANS
+    PARTY buyer MUST Order (EXACTLY buyer) AFTER 30 WITHIN 5 OF closingDate
+    HENCE FULFILLED
+    LEST BREACH
+
+#TRACE `bare after, instant within` AT 0 WITH
+  PARTY buyer DOES Order buyer AT 100
+
+#TRACE `bare after, instant within` AT 0 WITH
+  PARTY buyer DOES Order buyer AT 206
+
+
+§ `Under a LEST, the clock is the failure time`
+
+-- The delivery is never made; its deadline is 30, and for a MUST the failure
+-- time IS the missed deadline (§5.2). The cure window opens 3 after it and
+-- runs 30 from where it opened: [33, 63]. 32 is early, 33 is in time — with
+-- THE DEADLINE named, and with it left off: for a missed MUST the two
+-- spellings coincide.
 GIVETH A DEONTIC Actor Action
 `cure from the deadline` MEANS
     PARTY shop MUST Deliver (EXACTLY shop) WITHIN 30
@@ -198,11 +245,69 @@ GIVETH A DEONTIC Actor Action
 #TRACE `cure, bare` AT 0 WITH
   PARTY buyer DOES Order buyer AT 64
 
+-- For a SHANT the failure time is the VIOLATING act's stamp, not the end of
+-- the prohibition's window (§5.2.1) — so there the two spellings differ.
+-- Smoking at 5 violates a 30-day prohibition; the bare cure window counts
+-- from 5: [8, 38] — 7 early, 38 in time, 39 late. THE DEADLINE names the
+-- prohibition's end, 30: [33, 63] — 20 early, 33 in time. (The first cut's
+-- doc page said the two coincide "with or without" the anchor; adversarial
+-- pass of 2026-09-16, F2.)
+GIVETH A DEONTIC Actor Action
+`cure after violation, bare` MEANS
+    PARTY buyer SHANT Smoke (EXACTLY buyer) WITHIN 30
+    HENCE FULFILLED
+    LEST (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 WITHIN 30
+          HENCE FULFILLED)
+
+#TRACE `cure after violation, bare` AT 0 WITH
+  PARTY buyer DOES Smoke buyer AT 5
+  PARTY buyer DOES Order buyer AT 7
+
+#TRACE `cure after violation, bare` AT 0 WITH
+  PARTY buyer DOES Smoke buyer AT 5
+  PARTY buyer DOES Order buyer AT 38
+
+#TRACE `cure after violation, bare` AT 0 WITH
+  PARTY buyer DOES Smoke buyer AT 5
+  PARTY buyer DOES Order buyer AT 39
+
+GIVETH A DEONTIC Actor Action
+`cure after violation, from the deadline` MEANS
+    PARTY buyer SHANT Smoke (EXACTLY buyer) WITHIN 30
+    HENCE FULFILLED
+    LEST (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 OF THE DEADLINE WITHIN 30
+          HENCE FULFILLED)
+
+#TRACE `cure after violation, from the deadline` AT 0 WITH
+  PARTY buyer DOES Smoke buyer AT 5
+  PARTY buyer DOES Order buyer AT 20
+
+#TRACE `cure after violation, from the deadline` AT 0 WITH
+  PARTY buyer DOES Smoke buyer AT 5
+  PARTY buyer DOES Order buyer AT 33
+
+-- So under a SHANT's LEST a bare AFTER beside WITHIN OF THE DEADLINE has two
+-- origins — [violation+3, deadline+2] = [8, 32], open — and the checker does
+-- not compare the literals. Under a MUST's LEST it does: the same literals
+-- are refused in not-ok/tc/after-empty-window-lest.l4.
+GIVETH A DEONTIC Actor Action
+`cure after violation, deadline within` MEANS
+    PARTY buyer SHANT Smoke (EXACTLY buyer) WITHIN 30
+    HENCE FULFILLED
+    LEST (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 WITHIN 2 OF THE DEADLINE
+          HENCE FULFILLED)
+
+#TRACE `cure after violation, deadline within` AT 0 WITH
+  PARTY buyer DOES Smoke buyer AT 5
+  PARTY buyer DOES Order buyer AT 20
+
 
 § `AFTER alone: a right that vests and never expires`
 
 -- The window opens at 13 and never closes. An act at 1000 is in time; an
--- act at 12 is early; with no act at all the residual prints as written.
+-- act at 12 is early — and the note says the obligation has no closing edge,
+-- there being no deadline to leave untouched; with no act at all the
+-- residual prints as written.
 GIVETH A DEONTIC Actor Action
 `vests` MEANS
     PARTY shop MUST Deliver (EXACTLY shop) WITHIN 30
@@ -443,6 +548,88 @@ GIVETH A DEONTIC Actor Action
 #TRACE `window of, bare` 30 5 AT 0 WITH
   PARTY alice DOES Sign alice AT 8
   PARTY theLandlord DOES Deliver theLandlord AT 43
+
+-- The note is worded per the shape it met (the first cut said "both edges
+-- count from one anchor … drop the anchor from the WITHIN" for every shape;
+-- adversarial pass of 2026-09-16, F3). A bare AFTER beside a WITHIN anchored
+-- to the arming: the AFTER counts from the join (8), the WITHIN from the
+-- arming (0) — [38, 5].
+GIVEN d1 IS A NUMBER
+      d2 IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`window of, arming` d1 d2 MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) AFTER d1 WITHIN d2 OF THE ARMING
+           HENCE FULFILLED)
+    LEST BREACH
+
+#TRACE `window of, arming` 30 5 AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY theLandlord DOES Deliver theLandlord AT 20
+
+-- Two anchors: the AFTER from the join, the WITHIN from the arming — [38, 5].
+GIVEN d1 IS A NUMBER
+      d2 IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`window of, two anchors` d1 d2 MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) AFTER d1 OF THE JOIN WITHIN d2 OF THE ARMING
+           HENCE FULFILLED)
+    LEST BREACH
+
+#TRACE `window of, two anchors` 30 5 AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY theLandlord DOES Deliver theLandlord AT 20
+
+-- A BEFORE date earlier than the opening: opens 40 days after 1 June, on
+-- 11 July; closes on 10 June. No anchor anywhere for the note to talk about.
+GIVEN d IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`window before` d MEANS
+    PARTY buyer MUST Order (EXACTLY buyer) AFTER d BEFORE (YMD 2026 6 10)
+    HENCE FULFILLED
+    LEST BREACH
+
+#TRACE `window before` 40 AT (DATE_SERIAL (YMD 2026 6 1)) WITH
+  PARTY buyer DOES Order buyer AT (DATE_SERIAL (YMD 2026 6 20))
+
+-- A member's AFTER later than the join line's WITHIN: the demoted join-line
+-- deadline reaches each member anchored OF THE ARMING by the machine's own
+-- hand (`fork bounded as a whole` above), and the note says the WITHIN
+-- counts from the arming — not "drop the anchor", which the drafter never
+-- wrote. Each member's window is [40, 30]. The window's note is reported
+-- ONCE, not once per member — a note is said once per directive — while
+-- each early act is its own note, naming its party and stamp.
+GIVETH A DEONTIC Actor Action
+`fork bounded, empty` MEANS
+    EVERY Tenant t IN tenants MUST Sign (EXACTLY t) AFTER 40
+      UPON EACH WITHIN 30
+    HENCE FULFILLED
+    LEST BREACH
+
+#TRACE `fork bounded, empty` AT 0 WITH
+  PARTY alice DOES Sign alice AT 2
+  PARTY bob DOES Sign bob AT 4
+
+-- A LEST chain that re-arms the same empty window until the stall guard
+-- refuses it (run-lest.l4, §5.2.1) reports the window's note ONCE beside the
+-- refusal, not once per hand-off (the first cut printed it 1001 times;
+-- adversarial pass of 2026-09-16, F4).
+GIVEN d IS A NUMBER
+GIVETH A DEONTIC Actor Action
+retry d MEANS
+    PARTY buyer MUST Order (EXACTLY buyer) AFTER d WITHIN 0 OF 2
+    HENCE FULFILLED
+    LEST (retry d)
+
+GIVETH A DEONTIC Actor Action
+`stalled window` MEANS
+    PARTY buyer MUST Order (EXACTLY buyer) WITHIN 2
+    HENCE FULFILLED
+    LEST (retry 3)
+
+#TRACE `stalled window` AT 0 WITH
+  PARTY buyer DOES Order buyer AT 100
 
 
 § `The printers`

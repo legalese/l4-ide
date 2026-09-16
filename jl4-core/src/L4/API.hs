@@ -559,6 +559,9 @@ evalResultToJson fields edr = Aeson.object $
   case edr.range of
     Nothing -> []
     Just r -> ["range" .= rangeToJson r]
+  -- the run's notes (an early act, R-X6; an empty window), only when there
+  -- are any, so a directive with none is unchanged
+  ++ [ "notes" .= edr.notes | not (null edr.notes) ]
   where
     -- "success" is a NULLABLE boolean, and a refusal is the null. Saying
     -- @false@ would tell a consumer the assertion FAILED, which is a laundered

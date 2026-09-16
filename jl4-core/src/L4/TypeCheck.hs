@@ -2316,22 +2316,55 @@ checkOpening (MkOpening oann d ma) = do
 -- | The empty-window check (EVERY-EACH-QUANTIFIER-SPEC §5.1.2.2, RULED
 -- 2026-09-16): it applies ONLY to the explicitly anchored closing edge.
 -- Bare @AFTER d1 WITHIN d2@ re-anchors — the window is @[a+d1, a+d1+d2]@ —
--- and can never be empty. @AFTER d1 WITHIN d2 OF anchor@ measures both
--- edges from one anchor when the @AFTER@ is bare or names the SAME anchor,
--- and then @d1 > d2@ closes the window before it opens: a check error when
--- both offsets are literals (here), a run-time note otherwise
--- ('L4.EvaluateLazy.Machine', @Contract5@). An @AFTER@ anchored elsewhere
--- (@AFTER 3 OF THE ARMING WITHIN 30 OF THE JOIN@) has two origins and no
--- literal comparison to make.
+-- and can never be empty. @AFTER d1 WITHIN d2 OF anchor@ closes before it
+-- opens when @d1 > d2@ and the @AFTER@ opens no earlier than @d1@ after
+-- that same anchor: a check error when both offsets are literals (here), a
+-- run-time note otherwise ('L4.EvaluateLazy.Machine', @Contract5@).
+--
+-- When the @AFTER@ names an anchor, the two share an origin exactly when
+-- they name the same lifecycle noun. When the @AFTER@ is bare it counts
+-- from the continuation's default origin — the arming at top level, the
+-- join under @HENCE@, the failure time under @LEST@ (spec §5.1, §5.2) —
+-- which is NOT whatever the @WITHIN@ names. The comparison is made only
+-- where that origin is the @WITHIN@'s anchor or later, so that @d1 > d2@
+-- really does close the window before it opens:
+--
+--   * @OF THE ARMING@: everywhere — the arming precedes every default
+--     origin, so the window opens at @arming + d1@ or later and closes at
+--     @arming + d2@;
+--   * @OF THE JOIN@ under @HENCE@: the join IS the default origin;
+--   * @OF THE DEADLINE@ under the @LEST@ of a @MUST@\/@MAY@: the missed
+--     deadline IS the failure time. Under a @SHANT@'s @LEST@ the failure
+--     time is the violating act's stamp, which precedes the deadline, so
+--     @AFTER 3 WITHIN 2 OF THE DEADLINE@ there is @[violation+3,
+--     deadline+2]@ and may well be open: not compared. Under @HENCE@ the
+--     join precedes the deadline for the same reason: not compared;
+--   * @OF e@: an instant with no relation to the clock: never compared.
+--
+-- The first cut compared a bare @AFTER@ against ANY anchor and refused
+-- @AFTER 3 WITHIN 2 OF THE DEADLINE@ under @HENCE@, a window the machine
+-- runs as @[join+3, deadline+2]@ — the adversarial pass of 2026-09-16
+-- (findings F1 and R1-1) caught it with the offsets as parameters, where
+-- the checker cannot look. What it does not compare, the run-time note
+-- still reports if it turns out empty.
 checkWindowNotEmpty :: Maybe (Opening Name) -> Maybe (Deadline Name) -> Check ()
 checkWindowNotEmpty mopen mdue = case (mopen, mdue) of
   (Just (MkOpening _ (Lit _ (NumericLit _ d1)) moa), Just edge@(MkDeadline _ (Lit _ (NumericLit _ d2)) (Just ca)))
-    | sameOrigin moa ca, d1 > d2 -> addError (EmptyWindow edge d1 d2)
+    | d1 > d2 -> do
+        menc <- asks (.enclosingObligation)
+        when (sharesOrigin menc moa ca) $ addError (EmptyWindow edge d1 d2)
   _ -> pure ()
   where
-    sameOrigin moa ca = case moa of
-      Nothing -> True
+    sharesOrigin menc moa ca = case moa of
       Just oa -> anchorWords oa == anchorWords ca && not (isAt oa)
+      Nothing -> case ca of
+        AnchorArming{}   -> True
+        AnchorJoin{}     -> slotIs InHence
+        AnchorDeadline{} -> slotIs InLest && not (enclosingIs DMustNot)
+        AnchorAt{}       -> False
+      where
+        slotIs s = maybe False (\ enc -> enc.slot == s) menc
+        enclosingIs m = maybe False (\ enc -> enc.modal == m) menc
     isAt = \ case
       AnchorAt{} -> True
       _          -> False
@@ -2351,7 +2384,8 @@ checkWindowNotEmpty mopen mdue = case (mopen, mdue) of
 --   * @THE JOIN@ under @LEST@ is refused (the join did not fire) — the
 --     conservative reading of the question §5.1.1 leaves open;
 --   * @THE DEADLINE@ is refused when the enclosing obligation has no
---     @WITHIN@ on its act or its join line.
+--     closing edge — no @WITHIN@ or @BEFORE@ on its act, no @WITHIN@ on its
+--     join line.
 --
 -- The expression form is a NUMBER — an instant on the trace's own clock —
 -- or a DATE, which the machine lowers with @DATE_SERIAL@; anything else is
@@ -2402,9 +2436,9 @@ checkAnchor edge pos a = case a of
 -- The window's two edges are checked here too, the opening before the
 -- closing as in the source; neither sees the pattern's binders (a @WITHIN@
 -- never did, and an @AFTER@ is read at the same moment). 'hasDeadline' is
--- about the CLOSING edge only: @THE DEADLINE@ under an obligation that has
--- an @AFTER@ and no @WITHIN@ is refused, as the machine has no deadline to
--- bind there.
+-- about the CLOSING edge only (@WITHIN@ or @BEFORE@): @THE DEADLINE@ under
+-- an obligation that has an @AFTER@ and no closing edge is refused, as the
+-- machine has no deadline to bind there.
 checkDeontonBody
   :: Maybe (Expr Resolved) -> Type' Resolved -> Type' Resolved
   -> RAction Name -> Maybe (Opening Name) -> Maybe (Deadline Name) -> Bool -> Maybe (Expr Name) -> Maybe (Expr Name)
@@ -2416,7 +2450,7 @@ checkDeontonBody mPartyR partyT actionT action opens due joinHasDeadline hence l
     checkRegulativeActorAgreement partyT partyR (actionExprOfPattern actionR.action)
   let rTy = contract partyT actionT
       hasDeadline = isJust due || joinHasDeadline
-      inSlot slot = local \ env -> env { enclosingObligation = Just (MkEnclosingObligation slot hasDeadline) }
+      inSlot slot = local \ env -> env { enclosingObligation = Just (MkEnclosingObligation slot hasDeadline action.modal) }
   opensR <- traverse checkOpening opens
   dueR <- traverse (checkDeadline ActDeadline) due
   checkWindowNotEmpty opens due
@@ -6824,11 +6858,12 @@ prettyCheckError (AnchorUnavailable edge a reason) =
       ]
     EnclosingHasNoDeadline ->
       [ "OF THE DEADLINE names the deadline of the obligation this one is the"
-      , "continuation of, but that obligation has no WITHIN — not on its act, and"
-      , "not on its join line — so it has no deadline to count from."
+      , "continuation of, but that obligation has no closing edge — no WITHIN or"
+      , "BEFORE on its act, and no WITHIN on its join line — so it has no deadline"
+      , "to count from."
       , ""
-      , "Give the enclosing obligation a WITHIN, or anchor this one elsewhere:"
-      , "OF THE JOIN (under HENCE), OF THE ARMING, or an instant."
+      , "Give the enclosing obligation a WITHIN or a BEFORE, or anchor this one"
+      , "elsewhere: OF THE JOIN (under HENCE), OF THE ARMING, or an instant."
       ]
   where
     word = anchorWords a
@@ -6864,12 +6899,12 @@ prettyCheckError (AbsoluteEdgeAnchored _) =
   , "<date>) or give AFTER a duration to count from it (AFTER d OF <anchor>)."
   ]
 prettyCheckError (EmptyWindow _ d1 d2) =
-  [ "This window closes before it opens: it opens " <> prettyRatio d1
-      <> " after the anchor and closes " <> prettyRatio d2 <> " after the same anchor,"
-  , "so nothing can ever be performed in time."
+  [ "This window closes before it opens: the WITHIN closes it " <> prettyRatio d2 <> " after its anchor,"
+  , "and the AFTER opens it " <> prettyRatio d1 <> " after that same anchor, or later still — so"
+  , "nothing can ever be performed in time."
   , ""
-  , "Both edges count from one anchor because the WITHIN names it (WITHIN d2 OF"
-  , "…) and the AFTER counts from the same place. To open at d1 and stay open"
+  , "The WITHIN names its anchor (WITHIN d2 OF …), and the AFTER counts from that"
+  , "anchor or from an instant no earlier than it. To open at d1 and stay open"
   , "for d2 after that — the window [a+d1, a+d1+d2] — drop the anchor from the"
   , "WITHIN: bare AFTER d1 WITHIN d2 counts the WITHIN from the instant the"
   , "window opened. To keep both edges on one anchor, make d2 at least d1."

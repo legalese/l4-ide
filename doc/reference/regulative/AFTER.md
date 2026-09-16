@@ -31,19 +31,22 @@ WITHIN 30 OF THE JOIN        -- [delivery+3, delivery+30]
 
 A two-offset window can close before it opens. `AFTER 30 WITHIN 5 OF THE JOIN` is refused by the type checker when both offsets are literals; when they are computed, the run reports it beside the result and the obligation runs as written — every act is early or late.
 
+The checker refuses only what it can see is empty. A bare `AFTER` counts from the obligation's own clock — the join under a `HENCE`, the failure time under a `LEST`, the arming at top level — which is not necessarily what the `WITHIN` names: `AFTER 3 WITHIN 2 OF THE DEADLINE` under a `HENCE` is `[join+3, deadline+2]`, two origins, and is open. So the checker compares a bare `AFTER`'s literal against the `WITHIN`'s anchor only where the clock can never precede that anchor — `OF THE ARMING` anywhere, `OF THE JOIN` under `HENCE`, `OF THE DEADLINE` under a `MUST`'s `LEST` — and against an anchor the `AFTER` names itself only when both name the same one. Everything else runs, and the run's note says which shape it found empty.
+
+A negative offset is accepted and opens the window before the obligation exists: `AFTER -3 WITHIN 30` under a `HENCE` with the join at 10 is `[7, 37]` — for any event the obligation can see, the same as `AFTER 0 WITHIN 27`. Nothing refuses it; write it only if you mean it.
+
 ## An early act is a nullity, and the run says so
 
 An act before the window opens **does not count**. It is not performance, and it is not a breach: the obligation stays live, its deadline is what it was, and the party may act again once the window is open. What the machine adds is a report. A silent nullity is how a party loses a deadline it believed it had met, so the run prints a note beside the result:
 
 ```
 PARTY Buyer MUST order AFTER 1 WITHIN 30 HENCE FULFILLED
-NOTE: PARTY Buyer did order at 12, before the window opened at 13: the act
-does not count as performance. The obligation stays live, with its deadline
-untouched (the window closes at 43), and may be performed once the window
-is open.
+NOTE: PARTY Buyer did order at 12, before the window opened at 13: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 43), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 ```
 
-The residual printed above is the window as it stands at instant 12: it opens in 1 and runs 30 from there. Once the window has opened, the residual prints as a plain `WITHIN` with the time remaining, as an anchored deadline's does.
+That is the binary's output, one line, the closing citation included. The residual printed above it is the window as it stands at instant 12: it opens in 1 and runs 30 from there. Once the window has opened, the residual prints as a plain `WITHIN` with the time remaining, as an anchored deadline's does.
+
+The note travels with the result on every surface this evaluator renders to: the golden and `l4 run` text (a `NOTE:` line, a `Notes:` section), `l4 run --json` and `l4 batch --json` (a `"notes"` array on the directive, present only when there is something to report), the editor's diagnostic and inspector, and the REPL. A note is said once per directive — the same sentence, with the same instants, is not repeated. The one surface that does **not** carry it is the decision service (`jl4-service`), whose response schema has no place for it yet; a client of that service sees only the residual. That gap is recorded as owed.
 
 For a prohibition the early act is likewise not a violation — the prohibition has not started — and the note says so. `PARTY Buyer SHANT smoke AFTER 3 WITHIN 30` forbids smoking from 3 to 33: smoking at 2 is reported and ignored, smoking at 5 is the violation, and a prohibition kept through 33 is fulfilled.
 
@@ -55,11 +58,11 @@ An `AFTER` with no closing edge is a window that opens and never closes — a ri
 PARTY Buyer MAY order AFTER 3
 ```
 
-An act at 1000 is in time. Before the window opens the residual prints `AFTER n`; after it, the permission prints with no window at all.
+An act at 1000 is in time. Before the window opens the residual prints `AFTER n`; after it, the permission prints with no window at all. An early act here is reported with "no closing edge" in place of the deadline clause, there being no deadline to leave untouched.
 
 ## Under LEST, and under a join
 
-Under a `LEST` the clock is the missed deadline (see [LEST](README.md#lest-breach-consequence)), so `AFTER 3 WITHIN 30` there opens three after the deadline that was missed and closes thirty after that — `[deadline+3, deadline+33]` — with or without `OF THE DEADLINE` written on the `AFTER`. In the `HENCE` of a barrier (`ONCE ALL HAVE`) it counts from the last member's act; on the members' own line it counts from the `EVERY`'s arming, for each member. A join line's own `WITHIN` bounds the whole and is not re-anchored by a member's `AFTER`: with `AFTER 3` on the act and `WITHIN 30` on the join line, each member's window is `[3, 30]` from the arming. The join line takes no `AFTER` of its own. See [EVERY](EVERY.md#what-runs-today-and-what-does-not).
+Under a `LEST` the clock is the **failure time** (see [LEST](README.md#lest-breach-consequence)): for a `MUST`, `DO` or `MAY` that is the deadline it missed, so `AFTER 3 WITHIN 30` there opens three after that deadline and closes thirty after that — `[deadline+3, deadline+33]` — and `AFTER 3 OF THE DEADLINE WITHIN 30` names the same instant. For a `SHANT` the failure time is the violating act's own stamp, which comes before the prohibition's window ends: there the bare `AFTER 3 WITHIN 30` counts from the violation, while `OF THE DEADLINE` names the window's end, and the two windows differ. In the `HENCE` of a barrier (`ONCE ALL HAVE`) it counts from the last member's act; on the members' own line it counts from the `EVERY`'s arming, for each member. A join line's own `WITHIN` bounds the whole and is not re-anchored by a member's `AFTER`: with `AFTER 3` on the act and `WITHIN 30` on the join line, each member's window is `[3, 30]` from the arming. The join line takes no `AFTER` of its own. See [EVERY](EVERY.md#what-runs-today-and-what-does-not).
 
 ## The absolute forms: AFTER date, BEFORE date
 
@@ -81,9 +84,9 @@ The opening edge is written before the closing edge — `AFTER 3 WITHIN 30`, `AF
 
 ## What the exports do with it
 
-- The natural-language annotation reads the bare window aloud as _after 3, within 30 of that_.
-- The document export prints the window as one phrase with its own prepositions: _after 3, within 30 of that_; _before 30 June_.
-- The BPMN export does not draw an opening edge — a BPMN task is enabled as soon as it is reached — and its fidelity report says so on the task (`P-WINDOW-OPENING`, blocking). A `BEFORE` date is carried onto the boundary event verbatim as a condition, not as a timer.
+- The natural-language annotation reads the bare window aloud as `after 3 within 30 of that`.
+- The document export prints the window as one phrase with its own prepositions: `after 3, within 30 of that`; a `BEFORE` date is printed as its expression — `before YMD with 2026, 6 and 30` for `BEFORE (YMD 2026 6 30)`, `before 30 June 2026` for `BEFORE (Date 30 6 2026)`, whose constructor the export knows how to read aloud.
+- The BPMN export does not draw an opening edge — a BPMN task is enabled as soon as it is reached — and its fidelity report says so on the task (`P-WINDOW-OPENING`, blocking). A `BEFORE` date is carried onto the boundary event verbatim as a condition, not as a timer, and its documentation string reads _not discharged BEFORE …_.
 - The MLIR/WASM export fails closed on any obligation with an `AFTER`, as it already does on an anchored `WITHIN`.
 
 ## What `l4 lts` shows

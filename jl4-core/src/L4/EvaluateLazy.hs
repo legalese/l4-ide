@@ -23,6 +23,7 @@ module L4.EvaluateLazy
 , Refusal(..)
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
+, prettyNotes
 , prettyAssertionOutcome
 , prettyReductionOutcome
 , postprocessTrace

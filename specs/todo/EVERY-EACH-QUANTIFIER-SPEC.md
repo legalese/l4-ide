@@ -1057,14 +1057,14 @@ Action ::= Pattern ['PROVIDED' Expr]  -- the PROVIDED guard, measured working un
 
 TemporalConstraint ::= 'WITHIN' Duration ['OF' Anchor]   -- 'OF' Anchor: the named anchor of R-Q7 (§5.1).
                                       -- The connective is 'OF' and only 'OF' (R-Q7A, §5.1.1). BUILT 2026-09-15
-                                      -- ('L4.Parser.deadline', Parser.hs:2724): in the Duration slot OF is the
+                                      -- ('L4.Parser.deadline', Parser.hs:2806 after round 1): in the Duration slot OF is the
                                       -- anchor, so an application there is written '(f OF x)' or 'f x'.
                      | 'BEFORE' Expr                      -- R-X5: an absolute DATE, the closing edge; 'BEFORE' Duration is refused
-                                      -- naming WITHIN. BUILT 2026-09-16 ('L4.Parser.before', Parser.hs:2763;
+                                      -- naming WITHIN. BUILT 2026-09-16 ('L4.Parser.before', Parser.hs:2771;
                                       -- the second constructor of 'L4.Syntax.Deadline', Syntax.hs:581).
                                       -- Act position only: on a join line it is refused by name ('BeforeOnJoinLine').
                      | 'AFTER' (Duration ['OF' Anchor] | Expr)   -- R-X5: the opening edge, duration or DATE. RE-ANCHORS (RULED 2026-09-16, §5.1.2.2): the WITHIN beside it counts from this edge; two-offset is 'WITHIN d OF THE JOIN'.
-                                      -- BUILT 2026-09-16 ('L4.Parser.opening', Parser.hs:2779; the node is
+                                      -- BUILT 2026-09-16 ('L4.Parser.opening', Parser.hs:2787; the node is
                                       -- 'L4.Syntax.Opening', Syntax.hs:602, a field of 'Deonton' between the action and the deadline).
                                       -- The edges are written in ONE order, AFTER then WITHIN/BEFORE ('L4.Parser.edgeOrderGuard'); the join line takes no AFTER.
                      | 'BY' Deadline                      -- unruled and unbuilt; TKBy serves FOLLOWED BY, DIVIDED BY, BREACH BY
@@ -1072,13 +1072,13 @@ TemporalConstraint ::= 'WITHIN' Duration ['OF' Anchor]   -- 'OF' Anchor: the nam
 Anchor ::= 'THE' ('JOIN' | 'DEADLINE' | 'ARMING' | 'OPENING')   -- 'OPENING' proposed by R-X5 (§5.1.2), DECLINED (§5.1.3), unbuilt   -- R-Q7B: the three lifecycle positions. THE is already
                                       -- a keyword (Lexer.hs:283 at e578654c); JOIN, DEADLINE and ARMING are matched by
                                       -- SPELLING and not reserved, exactly as EACH is in UPON EACH.
-                                      -- The three are BUILT 2026-09-15 ('L4.Parser.anchor', Parser.hs:2745).
+                                      -- The three are BUILT 2026-09-15 ('L4.Parser.anchor', Parser.hs:2827 after round 1).
          | Event                      -- R-Q7: any recorded event, which the drafter has already named —
                                       -- served by the Expr form below: an expression whose value is
                                       -- that event's time (a ledger read, a recorded instant). BUILT.
          | Expr                       -- R-Q7C: a NUMBER (an instant on the trace's clock) or a DATE
                                       -- (lowered by its serial). The slot is a union the checker
-                                      -- discriminates ('L4.TypeCheck.checkAnchor', TypeCheck.hs:2046);
+                                      -- discriminates ('L4.TypeCheck.checkAnchor', TypeCheck.hs:2299 after round 1);
                                       -- no new keyword. Spellings RULED 2026-09-07 (R-Q7A/B/C, §5.1.1);
                                       -- BUILT 2026-09-15.
 
@@ -2082,12 +2082,15 @@ was ruled, with its "not built" sentences corrected in place.
 **The gap.** `WITHIN d` gives a window one edge, the closing one; the opening edge is the anchor
 itself, so an obligation is performable from the instant it arms. Meng's cooling-off example is the
 counter-case, and it is ordinary: _the customer may place a new order after a three-business-day
-cooling-off period, within 30 days_. Nothing in the language today can say when a window **opens**.
+cooling-off period, within 30 days_. Before this section was built nothing in the language could say
+when a window **opens**; `AFTER` now does (the BUILT block below).
 
 **We have already written this construct.** `jl4/experiments/purchase.l4` — an aspirational sketch
-that has never parsed — uses it throughout: a bare `BEFORE 30 days` at `:97` and `:102`, and the
-full two-edged form in four nested continuations at `:152-168`. It is worth reading because it
-disagrees with the note above on the one point that matters:
+that has never parsed — used it throughout: a bare `BEFORE n days` (at `:97` and `:102` before the
+migration of 2026-09-16; now `:97` and `:106`, reading `WITHIN 30 days` and `WITHIN 14 days`, with
+a comment at `:98-101` saying why), and the full two-edged form in four nested continuations
+(`:152-168` then; `:157-175` now, each `WITHIN` under an `AFTER` anchored `OF THE JOIN`). It is
+worth reading because it disagrees with the note above on the one point that matters:
 
 ```
 PARTY   seller
@@ -2227,14 +2230,16 @@ later commits unless their ledger entries say so.
 occurrence in a goldened glob, under `doc/`, in the libraries and in canon is inside a comment or a
 backticked name; the non-comment hits are all in `jl4/experiments/` (no glob), and those in
 `purchase.l4` migrated with this change (`BEFORE n days` → `WITHIN n days`, its `AFTER n days` kept
-— that file still does not parse, for the reasons it never did: `PERSON`, `SHOULD`, an undefined
-`days`). `Deonton` gains a field, `opens :: Maybe (Opening n)`, between the action and the deadline
+— that file still does not parse, for the reasons it never did: the lexer stops at the `+=` of
+`UPDATE … +=` at `:142`, with `IF … AT` and an undefined `days` behind it; the first cut of this
+sentence blamed `PERSON` and `SHOULD`, which are `jerseyAlcohol.l4`'s and occur in `purchase.l4`
+only in the comment that blamed them — adversarial pass of 2026-09-16, G2). `Deonton` gains a field, `opens :: Maybe (Opening n)`, between the action and the deadline
 (`Syntax.hs:429`), in source order as the exactprint zip requires; `Opening n =
 MkOpening Anno (Expr n) (Maybe (Anchor n))` mirrors `Deadline` (`:602`), and `Deadline` gains a second
 constructor, `MkBefore Anno (Expr n)` (`:581`), so the closing edge stays ONE hole of the parent
 and `WITHIN` and `BEFORE` cannot both be written. The parser (`obligation`,
-`Parser.hs:2578`) takes `opening` then `closingEdge` (`deadline <|> before`), then a guard that
-fails by name when an `AFTER` follows the closing slot (`edgeOrderGuard`, `:2600`; its
+`Parser.hs:2577`) takes `opening` then `closingEdge` (`deadline <|> before`), then a guard that
+fails by name when an `AFTER` follows the closing slot (`edgeOrderGuard`, `:2603`; its
 look-ahead is `hidden`, so `AFTER` does not join the expected-token list of every parse error after
 a `WITHIN`, which is how the two `every-join-misindented` goldens did not move). Inside the
 `AFTER`'s offset, `OF` is the anchor by the same flag `WITHIN` uses (`ofIsAnchor`); inside a
@@ -2247,72 +2252,121 @@ offset and reads it back with `checkAnchorAt`'s bias — `NUMBER` first (a durat
 allowed), then `DATE` (the instant; an anchor is refused, `AbsoluteEdgeAnchored`), else
 `OpeningNotAnInstant` naming both. `checkDeadline` (`:2170`) keeps `checkExpr … number` for a
 `WITHIN`, unchanged, and `checkExpr ExpectBeforeInstantContext … date` for a `BEFORE`; the
-"name the other word" rule lives in the mismatch wording (`withinGotDate`, `:6913`; the
+"name the other word" rule lives in the mismatch wording (`withinGotDate`, `:6948`; the
 `ExpectBeforeInstantContext` arm), which appends a sentence only when the given type IS a `DATE`
 (or a `NUMBER` after `BEFORE`), so every older mismatch wording holds byte for byte. The
-empty-window check (`checkWindowNotEmpty`, `:2228`) fires only for two literal offsets
-under a `WITHIN` that names an anchor which the `AFTER` shares (bare, or the same lifecycle
-noun) — §5.1.2.2's scoping; two different origins, or an `OF e` on either side, make no literal
-comparison. The anchor refusals of §5.1.1.1 apply to an `AFTER`'s anchor unchanged
+empty-window check (`checkWindowNotEmpty`, `:2252`) fires only for two literal offsets
+under a `WITHIN` that names an anchor, and only where the `AFTER` cannot open earlier than that
+anchor — §5.1.2.2's scoping, made exact by the adversarial pass of 2026-09-16 (F1, R1-1): an
+`AFTER` that names an anchor shares the origin when it names the SAME lifecycle noun; a bare
+`AFTER` counts from the continuation's default origin (the join under `HENCE`, the failure time
+under `LEST`, the arming at top level), and is compared against `OF THE ARMING` anywhere, `OF THE
+JOIN` under `HENCE`, and `OF THE DEADLINE` under the `LEST` of a `MUST`/`DO`/`MAY` — never
+against `OF THE DEADLINE` under `HENCE` (the join precedes the deadline: `AFTER 3 WITHIN 2 OF THE
+DEADLINE` there is `[join+3, deadline+2]`, open; witness `bare after, deadline within`), never
+under a `SHANT`'s `LEST` (the failure time is the violation, before the deadline; witness `cure
+after violation, deadline within`), and never against `OF e` (witness `bare after, instant
+within`: `[30, 205]`). The checker reads the enclosing obligation's slot and modal for this
+(`EnclosingObligation.modal`, `Types.hs:506`, new). The first cut compared a bare `AFTER` against
+ANY anchor and refused the three windows just named — all open — with a wording that claimed "the
+AFTER counts from the same place"; the refuters found it by making the offsets parameters, where the
+checker cannot look, and watching the run fulfil at 20. Two different origins named on the two
+edges make no literal comparison. The anchor refusals of §5.1.1.1 apply to an `AFTER`'s anchor unchanged
 (`checkAnchor` takes an `EdgeWord`, `Types.hs:449`, which only chooses the keyword in the
 wording — the `WITHIN` wordings are the 2026-09-15 ones byte for byte, so the five `anchor-*`
 goldens did not move). `hasDeadline` stays about the closing edge: `THE DEADLINE` under an
 `AFTER`-only obligation is refused, and the machine binds none there.
 
 **Machine.** The opening edge is resolved ONCE, at the first event, before the closing edge,
-because a bare `WITHIN` beside it counts from it: `Contract4` (`Machine.hs:1618`) dispatches on the
+because a bare `WITHIN` beside it counts from it: `Contract4` (`Machine.hs:1625`) dispatches on the
 opening — an anchored one through `Contract4oa` (the anchor, `resolveAnchor`, shared with the
 deadline's), then `Contract4o` (the offset: a NUMBER added to the anchor or to the arming clock, a
 DATE lowered by its serial) — and then hands the closing edge to `scrutinizeDue`
-(`:2315`), which is what `Contract4` used to do on its own, with one more input: the
+(`:2328`), which is what `Contract4` used to do on its own, with one more input: the
 opening instant. `Contract5`'s `anchorT` became `origin` (`ContractFrame.hs:302`): what a duration
 is added to — the anchor's instant for `WITHIN d OF …`, the opening instant for a bare `WITHIN`
 beside an `AFTER` (re-anchor), the frame's clock otherwise; a `BEFORE`'s value is a DATE and is
-absolute by itself (`:1676`). The four combinations are witnessed: bare/bare `[13, 43]`,
+absolute by itself (`Machine.hs:1683-1685`, the `ValDate` arm). The four combinations are witnessed: bare/bare `[13, 43]`,
 bare/`OF THE JOIN` `[13, 40]`, `OF THE JOIN`/bare `[13, 43]`, `OF THE JOIN`/`OF THE JOIN`
 `[13, 40]`, and two origins (`OF THE ARMING`/`OF THE JOIN`) `[3, 40]`. Under a `LEST` the
-continuation's clock is already the missed deadline (§5.2.1), so `AFTER 3 WITHIN 30` there is
-`[deadline+3, deadline+33]` with no plumbing of its own (witness `cure, bare`: 63 in time, 64
-late); under a barrier's `HENCE` it is `[t_last+3, t_last+33]` (witness `barrier then window`).
+continuation's clock is already the FAILURE TIME (§5.2, §5.2.1) — the missed deadline for a
+`MUST`/`DO`/`MAY`, the violating act's stamp for a `SHANT` — so `AFTER 3 WITHIN 30` there is
+`[failure+3, failure+33]` with no plumbing of its own: `[deadline+3, deadline+33]` under a missed
+`MUST` (witness `cure, bare`: 63 in time, 64 late), where `AFTER 3 OF THE DEADLINE WITHIN 30`
+names the same instant; `[violation+3, violation+33]` under a `SHANT`, where `OF THE DEADLINE`
+names the prohibition's end instead and the two windows differ (witness `cure after violation,
+bare`: `[8, 38]`; `cure after violation, from the deadline`: `[33, 63]`). The first cut of this
+sentence, and of the doc page, said "the missed deadline" unqualified and the page added "with or
+without `OF THE DEADLINE`" — false for the `SHANT` case, which the regulative README had already
+stated correctly (adversarial pass of 2026-09-16, F2). Under a barrier's `HENCE` it is
+`[t_last+3, t_last+33]` (witness `barrier then window`).
 After the first evaluation the value carries the opening as what is still to run until it opens
 (`ValObligation`'s fourth field, `ValueLazy.hs:60`; `MaybeOpened` on every act frame,
 `ContractFrame.hs:162`), `Just` while the window has not opened and `Nothing` once it has, and the
 remaining due is measured from the OPENING while that is ahead (`relativeDue`,
-`:2363`) — so a residual prints as the bare re-anchored window it is: `AFTER 1 WITHIN 30`
+`:2376`) — so a residual prints as the bare re-anchored window it is: `AFTER 1 WITHIN 30`
 at 12 is `[13, 43]`, where the first cut printed `AFTER 1 WITHIN 31`, which under the bare reading
 is `[13, 44]` — a wrong answer in the residual's own notation, caught by the first probe. `AFTER`
 alone takes the `Left Nothing` shortcut with the opening still re-relativised, so `Contract10` can
 see whether the window has opened. The early act (R-X6) is caught at `Contract10`
-(`:1902`), the one frame at which party, action and `PROVIDED` have all matched: the note is
+(`:1903`), the one frame at which party, action and `PROVIDED` have all matched: the note is
 raised, and the event is passed over exactly as a non-matching one is — the absolute deadline is
 untouched by construction (the `time + due` invariant), and the party may act again. For a
 `SHANT` the same arm applies and the note says the prohibition had not started: not a violation
 (witness `no smoking later`: 2 reported and ignored, 5 the violation, 2-then-40 kept). A member's
 opening is threaded through `memberObligation` and `barrierMember` from the deonton, so a fork or
 barrier member has its window; and a demoted join-line `WITHIN` beside a member's `AFTER` is
-handed to the member anchored `OF THE ARMING` explicitly (`memberDueExpr`, `:2660`), because a
+handed to the member anchored `OF THE ARMING` explicitly (`memberDueExpr`, `:2673`), because a
 join-line deadline bounds the whole from the `EVERY`'s arming (R-T2) and must not re-anchor on the
 act's opening (witness `fork bounded as a whole`: `[3, 30]`, not `[3, 33]`); without an `AFTER`
 the demoted deadline is handed over as written, so no older residual prints differently.
 
 **The diagnostic channel, which did not exist.** `l4 run`'s per-directive outputs were the value,
 the trace and the ledger; nothing non-fatal reached a golden. Built: `EvalState.notes`
-(`Machine.hs:280`), appended by `tellNote`, swapped fresh per directive beside the ledger
-(`withFreshLedger`, `EvaluateLazy.hs:146`), read into `EvalDirectiveResult.notes`
-(`:342`) and printed as `NOTE: …` lines after the value by `prettyEvalDirectiveResult`
-(what the goldens see), as a `Notes:` section by `l4 run`, and as a `"notes"` key in the JSON only
-when there are any — so no directive that raises none prints a byte differently. Twenty-one
+(`Machine.hs:279`), appended by `tellNote`, swapped fresh per directive beside the ledger
+(`withFreshLedger`, `EvaluateLazy.hs:147`), read into `EvalDirectiveResult.notes`
+(`:343`) and printed after the value, only when there are any — so no directive that raises none
+prints a byte differently. **Which renderers carry it** (measured, adversarial pass of 2026-09-16,
+G1/R1-2 — the first cut said "every renderer", and two did not): `prettyEvalDirectiveResult` as
+`NOTE: …` lines (what the goldens see, and the LSP diagnostic's message); `l4 run` as a `Notes:`
+section; `l4 run --json` as a `"notes"` array on the directive object (`Cli/Run.hs`,
+`evalResultToJson` — added by the pass; the first cut's envelope built `{range, kind, value}` and
+dropped the note, so a JSON consumer was handed exactly the silent nullity R-X6 forbids);
+`l4 batch --json` through the `ToJSON EvalDirectiveResult` instance (`EvaluateLazy.hs:517`);
+`L4.API`'s `"results"` objects (`API.hs:544`, added by the pass); the LSP inspector's `prettyText`
+(`prettyEvalDirectiveResultWithFields`); and the REPL (`formatResult`, added by the pass).
+**Not carried, and owed:** the decision service's `ResponseWithReason` (`jl4-service`,
+`Backend/Api.hs`) has fields for the result, the reasoning and a graph and no place for a note; its
+JSON shape is a public schema with its own tag scheme, swagger and TypeScript clients, so adding
+a field there is a schema decision the pass did not take — a client of the service sees only the
+residual. Recorded in the residue below and on the doc page. **A note is reported once per
+directive** (`tellNote` drops an exact duplicate; F4): a `LEST` chain that re-arms the same empty
+window a thousand times before the stall guard refuses it printed the note 1001 times beside the
+refusal (354 KB in the `Notes:` section alone); now once (witness `stalled window`). Distinct
+facts stay distinct, since a note names its party, act and instants. Twenty-one
 positional pattern and construction sites across four packages (`jl4-core`, `jl4`, `jl4-lsp`,
 `jl4-repl`; counted with `grep -rn MkEvalDirectiveResult`, the declaration and the record-syntax
-sites excluded) took the new field; the price of "the goldens can see it", paid once. A note's party is rendered by `peekNF` (`Machine.hs:5689`), which follows references
+sites excluded) took the new field; the price of "the goldens can see it", paid once. A note's party is rendered by `peekNF` (`Machine.hs:5754`), which follows references
 already in WHNF and forces nothing — a party that has just been matched against an event prints
-whole. Two notes exist: R-X6's early act (`earlyActNote`), and the explicitly anchored window a
-run finds empty (`emptyWindowNote`, raised once at `Contract5` when both instants are first known,
-for offsets the checker could not compare; witness `window of` 30 5).
+whole. Two notes exist: R-X6's early act (`earlyActNote` — "with its deadline untouched (the
+window closes at N)" when there is a closing edge, "with no closing edge" for an `AFTER` alone,
+which has no deadline to leave untouched; F5), and the window a run finds empty (`emptyWindowNote`,
+raised once at `Contract5` when both instants are first known, for offsets the checker could not
+compare; witness `window of` 30 5). The empty-window note is **worded per the shape it met** (F3,
+R1-3): the first cut said "both edges count from one anchor (the WITHIN names it …) — drop the
+anchor from the WITHIN" for every shape, which was true only for the same-anchor form and false for
+a `BEFORE` date earlier than the opening (no anchor anywhere), for two anchors (two origins), for a
+bare `AFTER` beside an anchored `WITHIN` (the `AFTER` counts from the clock), and for a demoted
+join-line `WITHIN`, which reaches the member anchored `OF THE ARMING` by the machine's hand, so
+that "drop the anchor" told the drafter to drop an anchor they never wrote. Now each shape gets its
+own sentence (witnesses `window of, arming`, `window of, two anchors`, `window before`, `fork
+bounded, empty`). The residual of an empty `BEFORE` window prints as `AFTER n WITHIN -m` — a
+`BEFORE`'s residual is a remaining `WITHIN`, decision 9 of the build — which is legible if odd, and
+is left.
 
 **The T1 decision (the brief's item 4): (a), a run-time refusal, with the heuristic stated.**
 `AFTER date` and `BEFORE date` are parsed and lower through the date's serial (the same arithmetic
-as `DATE_SERIAL`, `lowerInstant`, `Machine.hs:5620`). What the machine can see at that
+as `DATE_SERIAL`, `lowerInstant`, `Machine.hs:5635`). What the machine can see at that
 point is the obligation's arming instant, and what it checks is whether a calendar date could
 have that serial at all: an arming below `DATE_SERIAL (YMD 1 1 1)` (365; `earliestDateSerial`,
 computed, not a literal) is not on the date-serial scale, and the date is refused by name — the
@@ -2343,27 +2397,88 @@ deadline slot now carries "within 30" rather than "30", and the three renderers 
 "within" — no test or golden reads that slot), the state graph carries the opening as its own label
 field and a `BEFORE` with its keyword (`StateGraph.hs:684`; the record pattern named the new
 field rather than ignoring it), the BPMN lowering reports the opening edge as not drawn
-(`P-WINDOW-OPENING`, blocking, `Bpmn/Lower.hs:1746`) and carries a `BEFORE` verbatim as a
-condition through the existing unparsed-deadline path, the MLIR schema fails closed on any
+(`P-WINDOW-OPENING`, blocking, `Bpmn/Lower.hs:1751`) and carries a `BEFORE` verbatim as a
+condition through the existing unparsed-deadline path (its boundary `<documentation>` reads "not
+discharged BEFORE …" — the first cut wrote "not discharged within BEFORE …", the label's keyword
+under the caller's preposition; G8), the MLIR schema fails closed on any
 opening (`Schema.hs:931`), the LSP highlights the two keywords through the derived
 instances, and the service serialises an unevaluated opening as its source text and adds an
 `opens` key to the `OBLIGATION` object only while there is one to reach.
 
-**Existing goldens.** None moved: no eval, exactprint, NLG, schema, parse-error or semantic-token
-golden of a pre-existing file changed (run 1 of the suite failed on exactly the 33 goldens it
-created — four for the witness, four each for seven `not-ok/tc` witnesses, one for the LSP
-fixture; run 2 on the extended witness was 4 created; run 3 green). The two things that would
+**Existing goldens.** None moved in the build: no eval, exactprint, NLG, schema, parse-error or
+semantic-token golden of a pre-existing file changed (run 1 of the suite failed on exactly the 33
+goldens it created — four for the witness, four each for seven `not-ok/tc` witnesses, one for the
+LSP fixture; run 2 on the extended witness was 4 created; run 3 green). The two things that would
 have moved goldens were avoided deliberately: `AFTER` joining the expected-token list after a
 `WITHIN` (the `hidden` look-ahead above), and a `WITHIN` mismatch wording that changed for the
-non-`DATE` case (the sentence is appended only for a `DATE`).
+non-`DATE` case (the sentence is appended only for a `DATE`). The adversarial pass moved ONE
+pre-existing golden on purpose: `not-ok/tc/tests/anchor-no-deadline.golden` (from the anchors
+track, 2026-09-15), whose message said the enclosing obligation "has no WITHIN" and advised "give
+it a WITHIN" — a `BEFORE` now supplies the deadline too, so the message names both (G9). A
+re-bless, not a regression: the refusal and its range are unchanged.
 
 **Residue, owed by this section.** Backward windows from a future event ("not less than 10 days
 before the meeting" — the corpus's common two-offset case, §5.1.2.2's measurement) are not
 expressible: both edges count forward from an anchor. T1's `COMMENCING` and sorts, above. A
 join-line `AFTER`. `THE OPENING` stays declined. The noun `JOIN` (§5.1.2.2, footnote 1) stays
-open.
+open. **The decision service does not carry the R-X6 note** (the channel paragraph above): a
+schema decision for `jl4-service`'s `ResponseWithReason`, owed. **A negative `AFTER` offset is
+accepted** (F6): `AFTER -3 WITHIN 30` under a `HENCE` with the join at 10 is `[7, 37]`, the window
+opening before the obligation exists — coherent arithmetic, contrary to no ruling, and the closing
+edge's negative `WITHIN` is accepted the same way; refusing a literal negative offset at check time
+would be a new rule of the language with no ruling behind it, so the pass documented it on the doc
+page instead of refusing it, and a ruling is invited. **Two literal `DATE`s in reverse order**
+(`AFTER (YMD 2026 6 20) BEFORE (YMD 2026 6 10)`) are not a check error, only the run-time note:
+the check is scoped to the anchored `WITHIN` form (§5.1.2.2), and reading a `YMD` application as
+a literal is more than a `Lit` pattern; recorded, not filed.
 
-**What the adversarial pass of 2026-09-16 changed.** Pending, filled after the refute stage.
+**What the adversarial pass of 2026-09-16 changed** (round 1: 20 findings raised by three
+refuters, each checked by two independent checkers; none refuted by both; every one applied —
+the verdicts are in the scratch `FINDINGS-round1.md`). In past tense, one line each:
+
+- F1 / R1-1 (blocker): `checkWindowNotEmpty` compared a bare `AFTER` against ANY closing anchor and
+  refused three open windows (`WITHIN d2 OF THE DEADLINE` under `HENCE`; under a `SHANT`'s `LEST`;
+  `WITHIN d2 OF e`). Scoped to the anchors the clock cannot precede, reading the enclosing slot and
+  modal; the `EmptyWindow` wording no longer claims "the same place"; three `ok` witnesses and
+  `not-ok/tc/after-empty-window-lest.l4` (the `MUST`-`LEST` case, still refused) added.
+- F2 (major): the doc page and this block said the `LEST` clock is "the missed deadline" and the
+  page added "with or without `OF THE DEADLINE`"; corrected to the failure time, with the `SHANT`
+  divergence stated and witnessed (`cure after violation, *`).
+- F3 / R1-3 (minor): `emptyWindowNote` claimed a shared `WITHIN` anchor for every shape; worded
+  per shape, four witnesses added.
+- F4 (minor): the notes channel had no dedupe; a note is now reported once per directive
+  (witness `stalled window`: one note beside the stall refusal, not 1001).
+- F5 (minor): `earlyActNote` said "with its deadline untouched" for an `AFTER` alone; now "with no
+  closing edge" there (witness `vests` at 12; the skill's paragraph reworded).
+- F6 (minor): a negative `AFTER` offset is accepted silently; documented on the doc page and in the
+  residue above, not refused — no ruling.
+- G1 / R1-2 (major): `l4 run --json`, `L4.API` and the REPL dropped the note; each now carries
+  it; the "every renderer" sentence replaced by the measured list, the service named as not
+  carrying it and owed.
+- G2 (major): this block and `purchase.l4:101` blamed `PERSON`/`SHOULD` for `purchase.l4` not
+  parsing; both are `jerseyAlcohol.l4`'s. Corrected to the `+=` at `:142`.
+- G3 (minor): the doc page quoted export strings the binary does not produce ("before 30 June";
+  a comma in NLG); the actual strings quoted, with the `Date` constructor noted.
+- G4 (minor): §2.4's cites for `deadline`, `anchor` and `checkAnchor` were stale (the last never
+  true on this lineage); re-cited on this HEAD.
+- G5 (minor): the doc page's quoted `NOTE` dropped the trailing citation; now verbatim, one line.
+- G6 (minor): the scratch build notes miscounted the NLG golden (45 for 47); corrected there.
+- G7 (minor): `GLOSSARY.md` and `reference/README.md` omitted `AFTER`/`BEFORE`; rows added.
+- G8 (minor): BPMN boundary `<documentation>` read "within BEFORE …"; the preposition is dropped
+  when the label carries its keyword.
+- G9 (minor): the `THE DEADLINE` refusal said "has no WITHIN"; now names `WITHIN` or `BEFORE`
+  (one pre-existing golden re-blessed, above).
+- R1-4 (minor): "Nothing in the language today can say when a window opens" was present tense
+  and false; rewritten. The `purchase.l4` line cites in the same paragraph updated. the `BEFORE` arm's cite
+  (`Machine.hs:1676` then) widened to the case head and its arm; `Nlg.hs:252` was checked and is correct (both checkers refuted that
+  half).
+- R1-5 (minor): a second closing edge (`WITHIN 30 BEFORE date`) failed with megaparsec's token
+  list; `edgeOrderGuard` now names the one-closing-edge rule (witness
+  `not-ok/tc/after-two-closers.l4`), with the look-ahead `hidden` as before.
+- Raised and refuted: none by both checkers. Refuted in part: R1-4's `Nlg.hs:252` (a definition
+  line, not a comment); G4's attribution of the `checkAnchor` cite to this commit (it was stale
+  when inherited); F6's proposed equivalence "`AFTER -3 WITHIN 30` = `AFTER 0`" (it is `AFTER 0
+WITHIN 27`).
 
 ##### 5.1.2.1 The absolute forms need an origin, and now have one — RULED 2026-09-09 (T1)
 
@@ -3959,7 +4074,10 @@ in §5.1.2's build block; this is the ledger entry):
   on the act line only (the join line takes no `AFTER`; a `BEFORE` there is refused by name);
 - the type-directed checks: a `DATE` after `WITHIN` and a `NUMBER` after `BEFORE` refused naming
   the other word, an anchor on `AFTER date` refused, a non-instant after `AFTER` refused naming
-  both, the literal empty window under a shared anchor refused, the anchor refusals of §5.1.1.1
+  both, the literal empty window refused where the `AFTER` cannot open before the `WITHIN`'s
+  anchor (the same noun; a bare `AFTER` against `THE ARMING`, `THE JOIN` under `HENCE`, `THE
+DEADLINE` under a `MUST`'s `LEST` — never under `HENCE`, a `SHANT`'s `LEST`, or `OF e`), a
+  second closing edge a parse error naming the one-edge rule, the anchor refusals of §5.1.1.1
   applied to an `AFTER`'s anchor with the keyword substituted in the wording;
 - the machine: the opening resolved once at the first event, before the closing edge; the bare
   `WITHIN` re-anchored on the opening (R-X5 amended), the anchored one on its anchor, a
@@ -3968,8 +4086,10 @@ in §5.1.2's build block; this is the ledger entry):
   act at `Contract10` as a nullity with a note, for every modal (R-X6); the opening threaded to
   fork and barrier members, and a demoted join-line deadline kept on the arming beside a
   member's `AFTER`; a run-time note for the empty window the checker could not see;
-- the notes channel: `EvalState.notes`, `EvalDirectiveResult.notes`, printed after the value by
-  every renderer and only when non-empty;
+- the notes channel: `EvalState.notes`, `EvalDirectiveResult.notes`, printed after the value and
+  only when non-empty by the goldens' printer, `l4 run` (text and `--json`), `l4 batch --json`,
+  `L4.API`, the LSP diagnostic and inspector, and the REPL — NOT by the decision service, which is
+  owed (§5.1.2.0's channel paragraph); one note per directive, duplicates dropped;
 - the T1 decision: a date on either edge, and on a `WITHIN`'s anchor, refused by name when the
   obligation's clock at arming is below `DATE_SERIAL (YMD 1 1 1)`; the remaining limit (a floating
   trace at 365 or above) on the doc page in one sentence;
@@ -3985,9 +4105,16 @@ in §5.1.2's build block; this is the ledger entry):
 **Not built**: T1's `COMMENCING` and sorts (§5.1.2.1); a join-line `AFTER`; backward windows from a
 future event; `THE OPENING` (declined); `SOME m OF`.
 
-**Existing goldens.** None moved (§5.1.2's build block says which two moves were avoided and how).
+**Existing goldens.** None moved in the build (§5.1.2's build block says which two moves were
+avoided and how); the adversarial pass re-blessed one on purpose, `anchor-no-deadline.golden`
+(its message now names `BEFORE` beside `WITHIN`).
 
-**What the adversarial pass of 2026-09-16 changed.** Pending, filled after the refute stage.
+**What the adversarial pass of 2026-09-16 changed.** Round 1: twenty findings raised by three
+refuters, none refuted by both checkers, all twenty applied — the list, one line each, is at the
+end of §5.1.2's build block ("What the adversarial pass of 2026-09-16 changed"). The two that
+mattered: the empty-window check refused open windows (a bare `AFTER` was compared against any
+anchor; now only against an anchor its clock cannot precede), and `l4 run --json` dropped the R-X6
+note (now a `"notes"` array). The decision service still does not carry the note, and says so.
 
 #### Stacking B on C (2026-09-16) — `every/anchors` rebased onto `every/blame-set`, branch `every/anchors-on-blame`
 

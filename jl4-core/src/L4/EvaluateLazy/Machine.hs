@@ -84,7 +84,6 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Vector as Vector
 import qualified Data.Text.Read as TR
 import qualified Data.Char as Char
-import Data.Either (isLeft)
 import Data.Fixed (Pico)
 import Data.Time (UTCTime)
 import qualified Data.Time as Time
@@ -317,11 +316,19 @@ newtype Note = MkNote Text
   deriving stock (Show, Eq, Generic)
   deriving anyclass NFData
 
--- | Report something without failing (see 'EvalState.notes').
+-- | Report something without failing (see 'EvalState.notes'). A note is
+-- reported ONCE per directive: raising the same sentence again — the same
+-- party, act and instants — adds nothing a reader can use, and a @LEST@
+-- chain that re-arms the same empty window a thousand times before the
+-- stall guard refuses it ('stalledChainRefusal') would otherwise print the
+-- note a thousand times beside the refusal (adversarial pass of
+-- 2026-09-16, F4: 1001 copies, 354 KB). Distinct facts stay distinct,
+-- since a note names its instants.
 tellNote :: Text -> Eval ()
 tellNote t = do
   notesRef <- asks (.notes)
-  liftIO (modifyIORef' notesRef (`DList.snoc` MkNote t))
+  liftIO $ modifyIORef' notesRef \ ns ->
+    if MkNote t `elem` DList.toList ns then ns else ns `DList.snoc` MkNote t
 
 data Stack =
   MkStack
@@ -1909,14 +1916,20 @@ backwardContractFrame val = \ case
       ValDate _      -> lowerInstant "BEFORE" armed val
       v -> internalException $ RuntimeTypeError $
         "expected a NUMBER or a DATE as the closing edge but got: " <> prettyLayout v
-    -- The explicitly anchored empty window (§5.1.2.2): @AFTER d1 WITHIN d2
-    -- OF …@ with @d1 > d2@ from one anchor closes before it opens. The
-    -- checker catches it when both offsets are literals; a run reports it
-    -- here, once, when both instants are first known. The obligation then
-    -- runs as written: every act is early or late, and the expiry is what
-    -- ends it.
-    when (isLeft due) $ forM_ openT \ open ->
-      when (open > deadline) $ tellNote (emptyWindowNote open deadline)
+    -- The empty window (§5.1.2.2): a window that closes before it opens.
+    -- The explicitly anchored @AFTER d1 WITHIN d2 OF …@ with @d1 > d2@ from
+    -- one anchor is the ruled case, and the checker catches it when both
+    -- offsets are literals; a run reports it here, once, when both instants
+    -- are first known — and says which shape it met (a @BEFORE@ date
+    -- earlier than the opening, two anchors, a negative bare @WITHIN@), for
+    -- the note's wording is per shape (adversarial pass of 2026-09-16, F3).
+    -- The obligation then runs as written: every act is early or late, and
+    -- the expiry is what ends it.
+    case (opens, due) of
+      (Left (Just opening), Left (Just closing)) -> forM_ openT \ open ->
+        when (open > deadline) $
+          tellNote (emptyWindowNote opening closing (origin == Just time') open deadline)
+      _ -> pure ()
     let
       -- NOTE: the new due is the current due minus the time that has passed
       -- by observing the current event e.g. if the thing
@@ -3000,6 +3013,8 @@ memberDueExpr :: Maybe (Opening Resolved) -> MemberDue -> Maybe (Deadline Resolv
 memberDueExpr mopen = \ case
   NoMemberDue      -> Nothing
   MemberDue d      -> Just d
+  -- the anchor carries 'emptyAnno', and nothing a drafter writes does: that
+  -- is how 'emptyWindowNote' knows not to tell them to drop it
   DemotedJoinDue (MkDeadline a d Nothing)
     | isJust mopen -> Just (MkDeadline a d (Just (AnchorArming emptyAnno)))
   DemotedJoinDue d -> Just d
@@ -6072,23 +6087,73 @@ earlyActNote modal partyNF actPat stamp open deadlineAt = Text.unwords $
       [ "the prohibition had not started, so this is not a violation. It stays"
       , "in force" <> untilClose <> "." ]
     _ ->
-      [ "the act does not count as performance. The obligation stays live, with"
-      , "its deadline untouched" <> untilClose <> ", and may be performed once"
-      , "the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)" ]
+      [ "the act does not count as performance. The obligation stays live," <> clockClause
+      , "and may be performed once the window is open."
+      , "(EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)" ]
   where
+    -- with a closing edge the deadline is what the early act leaves alone;
+    -- without one (AFTER alone) there is no deadline to speak of
+    clockClause = case deadlineAt of
+      Just d  -> " with its deadline untouched (the window closes at " <> prettyRatio d <> "),"
+      Nothing -> " with no closing edge,"
     untilClose = maybe "" (\ d -> " (the window closes at " <> prettyRatio d <> ")") deadlineAt
 
--- | The explicitly anchored empty window, met at run time (§5.1.2.2): the
--- offsets were not literals, so the checker could not see it.
-emptyWindowNote :: Rational -> Rational -> Text
-emptyWindowNote open close = Text.unwords
-  [ "This window closes at " <> prettyRatio close <> ", before it opens at " <> prettyRatio open <> ":"
-  , "both edges count from one anchor (the WITHIN names it, and the AFTER"
-  , "counts from the same place), so no act can be performed in time. Drop"
-  , "the anchor from the WITHIN to count it from the instant the window"
-  , "opens, or make the closing offset at least the opening one."
-  , "(EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)"
-  ]
+-- | An empty window met at run time (§5.1.2.2): the closing instant is
+-- before the opening one. Worded per the shape of the two edges as written
+-- — the checker sees only the explicitly anchored form with literal
+-- offsets, so this is the one report the other shapes get, and the first
+-- cut's single wording ("both edges count from one anchor … drop the
+-- anchor from the WITHIN") was false for every shape but that one
+-- (adversarial pass of 2026-09-16, F3\/R1-3): a @BEFORE@ date has no
+-- anchor to drop, two anchors are two origins, and a demoted join-line
+-- @WITHIN@ reaches here anchored @OF THE ARMING@ by the machine's own
+-- hand, not the drafter's ('memberDueExpr' gives that anchor 'emptyAnno',
+-- which is how it is told from a written one). The Bool says whether the
+-- @WITHIN@'s anchor instant IS the obligation's own clock — the join under
+-- @HENCE@, say — in which case a bare @AFTER@ shares it and the ruled
+-- advice applies.
+emptyWindowNote :: Opening Resolved -> Deadline Resolved -> Bool -> Rational -> Rational -> Text
+emptyWindowNote (MkOpening _ _ moa) closing anchorIsClock open close = Text.unwords $
+  [ "This window closes at " <> prettyRatio close <> ", before it opens at " <> prettyRatio open <> ":" ]
+  <> shape
+  <> [ "so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)" ]
+  where
+    shape = case (closing, moa) of
+      -- the absolute closing edge: a date, before the instant the AFTER reaches
+      (MkBefore _ _, _) ->
+        [ "the BEFORE date is earlier than the instant the AFTER opens the window," ]
+      -- bare WITHIN beside an AFTER re-anchors, so only a negative offset gets here
+      (MkDeadline _ _ Nothing, _) ->
+        [ "the WITHIN counts from the opening and its offset is negative," ]
+      -- the join line's WITHIN, demoted to the member and anchored by the machine
+      (MkDeadline _ _ (Just ca), _) | demoted ca ->
+        [ "the join line's WITHIN bounds each member from the arming, and the"
+        , "member's AFTER opens later than that," ]
+      -- one anchor on both edges: the ruled case, with the ruled advice
+      (MkDeadline _ _ (Just ca), Just oa) | sameNoun oa ca ->
+        oneAnchor (words' ca)
+      (MkDeadline _ _ (Just ca), Nothing) | anchorIsClock ->
+        oneAnchor (words' ca <> " (the obligation's own clock here)")
+      -- two anchors, two origins
+      (MkDeadline _ _ (Just ca), Just oa) ->
+        [ "the AFTER counts from " <> words' oa <> " and the WITHIN from " <> words' ca <> "," ]
+      -- a bare AFTER counts from the obligation's own clock, whatever the WITHIN names
+      (MkDeadline _ _ (Just ca), Nothing) ->
+        [ "the WITHIN counts from " <> words' ca <> " and the AFTER from the"
+        , "obligation's own clock," ]
+    oneAnchor a =
+      [ "both edges count from " <> a <> " and the opening offset is the larger."
+      , "Drop the anchor from the WITHIN to count it from the instant the window"
+      , "opens, or make the closing offset at least the opening one —" ]
+    words' a = Text.strip (prettyLayout a)
+    sameNoun a b = case (a, b) of
+      (AnchorJoin{},     AnchorJoin{})     -> True
+      (AnchorDeadline{}, AnchorDeadline{}) -> True
+      (AnchorArming{},   AnchorArming{})   -> True
+      _                                    -> False
+    demoted = \ case
+      AnchorArming a -> isEmptyAnno a
+      _              -> False
 
 -- | A value as far as it has already been evaluated, for a note's wording:
 -- references whose thunks are in WHNF are followed, anything still

@@ -1640,7 +1640,12 @@ boundaryDoc (Just DMustNot) Nothing =
   \performed, so this is the HENCE arm — but the rule sets no WITHIN, so \
   \nothing reaches it: a prohibition with no deadline is discharged by neither \
   \the clock nor the act"
-boundaryDoc _ (Just d) = "LEST: the obligation is not discharged within " <> d
+-- a BEFORE's label carries its own keyword ('closingClause'), so the
+-- preposition is the label's, not ours: "not discharged BEFORE date", never
+-- "within BEFORE date" (adversarial pass of 2026-09-16, G8)
+boundaryDoc _ (Just d)
+  | "BEFORE " `Text.isPrefixOf` d = "LEST: the obligation is not discharged " <> d
+  | otherwise                     = "LEST: the obligation is not discharged within " <> d
 boundaryDoc _ Nothing =
   "LEST: the obligation is not discharged — but the rule sets no WITHIN, and \
   \for every modal but SHANT this arm is reached only by the deadline passing, \

@@ -594,16 +594,24 @@ data ContinuationSlot = InHence | InLest
   deriving anyclass NFData
 
 -- | What the checker knows about the obligation enclosing the one it is
--- checking: the slot it is in, and whether the enclosing obligation has a
--- deadline to name (an act @WITHIN@ or a join-line @WITHIN@). @Nothing@ in
--- 'CheckEnv' means the top level. Set with 'local' around a @HENCE@ or
--- @LEST@ body ('L4.TypeCheck.checkDeontonBody'), so a nested obligation —
--- however deep inside a @LET@, @IF@ or @AND@ — sees its nearest enclosing
--- one, which is also what the machine binds at run time.
+-- checking: the slot it is in, whether the enclosing obligation has a
+-- deadline to name (an act @WITHIN@\/@BEFORE@ or a join-line @WITHIN@),
+-- and its modal. @Nothing@ in 'CheckEnv' means the top level. Set with
+-- 'local' around a @HENCE@ or @LEST@ body ('L4.TypeCheck.checkDeontonBody'),
+-- so a nested obligation — however deep inside a @LET@, @IF@ or @AND@ — sees
+-- its nearest enclosing one, which is also what the machine binds at run
+-- time.
+--
+-- The modal is there for the empty-window check ('L4.TypeCheck.checkWindowNotEmpty',
+-- adversarial pass of 2026-09-16): under @LEST@ a bare @AFTER@ counts from
+-- the failure time, which is the missed deadline for a @MUST@\/@MAY@ and
+-- the violating event's stamp for a @SHANT@ (spec §5.2) — so whether a
+-- bare @AFTER@ shares @THE DEADLINE@ as its origin depends on what failed.
 data EnclosingObligation =
   MkEnclosingObligation
     { slot        :: !ContinuationSlot
     , hasDeadline :: !Bool
+    , modal       :: !DeonticModal
     }
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData

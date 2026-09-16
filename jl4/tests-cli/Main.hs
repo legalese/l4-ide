@@ -490,6 +490,11 @@ garbageFixture = fixtureDir </> "garbage.l4"
 evalCrashFixture :: FilePath
 evalCrashFixture = fixtureDir </> "eval-crash.l4"
 
+-- | A @#TRACE@ whose act lands before its @AFTER@ window opens: a nullity the
+-- run REPORTS (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X6) beside a live residual.
+earlyActFixture :: FilePath
+earlyActFixture = fixtureDir </> "early-act.l4"
+
 -- | Typechecks cleanly; every @#ASSERT@ in it RAISES instead of deciding.
 assertRaisesFixture :: FilePath
 assertRaisesFixture = fixtureDir </> "assert-raises.l4"
@@ -1246,6 +1251,28 @@ spec bin = do
       case objField env "results" of
         Just (Array v) -> length v `shouldBe` 2
         other          -> expectationFailure ("Expected results array, got " ++ show other)
+
+    -- The R-X6 note must reach the machine-readable surface too: a consumer
+    -- reading only "value" would be handed the silent nullity the ruling
+    -- forbids (adversarial pass of 2026-09-16, G1/R1-2 — the first envelope
+    -- dropped it). The key is present only on a directive that raised one.
+    it "carries the run's notes in JSON, only where there are any" $ do
+      env <- jsonEnvelope bin ["run", earlyActFixture, "--json"]
+      case objField env "results" of
+        Just (Array v) -> do
+          length v `shouldBe` 2
+          let notesOf r = case r of
+                Object o -> KeyMap.lookup (Key.fromString "notes") o
+                _        -> Nothing
+          case notesOf (toList v !! 0) of
+            Just (Array ns) -> do
+              length ns `shouldBe` 1
+              case toList ns of
+                [String n] -> T.unpack n `shouldSatisfy` ("before the window opened at 3" `isInfixOf`)
+                other      -> expectationFailure ("Expected one note string, got " ++ show other)
+            other -> expectationFailure ("Expected a notes array on the early act, got " ++ show other)
+          notesOf (toList v !! 1) `shouldBe` Nothing
+        other -> expectationFailure ("Expected results array, got " ++ show other)
 
     it "fails on a typecheck error" $
       expectFail bin ["run", errorFixture]
