@@ -1027,13 +1027,27 @@ resolveSectionGiven rdecls (MkGivenSig gann otns) =
       | k == wanted                   = Just (v, reverse skipped <> rest)
       | otherwise                     = search ((k, v) : skipped) rest
 
+-- | A @WHERE@\/@LET@ local is a VALUE as far as a deonton inside it is
+-- concerned ('asValue'): the machine attaches it to whatever obligation
+-- names it, which need not be the one this local was written under.
 inferLocalDecl :: LocalDecl Name -> Check (LocalDecl Resolved, [CheckInfo])
-inferLocalDecl (LocalDecide ann decide) = do
+inferLocalDecl (LocalDecide ann decide) = asValue do
   (rdecide, extends) <- softprune $ inferDecide decide
   pure (LocalDecide ann rdecide, extends)
-inferLocalDecl (LocalAssume ann assume) = do
+inferLocalDecl (LocalAssume ann assume) = asValue do
   (rassume, extends) <- softprune $ inferAssume WrittenLocalAssume assume
   pure (LocalAssume ann rassume, extends)
+
+-- | Check an expression as a VALUE that may be handed to another obligation
+-- — an argument to a function, a local definition — rather than as the
+-- continuation the enclosing obligation runs itself: the enclosing
+-- obligation is still visible (the anchor refusals of 'checkAnchor' read
+-- where a deonton was written, §5.1.1's conservative reading), but is no
+-- longer 'direct', so the empty-window check compares a bare @AFTER@ only
+-- against @THE ARMING@ ('checkWindowNotEmpty'; adversarial pass of
+-- 2026-09-16, round 2, R2-1).
+asValue :: Check a -> Check a
+asValue = local \ env -> env { enclosingObligation = (\ enc -> enc { direct = False }) <$> env.enclosingObligation }
 
 -- | The 'AssumeOrigin' is read only by the 'Assume' case; 'inferSection'
 -- computes it per declaration.
@@ -2333,20 +2347,32 @@ checkOpening (MkOpening oann d ma) = do
 --     origin, so the window opens at @arming + d1@ or later and closes at
 --     @arming + d2@;
 --   * @OF THE JOIN@ under @HENCE@: the join IS the default origin;
---   * @OF THE DEADLINE@ under the @LEST@ of a @MUST@\/@MAY@: the missed
---     deadline IS the failure time. Under a @SHANT@'s @LEST@ the failure
---     time is the violating act's stamp, which precedes the deadline, so
---     @AFTER 3 WITHIN 2 OF THE DEADLINE@ there is @[violation+3,
---     deadline+2]@ and may well be open: not compared. Under @HENCE@ the
---     join precedes the deadline for the same reason: not compared;
+--   * @OF THE DEADLINE@ under the @LEST@ of a @MUST@\/@DO@\/@MAY@: the
+--     missed deadline IS the failure time. Under a @SHANT@'s @LEST@ the
+--     failure time is the violating act's stamp, which precedes the
+--     deadline, so @AFTER 3 WITHIN 2 OF THE DEADLINE@ there is
+--     @[violation+3, deadline+2]@ and may well be open: not compared. Under
+--     @HENCE@ the join precedes the deadline for the same reason: not
+--     compared;
 --   * @OF e@: an instant with no relation to the clock: never compared.
+--
+-- The slot and the modal are those of the obligation the deonton is
+-- WRITTEN under, and they are its run-time ones only when the deonton is
+-- the continuation itself ('EnclosingObligation.direct'). A deonton that
+-- is an argument to a function, or a @WHERE@ local, is a value the machine
+-- may attach under some other obligation's @HENCE@ or @LEST@ — the
+-- lifecycle is bound at hand-off — so for it the @JOIN@ and @DEADLINE@
+-- cases above are not compared at all; @THE ARMING@ still is, since it
+-- precedes every origin wherever the value ends up.
 --
 -- The first cut compared a bare @AFTER@ against ANY anchor and refused
 -- @AFTER 3 WITHIN 2 OF THE DEADLINE@ under @HENCE@, a window the machine
 -- runs as @[join+3, deadline+2]@ — the adversarial pass of 2026-09-16
 -- (findings F1 and R1-1) caught it with the offsets as parameters, where
--- the checker cannot look. What it does not compare, the run-time note
--- still reports if it turns out empty.
+-- the checker cannot look; its round 2 (R2-1) caught the same window
+-- written under a @MUST@'s @LEST@ and handed as a value into a @SHANT@'s,
+-- which runs it as @[violation+3, deadline+2]@. What the checker does not
+-- compare, the run-time note still reports if it turns out empty.
 checkWindowNotEmpty :: Maybe (Opening Name) -> Maybe (Deadline Name) -> Check ()
 checkWindowNotEmpty mopen mdue = case (mopen, mdue) of
   (Just (MkOpening _ (Lit _ (NumericLit _ d1)) moa), Just edge@(MkDeadline _ (Lit _ (NumericLit _ d2)) (Just ca)))
@@ -2359,10 +2385,11 @@ checkWindowNotEmpty mopen mdue = case (mopen, mdue) of
       Just oa -> anchorWords oa == anchorWords ca && not (isAt oa)
       Nothing -> case ca of
         AnchorArming{}   -> True
-        AnchorJoin{}     -> slotIs InHence
-        AnchorDeadline{} -> slotIs InLest && not (enclosingIs DMustNot)
+        AnchorJoin{}     -> direct && slotIs InHence
+        AnchorDeadline{} -> direct && slotIs InLest && not (enclosingIs DMustNot)
         AnchorAt{}       -> False
       where
+        direct = maybe False (.direct) menc
         slotIs s = maybe False (\ enc -> enc.slot == s) menc
         enclosingIs m = maybe False (\ enc -> enc.modal == m) menc
     isAt = \ case
@@ -2450,7 +2477,7 @@ checkDeontonBody mPartyR partyT actionT action opens due joinHasDeadline hence l
     checkRegulativeActorAgreement partyT partyR (actionExprOfPattern actionR.action)
   let rTy = contract partyT actionT
       hasDeadline = isJust due || joinHasDeadline
-      inSlot slot = local \ env -> env { enclosingObligation = Just (MkEnclosingObligation slot hasDeadline action.modal) }
+      inSlot slot = local \ env -> env { enclosingObligation = Just (MkEnclosingObligation slot hasDeadline action.modal True) }
   opensR <- traverse checkOpening opens
   dueR <- traverse (checkDeadline ActDeadline) due
   checkWindowNotEmpty opens due
@@ -3767,7 +3794,10 @@ inferExpr' g =
         nlgRe <- nlgExpr re
         pure (nlgRe, te, rgivens)
       pure (Lam ann rgivens re, fun_ rargts te)
-    App ann n es -> do
+    -- The arguments of an application are VALUES ('asValue'): a deonton
+    -- among them is handed to the function, which may attach it anywhere.
+    -- The function itself is a name, so the whole node is checked that way.
+    App ann n es -> asValue do
       -- If this is a flat chain of fixity-declared binary operators, first
       -- re-associate it into nested binary applications and infer the result;
       -- see 'tryReassociateFixityChain' (a no-op for anything else). Otherwise
@@ -3781,7 +3811,7 @@ inferExpr' g =
       case mReassociated of
         Just reassociated -> inferExpr reassociated
         Nothing -> inferFlatApp fixityErrEmitted ann n es
-    AppNamed ann n nes _morder -> do
+    AppNamed ann n nes _morder -> asValue do
       (rn, pt) <- resolveTerm n
       t <- instantiate pt
       (ornes, rt) <- inferAppNamed rn t nes

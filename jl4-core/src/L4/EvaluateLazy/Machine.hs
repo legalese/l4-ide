@@ -322,8 +322,17 @@ newtype Note = MkNote Text
 -- chain that re-arms the same empty window a thousand times before the
 -- stall guard refuses it ('stalledChainRefusal') would otherwise print the
 -- note a thousand times beside the refusal (adversarial pass of
--- 2026-09-16, F4: 1001 copies, 354 KB). Distinct facts stay distinct,
--- since a note names its instants.
+-- 2026-09-16, F4: 1001 copies, 354 KB). The key is the SENTENCE, which
+-- names the party, the act pattern and the instants — not the obligation
+-- that raised it, nor the event. So two obligations that render the same
+-- sentence share one note: the two operands of a @RAND@ with one party,
+-- act and window, two members of an @EVERY@ roll that names one party
+-- twice, or two events at one stamp on one obligation (round 2, R2-2). A
+-- reader is told the fact once; the count is not carried. Keying on the
+-- raising frame instead would bring F4's thousand copies back, since the
+-- re-armed window is a fresh frame each time; keying on the source
+-- position would separate the @RAND@ case only. Whether multiplicity
+-- belongs in the note is a ruling, not taken here.
 tellNote :: Text -> Eval ()
 tellNote t = do
   notesRef <- asks (.notes)
@@ -1864,10 +1873,10 @@ backwardContractFrame val = \ case
       Right (Just rel) -> do
         time' <- assertTime val
         rel' <- assertTime rel
-        scrutinizeDue val (Just (time' + rel')) frame
+        scrutinizeDue val (Just (time' + rel')) False frame
       -- no opening edge, or the window already open
-      Right Nothing -> scrutinizeDue val Nothing frame
-      Left Nothing  -> scrutinizeDue val Nothing frame
+      Right Nothing -> scrutinizeDue val Nothing False frame
+      Left Nothing  -> scrutinizeDue val Nothing False frame
       Left (Just (MkOpening _ offset Nothing)) -> do
         pushCFrame (Contract4o ScrutinizeOpening {time = val, openAnchorT = Nothing, ..})
         continueExpr env offset
@@ -1884,12 +1893,12 @@ backwardContractFrame val = \ case
     -- opening instant itself — lowered by its serial (the checker has
     -- refused an anchor on a DATE)
     time' <- assertTime time
-    open <- case val of
-      ValNumber d -> pure (fromMaybe time' openAnchorT + d)
-      ValDate _   -> lowerInstant "AFTER" armed val
+    (open, absolute) <- case val of
+      ValNumber d -> pure (fromMaybe time' openAnchorT + d, False)
+      ValDate _   -> (, True) <$> lowerInstant "AFTER" armed val
       v -> internalException $ RuntimeTypeError $
         "expected a NUMBER or a DATE after AFTER but got: " <> prettyLayout v
-    scrutinizeDue time (Just open) (dueFrameOfOpening frame)
+    scrutinizeDue time (Just open) absolute (dueFrameOfOpening frame)
   Contract4b ScrutinizeAnchor {..} -> do
     -- the anchor's instant, lowered to the trace's clock: a DATE by its
     -- serial (what DATE_SERIAL computes), a NUMBER as it is ('lowerInstant',
@@ -1928,7 +1937,7 @@ backwardContractFrame val = \ case
     case (opens, due) of
       (Left (Just opening), Left (Just closing)) -> forM_ openT \ open ->
         when (open > deadline) $
-          tellNote (emptyWindowNote opening closing (origin == Just time') open deadline)
+          tellNote (emptyWindowNote opening closing openAbsolute (origin == Just time') open deadline)
       _ -> pure ()
     let
       -- NOTE: the new due is the current due minus the time that has passed
@@ -2632,7 +2641,8 @@ backwardContractFrame val = \ case
     -- The closing edge, once the opening instant (if any) is known: what
     -- 'Contract4' did on its own before the window had an opening edge.
     -- @timeW@ is the frame's clock, forced; @openT@ the absolute instant the
-    -- window opens, when it has one. Three shapes of closing edge, plus none:
+    -- window opens, when it has one, and @openAbsolute@ whether it was a
+    -- DATE (for the empty window's note). Three shapes of closing edge, plus none:
     --
     --   * an already-evaluated remaining due, relative to the clock;
     --   * the source deadline, met for the first time — the arming point as
@@ -2649,22 +2659,22 @@ backwardContractFrame val = \ case
     --     (@AFTER@ alone: a window that opens and never closes), is still
     --     re-relativised to that stamp, so 'Contract10' can see whether the
     --     window has opened.
-    scrutinizeDue :: WHNF -> Maybe Rational -> ScrutinizeDue -> Machine Config
-    scrutinizeDue timeW openT ScrutinizeDue {..} = case due of
+    scrutinizeDue :: WHNF -> Maybe Rational -> Bool -> ScrutinizeDue -> Machine Config
+    scrutinizeDue timeW openT openAbsolute ScrutinizeDue {..} = case due of
       -- the remaining due is relative to the instant the WITHIN runs from:
       -- the window's opening while that is still ahead, the clock otherwise
       -- ('relativeDue'); 'openT' is that opening exactly when it is ahead
       Right due' -> do
-        pushCFrame (Contract5 CheckTiming {time = timeW, origin = openT, openT, ..})
+        pushCFrame (Contract5 CheckTiming {time = timeW, origin = openT, openT, openAbsolute, ..})
         continueBackward due'
       Left (Just (MkDeadline _ duration Nothing)) -> do
-        pushCFrame (Contract5 CheckTiming {time = timeW, origin = openT, openT, ..})
+        pushCFrame (Contract5 CheckTiming {time = timeW, origin = openT, openT, openAbsolute, ..})
         continueExpr env duration
       Left (Just (MkDeadline _ duration (Just anchor))) -> do
-        pushCFrame (Contract4b ScrutinizeAnchor {time = timeW, openT, ..})
+        pushCFrame (Contract4b ScrutinizeAnchor {time = timeW, openT, openAbsolute, ..})
         resolveAnchor env armed anchor
       Left (Just (MkBefore _ instant)) -> do
-        pushCFrame (Contract5 CheckTiming {time = timeW, origin = Nothing, openT, ..})
+        pushCFrame (Contract5 CheckTiming {time = timeW, origin = Nothing, openT, openAbsolute, ..})
         continueExpr env instant
       Left Nothing -> do
         stamp <- assertTime ev'time
@@ -6073,6 +6083,10 @@ floatingClockRefusal what d t = Text.unwords
 -- the act came before the window opened, so it does not count — and the
 -- run says so rather than swallowing it.
 --
+-- In a window that closes before it opens (§5.1.2.2, reported by
+-- 'emptyWindowNote') the act can never be repeated in time, so the note
+-- says that instead of "once the window is open" (round 2, R2-4).
+--
 -- The act is printed through 'printActionPattern', the deontic-action
 -- printer (PATTERN-REFERENCE-RULE-SPEC §6): a bare name the checker resolved
 -- as a reference is printed bare, as the source spelled it. The generic
@@ -6082,15 +6096,27 @@ earlyActNote :: DeonticModal -> NF -> Pattern Resolved -> Rational -> Rational -
 earlyActNote modal partyNF actPat stamp open deadlineAt = Text.unwords $
   [ "PARTY " <> prettyLayout partyNF <> " did " <> Text.strip (docText (printActionPattern actPat))
   , "at " <> prettyRatio stamp <> ", before the window opened at " <> prettyRatio open <> ":"
-  ] <> case modal of
-    DMustNot ->
+  ] <> case (modal, closedBeforeOpen) of
+    (DMustNot, Just d) ->
+      [ "the prohibition had not started, so this is not a violation. It stays"
+      , "in force until " <> prettyRatio d <> ", before the window opens, so nothing"
+      , "can violate it." ]
+    (DMustNot, Nothing) ->
       [ "the prohibition had not started, so this is not a violation. It stays"
       , "in force" <> untilClose <> "." ]
-    _ ->
+    (_, Just d) ->
+      [ "the act does not count as performance. The obligation stays live, but"
+      , "its window closes at " <> prettyRatio d <> ", before it opens, so no act can"
+      , "be in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)" ]
+    (_, Nothing) ->
       [ "the act does not count as performance. The obligation stays live," <> clockClause
       , "and may be performed once the window is open."
       , "(EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)" ]
   where
+    -- the closing instant when it precedes the opening: the empty window
+    closedBeforeOpen = case deadlineAt of
+      Just d | d < open -> Just d
+      _                 -> Nothing
     -- with a closing edge the deadline is what the early act leaves alone;
     -- without one (AFTER alone) there is no deadline to speak of
     clockClause = case deadlineAt of
@@ -6108,12 +6134,16 @@ earlyActNote modal partyNF actPat stamp open deadlineAt = Text.unwords $
 -- anchor to drop, two anchors are two origins, and a demoted join-line
 -- @WITHIN@ reaches here anchored @OF THE ARMING@ by the machine's own
 -- hand, not the drafter's ('memberDueExpr' gives that anchor 'emptyAnno',
--- which is how it is told from a written one). The Bool says whether the
--- @WITHIN@'s anchor instant IS the obligation's own clock — the join under
--- @HENCE@, say — in which case a bare @AFTER@ shares it and the ruled
--- advice applies.
-emptyWindowNote :: Opening Resolved -> Deadline Resolved -> Bool -> Rational -> Rational -> Text
-emptyWindowNote (MkOpening _ _ moa) closing anchorIsClock open close = Text.unwords $
+-- which is how it is told from a written one). The first Bool says whether
+-- the opening instant was written as a DATE (@AFTER (YMD …)@), which counts
+-- from nothing — the frames carry only the lowered instant, and the
+-- @(YMD …)@ is an application, not a literal, so the source node cannot
+-- tell (round 2, R2-3: the first wording called it an offset from the
+-- WITHIN's anchor). The second says whether the @WITHIN@'s anchor instant
+-- IS the obligation's own clock — the join under @HENCE@, say — in which
+-- case a bare @AFTER@ shares it and the ruled advice applies.
+emptyWindowNote :: Opening Resolved -> Deadline Resolved -> Bool -> Bool -> Rational -> Rational -> Text
+emptyWindowNote (MkOpening _ _ moa) closing openAbsolute anchorIsClock open close = Text.unwords $
   [ "This window closes at " <> prettyRatio close <> ", before it opens at " <> prettyRatio open <> ":" ]
   <> shape
   <> [ "so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)" ]
@@ -6129,6 +6159,10 @@ emptyWindowNote (MkOpening _ _ moa) closing anchorIsClock open close = Text.unwo
       (MkDeadline _ _ (Just ca), _) | demoted ca ->
         [ "the join line's WITHIN bounds each member from the arming, and the"
         , "member's AFTER opens later than that," ]
+      -- the absolute opening edge: a date, later than the instant the anchored WITHIN reaches
+      (MkDeadline _ _ (Just ca), _) | openAbsolute ->
+        [ "the AFTER date is later than the instant the WITHIN, counted from"
+        , words' ca <> ", closes the window," ]
       -- one anchor on both edges: the ruled case, with the ruled advice
       (MkDeadline _ _ (Just ca), Just oa) | sameNoun oa ca ->
         oneAnchor (words' ca)

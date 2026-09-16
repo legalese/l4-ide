@@ -302,6 +302,76 @@ GIVETH A DEONTIC Actor Action
   PARTY buyer DOES Order buyer AT 20
 
 
+§ `Handed on as a value, the window is the machine's to judge`
+
+-- The checker compares the literals of a bare AFTER beside WITHIN OF THE
+-- DEADLINE only where the deonton IS the continuation it is written under.
+-- A deonton that is an ARGUMENT to a function is a value: the function may
+-- attach it under any obligation's LEST, and the anchors bind there, at
+-- hand-off (§5.1.1). The same literal window, written under a MUST's LEST
+-- both times, is handed once into a SHANT's LEST — where the failure time is
+-- the smoking, and the window [11+3, 40+2] = [14, 42] is open — and once
+-- into a MUST's, where it is [40+3, 40+2] and empty. The checker refuses
+-- neither (it did refuse both until round 2 of the adversarial pass of
+-- 2026-09-16, R2-1); the run reports the empty one.
+GIVEN k IS A DEONTIC Actor Action
+GIVETH A DEONTIC Actor Action
+`under a prohibition` k MEANS
+    PARTY buyer SHANT Smoke (EXACTLY buyer) WITHIN 30
+    HENCE FULFILLED
+    LEST k
+
+GIVEN k IS A DEONTIC Actor Action
+GIVETH A DEONTIC Actor Action
+`under an obligation` k MEANS
+    PARTY buyer MUST Sign (EXACTLY buyer) WITHIN 30
+    HENCE FULFILLED
+    LEST k
+
+GIVETH A DEONTIC Actor Action
+`cure handed on, prohibition` MEANS
+    PARTY shop MUST Deliver (EXACTLY shop) WITHIN 10
+    HENCE FULFILLED
+    LEST (`under a prohibition` (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 WITHIN 2 OF THE DEADLINE
+                                 HENCE FULFILLED
+                                 LEST BREACH))
+
+-- 13 is early, 20 and 42 in time, 43 late.
+#TRACE `cure handed on, prohibition` AT 0 WITH
+  PARTY buyer DOES Smoke buyer AT 11
+  PARTY buyer DOES Order buyer AT 13
+
+#TRACE `cure handed on, prohibition` AT 0 WITH
+  PARTY buyer DOES Smoke buyer AT 11
+  PARTY buyer DOES Order buyer AT 20
+
+#TRACE `cure handed on, prohibition` AT 0 WITH
+  PARTY buyer DOES Smoke buyer AT 11
+  PARTY buyer DOES Order buyer AT 42
+
+#TRACE `cure handed on, prohibition` AT 0 WITH
+  PARTY buyer DOES Smoke buyer AT 11
+  PARTY buyer DOES Order buyer AT 43
+
+GIVETH A DEONTIC Actor Action
+`cure handed on, obligation` MEANS
+    PARTY shop MUST Deliver (EXACTLY shop) WITHIN 10
+    HENCE FULFILLED
+    LEST (`under an obligation` (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 WITHIN 2 OF THE DEADLINE
+                                 HENCE FULFILLED
+                                 LEST BREACH))
+
+-- The signature is never made; its deadline 40 passes; the order at 41
+-- reveals that and is handed on to the cure, whose window is [43, 42]: the
+-- run notes the empty window, and the early act's note says the window
+-- closes before it opens rather than "once the window is open" (R2-4).
+#TRACE `cure handed on, obligation` AT 0 WITH
+  PARTY buyer DOES Order buyer AT 41
+
+#TRACE `cure handed on, obligation` AT 0 WITH
+  PARTY buyer DOES Order buyer AT 45
+
+
 § `AFTER alone: a right that vests and never expires`
 
 -- The window opens at 13 and never closes. An act at 1000 is in time; an
@@ -592,6 +662,36 @@ GIVETH A DEONTIC Actor Action
 
 #TRACE `window before` 40 AT (DATE_SERIAL (YMD 2026 6 1)) WITH
   PARTY buyer DOES Order buyer AT (DATE_SERIAL (YMD 2026 6 20))
+
+-- An AFTER date beside an anchored WITHIN: opens on 10 June, closes 5 days
+-- after the arming on 1 June. The checker compares literal OFFSETS only, so
+-- a date opening is never a check error; the note says the date is later
+-- than where the WITHIN closes — not that both edges count from the arming,
+-- which a date does not (adversarial pass of 2026-09-16, round 2, R2-3).
+GIVETH A DEONTIC Actor Action
+`window from june` MEANS
+    PARTY buyer MUST Order (EXACTLY buyer) AFTER (YMD 2026 6 10) WITHIN 5 OF THE ARMING
+    HENCE FULFILLED
+    LEST BREACH
+
+#TRACE `window from june` AT (DATE_SERIAL (YMD 2026 6 1)) WITH
+  PARTY buyer DOES Order buyer AT (DATE_SERIAL (YMD 2026 6 20))
+
+-- A SHANT whose window is empty: the early smoking is not a violation, and
+-- the note says the prohibition ends before its window opens, so nothing can
+-- violate it — not that it "stays in force" until a window that never opens.
+GIVEN d1 IS A NUMBER
+      d2 IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`window of, shant` d1 d2 MEANS
+    PARTY alice MUST Sign (EXACTLY alice) WITHIN 30
+    HENCE (PARTY theLandlord SHANT Smoke (EXACTLY theLandlord) AFTER d1 WITHIN d2 OF THE JOIN
+           HENCE FULFILLED)
+    LEST BREACH
+
+#TRACE `window of, shant` 30 5 AT 0 WITH
+  PARTY alice DOES Sign alice AT 8
+  PARTY theLandlord DOES Smoke theLandlord AT 10
 
 -- A member's AFTER later than the join line's WITHIN: the demoted join-line
 -- deadline reaches each member anchored OF THE ARMING by the machine's own

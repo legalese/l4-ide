@@ -322,6 +322,41 @@ anchoredSrc closing =
   , "  LEST BREACH"
   ]
 
+-- | The window's opening edge (@AFTER@, §5.1.2) beside each shape of closing
+-- edge the note has to tell apart: a bare @WITHIN@ (re-anchors on the
+-- opening), an anchored one (does not), a @BEFORE@ date (an instant), none at
+-- all, and — under @EVERY@ — a join line's @WITHIN@ demoted to the member.
+afterBareSrc, afterAnchoredSrc, afterBeforeSrc, afterAloneSrc, afterDemotedSrc :: [Text]
+afterBareSrc = afterSrc " WITHIN 30"
+afterAnchoredSrc = afterSrc " WITHIN 30 OF THE ARMING"
+afterBeforeSrc = "ASSUME closing IS A DATE" : "" : afterSrc " BEFORE closing"
+afterAloneSrc = afterSrc ""
+
+-- | A bare @WITHIN@ whose duration is a backticked name spelling @OF@: still
+-- bare (round 2 of the adversarial pass, R2-SEM-2 — the @OF@ inside the name
+-- used to read as an anchor here too).
+afterQuotedSrc :: [Text]
+afterQuotedSrc = "`days OF grace` MEANS 5" : "" : afterSrc " WITHIN `days OF grace`"
+afterDemotedSrc =
+  [ "`group` MEANS"
+  , "  EVERY p"
+  , "    MUST pay"
+  , "    AFTER 3"
+  , "    ONCE ALL HAVE WITHIN 30"
+  , "    HENCE FULFILLED"
+  , "    LEST BREACH"
+  ]
+
+afterSrc :: Text -> [Text]
+afterSrc closing =
+  [ "`window` MEANS"
+  , "  PARTY Alice"
+  , "  MUST pay"
+  , "  AFTER 3" <> closing
+  , "  HENCE FULFILLED"
+  , "  LEST BREACH"
+  ]
+
 -- | Two arms of one @IF@ chain guarded by the /same/ @DECIDE@ applied to
 -- /different/ arguments.
 --
@@ -1144,6 +1179,60 @@ spec = do
         f `shouldSatisfy` mentions "is a date, an absolute instant"
         f `shouldSatisfy` not . mentions "no unit could be read"
         f `shouldSatisfy` not . mentions "is anchored"
+
+  -- The opening edge is never drawn, and the note says so on every AFTER.
+  -- What it says about the CLOSING edge must depend on that edge's shape:
+  -- only a bare WITHIN re-anchors on the opening (§5.1.2.2), so only there
+  -- is a timer drawn from the task's start measured from the wrong point.
+  -- Before the adversarial pass of 2026-09-16 (R1-1) the re-anchor sentence
+  -- and its "lost" line went out for every shape — including the demoted
+  -- join-line WITHIN, whose P30D timer on the multi-instance task IS measured
+  -- from the arming the evaluator uses (run-after.l4, `fork bounded as a
+  -- whole`: [3, 30], not [3, 33]).
+  describe "the window's opening edge (AFTER) says what shape of closing edge it met" $ do
+    let noteOf nm src = case findingsFor "P-WINDOW-OPENING" (exportOf defaultBpmnOptions nm src) of
+          [f] -> pure f
+          other -> do
+            expectationFailure ("expected one P-WINDOW-OPENING note, got " <> show (length other))
+            error "unreachable"
+        measuredWrong f = mentions "measured from the wrong point" f && mentions "the point the closing edge is measured from" f
+
+    it "a bare WITHIN re-anchors, so the timer is measured from the wrong point" $ do
+      f <- noteOf "window" afterBareSrc
+      f.severity `shouldBe` Blocking
+      f `shouldSatisfy` measuredWrong
+
+    it "an anchored WITHIN does not, and the note names the anchor" $ do
+      f <- noteOf "window" afterAnchoredSrc
+      f `shouldSatisfy` mentions "anchored OF THE ARMING"
+      f `shouldSatisfy` not . measuredWrong
+
+    it "a bare WITHIN spelled with a backticked name that says OF is still bare" $ do
+      f <- noteOf "window" afterQuotedSrc
+      f `shouldSatisfy` measuredWrong
+      f `shouldSatisfy` not . mentions "anchored OF"
+
+    it "a BEFORE date is an instant the opening does not move" $ do
+      f <- noteOf "window" afterBeforeSrc
+      f `shouldSatisfy` mentions "BEFORE date"
+      f `shouldSatisfy` not . measuredWrong
+
+    it "no closing edge: the window never closes" $ do
+      f <- noteOf "window" afterAloneSrc
+      f `shouldSatisfy` mentions "no closing edge"
+      f `shouldSatisfy` not . measuredWrong
+
+    it "a join line's WITHIN demoted to the member is measured from the arming: the right point" $ do
+      let bx = exportOf defaultBpmnOptions "group" afterDemotedSrc
+      map (.nodeKind) (boundaries bx) `shouldBe` [Boundary "Task_0" (TimerAfter "P30D")]
+      f <- noteOf "group" afterDemotedSrc
+      f `shouldSatisfy` mentions "join line's WITHIN"
+      f `shouldSatisfy` mentions "measured from the right point"
+      f `shouldSatisfy` not . measuredWrong
+      findingsFor "P-JOIN-DEADLINE" bx `shouldBe` []
+
+    it "the control: no AFTER, no note" $
+      findingsFor "P-WINDOW-OPENING" (exportOf defaultBpmnOptions "rule" mustSrc) `shouldBe` []
 
   -- An interrupting boundary event is a race between "the activity completed"
   -- and "the trigger fired". For a prohibition the L4 runtime races them the

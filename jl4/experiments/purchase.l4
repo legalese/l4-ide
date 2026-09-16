@@ -99,7 +99,7 @@ WITHIN 30 days -- relative temporal referent: when the UPON first starts to be t
                -- absolute DATE and WITHIN the word for a duration, EVERY-EACH-QUANTIFIER-SPEC
                -- §5.1.2 R-X5; the seven BEFORE n days in this file migrated then. This file is
                -- an aspirational sketch that has never parsed — the lexer stops at the `+=` of
-               -- `UPDATE … +=` at :142; `IF … AT` and an undefined `days` wait behind it — and
+               -- `UPDATE … +=` at :143; `IF … AT` and an undefined `days` wait behind it — and
                -- still does not. PERSON and SHOULD are jerseyAlcohol.l4's, not this file's.)
 HENCE  -- "external choice" state transition: if we read from the trace that the party takes the action by the deadline, we proceed to new location
        PARTY   seller

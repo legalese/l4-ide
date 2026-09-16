@@ -604,14 +604,28 @@ data ContinuationSlot = InHence | InLest
 --
 -- The modal is there for the empty-window check ('L4.TypeCheck.checkWindowNotEmpty',
 -- adversarial pass of 2026-09-16): under @LEST@ a bare @AFTER@ counts from
--- the failure time, which is the missed deadline for a @MUST@\/@MAY@ and
--- the violating event's stamp for a @SHANT@ (spec §5.2) — so whether a
+-- the failure time, which is the missed deadline for a @MUST@\/@DO@\/@MAY@
+-- and the violating event's stamp for a @SHANT@ (spec §5.2) — so whether a
 -- bare @AFTER@ shares @THE DEADLINE@ as its origin depends on what failed.
+--
+-- 'direct' says whether the deonton being checked is the continuation
+-- ITSELF — written in the slot, or reached from it through an @IF@, a
+-- @CONSIDER@, a @RAND@ — as opposed to a VALUE: an argument to a function,
+-- or a @WHERE@\/@LET@ local, which the machine may attach to some other
+-- obligation altogether (the lifecycle is bound at hand-off, dynamically;
+-- 'L4.EvaluateLazy.Machine.bindLifecycle'). The slot and the modal are then
+-- where the deonton was WRITTEN, not where it will run, so the empty-window
+-- check compares a bare @AFTER@ against nothing but @THE ARMING@ there
+-- (adversarial pass of 2026-09-16, round 2, R2-1: a literal window written
+-- under a @MUST@'s @LEST@ but handed into a @SHANT@'s was refused although
+-- the machine runs it open). The anchor refusals ('L4.TypeCheck.checkAnchor')
+-- do not read it: they are the conservative syntactic reading §5.1.1 ruled.
 data EnclosingObligation =
   MkEnclosingObligation
     { slot        :: !ContinuationSlot
     , hasDeadline :: !Bool
     , modal       :: !DeonticModal
+    , direct      :: !Bool
     }
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData

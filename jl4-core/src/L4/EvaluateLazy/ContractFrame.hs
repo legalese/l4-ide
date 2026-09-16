@@ -262,6 +262,7 @@ data ScrutinizeAnchor = ScrutinizeAnchor
   , duration :: RExpr        -- ^ the @d@ of @WITHIN d OF …@, evaluated once the anchor is known
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
   , openT :: Maybe Rational  -- ^ the instant the window opens, when the act has an @AFTER@ (see 'CheckTiming')
+  , openAbsolute :: Bool     -- ^ whether that instant is a DATE (see 'CheckTiming')
   }
   deriving stock Show
 
@@ -330,6 +331,12 @@ data CheckTiming = CheckTiming
     -- @AFTER@ and the window has not yet opened; what the residual's
     -- opening edge is re-relativised from after this frame, and what the
     -- explicitly anchored empty window is diagnosed against
+  , openAbsolute :: Bool
+    -- ^ whether that instant was written as a DATE (@AFTER (YMD …)@) rather
+    -- than as an offset from an anchor or the clock — read only by the
+    -- empty window's note, whose wording is per shape: a date counts from
+    -- nothing (adversarial pass of 2026-09-16, round 2, R2-3). @False@
+    -- when there is no opening edge.
   }
   deriving stock Show
 

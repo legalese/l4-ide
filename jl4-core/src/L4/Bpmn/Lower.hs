@@ -2104,10 +2104,30 @@ modalityFinding n l =
 -- | The window's opening edge (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, 2026-09-16)
 -- is not drawn: the task is enabled as soon as the token reaches it, and
 -- an act before the window opens — a nullity in L4 (R-X6) — is a completion
--- in BPMN. The boundary timer, when there is one, is the closing edge as
--- written, which a bare @WITHIN@ measures from the opening instant
--- (re-anchor, §5.1.2.2), not from the task's start — so it is not the
--- duration a modeller would put on the timer either. Both are said here.
+-- in BPMN. That much is true of every @AFTER@.
+--
+-- What the opening does to the CLOSING edge depends on the closing edge's
+-- shape, and the note says which shape it met (adversarial pass of
+-- 2026-09-16, R1-1; before it, every @AFTER@ got the re-anchor sentence):
+--
+-- * a bare @WITHIN@ on the act counts from the instant the window opens
+--   (re-anchor, §5.1.2.2), not from the task's start — so the boundary
+--   timer, drawn from the task's start, is measured from the wrong point;
+--
+-- * a @BEFORE@ is an absolute instant the opening does not move;
+--
+-- * an anchored @WITHIN@ (@OF THE JOIN@, @OF THE DEADLINE@, @OF THE ARMING@,
+--   @OF instant@) counts from its anchor, not from the opening (§5.1.2.2);
+--   what the boundary event makes of the anchor is @P-DEADLINE@'s to say;
+--
+-- * a join line's @WITHIN@ demoted to the member — the act has an @AFTER@
+--   and no @WITHIN@ of its own, so 'memberDeadline' is the join's — bounds
+--   every member from the @EVERY@'s arming and does not re-anchor on the
+--   act's opening (R-T2; @memberDueExpr@ hands it over @OF THE ARMING@).
+--   The multi-instance activity is enabled at that arming, so a timer drawn
+--   from it is measured from the right point;
+--
+-- * no closing edge: the window opens and never closes.
 openingFindings :: FlowNode -> TransitionLabel -> [FidelityNote]
 openingFindings n l = case l.labelOpening of
   Nothing -> []
@@ -2123,14 +2143,46 @@ openingFindings n l = case l.labelOpening of
               <> "\8217, and BPMN has no way to hold a task closed until then: \
                  \the activity is enabled as soon as it is reached, so an act \
                  \the rule would treat as a nullity (performed before the window \
-                 \opened) reads here as a completion. A bare WITHIN beside the \
-                 \AFTER counts from the instant the window opens, so the boundary \
-                 \timer, if one is drawn, is measured from the wrong point too."
-        , lost =
-            "the opening edge, and the point the closing edge is measured from; \
-            \both survive only in the <documentation>"
+                 \opened) reads here as a completion. "
+              <> closingSentence
+        , lost = closingLost
         }
     ]
+ where
+  openingOnly = "the opening edge; it survives only in the <documentation>"
+  (closingSentence, closingLost) = case l.labelDeadline of
+    Just d
+      | "BEFORE " `Text.isPrefixOf` d ->
+          ( "The closing edge is a BEFORE date, an absolute instant the \
+            \opening does not move; the boundary event carries it as written."
+          , openingOnly
+          )
+      | Just a <- deadlineAnchor d ->
+          ( "The closing edge is anchored OF "
+              <> a
+              <> " and counts from that anchor, not from the opening; what \
+                 \the boundary event makes of the anchor is P-DEADLINE's to say."
+          , openingOnly
+          )
+      | otherwise ->
+          ( "A bare WITHIN beside the AFTER counts from the instant the \
+            \window opens, so the boundary timer, if one is drawn, is \
+            \measured from the wrong point too."
+          , "the opening edge, and the point the closing edge is measured from; \
+            \both survive only in the <documentation>"
+          )
+    Nothing
+      | Just _ <- memberDeadline l ->
+          ( "The closing edge is the join line's WITHIN, which bounds every \
+            \member from the EVERY's arming and does not re-anchor on the \
+            \act's opening; the activity is enabled at that arming, so the \
+            \boundary timer is measured from the right point."
+          , openingOnly
+          )
+      | otherwise ->
+          ( "There is no closing edge: the window opens and never closes."
+          , openingOnly
+          )
 
 guardFindings :: FlowNode -> TransitionLabel -> [FidelityNote]
 guardFindings n l = case l.labelGuard of

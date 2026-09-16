@@ -97,7 +97,9 @@ The other deadline the export declines is the anchored one — `WITHIN 5 OF THE 
 [WITHIN](../reference/regulative/README.md#within-temporal-deadline)). A BPMN timer runs from the
 moment its activity starts, and the exporter does not work out whether the anchor is that moment,
 so it draws no timer: the boundary event is a _conditional_ event carrying the text verbatim, and
-the report says so with a blocking `P-DEADLINE` that names the anchor.
+the report says so with a blocking `P-DEADLINE` that names the anchor. An anchored `WITHIN` beside
+an `AFTER` is not re-anchored by it, and the `P-WINDOW-OPENING` note on the task says which shape of
+closing edge it met (see [AFTER](../reference/regulative/AFTER.md#what-the-exports-do-with-it)).
 
 A rule written for a group — [`EVERY`](../reference/regulative/EVERY.md) — becomes **one task
 marked multi-instance** (the three parallel bars, in most modelers), not one task per member: who
