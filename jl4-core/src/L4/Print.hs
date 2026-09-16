@@ -945,6 +945,36 @@ instance LayoutPrinter (Threshold n) where
   printWithLayout = \ case
     AllHave _ -> "ALL HAVE"
 
+-- | @d [OF anchor]@ — the body of a @WITHIN@ in either position; the keyword
+-- is printed by the caller ('mprint').
+--
+-- Two renderings, so that the deadline prints byte-for-byte as the bare
+-- expression did in each of its two uses. 'parensIfNeeded' — what 'mprint'
+-- applies to a clause body — brackets the duration exactly as it bracketed
+-- the bare expression, which also keeps an applied duration re-parseable:
+-- in the WITHIN slot @OF@ introduces the anchor, so @(f OF x) OF THE JOIN@ is
+-- what 'L4.Parser.deadline' wants. 'printWithLayout' — what the service's
+-- residual string calls directly — leaves the duration unbracketed, as
+-- @prettyLayout@ of the bare expression was. The state graph's
+-- @labelDeadline@ goes through 'parensIfNeeded' ('L4.StateGraph.edgeText'):
+-- its label is the source form, and an applied duration is only that when
+-- bracketed.
+instance LayoutPrinterWithName n => LayoutPrinter (Deadline n) where
+  printWithLayout (MkDeadline _ d ma) = hsep $ [ printWithLayout d ] <> anchorDoc ma
+  parensIfNeeded  (MkDeadline _ d ma) = hsep $ [ parensIfNeeded d ]  <> anchorDoc ma
+
+anchorDoc :: LayoutPrinterWithName n => Maybe (Anchor n) -> [Doc ann]
+anchorDoc = foldMap (\ a -> [ "OF", printWithLayout a ])
+
+-- | The anchor's words (R-Q7B), or the expression (R-Q7C) bracketed like any
+-- other clause body. 'L4.TypeCheck.anchorWords' is the diagnostics' copy.
+instance LayoutPrinterWithName n => LayoutPrinter (Anchor n) where
+  printWithLayout = \ case
+    AnchorJoin _     -> "THE JOIN"
+    AnchorDeadline _ -> "THE DEADLINE"
+    AnchorArming _   -> "THE ARMING"
+    AnchorAt _ e     -> parensIfNeeded e
+
 instance LayoutPrinter UponEach where
   printWithLayout (MkUponEach _) = uponEachWords
 
@@ -1285,27 +1315,75 @@ instance LayoutPrinter BinOp where
     BinOpWhenNext -> "WHEN NEXT"
     BinOpValueAt -> "VALUE AT"
 
+-- | A breach names every obligation that failed (R-T3, spec §6.1; per-entry
+-- detail and no dedup RULED 2026-09-15). ONE failure prints exactly as it
+-- always did. TWO OR MORE — both operands of a @RAND@\/@ROR@ lost, several
+-- members of a barrier, or @BY LIST p, q@ — print one entry per failure, in
+-- operand \/ roll order, each with its own action and deadline or its own
+-- @BECAUSE@, so a reader can see the two ways.
+--
+-- Under a missed-deadline anchor the revealing event's three lines vouch for
+-- the ANCHOR only — the event at that stamp surpassed that one deadline —
+-- so the anchor prints first in the singleton's own words, and the full
+-- list follows under @and the breach names, in order@, a header that claims
+-- nothing about when each entry was revealed (a barrier's later failures
+-- are revealed by later events; the pass of 2026-09-15, round 2, found the
+-- earlier @revealed the breach of@ header listing a deadline the event
+-- could not have passed). Under a declared anchor there is no stamp to
+-- vouch for anything: @BREACH@ followed by one @BY …@ line per entry.
 instance LayoutPrinter a => LayoutPrinter (ReasonForBreach a) where
   printWithLayout = \ case
-    DeadlineMissed ev'party ev'action ev'time party action deadline -> vcat
+    DeadlineMissed ev'party ev'action ev'time blame -> vcat $
       [ "party"
       , i2 $ printWithLayout ev'party
       , "who did action"
       , i2 $ printWithLayout ev'action
       , "at"
       , i2 $ pretty (prettyRatio ev'time)
-      , "surpassed the deadline of party"
-      , i2 $ printWithLayout party
-      , "who had to do obligatory action"
-      , i2 $ printWithLayout action
-      , "before their deadline, which was at"
-      , i2 $ pretty (prettyRatio deadline)
       ]
-      where i2 = indent 2
-    ExplicitBreach mParty mReason -> vcat $
-      [ "BREACH" ]
-      <> maybe [] (\p -> [ "BY" <+> printWithLayout p ]) mParty
-      <> maybe [] (\r -> [ "BECAUSE" <+> printWithLayout r ]) mReason
+      <> anchorLines blame.anchor
+      <> case blameList blame of
+        _ :| [] -> []
+        fs -> "and the breach names, in order" : map (i2 . printFailure "") (NE.toList fs)
+      where
+        i2 = indent 2
+        -- the singleton's six lines for a missed deadline; an anchor that is
+        -- a declared breach under a missed-deadline stamp is not built by any
+        -- constructor site (spec §6.1.1) but prints rather than crashes
+        anchorLines = \ case
+          MissedDeadline p action deadline ->
+            [ "surpassed the deadline of party"
+            , i2 $ printWithLayout p
+            , "who had to do obligatory action"
+            , i2 $ printWithLayout action
+            , "before their deadline, which was at"
+            , i2 $ pretty (prettyRatio deadline)
+            ]
+          f@DeclaredBreach {} ->
+            [ "revealed the breach of", i2 $ printFailure "" f ]
+    ExplicitBreach blame -> vcat $
+      "BREACH" : case blameList blame of
+        DeclaredBreach mParty mReason :| [] ->
+          maybe [] (\p -> [ "BY" <+> printWithLayout p ]) mParty
+          <> maybe [] (\r -> [ "BECAUSE" <+> printWithLayout r ]) mReason
+        fs -> map (printFailure "BY ") (NE.toList fs)
+
+-- | One failure of a compound breach, under a prefix (@BY @ under a declared
+-- anchor, nothing under a missed-deadline one). A party that owed an action
+-- gets its action and deadline on the lines below; a declared breach is one
+-- line, with its @BECAUSE@ if it has one; an entry that names nobody says so.
+printFailure :: LayoutPrinter a => Doc ann -> Failure a -> Doc ann
+printFailure prefix = \ case
+  MissedDeadline p action deadline -> vcat
+    [ prefix <> printWithLayout p
+    , indent 2 "who had to do obligatory action"
+    , indent 4 $ printWithLayout action
+    , indent 2 "before their deadline, which was at"
+    , indent 4 $ pretty (prettyRatio deadline)
+    ]
+  DeclaredBreach mParty mReason ->
+    prefix <> maybe "(nobody named)" printWithLayout mParty
+      <> maybe mempty (\r -> " BECAUSE" <+> printWithLayout r) mReason
 
 instance LayoutPrinter Lazy.NF where
   printWithLayout = \ case

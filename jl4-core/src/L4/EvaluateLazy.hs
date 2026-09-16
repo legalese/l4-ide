@@ -580,16 +580,11 @@ nfAux  d (ValConstructor n rs)       = do
 nfAux _d (ValAssumed n)              = pure (MkNF (ValAssumed n))
 nfAux _d (ValEnvironment env)        = pure (MkNF (ValEnvironment env))
 nfAux d (ValBreached r')             = do
-  r <- case r' of
-    DeadlineMissed ev'party ev'act ev'timestamp party act deadline -> do
-      ev'party' <- evalAndNF d ev'party
-      act' <- evalAndNF d ev'act
-      party' <- evalAndNF d party
-      pure (DeadlineMissed ev'party' act' ev'timestamp party' act deadline)
-    ExplicitBreach mParty mReason -> do
-      mParty' <- traverse (evalAndNF d) mParty
-      mReason' <- traverse (evalAndNF d) mReason
-      pure (ExplicitBreach mParty' mReason')
+  -- Every reference inside the breach — the revealing event's party and
+  -- action, and each failure's party and BECAUSE — is forced to normal form;
+  -- the 'Traversable' instances of 'ReasonForBreach', 'Blame' and 'Failure'
+  -- reach all of them.
+  r <- traverse (evalAndNF d) r'
   pure (MkNF (ValBreached r))
 nfAux d (ValROp env op l r) = do
   l' <- traverseAndNF d l

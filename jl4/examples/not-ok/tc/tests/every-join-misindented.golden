@@ -11,4 +11,4 @@ File: every-join-misindented.l4
     34 |         UPON   EACH
        |         ^^^^
     unexpected UPON
-    expecting %, &&, *, +, -, .., ..., /, ;, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, FOLLOWED, GREATER, HENCE, IMPLIES, LESS, LEST, MINUS, MODULO, OR, PLUS, RAND, ROR, TIMES, UNLESS, WHERE, end of input, space token, or ||
+    expecting %, &&, *, +, -, .., ..., /, ;, <, <=, =, =>, >, >=, ABOVE, AND, AT, BELOW, DIVIDED, EQUALS, FOLLOWED, GREATER, HENCE, IMPLIES, LESS, LEST, MINUS, MODULO, OF, OR, PLUS, RAND, ROR, TIMES, UNLESS, WHERE, end of input, space token, or ||

@@ -273,6 +273,42 @@ opaqueDeadlineSrc =
   , "  LEST BREACH BY Alice BECAUSE \"late\""
   ]
 
+-- | An anchored closing edge (@WITHIN d OF anchor@, R-Q7): the unit is as
+-- readable as a bare @30@'s, and what the exporter cannot do is resolve the
+-- anchor. Beside it, an APPLIED duration with and without an anchor: the
+-- label brackets the application, so the @OF@ of the call and the @OF@ of
+-- the anchor cannot be confused — @(grace OF 2) OF THE ARMING@ is one
+-- anchored deadline, @(grace OF 2)@ is none.
+anchoredDeadlineSrc, appliedDeadlineSrc, appliedAnchoredDeadlineSrc :: [Text]
+anchoredDeadlineSrc = anchoredSrc "WITHIN 30 OF THE ARMING"
+appliedDeadlineSrc = anchoredSrc "WITHIN grace 2"
+appliedAnchoredDeadlineSrc = anchoredSrc "WITHIN (grace 2) OF THE ARMING"
+
+-- | A backticked NAME whose spelling contains @OF@ is one word to the lexer
+-- and must be one word to the anchor reader too (adversarial pass of
+-- 2026-09-16, round 2, R2-SEM-2): @WITHIN `days OF grace`@ is unanchored,
+-- and @WITHIN `days OF grace` OF THE ARMING@ is anchored at @THE ARMING@ and
+-- nowhere else.
+quotedDeadlineSrc, quotedAnchoredDeadlineSrc :: [Text]
+quotedDeadlineSrc = anchoredSrc "WITHIN `days OF grace`"
+quotedAnchoredDeadlineSrc = anchoredSrc "WITHIN `days OF grace` OF THE ARMING"
+
+anchoredSrc :: Text -> [Text]
+anchoredSrc closing =
+  [ "GIVEN n IS A NUMBER"
+  , "GIVETH A NUMBER"
+  , "grace n MEANS n TIMES 7"
+  , ""
+  , "`days OF grace` MEANS 5"
+  , ""
+  , "`anchored` MEANS"
+  , "  PARTY Alice"
+  , "  MUST pay"
+  , "  " <> closing
+  , "  HENCE FULFILLED"
+  , "  LEST BREACH"
+  ]
+
 -- | Two arms of one @IF@ chain guarded by the /same/ @DECIDE@ applied to
 -- /different/ arguments.
 --
@@ -1025,6 +1061,63 @@ spec = do
           f.severity `shouldBe` Blocking
           f.element `shouldBe` "Boundary_0"
         other -> expectationFailure ("expected one P-DEADLINE note, got " <> show (length other))
+
+    -- The anchored form is not a missing unit, and the note used to say it
+    -- was (adversarial pass of 2026-09-16, R1-2). It is carried as a condition
+    -- all the same: the exporter resolves no anchor, even THE ARMING.
+    describe "an anchored deadline is reported as anchored, not as unitless" $ do
+      let anchored = exportOf defaultBpmnOptions "anchored" anchoredDeadlineSrc
+          applied = exportOf defaultBpmnOptions "anchored" appliedDeadlineSrc
+          appliedAnchored = exportOf defaultBpmnOptions "anchored" appliedAnchoredDeadlineSrc
+          quoted = exportOf defaultBpmnOptions "anchored" quotedDeadlineSrc
+          quotedAnchored = exportOf defaultBpmnOptions "anchored" quotedAnchoredDeadlineSrc
+          theNote ex = case findingsFor "P-DEADLINE" ex of
+            [f] -> pure f
+            other -> do
+              expectationFailure ("expected one P-DEADLINE note, got " <> show (length other))
+              error "unreachable"
+
+      it "carries the anchored text as a condition, no timer" $
+        map (.nodeKind) (boundaries anchored)
+          `shouldBe` [Boundary "Task_0" (WhenCondition "30 OF THE ARMING")]
+
+      it "names the anchor, and does not call the unit unreadable" $ do
+        f <- theNote anchored
+        f.severity `shouldBe` Blocking
+        f `shouldSatisfy` mentions "is anchored: the duration counts from THE ARMING"
+        f `shouldSatisfy` not . mentions "no unit could be read"
+
+      it "brackets an applied duration in the label, so the call's OF is not an anchor" $ do
+        map (.nodeKind) (boundaries applied)
+          `shouldBe` [Boundary "Task_0" (WhenCondition "(grace OF 2)")]
+        f <- theNote applied
+        f `shouldSatisfy` mentions "no unit could be read"
+        f `shouldSatisfy` not . mentions "is anchored"
+        map (.nodeDoc) (tasks applied)
+          `shouldSatisfy` all (maybe False (\d -> Text.isInfixOf "WITHIN (grace OF 2)" d && not (Text.isInfixOf "OF THE" d)))
+
+      it "and an applied duration under an anchor is anchored, at the outer OF only" $ do
+        map (.nodeKind) (boundaries appliedAnchored)
+          `shouldBe` [Boundary "Task_0" (WhenCondition "(grace OF 2) OF THE ARMING")]
+        f <- theNote appliedAnchored
+        f `shouldSatisfy` mentions "counts from THE ARMING"
+
+      -- The OF inside a backticked name is part of the name (round 2,
+      -- R2-SEM-2): it used to be read as the anchor, so an unanchored
+      -- `days OF grace` was "anchored: the duration counts from grace`".
+      it "reads a backticked name that spells OF as one word, not as an anchor" $ do
+        map (.nodeKind) (boundaries quoted)
+          `shouldBe` [Boundary "Task_0" (WhenCondition "`days OF grace`")]
+        f <- theNote quoted
+        f `shouldSatisfy` mentions "no unit could be read"
+        f `shouldSatisfy` not . mentions "is anchored"
+
+      it "and an anchor after a backticked name is the anchor, whatever the name spells" $ do
+        map (.nodeKind) (boundaries quotedAnchored)
+          `shouldBe` [Boundary "Task_0" (WhenCondition "`days OF grace` OF THE ARMING")]
+        f <- theNote quotedAnchored
+        f `shouldSatisfy` mentions "counts from THE ARMING,"
+        f `shouldSatisfy` not . mentions "counts from grace"
 
   -- An interrupting boundary event is a race between "the activity completed"
   -- and "the trigger fired". For a prohibition the L4 runtime races them the

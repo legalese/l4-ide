@@ -1,0 +1,19 @@
+-- WITHIN d OF THE JOIN under LEST: the LEST runs because the enclosing
+-- obligation was NOT completed — its join did not fire — so there is no
+-- instant to count from. Refused (EVERY-EACH-QUANTIFIER-SPEC §5.1.1: the
+-- conservative reading of the question the ruling left open, a build
+-- decision of 2026-09-15). Under LEST, anchor to THE DEADLINE or THE ARMING.
+
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+
+DECLARE Action IS ONE OF
+    Pay
+    Deliver
+
+GIVETH A DEONTIC Actor Action
+bad MEANS
+    PARTY Buyer MUST Pay WITHIN 10
+    HENCE FULFILLED
+    LEST  (PARTY Seller MUST Deliver WITHIN 5 OF THE JOIN)

@@ -57,7 +57,11 @@ data Value a =
   | ValNil
   | ValCons a a
   | ValClosure (GivenSig Resolved) (Expr Resolved) Environment
-  | ValObligation Environment (Either RExpr (Value a)) (RAction Resolved) (Either (Maybe RExpr) (Value a)) RExpr (Maybe RExpr)
+  | ValObligation Environment (Either RExpr (Value a)) (RAction Resolved) (Either (Maybe (Deadline Resolved)) (Value a)) RExpr (Maybe RExpr)
+    -- ^ The fourth field is the deadline: before the first event, the source
+    -- @WITHIN d [OF anchor]@ (or nothing); after it, the REMAINING due as a
+    -- number relative to the obligation's current clock. An anchor is spent
+    -- by that first evaluation ('L4.EvaluateLazy.Machine', @Contract4@).
   | ValROp Environment RBinOp (Either RExpr (Value a)) (Either RExpr (Value a))
   | ValQuantified Environment (Deonton Resolved)
     -- ^ An ARMED but not yet run quantified obligation: @EVERY [Cast] v [WHO …]
@@ -93,11 +97,95 @@ instance NFData RBinOp where
   rnf ValROr = ()
   rnf ValRAnd = ()
 
-data ReasonForBreach a
-  = DeadlineMissed a a Rational a (RAction Resolved) Rational
-  | ExplicitBreach (Maybe a) (Maybe a)  -- optional party, optional reason
+-- | One failed obligation, as a breach records it (R-T3, EVERY-EACH-QUANTIFIER-SPEC
+-- §6.1, RULED 2026-09-15: _"let's not bother deduping the ReasonForBreach — maybe
+-- we need to be able to say, 'well, Alice screwed the pooch two different ways'"_).
+--
+-- A breach names every obligation that failed, ONE ENTRY EACH, with what was
+-- failed: a missed deadline carries the party, the action it owed and the
+-- deadline it missed; a declared breach carries whom @BREACH BY@ named (if
+-- anyone) and its @BECAUSE@ (if any). Nothing is deduplicated — the same party
+-- twice is two entries, and the two ways are visible in them.
+data Failure a
+  = MissedDeadline a (RAction Resolved) Rational
+    -- ^ the party, the action it owed, the deadline it missed
+  | DeclaredBreach (Maybe a) (Maybe a)
+    -- ^ @BREACH [BY p] [BECAUSE r]@: the party named, if any; the reason, if any
   deriving stock (Generic, Show, Functor, Foldable, Traversable)
   deriving anyclass NFData
+
+-- | The failures a breach names, in operand \/ roll order, with ONE of them
+-- marked as the ANCHOR — the failure the breach's time comes from (the
+-- earliest for @RAND@ and for a barrier, the latest for @ROR@; see the
+-- @RBinOp2@ clause and 'barrierFinish' in the machine). The anchor is marked
+-- by position rather than by an index, so it is always one of the entries and
+-- the order is the drafter's: 'blameList' is @before ++ [anchor] ++ after@.
+-- A single obligation's breach is @Blame [] f []@.
+data Blame a = Blame
+  { before :: [Failure a]
+  , anchor :: Failure a
+  , after  :: [Failure a]
+  }
+  deriving stock (Generic, Show, Functor, Foldable, Traversable)
+  deriving anyclass NFData
+
+-- | Why a contract is in breach.
+--
+-- The two constructors say what KIND of failure the breach is anchored at:
+-- 'DeadlineMissed' carries the event that revealed the anchoring miss (its
+-- party, action and stamp) beside the blame; 'ExplicitBreach' is anchored at a
+-- declared breach and carries no time. A compound breach — both operands of a
+-- @RAND@\/@ROR@ lost, or several members of a barrier — keeps the anchor's
+-- constructor and concatenates both sides' failures. A single obligation's
+-- breach is the singleton, which prints and serializes exactly as the
+-- one-party form did.
+data ReasonForBreach a
+  = DeadlineMissed a a Rational (Blame a)
+    -- ^ revealing event's party, action and stamp; the failures, anchored at a
+    -- 'MissedDeadline'
+  | ExplicitBreach (Blame a)
+    -- ^ the failures, anchored at a 'DeclaredBreach'
+  deriving stock (Generic, Show, Functor, Foldable, Traversable)
+  deriving anyclass NFData
+
+-- | The blame of a breach, whichever kind it is anchored at.
+breachBlame :: ReasonForBreach a -> Blame a
+breachBlame = \ case
+  DeadlineMissed _ _ _ b -> b
+  ExplicitBreach b       -> b
+
+-- | A single failure, its own anchor.
+singleBlame :: Failure a -> Blame a
+singleBlame f = Blame [] f []
+
+-- | Every failure, in order: @before ++ [anchor] ++ after@.
+blameList :: Blame a -> NonEmpty (Failure a)
+blameList b = case b.before of
+  []       -> b.anchor :| b.after
+  (f : fs) -> f :| (fs ++ [b.anchor] ++ b.after)
+
+-- | The anchor's position in 'blameList' (0-based) — what the wire reports.
+anchorIndex :: Blame a -> Int
+anchorIndex b = length b.before
+
+-- | The party a failure names, if it names one.
+failureParty :: Failure a -> Maybe a
+failureParty = \ case
+  MissedDeadline p _ _ -> Just p
+  DeclaredBreach mp _  -> mp
+
+-- | Every party the breach names, in order, WITH duplicates (no dedup, by
+-- ruling); entries that name nobody contribute nothing.
+blameParties :: Blame a -> [a]
+blameParties = mapMaybe failureParty . toList . blameList
+
+-- | Two blames concatenated (left first), anchored at the LEFT's anchor.
+anchorLeft :: Blame a -> Blame a -> Blame a
+anchorLeft l r = l { after = l.after ++ toList (blameList r) }
+
+-- | Two blames concatenated (left first), anchored at the RIGHT's anchor.
+anchorRight :: Blame a -> Blame a -> Blame a
+anchorRight l r = r { before = toList (blameList l) ++ r.before }
 
 data NullaryBuiltinFun
   = NullaryTodaySerial

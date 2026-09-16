@@ -1,0 +1,11 @@
+executing contract `all sign` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 `WAIT UNTIL` with 20
+executing contract `all sign, reversed` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 `WAIT UNTIL` with 20
+executing contract `staggered signing` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 `WAIT UNTIL` with 8 party `theLandlord` did `Refund` with `theLandlord` at 12 `WAIT UNTIL` with 20
+executing contract `staggered signing, no reparation` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 `WAIT UNTIL` with 8 `WAIT UNTIL` with 20
+executing contract `both sign` at 0 with the following events:  `WAIT UNTIL` with 20
+executing contract `alice twice` at 0 with the following events:  `WAIT UNTIL` with 20
+executing contract `joint and several` at 0 with the following events:  `WAIT UNTIL` with 20
+executing contract `blame nobody` at 0 with the following events:  `WAIT UNTIL` with 20
+executing contract `one misses` at 0 with the following events:  party `alice` did `Sign` with `alice` at 1 party `bob` did `Sign` with `bob` at 2 `WAIT UNTIL` with 20
+executing contract `the pair delivers` at 0 with the following events:  `WAIT UNTIL` with 20
+executing contract `the pair, breach first` at 0 with the following events:  `WAIT UNTIL` with 20

@@ -1,0 +1,32 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: anchor-on-join-line.l4
+  Hidden: no
+  Range: 16:56-16:67
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    OF THE JOIN cannot anchor the WITHIN on a join line.
+
+    A join line's WITHIN is the deadline on the whole group, so it is what
+    OF THE DEADLINE would name, and the group's join has not fired when it is
+    read. Write the join line's WITHIN as a plain duration (it counts from
+    the EVERY's arming), as WITHIN d OF THE ARMING, or as WITHIN d OF an
+    instant, a NUMBER or DATE expression.
+
+File: anchor-on-join-line.l4
+  Hidden: no
+  Range: 20:52-20:67
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    OF THE DEADLINE cannot anchor the WITHIN on a join line.
+
+    A join line's WITHIN is the deadline on the whole group, so it is what
+    OF THE DEADLINE would name, and the group's join has not fired when it is
+    read. Write the join line's WITHIN as a plain duration (it counts from
+    the EVERY's arming), as WITHIN d OF THE ARMING, or as WITHIN d OF an
+    instant, a NUMBER or DATE expression.

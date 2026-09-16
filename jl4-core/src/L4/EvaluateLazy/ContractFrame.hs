@@ -1,5 +1,6 @@
 module L4.EvaluateLazy.ContractFrame where
 
+import Base (Text)
 import L4.Evaluate.ValueLazy
 import L4.Syntax
 
@@ -18,6 +19,10 @@ data ContractFrame
   -- ^ checks if there's a due time, if that's the case, continue by checking
   -- timing constraints, if not, then skip the timing and go straight to checking
   -- the party
+  | Contract4b ScrutinizeAnchor
+  -- ^ the deadline is anchored (@WITHIN d OF …@, R-Q7): the anchor's instant
+  -- has just been forced; lower it to the trace's clock (a DATE via its
+  -- serial), then evaluate the duration for 'Contract5'
   | Contract5 CheckTiming
   -- ^ scrutinizes the current time, the timestamp of the event and the due time
   -- We check if the event happens within the due time, if that's the case, we continue
@@ -66,24 +71,72 @@ data ContractFrame
   | Barrier2 BarrierStampFrame
   -- ^ EVERY, the barrier: a completing member's timestamp, forced, so the
   -- last completion (@t_last@, spec §3.4) can be picked out.
+  | Barrier2b BarrierDueFrame
+  -- ^ EVERY, the barrier: a completing member's absolute act deadline,
+  -- forced, so the LATEST of them — the instant by which all performance
+  -- fell due — can be kept for @OF THE DEADLINE@ in the @HENCE@ (R-Q7B).
+  | BarrierEmpty BarrierEmptyFrame
+  -- ^ EVERY, the barrier over an EMPTY cast: the arming time, forced, which
+  -- is when "all zero of them" have acted, so the join fires there — through
+  -- the @ONCE@ line's @WITHIN@ when it has one, like any other join.
   | Barrier3 BarrierStateDueFrame
   -- ^ EVERY, the barrier: the @WITHIN@ on the @ONCE@ line (R-T2), evaluated
   -- after every member has completed, to bound the whole (spec §2.2.7.5 pt 3).
   | Barrier4 BarrierArmingFrame
   -- ^ EVERY, the barrier: the arming time, forced, to compare against the
   -- state deadline computed by 'Barrier3'.
+  | Barrier5 BarrierFailStampFrame
+  -- ^ EVERY, the barrier: a FAILING member's anchor, forced, so the earliest
+  -- failure can be picked out once every member has run (R-T3, spec §6.1).
+  | Barrier5c BarrierFailPosFrame
+  -- ^ EVERY, the barrier: the same failing member's stream position — how
+  -- far into the stream the event that revealed (or, for @SHANT@, WAS) the
+  -- failure stands — forced, so that two failures at the same stamp are
+  -- ordered by the stream before anything else: two @SHANT@ members violated
+  -- by two events at one stamp are two failures with two residuals, and the
+  -- @LEST@ must be handed the residual of the one the stream reached first
+  -- (spec §11.0.1 "Stacking B on C", round 1).
+  | Barrier5b BarrierFailDueFrame
+  -- ^ EVERY, the barrier: the same failing member's absolute deadline,
+  -- forced, so that two failures the same event revealed can be ordered by
+  -- the deadline missed — which is what @OF THE DEADLINE@ in the @LEST@
+  -- names, so the tie must not fall to roll order (R-Q7B on R-T3, spec
+  -- §11.0.1 "Stacking B on C").
+  | BreachBy BreachByFrame
+  -- ^ @BREACH BY e@: the party expression, forced. A LIST is walked one cons
+  -- cell per step (R-T3: @BY@ takes a party or a list of parties), one
+  -- declared failure per element, duplicates kept; anything else is the one
+  -- party.
   | ResolveParty ResolvePartyFrame
   -- ^ STATE-AS-LEDGER: on the deadline-passed / LEST path the obligation party is
   --   still an unevaluated expression; this frame forces it to a WHNF (via
   --   'maybeEvaluate') so it can be keyed and the followup (e.g. a RECORD in a
   --   breach reparation) attributed to the real acting party, not the anonymous
   --   ledger. Mirrors how 'Contract6 PartyWHNF' forces the party on the match path.
+  | Handoff Lifecycle
+  -- ^ R-Q7B: the value a @HENCE@ or @LEST@ evaluated to, about to be applied
+  -- to @[time, events]@. Rebinds the hand-off's 'Lifecycle' into that value's
+  -- own environment ('L4.EvaluateLazy.Machine.rebindLifecycle'), so that an
+  -- anchored @WITHIN@ inside it names the obligation the continuation is
+  -- ATTACHED to when it runs — also when the continuation arrived as a value
+  -- (a @GIVEN k IS A DEONTIC …@ parameter, a @WHERE@ local) whose closure
+  -- captured some other obligation's bindings, or none. Pushed at every
+  -- hand-off, and again before each operand of a compound is evaluated
+  -- ('L4.EvaluateLazy.Machine.operandHandoff'), because a compound's value
+  -- holds its operands as expressions and a value one of them evaluates to
+  -- is not reached by rebinding the compound.
   deriving stock Show
 
 data ScrutinizeEvents = ScrutinizeEvents
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , time :: Reference
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
@@ -96,81 +149,162 @@ data ScrutinizeEvents = ScrutinizeEvents
 -- which keeps evaluation terminating for recursive HENCE/LEST continuations
 -- with non-positive deadlines. See the Contract5 NOTE in Machine.hs.
 data ScrutinizeEvent = ScrutinizeEvent
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , events :: Reference, time :: Reference, ev'reoffered :: Bool
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
 data CurrentTimeWHNF = CurrentTimeWHNF
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: Reference
   , events :: Reference, time :: Reference, ev'reoffered :: Bool
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
 data ScrutinizeDue = ScrutinizeDue
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
   , events :: Reference, time :: Reference, ev'reoffered :: Bool
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
+  }
+  deriving stock Show
+
+-- | The anchor of an anchored deadline has been forced ('Contract4b' is what
+-- receives it); the duration is still to evaluate.
+data ScrutinizeAnchor = ScrutinizeAnchor
+  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
+  , events :: Reference, time :: WHNF, ev'reoffered :: Bool
+  , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
+  , armed :: Reference
+  , duration :: RExpr        -- ^ the @d@ of @WITHIN d OF …@, evaluated once the anchor is known
   }
   deriving stock Show
 
 data CheckTiming = CheckTiming
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
   , events :: Reference, time :: WHNF, ev'reoffered :: Bool
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
+  , anchorT :: Maybe Rational
+    -- ^ the anchor's instant on the trace's clock, when the deadline is
+    -- anchored (@WITHIN d OF …@): the deadline is then @anchorT + d@,
+    -- absolute, rather than @time + d@. Set once, at the first event, when
+    -- @time@ is still the arming time; after this frame the remaining due
+    -- is relative again ('Right (ValNumber newDue)') and the anchor is spent.
   }
   deriving stock Show
 
 data PartyWHNF = PartyWHNF
-  { act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
 data PartyEqual = PartyEqual
-  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
 data ScrutinizeParty = ScrutinizeParty
-  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
 data ScrutinizeEnvironment = ScrutinizeEnvironment
-  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
 data ScrutinizeActions = ScrutinizeActions
-  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment, henceEnv :: Environment -- ^ the environment to extend by when evaluating the hence clause
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
+  , armed :: Reference
   }
   deriving stock Show
 
 data ActionDoesn'tmatch = ActionDoesn'tmatch
-  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
+  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF
   , env :: Environment
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
+  , armed :: Reference
+    -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
   }
   deriving stock Show
 
@@ -261,7 +395,7 @@ data BarrierStepFrame = BarrierStepFrame
   , current :: WHNF                -- ^ the member obligation just applied
   , queue   :: [WHNF]              -- ^ members not yet run
   , tLast   :: Maybe (Rational, Reference)
-    -- ^ the latest completion so far, and the event stream that followed it:
+    -- ^ the latest completion so far and the event stream that followed it:
     -- the anchor and residual the @HENCE@ is handed (spec §3.4, §5.1).
     --
     -- The TIE is decided by roll order — the first member to reach a given
@@ -270,20 +404,133 @@ data BarrierStepFrame = BarrierStepFrame
     -- the other's completing event, so an act stamped at the join can reach
     -- the continuation. Getting it exactly right means trimming the stream to
     -- events strictly after the join, which needs frames of its own; the
-    -- limit is written into spec §11.0.1 and onto the doc page.
+    -- limit is written into spec §11.0.1 and onto the doc page. The tie
+    -- decides the STREAM only: the deadline the @HENCE@ may anchor to is
+    -- 'dueLatest', which no ordering can change.
+  , dueLatest :: Maybe Rational
+    -- ^ the latest of the completed members' absolute act deadlines so far —
+    -- the instant by which all performance fell due, and what @OF THE
+    -- DEADLINE@ in the @HENCE@ names when the @ONCE@ line has no @WITHIN@
+    -- of its own (R-Q7B). A maximum, so the roll's order cannot move it;
+    -- absent while no completed member had a deadline (the members either
+    -- all have one or none does, since they share one act @WITHIN@).
   , pending :: [WHNF]              -- ^ members still awaiting an event, reversed
+  , failures :: [BarrierFailure]
+    -- ^ members that definitively did not complete, reversed (so roll order
+    -- once reversed back). EVERY member runs before the barrier decides —
+    -- the first failure does not end the scan — so that the verdict can name
+    -- all of them (R-T3, spec §6.1) and the @LEST@ can be anchored at the
+    -- EARLIEST failure rather than the first in roll order.
+  , lapsed :: Bool
+    -- ^ some @MAY@ member's permission expired under a barrier with no
+    -- @LEST@: nothing was owed, so nothing is breached, but the join cannot
+    -- fire — the verdict is @FULFILLED@, as it was when this ended the scan.
   }
+  deriving stock Show
+
+-- | One member's definitive failure, as the barrier records it.
+data BarrierFailure
+  = BarrierFailedAt
+      { failAt      :: Rational    -- ^ the anchor the machine computed for the miss, forced
+      , failPos     :: Int
+        -- ^ the stream position of the event that revealed the miss (for
+        -- @SHANT@, the violating event itself), forced ('Barrier5c'): the
+        -- first tie-break when two failures share a 'failAt' — the earlier
+        -- in the stream wins, and only the same event ties
+      , failDue     :: Maybe Rational
+        -- ^ the member's absolute act deadline, forced ('Barrier5b'): the
+        -- tie-break when two failures share a 'failAt' AND a 'failPos'
+      , failTimeRef :: Reference   -- ^ …and as the reference the @LEST@ is handed
+      , failEvsRef  :: Reference   -- ^ the residual stream that followed the miss
+      , failDueRef  :: Maybe Reference
+        -- ^ the member's absolute act deadline, when it had one (the
+        -- sentinel's fourth argument): what @OF THE DEADLINE@ in the @LEST@
+        -- names when THIS member's failure is the one the @LEST@ is
+        -- anchored at (R-Q7B).
+      }
+    -- ^ reported through the failpoint sentinel — a barrier WITH a @LEST@.
+    -- 'failAt' is the sentinel's anchor forced, and 'failTimeRef' the same
+    -- value as the reference the @LEST@ is handed, so the ordering key IS the
+    -- anchor. Today it reads the revealing event's stamp (spec §5.2's
+    -- deadline anchor is not built). For @MUST@\/@DO@\/@MAY@ that orders by
+    -- the missed deadline up to ties, and a tie is the same revealing event;
+    -- for @SHANT@ the stamp is the violating event's own, and two members
+    -- violated at one stamp by two events are two failures with two
+    -- residuals. So a tie on 'failAt' is broken first by 'failPos' — the
+    -- stream position, which only the same event ties — then by 'failDue',
+    -- the deadline actually missed (the same event can reveal two deadlines,
+    -- and @THE DEADLINE@ in the @LEST@ reads the chosen member's, R-Q7B), and
+    -- only then by roll order, which by then names the same anchor, residual
+    -- and deadline either way (see 'barrierFinish', 'earliestFailure').
+  | BarrierBreached
+      { failReason :: ReasonForBreach Reference }
+    -- ^ the member's own breach — a barrier WITHOUT a @LEST@ mints no
+    -- sentinel, so a missed @MUST@ comes back as the 'ValBreached' the
+    -- single-party path builds, naming the member.
   deriving stock Show
 
 data BarrierStampFrame = BarrierStampFrame
   { step   :: BarrierStepFrame
   , evsRef :: Reference            -- ^ the stream after the completing event
+  , dueRef :: Maybe Reference      -- ^ the completing member's absolute deadline, if it had one
   }
+  deriving stock Show
+
+data BarrierFailStampFrame = BarrierFailStampFrame
+  { step    :: BarrierStepFrame
+  , timeRef :: Reference           -- ^ the failure's anchor, being forced
+  , evsRef  :: Reference           -- ^ the stream the failing member handed back
+  , posRef  :: Reference           -- ^ the failure's stream position, forced next ('Barrier5c')
+  , dueRef  :: Maybe Reference     -- ^ the failing member's absolute deadline, if it had one
+  }
+  deriving stock Show
+
+-- | The failing member's stream position is being forced ('Barrier5c'), its
+-- anchor already known.
+data BarrierFailPosFrame = BarrierFailPosFrame
+  { step    :: BarrierStepFrame
+  , failAt  :: Rational            -- ^ the failure's anchor, forced by 'Barrier5'
+  , timeRef :: Reference           -- ^ …and as a reference
+  , evsRef  :: Reference           -- ^ the stream the failing member handed back
+  , dueRef  :: Maybe Reference     -- ^ the failing member's absolute deadline, if it had one
+  }
+  deriving stock Show
+
+-- | The failing member's absolute deadline is being forced ('Barrier5b'),
+-- its anchor and stream position already known.
+data BarrierFailDueFrame = BarrierFailDueFrame
+  { step    :: BarrierStepFrame
+  , failAt  :: Rational            -- ^ the failure's anchor, forced by 'Barrier5'
+  , failPos :: Int                 -- ^ the failure's stream position, forced by 'Barrier5c'
+  , timeRef :: Reference           -- ^ …and as a reference
+  , evsRef  :: Reference           -- ^ the stream the failing member handed back
+  , dueRef  :: Reference           -- ^ the deadline, being forced
+  }
+  deriving stock Show
+
+-- | @BREACH BY e@, with @e@ under evaluation.
+data BreachByFrame = BreachByFrame
+  { partyRef :: Reference          -- ^ the whole @BY@ expression, allocated (forced on return)
+  , acc      :: [Reference]        -- ^ list elements collected so far, reversed
+  , mReason  :: Maybe Reference    -- ^ the @BECAUSE@, allocated
+  , clause   :: Text               -- ^ where the @BREACH@ was written, for the empty-list error
+  }
+  deriving stock Show
+
+-- | The completing member's absolute deadline is being forced ('Barrier2b').
+newtype BarrierDueFrame = BarrierDueFrame
+  { step :: BarrierStepFrame }
+  deriving stock Show
+
+-- | The barrier's cast was empty; its arming time is being forced
+-- ('BarrierEmpty'), which is when its join fires.
+newtype BarrierEmptyFrame = BarrierEmptyFrame
+  { ctx :: QuantCtx }
   deriving stock Show
 
 data BarrierStateDueFrame = BarrierStateDueFrame
   { ctx        :: QuantCtx
-  , joinTime   :: Rational      -- ^ when the last member completed
+  , joinTime   :: Rational      -- ^ when the last member completed (the arming, for an empty cast)
   , joinEvents :: Reference     -- ^ the stream that followed it
   }
   deriving stock Show
@@ -301,5 +548,45 @@ data ResolvePartyFrame = ResolvePartyFrame
   , env :: Environment       -- ^ environment in which to run the followup
   , events :: Reference      -- ^ remaining event stream (passed on to 'continueWithFollowup')
   , time :: Reference        -- ^ the (already-allocated) event time
+  , seen :: Int              -- ^ the stream position of the revealing event (see 'ScrutinizeEvents')
+  , lifecycle :: Lifecycle   -- ^ what the followup may anchor to (R-Q7B)
+  }
+  deriving stock Show
+
+-- | The positions in the life of an obligation that its continuation may
+-- anchor a @WITHIN@ to (EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7B: @OF THE
+-- JOIN@, @OF THE DEADLINE@, @OF THE ARMING@). Built by the obligation at the
+-- moment it hands off to its @HENCE@ or @LEST@, and bound into the
+-- continuation's environment under machine-minted names no program can
+-- spell ('L4.EvaluateLazy.Machine.bindLifecycle'): every hand-off REPLACES
+-- all three bindings — a position this hand-off does not have is deleted,
+-- never inherited from an outer obligation — and the value the continuation
+-- evaluated to is rebound the same way before it is applied ('Handoff'), so
+-- the obligation an anchor names is the one whose hand-off this is: the
+-- NEAREST enclosing one, dynamically, which for a continuation written
+-- inline is also the one the type checker assumes.
+data Lifecycle = MkLifecycle
+  { join     :: Maybe Reference
+    -- ^ the instant the join fired — the hand-off clock under @HENCE@. Absent
+    -- under @LEST@: the join did not fire (the checker refuses @THE JOIN@
+    -- there).
+  , deadline :: Maybe Reference
+    -- ^ the obligation's ABSOLUTE deadline, when it had one to hand off:
+    --
+    --   * a @PARTY@ obligation's act @WITHIN@;
+    --   * a barrier's @HENCE@: the @ONCE@ line's @WITHIN@ when written (the
+    --     deadline on the whole, R-T2), otherwise the latest of the members'
+    --     act deadlines — the instant by which all performance fell due —
+    --     and absent for an empty cast with no @ONCE@-line @WITHIN@;
+    --   * a barrier's @LEST@: the deadline that was actually missed — the
+    --     act deadline of the member whose failure the @LEST@ is anchored
+    --     at, i.e. the EARLIEST failure (R-T3's choice; several members may
+    --     have failed, and the deadline follows the anchor:
+    --     'L4.EvaluateLazy.Machine.barrierFinish', 'barrierFail'), the
+    --     @ONCE@ line's when everyone acted but the last act landed after
+    --     it ('L4.EvaluateLazy.Machine.barrierStateMissed');
+    --   * under a fork, the member's own.
+  , armed    :: Reference
+    -- ^ when the obligation was entered.
   }
   deriving stock Show

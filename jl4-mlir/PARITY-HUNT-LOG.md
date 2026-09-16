@@ -543,6 +543,24 @@ Catalogued during the lanes' hunts; none is a silent wrong answer at
 - **Scalar-name-colliding user types** — a user `DECLARE` whose name collides with
   a scalar builtin confuses schema typing (pre-existing, service-side too).
 
+### 2026-09-15 — the blame list added four keys to the breach wire; harness NOT re-run
+
+`legalese/l4-ide` `every/blame-set` (R-T3, EVERY-EACH-QUANTIFIER-SPEC §6.1) made a breach carry a
+non-empty list of FAILURES, each with its own detail (per-entry detail and no dedup RULED the same
+day, applied by the adversarial pass). jl4-service's `serializeBreachReason` now emits, beside the
+scalars (which describe the anchoring failure; `obligatedParty` used to be dropped), the arrays
+`obligatedParties` / `parties` (every party named, in order, with duplicates), `failures` (one
+object per failed obligation) and `anchor` (the anchor's index). The runtime mirrors all of them
+(`deonticBreachToWire`, `deonticEvaluatedParty`): this runtime models one obligation at a time, so
+its arrays are always the singleton of the scalar's failure and `anchor` is 0, and `obligatedParty`
+is rendered as the reference renders an EVALUATED party (record tagged with its type name;
+constructor plain), because the reference normalises the breach before serializing it. An
+`explicit` breach naming nobody has `parties: []` (not `null`). The pure unit tests
+(`jl4-runtime.test.mjs`, 89 pass) pin the new shape; **the full differential harness was not run
+on that branch** — it runs in CI only on `jl4-mlir/**` changes and is advisory — so the
+`deontic-seatbelt` deadline-missed cell is the first thing to re-check on the next sweep. If it
+differs, the likely cause is the obligated-party rendering, not the arrays.
+
 ## What a reviewer should actually check
 
 - The propagation is **sound but conservative**: it flags an export that _transitively_

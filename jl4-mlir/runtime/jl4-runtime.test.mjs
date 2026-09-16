@@ -523,7 +523,16 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
       {},
       null,
     ),
-    { BREACH: { detail: null, party: null, reason: "explicit" } },
+    {
+      BREACH: {
+        anchor: 0,
+        detail: null,
+        failures: [{ detail: null, party: null, reason: "explicit" }],
+        parties: [],
+        party: null,
+        reason: "explicit",
+      },
+    },
   );
   // Control: the same multiset in ascending order fulfils the first leg and
   // leaves a residual buyer obligation — proving order is the sole driver.
@@ -553,7 +562,16 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
       {},
       null,
     ),
-    { BREACH: { detail: null, party: null, reason: "explicit" } },
+    {
+      BREACH: {
+        anchor: 0,
+        detail: null,
+        failures: [{ detail: null, party: null, reason: "explicit" }],
+        parties: [],
+        party: null,
+        reason: "explicit",
+      },
+    },
   );
 
   // Blocker 2a — explicit LEST BREACH BY p BECAUSE r carries party/detail.
@@ -581,7 +599,16 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
     ),
     {
       BREACH: {
+        anchor: 0,
         detail: "loan not repaid",
+        failures: [
+          {
+            detail: "loan not repaid",
+            party: "`the borrower`",
+            reason: "explicit",
+          },
+        ],
+        parties: ["`the borrower`"],
         party: "`the borrower`",
         reason: "explicit",
       },
@@ -618,6 +645,7 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
     ),
     {
       BREACH: {
+        anchor: 0,
         deadline: 1,
         // eventAction is the event's own action name, which the reference
         // renders PLAIN (a9caf2f6 replaced prettyLayout with constructorText
@@ -628,6 +656,22 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
         // byte-identical against jl4-service with exactly these two spellings.
         eventAction: "wear seatbelt",
         eventParty: { Driver: { name: "Alice" } },
+        // The blame list (R-T3): one failure, the anchor, carrying the same
+        // party/action/deadline as the scalars.
+        failures: [
+          {
+            action: "`wear seatbelt`",
+            deadline: 1,
+            party: { Driver: { name: "Alice" } },
+            reason: "deadline_missed",
+          },
+        ],
+        // The obligated party: the reference normalises the breach before
+        // serializing it, so this is the EVALUATED record, tagged like
+        // eventParty — and the array is its singleton, this runtime
+        // modelling one obligation at a time.
+        obligatedParties: [{ Driver: { name: "Alice" } }],
+        obligatedParty: { Driver: { name: "Alice" } },
         obligationAction: "`wear seatbelt`",
         reason: "deadline_missed",
         timestamp: 2,

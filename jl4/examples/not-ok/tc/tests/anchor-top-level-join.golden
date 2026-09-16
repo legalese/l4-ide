@@ -1,0 +1,40 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: anchor-top-level-join.l4
+  Hidden: no
+  Range: 16:41-16:52
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    OF THE JOIN names a position in the life of the obligation this one
+    is the continuation of — but this obligation is not WRITTEN inside any
+    HENCE or LEST: it is at the top level, or defined in a WHERE, and the
+    checker cannot see which obligation (if any) it will be attached to.
+
+    Write the anchored obligation inline, under the HENCE or LEST whose join
+    it means, or anchor it to an instant instead: WITHIN d OF <a NUMBER or
+    DATE expression>. (OF THE ARMING is allowed here: it is the arming of
+    whatever obligation this one is attached to when it runs, or its own
+    when there is none, which is where an unanchored WITHIN already counts
+    from.)
+
+File: anchor-top-level-join.l4
+  Hidden: no
+  Range: 19:48-19:63
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    OF THE DEADLINE names a position in the life of the obligation this one
+    is the continuation of — but this obligation is not WRITTEN inside any
+    HENCE or LEST: it is at the top level, or defined in a WHERE, and the
+    checker cannot see which obligation (if any) it will be attached to.
+
+    Write the anchored obligation inline, under the HENCE or LEST whose deadline
+    it means, or anchor it to an instant instead: WITHIN d OF <a NUMBER or
+    DATE expression>. (OF THE ARMING is allowed here: it is the arming of
+    whatever obligation this one is attached to when it runs, or its own
+    when there is none, which is where an unanchored WITHIN already counts
+    from.)

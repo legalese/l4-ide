@@ -26,7 +26,7 @@ Regulative keywords express legal obligations, permissions, prohibitions, and th
 | --------------------- | -------------------------------------------------------------------------------------------------------------- |
 | [PARTY](PARTY.md)     | Who has the obligation/permission                                                                              |
 | [EVERY](EVERY.md)     | Every member of a group has it                                                                                 |
-| WITHIN                | Temporal deadline (relative)                                                                                   |
+| WITHIN                | Temporal deadline (relative, or absolute with `OF`)                                                            |
 | HENCE                 | Consequence on fulfillment                                                                                     |
 | LEST                  | Consequence on breach                                                                                          |
 | PROVIDED              | Guard condition on action                                                                                      |
@@ -44,9 +44,9 @@ Regulative keywords express legal obligations, permissions, prohibitions, and th
 
 ### Planned Keywords
 
-| Keyword | Purpose                      | Status          |
-| ------- | ---------------------------- | --------------- |
-| BEFORE  | Temporal deadline (absolute) | Not implemented |
+| Keyword | Purpose                                                                                                        | Status          |
+| ------- | -------------------------------------------------------------------------------------------------------------- | --------------- |
+| BEFORE  | Absolute deadline, as the window's closing edge (`WITHIN d OF instant` already expresses an absolute deadline) | Not implemented |
 
 ## Basic Rule Structure
 
@@ -70,31 +70,105 @@ paymentObligation MEANS
 
 ## WITHIN (Temporal Deadline)
 
-Specifies a relative time duration within which an action must/may be performed.
+Specifies a time duration within which an action must/may be performed.
 
 ### Syntax
 
 ```l4
 PARTY ...
 MUST action
-WITHIN duration
+WITHIN duration [OF anchor]
 ```
 
-The duration can optionally be anchored to an event with `OF`:
+The duration is a `NUMBER` of clock units — the same units the trace's timestamps use (days, if the trace is stamped in days). Written alone, it counts from where the language puts it: an obligation at the top level counts from when it was entered; an obligation under a `HENCE` counts from the moment the previous obligation was completed; an obligation under a `LEST` counts, today, from the event that revealed the miss.
 
-```l4
-WITHIN 5 days OF notice
-```
+The duration can be anchored with `OF`, and then the deadline is **absolute**: the anchor's instant plus the duration, whatever the clock read when the obligation was entered. The anchor is one of:
+
+| Anchor            | Names                                                                                           |
+| ----------------- | ----------------------------------------------------------------------------------------------- |
+| `OF THE JOIN`     | the instant the enclosing obligation's `HENCE` fired (under `HENCE` this is the default, named) |
+| `OF THE DEADLINE` | the enclosing obligation's deadline (its `WITHIN`)                                              |
+| `OF THE ARMING`   | the instant the enclosing obligation was entered                                                |
+| `OF expression`   | an instant: a `NUMBER` on the trace's clock, or a `DATE`                                        |
+
+"The enclosing obligation" is the one whose `HENCE` or `LEST` this obligation is the continuation of — the one it is attached to when it runs. Usually that is the obligation it is written under; but a continuation can also arrive as a value (a rule with `GIVEN k IS A DEONTIC …` that ends `HENCE k`, or a `WHERE` local), and then the anchors name the obligation it is handed to, not the one it was written under — also when the value is one operand of a `RAND` or `ROR` there. It is the _nearest_ enclosing obligation: two levels down, `THE ARMING` is the middle obligation's arming, not the outermost rule's, so "within 10 days of this agreement" (below) works from one level down, where the phrase is written.
+
+For a `MUST`, `DO` or `MAY`, the join is the act that completed it. For a prohibition (`SHANT`) that was kept, the `HENCE` fires when the machine _learns_ it was kept — the first event after its deadline, not the deadline itself — and `THE JOIN` is that instant, the same one an unanchored `WITHIN` counts from. To count from the day a prohibition was discharged, anchor to `THE DEADLINE`.
+
+`THE` is a keyword; `JOIN`, `DEADLINE` and `ARMING` are matched by spelling in this one position and are not reserved, so a program may still name a value `DEADLINE`.
+
+Inside the duration, `OF` is always the anchor — everywhere in it, not only at the front — so `WITHIN f OF x` means `f` anchored at `x`, and so does an `OF` inside an `IF` branch, an operator's operand or a `WHERE` in the duration. To apply a function there, bracket the call (`WITHIN (f OF x) OF THE JOIN`) or juxtapose its arguments (`WITHIN f x OF THE JOIN`); the checker's message says so when the duration turns out to be a function.
 
 ### Examples
 
-```l4
--- Simple deadline
-PARTY Alice MUST pay 100 WITHIN 30
+**Example file:** [within-example.l4](within-example.l4) — these rules, each with a trace showing the deadline its anchor produces.
 
--- Anchored to an event
-PARTY Seller MUST deliver WITHIN 5 days OF `order confirmation`
+```l4
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF pay HAS amount IS A NUMBER
+                         deliver
+closingDate MEANS 20
+
+-- Simple deadline: 30 units from when the obligation is entered
+GIVETH A DEONTIC Person Action
+simple MEANS PARTY Buyer MUST pay 100 WITHIN 30
+
+-- The cure period runs from when payment fell due, not from the day the
+-- buyer finally paid
+GIVETH A DEONTIC Person Action
+cure MEANS
+  PARTY Buyer MUST pay 100 WITHIN 30
+  HENCE (PARTY Seller MUST deliver WITHIN 5 OF THE DEADLINE)
+  LEST  BREACH
+
+-- "Within 10 days of this agreement": counts from when the outer obligation
+-- was entered, however long the buyer took to pay. (One level down only:
+-- an obligation nested a level deeper would count from the seller's
+-- arming, the nearest enclosing obligation.)
+GIVETH A DEONTIC Person Action
+`of this agreement` MEANS
+  PARTY Buyer MUST pay 100 WITHIN 30
+  HENCE (PARTY Seller MUST deliver WITHIN 10 OF THE ARMING)
+  LEST  BREACH
+
+-- An absolute deadline on the trace's own clock: due at 20 + 5 = 25
+GIVETH A DEONTIC Person Action
+absolute MEANS PARTY Seller MUST deliver WITHIN 5 OF closingDate
 ```
+
+A unit word is ordinary L4, not syntax: `WITHIN 5 days OF THE DEADLINE` checks once `days` is defined (`GIVEN n IS A NUMBER GIVETH A NUMBER DECIDE n days IS n`). Until it is, the file fails — how depends on what else is in scope. In a file with no imports and no other mixfix definition, like the one above, `5 days` parses as an application and the checker reports _could not find a definition for the identifier `days`_; once any mixfix operator is in scope (after `IMPORT prelude`, say, or one `DECIDE a plus b IS …`), the parser only accepts operator words it knows, and stops at `days` with _unexpected days_. Either way the fix is the one-line definition.
+
+An anchored deadline may already be in the past when the obligation is entered — `WITHIN 5 OF closingDate` on a contract that begins after `closingDate + 5`. That is not an error: the first event reveals the expiry, exactly as if the deadline had been missed by waiting.
+
+### Dates as anchors
+
+A `DATE` anchor is lowered to its serial (what `DATE_SERIAL` computes), so `WITHIN 0 OF (YMD 2026 6 30)` means _by 30 June 2026_ on a trace whose timestamps are date serials — start it `AT (DATE_SERIAL (YMD 2026 6 1))` and stamp its events the same way (`IMPORT daydate` for `YMD`). Nothing checks that the trace _is_ on that scale: a `DATE` anchor on a trace that starts `AT 0` counts from a serial in the hundreds of thousands, silently.
+
+### Where an anchor is refused
+
+The type checker refuses a lifecycle anchor where the position it names does not exist, and says so:
+
+- `THE JOIN` and `THE DEADLINE` on an obligation that is not inside any `HENCE` or `LEST` — there is no enclosing obligation. `THE ARMING` is allowed there: it is the obligation's own arming, which is the default.
+- `THE JOIN` under `LEST` — the enclosing obligation was not completed, so its join never fired.
+- `THE DEADLINE` where the enclosing obligation has no `WITHIN` at all.
+- An `OF` expression that is neither a `NUMBER` nor a `DATE`.
+
+The checker sees only where an anchor is _written_. A top-level rule referenced by name inside a `HENCE` (`HENCE cure`), and a `WHERE` local, are checked where they are written — outside any `HENCE` or `LEST` — and so cannot use `THE JOIN` or `THE DEADLINE`: write the anchored obligation inline under the `HENCE`. `THE ARMING` is accepted there, and when the rule runs it names the arming of the obligation the continuation is attached to (its own, when there is none), so factoring an inline continuation out into a `WHERE` does not move its deadline, nor does putting the local inside a `RAND` or `ROR`.
+
+Two refusals only a run can make, because the checker cannot see them, are reported when the rule runs, naming the cause:
+
+- `THE DEADLINE` in the `HENCE` of a barrier (`ONCE ALL HAVE`) whose group turned out to be _empty_ and whose `ONCE` line has no `WITHIN` — nobody had a deadline to meet, so there is none to name.
+- An obligation written under one `HENCE` and handed on as a value to a place where the position does not exist — `THE JOIN` attached under a `LEST`, `THE DEADLINE` attached under an obligation with no `WITHIN` — whether it is attached on its own or as one operand of a `RAND`/`ROR`.
+
+Under `EVERY` the same anchors work on the act's `WITHIN`, and a join line's own `WITHIN` may be anchored to `THE ARMING` or to an instant; see [EVERY](EVERY.md#anchored-deadlines-under-a-join).
+
+### What the exports do with an anchor
+
+The evaluator is the only consumer that resolves an anchor. The others carry it as written, and say so:
+
+- The state graph (`l4 state-graph`) labels the edge with the closing edge as the source spells it — `[5 OF THE JOIN]`, `ONCE ALL HAVE WITHIN 30 OF THE ARMING` — an applied duration bracketed, `[(period OF 2) OF THE ARMING]`, so the label re-parses as L4.
+- The BPMN export (`l4 export --to bpmn`) draws a **plain** `WITHIN` as a timer boundary event. An **anchored** `WITHIN` gets no timer: the boundary event is a _conditional_ event whose condition is the text verbatim, and the fidelity report carries a blocking `P-DEADLINE` note on it naming the anchor — _the duration counts from THE JOIN, and this exporter does not resolve anchors_. That holds even where a timer would have been exact (`OF THE JOIN` on a `HENCE` task starts when the task does); the export declines to work that out. The task's `<documentation>` restates the rule with the anchor in it. See [DMN and BPMN](../../exports/dmn-bpmn.md#what-doesnt-survive).
+- The MLIR/WASM export fails closed on an anchored `WITHIN`.
 
 ### Boundary
 
@@ -102,7 +176,7 @@ The deadline boundary is inclusive: an action arriving _exactly at_ the deadline
 
 ### See Also
 
-- **BEFORE** (planned, not yet implemented -- will support absolute deadlines)
+- **BEFORE** and **AFTER** (planned, not yet implemented -- the window's absolute closing edge and its opening edge)
 
 ## HENCE (Fulfillment Consequence)
 
@@ -297,15 +371,17 @@ dropping the keyword there.
 
 ## BREACH (Terminal Violation State)
 
-Terminal deontic value indicating that an obligation has been violated. Used as the consequence in LEST clauses. Can optionally specify the responsible party and a reason.
+Terminal deontic value indicating that an obligation has been violated. Used as the consequence in LEST clauses. Can optionally specify the responsible party — one, or a `LIST` of several — and a reason.
 
 ### Syntax
 
 ```l4
 LEST BREACH
 LEST BREACH BY party
+LEST BREACH BY LIST party, party
 LEST BREACH BECAUSE reason
 LEST BREACH BY party BECAUSE reason
+LEST BREACH BY LIST party, party BECAUSE reason
 ```
 
 ### Examples
@@ -316,6 +392,9 @@ LEST BREACH
 
 -- With responsible party
 LEST BREACH BY Seller
+
+-- With several responsible parties, one line of the answer each
+LEST BREACH BY LIST Seller, Carrier BECAUSE "goods lost in transit"
 
 -- With reason
 LEST BREACH BECAUSE "delivery deadline exceeded"
@@ -425,9 +504,9 @@ ROR
 
 ## BEFORE (NOT YET IMPLEMENTED)
 
-Planned temporal keyword for specifying absolute deadlines in deontic rules (as opposed to WITHIN, which specifies relative durations).
+Planned temporal keyword naming an absolute deadline as the closing edge of the window, in one word. An absolute deadline is already expressible today: `WITHIN d OF instant` (see [WITHIN](#within-temporal-deadline)) is `instant + d`, so `WITHIN 0 OF (YMD 2026 6 30)` means "by 30 June 2026". `BEFORE` would be the spelling for the same thing when there is no duration to add.
 
-**Status:** Planned but not yet in the parser. Use WITHIN for relative durations in the meantime.
+**Status:** Planned but not yet in the parser. Use `WITHIN d OF instant` for an absolute deadline in the meantime, and a bare `WITHIN d` for a relative one.
 
 ### Intended Syntax
 
@@ -439,7 +518,7 @@ BEFORE deadline
 
 ### See Also
 
-- **WITHIN** -- implemented, for relative durations
+- **WITHIN** -- implemented; relative as `WITHIN d`, absolute as `WITHIN d OF instant`
 
 ---
 

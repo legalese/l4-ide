@@ -1,0 +1,16 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: anchor-no-deadline.l4
+  Hidden: no
+  Range: 17:47-17:62
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    OF THE DEADLINE names the deadline of the obligation this one is the
+    continuation of, but that obligation has no WITHIN — not on its act, and
+    not on its join line — so it has no deadline to count from.
+
+    Give the enclosing obligation a WITHIN, or anchor this one elsewhere:
+    OF THE JOIN (under HENCE), OF THE ARMING, or an instant.

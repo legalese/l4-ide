@@ -1,0 +1,40 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: breach-by-list-needs-party-type.l4
+  Hidden: no
+  Range: 20:15-20:30
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    BREACH BY names a list, but the rule's party type is not known here.
+
+    A LIST after BY names several parties, one per element — unless the
+    party type is itself that kind of list, in which case it names one party
+    whose value is a list. Which of the two is meant is decided by the party
+    type, and nothing has fixed it at this point: this BREACH is checked
+    before anything says what the rule's party type is. Either
+
+      - give the definition a signature, GIVETH A DEONTIC <party> <action>, or
+      - if this BREACH is the first operand of a RAND or ROR, write the PARTY
+        operand first.
+
+File: breach-by-list-needs-party-type.l4
+  Hidden: no
+  Range: 26:16-26:31
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    BREACH BY names a list, but the rule's party type is not known here.
+
+    A LIST after BY names several parties, one per element — unless the
+    party type is itself that kind of list, in which case it names one party
+    whose value is a list. Which of the two is meant is decided by the party
+    type, and nothing has fixed it at this point: this BREACH is checked
+    before anything says what the rule's party type is. Either
+
+      - give the definition a signature, GIVETH A DEONTIC <party> <action>, or
+      - if this BREACH is the first operand of a RAND or ROR, write the PARTY
+        operand first.

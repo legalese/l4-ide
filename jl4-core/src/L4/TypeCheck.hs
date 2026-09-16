@@ -151,6 +151,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , sectionBinderDecls = Map.empty
     , importedImplicitReaders = Set.empty
     , inNonexhaustiveDecide = False
+    , enclosingObligation = Nothing
     , moduleUri
     , sectionStack = []
     , localBindings = Set.empty
@@ -417,8 +418,8 @@ withExtraMixfix mixfixAdds =
     -- positional match: 'mixfixRegistry' is a duplicated field name, so a
     -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb sd ir ne h i lb apos) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb sd ir ne h i lb apos
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb sd ir ne eo h i lb apos) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb sd ir ne eo h i lb apos
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -620,6 +621,45 @@ checkBinOp t1 t2 tr opname op ann e1 e2 = do
   e1' <- checkExpr (ExpectBinOpArgContext opname 1) e1 t1
   e2' <- checkExpr (ExpectBinOpArgContext opname 2) e2 t2
   pure (op ann e1' e2', tr)
+
+-- | A regulative @RAND@\/@ROR@ whose @DEONTIC party action@ type is given:
+-- both operands are checked against it, left first, with the inert context
+-- set for each. Shared by the two paths — 'inferExpr' gives a fresh contract
+-- type, 'checkRegulativeBinOp' the expected one after unifying with it.
+regulativeBinOpAt ::
+     Type' Resolved
+  -> Text
+  -> (Anno -> Expr Resolved -> Expr Resolved -> Expr Resolved)
+  -> InertContext
+  -> Anno
+  -> Expr Name
+  -> Expr Name
+  -> Check (Expr Resolved, Type' Resolved)
+regulativeBinOpAt contractT opname op ctx ann e1 e2 =
+  checkBinOp contractT contractT contractT opname op ann
+    (setInertContext ctx e1) (setInertContext ctx e2)
+
+-- | A regulative @RAND@\/@ROR@ checked against an expected type: unify the
+-- expected type with a @DEONTIC party action@ FIRST, then check both operands
+-- at it, so a @BREACH BY <list>@ in either operand is read against the
+-- rule's party type (see the 'checkExpr' clauses that call this, and
+-- 'checkBreachParty').
+checkRegulativeBinOp ::
+     ExpectationContext
+  -> Text
+  -> (Anno -> Expr Resolved -> Expr Resolved -> Expr Resolved)
+  -> InertContext
+  -> Anno
+  -> Expr Name
+  -> Expr Name
+  -> Type' Resolved
+  -> Check (Expr Resolved)
+checkRegulativeBinOp ec opname op ctx ann e1 e2 t = do
+  partyT <- fresh (NormalName "party")
+  actT <- fresh (NormalName "action")
+  let contractT = contract partyT actT
+  expect ec t contractT
+  fst <$> regulativeBinOpAt contractT opname op ctx ann e1 e2
 
 -- Phase 4.
 inferDeclare :: Declare Name -> Check (Declare Resolved, [CheckInfo])
@@ -1964,11 +2004,124 @@ checkExpr ec (LetIn ann ds e) t = softprune $ do
       re <- checkExpr ec e t
       nlgExpr re
   setAnnResolvedType t Nothing (LetIn ann rds re)
+-- A BREACH checked against a KNOWN deontic type unifies with it FIRST, so
+-- that its BY expression is read against the rule's party type (see
+-- 'checkBreachParty'): inferring it with a fresh party type and unifying
+-- afterwards would decide the list-versus-party reading before the party type
+-- was known. A LEST/HENCE, the operand of a RAND/ROR under a GIVETH (via the
+-- two clauses below), and a top-level @x MEANS BREACH BY …@ under a GIVETH
+-- all arrive here.
+checkExpr ec e@(Breach ann mParty mReason) t = softprune $ errorContext (WhileCheckingExpression e) do
+  partyT <- fresh (NormalName "party")
+  actionT <- fresh (NormalName "action")
+  expect ec t (contract partyT actionT)
+  mParty' <- traverse (checkBreachParty partyT) mParty
+  mReason' <- traverse (\r -> checkExpr ExpectBreachReasonContext r string) mReason
+  setAnnResolvedType t Nothing (Breach ann mParty' mReason')
+-- A RAND\/ROR checked against a KNOWN deontic type likewise unifies with it
+-- FIRST and then checks both operands against it, so that a @BREACH BY <list>@
+-- in EITHER operand sees the rule's party type. Inferring the compound (as
+-- 'inferExpr' must, when nothing says its type) checks the left operand
+-- under a fresh party type, which the left operand's own shape then fixes for
+-- the right — and a @BREACH BY <list>@ on the LEFT cannot fix it
+-- ('checkBreachParty' refuses it there). Without these two clauses a
+-- @GIVETH A DEONTIC …@ never reached the operands, and the refusal's advice
+-- ("give the definition a signature") was false for a rule that had one
+-- (adversarial pass of 2026-09-15, round 2, R2-TC-1).
+checkExpr ec e@(RAnd ann e1 e2) t = softprune $ errorContext (WhileCheckingExpression e) do
+  re <- checkRegulativeBinOp ec "AND" RAnd InertCtxAnd ann e1 e2 t
+  setAnnResolvedType t Nothing re
+checkExpr ec e@(ROr ann e1 e2) t = softprune $ errorContext (WhileCheckingExpression e) do
+  re <- checkRegulativeBinOp ec "OR" ROr InertCtxOr ann e1 e2 t
+  setAnnResolvedType t Nothing re
 checkExpr ec e t = softprune $ errorContext (WhileCheckingExpression e) do
   (re, rt) <- inferExpr e
   expect ec t rt
   -- Store the expected type in the annotation so it's available during evaluation
   setAnnResolvedType t Nothing re
+
+-- | @BREACH BY e@ takes a party or a LIST of parties (R-T3,
+-- EVERY-EACH-QUANTIFIER-SPEC §6.1, built 2026-09-15). The expression is
+-- inferred first and its type read back: a @LIST OF t@ unifies its ELEMENT
+-- type with the breach's party type, anything else is the party itself. This
+-- is deliberately not a nondeterministic 'choose' between the two readings:
+-- a party whose type is still an inference variable would then leave both
+-- branches viable and report an ambiguity where there was none.
+--
+-- The machine cannot see which reading was taken — no mark is left on the
+-- syntax — and reads a LIST value as several parties. So the one case where
+-- the two readings collide is settled HERE, by rewriting: when the party type
+-- is ITSELF the list type @e@ has (both fully known, so this is a structural
+-- comparison, not a unification), the drafter named ONE party whose value is
+-- a list — @DEONTIC (LIST OF Person) Action@ with @BREACH BY ps@ — and @e@ is
+-- wrapped as the one-element list @LIST e@, which the machine walks into
+-- exactly that one party. The wrap is idempotent under re-check (the printed
+-- @LIST (LIST …)@ takes the element reading, whose element type is the
+-- party type) and invisible to exactprint, which prints the parsed tree.
+-- Restored 2026-09-15 by the adversarial pass; the first build gave this
+-- case up.
+--
+-- That decision needs the party type, and a @BREACH@ reached by INFERENCE —
+-- a top-level @x MEANS BREACH BY …@ with no @GIVETH@, or the LEFT operand of
+-- a @RAND@\/@ROR@ that has none (with one, 'checkRegulativeBinOp' pushes the
+-- @GIVETH@'s type into both operands first) — arrives with a fresh one. Reading the list
+-- as several parties there would PIN the party type to the element type and
+-- fail later, at the use site, with a @HENCE@ or @AND@ mismatch that names
+-- the wrong place (and the same rule would pass with its operands swapped:
+-- measured by the adversarial pass of 2026-09-15, round 2, R2-TC-1). So a
+-- LIST after @BY@ under a party type that is not yet known is REFUSED here,
+-- at the @BREACH@, with the two ways to fix it ('BreachByListNeedsPartyType');
+-- the party type is left for the use site to fix, so that one cause is one
+-- error. Deferring the decision to the end of the module instead (record the
+-- breach, decide once the substitution is final, rewrite the tree) would
+-- accept those shapes; it needs a post-check rewrite pass the checker does
+-- not have, and is recorded in the spec (§6.1.1) as the fuller fix, not built.
+--
+-- A list LITERAL with nobody in it (@EMPTY@, or @LIST@ with no elements) is
+-- refused here, loudly: a breach blames at least one party, and the literal
+-- is decidable at check time. A computed list that turns out empty is
+-- refused when the rule runs ('emptyBreachByRefusal' in the machine).
+--
+-- A mismatch under the element reading is reported with the LIST's own type
+-- as the given type, because the range the error carries is the whole list
+-- expression (R2-TC-2): the message's prefix says that a list's elements
+-- must be the party type.
+checkBreachParty :: Type' Resolved -> Expr Name -> Check (Expr Resolved)
+checkBreachParty partyT p = errorContext (WhileCheckingExpression p) do
+  partyT' <- applySubst partyT
+  (rp, pt) <- inferExpr p
+  let emptyLiteral = isEmptyListLiteral rp
+  when emptyLiteral $ addError (EmptyBreachBy p)
+  pt' <- applySubst pt
+  let ground t = not (hasInfVarKey (typeKey t))
+  case pt' of
+    TyApp _ n [elemT] | getUnique n == getUnique listRef ->
+      if ground partyT' && ground pt' && typeKey partyT' == typeKey pt'
+        then do
+          -- the party type IS this list type: one party, wrapped (see above)
+          rp' <- setAnnResolvedType pt' Nothing rp
+          pure (List emptyAnno [rp'])
+        else if not (ground partyT') && not emptyLiteral
+          then do
+            -- the reading cannot be decided yet: refuse at the BREACH (see
+            -- above) and leave the party type for the use site to fix
+            addError (BreachByListNeedsPartyType p)
+            setAnnResolvedType pt' Nothing rp
+          else do
+            -- several parties, one per element
+            b <- unify partyT elemT
+            unless b $ addError (TypeMismatch ExpectBreachPartyContext partyT pt')
+            setAnnResolvedType pt' Nothing rp
+    _ -> do
+      expect ExpectBreachPartyContext partyT pt'
+      setAnnResolvedType pt' Nothing rp
+  where
+    -- @LIST@ with no elements, or the builtin @EMPTY@ (a nullary constructor)
+    isEmptyListLiteral = \ case
+      List _ []  -> True
+      Var _ r    -> getUnique r == emptyUnique
+      App _ r [] -> getUnique r == emptyUnique
+      _          -> False
 
 checkIfThenElse :: ExpectationContext -> Anno -> Expr Name -> Expr Name -> Expr Name -> Type' Resolved -> Check (Expr Resolved)
 checkIfThenElse ec ann e1 e2 e3 t = do
@@ -1988,7 +2141,7 @@ checkMultiWayIf ann es e t = do
 
 checkDeonton
   :: Anno -> Subject Name -> RAction Name
-  -> Maybe (Expr Name) -> Maybe (Join Name) -> Maybe (Expr Name) -> Maybe (Expr Name)
+  -> Maybe (Deadline Name) -> Maybe (Join Name) -> Maybe (Expr Name) -> Maybe (Expr Name)
   -> Type' Resolved -> Type' Resolved -> Check (Deonton Resolved)
 checkDeonton ann subject action due mjoin hence lest partyT actionT =
   case subject of
@@ -1998,7 +2151,7 @@ checkDeonton ann subject action due mjoin hence lest partyT actionT =
       forM_ mjoin (addError . JoinWithoutEvery)
       joinR <- traverse checkJoin mjoin
       (actionR, dueR, henceR, lestR) <-
-        checkDeontonBody (Just partyR) partyT actionT action due hence lest
+        checkDeontonBody (Just partyR) partyT actionT action due (hasJoinDeadline mjoin) hence lest
       pure (MkDeonton ann (Party sann partyR) actionR dueR joinR henceR lestR)
     Every sann mCast v mRoll mFilter -> do
       -- EVERY-EACH-QUANTIFIER-SPEC §2.1/§2.4: the bound variable has the
@@ -2070,7 +2223,7 @@ checkDeonton ann subject action due mjoin hence lest partyT actionT =
         -- spelling and tell the author to write @Sign (EXACTLY t)@ — is
         -- retired (R4). Its message would now be false.
         (actionR, dueR, henceR, lestR) <-
-          checkDeontonBody Nothing partyT actionT action due hence lest
+          checkDeontonBody Nothing partyT actionT action due (hasJoinDeadline mjoin) hence lest
         pure (MkDeonton ann (Every sann mCastR rv' mRollR filterR) actionR dueR joinR henceR lestR)
 
 -- | The @ONCE@ line: its threshold carries no expression in phase 1; its
@@ -2083,24 +2236,116 @@ checkJoin = \ case
   JoinUpon jann ue mdue ->
     JoinUpon jann ue <$> checkJoinDeadline mdue
   where
-    checkJoinDeadline =
-      traverse (\e -> checkExpr ExpectJoinDeadlineContext e number)
+    checkJoinDeadline = traverse (checkDeadline JoinLineDeadline)
+
+-- | Does the join line carry a @WITHIN@? Under a barrier that is the group's
+-- deadline, and it is what @THE DEADLINE@ in the barrier's continuation
+-- names when it is written (see 'checkAnchor').
+hasJoinDeadline :: Maybe (Join Name) -> Bool
+hasJoinDeadline = \ case
+  Just (JoinOnce _ _ (Just _)) -> True
+  Just (JoinUpon _ _ (Just _)) -> True
+  _                            -> False
+
+-- | The two positions a @WITHIN@ can sit in. The duration's type mismatch is
+-- worded per position ('ExpectRegulativeDeadlineContext',
+-- 'ExpectJoinDeadlineContext'), and the lifecycle anchors mean different
+-- things in the two (see 'checkAnchor').
+data DeadlinePosition = ActDeadline | JoinLineDeadline
+
+-- | @WITHIN d [OF anchor]@ (EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7A\/B\/C;
+-- built 2026-09-15). The duration is a NUMBER in either position; the anchor,
+-- when written, is one of the three lifecycle positions or an expression.
+checkDeadline :: DeadlinePosition -> Deadline Name -> Check (Deadline Resolved)
+checkDeadline pos (MkDeadline dann d ma) = do
+  dR <- checkExpr ctx d number
+  maR <- traverse (checkAnchor pos) ma
+  pure (MkDeadline dann dR maR)
+  where
+    -- An anchored deadline's duration is everything before OF, and inside
+    -- an unbracketed duration OF is never application ('L4.Parser.deadline',
+    -- @ofIsAnchor@). The commonest way to get a non-NUMBER there is to have
+    -- meant @f OF x@ as a call, so a mismatch next to an anchor says so; the
+    -- unanchored wording is kept for the unanchored form (its goldens hold).
+    ctx = case (pos, ma) of
+      (_, Just _)              -> ExpectAnchoredDurationContext
+      (ActDeadline, Nothing)      -> ExpectRegulativeDeadlineContext
+      (JoinLineDeadline, Nothing) -> ExpectJoinDeadlineContext
+
+-- | The anchor after @OF@.
+--
+-- The three lifecycle anchors name positions in the life of the ENCLOSING
+-- obligation, which 'enclosingObligation' describes; each is refused where
+-- the position it names does not exist ('AnchorRefusal'):
+--
+--   * on a join line, @THE JOIN@ and @THE DEADLINE@ are refused outright —
+--     that @WITHIN@ IS the group's deadline, and its join has not fired when
+--     it is read; @THE ARMING@ there is the EVERY's own arming;
+--   * on an act with no enclosing obligation, @THE JOIN@ and @THE DEADLINE@
+--     are refused; @THE ARMING@ is the obligation's own arming, i.e. the
+--     default, allowed and pointless;
+--   * @THE JOIN@ under @LEST@ is refused (the join did not fire) — the
+--     conservative reading of the question §5.1.1 leaves open;
+--   * @THE DEADLINE@ is refused when the enclosing obligation has no
+--     @WITHIN@ on its act or its join line.
+--
+-- The expression form is a NUMBER — an instant on the trace's own clock —
+-- or a DATE, which the machine lowers with @DATE_SERIAL@; anything else is
+-- refused naming both. The choice is biased: an expression of a
+-- not-yet-known type is taken as a NUMBER.
+checkAnchor :: DeadlinePosition -> Anchor Name -> Check (Anchor Resolved)
+checkAnchor pos a = case a of
+  AnchorJoin aann     -> AnchorJoin aann     <$ lifecycle (\ enc -> case enc.slot of
+                                                             InLest  -> Just JoinUnderLest
+                                                             InHence -> Nothing)
+  AnchorDeadline aann -> AnchorDeadline aann <$ lifecycle (\ enc ->
+                                                             if enc.hasDeadline then Nothing else Just EnclosingHasNoDeadline)
+  AnchorArming aann   -> pure (AnchorArming aann)
+  AnchorAt aann e     -> AnchorAt aann <$> checkAnchorAt e
+  where
+    -- refuse per position, then per what the enclosing obligation has
+    lifecycle :: (EnclosingObligation -> Maybe AnchorRefusal) -> Check ()
+    lifecycle refuseWithin = case pos of
+      JoinLineDeadline -> addError (AnchorUnavailable a OnJoinLine)
+      ActDeadline -> do
+        menc <- asks (.enclosingObligation)
+        case menc of
+          Nothing  -> addError (AnchorUnavailable a NoEnclosingObligation)
+          Just enc -> forM_ (refuseWithin enc) (addError . AnchorUnavailable a)
+
+    checkAnchorAt :: Expr Name -> Check (Expr Resolved)
+    checkAnchorAt e = softprune $ errorContext (WhileCheckingExpression e) do
+      (re, rt) <- inferExpr e
+      t <- accept number rt `orElse` accept date rt `orElse` (number <$ addError (AnchorNotAnInstant e rt))
+      setAnnResolvedType t Nothing re
+
+    accept :: Type' Resolved -> Type' Resolved -> Check (Type' Resolved)
+    accept t rt = do
+      ok <- unify t rt
+      if ok then pure t else empty
 
 -- | The part of a deonton after its subject: the action (with its PROVIDED
 -- guard), the deadline, and the two continuations. Shared by both subjects.
+--
+-- The continuations are checked with 'enclosingObligation' set to THIS
+-- deonton, so that a nested obligation's anchored @WITHIN@ can be checked
+-- against what this one has ('checkAnchor'). The nearest enclosing
+-- obligation wins, which is also what the machine binds at run time.
 checkDeontonBody
   :: Maybe (Expr Resolved) -> Type' Resolved -> Type' Resolved
-  -> RAction Name -> Maybe (Expr Name) -> Maybe (Expr Name) -> Maybe (Expr Name)
-  -> Check (RAction Resolved, Maybe (Expr Resolved), Maybe (Expr Resolved), Maybe (Expr Resolved))
-checkDeontonBody mPartyR partyT actionT action due hence lest = do
+  -> RAction Name -> Maybe (Deadline Name) -> Bool -> Maybe (Expr Name) -> Maybe (Expr Name)
+  -> Check (RAction Resolved, Maybe (Deadline Resolved), Maybe (Expr Resolved), Maybe (Expr Resolved))
+checkDeontonBody mPartyR partyT actionT action due joinHasDeadline hence lest = do
   (actionR, boundByPattern) <- checkAction action actionT
   checkPartyActionAgreement partyT actionT
   forM_ mPartyR \partyR ->
     checkRegulativeActorAgreement partyT partyR (actionExprOfPattern actionR.action)
   let rTy = contract partyT actionT
-  dueR <- traverse (\e -> checkExpr ExpectRegulativeDeadlineContext e number) due
-  henceR <- traverse (\e -> extendKnownMany boundByPattern $ checkExpr ExpectRegulativeFollowupContext e rTy) hence
-  lestR <- traverse (\e -> checkExpr ExpectRegulativeFollowupContext e rTy) lest
+      hasDeadline = isJust due || joinHasDeadline
+      inSlot slot = local \ env -> env { enclosingObligation = Just (MkEnclosingObligation slot hasDeadline) }
+  dueR <- traverse (checkDeadline ActDeadline) due
+  henceR <- traverse (\e -> extendKnownMany boundByPattern $ inSlot InHence $ checkExpr ExpectRegulativeFollowupContext e rTy) hence
+  lestR <- traverse (\e -> inSlot InLest $ checkExpr ExpectRegulativeFollowupContext e rTy) lest
   pure (actionR, dueR, henceR, lestR)
 
 -- | The cast of an @EVERY Cast v@: a data constructor whose result type is the
@@ -3241,21 +3486,15 @@ inferExpr' g =
       dsFun <- desugarBinOpToFunction (rawName orName) (Or ann e1' e2') ann e1' e2'
       inferExpr' dsFun
     RAnd ann e1 e2 -> do
-      -- Set inert context to AND for subexpressions
-      let e1' = setInertContext InertCtxAnd e1
-          e2' = setInertContext InertCtxAnd e2
+      -- nothing says the compound's type: a fresh DEONTIC, which the LEFT
+      -- operand then fixes for the right (see 'checkRegulativeBinOp')
       partyT <- fresh (NormalName "party")
       actT <- fresh (NormalName "action")
-      let contractT = contract partyT actT
-      checkBinOp contractT contractT contractT "AND" RAnd ann e1' e2'
+      regulativeBinOpAt (contract partyT actT) "AND" RAnd InertCtxAnd ann e1 e2
     ROr ann e1 e2 -> do
-      -- Set inert context to OR for subexpressions
-      let e1' = setInertContext InertCtxOr e1
-          e2' = setInertContext InertCtxOr e2
       partyT <- fresh (NormalName "party")
       actT <- fresh (NormalName "action")
-      let contractT = contract partyT actT
-      checkBinOp contractT contractT contractT "OR" ROr ann e1' e2'
+      regulativeBinOpAt (contract partyT actT) "OR" ROr InertCtxOr ann e1 e2
     Implies ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName impliesName) g ann e1 e2
       inferExpr' dsFun
@@ -3574,7 +3813,7 @@ inferExpr' g =
       -- Breach is a terminal clause that represents a contract breach
       partyT <- fresh (NormalName "party")
       actionT <- fresh (NormalName "action")
-      mParty' <- traverse (\p -> checkExpr ExpectRegulativePartyContext p partyT) mParty
+      mParty' <- traverse (checkBreachParty partyT) mParty
       mReason' <- traverse (\r -> checkExpr ExpectBreachReasonContext r string) mReason
       pure (Breach ann mParty' mReason', contract partyT actionT)
     Refuse ann msg -> do
@@ -5825,10 +6064,14 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
     goNamed ctx' (MkNamedExpr ann n e) = MkNamedExpr ann n (go False ctx' e)
     goGuarded ctx' (MkGuardedExpr ann c f) = MkGuardedExpr ann (go True ctx' c) (go False ctx' f)
     goObl ctx' (MkDeonton ann subj action due mjoin hence lest) =
-      MkDeonton ann (goSubject ctx' subj) (goRAction ctx' action) (fmap (go False ctx') due) (fmap (goJoin ctx') mjoin) (fmap (go False ctx') hence) (fmap (go False ctx') lest)
+      MkDeonton ann (goSubject ctx' subj) (goRAction ctx' action) (fmap (goDeadline ctx') due) (fmap (goJoin ctx') mjoin) (fmap (go False ctx') hence) (fmap (go False ctx') lest)
     goJoin ctx' = \ case
-      JoinOnce ann th due -> JoinOnce ann th (fmap (go False ctx') due)
-      JoinUpon ann ue due -> JoinUpon ann ue (fmap (go False ctx') due)
+      JoinOnce ann th due -> JoinOnce ann th (fmap (goDeadline ctx') due)
+      JoinUpon ann ue due -> JoinUpon ann ue (fmap (goDeadline ctx') due)
+    goDeadline ctx' (MkDeadline ann d ma) = MkDeadline ann (go False ctx' d) (fmap (goAnchor ctx') ma)
+    goAnchor ctx' = \ case
+      AnchorAt ann e -> AnchorAt ann (go False ctx' e)
+      a              -> a
     goSubject ctx' = \ case
       Party ann party -> Party ann (go False ctx' party)
       -- The filter is a BOOLEAN context ('go True'); the roll is a LIST, so it
@@ -5970,6 +6213,15 @@ prettyCheckErrorContext (WhileCheckingType _t ctx)       e = prettyCheckErrorCon
 -- alternatives' trailing comments and is sized for a nine-character fork.
 forkWordsText :: Text
 forkWordsText = Text.strip (prettyLayout (MkUponEach emptyAnno))
+
+-- | The lifecycle anchor's words as a drafter wrote them, for diagnostics
+-- ('L4.Print' is the printer's copy).
+anchorWords :: Anchor n -> Text
+anchorWords = \ case
+  AnchorJoin{}     -> "THE JOIN"
+  AnchorDeadline{} -> "THE DEADLINE"
+  AnchorArming{}   -> "THE ARMING"
+  AnchorAt{}       -> "…"
 
 prettyCheckError :: CheckError -> [Text]
 prettyCheckError (SuspiciousBinderPattern binder ctor)     =
@@ -6419,6 +6671,26 @@ prettyCheckError (ActionPatternNotComparable e t) =
   , "Pin something that can be compared, or -- if you meant a name that stands"
   , "for anything here -- give it a spelling nothing else is using."
   ]
+prettyCheckError (EmptyBreachBy _) =
+  [ "BREACH BY names an empty list."
+  , ""
+  , "A breach blames at least one party: give BY a party, or a LIST with"
+  , "someone in it, or leave BY out to blame nobody. (A list that is computed"
+  , "and turns out empty is refused when the rule runs.)"
+  ]
+prettyCheckError (BreachByListNeedsPartyType _) =
+  [ "BREACH BY names a list, but the rule's party type is not known here."
+  , ""
+  , "A LIST after BY names several parties, one per element — unless the"
+  , "party type is itself that kind of list, in which case it names one party"
+  , "whose value is a list. Which of the two is meant is decided by the party"
+  , "type, and nothing has fixed it at this point: this BREACH is checked"
+  , "before anything says what the rule's party type is. Either"
+  , ""
+  , "  - give the definition a signature, GIVETH A DEONTIC <party> <action>, or"
+  , "  - if this BREACH is the first operand of a RAND or ROR, write the PARTY"
+  , "    operand first."
+  ]
 prettyCheckError (JoinWithoutEvery _) =
   [ "A join line needs an EVERY."
   , ""
@@ -6438,6 +6710,59 @@ prettyCheckError (ContinuationWithoutJoin _) =
   , "on its own line between the act's WITHIN and the HENCE or LEST, indented"
   , "past the EVERY. There is no default: the two readings differ, and guessing"
   , "one would silently change the rule."
+  ]
+prettyCheckError (AnchorUnavailable a reason) =
+  case reason of
+    NoEnclosingObligation ->
+      [ "OF " <> word <> " names a position in the life of the obligation this one"
+      , "is the continuation of — but this obligation is not WRITTEN inside any"
+      , "HENCE or LEST: it is at the top level, or defined in a WHERE, and the"
+      , "checker cannot see which obligation (if any) it will be attached to."
+      , ""
+      , "Write the anchored obligation inline, under the HENCE or LEST whose " <> noun
+      , "it means, or anchor it to an instant instead: WITHIN d OF <a NUMBER or"
+      , "DATE expression>. (OF THE ARMING is allowed here: it is the arming of"
+      , "whatever obligation this one is attached to when it runs, or its own"
+      , "when there is none, which is where an unanchored WITHIN already counts"
+      , "from.)"
+      ]
+    OnJoinLine ->
+      [ "OF " <> word <> " cannot anchor the WITHIN on a join line."
+      , ""
+      , "A join line's WITHIN is the deadline on the whole group, so it is what"
+      , "OF THE DEADLINE would name, and the group's join has not fired when it is"
+      , "read. Write the join line's WITHIN as a plain duration (it counts from"
+      , "the EVERY's arming), as WITHIN d OF THE ARMING, or as WITHIN d OF an"
+      , "instant, a NUMBER or DATE expression."
+      ]
+    JoinUnderLest ->
+      [ "OF THE JOIN cannot anchor a WITHIN under LEST."
+      , ""
+      , "LEST runs because the obligation was NOT completed — its join did not"
+      , "fire — so there is no join to count from. Under LEST, anchor to"
+      , "OF THE DEADLINE (the deadline that was missed), to OF THE ARMING, or to"
+      , "an instant; or leave the WITHIN unanchored."
+      ]
+    EnclosingHasNoDeadline ->
+      [ "OF THE DEADLINE names the deadline of the obligation this one is the"
+      , "continuation of, but that obligation has no WITHIN — not on its act, and"
+      , "not on its join line — so it has no deadline to count from."
+      , ""
+      , "Give the enclosing obligation a WITHIN, or anchor this one elsewhere:"
+      , "OF THE JOIN (under HENCE), OF THE ARMING, or an instant."
+      ]
+  where
+    word = anchorWords a
+    noun = case a of
+      AnchorJoin{}     -> "join"
+      AnchorDeadline{} -> "deadline"
+      AnchorArming{}   -> "arming"
+      AnchorAt{}       -> "anchor"
+prettyCheckError (AnchorNotAnInstant _ given) =
+  [ "The anchor after OF in a WITHIN is expected to be an instant — a NUMBER on"
+  , "the trace's own clock, or a DATE — but is here of type"
+  , ""
+  , "  " <> prettyTypeForDisplay given
   ]
 prettyCheckError (RegulativeActorMismatch party performer actionName) =
   [ "An actor may only perform its own actions."
@@ -6858,6 +7183,12 @@ prettyTypeMismatch ExpectPartyActionAgreementContext expected given =
     ] expected given
 prettyTypeMismatch ExpectAssertContext expected given =
   standardTypeMismatch [ "An ASSERT directive is expected to be of type" ] expected given
+prettyTypeMismatch ExpectBreachPartyContext expected given =
+  standardTypeMismatch
+    [ "The party named by BREACH BY is expected to be of the rule's party type."
+    , "A LIST there names several parties, each of that type (or, when the party"
+    , "type is itself a LIST, the one party). The party type here is"
+    ] expected given
 prettyTypeMismatch ExpectBreachReasonContext expected given =
   standardTypeMismatch [ "The BECAUSE clause of a BREACH is expected to be of type" ] expected given
 prettyTypeMismatch ExpectRefuseMessageContext expected given =
@@ -6878,6 +7209,14 @@ prettyTypeMismatch ExpectQuantifierRollContext expected given =
     ] expected given
 prettyTypeMismatch ExpectJoinDeadlineContext expected given =
   standardTypeMismatch [ "The WITHIN on a join line (the deadline on the whole) is expected to be of type" ] expected given
+prettyTypeMismatch ExpectAnchoredDurationContext expected given =
+  standardTypeMismatch
+    [ "In WITHIN d OF anchor, everything before OF is the duration d, and inside"
+    , "it OF is never a function call: WITHIN f OF x means f anchored at x. To"
+    , "apply a function in the duration, bracket it (WITHIN (f OF x) OF ...) or"
+    , "juxtapose its arguments (WITHIN f x OF ...). The duration is expected to"
+    , "be of type"
+    ] expected given
 
 -- | Best effort, only small numbers will occur"
 prettyOrdinal :: Int -> Text
