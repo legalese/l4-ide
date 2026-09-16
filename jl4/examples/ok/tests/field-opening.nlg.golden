@@ -13,3 +13,6 @@
 `applicant is solvent` where `applicant` is `bob`
 `own age` with `carol`
 `entries` with `Dictionary` where `contents` is list of `PAIR` with 1 and one and `PAIR` with 2 and two
+`crate lid` with 1 and `Crate` where `lid` is 4
+`Invoice` where `net` is 2 's `gross`
+`rate in a rule` where `cfg` is `Config` where `vat rate` is 20

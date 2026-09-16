@@ -67,6 +67,13 @@ spec examplesRoot = describe "relational export" $ do
     -- with an invented output argument.
     it "computed.l4 — computed BOOLEAN field as a guard, both polarities" $
       goldenProgram examplesRoot "computed.l4" "computed"
+    -- R5 field opening: a bare field read of a record-typed GIVEN lowers to
+    -- the same `proj(...)` clause as the hand-written projection beside it.
+    -- The elaborated node is not annotation-identical to the written one, so
+    -- without this seed a change to 'L4.Desugar.openFields' could move backend
+    -- output with nothing red (review of lang/r5-field-opening, 2026-09-16).
+    it "field-opening.l4 - a bare opened field lowers as its spelled-out twin" $
+      goldenProgram examplesRoot "field-opening.l4" "field-opening"
     -- The SECOND source of an input predicate. Everything the ASSUME widening
     -- has to get right in one file: an ASSUMEd TYPE as an abstract category
     -- (its own block, not a fieldless record), a boolean ASSUME with its output

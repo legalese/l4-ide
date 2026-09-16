@@ -111,3 +111,49 @@ GIVETH A NUMBER
 `entries` MEANS count contents
 
 #EVAL entries (Dictionary WITH contents IS LIST (PAIR OF 1, "one"), (PAIR OF 2, "two"))
+
+-- == 6. A TYPE parameter is not a record ==
+
+§ `Type parameters`
+
+DECLARE Box   HAS lid IS A NUMBER
+DECLARE Crate HAS lid IS A NUMBER
+
+-- `Box` on the GIVEN line below is this rule's own TYPE parameter — a type
+-- variable that happens to be spelled like the record above it. A binder
+-- declared at a type variable opens nothing, so the only `lid` in scope here
+-- is the crate's. (Opening the record's too would have made this a collision,
+-- which is how the hazard was found: review 2026-09-16.)
+GIVEN Box IS A TYPE
+      b   IS A Box
+      c   IS A Crate
+GIVETH A NUMBER
+`crate lid` MEANS lid
+
+#EVAL `crate lid` 1 (Crate WITH lid IS 4)
+
+-- == 7. A DECLARE is not a rule that sees the section's binder ==
+
+DECLARE Config HAS `vat rate` IS A NUMBER
+
+`vat rate` MEANS 7
+
+§ `Priced goods`
+    GIVEN cfg IS A Config
+
+-- The `vat rate` in this computed field is the top-level definition above, not
+-- `cfg's `vat rate``: a DECLARE is not a rule under the heading, so a section
+-- binder does not open inside its computed fields. 2 TIMES 7.
+DECLARE Invoice HAS
+    net   IS A NUMBER
+    gross IS A NUMBER MEANS net TIMES `vat rate`
+
+#EVAL (Invoice WITH net IS 2)'s gross
+
+-- A RULE under the same heading does see it — and because a top-level
+-- definition of the same name exists, this is the one silent rung of the rank,
+-- so it draws a warning saying which of the two won.
+GIVETH A NUMBER
+`rate in a rule` MEANS `vat rate`
+
+#EVAL `rate in a rule` WITH cfg IS (Config WITH `vat rate` IS 20)

@@ -107,6 +107,28 @@ data OpenedFieldCollision =
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
 
+-- | What an opened field outranked at a bare read.
+--
+-- The ruling's rank (§11.7) ends at "selectors" and names neither
+-- constructors nor top-level definitions; the build ranks both with the
+-- selectors, which is the precedent's behaviour and means an opened field
+-- wins silently. Until the tier is ruled, a read of this shape draws a
+-- warning rather than nothing at all.
+data ShadowedByOpening = ShadowedConstructor | ShadowedDefinition
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
+-- | A bare read that an opened field won, over a name the checker would
+-- otherwise have resolved.
+data OpenedFieldShadow =
+  MkOpenedFieldShadow
+    { fieldRead :: !Name
+    , binder    :: !OpenedBinderDecl
+    , shadowed  :: !ShadowedByOpening
+    }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
 -- | Is this top-level declaration the /elaboration/ of one of the section-binder
 -- parameters named in @ns@ — the 0-ary @ASSUME@ that
 -- 'L4.Desugar.elaborateSectionBinder' prepends for it?

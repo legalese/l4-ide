@@ -16,7 +16,7 @@ import L4.Syntax
 import L4.TypeCheck.With
 import qualified L4.Utils.IntervalMap as IV
 import L4.Mixfix (MixfixInfo(..))
-import L4.Names (OpenedBinderDecl (..), OpenedFieldCollision (..), SectionBinderDecl)
+import L4.Names (OpenedBinderDecl (..), OpenedFieldCollision (..), OpenedFieldShadow (..), SectionBinderDecl)
 import qualified Base.Set as Set
 
 import Control.Applicative
@@ -286,10 +286,13 @@ data CheckError =
     -- ^ R5 (IMPLICIT-PROPS-DESIGN §11.7): a bare read of a field name that
     -- two or more record-typed binders of the same signature open. Anchored
     -- at the read; names every binder. See 'L4.Desugar.openFields'.
-  | OpenedFieldCollisionAtOpening OpenedFieldCollision OpenedBinderDecl
+  | OpenedFieldCollisionAtOpening OpenedFieldCollision OpenedBinderDecl [Name]
     -- ^ The same collision, anchored at a binder after the first that opens
     -- the name: the "declaration that opens the second" of the ruling. The
     -- second argument is that binder; it is one of the collision's binders.
+    -- The third is every field name these same binders collide on, so that
+    -- two shared fields draw ONE error at the declaration rather than two
+    -- stacked on the identical range.
     -- Emitted only alongside an 'OpenedFieldCollisionAtRead' — two binders
     -- that merely share a field name and read it as @r's f@ are fine.
   deriving stock (Eq, Generic, Show)
@@ -309,6 +312,13 @@ data CheckWarning
     -- ^ A fixity annotation was attached to a definition that is not a plain
     -- binary infix operator (pattern @_ op _@); the annotation is ignored.
     -- Carries the definition's name and the annotation's source range.
+  | OpenedFieldShadowsDefinition OpenedFieldShadow
+    -- ^ R5 (IMPLICIT-PROPS-DESIGN §11.7): a bare read that an opened field
+    -- won over a 0-ary constructor or top-level definition of the same name.
+    -- The rank puts both below every opened field, and the ruling names
+    -- neither, so this is the one place the rank decides an author's meaning
+    -- silently. A warning, never an error: nothing that checked before this
+    -- stops checking, and @r's f@ or a rename both silence it.
   | DeprecatedAssume DeprecatedAssumeInfo
     -- ^ An author-written @ASSUME@. The keyword is deprecated
     -- (IMPLICIT-PROPS-DESIGN.md §11.1), and this is the warning that says so
@@ -602,6 +612,7 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (PatternClausesMissing r _ _)) = Just r
   rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
+  rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
@@ -612,7 +623,7 @@ instance HasSrcRange CheckError where
   rangeOf (RestatedSectionBinder n)         = rangeOf n
   rangeOf (NotReachesConnective site)       = Just site.range
   rangeOf (OpenedFieldCollisionAtRead c)    = rangeOf c.fieldRead
-  rangeOf (OpenedFieldCollisionAtOpening _ b) = rangeOf b.binderName
+  rangeOf (OpenedFieldCollisionAtOpening _ b _) = rangeOf b.binderName
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)

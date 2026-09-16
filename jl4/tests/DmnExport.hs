@@ -1959,7 +1959,8 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         _              -> expectationFailure "expected a boxed literal expression"
 
     it "requires every DECISION a computed field's body names" $ do
-      -- 'Desugar.rewriteFieldRefs' rewrites only the record's OWN field names,
+      -- 'Desugar.openFields' rewrites only the record's OWN field names in a
+      -- computed field's body ('Desugar.isComputedFieldDecide'),
       -- so a MEANS body may reference any module-level decision and the
       -- context entry renders it by name. A hydrator whose only edge was its
       -- source instance left that name unbound: KIE 8.44 reports "Required

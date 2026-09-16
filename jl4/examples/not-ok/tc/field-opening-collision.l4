@@ -25,3 +25,38 @@ GIVEN buyer  IS A Buyer
       seller IS A Seller
 GIVETH A NUMBER
 `how much` MEANS pays
+
+-- Two field names shared by the same pair of binders draw ONE error at the
+-- later binder, naming both, rather than two stacked on the identical range.
+DECLARE Agent HAS name IS A STRING
+                  pays IS A NUMBER
+
+GIVEN buyer IS A Buyer
+      agent IS A Agent
+GIVETH A BOOLEAN
+`both` MEANS name EQUALS "x" AND pays > 0
+
+-- Three binders: the message degrades from "Neither one" to "None of them",
+-- and the earlier binders are joined with an "and".
+DECLARE Vector HAS x IS A NUMBER
+
+GIVEN a IS A Vector
+      b IS A Vector
+      c IS A Vector
+GIVETH A NUMBER
+`sum` MEANS x
+
+-- Two NESTED sections are ONE tier of the rank (§11.7 has a single rung for
+-- "fields opened from" section GIVENs), so a name both open collides here too
+-- rather than the inner one silently winning.
+DECLARE Person HAS age IS A NUMBER
+DECLARE Pet    HAS age IS A NUMBER
+
+§ `Outer`
+    GIVEN owner IS A Person
+
+§§ `Inner`
+    GIVEN animal IS A Pet
+
+GIVETH A NUMBER
+`whose age` MEANS age

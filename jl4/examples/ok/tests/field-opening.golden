@@ -31,3 +31,20 @@ field-opening.l4:102:1-22:
   17
 field-opening.l4:113:1-88:
   2
+field-opening.l4:133:1-42:
+  4
+field-opening.l4:151:1-38:
+  14
+field-opening.l4:157:24-34:
+  This name is read as a field of cfg, not as the definition of the same name:
+  
+    `vat rate`
+  
+  A field of a record input outranks a definition it shares a name
+  with, so the input decides what the body says. Write
+  
+    cfg's `vat rate`
+  
+  if that is what you meant, and rename one of the two if it is not.
+field-opening.l4:159:1-66:
+  20

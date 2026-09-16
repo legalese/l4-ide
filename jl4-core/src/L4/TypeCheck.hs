@@ -117,7 +117,7 @@ import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
 import Text.Read (readMaybe)
-import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames, openFields, recordFieldTable)
+import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
 
 mkInitialCheckState :: Substitution -> CheckState
@@ -223,11 +223,22 @@ doCheckProgramWithDependencies checkState checkEnv program =
         | c <- fieldCollisions
         ]
         ++
-        [ MkCheckErrorWithContext (OpenedFieldCollisionAtOpening c b) None
-        | c <- nubBy (\ a b -> collisionKey a == collisionKey b) fieldCollisions
+        [ MkCheckErrorWithContext (OpenedFieldCollisionAtOpening c b (fieldsOf c)) None
+        | c <- nubBy (\ x y -> x.binders == y.binders) fieldCollisions
         , b <- drop 1 c.binders
         ]
-      collisionKey c = (rawName c.fieldRead, c.binders)
+        ++
+        -- R5, the one silent rung of the rank: an opened field that outranks
+        -- a 0-ary constructor or top-level definition of the same name. A
+        -- warning, so nothing that checked before stops checking.
+        [ MkCheckErrorWithContext (CheckWarning (OpenedFieldShadowsDefinition s)) None
+        | s <- nubBy (\ x y -> rangeOf x.fieldRead == rangeOf y.fieldRead) fieldShadows
+        ]
+      -- Every field name one pair of binders collides on, in the order the
+      -- reads were found, deduplicated by spelling.
+      fieldsOf c =
+        nubBy (\ a b -> rawName a == rawName b)
+          [ c'.fieldRead | c' <- fieldCollisions, c'.binders == c.binders ]
       synonymCycles = detectTypeSynonymCycles program
       -- Section binders are elaborated LAST, so that the ASSUME each one becomes
       -- sits at the very head of its section's declaration list. Computed-field
@@ -238,8 +249,9 @@ doCheckProgramWithDependencies checkState checkEnv program =
       -- which the elaboration leaves in place. Its record table is read off
       -- the ORIGINAL module and the import environment, so computed fields —
       -- which the first pass strips from their DECLARE — are still in it.
-      (desugaredProgram, fieldCollisions) =
+      (desugaredProgram, fieldCollisions, fieldShadows) =
         openFields (recordFieldTable checkEnv.entityInfo program)
+          (shadowCandidates checkEnv.entityInfo program)
           (desugarSectionGivens (desugarComputedFields program))
       checkEnv' = checkEnv
         { computedFields = extractComputedFieldNames program
@@ -6120,23 +6132,28 @@ prettyCheckError (OpenedFieldCollisionAtRead c)              =
       let proj = openedProjection c.fieldRead b
       in "  " <> proj <> Text.replicate (width - Text.length proj + 5) " "
            <> "(" <> openedBinderDecl b <> ", declared at " <> openedBinderAt b <> ")"
-prettyCheckError (OpenedFieldCollisionAtOpening c b)         =
-  [ "This input has a field name that an earlier input of the " <> siteWord c.site <> " also has:"
+prettyCheckError (OpenedFieldCollisionAtOpening c b fields)  =
+  [ "This input has " <> (if oneField then "a field name" else "field names")
+      <> " that an earlier input of the " <> siteWord c.site <> " also has:"
   , ""
   , "  " <> openedBinderDecl b
   , ""
-  , "has a field named " <> quotedName c.fieldRead <> ", and so " <> does <> " "
-      <> Text.intercalate ", " (map earlier earliers) <> "."
-  , "Neither one can be read by its bare name in this " <> siteWord c.site <> ". Write"
+  , "has " <> (if oneField then "a field named " else "fields named ")
+      <> oxford (map quotedName fields) <> ", and so " <> does <> " "
+      <> oxford (map earlier earliers) <> "."
+  , neither <> " can be read by " <> (if oneField then "its bare name" else "these bare names")
+      <> " in this " <> siteWord c.site <> ". Write"
   , ""
-  ] ++ [ "  " <> openedProjection c.fieldRead b' | b' <- c.binders ] ++
+  ] ++ [ "  " <> openedProjection f b' | f <- fields, b' <- c.binders ] ++
   [ ""
   , "wherever the body means one of them. (The bare read is at "
       <> prettySrcRangeM (rangeOf c.fieldRead) <> ".)"
   ]
   where
+    oneField = length fields == 1
     earliers = takeWhile (/= b) c.binders
     does = if length earliers == 1 then "does" else "do"
+    neither = if length c.binders == 2 then "Neither one" else "None of them"
     earlier b' =
       prettyLayout b'.binderName <> " (" <> typeArticle b'.declaredType <> " "
         <> prettyLayout b'.declaredType <> ", declared at " <> openedBinderAt b' <> ")"
@@ -6532,6 +6549,23 @@ prettyCheckWarning = \ case
       , "Rename one of the two, so the name means only one thing where you"
       , "write it, and then the keyword can go."
       ]
+  OpenedFieldShadowsDefinition s ->
+    [ "This name is read as a field of " <> prettyLayout s.binder.binderName
+        <> ", not as the " <> what <> " of the same name:"
+    , ""
+    , "  " <> quotedName s.fieldRead
+    , ""
+    , "A field of a record input outranks a " <> what <> " it shares a name"
+    , "with, so the input decides what the body says. Write"
+    , ""
+    , "  " <> openedProjection s.fieldRead s.binder
+    , ""
+    , "if that is what you meant, and rename one of the two if it is not."
+    ]
+    where
+      what = case s.shadowed of
+        ShadowedConstructor -> "constructor"
+        ShadowedDefinition  -> "definition"
   DeprecatedAssume info ->
     [ "ASSUME is an older way of introducing a name, and it is being retired."
     , "Nothing is broken: the file still checks, runs and exports as before."
@@ -6941,6 +6975,13 @@ openedBinderAt b = prettySrcRangeM (rangeOf b.binderName)
 siteWord :: OpeningSite -> Text
 siteWord DeclarationOpening = "rule"
 siteWord SectionOpening     = "section"
+
+-- | @a@, @a and b@, @a, b and c@ — a list joined the way a sentence joins it.
+oxford :: [Text] -> Text
+oxford = \ case
+  []  -> ""
+  [x] -> x
+  xs  -> Text.intercalate ", " (init xs) <> " and " <> last xs
 
 -- | Show the name with its original / definition source range.
 prettyResolvedWithRange :: Resolved -> Text

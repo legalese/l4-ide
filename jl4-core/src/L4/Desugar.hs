@@ -12,6 +12,7 @@ module L4.Desugar (
   --
   RecordFieldTable,
   recordFieldTable,
+  shadowCandidates,
   openFields,
   -- * Type Synonyms
   --
@@ -312,7 +313,7 @@ makeComputedDecide appForm typeParams (MkTypedName fieldAnn fieldName fieldType 
     -- Extract record name and type args from the DECLARE's AppForm
     MkAppForm _ recordName typeArgs _ = appForm
     -- Create a self parameter name
-    selfName = MkName emptyAnno (NormalName "_self")
+    selfName = MkName emptyAnno computedSelfName
     -- Build the record type: RecordName arg1 arg2 ...
     recordType = TyApp emptyAnno recordName (map (\n -> TyApp emptyAnno n []) typeArgs)
     -- Type signature: GIVEN <typeParams>, _self IS A <RecordType> GIVETH A <FieldType>
@@ -326,6 +327,30 @@ makeComputedDecide appForm typeParams (MkTypedName fieldAnn fieldName fieldType 
     decideAppForm = MkAppForm fieldAnn fieldName [selfName] Nothing
   in Just (fieldAnn, MkDecide fieldAnn decideTypeSig decideAppForm meansExpr)
 makeComputedDecide _ _ _ = Nothing  -- stored field, no DECIDE needed
+
+-- | The name 'makeComputedDecide' gives a computed field's record parameter.
+computedSelfName :: RawName
+computedSelfName = NormalName "_self"
+
+-- | Is this @DECIDE@ one 'makeComputedDecide' synthesised for a computed
+-- field, rather than something the author wrote?
+--
+-- It matters to 'openFields': a computed field's body is the body of a
+-- @DECLARE@, and a @DECLARE@ is not "the function that declares or sees the
+-- binder" of an enclosing section @GIVEN@ (§11.7). Walking it with the
+-- section's frames in scope silently rebound a sibling read — measured
+-- 2026-09-16, see §11.7.1 "what review changed": a computed field reading a
+-- top-level @\`vat rate\` MEANS 7@ started reading @cfg's \`vat rate\`@ merely
+-- because an unrelated @§ ... GIVEN cfg IS A Config@ sat above the @DECLARE@.
+--
+-- The test is the synthesis's own shape: the last @GIVEN@ binder and the sole
+-- head argument are both @_self@. An author who writes that shape by hand
+-- gets the same (narrower) scope, which is a boundary, not a defect.
+isComputedFieldDecide :: Decide Name -> Bool
+isComputedFieldDecide (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) (MkAppForm _ _ args _) _) =
+  not (null otns)
+    && rawName (getName (last otns)) == computedSelfName
+    && map rawName args == [computedSelfName]
 
 -- ----------------------------------------------------------------------------
 -- Field opening (IMPLICIT-PROPS-DESIGN §11.7, R5)
@@ -343,9 +368,17 @@ makeComputedDecide _ _ _ = Nothing  -- stored field, no DECIDE needed
 type RecordFieldTable = Map RawName (Set RawName)
 
 -- | The record field table a module is checked against.
+--
+-- Left-biased, NOT unioned: a record the module declares itself is what a
+-- binder written with that spelling resolves to, so its fields are the ones
+-- that open. Unioning the two made a local @DECLARE Dictionary HAS label@
+-- open the prelude @Dictionary@'s @contents@ as well, and a bare read of
+-- @contents@ then elaborated to a projection the checker refused
+-- (@expected to be of type Dictionary OF k, v but is here of type
+-- Dictionary@) — found in review 2026-09-16, see §11.7.1.
 recordFieldTable :: EntityInfo -> Module Name -> RecordFieldTable
 recordFieldTable ei m =
-  Map.unionWith Set.union (recordFieldsDeclared m) (recordFieldsImported ei)
+  Map.union (recordFieldsDeclared m) (recordFieldsImported ei)
 
 recordFieldsDeclared :: Module Name -> RecordFieldTable
 recordFieldsDeclared (MkModule _ _ section) = goSection section
@@ -371,15 +404,29 @@ recordFieldsDeclared (MkModule _ _ section) = goSection section
 -- is the section-qualified one ('L4.TypeCheck.Types.extendEnv' inserts each
 -- alias of one 'Unique' over the previous); the prelude's @Dictionary@ lives
 -- under @§§ Dictionaries@, and would otherwise not open at all.
+--
+-- A spelling more than one /distinct/ record claims contributes nothing. Two
+-- imported records with the same unqualified name cannot both be what a
+-- binder written with that name resolves to, and unioning their fields opened
+-- fields the binder does not have. Not opening is never a meaning change
+-- against the pre-R5 tree; guessing is (review 2026-09-16, §11.7.1).
 recordFieldsImported :: EntityInfo -> RecordFieldTable
 recordFieldsImported ei =
-  Map.fromListWith Set.union
-    [ (unqualified (rawName (getName r)), Set.singleton (unqualified (rawName fieldName)))
-    | (_, (fieldName, KnownTerm ty kind)) <- Map.toList ei
-    , kind == Selector || kind == ComputedSelector
-    , Just r <- [selectorRecord ty]
-    ]
+  Map.mapMaybe onlyOneRecord $
+    Map.fromListWith (Map.unionWith Set.union)
+      [ ( unqualified (rawName (getName r))
+        , Map.singleton (getUnique r) (Set.singleton (unqualified (rawName fieldName)))
+        )
+      | (_, (fieldName, KnownTerm ty kind)) <- Map.toList ei
+      , kind == Selector || kind == ComputedSelector
+      , Just r <- [selectorRecord ty]
+      ]
  where
+  onlyOneRecord :: Map Unique (Set RawName) -> Maybe (Set RawName)
+  onlyOneRecord byRecord = case Map.elems byRecord of
+    [fields] -> Just fields
+    _        -> Nothing
+
   unqualified :: RawName -> RawName
   unqualified (QualifiedName _ n) = NormalName n
   unqualified rn                  = rn
@@ -389,6 +436,48 @@ recordFieldsImported ei =
     Forall _ _ t -> selectorRecord t
     Fun _ [MkOptionallyNamedType _ _ (TyApp _ r _)] _ -> Just r
     _ -> Nothing
+
+-- | The names an opened field can outrank silently: 0-ary constructors and
+-- 0-ary definitions, from this module and from the import environment.
+--
+-- This is not the checker's resolution — it cannot be, it runs before the
+-- checker — but it is the shape that the rank decides without saying so, and
+-- it is what 'L4.TypeCheck.Types.OpenedFieldShadowsDefinition' warns about.
+-- Deliberately 0-ary only: an applied head is never opened in the first
+-- place, so a function of the same name is not at risk.
+shadowCandidates :: EntityInfo -> Module Name -> Map RawName ShadowedByOpening
+shadowCandidates ei (MkModule _ _ section) =
+  Map.union (goSection section) imported
+ where
+  imported =
+    Map.fromList
+      [ (rawName (getName nm), kindOf kind)
+      | (_, (nm, KnownTerm ty kind)) <- Map.toList ei
+      , kind /= Selector && kind /= ComputedSelector
+      , not (isFunctionType ty)
+      ]
+  kindOf Constructor = ShadowedConstructor
+  kindOf _           = ShadowedDefinition
+
+  isFunctionType = \ case
+    Forall _ _ t -> isFunctionType t
+    Fun {}       -> True
+    _            -> False
+
+  goSection (MkSection _ _ _ _ decls) = Map.unions (map goTopDecl decls)
+  goTopDecl = \ case
+    Section _ s -> goSection s
+    Declare _ (MkDeclare _ _ _ (EnumDecl _ conDecls)) ->
+      Map.fromList
+        [ (rawName (getName cd), ShadowedConstructor)
+        | cd@(MkConDecl _ _ tns) <- conDecls
+        , null tns
+        ]
+    Decide _ (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) (MkAppForm _ n args _) _)
+      | null otns, null args -> Map.singleton (rawName n) ShadowedDefinition
+    Assume _ (MkAssume _ (MkTypeSig _ (MkGivenSig _ otns) _) (MkAppForm _ n args _) _ _)
+      | null otns, null args -> Map.singleton (rawName n) ShadowedDefinition
+    _ -> Map.empty
 
 -- | One rung of the scope a bare name is resolved against, innermost first.
 --
@@ -406,11 +495,16 @@ data Frame =
     { bound  :: !(Set RawName)
     , opened :: !(Map RawName [OpenedBinderDecl])
       -- ^ In declaration order; more than one binder is a collision.
+    , tyvars :: !(Set RawName)
+      -- ^ The TYPE parameters this frame's signature quantifies over. A
+      -- binder declared at one of them (@GIVEN Box IS A TYPE, x IS A Box@)
+      -- is a universally quantified type, never the record that happens to
+      -- share the spelling, so it opens nothing.
     , site   :: !OpeningSite
     }
 
 bindingFrame :: Set RawName -> Frame
-bindingFrame names = MkFrame names Map.empty DeclarationOpening
+bindingFrame names = MkFrame names Map.empty Set.empty DeclarationOpening
 
 -- | The frame a signature contributes: its binders, and the fields opened from
 -- those of its binders whose declared type is a record in the table.
@@ -418,20 +512,48 @@ bindingFrame names = MkFrame names Map.empty DeclarationOpening
 -- Only a binder written with a type opens. An un-annotated @GIVEN x@, or a
 -- parameter that appears in the head alone (@f p MEANS ...@), has a type the
 -- checker infers later, which this pass cannot see.
-signatureFrame :: RecordFieldTable -> OpeningSite -> [RawName] -> [OptionallyTypedName Name] -> Frame
-signatureFrame table site extraBound otns =
-  MkFrame bound opened site
+-- A binder whose type names a TYPE parameter in scope — this signature's own,
+-- or an enclosing one's — opens nothing: it is a universally quantified type
+-- variable, and the record that shares its spelling is not what the checker
+-- resolves it to.
+signatureFrame :: RecordFieldTable -> OpeningSite -> Set RawName -> [RawName] -> [OptionallyTypedName Name] -> Frame
+signatureFrame table site outerTyVars extraBound otns =
+  MkFrame bound opened tyvars site
  where
   bound = Set.fromList (extraBound <> [ rawName (getName otn) | otn <- otns ])
+  tyvars =
+    outerTyVars
+      <> Set.fromList [ rawName n | MkOptionallyTypedName _ n (Just (Type _)) _ <- otns ]
   opened =
     Map.fromListWith (flip (<>))
       [ (field, [MkOpenedBinderDecl n ty])
       | MkOptionallyTypedName _ n (Just ty) _ <- otns
       , TyApp _ tyName _ <- [ty]
+      , not (rawName tyName `Set.member` tyvars)
       , Just fields <- [Map.lookup (rawName tyName) table]
       , field <- Set.toList fields
       , not (field `Set.member` bound)
       ]
+
+-- | Every TYPE parameter a stack of frames has in scope.
+tyVarsInScope :: [Frame] -> Set RawName
+tyVarsInScope = foldMap (.tyvars)
+
+-- | Two enclosing sections' opened fields are ONE tier of the rank, so they
+-- share one frame: a name both open is a collision, not a silent shadow.
+-- Binding still beats opening, because 'lookupBare' consults @bound@ first
+-- and the merged frame binds both sections' binder names.
+mergeSectionFrames :: Frame -> Frame -> Frame
+mergeSectionFrames outer inner =
+  MkFrame
+    { bound  = outer.bound <> inner.bound
+    , opened = Map.unionWith (<>) outer.opened inner.opened
+    , tyvars = outer.tyvars <> inner.tyvars
+    , site   = SectionOpening
+    }
+
+-- | The writer 'openFields' runs in: collisions, and the silent-rank warnings.
+type Opening = Writer ([OpenedFieldCollision], [OpenedFieldShadow])
 
 -- | What a bare name resolves to under a stack of frames.
 data Lookup
@@ -477,46 +599,78 @@ lookupBare n (f : fs)
 -- unless the name is actually read bare: the prelude itself declares
 -- @dict1 IS A Dictionary k v, dict2 IS A Dictionary k v@ and reads both
 -- explicitly. A field opened at two different rungs is a silent shadow, as the
--- rank says.
+-- rank says — but NOT between two enclosing sections: every enclosing
+-- section's binders share ONE frame, because the ruling's rank has one tier
+-- for "fields opened from" section @GIVEN@s, so two nested sections that open
+-- the same field name collide rather than shadowing (review 2026-09-16).
 --
 -- Runs after 'desugarComputedFields', so a computed field's synthetic
 -- @GIVEN _self IS A R@ opens its siblings through this pass and no other; the
 -- table is nevertheless read off the module BEFORE that pass, so the computed
--- siblings are in it.
-openFields :: RecordFieldTable -> Module Name -> (Module Name, [OpenedFieldCollision])
-openFields table (MkModule mAnn uri sect) =
-  let (sect', collisions) = runWriter (goSection [] sect)
-  in (MkModule mAnn uri sect', collisions)
+-- siblings are in it. A synthetic computed-field @DECIDE@ is walked with NO
+-- enclosing frames: a @DECLARE@ is not a rule that sees its section's binder,
+-- and giving its computed fields the section's opened fields silently changed
+-- what a body already in the corpus meant ('isComputedFieldDecide').
+--
+-- 'shadowCandidates' names what the checker would otherwise have resolved a
+-- bare name to — a 0-ary constructor or definition. An opened field that
+-- outranks one of those is reported as a warning ('OpenedFieldShadow'); it is
+-- not an error, because the rank is what it is, but it is the one silent case
+-- of the rank worth saying out loud.
+openFields
+  :: RecordFieldTable
+  -> Map RawName ShadowedByOpening
+  -> Module Name
+  -> (Module Name, [OpenedFieldCollision], [OpenedFieldShadow])
+openFields table shadowed (MkModule mAnn uri sect) =
+  let (sect', (collisions, shadows)) = runWriter (goSection [] sect)
+  in (MkModule mAnn uri sect', collisions, shadows)
  where
-  goSection :: [Frame] -> Section Name -> Writer [OpenedFieldCollision] (Section Name)
+  goSection :: [Frame] -> Section Name -> Opening (Section Name)
   goSection frames (MkSection sAnn mn maka mgiven decls) = do
     let frames' = case mgiven of
-          Just (MkGivenSig _ otns) -> signatureFrame table SectionOpening [] otns : frames
+          Just (MkGivenSig _ otns) ->
+            let inner = signatureFrame table SectionOpening (tyVarsInScope frames) [] otns
+            in case frames of
+                 -- One tier for every enclosing section, as the rank says.
+                 (outer : rest) -> mergeSectionFrames outer inner : rest
+                 []             -> [inner]
           Nothing                  -> frames
     MkSection sAnn mn maka mgiven <$> traverse (goTopDecl frames') decls
 
-  goTopDecl :: [Frame] -> TopDecl Name -> Writer [OpenedFieldCollision] (TopDecl Name)
+  goTopDecl :: [Frame] -> TopDecl Name -> Opening (TopDecl Name)
   goTopDecl frames = \ case
     Section a s -> Section a <$> goSection frames s
-    Decide a d  -> Decide a <$> goDecide frames d
+    Decide a d
+      | isComputedFieldDecide d -> Decide a <$> goDecide [] d
+      | otherwise               -> Decide a <$> goDecide frames d
     other       -> pure other
 
-  goDecide :: [Frame] -> Decide Name -> Writer [OpenedFieldCollision] (Decide Name)
+  goDecide :: [Frame] -> Decide Name -> Opening (Decide Name)
   goDecide frames (MkDecide dAnn tysig@(MkTypeSig _ (MkGivenSig _ otns) _) af@(MkAppForm _ hd args _) body) = do
-    let frame = signatureFrame table DeclarationOpening (rawName hd : map rawName args) otns
+    let frame =
+          signatureFrame table DeclarationOpening (tyVarsInScope frames)
+            (rawName hd : map rawName args) otns
     MkDecide dAnn tysig af <$> go (frame : frames) body
 
-  go :: [Frame] -> Expr Name -> Writer [OpenedFieldCollision] (Expr Name)
+  opened :: Anno -> OpenedBinderDecl -> Name -> Opening (Expr Name)
+  opened ann b n = do
+    case Map.lookup (rawName n) shadowed of
+      Nothing   -> pure ()
+      Just what -> tell ([], [MkOpenedFieldShadow n b what])
+    pure (projectOn ann b n)
+
+  go :: [Frame] -> Expr Name -> Opening (Expr Name)
   go frames expr = case expr of
     -- Variable/application: elaborate a bare opened field, leave an applied head alone
     App ann n args
       | null args ->
           case lookupBare (rawName n) frames of
             Unchanged   -> pure expr
-            Opened b    -> pure (projectOn ann b n)
+            Opened b    -> opened ann b n
             Collided site bs@(b :| _) -> do
-              tell [MkOpenedFieldCollision n site (toList bs)]
-              pure (projectOn ann b n)
+              tell ([MkOpenedFieldCollision n site (toList bs)], [])
+              opened ann b n
       | otherwise ->
           App ann n <$> traverse (go frames) args
     -- Binary operators
@@ -579,16 +733,26 @@ openFields table (MkModule mAnn uri sect) =
     Regulative {}       -> pure expr  -- regulative rules: leave as-is
     Inert {}            -> pure expr
 
-  -- @r's f@, carrying the bare read's source range on the projection so that
-  -- a diagnostic on the elaborated node still points at what the author
-  -- wrote. The hole is range-hinted and token-free, as
-  -- 'elaborateSectionBinder' explains; the binder occurrence is range-less so
-  -- that the read is not recorded as a reference at the GIVEN line.
+  -- @r's f@, carrying the bare read's source range on the projection AND on
+  -- its record operand, so that a diagnostic on either still points at what
+  -- the author wrote. The holes are range-hinted and token-free, as
+  -- 'elaborateSectionBinder' explains; the binder /occurrence/ is range-less
+  -- (its 'Name' has 'clearSourceAnno' applied) so the read is not recorded as
+  -- a reference at the GIVEN line.
+  --
+  -- TWO holes, as the parser's own projection has (@hole e@, @'s@, @hole n@).
+  -- 'flattenConcreteNodes' zips holes against child node-lists positionally
+  -- and drops the surplus, so with one hole the label @n@ was never reached:
+  -- the type-checked semantic-token pass emitted nothing at the bare read and
+  -- the editor left it unhighlighted (review 2026-09-16, witnessed by
+  -- @lsp\/semantic-tokens\/field-opening.l4@).
   projectOn :: Anno -> OpenedBinderDecl -> Name -> Expr Name
   projectOn ann b n =
-    Proj (Anno mempty (rangeOf ann) [mkHoleWithSrcRangeHint (rangeOf ann)])
-      (Var emptyAnno (clearSourceAnno b.binderName))
+    Proj (Anno mempty (rangeOf ann) [ hole, mkHoleWithSrcRangeHint (rangeOf n) ])
+      (Var (Anno mempty (rangeOf ann) [hole]) (clearSourceAnno b.binderName))
       n
+   where
+    hole = mkHoleWithSrcRangeHint (rangeOf ann)
 
   goGuarded frames (MkGuardedExpr ann c e) =
     MkGuardedExpr ann <$> go frames c <*> go frames e

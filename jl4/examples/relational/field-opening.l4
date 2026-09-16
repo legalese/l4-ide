@@ -1,0 +1,31 @@
+-- R5 field opening (IMPLICIT-PROPS-DESIGN.md §11.7) as a lowering backend sees
+-- it.
+--
+-- A bare read of a record-typed GIVEN's field is elaborated to `p's age`
+-- before the checker runs, so the middle end meets an ordinary projection and
+-- emits the same `proj(P, age, Age)` clause for both halves of this seed. That
+-- is the whole claim of the ruling's "every backend consumes it", and until
+-- this file nothing pinned it for a rule: the elaborated node is NOT
+-- annotation-identical to a hand-written projection (it carries the bare
+-- read's source range where the old computed-field rewrite carried none), and
+-- that difference alone moved two goldens in the branch that built R5.
+--
+-- The two decisions below must differ only in their provenance ranges.
+
+DECLARE Person HAS
+    age IS A NUMBER
+
+@export
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `adult bare` IF age AT LEAST 18
+
+@export
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `adult spelled out` IF p's age AT LEAST 18
+
+#EVAL `adult bare` (Person WITH age IS 20)
+-- L4 oracle ==> TRUE
+#EVAL `adult spelled out` (Person WITH age IS 20)
+-- L4 oracle ==> TRUE
