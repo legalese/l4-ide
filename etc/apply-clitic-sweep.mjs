@@ -112,29 +112,63 @@ export function renameOf(name) {
   return m ? m[2].trim() : null;
 }
 
-// The three delimited forms, escaped-backtick FIRST because it is the most
-// specific: the plain-backtick pattern is a substring of it, so the other order
-// leaves a stranded backslash.
-export function formsFor(from, to) {
-  return [
+// The delimited forms. Escaped-backtick is the most specific (the plain form is
+// a substring of it), and `sweepText` sorts by length anyway so no form can
+// claim a prefix of another.
+//
+// THE QUOTED FORM IS NOT OFFERED IN `.l4` OR `.md`, and that exclusion was
+// missed on the first pass. In L4 a double-quoted run is a STRING LITERAL --
+// data -- so `GIVETH \`label\` MEANS "is a Singapore citizen"` is a value that
+// happens to read like a name, and rewriting it changes what the program says.
+// In Markdown it is prose: `the employee "is a Singapore citizen" at the time`
+// is a sentence with quotation marks, and rewriting it makes the page assert
+// something nobody wrote. The form exists for deposit JSON and for generators,
+// where a bare "name" really is a reference to a field.
+//
+// Backticks stay available everywhere, because a backtick is how L4 spells an
+// identifier and nothing else uses it that way.
+const QUOTED_UNSAFE = new Set([".l4", ".md"]);
+
+export function formsFor(from, to, ext = null) {
+  const forms = [
     ["\\`" + from + "\\`", "\\`" + to + "\\`"],
     ["`" + from + "`", "`" + to + "`"],
-    ['"' + from + '"', '"' + to + '"'],
   ];
+  if (!QUOTED_UNSAFE.has(ext)) forms.push(['"' + from + '"', '"' + to + '"']);
+  return forms;
 }
 
+// ONE PASS over the text, never a sequence of passes. The first version applied
+// each rename to the OUTPUT of the last, which is order-dependent and collapses
+// two distinct fields into one whenever a rename's output is another's input:
+//
+//   [["has is bankrupt","is bankrupt"], ["is bankrupt","bankrupt"]]
+//   "p's `has is bankrupt` AND p's `is bankrupt`"
+//     -> "p's `bankrupt`   AND p's `bankrupt`"      two fields, one name
+//
+// Sorting the list differently only moves the failure. A single pass cannot see
+// its own output, so the result does not depend on order at all.
+//
 // Pure, so the selftest can exercise it without a filesystem.
-export function sweepText(text, renames) {
-  let out = text;
-  let n = 0;
+const RX_SPECIAL = /[.*+?^${}()|[\]\\]/g;
+
+export function sweepText(text, renames, ext = null) {
+  const pairs = [];
   for (const [from, to] of renames)
-    for (const [a, b] of formsFor(from, to)) {
-      const hits = out.split(a).length - 1;
-      if (hits) {
-        n += hits;
-        out = out.split(a).join(b);
-      }
-    }
+    for (const f of formsFor(from, to, ext)) pairs.push(f);
+  if (!pairs.length) return { text, edits: 0 };
+  // Longest first: a shorter form must never claim a prefix of a longer one.
+  pairs.sort((a, b) => b[0].length - a[0].length);
+  const map = new Map(pairs);
+  const rx = new RegExp(
+    pairs.map(([a]) => a.replace(RX_SPECIAL, "\\$&")).join("|"),
+    "g",
+  );
+  let n = 0;
+  const out = text.replace(rx, (m) => {
+    n++;
+    return map.get(m) ?? m;
+  });
   return { text: out, edits: n };
 }
 
@@ -192,7 +226,7 @@ export function writeWalk(dir, out = []) {
 // them before returning.
 export function collect(dirs) {
   const corpus = [];
-  const names = new Map(); // name -> [file:line, ...]
+  const names = new Map(); // name -> {sites:[], kinds:Set}
   for (const dir of dirs)
     for (const f of walk(dir)) {
       const text = readFileSync(f, "utf8");
@@ -200,43 +234,84 @@ export function collect(dirs) {
       const sink = [];
       for (const g of scanText(text, f, sink)) {
         if (!g.name) continue;
-        if (!names.has(g.name)) names.set(g.name, []);
-        names.get(g.name).push(`${g.file}:${g.line}`);
+        if (!names.has(g.name))
+          names.set(g.name, { sites: [], kinds: new Set() });
+        const e = names.get(g.name);
+        e.sites.push(`${g.file}:${g.line}`);
+        e.kinds.add(g.kind);
       }
     }
   return { corpus, names };
 }
 
+// A NAME IS RENAMED ONLY WHERE IT IS DECLARED. This is the restriction the first
+// version lacked, and it is the difference between a checker and a tool that
+// edits.
+//
+// The checker is DESIGNED to over-report: a dereference-shaped match is cheap to
+// produce and a human filters it, so its own header lists the benign classes it
+// knowingly reports. Making its findings actionable turns every one of those
+// into an edit. MEASURED, in `cleanroom-2026-08/guardianship-of-infants-act.l4`,
+// a COMMENT mentioning another file -- "probate-administration-act.l4's `is an
+// infant on` writes it `is before`" -- is a filename's genitive, not a field
+// reference. The first version took it at face value and renamed `is an infant
+// on` across 20+ sites, and that name is not a field at all: it is a top-level
+// mixfix predicate, `p `is an infant on` `the date` MEANS`, applied infix.
+//
+// A DEREFERENCE tells you a name is used somewhere. Only a DECLARATION tells you
+// it is a field, which is what the ruling is about -- how a field is NAMED --
+// and the declaration is where the name is defined. So a rename needs at least
+// one `decl` finding, and a name seen only through dereferences is reported and
+// left alone.
+//
+// This also closes a second hole for free. `CLITIC` makes the closing backtick
+// optional so that a name wrapped across lines still matches, which means a
+// dereference can yield a TRUNCATED name -- measured in the corpus today,
+// `has given such security as is lawfully required to be`, whose EXEMPT entry is
+// spelled `... to be furnished` and therefore never matched. `DECL` requires the
+// closing backtick, so a declaration-sourced name is always whole.
 export function plan(dirs) {
   const { corpus, names } = collect(dirs);
   const renames = [];
   const unrenamable = [];
+  const derefOnly = [];
   for (const name of [...names.keys()].sort()) {
+    const { kinds, sites } = names.get(name);
+    if (!kinds.has("decl")) {
+      derefOnly.push([name, sites[0]]);
+      continue;
+    }
     const to = renameOf(name);
     if (!to) unrenamable.push(name);
     else renames.push([name, to]);
   }
   const { held, safe } = hazards(renames, corpus);
-  return { corpus, names, safe, held, unrenamable };
+  return { corpus, names, safe, held, unrenamable, derefOnly };
 }
 
 // ---------------------------------------------------------------------------
-// Selftest. Every case is a bug this file had, or would have had without the
-// line it exercises. Each has been SEEN TO FAIL, measured 2026-09-16 by mutating
-// a scratch copy one rule at a time:
+// Selftest. Every case is a bug this file HAD — every one of the numbers below
+// is a defect a refuter found in the first version of this file, not a
+// hypothetical. Each has been SEEN TO FAIL, measured 2026-09-16 by mutating a
+// scratch copy one rule at a time:
 //
-//   drop the escaped-backtick form      2 cases redden
-//   drop the plain-backtick form        1
-//   drop the JSON-string form           1
-//   sweep BARE TEXT (no delimiters)     3
-//   drop the `tests/` exclusion         1  (the filesystem check below)
-//   follow symlinks                     1  (ditto)
+//   sweep BARE TEXT (undelimited)         5 cases redden
+//   drop the plain-backtick form          4
+//   drop the escaped-backtick form        2
+//   drop the quoted form entirely         2
+//   allow the quoted form in .l4/.md      2
+//   apply renames in sequence, not once   2
+//   drop the declaration requirement      2
+//   drop the `tests/` exclusion           1
+//   follow symlinks                       1
 //
-// The first and fourth numbers are 2 and 3 rather than the 1 and 2 a reader
-// might expect, and the difference is the point: removing the escaped form also
-// reddens the anti-shredding case, and sweeping bare text reddens the quotation,
-// the comment AND the name that merely contains the target. A rule whose removal
-// breaks more than its own case is a rule doing more than one job.
+// A MEASUREMENT NOTE, because the harness lies if you skip it. The mutant must
+// be run where `REPO` still resolves to this repository: `REPO` is derived from
+// `import.meta.url`, so a copy executed out of /tmp reports 4 phantom isMirror
+// failures that have nothing to do with the mutation. The numbers above are
+// differences against an UNMUTATED copy run from the same place, not raw counts.
+// An instrument that reports 6 where the answer is 2 is worse than no
+// instrument, because it reads as thoroughness.
 // ---------------------------------------------------------------------------
 const R = [["is a Singapore citizen", "a Singapore citizen"]];
 
@@ -287,6 +362,61 @@ const SELFTEST = [
     want: "    IF p's `is a Singapore citizen by descent`",
     edits: 0,
   },
+  {
+    // A double-quoted run in L4 is a STRING LITERAL. Rewriting it changes what
+    // the program says, not what a field is called.
+    name: "quoted form is NOT applied in .l4 — a string literal is data",
+    ext: ".l4",
+    src: '    GIVETH `label` MEANS "is a Singapore citizen"',
+    want: '    GIVETH `label` MEANS "is a Singapore citizen"',
+    edits: 0,
+  },
+  {
+    // In prose, quotation marks are quotation marks.
+    name: "quoted form is NOT applied in .md — prose is not a reference",
+    ext: ".md",
+    src: 'The Act asks whether the employee "is a Singapore citizen" at the time.',
+    want: 'The Act asks whether the employee "is a Singapore citizen" at the time.',
+    edits: 0,
+  },
+  {
+    name: "quoted form IS applied in .json — a deposit names the field",
+    ext: ".json",
+    src: '  "field": "is a Singapore citizen",',
+    want: '  "field": "a Singapore citizen",',
+    edits: 1,
+  },
+  {
+    // Backticks are how L4 spells an identifier, so they stay live everywhere.
+    name: "backticks still work in .l4 despite the quoted-form exclusion",
+    ext: ".l4",
+    src: "    IF p's `is a Singapore citizen`",
+    want: "    IF p's `a Singapore citizen`",
+    edits: 1,
+  },
+];
+
+// Order independence (S2). Applied in sequence, the first rename's output is the
+// second's input and two distinct fields collapse into one name.
+const ORDER_CASES = [
+  {
+    name: "a rename whose output is another's input does not collapse them",
+    renames: [
+      ["has is bankrupt", "is bankrupt"],
+      ["is bankrupt", "bankrupt"],
+    ],
+    src: "p's `has is bankrupt` AND p's `is bankrupt`",
+    want: "p's `is bankrupt` AND p's `bankrupt`",
+  },
+  {
+    name: "and the result does not depend on the order given",
+    renames: [
+      ["is bankrupt", "bankrupt"],
+      ["has is bankrupt", "is bankrupt"],
+    ],
+    src: "p's `has is bankrupt` AND p's `is bankrupt`",
+    want: "p's `is bankrupt` AND p's `bankrupt`",
+  },
 ];
 
 // Cases for the parts that are not textual.
@@ -298,11 +428,20 @@ function selftest() {
   };
 
   for (const c of SELFTEST) {
-    const got = sweepText(c.src, R);
+    const got = sweepText(c.src, R, c.ext ?? null);
     if (got.text !== c.want || got.edits !== c.edits)
       fail(
         c.name,
         `want ${c.edits} edit(s) -> ${JSON.stringify(c.want)}\n  got  ${got.edits} -> ${JSON.stringify(got.text)}`,
+      );
+  }
+
+  for (const c of ORDER_CASES) {
+    const got = sweepText(c.src, c.renames);
+    if (got.text !== c.want)
+      fail(
+        c.name,
+        `want ${JSON.stringify(c.want)}\n  got  ${JSON.stringify(got.text)}`,
       );
   }
 
@@ -426,12 +565,44 @@ function selftest() {
     rmSync(tmp, { recursive: true, force: true });
   }
 
+  // S1: a name seen ONLY through a dereference is reported, never renamed. The
+  // witness is the real one: a comment naming another file, whose genitive the
+  // detector reports by design and a human filters.
+  const t2 = mkdtempSync(join(tmpdir(), "clitic-decl-"));
+  try {
+    writeFileSync(
+      join(t2, "m.l4"),
+      [
+        "-- probate-administration-act.l4's `is an infant on` writes it `is before`.",
+        "GIVEN p",
+        "DECLARE Thing",
+        "    HAS `is bankrupt` IS A BOOLEAN",
+        "",
+        "`x` MEANS p's `is bankrupt`",
+        "",
+      ].join("\n"),
+    );
+    const { safe, derefOnly } = plan([t2]);
+    const safeNames = safe.map(([f]) => f);
+    if (!safeNames.includes("is bankrupt"))
+      fail(
+        "plan",
+        `a DECLARED field must be renamed, got ${JSON.stringify(safeNames)}`,
+      );
+    if (safeNames.includes("is an infant on"))
+      fail("plan", "a deref-only name (here, a comment) must NOT be renamed");
+    if (!derefOnly.some(([n]) => n === "is an infant on"))
+      fail("plan", "a deref-only name must still be REPORTED");
+  } finally {
+    rmSync(t2, { recursive: true, force: true });
+  }
+
   if (bad) {
     console.error(`\napply-clitic-sweep selftest: ${bad} check(s) failed`);
     return 1;
   }
   console.log(
-    `apply-clitic-sweep selftest: ${SELFTEST.length} text cases + 22 structural checks pass`,
+    `apply-clitic-sweep selftest: ${SELFTEST.length} text + ${ORDER_CASES.length} order cases + 25 structural checks pass`,
   );
   return 0;
 }
@@ -474,7 +645,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     process.exit(2);
   }
 
-  const { safe, held, unrenamable } = plan(dirs);
+  const { safe, held, unrenamable, derefOnly } = plan(dirs);
 
   if (!safe.length && !held.length) {
     console.log(`apply-clitic-sweep: nothing to rename in ${dirs.join(", ")}`);
@@ -487,7 +658,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   for (const dir of dirs)
     for (const f of writeWalk(dir)) {
       const before = readFileSync(f, "utf8");
-      const { text, edits: n } = sweepText(before, safe);
+      const { text, edits: n } = sweepText(before, safe, extname(f));
       if (!n) continue;
       // THE guard. Reading and reporting is always fine; writing is not.
       if (mode === "apply" && isMirror(f) && !allowMirror) {
@@ -526,6 +697,14 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   if (unrenamable.length) {
     console.log(`\nNOT RENAMABLE (the name is only the verb):`);
     for (const n of unrenamable) console.log(`  \`${n}\``);
+  }
+  if (derefOnly.length) {
+    console.log(
+      `\nREPORTED, NOT RENAMED (seen only through a dereference, never declared —\n` +
+        `so it may be a mixfix predicate, a comment, or a name wrapped across lines):`,
+    );
+    for (const [n, where] of derefOnly)
+      console.log(`  \`${n}\`  first seen ${where}`);
   }
 
   // --check is the CI-shaped question "is there anything to sweep?", so pending

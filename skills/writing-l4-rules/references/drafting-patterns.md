@@ -601,13 +601,24 @@ node etc/apply-clitic-sweep.mjs            <dir>...   # apply
 node etc/apply-clitic-sweep.mjs --selftest
 ```
 
-Three things it will not do, each for a measured reason. It rewrites only **delimited** occurrences
-— `` `name` ``, `"name"`, and the escaped `` \`name\` `` that L4-inside-a-JS-template-literal uses —
-because the same words appear in a quotation of the statute and in comments, where editing them
-would make the corpus say something the Act does not. It never enters `tests/`, because goldens are
+**It renames only what is DECLARED.** The checker is designed to over-report, because a
+dereference-shaped match is cheap and a human filters the result; its own header lists the benign
+classes it knowingly reports. An applier makes every one of those actionable, so the rule here is
+narrower than the checker's: a name needs at least one **declaration** site. A name seen only
+through a dereference is printed and left alone — it may be a mixfix predicate, a mention in a
+comment, or a name the checker truncated because it wrapped across lines.
+
+Three more things it will not do, each for a measured reason. It rewrites only **delimited**
+occurrences — `` `name` ``, `"name"`, and the escaped `` \`name\` `` that
+L4-inside-a-JS-template-literal uses — because the same words appear in quotations of the statute
+and in comments, where editing them would make the corpus say something the Act does not. **The
+quoted form is not used in `.l4` or `.md` at all**: there a double-quoted run is a string literal or
+ordinary prose, not a reference to a field. It never enters `tests/`, because goldens are
 regenerated from swept sources and hand-editing one blesses output nothing produced. And it
 **refuses to write inside `jl4/examples/canon/`**, the vendored mirror: a sweep applied there makes
-the mirror disagree with the SHA in `etc/canon-pin.json`. Sweep in canon, then bump the pin.
+the mirror disagree with the SHA in `etc/canon-pin.json`. Sweep in canon, then bump the pin. That
+refusal resolves real paths and is checked per file, so passing a parent directory does not slip
+past it.
 
 A rename whose target name is **already bound** is listed and held back, never forced — the checker
 reports it as outstanding until a human decides. That is not a limitation but the interesting case:
