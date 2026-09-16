@@ -1,0 +1,131 @@
+aContract — after 3 events, the clock stands at 10 (the #TRACE on line 23)
+    PARTY S DOES delivery AT 2
+    PARTY B DOES payment OF 21 AT 4
+    `WAIT UNTIL` OF 10
+  Standing: in progress.
+
+  Owed now:
+    - B MUST return — due by 14 (4 from now)
+
+  What would put someone in breach:
+    - nothing happens by 14 (the clock reaches 15) → B is in breach: MUST return was due by 14; the clock reached 15 without it
+
+  What could not be tried:
+    - B does return — the action binds `return`, which the what-if cannot choose
+
+  Next deadline: 14 (B: return)
+
+  Steps, in order:
+    at 2: S does delivery at 2; S MUST — done; on to what follows
+    at 4: B does payment OF … at 4; B MUST — done; on to what follows
+    at 10: the clock runs to 10 with nothing happening; B MUST — not this party's event; passed over
+    at 10: B MUST — no more events; still waiting
+
+aContract — after 2 events, the clock stands at 4 (the #TRACE on line 29)
+    PARTY S DOES delivery AT 2
+    PARTY B DOES payment OF 20 AT 4
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at 2: S does delivery at 2; S MUST — done; on to what follows
+    at 4: B does payment OF … at 4; B MUST — done; on to what follows
+
+aContract — after 3 events, the clock stands at 9 (the #TRACE on line 33)
+    PARTY S DOES delivery AT 2
+    PARTY B DOES payment OF 30 AT 6
+    PARTY B DOES payment OF 10 AT 9
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at 2: S does delivery at 2; S MUST — done; on to what follows
+    at 2: B does something at 6; B MUST — deadline 5 passed without the act; on to the fallback
+    at 6: B does payment OF … at 6; B MUST — not the act awaited; passed over [the same event, offered a second time]
+    at 9: B does payment OF … at 9; B MUST — done; on to what follows
+
+y — after 2 events, the clock stands at 20 (the #TRACE on line 58)
+    PARTY B DOES payment OF 2 AT 5
+    PARTY S DOES delivery AT 20
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at 5: B does payment OF … at 5; B MUST — done; on to what follows
+
+quux — after 3 events, the clock stands at 1 (the #TRACE on line 69)
+    PARTY B DOES quuux AT 1
+    PARTY B DOES baz OF qux AT 1
+    PARTY B DOES baz OF bar AT 1
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at 1: B does quuux at 1; B MAY — not the act awaited; passed over
+    at 1: B does baz OF … at 1; B MAY — not the act awaited; passed over
+    at 1: B does baz OF … at 1; B MAY — done; on to what follows
+
+(PARTY B MUST payment) ROR FULFILLED — before anything has happened, the clock stands at 2 (the #TRACE on line 81)
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at —: (party not yet known) MUST — no more events; still waiting
+    at —: either part: fulfilled (decided by the second part)
+
+x — after 1 event, the clock stands at 4 (the #TRACE on line 83)
+    PARTY S DOES delivery AT 4
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at 4: S does delivery at 4; S MUST — done; on to what follows
+
+y — after 1 event, the clock stands at 4 (the #TRACE on line 86)
+    PARTY B DOES payment OF 4 AT 4
+  Standing: in progress.
+
+  Owed now:
+    - B MUST payment OF 2 — due by 9 (5 from now)
+
+  What would discharge it (the contract ends fulfilled):
+    - B does payment OF 2 now (at 4) → fulfilled
+
+  What would put someone in breach:
+    - nothing happens by 9 (the clock reaches 10) → B is in breach: MUST payment n was due by 9; the clock reached 10 without it
+
+  Next deadline: 9 (B: payment OF 2)
+
+  Steps, in order:
+    at 4: B does payment OF … at 4; B MUST — not the act awaited; passed over
+    at 4: B MUST — no more events; still waiting
+
+z — after 2 events, the clock stands at 26 (the #TRACE on line 89)
+    PARTY S DOES delivery AT 4
+    PARTY B DOES payment OF 4 AT 26
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at 4: S does delivery at 4; S MUST — done; on to what follows
+    at —: either part: fulfilled (decided by the first part)
+
+z — after 2 events, the clock stands at 26 (the #TRACE on line 93)
+    PARTY S DOES delivery AT 4
+    PARTY B DOES payment OF 5 AT 26
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at 4: S does delivery at 4; S MUST — done; on to what follows
+    at —: either part: fulfilled (decided by the first part)
+
+goesOn — after 2 events, the clock stands at 3 (the #TRACE on line 102)
+    PARTY S DOES delivery AT 2
+    PARTY B DOES payment OF 6 AT 3
+  Standing: BREACHED — S is in breach: MUST payment n PROVIDED (n EQUALS 7) was due by 2; seen at 3, when payment OF 6 happened instead.
+
+  Steps, in order:
+    at 2: S does delivery at 2; S MUST — not the act awaited; passed over
+    at 2: B does something at 3; S MUST — deadline 2 passed without the act; that is a breach
+
+goesOn — after 2 events, the clock stands at 3 (the #TRACE on line 106)
+    PARTY S DOES delivery AT 2
+    PARTY S DOES payment OF 7 AT 3
+  Standing: BREACHED — S is in breach: MUST payment n PROVIDED (n EQUALS 7) was due by 2; seen at 3, when payment OF 7 happened instead.
+
+  Steps, in order:
+    at 2: S does delivery at 2; S MUST — not the act awaited; passed over
+    at 2: S does something at 3; S MUST — deadline 2 passed without the act; that is a breach

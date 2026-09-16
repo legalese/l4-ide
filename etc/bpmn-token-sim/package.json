@@ -1,0 +1,19 @@
+{
+  "name": "bpmn-token-sim",
+  "version": "0.1.0",
+  "private": true,
+  "description": "P2a harness: drive bpmn-js-token-simulation over the L4 BPMN goldens headlessly and screenshot the result",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "run": "node run.mjs"
+  },
+  "dependencies": {
+    "bpmn-js": "18.28.0",
+    "bpmn-js-token-simulation": "0.40.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.9",
+    "playwright": "1.63.0"
+  }
+}

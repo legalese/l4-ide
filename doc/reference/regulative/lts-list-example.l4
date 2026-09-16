@@ -1,0 +1,28 @@
+-- The worked example on lts-list.md: a sale where the seller has delivered
+-- and the buyer has not yet paid. `l4 lts` on this file lists the buyer's
+-- position after the one event in the #TRACE.
+
+DECLARE Person IS ONE OF Seller, Buyer
+DECLARE Action IS ONE OF
+  delivery
+  payment HAS amount IS A NUMBER
+
+saleContract MEANS
+  PARTY Seller
+  MUST delivery
+  WITHIN 3
+  HENCE (
+    PARTY Buyer
+    MUST payment EXACTLY 100
+    WITHIN 7
+    LEST (
+      PARTY Buyer
+      MUST payment EXACTLY 120
+      WITHIN 14
+    )
+  )
+  LEST BREACH BY Seller
+
+-- The seller delivered on day 2. What does the buyer owe now?
+#TRACE saleContract AT 0 WITH
+  PARTY Seller DOES delivery AT 2

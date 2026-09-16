@@ -1,0 +1,491 @@
+{
+  "fixture": "jl4/examples/bpmn/expected/regcf-reporting.bpmn",
+  "importWarnings": [],
+  "elements": [
+    {
+      "id": "Start_0",
+      "type": "bpmn:StartEvent",
+      "name": null,
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Start_0__Decide_0"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Split_0",
+      "type": "bpmn:ExclusiveGateway",
+      "name": "one of",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": "Diverging",
+      "outgoing": [
+        "Flow_Split_0__Task_1",
+        "Flow_Split_0__End_2",
+        "Flow_Split_0__Task_4"
+      ],
+      "incoming": [
+        "Flow_Decide_0__Split_0"
+      ]
+    },
+    {
+      "id": "Task_1",
+      "type": "bpmn:Task",
+      "name": "MUST file a Form C-TR termination of reporting",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_1__End_2"
+      ],
+      "incoming": [
+        "Flow_Split_0__Task_1"
+      ]
+    },
+    {
+      "id": "End_2",
+      "type": "bpmn:EndEvent",
+      "name": "Fulfilled",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_Split_0__End_2",
+        "Flow_Task_1__End_2"
+      ]
+    },
+    {
+      "id": "End_3",
+      "type": "bpmn:EndEvent",
+      "name": "Breach",
+      "eventDefinitions": [
+        "bpmn:ErrorEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_Boundary_1__End_3",
+        "Flow_Boundary_4__End_3"
+      ]
+    },
+    {
+      "id": "Task_4",
+      "type": "bpmn:Task",
+      "name": "MUST file a Form C-AR annual report",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_4__Decide_0"
+      ],
+      "incoming": [
+        "Flow_Split_0__Task_4"
+      ]
+    },
+    {
+      "id": "Decide_0",
+      "type": "bpmn:BusinessRuleTask",
+      "name": "ongoing reporting obligation",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Decide_0__Split_0"
+      ],
+      "incoming": [
+        "Flow_Start_0__Decide_0",
+        "Flow_Task_4__Decide_0"
+      ]
+    },
+    {
+      "id": "Boundary_4",
+      "type": "bpmn:BoundaryEvent",
+      "name": "timeout",
+      "eventDefinitions": [
+        "bpmn:ConditionalEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_4",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Boundary_4__End_3"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Boundary_1",
+      "type": "bpmn:BoundaryEvent",
+      "name": "timeout",
+      "eventDefinitions": [
+        "bpmn:ConditionalEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_1",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Boundary_1__End_3"
+      ],
+      "incoming": []
+    }
+  ],
+  "unsupportedElements": [],
+  "pausePoints": [
+    "Task_1",
+    "Task_4",
+    "Decide_0"
+  ],
+  "exclusiveGateways": [
+    {
+      "id": "Split_0",
+      "arms": [
+        "Flow_Split_0__Task_1",
+        "Flow_Split_0__End_2",
+        "Flow_Split_0__Task_4"
+      ]
+    }
+  ],
+  "started": {
+    "tokensOn": [
+      "Decide_0"
+    ],
+    "boundarySubscriptions": [],
+    "triggers": [
+      "Start_0",
+      "Decide_0"
+    ],
+    "history": [
+      "Start_0",
+      "Flow_Start_0__Decide_0",
+      "Decide_0"
+    ],
+    "endEventsReached": [],
+    "log": [
+      "Process started 11mwz1z",
+      "Start Event 11mwz1z"
+    ],
+    "afterWaiting3s": {
+      "tokensOn": [
+        "Decide_0"
+      ],
+      "triggers": [
+        "Start_0",
+        "Decide_0"
+      ],
+      "endEventsReached": []
+    }
+  },
+  "breach": {
+    "arm": "Flow_Split_0__Task_1",
+    "continuedFirst": [
+      "Decide_0"
+    ],
+    "fired": "Boundary_1",
+    "tokensOn": [],
+    "boundarySubscriptions": [],
+    "triggers": [
+      "Start_0"
+    ],
+    "history": [
+      "Start_0",
+      "Flow_Start_0__Decide_0",
+      "Decide_0",
+      "Flow_Decide_0__Split_0",
+      "Split_0",
+      "Flow_Split_0__Task_1",
+      "Task_1",
+      "Boundary_1",
+      "Flow_Boundary_1__End_3",
+      "End_3"
+    ],
+    "endEventsReached": [
+      "End_3"
+    ],
+    "log": [
+      "Process started 1uu3tzp",
+      "Start Event 1uu3tzp",
+      "ongoing reporting obligation 1uu3tzp",
+      "one of 1uu3tzp",
+      "MUST file a Form C-TR termination of reporting 1uu3tzp",
+      "timeout 1uu3tzp",
+      "Breach 1uu3tzp",
+      "Process finished 1uu3tzp"
+    ]
+  },
+  "happy": [
+    {
+      "arm": "Flow_Split_0__Task_1",
+      "continued": [
+        "Decide_0",
+        "Task_1"
+      ],
+      "steps": [
+        {
+          "tokensOn": [
+            "Decide_0"
+          ],
+          "continued": "Decide_0"
+        },
+        {
+          "tokensOn": [
+            "Task_1"
+          ],
+          "continued": "Task_1"
+        }
+      ],
+      "hitStepLimit": false,
+      "tokensOn": [],
+      "boundarySubscriptions": [],
+      "triggers": [
+        "Start_0"
+      ],
+      "history": [
+        "Start_0",
+        "Flow_Start_0__Decide_0",
+        "Decide_0",
+        "Flow_Decide_0__Split_0",
+        "Split_0",
+        "Flow_Split_0__Task_1",
+        "Task_1",
+        "Flow_Task_1__End_2",
+        "End_2"
+      ],
+      "endEventsReached": [
+        "End_2"
+      ],
+      "log": [
+        "Process started 09fp4gm",
+        "Start Event 09fp4gm",
+        "ongoing reporting obligation 09fp4gm",
+        "one of 09fp4gm",
+        "MUST file a Form C-TR termination of reporting 09fp4gm",
+        "Fulfilled 09fp4gm",
+        "Process finished 09fp4gm"
+      ]
+    },
+    {
+      "arm": "Flow_Split_0__End_2",
+      "continued": [
+        "Decide_0"
+      ],
+      "steps": [
+        {
+          "tokensOn": [
+            "Decide_0"
+          ],
+          "continued": "Decide_0"
+        }
+      ],
+      "hitStepLimit": false,
+      "tokensOn": [],
+      "boundarySubscriptions": [],
+      "triggers": [
+        "Start_0"
+      ],
+      "history": [
+        "Start_0",
+        "Flow_Start_0__Decide_0",
+        "Decide_0",
+        "Flow_Decide_0__Split_0",
+        "Split_0",
+        "Flow_Split_0__End_2",
+        "End_2"
+      ],
+      "endEventsReached": [
+        "End_2"
+      ],
+      "log": [
+        "Process started 1h41xy6",
+        "Start Event 1h41xy6",
+        "ongoing reporting obligation 1h41xy6",
+        "one of 1h41xy6",
+        "Fulfilled 1h41xy6",
+        "Process finished 1h41xy6"
+      ]
+    },
+    {
+      "arm": "Flow_Split_0__Task_4",
+      "continued": [
+        "Decide_0",
+        "Task_4",
+        "Decide_0",
+        "Task_4",
+        "Decide_0",
+        "Task_4",
+        "Decide_0",
+        "Task_4",
+        "Decide_0",
+        "Task_4",
+        "Decide_0",
+        "Task_4"
+      ],
+      "steps": [
+        {
+          "tokensOn": [
+            "Decide_0"
+          ],
+          "continued": "Decide_0"
+        },
+        {
+          "tokensOn": [
+            "Task_4"
+          ],
+          "continued": "Task_4"
+        },
+        {
+          "tokensOn": [
+            "Decide_0"
+          ],
+          "continued": "Decide_0"
+        },
+        {
+          "tokensOn": [
+            "Task_4"
+          ],
+          "continued": "Task_4"
+        },
+        {
+          "tokensOn": [
+            "Decide_0"
+          ],
+          "continued": "Decide_0"
+        },
+        {
+          "tokensOn": [
+            "Task_4"
+          ],
+          "continued": "Task_4"
+        },
+        {
+          "tokensOn": [
+            "Decide_0"
+          ],
+          "continued": "Decide_0"
+        },
+        {
+          "tokensOn": [
+            "Task_4"
+          ],
+          "continued": "Task_4"
+        },
+        {
+          "tokensOn": [
+            "Decide_0"
+          ],
+          "continued": "Decide_0"
+        },
+        {
+          "tokensOn": [
+            "Task_4"
+          ],
+          "continued": "Task_4"
+        },
+        {
+          "tokensOn": [
+            "Decide_0"
+          ],
+          "continued": "Decide_0"
+        },
+        {
+          "tokensOn": [
+            "Task_4"
+          ],
+          "continued": "Task_4"
+        }
+      ],
+      "hitStepLimit": true,
+      "tokensOn": [
+        "Decide_0"
+      ],
+      "boundarySubscriptions": [],
+      "triggers": [
+        "Start_0",
+        "Decide_0"
+      ],
+      "history": [
+        "Start_0",
+        "Flow_Start_0__Decide_0",
+        "Decide_0",
+        "Flow_Decide_0__Split_0",
+        "Split_0",
+        "Flow_Split_0__Task_4",
+        "Task_4",
+        "Flow_Task_4__Decide_0",
+        "Decide_0",
+        "Flow_Decide_0__Split_0",
+        "Split_0",
+        "Flow_Split_0__Task_4",
+        "Task_4",
+        "Flow_Task_4__Decide_0",
+        "Decide_0",
+        "Flow_Decide_0__Split_0",
+        "Split_0",
+        "Flow_Split_0__Task_4",
+        "Task_4",
+        "Flow_Task_4__Decide_0",
+        "Decide_0",
+        "Flow_Decide_0__Split_0",
+        "Split_0",
+        "Flow_Split_0__Task_4",
+        "Task_4",
+        "Flow_Task_4__Decide_0",
+        "Decide_0",
+        "Flow_Decide_0__Split_0",
+        "Split_0",
+        "Flow_Split_0__Task_4",
+        "Task_4",
+        "Flow_Task_4__Decide_0",
+        "Decide_0",
+        "Flow_Decide_0__Split_0",
+        "Split_0",
+        "Flow_Split_0__Task_4",
+        "Task_4",
+        "Flow_Task_4__Decide_0",
+        "Decide_0"
+      ],
+      "endEventsReached": [],
+      "log": [
+        "Process started 154f9m5",
+        "Start Event 154f9m5",
+        "ongoing reporting obligation 154f9m5",
+        "one of 154f9m5",
+        "MUST file a Form C-AR annual report 154f9m5",
+        "ongoing reporting obligation 154f9m5",
+        "one of 154f9m5",
+        "MUST file a Form C-AR annual report 154f9m5",
+        "ongoing reporting obligation 154f9m5",
+        "one of 154f9m5",
+        "MUST file a Form C-AR annual report 154f9m5",
+        "ongoing reporting obligation 154f9m5",
+        "one of 154f9m5",
+        "MUST file a Form C-AR annual report 154f9m5",
+        "ongoing reporting obligation 154f9m5",
+        "one of 154f9m5",
+        "MUST file a Form C-AR annual report 154f9m5",
+        "ongoing reporting obligation 154f9m5",
+        "one of 154f9m5",
+        "MUST file a Form C-AR annual report 154f9m5"
+      ]
+    }
+  ],
+  "pageErrors": []
+}

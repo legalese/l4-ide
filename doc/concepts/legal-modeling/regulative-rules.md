@@ -479,7 +479,7 @@ l4 state-graph mycontract.l4
 cabal run l4 -- state-graph mycontract.l4
 ```
 
-The graph shows the initial state, intermediate obligations, deadline transitions, and terminal `FULFILLED` / `BREACH` nodes.
+The graph shows the initial state, intermediate obligations, deadline transitions, and terminal `FULFILLED` / `BREACH` nodes. In the editor, **Show state graph** above a regulative rule opens the same graph in a pane; the [state graph reference page](../../reference/regulative/STATE-GRAPH.md) says how to read it and what it does not show.
 
 ---
 

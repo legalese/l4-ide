@@ -46,6 +46,7 @@ import qualified System.OsPath as OsPath
 import LSP.L4.Rules
 
 import qualified BpmnExport
+import qualified LtsList
 import qualified Hover
 import qualified SemanticTokens
 import qualified VizAutoRefresh
@@ -159,6 +160,7 @@ main = do
     DmnExport.spec examplesRoot
     RelationalExport.spec examplesRoot
     describe "bpmn export" BpmnExport.spec
+    describe "lts list" LtsList.spec
   where
     tests evalConfig (tcOk, nlgOk) files root =
       forM_ files $ \inputFile -> do

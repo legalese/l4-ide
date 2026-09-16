@@ -324,6 +324,26 @@ reports exactly one `label-required` on each of the two deadlocking diagrams in
 `check-bpmn-soundness.mjs` catches with a witness trace and jBPM confirms
 independently.)
 
+## Watching it animate: the token-simulation baseline
+
+`etc/bpmn-token-sim/` drives bpmn.io's own `bpmn-js-token-simulation` over
+every file in `expected/`, headlessly, and screenshots what a reader would see.
+It is the P2a experiment of `specs/todo/lexipedia-superset/LTS-VISUALISER.md`
+§7.2, and its findings — case by case, what the animation can and cannot say
+about the rule — are in `specs/todo/lexipedia-superset/P2A-TOKEN-SIM-BASELINE.md`.
+It has its own `package.json` and touches no lockfile here:
+
+```sh
+cd etc/bpmn-token-sim && npm ci && npm run build && npm run run
+```
+
+It is not a check and has no verdict. The short version of what it found
+(2026-09-15): the simulator accepts all eight files without complaint and
+animates a `MUST`, a `MAY` and a `SHANT` with the same token and the same
+buttons; `tenancy-barrier` and `tenancy-fork` animate identically; no timer fired on
+its own in 4.5 s of wall clock (the simulator has no clock — timers are play
+buttons); and a breach end event does not stop the siblings.
+
 ## Asking an actual engine: the jBPM/KIE second opinion
 
 Both checks above are ours. `etc/check-bpmn-kie.sh` runs somebody else's — jBPM
@@ -382,7 +402,10 @@ The conclusion survives the correction and in fact sharpens: **every** golden
 that has a real branch is one jBPM rejects. `handover.bpmn` is rejected for axis
 A4, and all three Reg CF files are rejected too — two of them for A4's defect
 class (an L4 name inside a `conditionExpression` declared as a formal
-expression), and `regcf-reporting.bpmn` for its mixed gateway. So branching has
+expression), and `regcf-reporting.bpmn` because `Decide_0` takes two incoming
+edges — the start edge and the renewal loop, since the 2026-08-02 reroute that
+put `Decide_0` in front of `Split_0`; before that reroute the same file was
+rejected for its mixed gateway. So branching has
 still never been executed on exporter output. Most of what the engine confirms,
 it confirms on files written by hand for this purpose.
 
@@ -401,7 +424,7 @@ the three Reg CF goldens whose rejections were disclosed only in
 | `offering.bpmn`                                      | OK, 0 warnings      | SOUND                      | ABORTED via error end event `Breach`  |
 | `handover.bpmn`                                      | OK, 0 warnings      | SOUND                      | **rejected at compile, see A4**       |
 | `regcf-advertising.bpmn`                             | OK, 0 warnings      | SOUND                      | **rejected at compile**, A4's defect class: `` `notice complies with Rule 204(b)` OF notice `` in a `conditionExpression` |
-| `regcf-reporting.bpmn`                               | OK, 0 warnings      | SOUND                      | **rejected at compile**: `Unknown gateway direction: Mixed` |
+| `regcf-reporting.bpmn`                               | OK, 0 warnings      | SOUND                      | **rejected at compile** (re-measured 2026-09-15): `This type of node [Decide_0, ongoing reporting obligation] cannot have more than one incoming connection!` |
 | `regcf-resale.bpmn`                                  | OK, 0 warnings      | SOUND                      | **rejected at compile**, A4's defect class |
 | `sound/joined-beside-breach.bpmn`                    | OK, 0 warnings      | SOUND                      | COMPLETED                             |
 | `unsound/historical-handover-edge-counted-join.bpmn` | OK, 0 warnings      | UNSOUND (S2)               | **rejected at compile, see A4**       |
@@ -507,19 +530,28 @@ differences and are **not** defects:
   own default both by name and by omission, and by omission it is the same
   rejection, not a distinct one. Nothing emitted today is affected:
   `grep -ho 'gatewayDirection="[A-Za-z]*"'` over `expected/`, `sound/` and
-  `unsound/` returns 15 `Diverging`, 6 `Converging`, 1 `Mixed` and **no**
-  `Unspecified`. It is a latent hazard rather than a live one, recorded so that
+  `unsound/` returned 15 `Diverging`, 6 `Converging`, 1 `Mixed` and **no**
+  `Unspecified` when this was written (2026-07-28); on 2026-09-15 the same grep
+  returns 24 `Diverging`, 7 `Converging`, and **no** `Mixed`. It is a latent
+  hazard rather than a live one, recorded so that
   the first gateway with one incoming and one outgoing flow — which
   `gatewayFlowFor` would correctly call `Unspecified` — is a known cost and not
   a surprise.
 
-  The `Mixed` case **is** reached by exporter output: `expected/regcf-reporting.bpmn`'s
-  renewal loop makes its gateway genuinely mixed, so the file now says `Mixed`
-  and jBPM will not read it. Unlike A0–A2, the harness cannot adapt around it —
-  the shape, not the spelling, is what jBPM has no node for. Before this was
-  measured the same rejection was attributed to mixedness on the strength of the
-  `Diverging` message, which is about incoming arity; the difference is recorded
-  in `../legal/regcf/PROJECTIONS.md` §3 and `unsound/README.md`.
+  The `Mixed` case **was** reached by exporter output between 2026-07-28 and
+  2026-08-02: `expected/regcf-reporting.bpmn`'s renewal loop re-entered at
+  `Split_0`, which made the gateway genuinely mixed and jBPM would not read it.
+  Unlike A0–A2, the harness cannot adapt around that — the shape, not the
+  spelling, is what jBPM has no node for. The 2026-08-02 reroute (commit
+  `30308c4f`) put `Decide_0` in front of `Split_0` and sent both arrivals
+  through it, so the gateway is `Diverging` again and no emitted file says
+  `Mixed` today; jBPM now rejects the same file one node earlier, for
+  `Decide_0`'s two incoming edges (table above, re-measured 2026-09-15 with
+  `etc/check-bpmn-kie.sh`). An earlier version of this paragraph kept saying
+  `Mixed` for six weeks after the reroute. Before the original measurement the
+  same rejection was attributed to mixedness on the strength of the `Diverging`
+  message, which is about incoming arity; the difference is recorded in
+  `../legal/regcf/PROJECTIONS.md` §3 and `unsound/README.md`.
 
 A5 is neither, and used to be filed with the gaps below by mistake:
 
@@ -561,8 +593,9 @@ The remaining two are **real gaps in the emitted XML**, not tool disagreements:
   the Reg CF gateways are L4 too, so `regcf-advertising.bpmn` and
   `regcf-resale.bpmn` are rejected the same way (`Unable to Analyse Expression`
   `` `notice complies with Rule 204(b)` OF notice ``). Counting from the table
-  above, jBPM rejects 6 of the 12 fixtures: four for this, one for A6's mixed
-  gateway, one for the deliberate structural fixture. It is a fidelity defect
+  above, jBPM rejects 6 of the 12 fixtures: four for this, one for
+  `regcf-reporting.bpmn`'s two-incoming `Decide_0` (A6's mixed gateway, before
+  the 2026-08-02 reroute), one for the deliberate structural fixture. It is a fidelity defect
   rather than a flavor axis: the honest emission would set `language` to
   something naming L4, or drop the `tFormalExpression` type.
 

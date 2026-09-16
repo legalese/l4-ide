@@ -6,13 +6,18 @@
 -- diagram of those transitions so designers can visually check the flow.
 --
 -- Output goes to stdout; redirect with @>@. Exits 1 on typecheck failure.
+--
+-- With @--dominators@ the DOT is replaced by a plain-text answer per rule:
+-- for each terminal state, the acts every path from the start must pass
+-- through on the way to it ('L4.StateGraph.Dominators'). @--all-states@
+-- widens that to every state of the graph.
 module L4.Cli.StateGraph
   ( StateGraphOptions(..)
   , stateGraphOptionsParser
   , stateGraphCmd
   ) where
 
-import Base (for_)
+import Base (for_, when)
 import qualified Base.Text as Text
 import qualified Data.Text.IO as TIO
 import Options.Applicative
@@ -22,6 +27,7 @@ import System.IO (hPutStrLn, stderr)
 import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import qualified L4.StateGraph as StateGraph
+import qualified L4.StateGraph.Dominators as Dominators
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
 import L4.Cli.Common
@@ -30,13 +36,24 @@ import L4.Cli.Common
 -- Options
 ----------------------------------------------------------------------------
 
-newtype StateGraphOptions = StateGraphOptions
+data StateGraphOptions = StateGraphOptions
   { stateGraphFile :: FilePath
+  , stateGraphDominators :: Bool
+    -- ^ Print, instead of DOT, the acts every path to each terminal state
+    -- must traverse.
+  , stateGraphAllStates :: Bool
+    -- ^ With @--dominators@: answer for every state, not only the terminals.
   }
 
 stateGraphOptionsParser :: Parser StateGraphOptions
 stateGraphOptionsParser = StateGraphOptions
   <$> strArgument (metavar "FILE" <> help "Path to the .l4 file with regulative rules")
+  <*> switch
+        ( long "dominators"
+       <> help "Instead of DOT, list the acts every path to FULFILLED and to BREACH must pass through" )
+  <*> switch
+        ( long "all-states"
+       <> help "With --dominators: answer for every state of the graph, not only the terminal ones" )
 
 ----------------------------------------------------------------------------
 -- Entry point
@@ -44,6 +61,11 @@ stateGraphOptionsParser = StateGraphOptions
 
 stateGraphCmd :: StateGraphOptions -> IO ()
 stateGraphCmd opts = do
+  -- @--all-states@ only means something to the dominators listing. Accepting
+  -- it alone would print the DOT as if the flag had been read, and exit 0.
+  when (opts.stateGraphAllStates && not opts.stateGraphDominators) do
+    hPutStrLn stderr "l4 state-graph: --all-states requires --dominators"
+    exitFailure
   evalConfig <- makeEvalConfig (FixedNowOpt Nothing)
   (errs, mTc) <- runOneshot evalConfig opts.stateGraphFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
@@ -60,13 +82,11 @@ stateGraphCmd opts = do
         _ -> do
           let sgOpts = StateGraph.defaultStateGraphOptions
           for_ graphs $ \sg ->
-            TIO.putStrLn (StateGraph.stateGraphToDot sgOpts sg)
+            if opts.stateGraphDominators
+              then TIO.putStr (Text.unlines (Dominators.renderGraphDominators opts.stateGraphAllStates sg))
+              else TIO.putStrLn (StateGraph.stateGraphToDot sgOpts sg)
           exitSuccess
     _ -> do
       putDiagnostics errs
       hPutStrLn stderr "Type checking failed — cannot extract state graph"
       exitFailure
-
--- Silence unused-top-binds nag for Text.pack re-export via Base.Text.
-_unusedText :: ()
-_unusedText = let _ = Text.pack "" in ()

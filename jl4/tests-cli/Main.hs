@@ -108,6 +108,9 @@ locateL4Binary' = do
 -- Helpers for running the CLI
 ----------------------------------------------------------------------------
 
+notInfixOf :: String -> String -> Bool
+notInfixOf needle hay = not (needle `isInfixOf` hay)
+
 data Output = Output
   { outExit   :: ExitCode
   , outStdout :: String
@@ -1479,6 +1482,57 @@ spec bin = do
       Output code _ serr <- runL4 bin ["state-graph", cleanFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("regulative" `isInfixOf`)
+
+    -- P2f (LTS-VISUALISER §1.1c): the acts every path to a terminal state
+    -- must traverse, as a reader sees them. @aContract@ in contracts.l4 is
+    -- S delivers, then B pays, then one of three continuations, and breach
+    -- is reachable from the very first deadline — so delivery dominates
+    -- FULFILLED and nothing dominates BREACH.
+    it "--dominators lists the acts on every path to each terminal state" $ do
+      Output code sout _ <- runL4 bin ["state-graph", "--dominators", "examples/ok/contracts.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("digraph" `notInfixOf`)
+      let expected = unlines
+            [ "aContract"
+            , "  Every path to FULFILLED passes through:"
+            , "    - PARTY S delivery (MUST, WITHIN 3)"
+            , "  Every path to BREACH passes through: nothing in particular (there is more than one route)."
+            ]
+      sout `shouldSatisfy` (expected `isPrefixOf`)
+      -- A single obligation: its act reaches FULFILLED, its deadline BREACH.
+      sout `shouldSatisfy` (unlines
+        [ "x"
+        , "  Every path to FULFILLED passes through:"
+        , "    - PARTY S delivery (MUST, WITHIN 3)"
+        , "  Every path to BREACH passes through:"
+        , "    - the deadline passing on PARTY S delivery (MUST, WITHIN 3)"
+        ] `isInfixOf`)
+
+    it "--dominators --all-states answers for the intermediate states too" $ do
+      Output code sout _ <- runL4 bin
+        ["state-graph", "--dominators", "--all-states", "examples/ok/contracts.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"initial\" is the start state" `isInfixOf`)
+      sout `shouldSatisfy` (unlines
+        [ "  Every path to \"B must return\" passes through:"
+        , "    - PARTY S delivery (MUST, WITHIN 3)"
+        , "    - PARTY B payment ... (MUST, WITHIN 3, PROVIDED price AT LEAST 20)"
+        , "    - the arm IF NOT (price EQUALS 20)"
+        ] `isInfixOf`)
+
+    it "without --dominators the DOT output is unchanged" $ do
+      Output code sout _ <- runL4 bin ["state-graph", "examples/ok/contracts.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("digraph" `isPrefixOf`)
+      sout `shouldSatisfy` ("Every path" `notInfixOf`)
+
+    -- The flag has no meaning for the DOT; taking it silently would print
+    -- the graph as if it had been read.
+    it "--all-states without --dominators is refused, not ignored" $ do
+      Output code sout serr <- runL4 bin ["state-graph", "--all-states", "examples/ok/contracts.l4"]
+      code `shouldSatisfy` (/= ExitSuccess)
+      serr `shouldSatisfy` ("requires --dominators" `isInfixOf`)
+      sout `shouldSatisfy` ("digraph" `notInfixOf`)
 
   describe "l4 batch" $ do
     it "serializes a #TRACE breach with correctly-labeled fields" $ do

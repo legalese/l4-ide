@@ -15,6 +15,8 @@
 - [Syntax](reference/syntax/README.md)
   - [Field opening](reference/syntax/field-opening.md)
 - [Regulative](reference/regulative/README.md)
+  - [What is owed now: `l4 lts`](reference/regulative/lts-list.md)
+  - [State graph and `--dominators`](reference/regulative/STATE-GRAPH.md)
 - [Built-ins](reference/builtins/README.md)
 - [Libraries](reference/libraries/README.md)
 - [Patterns](reference/patterns/README.md)

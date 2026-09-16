@@ -25,6 +25,7 @@
   import { defaultExample, type LegalExample } from '$lib/legal-examples'
   import ExampleSelector from '$lib/components/example-selector.svelte'
   import InspectorPanel from '$lib/components/inspector-panel.svelte'
+  import StateGraphPanel from '$lib/components/state-graph-panel.svelte'
   import {
     EvalDirectiveResultRequestType,
     QueryPlanRequestType,
@@ -73,7 +74,9 @@
     window.innerWidth < 1024 ? false : !ownUrl.searchParams.has('no-examples')
   )
   let showVisualizer = $state(false)
-  let rightPaneView: 'ladder' | 'inspector' = $state('ladder')
+  let rightPaneView: 'ladder' | 'inspector' | 'stategraph' = $state('ladder')
+  // What the "Show state graph" lens last answered; shown when rightPaneView is 'stategraph'
+  let stateGraph: { name: string; dot: string } | null = $state(null)
   let inspectorPanel: InspectorPanel | undefined = $state(undefined)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let paneGroup: any = $state()
@@ -748,6 +751,25 @@
             return
           }
 
+          // "Show state graph": the answer is { name, dot }, not a ladder
+          // payload, so it must not reach the decoder below.
+          if (command === 'l4.stateGraph') {
+            const { name, dot } = responseFromLangServer as {
+              name?: string
+              dot?: string
+            }
+            if (typeof dot === 'string') {
+              stateGraph = { name: name ?? '', dot }
+              rightPaneView = 'stategraph'
+              showVisualizer = true
+            } else {
+              logger.error(
+                `l4.stateGraph returned no dot: ${JSON.stringify(responseFromLangServer)}`
+              )
+            }
+            return
+          }
+
           // Handle the "cleared" response when a function is deleted during auto-refresh
           const maybeClearedResponse = responseFromLangServer as {
             cleared?: boolean
@@ -1199,6 +1221,14 @@
               {:catch error}
                 <p>Error loading Ladder Diagram: {error.message}</p>
               {/await}
+            </div>
+            <div
+              class="h-full"
+              class:hidden-pane={rightPaneView !== 'stategraph'}
+            >
+              {#if stateGraph}
+                <StateGraphPanel name={stateGraph.name} dot={stateGraph.dot} />
+              {/if}
             </div>
             <div
               class="h-full"

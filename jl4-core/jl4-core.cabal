@@ -145,11 +145,17 @@ library
     L4.EvaluateLazy
     L4.EvaluateLazy.Machine
     L4.EvaluateLazy.ContractFrame
+    L4.EvaluateLazy.DeonticStep
     L4.EvaluateLazy.Exceptions
     L4.EvaluateLazy.GraphViz2
     L4.EvaluateLazy.GraphVizOptions
     L4.EvaluateLazy.Trace
+    L4.Lts.List
+    L4.Lts.Marking
+    L4.Lts.WhatIf
     L4.StateGraph
+    L4.StateGraph.Dominators
+    L4.StateGraph.Lens
     L4.ExactPrint
     L4.Discharge
     L4.Export
@@ -247,15 +253,22 @@ test-suite jl4-core-test
     BitemporalRecallSpec
     TraceOrderingSpec
     StateGraphSpec
+    DeonticStepSpec
+    LtsListSpec
+    LtsMarkingSpec
+    LtsWhatIfSpec
+    DominatorsSpec
     RelationalSpec
     BlawxAssumeSpec
     BlawxNlgSpec
     BlawxImportImageSpec
     BlawxLiftSpec
     BlawxParseSpec
+    ApiStateGraphLensSpec
   build-tool-depends:
     hspec-discover:hspec-discover
   build-depends:
+    aeson,
     base,
     bytestring,
     containers,
@@ -263,4 +276,5 @@ test-suite jl4-core-test
     hspec,
     jl4-core,
     text,
-    time
+    time,
+    vector

@@ -1,0 +1,277 @@
+# P2a — the picture baseline: `bpmn-js-token-simulation` over P1's shipped BPMN
+
+**Status: MEASURED 2026-09-15.** This is the experiment [LTS-VISUALISER.md](./LTS-VISUALISER.md)
+§7.2 stages as **P2a** — _"point `bpmn-io/bpmn-js-token-simulation` (MIT) at P1's shipped output
+and write down, case by case, what it cannot say."_ It is **not** the gate. §7.3 makes P2a′ (the
+list baseline, a reader experiment) the primary gate and this the secondary one, and §7.2's second
+table says what P2a cannot falsify; the last section here restates that against what was seen and
+decides nothing.
+
+What was run, on what, with what:
+
+- **Apparatus:** [`etc/bpmn-token-sim/`](../../../etc/bpmn-token-sim/README.md) — a self-contained
+  harness (own `package.json`; the root and `ts-apps/` lockfiles are untouched) that bundles
+  `bpmn-js` with the token-simulation module, opens each fixture headlessly in Google Chrome via
+  Playwright, plays three scenarios, screenshots each and dumps everything the simulator's own
+  services report to `out/<fixture>.json`.
+- **Input:** the eight committed goldens in `jl4/examples/bpmn/expected/*.bpmn` at this branch —
+  `consultation`, `handover`, `offering`, `regcf-advertising`, `regcf-reporting`, `regcf-resale`,
+  `tenancy-barrier`, `tenancy-fork`. No Haskell was built; the fixtures are P1's output as committed.
+- **Versions** (`etc/bpmn-token-sim/out/run-meta.json`, from `npm ls --depth=0`):
+
+  ```
+  bpmn-token-sim@0.1.0
+  ├── bpmn-js-token-simulation@0.40.0
+  ├── bpmn-js@18.28.0
+  ├── esbuild@0.25.9
+  └── playwright@1.63.0
+  browser: chrome 152.0.7977.83 (Playwright channel 'chrome', headless)   node: v26.4.0
+  ```
+
+- **Run:** `cd etc/bpmn-token-sim && npm install && npm run build && npm run run` (the README now
+  says `npm ci`; the lockfile that run produced is the one committed), 2026-09-15
+  08:45 UTC. One run is committed. Runs are not byte-identical: the simulator's instance ids
+  inside `log` are random per run (a re-run of `tenancy-fork` at 08:48 differed from the committed
+  JSON in those ids and in nothing else); no other run is committed, so no cross-run claim is made.
+
+**Every claim below is tagged.** `MEASURED` means the harness ran it and the value is in
+`out/<fixture>.json` (field named where it matters) or visible in the linked screenshot. `READ`
+means it comes from the simulator's source at `node_modules/bpmn-js-token-simulation/lib/…` (0.40.0, per `package.json`)
+or its documentation, and was **not** exercised. A `READ` line is a prediction, not an observation.
+
+---
+
+## 1. Method, and the one charitable choice it makes
+
+The simulator does not stop at a task. `ActivityBehavior.enter` exits the activity the moment a
+token arrives unless a **pause point** has been set on it
+(`lib/simulator/behaviors/ActivityBehavior.js:56,140`, READ). Left alone, a run from the start event
+goes straight to an end event and there is no instant at which _"what is owed right now"_ could be
+read off the picture at all. Pause points are the tool's own affordance — the pause icon that
+appears on hover — so the harness sets one on **every** activity before starting (`pausePoints` in
+each JSON, MEASURED). That is the most charitable reading of the tool: a token sitting on a task is
+then the closest thing the simulator has to "an obligation in force".
+
+Three scenarios per fixture, each from a fresh start:
+
+| scenario    | what the harness does                                                                                                                                                                             | screenshot                       |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| `started`   | fire the start event; read the state at 1.5 s; read it again at 4.5 s                                                                                                                             | `out/<fixture>.png`              |
+| `breach`    | continue activities until the simulator offers a boundary-event trigger; fire it (exclusive-gateway arms tried in document order until one reaches a boundary)                                    | `out/<fixture>.breach.png`       |
+| `happy[-k]` | keep clicking "continue" on whatever waits, until nothing waits or 12 steps; once per arm `k` of the first exclusive gateway — arm 0 is the simulator's own default, first flow in document order | `out/<fixture>.happy[-armk].png` |
+
+---
+
+## 2. What the simulator handles at all (READ, then confirmed on the fixtures)
+
+| element in the goldens                         | simulator source                                                                                                                       | tag  | on these fixtures                                                                                                                                                                    |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `task`, `businessRuleTask`                     | `ActivityBehavior.js:17-25` registers Task, UserTask, BusinessRuleTask, … ; no wait unless paused                                      | READ | every task and every `Decide_0` took a token and paused (MEASURED, `started.tokensOn`)                                                                                               |
+| `parallelGateway` split / join                 | `ParallelGatewayBehavior.js` — joins only when every incoming flow has a scope waiting                                                 | READ | `consultation`'s `Join_0` waited for both branches and fired once (MEASURED, §3)                                                                                                     |
+| `exclusiveGateway`                             | `ExclusiveGatewayBehavior.js:24` — _"depends on UI to properly configure activeOutgoing"_                                              | READ | `conditionExpression` text was never consulted; the arm is whatever was last clicked, default arm 0 (MEASURED, §3, the three `regcf-*` and `handover`)                               |
+| `boundaryEvent` + `timerEventDefinition`       | `Simulator.js:390` — a timer is an event of `type: 'timer'` and nothing else; `:922` makes timer/condition boundaries user-triggerable | READ | no timer fired on its own in 4.5 s of wall clock; every timer was a "Trigger Event" play button from the moment its host had a token (MEASURED, `started.afterWaiting3s`, all eight) |
+| `boundaryEvent` + `conditionalEventDefinition` | same as timer (`:922`) — a play button, the condition text is not evaluated                                                            | READ | `handover`'s `` `grace period` `` boundary and `regcf-advertising`'s _"unreachable: no WITHIN"_ boundary were both offered and both fired when clicked (MEASURED, §3)                |
+| `endEvent` + `errorEventDefinition`            | `EventBehaviors.js:154` — _"TODO(nikku): ensure error always interrupts, also if no error catch is present"_                           | READ | with no catcher, the error end consumed its own token and **siblings kept running** (MEASURED, `offering` §3)                                                                        |
+| `multiInstanceLoopCharacteristics`             | **no occurrence of `multiInstance` or `loopCharacteristics` anywhere under `lib/`** (grep, 0 hits)                                     | READ | the three-bar multi-instance marker renders; the simulator ran one scope, one token, one click (MEASURED, `tenancy-*` §3)                                                            |
+| `lane`, `participant`                          | no lane behaviour; `Participant` is the root scope                                                                                     | READ | the token-count badge is per pool; lanes are paint (MEASURED, screenshots)                                                                                                           |
+| unsupported                                    | `ElementSupport.js:18-20` — only `bpmn:ComplexGateway`                                                                                 | READ | `unsupportedElements: []` on all eight; zero import warnings; zero page errors (MEASURED)                                                                                            |
+
+So the simulator accepts every golden without complaint. That is the same well-formedness trap
+`jl4/examples/bpmn/README.md` warns about for `validate-bpmn.mjs`: acceptance is not evidence.
+
+---
+
+## 3. Case by case
+
+Each row answers the §7.3 question — _what do I owe, what discharges it, what breaches it_ — from
+the simulator's picture alone, and says where the picture stops. Screenshots are in
+`etc/bpmn-token-sim/out/`.
+
+### 3.1 `tenancy-barrier` and `tenancy-fork` — the pair that differs only by the join
+
+Source: `jl4/examples/bpmn/tenancy.l4`. `the tenancy` is `EVERY Tenant t IN tenants MUST Sign …
+WITHIN 14 ONCE ALL HAVE HENCE (theLandlord MUST Deliver … WITHIN 5)`; `receipts` is the same shape
+with `UPON EACH` and a per-member `HENCE`. Their XML differs only in names, deadlines and the
+`<documentation>` carrying `P-CAST`/`P-FORK` (`diff` of the two goldens: 13 changed lines, all of
+them those). Fidelity reports: `P-CAST` on both, `P-FORK` (lossy) on the fork alone.
+
+| question                              | what the simulator shows                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | tag      |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| does the multi-instance task animate? | Yes, as **one** activity. After start, exactly one scope on `Task_0`, one token badge, one "Trigger Event" pad on the task and one on `Boundary_0` (`started.tokensOn: ["Task_0"]`, `started.triggers: ["Start_0","Task_0","Boundary_0"]`). No per-member instances; nothing says there are three tenants; nothing says how many have signed.                                                                                                                                                           | MEASURED |
+| does it wait? (barrier)               | It waits for **one** click, not for `n`. One "continue" on `Task_0` moved the token to `Task_1` (`happy.continued: ["Task_0","Task_1"]`, ends at `End_2` Fulfilled). There is no state between "no tenant has signed" and "all have signed".                                                                                                                                                                                                                                                            | MEASURED |
+| barrier vs fork difference            | **None visible in the animation.** Element census, scopes, triggers, history and end events are identical for the two files modulo label text (`diff` of the two JSONs with `log`, `name` and `fixture` removed: empty; with only `log` removed, the four changed lines are the fixture path and three labels). The only place the difference exists is the `<documentation>` string, which the simulator never shows. `P-FORK`'s once-per-member continuation is not drawn and therefore not animated. | MEASURED |
+| what do I owe right now?              | "A token is on `MUST Sign …`". Who — Alice, Bob, Carol, or all of them — is not sayable; the lane label reads `EVERY Tenant t IN tenants` verbatim.                                                                                                                                                                                                                                                                                                                                                     | MEASURED |
+| what discharges it?                   | Clicking the task. The act `Sign (EXACTLY t)` is the task label truncated to `MUST Sign ...`.                                                                                                                                                                                                                                                                                                                                                                                                           | MEASURED |
+| what breaches it?                     | Clicking `Boundary_0` ("after P14D"). Firing it went to `End_3` Breach and _"Process finished"_ (`breach.endEventsReached: ["End_3"]`). `WITHIN 14` never elapsed on its own; the boundary was clickable from the first instant, and still unfired 4.5 s later (`started.afterWaiting3s.tokensOn: ["Task_0"]`). Which tenant's lateness breached, and `LEST BREACH BY t` on the fork, are not sayable.                                                                                                  | MEASURED |
+| the `LEST` arm's meaning              | The boundary is labelled `after P14D` and the arrow goes to a lightning-bolt end named Breach. That it is the **default** consequence of not acting — not an alternative route — is nowhere; a reader sees two exits of equal standing.                                                                                                                                                                                                                                                                 | MEASURED |
+| the `HENCE` into the landlord's duty  | Drawn faithfully as sequence; the landlord's token appears only after the tenants' task completes. On the fork this is wrong (should fire per tenant) and the picture is the same as on the barrier.                                                                                                                                                                                                                                                                                                    | MEASURED |
+
+Screenshots: `tenancy-barrier.png`, `tenancy-fork.png` (token on the three-bar task, timer clickable);
+`*.breach.png` (after the timer); `*.happy.png` (finished).
+
+### 3.2 `offering` — three parties, four-way `RAND`, two `SHANT`s, breach terminal
+
+| question                                           | what the simulator shows                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | tag      |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| the `RAND` (P-NOJOIN, fork without a join)         | After `Task_0`, `Split_1` put one token on each of `Task_2`, `Task_5`, `Task_6`, `Task_7` — four concurrent scopes in three lanes (`happy.steps[1].tokensOn`). That much is right and is the exhibit's whole point. There is no join, and the simulator does not miss it: each branch ends on its own.                                                                                                                                                                                                                                                                                                                                                                                                    | MEASURED |
+| the `SHANT`s (`Task_5` advertise, `Task_7` resell) | **"Continue" on a prohibition is the breach.** On the happy run the harness clicked every waiting task; the log reads _"SHANT advertise the terms → Breach"_ and _"SHANT resell the securities → Breach"_ (`happy.endEventsReached: ["End_3","End_4","End_3","End_4"]`). The play button, the pad and the token look identical on a `MUST` and a `SHANT`; only the label's first word differs. F1 in motion.                                                                                                                                                                                                                                                                                              | MEASURED |
+| the `SHANT`s' `HENCE` arm                          | Firing `Boundary_5`/`Boundary_7` ("after P30D, not performed") would go to Fulfilled — the timer is the **compliance** exit. Not exercised here (the breach scenario fires the first live boundary, `Boundary_0`); the same shape was exercised on `regcf-resale` below and behaves as read.                                                                                                                                                                                                                                                                                                                                                                                                              | READ     |
+| the error end event                                | **Breach did not abandon the siblings.** After `Task_5 → End_4 (Breach)` the run continued: `Task_6 → Fulfilled`, `Task_7 → Breach`, then _"Process finished"_. Two Fulfilled and two Breach tokens, and the process "finished" as if nothing were wrong. jBPM aborts the instance here (`README.md` table: _ABORTED via error end event_); the simulator does not, per `EventBehaviors.js:154`'s own TODO. The picture's verdict is _finished_, not _breached_.                                                                                                                                                                                                                                          | MEASURED |
+| what do I owe right now?                           | After the split: "tokens on four tasks". Which of the four is mine is the lane; that two of them are things I must **not** do is the label's first word.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | MEASURED |
+| what discharges / breaches it?                     | For `MUST`: click = discharge, timer = breach. For `SHANT`: click = breach, timer = discharge. Same two buttons, opposite meanings, no notational difference.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | MEASURED |
+| `BREACH BY Issuer BECAUSE "…"`                     | Not present. The Breach end is one node shared by five arrows; who breached and why is not recoverable from the picture.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | MEASURED |
+| deadlines as boundary timers                       | Five timers drawn, none counting. Only the one on the task holding the token is offered — `Boundary_0` (`P21D`) with the token on `Task_0` (`started.triggers: ["Start_0","Task_0","Boundary_0"]`) — and it is offered from the first instant, not after 21 days. The harness records `triggers` only at start and after the 3 s wait, so which boundaries were offered after `Split_1` is **not** on record (`happy.steps[]` carries `tokensOn` alone); five at once is impossible in any case, `Task_0` having completed before `Split_1` fires. `P21D`, `P7D`, `P30D`, `P120D`, `P365D` are labels; a reader cannot tell from the animation that the resale restriction outlasts the filing by a year. | MEASURED |
+
+Screenshots: `offering.png` (token on `Task_0`, five timers drawn, one play pad on `Boundary_0`), `offering.breach.png` (after `P21D`:
+straight to Breach, no `RAND` ever started), `offering.happy.png` (finished; two branches breached).
+
+### 3.3 `handover` — a named deadline, a `RAND`, a `ROR` of permissions, lapse timers
+
+| question                               | what the simulator shows                                                                                                                                                                                                                                                                                                                                                                                           | tag      |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| the named deadline (`P-DEADLINE`)      | `Boundary_0` is a conditional boundary carrying `` `grace period` `` as text. The simulator offered it as a play button exactly like a timer (`started.triggers: […, "Boundary_0"]`). That its duration is a _name_ the L4 source resolves to 14 is invisible; that it is not a timer at all is invisible.                                                                                                         | MEASURED |
+| the `LEST` arm as a `ROR` of `MAY`s    | Firing `Boundary_0` moved the token through `Split_5` ("one of") to **`Task_6` only** (`breach.tokensOn: ["Task_6"]`, `MAY retain the deposit`), because the exclusive gateway's arm was the default first flow. In L4 a `ROR` of permissions is resolved by whichever act happens; here the reader must **choose the arm at the gateway before either permission is exercised**, and the other arm is greyed out. | MEASURED |
+| the `RAND` of `MAY`s with lapse timers | Both tokens sat on `Task_2` and `Task_4` with `Lapse_2`/`Lapse_4` clickable. Continuing both reached Fulfilled twice. A permission not exercised is not representable except by clicking its lapse timer — there is no "decline".                                                                                                                                                                                  | MEASURED |
+| what do I owe right now?               | After `Boundary_0`: a token on `MAY retain the deposit`. Nothing says the tenant is in breach — there is **no breach end in this file** (`Split_5` leads only to Fulfilled), so the animation of the tenant's failure ends in _"Fulfilled"_.                                                                                                                                                                       | MEASURED |
+| what discharges / breaches it?         | For the `MAY`s: click or timer, both to Fulfilled — the picture correctly shows there is nothing to breach, and incorrectly makes the permission look like a task to be done.                                                                                                                                                                                                                                      | MEASURED |
+| `P-NOJOIN` on `Split_1`                | No join drawn; both permission tokens end independently. Correct by construction and invisible as a loss.                                                                                                                                                                                                                                                                                                          | MEASURED |
+
+Screenshots: `handover.png`, `handover.breach.png` (token on the chosen `ROR` arm, other arm
+greyed), `handover.happy-arm0.png` / `-arm1.png` (identical: the gateway is only on the `LEST` path).
+
+### 3.4 `consultation` — the only drawn join
+
+| question                        | what the simulator shows                                                                                                                                                                                                                                                                          | tag      |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| the converging parallel gateway | It works as a barrier: tokens on `Task_1` and `Task_4`; continuing `Task_1 → Task_2` then `Task_4` fired `Join_0` once and reached `End_3` (`happy.log` ends _"MAY file a response, Parallel Gateway, Fulfilled, Process finished"_). The one join P1 can draw, the simulator animates correctly. | MEASURED |
+| three `MAY`s, no deadlines      | Every one is a task with a play button. The only way the process finishes is to **perform all three permissions**. That the whole thing is optional — a `RAND` of `MAY`s — has no expression: a reader who does nothing sees two tokens parked forever and no exit.                               | MEASURED |
+| what do I owe right now?        | "Tokens on two `MAY`s". Nothing is owed; the picture cannot say so (F1, `[F1] blocking` ×3 in the fidelity report).                                                                                                                                                                               | MEASURED |
+| what breaches it?               | Nothing can, and the picture agrees by having no Breach node. This is the one fixture where the simulator's silence is the right answer.                                                                                                                                                          | MEASURED |
+
+### 3.5 `regcf-advertising` and `regcf-resale` — DMN-wired gateway, a `SHANT`, an undrawable `LEST`
+
+Both have the same shape: `Start → Decide_0 (businessRuleTask) → Split_0 (XOR) → {Fulfilled | SHANT task}`.
+
+| question                                                                 | what the simulator shows                                                                                                                                                                                                                                                                                                                                                                                                                                                       | tag      |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| the `businessRuleTask` (`P-DMNWIRED`)                                    | A token parks on `Decide_0` and waits for a click. The DMN decision is not evaluated — the simulator has nothing to evaluate it with — and the `conditionExpression`s on the arms (`notice_complies_with_Rule_204_b` / `not(…)`) are never read. The arm is a **setting on the gateway**, chosen by the reader.                                                                                                                                                                | MEASURED |
+| the `IF` guard's meaning                                                 | Lost. Arm 0 (Fulfilled) and arm 1 (the `SHANT`) are equally available; nothing says arm 0 is "the notice complies" and arm 1 is "it does not". The guard text lives in the flow's `<documentation>`, which the simulator does not display.                                                                                                                                                                                                                                     | MEASURED |
+| the `SHANT` (`Task_2`)                                                   | Arm 1, continue: _"SHANT advertise the terms of the offering → Breach"_ (`happy[1].endEventsReached: ["End_3"]`). Same as `offering`: the play button is the violation.                                                                                                                                                                                                                                                                                                        | MEASURED |
+| the `LEST` with no `WITHIN` (`P-DEADLINE` blocking, `regcf-advertising`) | **The simulator let the harness fire an event the fidelity report says nothing can fire.** `Boundary_2` is named _"unreachable: no WITHIN"_; it was offered as a trigger and, clicked, went to `End_1` Fulfilled (`breach.fired: "Boundary_2"`, `breach.endEventsReached: ["End_1"]`). The animation reads: "the prohibition can be discharged by waiting" — and the rule sets no period to wait for. A standing prohibition for the life of the offering animates as a timer. | MEASURED |
+| `regcf-resale`'s named deadline boundary                                 | `Boundary_2` (_"deadline passes, not performed"_, condition `` `days until the first anniversary …` OF transfer ``) fired → Fulfilled. Correct polarity for a `SHANT` (waiting out the period is compliance), and the reader cannot tell that from the identical-looking `MUST` timers elsewhere.                                                                                                                                                                              | MEASURED |
+| what do I owe right now?                                                 | Before the gateway: "a token on a decision". Whether I am bound at all depends on the DMN answer the simulator cannot compute; the reader picks.                                                                                                                                                                                                                                                                                                                               | MEASURED |
+
+### 3.6 `regcf-reporting` — the renewing obligation, `P-CYCLE`, a three-arm gateway
+
+| question                          | what the simulator shows                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | tag      |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| the cycle (`P-CYCLE`)             | Animates. Arm 2 (`MUST file a Form C-AR annual report and continue`) ran `Decide_0 → Task_4 → Decide_0 → Task_4 …` for twelve clicks and hit the harness's step limit with the token back on `Decide_0` and no end event reached (`happy[2].hitStepLimit: true`, `happy[2].endEventsReached: []`). The loop never exits by itself because the gateway arm is a fixed setting; a reader has to re-click the gateway to "decide" the year the reporting ends.                                                                                                                                                                                                                                                                                                                                                                                                                      | MEASURED |
+| the layout `P-CYCLE` warns about  | Visible: the start event sits at the far left of a very wide pool and every other node at the far right, so the only thing the horizontal axis carried — time — reads as one long flow followed by a knot (`regcf-reporting.png`). This is P1's layout, not the simulator's, and the simulator draws over it faithfully.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | MEASURED |
+| the three-arm exclusive gateway   | `Split_0` is `Diverging` (`expected/regcf-reporting.bpmn:32`, `elements[Split_0].gatewayDirection`); the loop re-enters at `Decide_0`, not at the gateway. bpmn-js renders it and the simulator routes through it. (jBPM still rejects the file, re-measured 2026-09-15 with `etc/check-bpmn-kie.sh`: _"This type of node [Decide_0 …] cannot have more than one incoming connection!"_ — the two arrivals at `Decide_0`, not a mixed gateway; `README.md`'s _"Unknown gateway direction: Mixed"_ predates the 2026-08-02 reroute and is corrected in the same commit as this line.) Its three arms are one setting cycled by clicking; arm 1, "fulfilled", is `Split_0 → End_2` with no task in between, so on that arm the process finishes after one click on `Decide_0` and _nothing was ever owed_ — which is right, and indistinguishable from a process that was skipped. | MEASURED |
+| named deadlines (`P-DEADLINE` ×2) | `Boundary_1`/`Boundary_4` (_"timeout"_, conditions `` `business days to file Form C-TR` `` etc.) are play buttons. Firing `Boundary_1` → Breach (`breach.endEventsReached: ["End_3"]`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | MEASURED |
+| what do I owe right now?          | On arm 2, after year `k`: "a token on `Decide_0`" — the same picture as year 1. Which fiscal year, how many reports have been filed, whether the obligation has ended: not sayable.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | MEASURED |
+
+---
+
+## 4. Across all eight: what the simulator cannot say
+
+Stated against §7.3's three clauses, with the `STATEFUL-CONTRACT-DEPLOYMENT.md` §6.4 endpoint that
+would carry the answer as data.
+
+| the clause                                     | endpoint      | the simulator's nearest thing                                                                                                                                                                                                                                                                                                                                                                            | tag      |
+| ---------------------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| _what do I owe right now_                      | 14/15/16 + 17 | A token on an activity, provided someone set a pause point there. It is the same token on a `MUST`, a `MAY`, a `SHANT` and a decision (`Decide_0`). No bearer beyond the lane. No count under an `EVERY`. No "not applicable" or "never triggered" state — a norm that was never reached has no token and looks the same as one already discharged. No next deadline: timers are labels.                 | MEASURED |
+| _what would discharge it_                      | 19            | The play button on the task — for a `MUST`. For a `SHANT`, the play button on its **timer**. For a `MAY`, either. The simulator offers the same two buttons in all three cases.                                                                                                                                                                                                                          | MEASURED |
+| _what would put me in breach_                  | 20            | The play button on the timer — for a `MUST`. For a `SHANT`, the play button on the **task**. On `offering`, a breach on one branch did not stop the others, and the process "finished". On `handover` there is no breach node at all. Who breached and why (`BREACH BY … BECAUSE …`) is never present.                                                                                                   | MEASURED |
+| the norm's lifecycle (§2.3, Symboleo's states) | —             | Two: token present / token absent. No _Created_ vs _Fulfilled_ vs _Violated_ vs _Expired_; a scope is `running`, `completed` or `failed` and the picture shows only the first.                                                                                                                                                                                                                           | MEASURED |
+| the barrier vs the fork (§4.9)                 | —             | Not distinguishable. One task, one token, one click, on both.                                                                                                                                                                                                                                                                                                                                            | MEASURED |
+| the `LEST` arm's default character             | —             | Not marked. Every boundary is a play button of equal standing with the task's own.                                                                                                                                                                                                                                                                                                                       | MEASURED |
+| guards (`PROVIDED`, `IF`, DMN)                 | —             | Not evaluated; the reader picks the arm. `P-DMNWIRED`'s `businessRuleTask` is a task that waits for a click.                                                                                                                                                                                                                                                                                             | MEASURED |
+| time                                           | —             | None. No clock, no countdown, no ordering of deadlines; every boundary that was offered was offered the instant its host task held a token, whatever its duration (`P7D`, `P14D`, `P21D` and `handover`'s named _timeout_ — the `started.triggers` of the four fixtures whose first task carries a boundary), and none fired unaided in 4.5 s (`started.afterWaiting3s.tokensOn` unchanged on all four). | MEASURED |
+| unreachable events                             | —             | Fired on request. `regcf-advertising`'s _"unreachable: no WITHIN"_ boundary fires to Fulfilled.                                                                                                                                                                                                                                                                                                          | MEASURED |
+
+And two things it says **well**, recorded so the baseline is not a straw man:
+
+- **Concurrency.** Four tokens in three lanes on `offering` is a genuinely better answer to "what is
+  live" than the static picture, and it is exactly what P1's `RAND` was drawn to show.
+- **The one drawn join.** `consultation`'s `Join_0` animates as a barrier, correctly.
+
+---
+
+## 5. What this cannot falsify (§7.2's second table, against what was observed)
+
+§7.2 says P2a tests _"position, as an off-the-shelf animation over BPMN"_ and **cannot** test
+reachability or dominance. Both held, and the reasons were visible:
+
+- **Reachability.** The simulator has no query. It has a play button on every event that could ever
+  fire, and it lets you fire one that cannot (`regcf-advertising`, §3.5). It is therefore the
+  over-approximation §1.1b describes, made interactive: it will show you a path to red that the
+  evaluator would never take, and it cannot show you that no path reaches red.
+- **Dominance.** No dominators, no "on every path from here you must do X". The `RAND` on `offering`
+  shows four things live and nothing about which of them every future has to pass through.
+- **And one more this run adds:** P2a **cannot test the list either**. Nothing here says whether a
+  reader given `obligations`/`discharging_events`/`breaching_events` as text would have done better
+  than a reader given this animation, because no reader was given either. That is P2a′, and it
+  remains unrun.
+
+---
+
+## 6. What this means for the §7.3 gate — stated without deciding it
+
+§7.3: _build P2d/P2e only if P2a′ shows readers cannot answer the question from the list — **and**
+P2a shows the off-the-shelf simulator cannot either._
+
+The second conjunct is what this document measured. On P1's shipped output, the off-the-shelf
+simulator answers "what do I owe" with a token that does not know its modality, its bearer beyond a
+lane, its deadline, its cardinality, or whether it was ever triggered; it answers "what discharges"
+and "what breaches" with two buttons whose meanings invert between `MUST` and `SHANT` with no
+notational difference; and it shows a breach that does not end the process. Every one of those is
+a fidelity loss P1's report already names (F1, F2, F3, `P-CAST`, `P-FORK`, `P-DEADLINE`,
+`P-CYCLE`) — the animation makes them **visible in motion**, it does not close any of them. Nothing
+in this run suggests the simulator could be configured into closing them: the losses are in what
+the file can carry, per §1.2's _"correct category, missing vocabulary"_, and the simulator is
+faithful to the file.
+
+What this does **not** settle, and why the gate is still open:
+
+1. **The first conjunct is unmeasured.** P2a′ is a reader experiment against a list, and no reader
+   has been shown anything. Q7 makes it the primary gate for exactly the reason §1.1a gives: the
+   payload is data, and a list may suffice. If it does, this document's findings are moot in the
+   direction of building a picture.
+2. **The reader was a script.** The harness clicked what the tool offered; it did not measure what a
+   person understands from the animation, which is the quantity §7.4's literature is about.
+3. **P1's output is one encoding.** A hand-drawn BPMN with a multi-instance subProcess for the fork,
+   or with lanes per cast member, would animate differently. That is a P1 question (`P-FORK` says
+   the exporter does not emit it), not evidence for or against P2d.
+
+So: the second conjunct looks satisfied on this evidence, the first is untested, and the gate is
+not this document's to close. Recorded as a `RESULT` block under LTS-VISUALISER.md §7.2.
+
+---
+
+## 7. The empirical warrant this leans on
+
+Copied exactly from LTS-VISUALISER.md §7.4, which corrected revision 1's two wrong DOIs; not
+re-derived here:
+
+- Maslov & Poelmans, "Facilitating the comprehension of business process models for unexperienced
+  modelers using token-based animations", _Information & Management_ **61**:103967, 2024.
+  DOI `10.1016/j.im.2024.103967`.
+- Maslov, Poelmans, Wautelet & Gailly, "Novice modelers' subjective comprehension and interaction
+  with token-animated process models", _Journal of Computer Languages_ **84**:101350, 2025.
+  DOI `10.1016/j.cola.2025.101350`. _(Not CHBR — the venue was wrong too.)_
+
+And §7.4's own reading of them, which this experiment neither confirms nor contradicts because it
+measured no reader: token animation reduced extraneous cognitive load for novices and did **not**
+significantly improve comprehension scores directly. It is a warrant for the audience thesis, not
+for expecting readers to get more answers right — and, on the evidence above, not for expecting
+this particular animation to say what the rule says.
+
+---
+
+## 8. Files
+
+- `etc/bpmn-token-sim/` — `package.json`, `src/app.js`, `index.html`, `build.mjs`, `run.mjs`,
+  `README.md`, `package-lock.json` (committed, so `npm ci` pins the transitive tree),
+  `.gitignore` (`node_modules/`, `dist/` ignored; `out/` un-ignored).
+- `etc/bpmn-token-sim/out/` — 28 screenshots (29–58 KB each), eight `<fixture>.json`, `run-meta.json`.

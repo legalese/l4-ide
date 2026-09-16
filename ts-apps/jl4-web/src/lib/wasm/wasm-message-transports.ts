@@ -302,6 +302,7 @@ export class WasmLspHandler {
             'l4.visualize',
             'l4.resetvisualization',
             'l4.renderResult',
+            'l4.stateGraph',
           ],
         },
         // Go-to-definition and find-references (single-file only)
@@ -574,7 +575,7 @@ export class WasmLspHandler {
 
   /**
    * Handle workspace/executeCommand requests.
-   * Supports l4.visualize and l4.resetvisualization commands.
+   * Supports l4.visualize, l4.resetvisualization and l4.stateGraph commands.
    */
   private async handleExecuteCommand(params: unknown): Promise<unknown> {
     const p = params as {
@@ -594,10 +595,37 @@ export class WasmLspHandler {
         // Handled by client middleware; WASM mode does not support this yet
         return null
 
+      case 'l4.stateGraph':
+        return this.handleStateGraph(p.arguments)
+
       default:
         // Unknown command
         return null
     }
+  }
+
+  /**
+   * Handle the l4.stateGraph command — the "Show state graph" code lens.
+   *
+   * Arguments are [verDocId, functionName], the name-addressed form
+   * `l4CodeLenses` emits (LTS-VISUALISER.md §4.8). Answers { name, dot } for
+   * the page to show, or null when the rule is gone or has no graph.
+   */
+  private async handleStateGraph(args?: unknown[]): Promise<unknown> {
+    if (!args || args.length < 2) {
+      return null
+    }
+    const verDocId = args[0] as { uri: string }
+    const functionName = args[1] as string
+    const content = this.documentContents.get(verDocId.uri)
+    if (!content) {
+      return null
+    }
+    const result = await this.bridge.stateGraphByName(content, functionName)
+    if (result.error || typeof result.dot !== 'string') {
+      return null
+    }
+    return { name: result.name ?? functionName, dot: result.dot }
   }
 
   /**

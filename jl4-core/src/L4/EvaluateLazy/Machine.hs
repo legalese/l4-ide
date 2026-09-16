@@ -27,6 +27,20 @@ module L4.EvaluateLazy.Machine
 -- * STATE-AS-LEDGER substrate. Exposed for the test suite and the high-level
 -- driver in 'L4.EvaluateLazy'; not part of the stable public API.
 , tellEventRouted
+-- * The deontic step log (LTS-VISUALISER §4.3, P2b). 'tellDeonticStep' is
+-- the write; the capture lives in 'L4.EvaluateLazy'.
+, tellDeonticStep
+, partyKeyWHNF
+-- * What the marking (LTS-VISUALISER §4.2a, P2c) needs to read a residual:
+-- the barrier sentinels' names and the FULFILLED view.
+, joinCheckpointName
+, joinFailpointName
+, pattern ValFulfilled
+-- * What the what-if (LTS-VISUALISER §2.4: no second semantics) needs to
+-- read an anchored deadline (R-Q7B/C) off a residual without re-deriving it:
+-- the lifecycle an environment carries, and the anchor's lowering.
+, lifecycleOf
+, anchorInstant
 , currentLedgerEval
 , readEvalRef
 , Config (..)
@@ -98,6 +112,8 @@ import L4.Syntax
 import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo)
 import L4.EvaluateLazy.ContractFrame
+import L4.EvaluateLazy.DeonticStep hiding (Branch)
+import qualified L4.EvaluateLazy.DeonticStep as DS
 import L4.EvaluateLazy.Exceptions
 import L4.EvaluateLazy.Trace (EvalTraceAction (..))
 import L4.TracePolicy (TracePolicy)
@@ -272,6 +288,11 @@ data EvalState =
       -- re-offer rule: a marked event that reveals a second expiry is
       -- consumed rather than re-offered again, which bounds evaluation for
       -- recursive continuations with non-positive deadlines.
+    , deonticLog :: !(Maybe DeonticLog)
+      -- ^ LTS-VISUALISER §4.3 (P2b): the deontic step log, OPTIONAL and off
+      -- by default exactly as 'evalTrace' is (ruling R5, §8). 'Nothing' means
+      -- no call site computes anything; 'L4.EvaluateLazy.captureDeonticSteps'
+      -- installs one for the duration of a directive.
     }
 
 data Stack =
@@ -325,6 +346,198 @@ traceEval ta = do
   case mtr of
     Nothing -> pure ()
     Just tr -> liftIO (modifyIORef' tr (`DList.snoc` ta))
+
+-----------------------------------------------------------------------------
+-- The deontic step log (LTS-VISUALISER §4.3, amended by §4.9; P2b).
+--
+-- Modelled on 'traceEval': an optional IORef in the reader env, newest-last.
+-- Every call site goes through 'whenDeonticLog', so with the log off the
+-- machine computes nothing for it; what it does do is carry state it never
+-- reads — a lazy 'NormKey' through the contract frames, @ev'reoffered@ past
+-- @Contract5@ (the only frame that consults it), and a @pending@ step
+-- (always 'Nothing' when off) on 'ResolvePartyFrame'. The types are in
+-- "L4.EvaluateLazy.DeonticStep".
+-----------------------------------------------------------------------------
+
+-- | Run a log-side action only when the log is on. The action receives the
+-- log so it can also bump the counters the key needs.
+whenDeonticLog :: (DeonticLog -> Eval ()) -> Eval ()
+whenDeonticLog k = asks (.deonticLog) >>= maybe (pure ()) k
+
+-- | Append a step to the log, if there is one. The write; the read is
+-- 'L4.EvaluateLazy.captureDeonticSteps'.
+tellDeonticStep :: DeonticStep -> Eval ()
+tellDeonticStep step = whenDeonticLog \ l -> logStep l step
+
+logStep :: DeonticLog -> DeonticStep -> Eval ()
+logStep l step = liftIO (modifyIORef' l.dlSteps (`DList.snoc` step))
+
+-- | Log a step that ROUTES control (a 'Matched' or 'Expired'), filling in
+-- §4.9's join progress from the norm's membership: a barrier member's
+-- 'ToHence' satisfies one arm (and bumps the arm count), a fork member's
+-- continuation runs on its own. The join's own release is NOT recorded here;
+-- see 'JoinProgress'.
+tellRoutedStep :: NormKey -> DS.Branch -> DeonticStep -> Eval ()
+tellRoutedStep norm branch step = whenDeonticLog \ l -> do
+  progress <- case (norm.nkMember, branch) of
+    (Just m, ToHence) | isBarrier m.moJoin -> do
+      n <- liftIO (bumpCounter l.dlJoinDone m.moJoinSite)
+      pure (Just (MemberSatisfied n m.moTotal))
+    (Just m, b) | m.moJoin == Fork, b /= ToBreach ->
+      pure (Just (ForkContinued m.moIndex m.moTotal))
+    _ -> pure Nothing
+  logStep l step {dsNorm = Just norm, dsJoin = progress}
+
+-- | Increment a per-key counter and return the new count (from 1).
+bumpCounter :: Ord k => IORef (Map k Int) -> k -> IO Int
+bumpCounter counter k = atomicModifyIORef' counter \ m ->
+  let n = Map.findWithDefault 0 k m + 1 in (Map.insert k n m, n)
+
+-- | Read a reference WITHOUT forcing it. The log must never change what the
+-- machine evaluates, so anything it reports about an unforced thunk is
+-- 'Nothing'.
+peekWHNF :: Reference -> Eval (Maybe WHNF)
+peekWHNF rf = liftIO (readIORef rf.pointer) >>= pure . \ case
+  WHNF v            -> Just v
+  WHNFWhen _ v _ _  -> Just v
+  Unevaluated {}    -> Nothing
+
+-- | The contract clock held in a reference, if it has been forced.
+peekClock :: Reference -> Eval (Maybe Rational)
+peekClock rf = peekWHNF rf >>= pure . \ case
+  Just (ValNumber t) -> Just t
+  _                  -> Nothing
+
+-- | The party key of a forced party reference, if forced.
+peekParty :: Reference -> Eval (Maybe Text)
+peekParty rf = fmap partyKeyWHNF <$> peekWHNF rf
+
+-- | The action of a forced action reference, if forced.
+peekAction :: Reference -> Eval (Maybe Text)
+peekAction rf = fmap prettyLayout <$> peekWHNF rf
+
+-- | The event key for a scrutiny, from the pieces the frame holds. The
+-- stamp is always in hand (it is what the deadline was compared with).
+eventKeyAt :: Rational -> Maybe Text -> Reference -> Eval EventKey
+eventKeyAt stamp mParty actRef = do
+  action <- peekAction actRef
+  pure MkEventKey {ekStamp = stamp, ekParty = mParty, ekAction = action}
+
+-- | The scrutiny an event-bearing step reports (§4.4): a re-offered event's
+-- second look is always 'Reoffered'; otherwise the site says.
+scrutinyOf :: Bool -> Scrutiny -> Scrutiny
+scrutinyOf reoffered s = if reoffered then Reoffered else s
+
+-- | The key an obligation is armed with when it meets its event stream (the
+-- @App1@ arm below). With the log off this is a lazy record that nothing
+-- forces; with it on, the site's activation counter is bumped and the cast
+-- register consulted for §4.9's per-member identity.
+armNormKey :: MaybeEvaluated -> RAction Resolved -> Eval NormKey
+armNormKey party act = do
+  mlog <- asks (.deonticLog)
+  let site   = rangeOf act
+      bearer = either (const Nothing) (Just . partyKeyWHNF) party
+  (activation, member) <- case mlog of
+    Nothing -> pure (0, Nothing)
+    Just l  -> do
+      n <- liftIO (bumpCounter l.dlActivations site)
+      m <- case bearer of
+        Nothing -> pure Nothing
+        Just b  -> liftIO (Map.lookup (site, b) <$> readIORef l.dlMembers)
+      pure (n, m)
+  pure MkNormKey
+    { nkSite = site, nkActivation = activation, nkBearer = bearer
+    , nkModal = act.modal, nkMember = member }
+
+-- | Refresh a key's bearer once the machine has forced the party.
+bearing :: WHNF -> NormKey -> NormKey
+bearing v k = k {nkBearer = Just (partyKeyWHNF v)}
+
+-- | The site an @EVERY@'s join steps are keyed by: the join line when there
+-- is one, else the whole rule.
+joinSiteOf :: Deonton Resolved -> Maybe SrcRange
+joinSiteOf d = maybe (rangeOf d) rangeOf d.join
+
+-- | The join's own key, made when the quantified obligation is armed
+-- ('startRollCall'); it is what the barrier's 'JoinReleased' /
+-- 'JoinExpired' / 'JoinFailed' steps carry.
+armJoinKey :: Deonton Resolved -> Eval NormKey
+armJoinKey d = do
+  mlog <- asks (.deonticLog)
+  let site = joinSiteOf d
+  activation <- case mlog of
+    Nothing -> pure 0
+    Just l  -> liftIO (bumpCounter l.dlActivations site)
+  pure MkNormKey
+    { nkSite = site, nkActivation = activation, nkBearer = Nothing
+    , nkModal = d.action.modal, nkMember = Nothing }
+
+-- | Register an @EVERY@'s cast, so each member's obligation can find its
+-- membership when it is armed ('armNormKey'). A barrier's arm count starts
+-- at zero here.
+registerCast :: QuantCtx -> JoinKind -> [CastMember] -> Eval ()
+registerCast ctx kind members = whenDeonticLog \ l -> liftIO do
+  let site  = rangeOf ctx.deonton.action
+      jsite = joinSiteOf ctx.deonton
+      total = length members
+      entries =
+        [ ((site, partyKeyWHNF mval), MkMemberOf {moJoin = kind, moIndex = i, moTotal = total, moJoinSite = jsite})
+        | (i, (_, mval)) <- zip [1 ..] members ]
+  modifyIORef' l.dlMembers (\ m -> foldl' (\ acc (k, v) -> Map.insert k v acc) m entries)
+  modifyIORef' l.dlJoinDone (Map.insert jsite 0)
+
+-- | The blame a breach value carries, as far as it has been forced: the
+-- anchor's party, stamp and deadline as the headline, and every failure the
+-- breach names (R-T3) in order, the anchor among them. Nothing is forced.
+breachSummary :: ReasonForBreach Reference -> Eval BreachSummary
+breachSummary reason = do
+  let blame = breachBlame reason
+  failures <- traverse failureSummary (toList (blameList blame))
+  (party, deadline) <- case blame.anchor of
+    MissedDeadline partyR _ d -> (, Just d) <$> peekParty partyR
+    DeclaredBreach mParty _   -> (, Nothing) <$> maybe (pure Nothing) peekParty mParty
+  pure MkBreachSummary
+    { bsBlame = party
+    , bsStamp = case reason of
+        DeadlineMissed _ _ stamp _ -> Just stamp
+        ExplicitBreach _           -> Nothing
+    , bsDeadline = deadline
+    , bsFailures = failures
+    , bsAnchor = anchorIndex blame
+    }
+  where
+    failureSummary = \ case
+      MissedDeadline partyR act d -> do
+        party <- peekParty partyR
+        pure (MissedSummary party (prettyLayout act) d)
+      DeclaredBreach mParty mReason -> do
+        -- whether BY named anyone is known without forcing; who, only if forced
+        party <- maybe (pure NobodyNamed) (fmap PartyNamed . peekParty) mParty
+        why <- maybe (pure Nothing) peekReason mReason
+        pure (DeclaredSummary party why)
+    peekReason rf = peekWHNF rf >>= pure . \ case
+      Just (ValString t) -> Just t
+      _                  -> Nothing
+
+-- | Construct a declared breach (@BREACH [BY …] [BECAUSE …]@) and log it
+-- (P2b): the log's 'Breached' step, with no norm — a terminal is not an
+-- obligation — and no clock, the expression arm having none in hand. The
+-- blame is peeked, never forced.
+declareBreach :: ReasonForBreach Reference -> Machine Config
+declareBreach reason = do
+  whenDeonticLog \ l -> do
+    summary <- breachSummary reason
+    logStep l MkDeonticStep
+      { dsClock = Nothing, dsEvent = Nothing, dsScrutiny = NoEvent, dsNorm = Nothing
+      , dsOutcome = Breached summary, dsJoin = Nothing }
+  continueBackward (ValBreached reason)
+
+-- | A step with no event and no join progress, for the sites that have
+-- neither.
+plainStep :: Maybe Rational -> Maybe EventKey -> Scrutiny -> NormKey -> StepOutcome -> DeonticStep
+plainStep clock ev scrutiny norm outcome = MkDeonticStep
+  { dsClock = clock, dsEvent = ev, dsScrutiny = scrutiny
+  , dsNorm = Just norm, dsOutcome = outcome, dsJoin = Nothing }
 
 -- | Throw an evaluation exception: unwind the stack frame by frame (so an
 -- active trace records the pops, mirroring the historical behaviour),
@@ -1014,7 +1227,12 @@ forwardExpr env = \ case
     -- BY is ONE declared failure naming nobody.
     mReasonRef <- traverse (\r -> allocate_ r env) mReason
     case mParty of
-      Nothing -> continueBackward (ValBreached (ExplicitBreach (singleBlame (DeclaredBreach Nothing mReasonRef))))
+      -- P2b: a declared breach is logged where it is constructed — here for
+      -- a BREACH with no BY, and at the 'BreachBy' frame's end otherwise
+      -- ('declareBreach'). No norm (a terminal is not an obligation), no
+      -- clock (the expression arm has none in hand), and the blame is
+      -- peeked, never forced.
+      Nothing -> declareBreach (ExplicitBreach (singleBlame (DeclaredBreach Nothing mReasonRef)))
       Just p  -> do
         partyRef <- allocate_ p env
         pushFrame $ ContractFrame $ BreachBy BreachByFrame
@@ -1122,6 +1340,9 @@ backward val = withPoppedFrame $ \ case
           [t, r] -> pure (t, r)
           rs' -> internalException $ RuntimeTypeError $
             "expected a time stamp, and a list of events but found: " <> foldMap prettyLayout rs'
+        -- P2b: this is the ENTRY into the obligation's site — the activation
+        -- the step log's key counts. Lazy when the log is off.
+        norm <- armNormKey party act
         -- this is the arming point: the clock now is what THE ARMING will
         -- name in this obligation's continuation (R-Q7B), so keep it —
         -- 'time' itself advances with every scrutinised event; no event has
@@ -1543,7 +1764,13 @@ backwardContractFrame val = \ case
         -- stream, which is what a barrier orders same-stamp failures by
         pushCFrame (Contract2 ScrutinizeEvent {events = es, seen = seen + 1, ..})
         continueRef e
-      ValNil -> continueBackward (ValObligation env party act due followup lest)
+      ValNil -> do
+        -- P2b: the stream ran out; the residual stands. The clock is peeked,
+        -- not forced: with no event seen yet it may still be a thunk.
+        whenDeonticLog \ l -> do
+          clock <- peekClock time
+          logStep l (plainStep clock Nothing NoEvent norm Waiting)
+        continueBackward (ValObligation env party act due followup lest)
       _ -> internalException $ RuntimeTypeError $
         "expected LIST EVENT but found: " <> prettyLayout val <> " when scrutinizing regulative events"
   Contract2 ScrutinizeEvent {..} -> case val of
@@ -1587,12 +1814,8 @@ backwardContractFrame val = \ case
          maybeEvaluate env party
   Contract4b ScrutinizeAnchor {..} -> do
     -- the anchor's instant, lowered to the trace's clock: a DATE by its
-    -- serial (what DATE_SERIAL computes), a NUMBER as it is
-    instant <- case val of
-      ValNumber t -> pure t
-      ValDate d   -> pure (fromIntegral (dayNumberFromDay d))
-      v -> internalException $ RuntimeTypeError $
-        "expected a NUMBER or a DATE as the anchor of a WITHIN but got: " <> prettyLayout v
+    -- serial (what DATE_SERIAL computes), a NUMBER as it is ('anchorInstant')
+    instant <- either (internalException . RuntimeTypeError) pure (anchorInstant val)
     pushCFrame (Contract5 CheckTiming {anchorT = Just instant, ..})
     continueExpr env duration
   Contract5 CheckTiming {..} -> do
@@ -1663,41 +1886,65 @@ backwardContractFrame val = \ case
         -- continuation is the HENCE, i.e. the join fired — the hand-off
         -- clock as THE JOIN.
         deadlineR <- allocateValue (ValNumber deadline)
+        -- P2b: the 'Expired' step. It is built here, where the deadline and
+        -- the revealing event are in hand, but LOGGED at the ResolveParty
+        -- frame for the routed cases, because that is where the party gets
+        -- forced and the key wants the bearer. Consumed-vs-witnessed follows
+        -- the re-offer rule above: a first look is re-offered onward
+        -- ('WitnessedOnly'); a second look is 'Reoffered' and consumed.
+        let expiredStep :: DS.Branch -> Maybe Text -> Eval (Maybe DeonticStep)
+            expiredStep branch mBearer = asks (.deonticLog) >>= \ case
+              Nothing -> pure Nothing
+              Just _  -> do
+                mParty <- peekParty ev'party
+                ev <- eventKeyAt stamp mParty ev'act
+                let norm' = norm {nkBearer = maybe norm.nkBearer Just mBearer}
+                pure $ Just $ plainStep (Just time') (Just ev)
+                  (scrutinyOf ev'reoffered WitnessedOnly) norm' (Expired branch deadline)
         let lifecycleAt isHence t = MkLifecycle
               { join = if isHence then Just t else Nothing
               , deadline = Just deadlineR
               , armed }
-            reofferResolve isHence followup'
-              | ev'reoffered = do
+            reofferResolve isHence followup' branch = do
+              pending <- expiredStep branch Nothing
+              if ev'reoffered
+                then do
                   -- this event was already re-offered once and has now
                   -- revealed a second expiry: consume it (see NOTE above)
                   t <- allocateValue ev'time
-                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events, time = t, seen, lifecycle = lifecycleAt isHence t})
+                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events, time = t, pending, seen, lifecycle = lifecycleAt isHence t})
                   maybeEvaluate env party
-              | otherwise = do
+                else do
                   ev'timeR <- allocateValue ev'time
                   evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
                   markReoffered evR
                   eventsR <- allocateValue (ValCons evR events)
-                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = ev'timeR, seen, lifecycle = lifecycleAt isHence ev'timeR})
+                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = ev'timeR, pending, seen, lifecycle = lifecycleAt isHence ev'timeR})
                   maybeEvaluate env party
         case act.modal of
           DMustNot ->
             -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline
             -- Continue with HENCE (followup), which defaults to FULFILLED
-            reofferResolve True followup
+            reofferResolve True followup ToHence
           DMay ->
             -- Permission was NOT EXERCISED: per the README default-consequence
             -- matrix, expiry of a MAY routes to LEST (default FULFILLED);
             -- HENCE fires only when the permitted action is taken.
-            reofferResolve False (fromMaybe fulfilExpr lest)
+            reofferResolve False (fromMaybe fulfilExpr lest) ToLest
           _ -> -- DMust, DDo: deadline passed = failure
             case lest of
               Nothing -> do
                 -- NOTE: this is not too nice, but not wanting this would require to change `App1` to take MaybeEvaluated's
                 partyR <- either (`allocate_` env) allocateValue party
+                -- P2b: no continuation to force the party in; the bearer is
+                -- what the breach's own party cell holds, if anything has
+                -- forced it (a nullary constructor is allocated as a value,
+                -- so @PARTY Alice@ is known; a computed party may not be).
+                whenDeonticLog \ _ -> do
+                  mBearer <- peekParty partyR
+                  expiredStep ToBreach mBearer >>= traverse_ tellDeonticStep
                 continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp (singleBlame (MissedDeadline partyR act deadline))))
-              Just lestFollowup -> reofferResolve False lestFollowup
+              Just lestFollowup -> reofferResolve False lestFollowup ToLest
       else do
         -- NOTE: we have observed the event and do not branch, either, the
         -- only thing that may now happen is that we try a new event. Hence we
@@ -1705,7 +1952,8 @@ backwardContractFrame val = \ case
         pushCFrame (Contract6 PartyWHNF {time = ev'time, due = Right $ ValNumber newDue, ..})
         maybeEvaluate env party
   Contract6 PartyWHNF {..} -> do
-    pushCFrame (Contract7 PartyEqual {party = val, ..})
+    -- P2b: the party is forced now; every later frame's key knows the bearer.
+    pushCFrame (Contract7 PartyEqual {party = val, norm = bearing val norm, ..})
     continueRef ev'party
   Contract7 PartyEqual {..} -> do
     pushCFrame (Contract8 ScrutinizeParty {ev'party = val, ..})
@@ -1717,6 +1965,10 @@ backwardContractFrame val = \ case
         pushCFrame (Contract9 ScrutinizeEnvironment {..})
         continuePattern ev'act env act.action
       ValBool False -> do
+        whenDeonticLog \ l -> do
+          stamp <- assertTime time
+          ev <- eventKeyAt stamp (Just (partyKeyWHNF ev'party)) ev'act
+          logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered WitnessedOnly) norm PartyMismatch)
         newTime <- allocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
       _ -> internalException $ RuntimeTypeError $
@@ -1733,7 +1985,14 @@ backwardContractFrame val = \ case
         "expected environment but found: " <> prettyLayout val
   Contract10 ScrutinizeActions {..} ->
     case val of
-      ValBool True ->
+      ValBool True -> do
+        -- P2b: the match, routed per modal. Logged before the continuation
+        -- is entered, so the log reads in machine order.
+        let matchedStep branch = whenDeonticLog \ _ -> do
+              stamp <- assertTime time
+              ev <- eventKeyAt stamp (Just (partyKeyWHNF ev'party)) ev'act
+              tellRoutedStep norm branch
+                (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered Consumed) norm (Matched branch))
         -- Action matched! What happens depends on the deontic modal:
         -- MUST/MAY/DO: action done = success → continue with HENCE (followup)
         -- MUST NOT: action done = VIOLATION → continue with LEST (or BREACH if no LEST)
@@ -1741,6 +2000,7 @@ backwardContractFrame val = \ case
           DMustNot -> case lest of
             -- Prohibition violated: action was done, trigger LEST clause
             Just lestFollowup -> do
+              matchedStep ToLest
               timeR <- allocateValue time
               deadlineR <- absoluteDeadline time due
               -- LEST: the join did not fire, so no THE JOIN (R-Q7B)
@@ -1748,6 +2008,7 @@ backwardContractFrame val = \ case
               continueWithFollowup (Just (partyKeyWHNF party)) lifecycle (env `Map.union` henceEnv) lestFollowup events timeR seen
             -- No LEST clause: immediate breach
             Nothing -> do
+              matchedStep ToBreach
               -- Extract timestamp from time (which has been updated to event time)
               stamp <- assertTime time
               -- allocateRecursive references for the WHNF values
@@ -1765,6 +2026,7 @@ backwardContractFrame val = \ case
               continueBackward (ValBreached (DeadlineMissed ev'partyRef ev'act stamp (singleBlame (MissedDeadline partyRef act stamp))))
           -- MUST, MAY, DO: action done = success
           _ -> do
+            matchedStep ToHence
             timeR <- allocateValue time
             deadlineR <- absoluteDeadline time due
             -- HENCE: the join is this completion (R-Q7, §5.1: an unanchored
@@ -1773,11 +2035,21 @@ backwardContractFrame val = \ case
             let lifecycle = MkLifecycle {join = Just timeR, deadline = deadlineR, armed}
             continueWithFollowup (Just (partyKeyWHNF party)) lifecycle (env `Map.union` henceEnv) followup events timeR seen
       ValBool False -> do
+        -- P2b: the action matched but the PROVIDED did not hold; next event.
+        whenDeonticLog \ l -> do
+          stamp <- assertTime time
+          ev <- eventKeyAt stamp (Just (partyKeyWHNF ev'party)) ev'act
+          logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered WitnessedOnly) norm GuardFailed)
         newTime <- allocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
       _ -> internalException $ RuntimeTypeError $
         "expected BOOLEAN but found: " <> prettyLayout val
-  ResolveParty ResolvePartyFrame {..} ->
+  ResolveParty ResolvePartyFrame {..} -> do
+    -- P2b: the party is forced; log the 'Expired' step Contract5 built,
+    -- with the bearer filled in and the join progress worked out.
+    for_ pending \ step -> for_ step.dsNorm \ norm ->
+      for_ (expiredBranch step.dsOutcome) \ branch ->
+        tellRoutedStep (bearing val norm) branch step
     -- 'val' is the obligation party, now forced to WHNF by 'maybeEvaluate env party'
     -- on the deadline-passed / LEST path. Key it exactly as the matched HENCE path
     -- does, so a RECORD in the followup/reparation attributes to the real party.
@@ -1856,13 +2128,19 @@ backwardContractFrame val = \ case
       ValROp{}        -> barrierNext BarrierStepFrame {pending = val : pending, ..}
       -- A member's own breach, under a barrier with no LEST (so no sentinel
       -- was minted). Recorded, not returned: the scan goes on so that the
-      -- verdict can name EVERY member that failed (R-T3, spec §6.1).
+      -- verdict can name EVERY member that failed (R-T3, spec §6.1). P2b's
+      -- 'JoinFailed ToBreach' step is logged where the verdict is decided
+      -- ('barrierFinish'), not per member.
       ValBreached reason ->
         barrierNext BarrierStepFrame {failures = BarrierBreached reason : failures, ..}
       -- A MAY member whose permission expired under a barrier with no LEST:
       -- nothing was owed, so nothing is breached, but the join cannot fire.
+      -- P2b's 'JoinStalled' step is likewise logged at 'barrierFinish'.
       ValFulfilled    -> barrierNext BarrierStepFrame {lapsed = True, ..}
-      _               -> continueBackward val
+      -- Every terminal a member can reach is named above; anything else is a
+      -- machine bug, and is loud (P2b) rather than returned as the verdict.
+      other -> internalException $ RuntimeTypeError $
+        "unexpected barrier member value: " <> prettyLayout other
   -- EVERY, the barrier: a completion's timestamp. The LATEST one is the
   -- join's firing time, and the stream that followed it is what the HENCE
   -- scrutinizes (spec §3.4, §5.1).
@@ -1930,9 +2208,9 @@ backwardContractFrame val = \ case
         continueRef tl
       ValNil -> case reverse acc of
         []       -> userException (UserError (emptyBreachByRefusal clause))
-        (p : ps) -> continueBackward $ ValBreached $ ExplicitBreach
+        (p : ps) -> declareBreach $ ExplicitBreach
           Blame { before = [], anchor = declared p, after = map declared ps }
-      _ | null acc -> continueBackward (ValBreached (ExplicitBreach (singleBlame (declared partyRef))))
+      _ | null acc -> declareBreach (ExplicitBreach (singleBlame (declared partyRef)))
         | otherwise -> internalException $ RuntimeTypeError $
             "expected a LIST of parties after BREACH BY but found: " <> prettyLayout val
     where
@@ -1953,15 +2231,11 @@ backwardContractFrame val = \ case
       _ -> continueRef ctx.time
   Barrier4 BarrierArmingFrame {..} -> do
     -- the state deadline's origin, forced (see 'Barrier3'): a NUMBER, or a
-    -- DATE lowered to its serial
-    origin <- case val of
-      ValNumber t -> pure t
-      ValDate d   -> pure (fromIntegral (dayNumberFromDay d))
-      v -> internalException $ RuntimeTypeError $
-        "expected a NUMBER or a DATE as the anchor of a WITHIN but got: " <> prettyLayout v
+    -- DATE lowered to its serial ('anchorInstant')
+    origin <- either (internalException . RuntimeTypeError) pure (anchorInstant val)
     let stateDeadline = origin + stateDue
     if joinTime > stateDeadline
-      then barrierStateMissed ctx stateDeadline
+      then barrierStateMissed ctx joinTime stateDeadline
       else do
         tRef <- allocateValue (ValNumber joinTime)
         dRef <- allocateValue (ValNumber stateDeadline)
@@ -1972,7 +2246,12 @@ backwardContractFrame val = \ case
     -- wait for the left hand side expression to run to observe
     -- how we'll have to do the blame assignment
     | ValROr <- op
-    , ValFulfilled <- val -> continueBackward ValFulfilled
+    , ValFulfilled <- val -> do
+      -- P2b: the OR's commonest success path. The RBinOp2 arm for a
+      -- fulfilled LEFT operand is unreachable because of this short-circuit,
+      -- so the step is logged here.
+      joinedStep op JoinFulfilled (Just LeftSide) False
+      continueBackward ValFulfilled
 
   RBinOp1 MkRBinOp1 {..} -> do
 
@@ -2020,15 +2299,27 @@ backwardContractFrame val = \ case
             (Just vt, Just vt', ValROr)  -> vt > vt'
             (_, _, ValRAnd)              -> True
             (_, _, ValROr)               -> False
+          -- P2b: simultaneous, or one side untimestamped, is CSL's tie-break
+          tieBreak = case (breachTime r1, breachTime r2) of
+            (Just vt, Just vt') -> vt == vt'
+            _                   -> True
           (anchor, blame)
             | leftAnchored = (r1, anchorLeft  (breachBlame r1) (breachBlame r2))
             | otherwise    = (r2, anchorRight (breachBlame r1) (breachBlame r2))
-      continueBackward (ValBreached (rebase blame anchor))
+          chosen = rebase blame anchor
+      -- P2b: which side's breach anchors the compound's, and whether the
+      -- tie-break chose it. The summary names every failure of both sides.
+      whenDeonticLog \ _ -> do
+        summary <- breachSummary chosen
+        joinedStep op (JoinBreached summary) (Just (if leftAnchored then LeftSide else RightSide)) tieBreak
+      continueBackward (ValBreached chosen)
 
   RBinOp2 MkRBinOp2 {..}
     | ValFulfilled <- val
     , ValFulfilled <- rval1
-    -> continueBackward ValFulfilled
+    -> do
+      joinedStep op JoinFulfilled (Just BothSides) False
+      continueBackward ValFulfilled
 
   -- NOTE: note that blame assignment in the case of AND
   -- operators may be wrong if the events are passed out
@@ -2043,27 +2334,43 @@ backwardContractFrame val = \ case
     -- more specifically, with this assumption, there's no
     -- possibility for future events to advance a possible
     -- remaining obligation while changing the blame assignment
-    -> continueBackward (ValBreached reason)
+    -> do
+      whenDeonticLog \ _ -> do
+        summary <- breachSummary reason
+        joinedStep op (JoinBreached summary) (Just LeftSide) False
+      continueBackward (ValBreached reason)
   RBinOp2 MkRBinOp2 {..}
     | ValRAnd <- op
     , ValBreached reason <- val
-    -> continueBackward (ValBreached reason)
+    -> do
+      whenDeonticLog \ _ -> do
+        summary <- breachSummary reason
+        joinedStep op (JoinBreached summary) (Just RightSide) False
+      continueBackward (ValBreached reason)
 
   -- OR
   RBinOp2 MkRBinOp2 {..}
     | ValROr <- op
     , ValFulfilled <- val
-    -> continueBackward ValFulfilled
+    -> do
+      joinedStep op JoinFulfilled (Just RightSide) False
+      continueBackward ValFulfilled
+  -- NOTE: unreachable — a fulfilled LEFT operand of an OR never gets past
+  -- the RBinOp1 short-circuit above, which is where that step is logged.
+  -- Kept so the arms read as the full table.
   RBinOp2 MkRBinOp2 {..}
     | ValROr <- op
     , ValFulfilled <- rval1
-    -> continueBackward ValFulfilled
+    -> do
+      joinedStep op JoinFulfilled (Just LeftSide) False
+      continueBackward ValFulfilled
 
 
   -- NOTE: otherwise, we do not have enough information to do
   -- any reduction of the contract clauses and thus have to return
   -- a value that represents the operator applied to each operand
-  RBinOp2 MkRBinOp2 {..} ->
+  RBinOp2 MkRBinOp2 {..} -> do
+    joinedStep op JoinPending Nothing False
     continueBackward (ValROp env op (Right rval1) (Right val))
   where
     tryNextEvent :: ScrutinizeEvents -> Reference -> Machine Config
@@ -2078,6 +2385,19 @@ backwardContractFrame val = \ case
     breachTime :: ReasonForBreach a -> Maybe Rational
     breachTime (DeadlineMissed _ _ stamp _) = Just stamp
     breachTime (ExplicitBreach _) = Nothing
+
+    -- P2b: the branch a pending 'Expired' step was routed to.
+    expiredBranch :: StepOutcome -> Maybe DS.Branch
+    expiredBranch (Expired b _) = Just b
+    expiredBranch _             = Nothing
+
+    -- P2b: an 'RBinOp2' reduction, logged as a 'Joined' step. The compound
+    -- is not a norm instance, so the step carries no key (see 'dsNorm').
+    joinedStep :: RBinOp -> JoinResult -> Maybe Side -> Bool -> Eval ()
+    joinedStep op result winner tieBreak = tellDeonticStep MkDeonticStep
+      { dsClock = Nothing, dsEvent = Nothing, dsScrutiny = NoEvent, dsNorm = Nothing
+      , dsOutcome = Joined op MkJoinNote {jnResult = result, jnWinner = winner, jnTieBreak = tieBreak}
+      , dsJoin = Nothing }
 
     -- M4 party-threading hinge: set the acting party for the DURATION of the
     -- HENCE/LEST body, so a RECORD fired inside it routes to that party's own
@@ -2278,7 +2598,9 @@ startRollCall env deonton time events =
     Party{} -> internalException $ RuntimeTypeError
       "a PARTY obligation reached the quantifier's roll call"
     Every _ cast var roll filt -> do
-      let ctx = MkQuantCtx {deonton, var, cast, roll, filt, env, time, events}
+      -- P2b: arming is the join's own entry into its site.
+      norm <- armJoinKey deonton
+      let ctx = MkQuantCtx {deonton, var, cast, roll, filt, env, time, events, norm}
       case maybe (filt >>= quantifierRoll var) Just roll of
         Nothing -> userException (UserError rollCallRefusal)
         -- The roll is read BEFORE any member exists, so it cannot depend on
@@ -2312,9 +2634,9 @@ quantNext frame rest = do
 assembleQuantified :: QuantCtx -> [CastMember] -> Machine Config
 assembleQuantified ctx members =
   case ctx.deonton.join of
-    Nothing                      -> runQuantifiedFold ctx members memberDue
-    Just JoinUpon{}              -> runQuantifiedFold ctx members memberDue
-    Just (JoinOnce _ AllHave{} _)
+    Nothing                      -> registerCast ctx Distributive members >> runQuantifiedFold ctx members memberDue
+    Just JoinUpon{}              -> registerCast ctx Fork members >> runQuantifiedFold ctx members memberDue
+    Just (JoinOnce _ threshold@AllHave{} _)
       -- A barrier's HENCE and LEST belong to the JOIN, not to a member (spec
       -- §3.1 writes them @shared_h@ / @shared_l@), so there is no member for
       -- the variable to denote. The type checker binds it throughout the rule
@@ -2323,7 +2645,7 @@ assembleQuantified ctx members =
       -- crashed on.
       | any (mentionsVar ctx.var) (catMaybes [ctx.deonton.hence, ctx.deonton.lest])
       -> userException (UserError (sharedContinuationRefusal ctx.var))
-      | otherwise -> startBarrier ctx members memberDue
+      | otherwise -> registerCast ctx (Barrier threshold) members >> startBarrier ctx members memberDue
   where
     -- The act's own WITHIN bounds each performance; the join's bounds the
     -- whole (R-T2). When only the join carries one it has to bound the acts
@@ -2472,6 +2794,14 @@ defSentinel n = do
 isSentinel :: Resolved -> Bool
 isSentinel r = (getUnique r).sort == 's'
 
+-- | The names of the barrier's two sentinels, as a member's residual prints
+-- them (@HENCE `the join` LEST `the join fails`@). They are minted fresh per
+-- barrier ('startBarrier'), so the NAME is the only thing a reader of a
+-- residual can recognise them by; "L4.Lts.Marking" does exactly that.
+joinCheckpointName, joinFailpointName :: Text
+joinCheckpointName = "the join"
+joinFailpointName  = "the join fails"
+
 -- | Arm the barrier. The checkpoint is a FRESH constructor, minted here and
 -- bound into each member's environment: applied to the @[time, events]@ that
 -- every continuation receives, it yields @ValConstructor cp [time, events]@,
@@ -2484,10 +2814,10 @@ startBarrier ctx members mdue = do
   -- Both names are user-visible: a member that has not yet acted when the
   -- event stream runs out is printed as a residual obligation carrying these
   -- sentinels in its HENCE and LEST, so they have to read as English there.
-  cp <- defSentinel (MkName emptyAnno (NormalName "the join"))
+  cp <- defSentinel (MkName emptyAnno (NormalName joinCheckpointName))
   cpRef <- allocateValue (ValUnappliedConstructor cp)
   mfail <- for ctx.deonton.lest \ _ -> do
-    fp <- defSentinel (MkName emptyAnno (NormalName "the join fails"))
+    fp <- defSentinel (MkName emptyAnno (NormalName joinFailpointName))
     fpRef <- allocateValue (ValUnappliedConstructor fp)
     pure (fp, fpRef)
   case map (barrierMember ctx cp cpRef mfail mdue) members of
@@ -2580,9 +2910,23 @@ barrierFinish step = case reverse step.failures of
           blame = own
             { before = concatMap entries earlier ++ own.before
             , after  = own.after ++ concatMap entries (drop 1 later) }
-      in continueBackward (ValBreached (rebase blame failReason))
+          verdict = rebase blame failReason
+      in do
+        -- P2b: the barrier's own step, logged once the verdict is decided
+        -- (every member has run). The clock is the anchoring failure's
+        -- revealing stamp — in hand for a missed deadline, absent only when
+        -- the anchoring member's own breach was an explicit BREACH.
+        let clock = case verdict of
+              DeadlineMissed _ _ stamp _ -> Just stamp
+              ExplicitBreach {}          -> Nothing
+        tellDeonticStep $ plainStep clock Nothing NoEvent step.ctx.norm (JoinFailed ToBreach)
+        continueBackward (ValBreached verdict)
   []
-    | step.lapsed -> continueBackward ValFulfilled
+    | step.lapsed -> do
+        -- P2b: a MAY member lapsed under a barrier with no LEST; the join
+        -- can never fire. 'ValFulfilled' carries no time, so no clock.
+        tellDeonticStep $ plainStep Nothing Nothing NoEvent step.ctx.norm JoinStalled
+        continueBackward ValFulfilled
     | otherwise -> case reverse step.pending of
       -- Some members are still waiting for their event. The barrier has neither
       -- fired nor failed; what remains to be done is those obligations, as the
@@ -2675,6 +3019,11 @@ barrierJoined ctx t evs dueLatest = case joinStateDue ctx of
 -- EVERY's.
 fireBarrierHence :: QuantCtx -> Maybe Reference -> Reference -> Reference -> Machine Config
 fireBarrierHence ctx deadlineRef timeRef eventsRef = do
+  -- P2b: the join's own step. Peeked, not forced: for an empty cast the
+  -- anchor is the arming time, which may still be a thunk.
+  whenDeonticLog \ l -> do
+    clock <- peekClock timeRef
+    logStep l (plainStep clock Nothing NoEvent ctx.norm JoinReleased)
   mOriginal <- getCurrentParty
   putCurrentParty Nothing
   pushFrame (RestoreCurrentParty mOriginal)
@@ -2713,6 +3062,10 @@ barrierFail ctx deadlineRef timeRef eventsRef = case ctx.deonton.lest of
   Nothing -> internalException $ RuntimeTypeError
     "the barrier's LEST sentinel fired for a barrier that has no LEST"
   Just lestExpr -> do
+    -- P2b: the failing member's own expiry step precedes this one.
+    whenDeonticLog \ l -> do
+      clock <- peekClock timeRef
+      logStep l (plainStep clock Nothing NoEvent ctx.norm (JoinFailed ToLest))
     mOriginal <- getCurrentParty
     putCurrentParty Nothing
     pushFrame (RestoreCurrentParty mOriginal)
@@ -2726,9 +3079,14 @@ barrierFail ctx deadlineRef timeRef eventsRef = case ctx.deonton.lest of
 --
 -- The LEST is anchored at the state deadline, which is also what THE
 -- DEADLINE names in it (R-Q5's state layer, R-Q7B).
-barrierStateMissed :: QuantCtx -> Rational -> Machine Config
-barrierStateMissed ctx deadline = case ctx.deonton.lest of
+--
+-- P2b logs the 'JoinExpired' step here, in each arm beside the routing it
+-- records, so the log cannot classify the routing differently from the
+-- machine. @joinTime@ is the last completion, the step's clock.
+barrierStateMissed :: QuantCtx -> Rational -> Rational -> Machine Config
+barrierStateMissed ctx joinTime deadline = case ctx.deonton.lest of
   Just lestExpr -> do
+    tellDeonticStep $ plainStep (Just joinTime) Nothing NoEvent ctx.norm (JoinExpired ToLest deadline)
     tRef <- allocateValue (ValNumber deadline)
     mOriginal <- getCurrentParty
     putCurrentParty Nothing
@@ -2738,6 +3096,7 @@ barrierStateMissed ctx deadline = case ctx.deonton.lest of
     pushFrame (ContractFrame (Handoff lifecycle))
     continueExpr (bindLifecycle lifecycle ctx.env) lestExpr
   Nothing -> do
+    tellDeonticStep $ plainStep (Just joinTime) Nothing NoEvent ctx.norm (JoinExpired ToBreach deadline)
     reason <- allocateValue (ValString
       "every member acted, but the last of them acted after the ONCE line's WITHIN deadline")
     continueBackward (ValBreached (ExplicitBreach (singleBlame (DeclaredBreach Nothing (Just reason)))))
@@ -2869,6 +3228,18 @@ lifecycleRefusal a = Text.unwords
   , "all. Anchor it to THE ARMING or to an instant, give the enclosing"
   , "obligation the WITHIN, or guard an EVERY that may range over nobody."
   ]
+
+-- | An anchor's instant on the trace's clock (R-Q7C): a NUMBER as it is, a
+-- DATE by its serial — the same arithmetic as @DATE_SERIAL@, not a call
+-- through it. This is the ONE place the lowering is defined: 'Contract4b'
+-- (an act line's anchor) and 'Barrier4' (a join line's) apply it, and
+-- "L4.Lts.WhatIf" reads an unforced anchored deadline through it rather
+-- than re-deriving it (LTS-VISUALISER §2.4).
+anchorInstant :: WHNF -> Either Text Rational
+anchorInstant = \ case
+  ValNumber t -> Right t
+  ValDate d   -> Right (fromIntegral (dayNumberFromDay d))
+  v -> Left ("expected a NUMBER or a DATE as the anchor of a WITHIN but got: " <> prettyLayout v)
 
 -- | A join-line anchor the checker refuses ('OnJoinLine'), met at run time.
 unreachableAnchor :: Anchor Resolved -> Machine Config
@@ -3187,6 +3558,13 @@ patternMatchFailure = withPoppedFrame $ \ case
     continueBranches scrutinee env branches
   -- we have unwound the frame that would reenter when scrutinizing the event
   Just (ContractFrame (Contract11 ActionDoesn'tmatch {..})) -> do
+    -- P2b: the action pattern did not match; next event.
+    whenDeonticLog \ l -> do
+      stamp <- case time of
+        ValNumber t -> pure t
+        v -> internalException $ RuntimeTypeError $ "expected a NUMBER but got: " <> prettyLayout v
+      ev <- eventKeyAt stamp (Just (partyKeyWHNF ev'party)) ev'act
+      logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered WitnessedOnly) norm ActionMismatch)
     newTime <- allocateValue time
     pushFrame $ ContractFrame $ Contract1 ScrutinizeEvents {party = Right party, time = newTime, ..}
     continueRef events
