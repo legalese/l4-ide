@@ -58,7 +58,7 @@ theLandlord MEANS Landlord OF "Ms Ng"
 
 GIVETH A DEONTIC Actor Action
 `the tenancy begins` MEANS
-    PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 5
+    PARTY theLandlord MUST Deliver theLandlord what WITHIN 5
 ```
 
 With those declarations:
@@ -85,7 +85,7 @@ GIVETH A DEONTIC Actor Action
 `the tenants who are not Carol sign` MEANS
     EVERY Tenant t IN tenants
         WHO    NOT (t EQUALS (Tenant OF "Carol"))
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
 ```
 
@@ -98,7 +98,7 @@ The condition names the variable itself — `t` is in scope inside `WHO`, which 
 ```l4
 GIVETH A DEONTIC Actor Action
 `sign by the due date` MEANS
-    EVERY Tenant t MUST Sign (EXACTLY t) WITHIN due
+    EVERY Tenant t MUST Sign t WITHIN due
     WHERE
         due MEANS 14
 ```
@@ -121,7 +121,7 @@ tenants MEANS LIST (Tenant OF "Alice"), (Tenant OF "Bob"), (Tenant OF "Carol")
 GIVETH A DEONTIC Actor Action
 `all tenants sign` MEANS
     EVERY Tenant t IN tenants      -- the roll: these three, and nobody else
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -136,7 +136,7 @@ Read it aloud and it says what it does: _every tenant t in tenants must sign, wi
 EVERY Tenant t
     IN     tenants
     WHO    NOT (t EQUALS (Tenant OF "Carol"))
-    MUST   Sign (EXACTLY t)
+    MUST   Sign t
     WITHIN 14
 ```
 
@@ -217,18 +217,37 @@ EVERY Tenant t IN tenants
 
 draws the three from `tenants`, then keeps the two the condition allows. Nothing is ambiguous and nothing is silently dropped — and note that this is **not** the deprecated spelling, because the roll is written outright. An `elem` condition beside an `IN` roll is an ordinary condition, and there is nothing wrong with it. Worked examples of both spellings side by side are in `jl4/examples/ok/every/run-in.l4`.
 
-## The action: write EXACTLY to mean the member
+## The action: the member's own name means the member
 
-The action after `MUST` is a **pattern**, exactly as it is after `PARTY` (see [EXACTLY](README.md#exactly-exact-action-matching)). A bare name in a pattern is a _new_ name that matches anything. So `MUST Sign t` would not mean "t signs": it would introduce a second `t` that matches any signer at all, and a stranger's signature would discharge the tenant's duty.
-
-The checker refuses that spelling and says what to write instead:
+The action after `MUST` is a **pattern**, exactly as it is after `PARTY` (see
+[Action Patterns: Reference or Wildcard](README.md#action-patterns-reference-or-wildcard)).
+`t` is the quantifier's own variable, so it is a name already in scope — and a
+name in an action that is already in scope requires that value:
 
 ```l4
-EVERY Tenant t MUST Sign t WITHIN 14            -- ERROR: rebinds t; write EXACTLY t
-EVERY Tenant t MUST Sign (EXACTLY t) WITHIN 14  -- the member signs
+EVERY Tenant t MUST Sign t WITHIN 14  -- t is the quantifier's own variable: the member signs
 ```
 
-Other arguments of the action may still be patterns. `MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount` pins the payer and the payee and binds `amount` to whatever was paid; `amount` is then in scope in `PROVIDED`, in `HENCE` and in `LEST`, as it is for a `PARTY` rule.
+`MUST Sign someoneElse`, with a name that is not the quantifier's variable and
+names nothing else either, is a different case: it introduces a fresh
+placeholder that matches any signer, and a stranger's signature would
+discharge the tenant's duty. The rule is the same one that holds everywhere
+else in an action: a name that refers to something requires it, and a name
+that refers to nothing is a wildcard. (Before this rule shipped, `t` had to be
+written `EXACTLY t` to make this reference explicit, and writing the bare
+`t` was refused outright, naming `EXACTLY t` as the fix. `EXACTLY` still
+parses and still works; it just is not needed here any more.)
+
+The same lookup applies at any nesting depth: an inner `EVERY`'s action
+referring to an **outer** quantifier's variable resolves to that outer
+member, not to a fresh name of its own, so a nested rule may refer to an
+enclosing member's variable the same way a flat one refers to its own.
+
+Other arguments of the action are read the same way. `MUST Pay t theLandlord amount`
+requires the payer to be the member and the payee to be `theLandlord` (a
+top-level name), and binds `amount` — which names nothing here — to whatever
+was paid; `amount` is then in scope in `PROVIDED`, in `HENCE` and in `LEST`,
+as it is for a `PARTY` rule.
 
 ## The join line: once, or once per member
 
@@ -241,7 +260,7 @@ Under an `EVERY`, a `HENCE` or a `LEST` needs a line saying **when it fires**, a
 GIVETH A DEONTIC Actor Action
 `all tenants sign` MEANS
     EVERY Tenant t
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  `the tenancy begins`
@@ -254,11 +273,11 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `each payment gets a receipt` MEANS
     EVERY Tenant t
-        MUST   Pay (EXACTLY t) (EXACTLY theLandlord) amount
+        MUST   Pay t theLandlord amount
         WITHIN 7
         UPON   EACH
         HENCE  (PARTY theLandlord
-                    MUST   Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)
+                    MUST   Receipt theLandlord t amount
                     WITHIN 5)
         LEST   BREACH BY t
 ```
@@ -295,7 +314,7 @@ When it is the **only** deadline in the rule it also becomes each member's, beca
 GIVETH A DEONTIC Actor Action
 `sign, and be done by day 30` MEANS
     EVERY Tenant t
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE WITHIN 30
         HENCE  FULFILLED
@@ -313,9 +332,9 @@ An `EVERY` may appear wherever a `PARTY` rule may: as an operand of `RAND` or `R
 ```l4
 GIVETH A DEONTIC Actor Action
 `sign and deliver` MEANS
-    (EVERY Tenant t MUST Sign (EXACTLY t) WITHIN 14 ONCE ALL HAVE HENCE FULFILLED LEST BREACH)
+    (EVERY Tenant t MUST Sign t WITHIN 14 ONCE ALL HAVE HENCE FULFILLED LEST BREACH)
     RAND
-    (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 14 HENCE FULFILLED LEST BREACH)
+    (PARTY theLandlord MUST Deliver theLandlord what WITHIN 14 HENCE FULFILLED LEST BREACH)
 ```
 
 `RAND` asks for both sides: every tenant signs, and the landlord delivers. `ROR` asks for either. The `EVERY` on one side is a single operand, whatever its cast turns out to hold.
@@ -333,12 +352,12 @@ DECLARE Action IS ONE OF
 GIVETH A DEONTIC Actor Action
 `mutual termination` MEANS
     EVERY Partner x
-        MAY    Terminate (EXACTLY x)
+        MAY    Terminate x
         WITHIN 365
         UPON   EACH
         HENCE  EVERY Partner y
                    WHO    NOT (y EQUALS x)
-                   MUST   Settle (EXACTLY y) (EXACTLY x)
+                   MUST   Settle y x
                    WITHIN 30
                    ONCE   ALL HAVE
                    HENCE  FULFILLED
@@ -404,7 +423,7 @@ Verified 2026-09-08 against the compiler at the head of this branch.
 - **When two members act at the very same instant, the continuation can see one of their acts.** The join's time is right either way, but the stream handed to the continuation is the one belonging to whichever of the two the roll named first, so an event stamped exactly at the join may still reach it. It only bites if the continuation's action could be matched by a member's own act at that instant. A prohibition (`SHANT`) barrier ties by construction and is not affected, because every member finishes on the same event.
 - **The type checker is looser than the run time in two places**, and both refuse rather than answer: a barrier continuation that names the member, and a roll — in the older, deprecated `WHO elem` spelling only — that names the member. Both are described above. An `IN` roll that names the member is caught earlier, at check time, which is one of the reasons the older spelling is the deprecated one.
 
-- **Nothing checks that the action names the member.** `MUST Sign (EXACTLY t)` ties the act to the member; `MUST Sign someoneElse` does not, and is accepted. What the run does check is that the **event's** party is the member. Write `EXACTLY t`.
+- **Writing the member's own variable is what ties the act to the member — an unrelated name never does, automatically.** `MUST Sign t` ties the act to the member because `t` is the quantifier's variable; `MUST Sign someoneElse`, with a name that is not `t` and names nothing else, is a placeholder and is accepted. What the run checks is that the **event's** party equals whatever the action names — the member, if you wrote the member's name.
 - **The count and measure joins are not built at all** — `ONCE SOME 2 OF … HAVE`, `ONCE sum OF amount AT LEAST rent`. Only `ONCE ALL HAVE` and `UPON EACH` parse.
 - The WASM export refuses a rule containing `EVERY` rather than compile it wrongly.
 - **FIXED 2026-09-15 — the BPMN export used to draw a barrier and a fork identically, and its fidelity report did not say so.**
@@ -421,7 +440,6 @@ Verified 2026-09-08 against the compiler at the head of this branch.
 - **Naming the member in a join line's `WITHIN`** is rejected, correctly, but the message is the generic `could not find a definition for the identifier t` — and it then prints the type it inferred for `t`, which reads as a contradiction. What it means is that a deadline on the whole group may not depend on one member. True of both `ONCE ALL HAVE` and `UPON EACH`.
 - **Using the party _type_ as the cast** — `EVERY Actor a` where `Actor` is the type — gives `could not find a definition for the identifier Actor ... of type: Actor`, the same self-contradictory shape. The cast must be a constructor. Write `EVERY a` for the unfiltered case.
 - **A join line with no `HENCE` and no `LEST` is accepted**, and since 2026-09-08 its `WITHIN` is not idle: a deadline written only on the join line bounds each act, because otherwise nothing would ever expire and the rule could never fail. What is still true is that there is no continuation for it to fire, so what you get at the deadline is a breach rather than anything you wrote.
-- **The check that an action may not rebind the quantifier's variable only looks at the innermost `EVERY`.** In a nested rule, an inner action writing a bare `x` where `x` is the _outer_ quantifier's variable is accepted, and binds a fresh name matching anyone. Write `EXACTLY x` for every quantifier variable you mean to refer to, at every depth.
 - **Clause order decides which `WITHIN` you wrote, silently.** A `WITHIN` before the join line bounds each act; the same `WITHIN` after it bounds the whole group. Both orders parse, both check, and `l4 format` prints either back unchanged, so nothing tells you which one you got. Write the act's `WITHIN` first, as every example here does.
 - **A misplaced join line does not say "indentation".** If its head keyword (`ONCE` or `UPON`) is too far left, the join simply does not match, and the leftover keyword is reported against the expression that precedes it — a long `expecting %, &&, *, …` list. Only a misplaced _second_ word (`ALL`, `HAVE`, `EACH`) produces the `incorrect indentation` message. If you get operator soup after a rule that looks right, check the join line's column first.
 - **A join line under a `PARTY` rule can report two errors** — that the join line needs an `EVERY`, and separately anything wrong inside the line itself, such as a non-`NUMBER` deadline. A plain `ONCE ALL HAVE` under a `PARTY` reports just the one. Where the second appears it is noise: fixing it does not help, because the line has to go.
@@ -438,6 +456,6 @@ Verified 2026-09-08 against the compiler at the head of this branch.
 
 ## See Also
 
-- **[Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md)** - why `Tenant` is a constructor, and what `EXACTLY` does
+- **[Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md)** - why `Tenant` is a constructor, and what a name in an action means
 - **[Regulative Rules](../../concepts/legal-modeling/regulative-rules.md)** - the five slots of a rule
 - `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md` - the design, its rulings, and the parts still open

@@ -1,0 +1,40 @@
+-- R1 row 4 of specs/todo/PATTERN-REFERENCE-RULE-SPEC.md: the ONE carve-out.
+--
+-- A name that resolves only to a record SELECTOR still binds a fresh
+-- wildcard. `Pay Alice `Ms Ng` amount` names the slot it is filling, which is
+-- the established idiom — the memo found 26 corpus sites of this spelling and
+-- every one is a deliberate wildcard, usually narrowed afterwards by PROVIDED.
+-- A selector is a function and can never be the intended value in an action
+-- slot, so nothing is lost by carving it out, and R3's claim that dropping
+-- EXACTLY is always meaning-preserving depends on it.
+--
+-- The traces show the wildcard still matching any amount, and PROVIDED still
+-- narrowing it: the first pays 1 and IS accepted by the bare wildcard, the
+-- second is refused by the guarded rule until the amount is at least 1000.
+
+DECLARE Actor IS ONE OF
+    Alice
+    `Ms Ng`
+
+DECLARE Action IS ONE OF
+    Pay HAS payer IS AN Actor, payee IS AN Actor, amount IS A NUMBER
+
+GIVETH A DEONTIC Actor Action
+`any amount will do` MEANS
+    PARTY Alice MUST Pay Alice `Ms Ng` amount WITHIN 30 HENCE FULFILLED LEST BREACH
+
+#TRACE `any amount will do` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1 AT 10
+
+GIVETH A DEONTIC Actor Action
+`at least a thousand` MEANS
+    PARTY Alice
+    MUST Pay Alice `Ms Ng` amount PROVIDED amount AT LEAST 1000
+    WITHIN 30
+    HENCE FULFILLED
+    LEST BREACH
+
+#TRACE `at least a thousand` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1 AT 10
+#TRACE `at least a thousand` AT 0 WITH
+    PARTY Alice DOES Pay Alice `Ms Ng` 1000 AT 10

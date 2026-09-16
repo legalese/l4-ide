@@ -2,7 +2,7 @@
 
 Regulative keywords express legal obligations, permissions, prohibitions, and their consequences. They form the core of L4's contract and regulation modeling.
 
-> **See also:** [Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md) — how L4 decides _who may perform which action_ (the performer/agreement rule, duplex actions, `EXACTLY`-applied parameterised actions, and higher-order procurement), with worked ✅/❌ examples.
+> **See also:** [Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md) — how L4 decides _who may perform which action_ (the performer/agreement rule, duplex actions, parameterised actions applied by a rule, and higher-order procurement), with worked ✅/❌ examples.
 
 ## Overview
 
@@ -22,18 +22,18 @@ Regulative keywords express legal obligations, permissions, prohibitions, and th
 
 ### Rule Structure
 
-| Keyword               | Purpose                           |
-| --------------------- | --------------------------------- |
-| [PARTY](PARTY.md)     | Who has the obligation/permission |
-| [EVERY](EVERY.md)     | Every member of a group has it    |
-| WITHIN                | Temporal deadline (relative)      |
-| HENCE                 | Consequence on fulfillment        |
-| LEST                  | Consequence on breach             |
-| PROVIDED              | Guard condition on action         |
-| EXACTLY               | Exact value matching on action    |
-| BREACH                | Terminal violation state          |
-| [BECAUSE](BECAUSE.md) | Reason for breach                 |
-| FULFILLED             | Terminal success state            |
+| Keyword               | Purpose                                                                                                        |
+| --------------------- | -------------------------------------------------------------------------------------------------------------- |
+| [PARTY](PARTY.md)     | Who has the obligation/permission                                                                              |
+| [EVERY](EVERY.md)     | Every member of a group has it                                                                                 |
+| WITHIN                | Temporal deadline (relative)                                                                                   |
+| HENCE                 | Consequence on fulfillment                                                                                     |
+| LEST                  | Consequence on breach                                                                                          |
+| PROVIDED              | Guard condition on action                                                                                      |
+| EXACTLY (deprecated)  | See [below](#action-patterns-reference-or-wildcard) — a name in an action already refers to the thing it names |
+| BREACH                | Terminal violation state                                                                                       |
+| [BECAUSE](BECAUSE.md) | Reason for breach                                                                                              |
+| FULFILLED             | Terminal success state                                                                                         |
 
 ### Parallel Obligation Combinators
 
@@ -228,51 +228,68 @@ MUST `Amount Transferred`
 
 ### See Also
 
-- **EXACTLY** -- controls pattern vs equality matching of the action itself
+- **Action Patterns** -- what a name in an action means, [below](#action-patterns-reference-or-wildcard)
 
-## EXACTLY (Exact Action Matching)
+## Action Patterns: Reference or Wildcard
 
-Changes how (part of) the action is matched against incoming events during contract execution. Without EXACTLY, the action is a pattern (matched structurally, like WHEN in CONSIDER -- can bind variables). With EXACTLY, the marked part is an expression that is evaluated to a value and compared for equality against the corresponding part of the event.
+A name written in an action slot means one of two things, and the checker
+decides which by looking the name up:
 
-There are two placements:
+1. **The name refers to something already in scope** -- a `GIVEN` input, a
+   `WHERE` local, a name an outer action already bound, a same-module rule, an
+   import. Then the action requires _that_ value: the event must equal it,
+   the way `WHEN` does in `CONSIDER`.
+2. **The name refers to nothing at all.** Then it is a fresh placeholder that
+   matches any value in that position, usable afterwards in `PROVIDED`,
+   `HENCE` and `LEST`. (A name that refers only to the action's own field
+   selector -- `amount` naming the `amount` field being matched -- is treated
+   the same way, because a selector is a function and can never be the value
+   the slot wants.)
 
-1. **Whole-action**: `MUST EXACTLY expression` -- the entire action expression is evaluated and the event must equal the result.
-2. **Per-argument**: `MUST action (EXACTLY expression) pattern...` -- the action's name and its other arguments are still matched as patterns, but the argument marked EXACTLY must equal the evaluated expression.
-
-The per-argument form comes with two constraints:
-
-- **Parenthesize the EXACTLY argument** whenever the action has more than one argument. EXACTLY greedily consumes everything to its right, so `MUST transfer EXACTLY 100 recipient` is read as a single EXACTLY expression spanning `100 recipient` and fails to typecheck ("transfer expects 2 inputs, but here it is given 1 input"). Write `MUST transfer (EXACTLY 100) recipient` instead. For a single-argument action, `MUST pay EXACTLY 100` needs no parentheses.
-- **Order EXACTLY arguments before pattern names.** A pattern name to the left of an EXACTLY argument -- e.g. `MUST transfer amt (EXACTLY Bob)` -- is currently rejected at evaluation time with an internal "not in scope" error. Until that limitation is lifted, put the exact arguments first: `MUST transfer (EXACTLY 100) recip` works, matching the amount exactly while still binding `recip`.
-
-### Syntax
-
-```l4
-MUST EXACTLY expression
-MUST actionName EXACTLY expression             -- single-argument action
-MUST actionName (EXACTLY expression) pattern   -- multi-argument action
-```
-
-### Examples
+There is no keyword to choose between them: whichever is true of the name is
+what it means.
 
 ```l4
--- Without EXACTLY: "pay" is a pattern, matches any pay-shaped event
-PARTY buyer MUST pay
+-- pay is a pattern; amount matches any figure and is bound for later use
+PARTY buyer MUST pay amount PROVIDED amount >= 20
 
--- Whole-action: the expression is evaluated, event must equal the result
-PARTY lender MUST EXACTLY send capital to borrower
-
--- Per-argument, single argument: pay's amount must equal 100 exactly
-PARTY Alice
-MUST pay EXACTLY 100
-WITHIN 30
-
--- Per-argument, multiple arguments: parenthesize EXACTLY and put it before
--- any pattern names; the amount must be exactly 100, the recipient is bound
--- as the pattern variable recip
-PARTY Alice
-MUST transfer (EXACTLY 100) recip
-WITHIN 30
+-- price is a GIVEN input, so it must be paid exactly, not matched loosely
+GIVEN price IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`fixed payment` MEANS PARTY buyer MUST pay price WITHIN 30
 ```
+
+**Whole actions and other expressions** are read the same way they always
+were: evaluated, and compared against the event for equality. A compound
+expression should be parenthesized so it does not swallow what follows it:
+
+```l4
+PARTY lender MUST (send capital to borrower)
+PARTY Alice  MUST transfer (price PLUS 50) recip WITHIN 30
+```
+
+`recip` above still follows the rule at the top of this section: a reference
+if something in scope is called `recip`, a placeholder otherwise.
+
+### EXACTLY (deprecated)
+
+`EXACTLY` used to be the keyword that spelled the first branch above -- "this
+argument is a value to require," not a name to bind. It still parses and
+still works exactly as it always did, but it is no longer needed: the checker
+now takes the reference on its own. Where dropping it is safe, the checker's
+warning says exactly what to write instead -- for a name, just the name; for
+any other expression, the expression with its parentheses kept:
+
+```l4
+MUST EXACTLY (send capital to borrower)   -- deprecated
+MUST (send capital to borrower)           -- means the same thing
+```
+
+One case keeps its warning without a suggested drop: an `EXACTLY` operand
+that refers to nothing in scope (a typo, or a name not yet defined) would
+become a silent placeholder if the keyword were simply removed, so the
+checker flags it without offering that rewrite. Fix the name instead of
+dropping the keyword there.
 
 ### See Also
 

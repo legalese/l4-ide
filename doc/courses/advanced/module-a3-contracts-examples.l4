@@ -151,7 +151,7 @@ GIVETH A DEONTIC Party `Loan Action`
     IF outstanding's `the amount` > 0
     THEN
         PARTY `the borrower party` debtor
-        MUST `pay installment` EXACTLY creditor
+        MUST `pay installment` creditor
                                `the amount paid` PROVIDED `the amount paid`'s `the amount` >= `the payment due`'s `the amount`
         WITHIN `the next due date`
         HENCE
@@ -179,7 +179,7 @@ GIVETH A DEONTIC Party `Loan Action`
 `late payment handling` MEANS
     -- Grace period with penalty interest
     PARTY `the borrower party` debtor
-    MUST `pay installment` EXACTLY creditor
+    MUST `pay installment` creditor
                            `the amount paid` PROVIDED `the amount paid`'s `the amount` >= `the payment with penalty`'s `the amount`
     WITHIN (`the next due date` + terms's `the penalty terms`'s `the grace period`)
     HENCE
@@ -207,8 +207,8 @@ GIVEN terms IS A `Loan Terms`
 GIVETH A DEONTIC Party `Loan Action`
 `default handling` MEANS
     PARTY `the borrower party` debtor
-    MUST `pay installment` EXACTLY creditor
-                           EXACTLY outstanding  -- Full balance required
+    MUST `pay installment` creditor
+                           outstanding  -- Full balance required
     WITHIN terms's `the days until default`
     HENCE FULFILLED
     LEST BREACH BY (`the borrower party` debtor) BECAUSE "loan default"

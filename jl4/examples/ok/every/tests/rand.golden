@@ -1,2 +1,14 @@
 Parsing successful
 Typechecking successful
+rand.l4:20:37-48:
+  I found a problem while checking the definition of `sign and deliver`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at rand.l4:14:1-12)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.

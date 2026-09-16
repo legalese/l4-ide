@@ -195,8 +195,8 @@ An actor may only perform its own actions.
 ```
 
 See [Actors and Actions](../../concepts/legal-modeling/actors-and-actions.md) for
-the full treatment including duplex actions, parameterised `EXACTLY`-applied
-actions, and procurement / principal–agent chains.
+the full treatment including duplex actions, parameterised actions applied by a
+rule, and procurement / principal–agent chains.
 
 ### Flat-union style (also valid)
 

@@ -24,10 +24,10 @@ xProcuresShip MEANS Procure OF X, shipByY                 -- X procures that Y s
 
 GIVETH DEONTIC Actor Action
 -- GOOD (no error): the procurement obligation falls on the procurer X
-goodProcure     MEANS PARTY X MUST EXACTLY xProcuresShip WITHIN 10
+goodProcure     MEANS PARTY X MUST xProcuresShip WITHIN 10
 
 -- BAD: a stranger cannot bear this particular procurement
-strangerProcure MEANS PARTY Z MUST EXACTLY xProcuresShip WITHIN 10
+strangerProcure MEANS PARTY Z MUST xProcuresShip WITHIN 10
 
 -- BAD: X cannot directly PERFORM Y's action — only procure it
-xCannotPerform  MEANS PARTY X MUST EXACTLY shipByY WITHIN 10
+xCannotPerform  MEANS PARTY X MUST shipByY WITHIN 10

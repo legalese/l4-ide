@@ -33,14 +33,14 @@ Three flatmates must sign, and when the last of them has, the tenancy begins. In
 ```l4
 -- BUILT (2026-09-08). This runs.
 EVERY Flatmate f IN flatmates       -- the group, given as a list
-    MUST   Sign (EXACTLY f)
+    MUST   Sign f
     WITHIN 14
     ONCE   ALL HAVE                 -- the line that says when the follow-on fires
     HENCE  `the tenancy begins`     -- fires once, when the last of them has signed
     LEST   `the lease falls through`
 ```
 
-Three things in that block were not in the first draft of this page. `IN flatmates` names the group as a list, which is what makes the rule runnable at all — see [Where the group comes from](../../reference/regulative/EVERY.md#where-the-group-comes-from-the-roll). `ONCE ALL HAVE` is a line of its own saying when the follow-on fires, and it is required whenever there is one; it was ruled on 7 September 2026. And `EXACTLY f` is how you say "this flatmate" inside the action; a bare `f` there would match anybody's signature.
+Two things in that block were not in the first draft of this page. `IN flatmates` names the group as a list, which is what makes the rule runnable at all — see [Where the group comes from](../../reference/regulative/EVERY.md#where-the-group-comes-from-the-roll). `ONCE ALL HAVE` is a line of its own saying when the follow-on fires, and it is required whenever there is one; it was ruled on 7 September 2026. And `f` inside the action is how you say "this flatmate": `f` is the quantifier's own variable, already in scope, so it requires that flatmate rather than matching anybody's signature.
 
 (`IN` was ruled a day later, on 8 September 2026. Examples written before that put the same list inside the `WHO` condition, as `WHO elem f flatmates`. **That older spelling is deprecated**, ruled on the same day: it still runs, and nothing warns you if you write it, but `IN` is the one to use and everything we ship has been moved across. You will still meet the old shape in material written earlier, which is why it is worth being able to recognise; the [reference page](../../reference/regulative/EVERY.md#the-older-spelling-now-deprecated-a-roll-read-out-of-the-who-condition) gives the two-line rewrite.)
 
@@ -61,11 +61,11 @@ A different sentence, and a different shape. Each flatmate who pays a share is t
 ```l4
 -- BUILT (2026-09-08). This runs.
 EVERY Flatmate f IN flatmates
-    MUST   Pay (EXACTLY f) (EXACTLY theLandlord) amount
+    MUST   Pay f theLandlord amount
     WITHIN 7
     UPON   EACH                     -- the fork: once per flatmate who pays
     HENCE  (PARTY theLandlord
-                MUST   Receipt (EXACTLY theLandlord) (EXACTLY f) (EXACTLY amount)
+                MUST   Receipt theLandlord f amount
                 WITHIN 5)
     LEST   BREACH BY f
 ```

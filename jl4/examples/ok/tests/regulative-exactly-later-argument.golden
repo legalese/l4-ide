@@ -1,15 +1,134 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-regulative-exactly-later-argument.l4:40:1-41:35:
+regulative-exactly-later-argument.l4:48:38-45:
+  I found a problem while checking the definition of `waves`:
+    EXACTLY is no longer needed here, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    
+    A name written in an action already refers to the thing it names, and a
+    parenthesised expression is already read as an expression. Write
+    
+      alice
+    
+    in place of the EXACTLY and this rule means exactly what it means now.
+regulative-exactly-later-argument.l4:50:1-51:35:
   FULFILLED
-regulative-exactly-later-argument.l4:47:1-48:46:
+regulative-exactly-later-argument.l4:55:44-51:
+  I found a problem while checking the definition of `pays someone`:
+    EXACTLY is no longer needed here, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    
+    A name written in an action already refers to the thing it names, and a
+    parenthesised expression is already read as an expression. Write
+    
+      alice
+    
+    in place of the EXACTLY and this rule means exactly what it means now.
+regulative-exactly-later-argument.l4:57:1-58:46:
   FULFILLED
-regulative-exactly-later-argument.l4:54:1-55:46:
+regulative-exactly-later-argument.l4:62:55-62:
+  I found a problem while checking the definition of `pays the landlord`:
+    EXACTLY is no longer needed here, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    
+    A name written in an action already refers to the thing it names, and a
+    parenthesised expression is already read as an expression. Write
+    
+      theLandlord
+    
+    in place of the EXACTLY and this rule means exactly what it means now.
+regulative-exactly-later-argument.l4:64:1-65:46:
   FULFILLED
-regulative-exactly-later-argument.l4:62:1-63:46:
+regulative-exactly-later-argument.l4:70:27-34:
+  I found a problem while checking the definition of `alice pays the landlord`:
+    EXACTLY is no longer needed here, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    
+    A name written in an action already refers to the thing it names, and a
+    parenthesised expression is already read as an expression. Write
+    
+      alice
+    
+    in place of the EXACTLY and this rule means exactly what it means now.
+regulative-exactly-later-argument.l4:70:43-50:
+  I found a problem while checking the definition of `alice pays the landlord`:
+    EXACTLY is no longer needed here, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    
+    A name written in an action already refers to the thing it names, and a
+    parenthesised expression is already read as an expression. Write
+    
+      theLandlord
+    
+    in place of the EXACTLY and this rule means exactly what it means now.
+regulative-exactly-later-argument.l4:72:1-73:46:
   FULFILLED
-regulative-exactly-later-argument.l4:71:1-72:55:
+regulative-exactly-later-argument.l4:79:28-35:
+  I found a problem while checking the definition of `notes the landlord`:
+    EXACTLY is no longer needed here, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    
+    A name written in an action already refers to the thing it names, and a
+    parenthesised expression is already read as an expression. Write
+    
+      alice
+    
+    in place of the EXACTLY and this rule means exactly what it means now.
+regulative-exactly-later-argument.l4:79:44-51:
+  I found a problem while checking the definition of `notes the landlord`:
+    EXACTLY is no longer needed here, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    
+    A name written in an action already refers to the thing it names, and a
+    parenthesised expression is already read as an expression. Write
+    
+      theLandlord
+    
+    in place of the EXACTLY and this rule means exactly what it means now.
+regulative-exactly-later-argument.l4:81:1-82:55:
   FULFILLED
-regulative-exactly-later-argument.l4:76:1-77:40:
+regulative-exactly-later-argument.l4:86:1-87:40:
   PARTY Tenant OF "Alice" MUST Pay (EXACTLY alice) (EXACTLY theLandlord) WITHIN 6 HENCE FULFILLED
+regulative-exactly-later-argument.l4:93:60-71:
+  I found a problem while checking the definition of `pays the landlord, bare`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at regulative-exactly-later-argument.l4:43:1-12)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
+regulative-exactly-later-argument.l4:95:1-96:46:
+  FULFILLED
+regulative-exactly-later-argument.l4:100:27-32:
+  I found a problem while checking the definition of `notes the landlord, bare`:
+    In this action, `alice` refers to
+    
+      alice (at regulative-exactly-later-argument.l4:44:1-6)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
+regulative-exactly-later-argument.l4:100:33-44:
+  I found a problem while checking the definition of `notes the landlord, bare`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at regulative-exactly-later-argument.l4:43:1-12)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
+regulative-exactly-later-argument.l4:102:1-103:55:
+  FULFILLED
+regulative-exactly-later-argument.l4:107:1-108:49:
+  PARTY Tenant OF "Alice" MUST Note alice theLandlord what WITHIN 6 HENCE FULFILLED

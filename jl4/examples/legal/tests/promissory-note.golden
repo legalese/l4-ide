@@ -1,6 +1,42 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+promissory-note.l4:91:27-39:
+  I found a problem while checking the definition of `Payment Obligations`:
+    In this action, `The Lender` refers to
+    
+      `Promissory Note`.Parties.`The Lender` (at promissory-note.l4:46:1-13)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
+promissory-note.l4:104:35-47:
+  I found a problem while checking the definition of `Payment Obligations`:
+    In this action, `The Lender` refers to
+    
+      `Promissory Note`.Parties.`The Lender` (at promissory-note.l4:46:1-13)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
+promissory-note.l4:112:43-55:
+  I found a problem while checking the definition of `Payment Obligations`:
+    In this action, `The Lender` refers to
+    
+      `Promissory Note`.Parties.`The Lender` (at promissory-note.l4:46:1-13)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
 promissory-note.l4:165:1-30:
   Money OF "USD", 2077.49370354708
 promissory-note.l4:167:1-31:
@@ -12,4 +48,4 @@ promissory-note.l4:171:1-35:
 promissory-note.l4:176:1-188:111:
   FULFILLED
 promissory-note.l4:192:1-193:108:
-  PARTY `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) MUST `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred` PROVIDED (`is money at least equal within error` OF `Amount Transferred`, `Next Payment Due Amount With Penalty`) WITHIN 61 HENCE FULFILLED LEST (PARTY `The Borrower` MUST `pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred` PROVIDED (`is money at least equal within error` OF `Amount Transferred`, `All Outstanding Debts`))
+  PARTY `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) MUST `pay monthly installment to` `The Lender` `Amount Transferred` PROVIDED (`is money at least equal within error` OF `Amount Transferred`, `Next Payment Due Amount With Penalty`) WITHIN 61 HENCE FULFILLED LEST (PARTY `The Borrower` MUST `pay monthly installment to` `The Lender` `Amount Transferred` PROVIDED (`is money at least equal within error` OF `Amount Transferred`, `All Outstanding Debts`))

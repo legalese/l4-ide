@@ -501,7 +501,7 @@ _(Probe `d06-offence.l4`, exit 0, three assertions satisfied. The full probe add
 a `` `s 42 — the fine is within the maximum` `` predicate that tests a sentence against the ceiling,
 satisfied at 500 and refuted at 1,500.)_
 
-**Not** a duty to pay the maximum. Written as ``MUST `pay a fine` EXACTLY 1_000``, an offender
+**Not** a duty to pay the maximum. Written as ``MUST `pay a fine` 1_000``, an offender
 fined $500 by the court — a sentence s 42 plainly permits — who pays it in full produces
 
 ```
@@ -599,7 +599,7 @@ flattened form returns `DEONTIC BREACHED: BREACH` and the nested one `FULFILLED`
 directives are in one file, probe `d07b-notice-flat.l4`, exit 0. `RAND` is for duties that genuinely
 run in parallel; a period measured from an event is not one of them.
 
-**See** [regulative.md](../regulative.md), "`PROVIDED` and `EXACTLY` — action matching", and
+**See** [regulative.md](../regulative.md), "PROVIDED and action patterns — reference and wildcard matching", and
 "Composition: `RAND` and `ROR`"; entry [4.3](04-dates-and-periods.md#e4-3) for the unit that `WITHIN
 5` does not record — "five business days" and "five days" are the same `5` here, and only your
 comment says which — and entry [5.6](#e5-6) for the `` `five business days` `` definition the block

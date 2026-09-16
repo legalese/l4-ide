@@ -19,7 +19,7 @@ tenants MEANS LIST (Tenant OF "Alice"), (Tenant OF "Bob"), (Tenant OF "Carol")
 GIVETH A DEONTIC Actor Action
 `the listed tenants sign` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -28,4 +28,4 @@ GIVETH A DEONTIC Actor Action
 -- the filter inline, and the cast narrowed further by a comparison
 GIVETH A DEONTIC Actor Action
 `everyone but Carol signs` MEANS
-    EVERY Tenant t WHO NOT (t EQUALS Tenant OF "Carol") MUST Sign (EXACTLY t) WITHIN 14
+    EVERY Tenant t WHO NOT (t EQUALS Tenant OF "Carol") MUST Sign t WITHIN 14

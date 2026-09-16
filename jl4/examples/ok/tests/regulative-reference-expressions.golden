@@ -1,0 +1,19 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+regulative-reference-expressions.l4:44:1-45:35:
+  PARTY Tenant MUST pay (price PLUS 50) WITHIN 9 HENCE FULFILLED LEST BREACH
+regulative-reference-expressions.l4:46:1-47:35:
+  FULFILLED
+regulative-reference-expressions.l4:56:1-57:56:
+  PARTY Tenant MUST Deliver Tenant (p's landlord) what WITHIN 9 HENCE FULFILLED LEST BREACH
+regulative-reference-expressions.l4:58:1-59:58:
+  FULFILLED
+regulative-reference-expressions.l4:66:1-67:52:
+  PARTY Tenant MUST payMoney (Money 1000 "USD") WITHIN 9 HENCE FULFILLED LEST BREACH
+regulative-reference-expressions.l4:68:1-69:55:
+  FULFILLED
+regulative-reference-expressions.l4:84:1-85:58:
+  PARTY Landlord MUST Receipt landlord t (amount MINUS 5) WITHIN 9 HENCE FULFILLED LEST BREACH
+regulative-reference-expressions.l4:86:1-87:57:
+  FULFILLED

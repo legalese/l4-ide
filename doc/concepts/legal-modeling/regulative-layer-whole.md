@@ -39,19 +39,19 @@ _Who must do what, by when, and then what?_ An obligation in L4 is one unit with
 GIVETH A DEONTIC Actor Action
 `the rent is due` MEANS
     PARTY  Alice
-    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    MUST   (Pay Alice `Ms Ng` 1500)
     WITHIN 7
     HENCE  FULFILLED
     LEST   BREACH BY Alice BECAUSE "the rent was not paid by the seventh day"
 ```
 
-| Part                     | Question it answers                                      | What may go there                                                                               |
-| ------------------------ | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `PARTY`                  | who is bound                                             | one member of the cast                                                                          |
-| `MUST` / `MAY` / `SHANT` | what, and whether it is a duty, a right or a prohibition | an act — exactly this one (`EXACTLY`), or a shape to be matched (Question 3)                    |
-| `WITHIN`                 | by when                                                  | a number of your units, counted from when the obligation begins; omit it for an open-ended duty |
-| `HENCE`                  | then what, if it goes well                               | `FULFILLED`, or another obligation (Question 2)                                                 |
-| `LEST`                   | then what, if it goes badly                              | `BREACH`, with `BY` whom and `BECAUSE` why, or another obligation (Question 2)                  |
+| Part                     | Question it answers                                      | What may go there                                                                                |
+| ------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `PARTY`                  | who is bound                                             | one member of the cast                                                                           |
+| `MUST` / `MAY` / `SHANT` | what, and whether it is a duty, a right or a prohibition | an act — exactly this one (a name that refers to a value), or a shape to be matched (Question 3) |
+| `WITHIN`                 | by when                                                  | a number of your units, counted from when the obligation begins; omit it for an open-ended duty  |
+| `HENCE`                  | then what, if it goes well                               | `FULFILLED`, or another obligation (Question 2)                                                  |
+| `LEST`                   | then what, if it goes badly                              | `BREACH`, with `BY` whom and `BECAUSE` why, or another obligation (Question 2)                   |
 
 `DEONTIC Actor Action` is the kind of thing an obligation is — the word programming language theorists would call its type, given in the same place a rule that gives a number says `GIVETH A NUMBER` — and the two names after it say whose acts and which acts it is about. There is also a fourth word, `DO`, which this page does not use; the keyword reference describes it.
 
@@ -81,15 +81,15 @@ _What comes after this one — and what is live at the same time as it?_ Two ent
 GIVETH A DEONTIC Actor Action
 `rent, receipt, guarantee` MEANS
     PARTY  Alice
-    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    MUST   (Pay Alice `Ms Ng` 1500)
     WITHIN 7
     HENCE  PARTY  `Ms Ng`
-           MUST   EXACTLY (Receipt `Ms Ng` Alice 1500)
+           MUST   (Receipt `Ms Ng` Alice 1500)
            WITHIN 5
            HENCE  FULFILLED
            LEST   BREACH BY `Ms Ng` BECAUSE "no receipt was issued"
     LEST   PARTY  `Mr Lim`
-           MUST   EXACTLY (Pay `Mr Lim` `Ms Ng` 1500)
+           MUST   (Pay `Mr Lim` `Ms Ng` 1500)
            WITHIN 14
            HENCE  FULFILLED
            LEST   BREACH BY `Mr Lim` BECAUSE "the guarantor did not pay the rent"
@@ -102,15 +102,15 @@ A chain ends at a `FULFILLED` or a `BREACH`, and the screen, when a chain is sti
 ```l4
 GIVETH A DEONTIC Actor Action
 `two shares` MEANS
-    (PARTY Alice MUST EXACTLY (Pay Alice `Ms Ng` 750) WITHIN 7 HENCE FULFILLED LEST BREACH BY Alice)
+    (PARTY Alice MUST (Pay Alice `Ms Ng` 750) WITHIN 7 HENCE FULFILLED LEST BREACH BY Alice)
     RAND
-    (PARTY Bob   MUST EXACTLY (Pay Bob   `Ms Ng` 750) WITHIN 7 HENCE FULFILLED LEST BREACH BY Bob)
+    (PARTY Bob   MUST (Pay Bob   `Ms Ng` 750) WITHIN 7 HENCE FULFILLED LEST BREACH BY Bob)
 
 GIVETH A DEONTIC Actor Action
 `either pays the whole` MEANS
-    (PARTY Alice MUST EXACTLY (Pay Alice `Ms Ng` 1500) WITHIN 7 HENCE FULFILLED LEST BREACH BY Alice)
+    (PARTY Alice MUST (Pay Alice `Ms Ng` 1500) WITHIN 7 HENCE FULFILLED LEST BREACH BY Alice)
     ROR
-    (PARTY Bob   MUST EXACTLY (Pay Bob   `Ms Ng` 1500) WITHIN 7 HENCE FULFILLED LEST BREACH BY Bob)
+    (PARTY Bob   MUST (Pay Bob   `Ms Ng` 1500) WITHIN 7 HENCE FULFILLED LEST BREACH BY Bob)
 ```
 
 `RAND` is fulfilled when every side is; `ROR` is fulfilled when any side is, and is broken only when every side has been lost. Without brackets, `A RAND B ROR C` is read as `(A RAND B) ROR C`; bracket every side, as the tutorials do. In a "still owed" line the screen writes them `AND` and `OR`.
@@ -147,7 +147,7 @@ The rules of the clock are few and worth having in one place:
 
 **How an event matches an act** is the part of this question that carries the most weight, because it is where a fact from the world enters the obligation. Two ways:
 
-- **Exactly this act.** ``EXACTLY (Pay Alice `Ms Ng` 1500)``: the event must be this payment and no other. $1,000 does not count; Bob's payment does not count.
+- **Exactly this act.** ``(Pay Alice `Ms Ng` 1500)``: every figure in the act is written out, so the event must be this payment and no other. $1,000 does not count; Bob's payment does not count.
 - **An act of this shape.** ``Pay Alice `Ms Ng` amount PROVIDED amount AT LEAST 1500``: a payment from Alice to Ms Ng of _some_ amount. `amount` is not defined anywhere — it is a blank, and the matching event fills it. `PROVIDED` then tests the filled blank, and a payment that fails the test is passed over as if it had not fitted.
 
 A blank filled from an event can be used in the `PROVIDED` test and can be handed to a rule that gives the next obligation — which is how a figure from the world travels down a chain:
@@ -158,7 +158,7 @@ GIVEN who    IS AN Actor
 GIVETH A DEONTIC Actor Action
 `a receipt to` who amount MEANS
     PARTY  `Ms Ng`
-    MUST   EXACTLY (Receipt `Ms Ng` who amount)
+    MUST   (Receipt `Ms Ng` who amount)
     WITHIN 5
     HENCE  FULFILLED
     LEST   BREACH BY `Ms Ng` BECAUSE "no receipt was issued"
@@ -172,11 +172,11 @@ GIVETH A DEONTIC Actor Action
     LEST   BREACH BY Alice BECAUSE "the rent was not paid by the seventh day"
 ```
 
-One limit, measured on the current release: `EXACTLY` around a single figure, `(EXACTLY 1500)`, works only when the figure is written out as a number. With a defined name, a rule's input or a blank it stops with an internal error, so use `EXACTLY` around the whole act, which has no such limit. That is not a design, and it is why the tutorials use the spelling they use. The blank can equally be read inside a next obligation written directly under `HENCE`; the rule above is preferred because it can be used from more than one place.
+A name in the act is required the same way a literal is, whether it names a defined figure, a rule's own input, or the whole act at once — there is no longer a spelling that works for one and not the other. The blank can equally be read inside a next obligation written directly under `HENCE`; the rule above is preferred because it can be used from more than one place.
 
 The time of an event is not something an obligation can read: there is no blank for it. That is why a rule that pays a debt in instalments cannot carry a single deadline down through the instalments (Question 5).
 
-**Built:** all of this, with the two limits stated.
+**Built:** all of this.
 
 ---
 
@@ -215,13 +215,13 @@ Three consequences follow from the convention, and each is its own small feature
   GIVETH A DEONTIC Actor Action
   `rent, by whoever is named` MEANS
       PARTY  Alice
-      MUST   EXACTLY (`payment by` Alice 1500)
+      MUST   (`payment by` Alice 1500)
       WITHIN 7
       HENCE  FULFILLED
       LEST   BREACH BY Alice
   ```
 
-  Such an act must be written into an obligation with `EXACTLY`, because a bare rule name in that position is read as a shape to be matched, not a rule to be used, and L4 reports that it cannot find a definition for it. The check still fires: `PARTY Bob` in front of `` `payment by` Alice 1500 `` is rejected.
+  `` `payment by` `` names a rule, not a person or an act on the cast, so the whole call is evaluated and the event must equal what it returns — the same reading an expression gets anywhere else in an action. (Before this rule shipped, a rule call written this way had to be wrapped in the now-deprecated `EXACTLY`; without it, L4 read the bare call as a shape to be matched and reported that it could not find a definition for `payment by`.) The check still fires: `PARTY Bob` in front of `` `payment by` Alice 1500 `` is rejected.
 
 - **Procuring an act.** "Ms Ng undertakes to procure that her agent inspects" is an act that wraps another act; the outer obligation binds the procurer and the inner act keeps its own performer, so principal and agent are told apart by the check. [Actors, Actions, and Agreement](actors-and-actions.md) works this through.
 
@@ -287,15 +287,15 @@ One place where two questions meet deserves to be named, because it is where rea
 
 ## Built, and proposed
 
-| Built, in the current release                                                                                         | Proposed, not landed (2026-09-08)                                                             |
-| --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| the five-part obligation; `MUST`, `MAY`, `SHANT`, `DO`; `WITHIN`; `FULFILLED`, `BREACH BY … BECAUSE …`                | `ONCE` with a count or a total; `SOME m OF` ≡ `AT LEAST m OF`                                 |
-| chains through `HENCE` and `LEST`; a rule that gives an obligation, including one that uses itself                    | a follow-on attached to a `RAND` or `ROR` as a whole                                          |
-| `RAND`, `ROR`, and how they group without brackets                                                                    | a breach that names every party who failed                                                    |
-| `#TRACE`, `AT`, `DOES`, `WAIT UNTIL`; the inclusive deadline; the clock rules for `HENCE` and `LEST`                  | a `LEST` clock counted from the missed deadline rather than from the event that revealed it   |
-| `EXACTLY` around the whole act; a shape with a blank; `PROVIDED`; handing a blank to a rule                           | `EXACTLY` around a named figure (today, only around the whole act)                            |
-| `EVERY` for a group, with `ONCE ALL HAVE` (barrier) or `UPON EACH` (fork), the group given as a list after `IN`       |                                                                                               |
-| the cast as a fixed list; the performer convention and check; one act in both directions; open-doer acts; procurement | an obligation that says whom it is owed to (the layer has a party and an act, but no obligee) |
+| Built, in the current release                                                                                                                 | Proposed, not landed (2026-09-08)                                                             |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| the five-part obligation; `MUST`, `MAY`, `SHANT`, `DO`; `WITHIN`; `FULFILLED`, `BREACH BY … BECAUSE …`                                        | `ONCE` with a count or a total; `SOME m OF` ≡ `AT LEAST m OF`                                 |
+| chains through `HENCE` and `LEST`; a rule that gives an obligation, including one that uses itself                                            | a follow-on attached to a `RAND` or `ROR` as a whole                                          |
+| `RAND`, `ROR`, and how they group without brackets                                                                                            | a breach that names every party who failed                                                    |
+| `#TRACE`, `AT`, `DOES`, `WAIT UNTIL`; the inclusive deadline; the clock rules for `HENCE` and `LEST`                                          | a `LEST` clock counted from the missed deadline rather than from the event that revealed it   |
+| a name in an act requiring the value it names, on the whole act or on one figure; a shape with a blank; `PROVIDED`; handing a blank to a rule |                                                                                               |
+| `EVERY` for a group, with `ONCE ALL HAVE` (barrier) or `UPON EACH` (fork), the group given as a list after `IN`                               |                                                                                               |
+| the cast as a fixed list; the performer convention and check; one act in both directions; open-doer acts; procurement                         | an obligation that says whom it is owed to (the layer has a party and an act, but no obligee) |
 
 The last row of the right-hand column is one the design documents record as the next axis after this one, and it is not on this page: an L4 obligation says who is bound and to do what, but not to whom it is owed, so "payment to any one of several creditors discharges the debt" cannot yet be written at all.
 

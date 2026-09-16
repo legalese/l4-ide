@@ -74,7 +74,7 @@ An actor may only perform its own actions.
   `regulator notifies subject` is performed by `RegulatorActor`, not by `SubjectActor`.
 ```
 
-For the full performer-rule reference including parameterised (`EXACTLY`-applied)
+For the full performer-rule reference including parameterised (rule-applied)
 actions and procurement chains, see
 [Actors and Actions](../../concepts/legal-modeling/actors-and-actions.md).
 

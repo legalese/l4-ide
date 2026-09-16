@@ -1,0 +1,26 @@
+-- R1 of specs/todo/PATTERN-REFERENCE-RULE-SPEC.md: the selector carve-out is
+-- an ARGUMENT-position rule, and this is the file that pins it.
+--
+-- `amount` is a field of the action's own `pay` constructor and nothing else.
+-- In an ARGUMENT slot that spelling names the slot being filled and is a
+-- deliberate placeholder (see ok/regulative-reference-selector-wildcard.l4).
+-- At the HEAD there is no slot to name: the whole action is being written, and
+-- a field of an action is not an action. So the name refers, and fails the
+-- rule's declared type -- which is what this file shows, and what the head
+-- rule has done since 34a7c1c5.
+--
+-- Carving selectors out here as well would make `amount` a fresh name at the
+-- head, and a fresh name at the head matches EVERY action: the obligation
+-- would be discharged by `ship 3`. The review of 2026-09-16 found exactly
+-- that, which is why this fixture exists.
+
+DECLARE Actor IS ONE OF
+    Buyer
+
+DECLARE Action IS ONE OF
+    pay  HAS amount IS A NUMBER
+    ship HAS count  IS A NUMBER
+
+GIVETH A DEONTIC Actor Action
+`head names a field` MEANS
+    PARTY Buyer MUST amount WITHIN 30 HENCE FULFILLED LEST BREACH

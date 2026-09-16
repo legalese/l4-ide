@@ -88,8 +88,8 @@ GIVEN `Outstanding Payment Amount` IS A Money
     IF `Outstanding Payment Amount`'s Value GREATER THAN 0  -- As long as there is still money owed
         THEN  PARTY   `The Borrower`                        -- These keywords create the next obligations
               MUST    `pay monthly installment to`          -- This function/action is defined in the prelude and expects an object of type Lender and a Money
-                          EXACTLY `The Lender`              -- The keyword EXACTLY sets the expectation that the payee must be `The Lender` object, not any other Lender
-                          `Amount Transferred` PROVIDED     -- This is the alternative syntax to EXACTLY. It allows you to define your own conditional requirement
+                          `The Lender`                    -- A name in an action refers to what it names: the payee must be this `The Lender` object, not any other Lender
+                          `Amount Transferred` PROVIDED     -- `Amount Transferred` names nothing here, so it is a placeholder matching any amount, refined by the PROVIDED guard below
                              `is money at least equal within error` -- This function is also defined in the prelude. It returns true or false to fulfill the obligation.
                                 `Amount Transferred`
                                 (`Next Payment Due`'s Amount)
@@ -101,7 +101,7 @@ GIVEN `Outstanding Payment Amount` IS A Money
                                                 MINUS `Amount Transferred`'s Value)
               LEST     PARTY   `The Borrower`               -- LEST describes what happens when `The Borrower` doesn't pay.
                        MUST    `pay monthly installment to`
-                                  EXACTLY `The Lender`
+                                  `The Lender`
                                   `Amount Transferred` PROVIDED
                                       `is money at least equal within error`
                                           `Amount Transferred`
@@ -109,7 +109,7 @@ GIVEN `Outstanding Payment Amount` IS A Money
                        WITHIN  `Default After Days Beyond Commencement`
                        LEST    PARTY  `The Borrower`
                                MUST   `pay monthly installment to`
-                                          EXACTLY `The Lender`
+                                          `The Lender`
                                           `Amount Transferred` PROVIDED
                                               `is money at least equal within error`
                                                   `Amount Transferred`
@@ -202,12 +202,12 @@ GIVEN `Outstanding Payment Amount` IS A Money
 -- `Default After Days Beyond Commencement`:
 --
 -- PARTY `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG"))
--- MUST `pay monthly installment to` EXACTLY `The Lender`
+-- MUST `pay monthly installment to` `The Lender`
 --                                    `Amount Transferred` PROVIDED `is money at least equal within error` OF `Amount Transferred`, `Next Payment Due Amount With Penalty`
 -- WITHIN 61
 -- HENCE FULFILLED
 -- LEST PARTY `The Borrower`
--- MUST `pay monthly installment to` EXACTLY `The Lender`
+-- MUST `pay monthly installment to` `The Lender`
 --                                   `Amount Transferred` PROVIDED `is money at least equal within error` OF `Amount Transferred`, `All Outstanding Debts`
 
 § `Promissory Appendix`

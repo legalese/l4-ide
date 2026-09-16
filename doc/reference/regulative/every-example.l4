@@ -20,14 +20,14 @@ tenants     MEANS LIST (Tenant OF "Alice"), (Tenant OF "Bob"), (Tenant OF "Carol
 
 GIVETH A DEONTIC Actor Action
 `the tenancy begins` MEANS
-    PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 5
+    PARTY theLandlord MUST Deliver theLandlord what WITHIN 5
 
 -- everyone, then one thing: ONCE ALL HAVE, then HENCE fires once, when the
 -- last tenant has signed
 GIVETH A DEONTIC Actor Action
 `all tenants sign` MEANS
     EVERY Tenant t
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  `the tenancy begins`
@@ -37,11 +37,11 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `each payment gets a receipt` MEANS
     EVERY Tenant t
-        MUST   Pay (EXACTLY t) (EXACTLY theLandlord) amount
+        MUST   Pay t theLandlord amount
         WITHIN 7
         UPON   EACH
         HENCE  (PARTY theLandlord
-                    MUST   Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)
+                    MUST   Receipt theLandlord t amount
                     WITHIN 5)
         LEST   BREACH BY t
 
@@ -49,7 +49,7 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `sign, and be done by day 30` MEANS
     EVERY Tenant t
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE WITHIN 30
         HENCE  FULFILLED
@@ -58,16 +58,16 @@ GIVETH A DEONTIC Actor Action
 -- composed with RAND: the tenants' signatures AND the landlord's delivery
 GIVETH A DEONTIC Actor Action
 `sign and deliver` MEANS
-    (EVERY Tenant t MUST Sign (EXACTLY t) WITHIN 14 ONCE ALL HAVE HENCE FULFILLED LEST BREACH)
+    (EVERY Tenant t MUST Sign t WITHIN 14 ONCE ALL HAVE HENCE FULFILLED LEST BREACH)
     RAND
-    (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 14 HENCE FULFILLED LEST BREACH)
+    (PARTY theLandlord MUST Deliver theLandlord what WITHIN 14 HENCE FULFILLED LEST BREACH)
 
 -- where the group comes from: IN names the roll, and WHO narrows it
 GIVETH A DEONTIC Actor Action
 `the listed tenants sign` MEANS
     EVERY Tenant t IN tenants
         WHO    NOT (t EQUALS (Tenant OF "Carol"))
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
 
 -- THE DEPRECATED SPELLING of the same thing: the roll read out of the WHO
@@ -82,10 +82,10 @@ GIVETH A DEONTIC Actor Action
 `the listed tenants sign, the old way` MEANS
     EVERY Tenant t
         WHO    elem t tenants AND NOT (t EQUALS (Tenant OF "Carol"))
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
 
 -- the bare form: every value of the party type, landlord included
 GIVETH A DEONTIC Actor Action
 `everyone signs` MEANS
-    EVERY a MUST Sign (EXACTLY a) WITHIN 14
+    EVERY a MUST Sign a WITHIN 14

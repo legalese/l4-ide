@@ -1,0 +1,3 @@
+-- The imported half of regulative-reference-outer.l4: one name, so that
+-- fixture can exercise the IMPORTED row of R1's resolution table.
+`the imported fee` MEANS 250

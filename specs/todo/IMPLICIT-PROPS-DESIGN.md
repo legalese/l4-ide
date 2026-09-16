@@ -1142,6 +1142,13 @@ opening's remaining value is bare field names inside a rule; it is implemented a
 lands, and opt-in `OPENED` stays the fallback if reviewers cannot see binding class. Detail:
 `PROPS-REDTEAM-2026-09-03.md` §2.7.
 
+**Pointer, not a ruling here:** `PATTERN-REFERENCE-RULE-SPEC.md` §10 item 4 flags an interaction
+this ruling creates once R5 field-opening lands — an opened field spelled like the action's own
+slot (`amount` in `Pay t landlord amount`, inside a rule that also opens a record with an `amount`
+field) would flip from wildcard to reference under that spec's R1, because this section ranks an
+opened field as a lexical local. That spec takes no position and leaves the question open for
+Meng; this section is not amended pending that ruling.
+
 ### 11.8 R6 — The `MAYBE`/`EITHER` propagation sugar is withdrawn. RULED 2026-09-04 (marked accept).
 
 Declined on measurement: seven of seven rating sets against; no use-site marker; the FEEL claim

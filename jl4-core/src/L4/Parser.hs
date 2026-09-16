@@ -2806,14 +2806,36 @@ basePattern =
   patLit
   <|> patExpr
   <|> patApp
-  <|> paren pattern'
+  <|> parenPatternOrExpr
 
 atomicPattern :: Parser (Pattern Name)
 atomicPattern =
   patLit
   <|> patExpr
   <|> nameAsPatApp
-  <|> paren pattern'
+  <|> parenPatternOrExpr
+
+-- | A bracketed thing in pattern position: a pattern if it can be one, an
+-- expression otherwise (R2 of @specs\/todo\/PATTERN-REFERENCE-RULE-SPEC.md@).
+--
+-- This is what admits @MUST pay (price PLUS 50)@ and
+-- @MUST Deliver (t's landlord) what@ without the @EXACTLY@ keyword. The
+-- pattern reading is tried first, so @MUST pay (Money 1000 "USD")@ — a
+-- constructor application — keeps its existing pattern semantics exactly.
+--
+-- __The cost__ is one @try@ over the bracketed group: when the group is not a
+-- well-formed pattern, its tokens are scanned twice. The bound on the wasted
+-- scan is the bracketed group itself, not the rule or the file, because the
+-- @try@ cannot reach past the closing bracket it failed to find. Only a group
+-- that /fails/ as a pattern pays it, and such a group is an outright parse
+-- error today.
+--
+-- An unbracketed operator expression (@MUST pay price PLUS 50@) is still not
+-- admitted, and deliberately: argument juxtaposition would make it ambiguous.
+parenPatternOrExpr :: Parser (Pattern Name)
+parenPatternOrExpr =
+  try (paren pattern')
+  <|> attachAnno (PatExpr emptyAnno <$> annoHole (paren expr))
 
 patLit :: Parser (Pattern Name)
 patLit = attachAnno $ PatLit emptyAnno <$> annoHole rawLit

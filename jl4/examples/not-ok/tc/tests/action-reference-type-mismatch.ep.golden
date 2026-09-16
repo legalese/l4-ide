@@ -1,0 +1,26 @@
+-- R7 of specs/todo/PATTERN-REFERENCE-RULE-SPEC.md: the one diagnostic the
+-- rule's own principle ("if we know enough to call it an error, we know
+-- enough to correct the error") deliberately does not reach.
+--
+-- `amount` is a NUMBER; Deliver's second field is a Thing. Under R1 the name
+-- refers, so this is a type error — and the checker cannot pick the
+-- correction, because there are two and they are both plausible: the author
+-- meant the reference and the action's type is wrong, or the author meant a
+-- placeholder and picked a spelling that was already taken. The message
+-- therefore names both.
+
+DECLARE Thing IS ONE OF
+    Widget
+
+DECLARE Actor IS ONE OF
+    Landlord
+    Tenant
+
+DECLARE Action IS ONE OF
+    Deliver HAS recipient IS AN Actor
+                what IS A Thing
+
+GIVEN amount IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`mistyped reference` MEANS
+    PARTY Tenant MUST Deliver Tenant amount WITHIN 10 HENCE FULFILLED LEST BREACH
