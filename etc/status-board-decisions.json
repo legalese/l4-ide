@@ -150,19 +150,18 @@
     },
     {
       "id": "Canon corpus",
-      "owner": "go-pipeline-diagram (step B) · GM (push/PR)",
-      "kind": "in queue; migration next",
+      "owner": "merge-manager (enqueue #404) · go-pipeline-diagram (applier PR next)",
+      "kind": "in queue",
       "quick": true,
       "raised": "2026-09-15",
-      "ask": "BUILT — PR #398 (mengwong/canon-vendor @ 03d2d8a0, 8 commits, 0 behind). RE-ENQUEUED 2026-09-16 after a hold: the branch (and the spec on unstable, via GM's own #396) claimed jl4-test has an `--accept` flag; it does not (measured: `unrecognized option`); blessing is delete-the-golden-and-run-twice. All four sites corrected in 03d2d8a0 with provenance. Step A of the migration (canon-side clitic sweep, 21→4 findings; the wizard file; swept sg-paa.l4 byte-identical to l4-ide's) is merged into mengwong/drafts as e1a1a2bc; step B (pin bump to that SHA, delete legal/chubb + legal/sg-succession, retarget go registrations and three spec citations) starts once #398 merges. The shake worked on run one: canon's sg-csp.golden was stale (predates the ASSUME-retirement notice, #328–#332); re-blessed IN CANON as 9a1a3155 on branch gm/rebless-2026-09-15 (cut from mengwong/drafts 299dd490 — Meng's shelf untouched), pin bumped, 90/0. Ruling recorded in §3B: blessed = goldens match the pinned binary UNDER THE HARNESS; l4 check exit is necessary, not sufficient. Two refuters found ten defects in the deputy's own work, all fixed in-branch. Full local gate 8/8 at 0e4efe66 (+ rebase only). NOT CHECKED: the `Canon Mirror` job has never run in GitHub Actions — a bare-SHA shallow fetch from a runner is unverified; watch its first CI run before making it required. Meng's three asks: (1) review/enqueue #398; (2) merge canon branch gm/rebless-2026-09-15 into mengwong/drafts with a MERGE commit (squash/rebase mints a new SHA; the pin survives only because delete_branch_on_merge is false); (3) then the §4 migration of legal/chubb and legal/sg-succession is the next PR — say go. Pre-existing checker gap found on the way: smucclaw#963.",
-      "unblocks": "deleting canon-duplicated subjects from l4-ide without losing regression coverage",
+      "ask": "#398 MERGED (11b7534b). Step B BUILT and VERIFIED by GM: PR #404 (mengwong/canon-migrate @ b7eb2ecc, rebased onto e0f7dc91, 0 behind, merge-tree clean) — pin bumped to mengwong/drafts@5f248326 (re-bless + clitic sweep 21→0 + fixture rename all merged into the shelf), legal/chubb and legal/sg-succession committed encodings deleted (45 files, every one in the mirror; chubb's source deposit and cleanroom-2026-08 stay), 60 silent path references repaired under the rule 'a locator must resolve; a record must not be rewritten but must point forward'; nine references dangle deliberately, dated. Gate 8/8; sync-canon --check matches the pin; check-clitic-verbs over jl4/examples/canon = 0. merge-manager will enqueue when CLEAN. OWED after: the clitic applier PR (etc/apply-clitic-sweep.mjs, briefed to go-pipeline-diagram, off unstable). Filed on the way: smucclaw#964 (check-subject-ci-coverage hardcodes jl4/examples/legal — canon subjects invisible), smucclaw#965 (chubb fork-register fails the schema; its x-rules never run). RETRACTED: 'l4-ide's copy of cleanroom-2026-08 is the healthy one' — both copies' goldens are byte-identical bar one column count; the directory stays because the mirror carries none of it.",
+      "unblocks": "a clitic-clean canon mirror; regressions read from canon at a pin; the applier PR",
       "source": {
         "file": "specs/todo/CANON-REGRESSION-CORPUS-SPEC.md",
-        "anchor": "UNDER THE HARNESS",
-        "ref": "origin/mengwong/canon-vendor"
+        "anchor": "UNDER THE HARNESS"
       },
       "verify": {
-        "cmd": "gh pr view 398 --repo legalese/l4-ide --json state --jq .state",
+        "cmd": "gh pr view 404 --repo legalese/l4-ide --json state --jq .state || true",
         "pendingWhen": "^OPEN$"
       }
     },
@@ -172,39 +171,28 @@
       "kind": "queued build",
       "quick": false,
       "raised": "2026-09-16",
-      "ask": "Unblocked by A1–A5 (PR #400). Brief: /Users/Shared/claude-collab-legalese-gm/inbox/2026-09-16T0130Z-BRIEF-applies-i1.md. Phase 0 measures the two things §12.3.3 A4 says are owed (can a § heading's name double as a function name; spellings for the four conjunct projections — proposed, Meng rules) and where each conjunct comes from in the AST today; Phase 1 derives the read `` `<label>` p `` for every §-labelled node as names in scope after typechecking, MAYBE BOOLEAN, inForce TRUE when unpinned; the pilots (Wills Act s 5(9)/s 27, Jersey Art 10(4)/27(1)) diff generated against hand-rolled. Claim it in the outbox before starting.",
+      "ask": "Unblocked by A1–A5 (PR #400, MERGED e0f7dc91). Brief: /Users/Shared/claude-collab-legalese-gm/inbox/2026-09-16T0130Z-BRIEF-applies-i1.md. Phase 0 measures the two things §12.3.3 A4 says are owed (can a § heading's name double as a function name; spellings for the four conjunct projections — proposed, Meng rules) and where each conjunct comes from in the AST today; Phase 1 derives the read `` `<label>` p `` for every §-labelled node as names in scope after typechecking, MAYBE BOOLEAN, inForce TRUE when unpinned; the pilots (Wills Act s 5(9)/s 27, Jersey Art 10(4)/27(1)) diff generated against hand-rolled. Claim it in the outbox before starting.",
       "unblocks": "the APPLIES read side moving from spec to compiler; §9.6's stratification check gets something to attach to",
       "source": {
         "file": "specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md",
-        "anchor": "#### 12.3.4 Proposed sequencing, for whoever picks this up",
-        "ref": "origin/mengwong/applies-corpus-survey"
+        "anchor": "#### 12.3.4 Proposed sequencing, for whoever picks this up"
       }
     },
     {
       "id": "R5 opening",
-      "owner": "GM workflow wf_686ecb24-22e (running)",
-      "kind": "in build",
+      "owner": "Meng (enqueue #403; three rulings)",
+      "kind": "PR open",
       "quick": false,
       "raised": "2026-09-16",
-      "ask": "Ruled 2026-09-04 (IMPLICIT-PROPS-DESIGN §11.7), sequenced after discharge, which has landed — nothing blocks it. Brief: /Users/Shared/claude-collab-legalese-gm/inbox/2026-09-16T0130Z-BRIEF-r5-field-opening.md. Fields of a record-typed GIVEN (function or section) in bare scope inside the body; rank as ruled; collision error naming both records at two sites; elaborates to Proj (App r []) field; computed-field opening already exists and is the mechanism to extend, not duplicate. Phase 0 measures the overlap with #386's 28 held-back names. LAUNCHED 2026-09-16 ~01:00Z by GM as a workflow on Meng's instruction: measure ×3 → refute ×2 → build → skeptics ×2 → fix → gate (≤3 rounds). Worktree ~/src/legalese/l4wt/r5-opening, branch lang/r5-field-opening, base 0b640727.",
-      "unblocks": "rule bodies reading `bankrupt` instead of p's `bankrupt` — the reading Meng wanted on 2026-09-13",
+      "ask": "BUILT 2026-09-16 by workflow wf_686ecb24-22e (10 agents): PR #403 (lang/r5-field-opening @ eac99b19, mergeable, gate 8/8, jl4-test 3147/0, docs checked with the branch binary). A record-typed GIVEN on a function or section opens its fields by bare name, elaborated before type checking to the same Proj a hand-written `r's f` produces; the computed-field rewrite generalised into the one pass; rank as ruled as a frame stack, every enclosing section one frame; two-site collision error. Review round fixed 1 BLOCKER (a computed field's body opened an unrelated section GIVEN's fields — silent, 14→200) + 6 defects; the rank's silent rung now WARNS (OpenedFieldShadowsDefinition). NOT built (each a coarser answer): untyped binders, record synonyms, lambda params, anything inside a regulative/EVENT/inert body, directive bodies. MENG: (1) say enqueue; (2) rule the tier of constructors and top-level names vs opened fields (warning today); (3) rule whether opening extends into regulatives — until it does, the EXACTLY-retirement interaction (an opened field spelled like an action slot) has no live case.",
+      "unblocks": "rule bodies reading `bankrupt` instead of p's `bankrupt`; WHOSE (EVERY spec §13.6) is sequenced behind it",
       "source": {
         "file": "specs/todo/IMPLICIT-PROPS-DESIGN.md",
         "anchor": "### 11.7 R5 — Field-opening is lexical only. RULED 2026-09-04 (marked accept)."
-      }
-    },
-    {
-      "id": "Canon fixture",
-      "owner": "Meng (canon-side judgement)",
-      "kind": "canon edit",
-      "quick": true,
-      "raised": "2026-09-16",
-      "ask": "The canon sweep held back ONE name: `is the natural father` (sg/child-support). Its target `the natural father` already exists as a top-level MEANS test fixture at cases/sg-child-support-cases.l4:292, used by #ASSERT; renaming the field would make the fixture's body read `the natural father` IS TRUE inside the definition of `the natural father`. Remedy: rename the FIXTURE (e.g. `the fixture father`), then sweep the field. Canon's judgement, not a sweep's — the mirror carries 4 clitic findings until it is made. Also queued as GM backlog: persist the sweep applier as etc/apply-clitic-sweep.mjs (two disposable copies written so far) — deputy will PR it after step B.",
-      "unblocks": "a clitic-clean canon mirror (`node etc/check-clitic-verbs.mjs --dir jl4/examples/canon` → 0)",
-      "source": {
-        "file": "specs/todo/CANON-REGRESSION-CORPUS-SPEC.md",
-        "anchor": "**What review changed**",
-        "ref": "origin/mengwong/canon-vendor"
+      },
+      "verify": {
+        "cmd": "gh pr view 403 --repo legalese/l4-ide --json state --jq .state || true",
+        "pendingWhen": "^OPEN$"
       }
     },
     {
@@ -271,6 +259,19 @@
         "file": "specs/todo/PATTERN-REFERENCE-RULE-SPEC.md",
         "anchor": "## 1. The ruling",
         "ref": "lang/action-binder-reference"
+      }
+    },
+    {
+      "id": "CLAUDE.md §1.0",
+      "owner": "Meng",
+      "kind": "doc correction",
+      "quick": true,
+      "raised": "2026-09-16",
+      "ask": "CLAUDE.md §1.0 says the writing-l4-rules skill and its l4-plugin copy are byte-identical. FALSE today, GM-verified 2026-09-16 against l4-plugin@0c7a23d (2026-09-10): 7 of the skill's files differ (SKILL.md, drafting-patterns.md, gotchas.md, source-patterns 01/05/06/11) and the shipped bundle carries 6 occurrences of the retired term `binder` where this repo has 0 — the term CI sweeps skills/ for. Nobody can regenerate the bundle: etc/build-plugin-bundle.mjs lives only on the unpushed local branch ci/skills-layout. Raised by a peer session and NOT edited on its word (a CLAUDE.md edit needs Meng). ASK: say yes and GM corrects the sentence in the next PR that touches the skill — the EXACTLY sweep (wf_8a91a677-de7) — and re-ports the skill by hand, marked as superseded by the next regeneration.",
+      "unblocks": "a true §1.0; a bundle that does not ship a retired word",
+      "source": {
+        "file": "CLAUDE.md",
+        "anchor": "the copies are **byte-identical**"
       }
     }
   ]
