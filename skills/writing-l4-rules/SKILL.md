@@ -289,7 +289,7 @@ Three things about it are non-obvious enough that a general-purpose model gets t
 
 1. **The group must be a list, given after `IN`.** Without it the rule parses and type-checks and then **refuses at run time** — so `l4 check` passing is not evidence it will run.
 2. **The join line is mandatory whenever there is a `HENCE` or `LEST`**, and picks the meaning: `ONCE ALL HAVE` fires once when the last member acts (a **barrier**); `UPON EACH` fires once per member as each acts (a **fork**). There is no default.
-3. **`t` in the action already refers to the member.** A bare name in an action pattern refers to whatever it names, if it names anything in scope — `t` is the quantifier's own variable, so `MUST Sign t` means the member signs. Only a name that names *nothing* in scope (or only a field selector of the action's own record type) is a fresh wildcard. `EXACTLY t` still parses but is the deprecated spelling of the same reference; write plain `t`.
+3. **`t` in the action already refers to the member.** A bare name in an action pattern refers to whatever it names, if it names anything in scope — `t` is the quantifier's own variable, so `MUST Sign t` means the member signs. Only a name that names _nothing_ in scope (or only a field selector of the action's own record type) is a fresh wildcard. `EXACTLY t` still parses but is the deprecated spelling of the same reference; write plain `t`.
 
 Do **not** write `EVERY Tenant t WHO elem t tenants`: that is the pre-2026-09-08 spelling of the roll, deprecated, and it still runs with no warning of any kind. `WHO elem t xs` becomes `IN xs`; `WHO elem t xs AND p` becomes `IN xs WHO p`.
 

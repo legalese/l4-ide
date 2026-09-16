@@ -22,18 +22,18 @@ Regulative keywords express legal obligations, permissions, prohibitions, and th
 
 ### Rule Structure
 
-| Keyword               | Purpose                           |
-| --------------------- | --------------------------------- |
-| [PARTY](PARTY.md)     | Who has the obligation/permission |
-| [EVERY](EVERY.md)     | Every member of a group has it    |
-| WITHIN                | Temporal deadline (relative)      |
-| HENCE                 | Consequence on fulfillment        |
-| LEST                  | Consequence on breach             |
-| PROVIDED              | Guard condition on action         |
+| Keyword               | Purpose                                                                                                        |
+| --------------------- | -------------------------------------------------------------------------------------------------------------- |
+| [PARTY](PARTY.md)     | Who has the obligation/permission                                                                              |
+| [EVERY](EVERY.md)     | Every member of a group has it                                                                                 |
+| WITHIN                | Temporal deadline (relative)                                                                                   |
+| HENCE                 | Consequence on fulfillment                                                                                     |
+| LEST                  | Consequence on breach                                                                                          |
+| PROVIDED              | Guard condition on action                                                                                      |
 | EXACTLY (deprecated)  | See [below](#action-patterns-reference-or-wildcard) — a name in an action already refers to the thing it names |
-| BREACH                | Terminal violation state          |
-| [BECAUSE](BECAUSE.md) | Reason for breach                 |
-| FULFILLED             | Terminal success state            |
+| BREACH                | Terminal violation state                                                                                       |
+| [BECAUSE](BECAUSE.md) | Reason for breach                                                                                              |
+| FULFILLED             | Terminal success state                                                                                         |
 
 ### Parallel Obligation Combinators
 

@@ -81,26 +81,26 @@ Keywords are reserved words that form the structure of L4 programs.
 
 For expressing legal obligations, permissions, and prohibitions.
 
-| Keyword       | Purpose                            | Reference                          |
-| ------------- | ---------------------------------- | ---------------------------------- |
-| **PARTY**     | Declares a legal party             | [PARTY](regulative/PARTY.md)       |
-| **MUST**      | Obligation (deontic necessity)     | [MUST](regulative/MUST.md)         |
-| **MAY**       | Permission (deontic possibility)   | [MAY](regulative/MAY.md)           |
-| **SHANT**     | Prohibition                        | [SHANT](regulative/SHANT.md)       |
-| **MUST NOT**  | Prohibition (synonym for SHANT)    | [SHANT](regulative/SHANT.md)       |
-| **DO**        | Optionality (deontic possibility)  | [REGULATIVE](regulative/README.md) |
-| **DOES**      | Action verb in directive           | [REGULATIVE](regulative/README.md) |
+| Keyword       | Purpose                                                              | Reference                          |
+| ------------- | -------------------------------------------------------------------- | ---------------------------------- |
+| **PARTY**     | Declares a legal party                                               | [PARTY](regulative/PARTY.md)       |
+| **MUST**      | Obligation (deontic necessity)                                       | [MUST](regulative/MUST.md)         |
+| **MAY**       | Permission (deontic possibility)                                     | [MAY](regulative/MAY.md)           |
+| **SHANT**     | Prohibition                                                          | [SHANT](regulative/SHANT.md)       |
+| **MUST NOT**  | Prohibition (synonym for SHANT)                                      | [SHANT](regulative/SHANT.md)       |
+| **DO**        | Optionality (deontic possibility)                                    | [REGULATIVE](regulative/README.md) |
+| **DOES**      | Action verb in directive                                             | [REGULATIVE](regulative/README.md) |
 | **EXACTLY**   | Deprecated: a name in an action already refers to the thing it names | [REGULATIVE](regulative/README.md) |
-| **WITHIN**    | Temporal deadline (relative)       | [REGULATIVE](regulative/README.md) |
-| **HENCE**     | Consequence on fulfillment         | [REGULATIVE](regulative/README.md) |
-| **LEST**      | Consequence on breach              | [REGULATIVE](regulative/README.md) |
-| **BREACH**    | Terminal violation state           | [REGULATIVE](regulative/README.md) |
-| **FULFILLED** | Terminal success state             | [REGULATIVE](regulative/README.md) |
-| **BECAUSE**   | Justification or reason for breach | [BECAUSE](regulative/BECAUSE.md)   |
-| **PROVIDED**  | Guard condition on action          | [REGULATIVE](regulative/README.md) |
-| **AT**        | Temporal specification             | [REGULATIVE](regulative/README.md) |
-| **RAND**      | Parallel AND of obligations        | [REGULATIVE](regulative/README.md) |
-| **ROR**       | Parallel OR of obligations         | [REGULATIVE](regulative/README.md) |
+| **WITHIN**    | Temporal deadline (relative)                                         | [REGULATIVE](regulative/README.md) |
+| **HENCE**     | Consequence on fulfillment                                           | [REGULATIVE](regulative/README.md) |
+| **LEST**      | Consequence on breach                                                | [REGULATIVE](regulative/README.md) |
+| **BREACH**    | Terminal violation state                                             | [REGULATIVE](regulative/README.md) |
+| **FULFILLED** | Terminal success state                                               | [REGULATIVE](regulative/README.md) |
+| **BECAUSE**   | Justification or reason for breach                                   | [BECAUSE](regulative/BECAUSE.md)   |
+| **PROVIDED**  | Guard condition on action                                            | [REGULATIVE](regulative/README.md) |
+| **AT**        | Temporal specification                                               | [REGULATIVE](regulative/README.md) |
+| **RAND**      | Parallel AND of obligations                                          | [REGULATIVE](regulative/README.md) |
+| **ROR**       | Parallel OR of obligations                                           | [REGULATIVE](regulative/README.md) |
 
 ### Arithmetic Keywords
 

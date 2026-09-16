@@ -45,13 +45,13 @@ GIVETH A DEONTIC Actor Action
     LEST   BREACH BY Alice BECAUSE "the rent was not paid by the seventh day"
 ```
 
-| Part                     | Question it answers                                      | What may go there                                                                               |
-| ------------------------ | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `PARTY`                  | who is bound                                             | one member of the cast                                                                          |
+| Part                     | Question it answers                                      | What may go there                                                                                |
+| ------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `PARTY`                  | who is bound                                             | one member of the cast                                                                           |
 | `MUST` / `MAY` / `SHANT` | what, and whether it is a duty, a right or a prohibition | an act — exactly this one (a name that refers to a value), or a shape to be matched (Question 3) |
-| `WITHIN`                 | by when                                                  | a number of your units, counted from when the obligation begins; omit it for an open-ended duty |
-| `HENCE`                  | then what, if it goes well                               | `FULFILLED`, or another obligation (Question 2)                                                 |
-| `LEST`                   | then what, if it goes badly                              | `BREACH`, with `BY` whom and `BECAUSE` why, or another obligation (Question 2)                  |
+| `WITHIN`                 | by when                                                  | a number of your units, counted from when the obligation begins; omit it for an open-ended duty  |
+| `HENCE`                  | then what, if it goes well                               | `FULFILLED`, or another obligation (Question 2)                                                  |
+| `LEST`                   | then what, if it goes badly                              | `BREACH`, with `BY` whom and `BECAUSE` why, or another obligation (Question 2)                   |
 
 `DEONTIC Actor Action` is the kind of thing an obligation is — the word programming language theorists would call its type, given in the same place a rule that gives a number says `GIVETH A NUMBER` — and the two names after it say whose acts and which acts it is about. There is also a fourth word, `DO`, which this page does not use; the keyword reference describes it.
 
@@ -287,15 +287,15 @@ One place where two questions meet deserves to be named, because it is where rea
 
 ## Built, and proposed
 
-| Built, in the current release                                                                                         | Proposed, not landed (2026-09-08)                                                             |
-| --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| the five-part obligation; `MUST`, `MAY`, `SHANT`, `DO`; `WITHIN`; `FULFILLED`, `BREACH BY … BECAUSE …`                | `ONCE` with a count or a total; `SOME m OF` ≡ `AT LEAST m OF`                                 |
-| chains through `HENCE` and `LEST`; a rule that gives an obligation, including one that uses itself                    | a follow-on attached to a `RAND` or `ROR` as a whole                                          |
-| `RAND`, `ROR`, and how they group without brackets                                                                    | a breach that names every party who failed                                                    |
-| `#TRACE`, `AT`, `DOES`, `WAIT UNTIL`; the inclusive deadline; the clock rules for `HENCE` and `LEST`                  | a `LEST` clock counted from the missed deadline rather than from the event that revealed it   |
-| a name in an act requiring the value it names, on the whole act or on one figure; a shape with a blank; `PROVIDED`; handing a blank to a rule | |
-| `EVERY` for a group, with `ONCE ALL HAVE` (barrier) or `UPON EACH` (fork), the group given as a list after `IN`       |                                                                                               |
-| the cast as a fixed list; the performer convention and check; one act in both directions; open-doer acts; procurement | an obligation that says whom it is owed to (the layer has a party and an act, but no obligee) |
+| Built, in the current release                                                                                                                 | Proposed, not landed (2026-09-08)                                                             |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| the five-part obligation; `MUST`, `MAY`, `SHANT`, `DO`; `WITHIN`; `FULFILLED`, `BREACH BY … BECAUSE …`                                        | `ONCE` with a count or a total; `SOME m OF` ≡ `AT LEAST m OF`                                 |
+| chains through `HENCE` and `LEST`; a rule that gives an obligation, including one that uses itself                                            | a follow-on attached to a `RAND` or `ROR` as a whole                                          |
+| `RAND`, `ROR`, and how they group without brackets                                                                                            | a breach that names every party who failed                                                    |
+| `#TRACE`, `AT`, `DOES`, `WAIT UNTIL`; the inclusive deadline; the clock rules for `HENCE` and `LEST`                                          | a `LEST` clock counted from the missed deadline rather than from the event that revealed it   |
+| a name in an act requiring the value it names, on the whole act or on one figure; a shape with a blank; `PROVIDED`; handing a blank to a rule |                                                                                               |
+| `EVERY` for a group, with `ONCE ALL HAVE` (barrier) or `UPON EACH` (fork), the group given as a list after `IN`                               |                                                                                               |
+| the cast as a fixed list; the performer convention and check; one act in both directions; open-doer acts; procurement                         | an obligation that says whom it is owed to (the layer has a party and an act, but no obligee) |
 
 The last row of the right-hand column is one the design documents record as the next axis after this one, and it is not on this page: an L4 obligation says who is bound and to do what, but not to whom it is owed, so "payment to any one of several creditors discharges the debt" cannot yet be written at all.
 

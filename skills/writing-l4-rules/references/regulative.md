@@ -178,10 +178,10 @@ bare name would not already do on its own: the checker resolves a bare name to a
 automatically wherever `EXACTLY` used to be needed. Every remaining use warns, with the
 meaning-preserving replacement:
 
-| written today     | replacement | why                                        |
-| ------------------ | ----------- | ------------------------------------------- |
-| `EXACTLY name`     | `name`      | the name already resolves to a reference   |
-| `EXACTLY (expr)`   | `(expr)`    | keep the parentheses around an expression  |
+| written today    | replacement | why                                       |
+| ---------------- | ----------- | ----------------------------------------- |
+| `EXACTLY name`   | `name`      | the name already resolves to a reference  |
+| `EXACTLY (expr)` | `(expr)`    | keep the parentheses around an expression |
 
 Write plain names and parenthesised expressions in new rules; do not write new `EXACTLY`.
 
