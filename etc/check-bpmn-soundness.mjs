@@ -119,8 +119,6 @@ const REFUSED = {
     "its token game needs the branch conditions this checker does not read",
   complexGateway:
     "a complex gateway's activation rule is an arbitrary expression",
-  subProcess:
-    "a sub-process has its own token scope; this checker plays one process only",
   transaction: "a transaction sub-process adds compensation semantics",
   adHocSubProcess: "an ad-hoc sub-process has no sequence flow to play",
 };
@@ -154,9 +152,21 @@ function readBpmn(xml) {
   const refusals = [];
   const processes = [];
   const stack = [];
-  let current = null; // the process being filled
+  let current = null; // the CONTAINER being filled: a process, or a sub-process scope
   let inDiagram = 0;
   let openEnd = null; // the <endEvent> currently open, if any
+
+  // This reader used to be flat, and `subProcess` was refused because of it: a
+  // sub-process's children live in the same document, so they would be scanned
+  // straight into the parent's node map and played as siblings. It now keeps a
+  // stack of containers instead, so a scope's children are its own.
+  //
+  // `scopes` is the container stack; `current` is its top. `activities` is the
+  // stack of activity elements currently open, so that a
+  // <multiInstanceLoopCharacteristics> can be recorded on the activity that
+  // encloses it — which is the parent element, not the container.
+  const scopes = [];
+  const activities = [];
 
   for (const m of text.matchAll(TAG_RE)) {
     const [, closing, qname, attrChunk] = m;
@@ -174,7 +184,36 @@ function readBpmn(xml) {
 
     if (closing) {
       const popped = stack.pop();
-      if (popped === "process") current = null;
+      if (popped === "process") {
+        scopes.pop();
+        current = null;
+      }
+      if (popped === "subProcess") {
+        const scope = scopes.pop();
+        current = scopes[scopes.length - 1] ?? null;
+        const owner = activities.pop();
+        // THE SCOPE IS READ BUT NOT YET PLAYED. `buildNet` expands a process,
+        // not a nested scope, so a file containing one is still refused —
+        // loudly, and now with the detail the reader has: how big the interior
+        // is, and whether it is multi-instance. What this is NOT allowed to
+        // become is silence: a scope played as an atomic activity would be a
+        // verdict about a different net, and a scope skipped would drop S1 and
+        // S2 (option-to-complete and deadlock-freedom, which this file's own
+        // header names as the properties the historical bug violated) on the
+        // most complex construct the exporter emits. See the expansion plan in
+        // specs/todo/lexipedia-superset/LTS-VISUALISER.md.
+        const mi = owner?.multiInstance;
+        refusals.push(
+          `subProcess ${scope.id}: ${
+            mi
+              ? `a ${mi.isSequential ? "sequential" : "parallel"} multi-instance`
+              : "a"
+          } sub-process with ${scope.nodes.size} interior flow node(s) and ` +
+            `${scope.flows.length} interior sequence flow(s) — this checker ` +
+            `plays one process at a time and does not yet expand a scope`,
+        );
+      }
+      if (ACTIVITIES.has(popped)) activities.pop();
       if (popped === "endEvent") openEnd = null;
       continue;
     }
@@ -203,6 +242,7 @@ function readBpmn(xml) {
         boundaries: [], // { id, name, attachedTo, interrupting }
       };
       processes.push(current);
+      scopes.push(current);
       continue;
     }
     if (!current) continue; // laneSet inside collaboration, extensions, etc.
@@ -210,6 +250,55 @@ function readBpmn(xml) {
     // Object.hasOwn, not `in`: `in` walks Object.prototype, so an element named
     // `constructor` or `toString` would "match" and yield a function body as its
     // refusal reason.
+    // A sub-process is a node in its parent AND a container of its own. Its
+    // boundary events are siblings in the parent (they attach to it from
+    // outside), so only sequence flows and flow nodes go inward.
+    if (name === "subProcess") {
+      const scope = {
+        id: a.id,
+        name: a.name ?? "",
+        nodes: new Map(),
+        flows: [],
+        boundaries: [],
+      };
+      const node = {
+        id: a.id,
+        kind: "subProcess",
+        name: a.name ?? "",
+        scope,
+      };
+      current.nodes.set(a.id, node);
+      if (isLeaf) {
+        // <subProcess/> with no children: an empty scope, which is legal and
+        // behaves as a pass-through. Nothing to push.
+        continue;
+      }
+      scopes.push(scope);
+      current = scope;
+      activities.push(node);
+      continue;
+    }
+
+    // <multiInstanceLoopCharacteristics> belongs to the activity that ENCLOSES
+    // it, which is the open element rather than the open container: on a task
+    // there is no container at all. `isSequential` defaults to true per the
+    // XSD, which is the opposite of what the exporter writes, so it is read
+    // rather than assumed.
+    if (name === "multiInstanceLoopCharacteristics") {
+      const owner = activities[activities.length - 1];
+      if (owner)
+        owner.multiInstance = {
+          isSequential: a.isSequential !== "false",
+          completionCondition: false,
+        };
+      continue;
+    }
+    if (name === "completionCondition") {
+      const owner = activities[activities.length - 1];
+      if (owner?.multiInstance) owner.multiInstance.completionCondition = true;
+      continue;
+    }
+
     if (Object.hasOwn(REFUSED, name)) {
       refusals.push(`${name} ${a.id ?? "(no id)"}: ${REFUSED[name]}`);
       continue;
@@ -251,6 +340,8 @@ function readBpmn(xml) {
         node.gatewayDirection = a.gatewayDirection;
       current.nodes.set(a.id, node);
       if (name === "endEvent" && !isLeaf) openEnd = node;
+      // An open activity can enclose a <multiInstanceLoopCharacteristics>.
+      if (ACTIVITIES.has(name) && !isLeaf) activities.push(node);
     }
   }
   return { processes, refusals };
