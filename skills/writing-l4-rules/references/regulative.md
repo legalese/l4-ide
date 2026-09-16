@@ -206,9 +206,12 @@ A plain `WITHIN d` counts from where the obligation sits: at the top level,
 from when it was entered; under `HENCE`, from the act that completed the
 previous obligation; under `LEST`, from the previous obligation's FAILURE —
 its missed deadline for `MUST`/`DO`/`MAY`, the forbidden act's own stamp for
-`SHANT`, the group deadline for a late `ONCE … WITHIN` barrier — not from the
-later event that revealed it (built 2026-09-16, `run-lest.l4`; a party who
-misses a deadline and goes quiet does not postpone its own cure period).
+`SHANT`, the group deadline for an `ONCE … WITHIN` barrier whose members all
+acted but the last of them late (a member who never acts fails on its OWN
+`WITHIN` when it has one, so the reparation counts from that act deadline
+even when the group deadline was earlier) — not from the later event that
+revealed it (built 2026-09-16, `run-lest.l4`; a party who misses a deadline
+and goes quiet does not postpone its own cure period).
 
 `WITHIN d OF anchor` anchors the deadline (built 2026-09-15): `OF THE JOIN`,
 `OF THE DEADLINE` or `OF THE ARMING` name the enclosing obligation's completion,

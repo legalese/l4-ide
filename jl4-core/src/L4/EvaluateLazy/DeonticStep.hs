@@ -13,9 +13,11 @@
 -- call site checks that @Maybe@ before it computes anything. With the log
 -- off, the work the machine does for it is carrying state it never reads:
 -- a lazy 'NormKey' through the contract frames (never forced), the
--- @ev'reoffered :: Bool@ the machine already computed at @Contract2@ through
--- six more frames past the one that consults it, and a @pending :: Maybe
--- DeonticStep@ (always 'Nothing' when off) on the @ResolveParty@ frame.
+-- re-offer mark @ev'reoffered@ the machine already looked up at @Contract1@
+-- (a @Bool@ when P2b was built; the EVERY wave's LEST pass re-typed it, see
+-- 'Reoffered') through six more frames past the one that consults it, and
+-- a @pending :: Maybe DeonticStep@ (always 'Nothing' when off) on the
+-- @ResolveParty@ frame.
 --
 -- == What a consumer can rely on
 --

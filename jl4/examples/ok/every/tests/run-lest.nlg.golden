@@ -31,3 +31,9 @@ executing contract `sign, with a second chance` at 0 with the following events: 
 executing contract `sign, with a second chance` at 0 with the following events:  `WAIT UNTIL` with 8 party `alice` did `Sign` with `alice` at 22
 executing contract `sign, or try again` at 0 with the following events:  `WAIT UNTIL` with 100
 executing contract `sign, or try again` at 0 with the following events:  `WAIT UNTIL` with 100 party `alice` did `Sign` with `alice` at 101
+executing contract `third chance` at 0 with the following events:  party `alice` did `Sign` with `alice` at 100
+executing contract `third chance` at 0 with the following events:  party `bob` did `Approve` with `bob` at 7 party `alice` did `Sign` with `alice` at 100
+executing contract `three chances` at 0 with the following events:  `WAIT UNTIL` with 100
+executing contract `three chances` at 0 with the following events:  `WAIT UNTIL` with 100 party `alice` did `Sign` with `alice` at 101
+executing contract `arming under lest` at 0 with the following events:  `WAIT UNTIL` with 14 party `theLandlord` did `Refund` with `theLandlord` at 16 `WAIT UNTIL` with 16
+executing contract `arming under hence` at 0 with the following events:  party `alice` did `Sign` with `alice` at 4 party `theLandlord` did `Refund` with `theLandlord` at 6 `WAIT UNTIL` with 8

@@ -1949,8 +1949,9 @@ BREACHED, same events) and on no tie was the last completer's rather than the gr
 adversarial pass replaced it. Under `LEST`, THE DEADLINE is the deadline that was actually missed:
 the failing member's act deadline when a member expired (`barrierFail`, carried by the sentinel) —
 and once R-T3 is under this (§11.0.1 "Stacking B on C", 2026-09-16), _which_ failing member is the
-one whose failure the `LEST` is anchored at, the earliest, with a tie on the revealing event broken
-by the earlier deadline —
+one whose failure the `LEST` is anchored at: the earliest by its failure time — the missed
+deadline since 2026-09-16 (§5.2.1), so two misses one event reveals are already ordered; until
+then the revealing stamp, with a tie broken by the earlier deadline —
 the `ONCE` line's when everyone acted but the last act landed after it (`barrierStateMissed`) —
 witnesses `the tenancy` (LEST, 14 + 5 = 19), `the tenancy, a member late` (act 14 and `ONCE`
 30 both written, Bob late: 14 + 5 = 19, not 35), `the tenancy, the group late` (30 + 5 = 35), `by
@@ -2330,72 +2331,103 @@ Built on `every/lest-anchor`, cut from `every/anchors-on-blame` at `6a8295bf` (n
 `jl4/examples/ok/every/run-lest.l4` (33 directives, nine sections: the spec's own probe with its
 anchored twin, silence, the barrier unanchored beside `run-stack.l4`'s anchored form, the fork,
 `SHANT`, the state layer, `MAY` and `DO`, a chain, a `LEST` that names itself). Line numbers below
-are on `546965be`, the build commit of this section (subject `lang: a LEST counts from the failure
-time …`); they are NOT re-cited by later commits, which say so in their own ledger entries.
+are on the round-1 fix commit of the adversarial pass (subject `lang(every): apply round 1 of the
+LEST pass …`, the commit after `546965be`, which moved `Machine.hs` by up to 31 lines and
+`ContractFrame.hs` by 2); the cites of the two earlier commits were re-pinned there, and they are
+NOT re-cited by later commits, which say so in their own ledger entries.
 
 **The mechanism: one place, one reference.** `Contract5`'s expiry branch already computed the
-absolute deadline (`Machine.hs:1608`) and allocated it as `deadlineR` for `THE DEADLINE` (`:1691`).
+absolute deadline (`Machine.hs:1612`) and allocated it as `deadlineR` for `THE DEADLINE` (`:1718`).
 The change is that under `LEST` the continuation's CLOCK is that same reference: `clockAt`
-(`:1696`) picks `deadlineR` for a `LEST` hand-off and the revealing event's stamp for a `HENCE`
-hand-off, on both the re-offer branch and the consume branch (`:1704`, `:1711`), and `ResolveParty`
-carries it to `continueWithFollowup` as the `time` the continuation is applied to (`:1820`;
-`ResolvePartyFrame.time`, `ContractFrame.hs:145`). So `WITHIN d` and `WITHIN d OF THE DEADLINE`
+(`:1723`) picks `deadlineR` for a `LEST` hand-off and the revealing event's stamp for a `HENCE`
+hand-off, on both the re-offer branch and the consume branch (`:1733`, `:1742`), and `ResolveParty`
+carries it to `continueWithFollowup` as the `time` the continuation is applied to (`:1851`;
+`ResolvePartyFrame.time`, `ContractFrame.hs:591`). So `WITHIN d` and `WITHIN d OF THE DEADLINE`
 under a `LEST` read one reference and cannot drift apart (item 4 of the build brief: they coincide
-by construction, and the `Lifecycle` haddock says so, `ContractFrame.hs:615`). Nothing else
+by construction, and the `Lifecycle` haddock says so, `ContractFrame.hs:617`). Nothing else
 chooses a clock:
 
 - A **barrier member** is an ordinary `ValObligation` whose `LEST` slot holds the failpoint
   sentinel, so its expiry goes through the same branch and hands the sentinel `deadlineR` as its
   anchor — its first argument — and, as its fourth, the very same reference (`continueWithFollowup`
-  `:2208`; `sentinelArgs` `:2540`, whose haddock records that the two are one reference on purpose).
-  `Barrier5` forces it as `failAt` (`:1948`), `earliestFailure` orders by it (`:2700`), and
-  `barrierFail` (`:2794`) hands it on unchanged: the barrier's `LEST` counts from the
+  `:2242`; `sentinelArgs` `:2571`, whose haddock records that the two are one reference on purpose).
+  `Barrier5` forces it as `failAt` (`:1979`), `earliestFailure` orders by it (`:2731`), and
+  `barrierFail` (`:2825`) hands it on unchanged: the barrier's `LEST` counts from the
   earliest-failing member's deadline with **no code change in the barrier at all** — which is the
   "one mechanism" the old `barrierFail` haddock asked for. `THE DEADLINE` under a barrier's `LEST`
   and the unanchored default now agree (witness `staggered` vs `staggered, anchored`: 10 and 10).
 - The **fork** carries the drafter's `LEST` on each member, so each member's reparation counts from
   that member's own deadline (witness `each signs or refund`: refunds due 10 and 19).
-- **`SHANT`** was already R-Q5's failure time: `Contract10`'s `DMustNot` arm (`:1777`) hands the
+- **`SHANT`** was already R-Q5's failure time: `Contract10`'s `DMustNot` arm (`:1808`) hands the
   violating event's stamp as the clock, and the violating event is consumed, not re-offered.
   Untouched, and now the one failure where the plain `WITHIN` and `OF THE DEADLINE` differ
   (witness `no smoking`: due 8; `no smoking, anchored`: due 19).
-- A **`MAY`** lapse routes to `LEST` (`:1718`) and counts from the deadline as a `MUST` does; a
+- A **`MAY`** lapse routes to `LEST` (`:1749`) and counts from the deadline as a `MUST` does; a
   **`DO`** is a `MUST` here. Both witnessed (§7 of the witness).
 
 **Ordering keys after the change.** `earliestFailure`'s primary key IS R-Q5's failure time for
-every modal now, so for `MUST`/`DO`/`MAY` the stack's third key (`failDue`, `Barrier5b` `:1963`)
+every modal now, so for `MUST`/`DO`/`MAY` the stack's third key (`failDue`, `Barrier5b` `:1994`)
 can no longer separate anything the first two tied — two such members with one anchor have one
 deadline and are revealed by one event. It is kept, and its haddocks say it is redundant
-(`barrierFinish` `:2646`, `BarrierFailedAt` `ContractFrame.hs:446`), rather than half-removed;
+(`barrierFinish` `:2677`, `BarrierFailedAt` `ContractFrame.hs:448`), rather than half-removed;
 removing it is a larger diff than this change and touches the stack's witnesses. Which member a
 barrier anchors at does not change: the revealing stamp was monotone in the deadline, and the
 `run-stack.l4` tie cases (§3, §3b) give the same numbers — decided now on the first key, which the
 witness's comments say. `run-stack.golden` is identical up to the source line ranges those
 comment edits shifted (checked with the ranges normalised).
 
-**The termination argument, re-read.** Each real event is still re-offered at most once, marked by
-store address; what changed is WHY a marked event can reveal a second expiry. Before, only a
-non-positive computed `WITHIN` could put a continuation's deadline before the re-offered stamp;
-now that is the ordinary case whenever the miss came to light late, and the marked event is then
-consumed — the intended semantics, not a corner. The stream strictly shrinks on every other step,
-so evaluation terminates (`Machine.hs` NOTE above `:1691`; witness §9, `sign, or try again`, with
-`WAIT UNTIL 100` alone and with a signature at 101 after it: a residual both times, the fifth
-incarnation in the second). The corpus's recursive witness, `deontic-breach-semantics.l4` (f),
-prints the same residual as before.
+**The termination argument, re-read — and rewritten by the adversarial pass.** The build commit
+kept the old rule that each real event is re-offered AT MOST ONCE, marked by store address, and
+consumed when it revealed a second expiry, and called the second expiry "the intended semantics,
+not a corner". That was wrong as semantics, and round 1 (R1-1, a blocker found twice) showed why:
+with the clock at the deadline, one event can be past SEVERAL `LEST` windows at once — a chain of
+three chances due at 3, 6 and 106 and a signature at 100 — and consuming the event at the second
+layer drops it before it reaches the third, the one it was timely for. The verdict then depended on
+how many events the trace carried (three chances due at 3, 6 and 9: `WAIT UNTIL 100` alone left
+a residual, the same `WAIT` followed by a signature at 101 breached — one instant past every window,
+two verdicts), and a residual reached that way printed its full `WITHIN` with a deadline already in
+the past (R1-3). The rule since the round-1 fix commit: a re-offered copy is marked
+with the absolute deadline whose expiry minted it (`markReoffered`, `reofferedEvents` is now a
+`Map Address Rational`, `ev'reoffered :: Maybe Rational` through the five scrutiny frames), and a
+marked copy that reveals a further expiry is **re-offered again while the deadline strictly
+advances** — every positive `WITHIN` under the deadline anchor, and any anchored deadline that
+moved forward — and **consumed only when it does not** (a non-positive `WITHIN`, or an anchor that
+did not move: the one case in which unconditional re-offering would loop). The deadlines one event
+walks are then strictly increasing and every one of them lies below its stamp, so the walk is
+finite whenever the durations are bounded away from zero; measured, a self-naming `WITHIN 1` walked
+100,000 incarnations in 0.15 s. The residual class is a Zeno chain — durations shrinking
+geometrically, `x d MEANS … WITHIN d LEST x (d DIVIDED BY 2)` — whose deadlines advance forever
+without reaching the stamp. It is left to the machine's frame-depth guard (`maximumFrameDepth`,
+1,000,000: every nested hand-off leaves a `RestoreCurrentParty` frame on the stack — measured, a
+`WITHIN 1` chain walked to 1,500,000 reports `Stack overflow: Recursion depth of 1000000 exceeded`
+in 1.3 s); the halving Zeno chain itself did not reach that guard in 120 s because its rationals
+grow a bit per layer, so it is a hang in practice — the class ordinary non-terminating recursion
+is already in (`f x MEANS f (x PLUS 1)` is a tail call that pushes no frame; measured, no answer
+in 60 s). Witness §9 (`sign,
+or try again`: `WAIT UNTIL 100` alone is the thirty-fourth incarnation with two days left, and the
+signature at 101 fulfils it; `third chance` and `three chances` pin the chain with one event and
+with two). The corpus's recursive witness, `deontic-breach-semantics.l4` (f), a negative `WITHIN`,
+still prints the same residual: its chain does not advance, so its event is consumed at the second
+layer as before. `nested peel` (layers due 2, 5, 15) is now walked to its end by the `WAIT` at 20 —
+`BREACHED` dated 20 reporting 15 where the build commit had dated it 30 — and a delivery at 12,
+timely for layer 3, is `FULFILLED` (a new trace).
 
-**The consume branch** (a marked event revealing a second expiry, `:1704`) also anchors at the
-deadline: the failure time is the deadline whether the event that revealed the miss was fresh or
-already re-offered. The alternative — keep the marked event's stamp there — would have made the
-same miss count from two different instants depending on how the revealing event arrived. Open to
-Meng's ruling; it decides only the numbers in `deontic-breach-semantics.l4`'s `nested peel`
-(deadlines 2, 5, 15 rather than 2, 5, 30), not its verdict.
+**The consume branch** (a marked event whose chain has stopped advancing, `:1733`) anchors at the
+deadline like the re-offer branch: the failure time is the deadline whether the event that revealed
+the miss was fresh or already re-offered. Since the round-1 fix it is reached only by a
+non-advancing chain, so the residual it leaves is armed at the consumed layer's deadline and has
+met no event; it prints its source `WITHIN`, as any residual that met no event does, and the
+consumed event never reaches a later layer. That is the documented limit of the guard, not a
+number a ruling decides: the alternative — keep the marked event's stamp — would make the same
+miss count from two instants depending on how the revealing event arrived, and no corpus file
+reaches the branch with a positive `WITHIN` any more.
 
 **The state-layer stream (R1-5 from the stack's round 1, applied here).** `barrierStateMissed`
-(`:2821`) no longer hands the `LEST` the whole stream from the arming. It walks the barrier's stream
+(`:2852`) no longer hands the `LEST` the whole stream from the arming. It walks the barrier's stream
 from its arming to the first event stamped strictly after the state deadline — three new frames,
-`BarrierTrim` / `BarrierTrimEvent` / `BarrierTrimStamp` (`:2017-2043`; `ContractFrame.hs:88-97`,
-records `:562-583`), one cons cell per step, modelled on `Contract1`–`Contract3` — and applies the
-`LEST` to the stream from that cell on (`barrierStateLest`, `:2836`), the same shape the act layer
+`BarrierTrim` / `BarrierTrimEvent` / `BarrierTrimStamp` (`:2048-2074`; `ContractFrame.hs:88-97`,
+records `:564-585`), one cons cell per step, modelled on `Contract1`–`Contract3` — and applies the
+`LEST` to the stream from that cell on (`barrierStateLest`, `:2867`), the same shape the act layer
 gives its `LEST`. The walk is a prefix-drop, not a filter: it stops at the first event past the
 deadline and keeps everything after it. A trace is stamp-sorted (`TraceOrderingSpec`), so the two
 readings agree on every trace `l4 run` can see; they would differ only on an unsorted stream fed
@@ -2419,11 +2451,11 @@ returns. (The brief's path `doc/reference/ledger` does not exist; the ledger's p
 **What is NOT moved, on purpose.**
 
 - **The breach's own date.** A `DeadlineMissed` is still stamped at the event that revealed it and
-  carries the deadline it missed (`:1733`; `EVERY.md`'s "dated at the event that revealed"). §3.4's
+  carries the deadline it missed (`:1764`; `EVERY.md`'s "dated at the event that revealed"). §3.4's
   last paragraph says dating the failure to the deadline would change that stamp and the goldens
   that print it; that is a separate change and no ruling asks for it.
 - **A kept `SHANT`'s `HENCE`.** Its clock and its `THE JOIN` are still the revealing event's stamp
-  (`clockAt True`, `:1696`; §5.1.1.1's "For a kept `SHANT` the join is the event that revealed the
+  (`clockAt True`, `:1723`; §5.1.1.1's "For a kept `SHANT` the join is the event that revealed the
   deadline had passed"; `README.md`'s kept-prohibition sentence; witness `run-anchors.l4` `kept,
 the join`, 33). §3.4 says a `SHANT` barrier "achieves at the deadline", and R-Q7 says a `HENCE`
   counts from the join's firing, so a reading under which that `HENCE` should count from the
@@ -2432,6 +2464,33 @@ the join`, 33). §3.4 says a `SHANT` barrier "achieves at the deadline", and R-Q
   as the next item on this axis. If moved: `run-anchors.golden` `kept, the join` 33 → 13,
   `README.md`'s sentence, `Syntax.hs`'s `THE JOIN` bullet, and a `SHANT` barrier's join time
   (`Barrier2`'s `tLast` becomes the window's end).
+- **The layer a never-completing member fails on, when both `WITHIN`s are written.** With
+  `EVERY Tenant t … WITHIN 14 … ONCE ALL HAVE WITHIN 10 … LEST … WITHIN 5` and one tenant who never
+  signs, the machine fails the barrier on the ACT layer — Bob's missed 14 — and the reparation is
+  due at 19, not at the state deadline plus 5 = 15; the same trace with no act `WITHIN` gives 15
+  (the `ONCE` line's `WITHIN` is demoted to each member, `memberDue`). So writing a LOOSER act
+  `WITHIN` moves the landlord's reparation later (act 30: 35), and the state deadline is compared
+  only after the join (`Barrier3`/`Barrier4`, reached from `barrierJoined` alone; §3.4's as-built
+  note). R-Q5's words — "the failure time is the state's deadline, whatever the acts' modals" —
+  read alone give 15 here. Found by round 1 (R1-2): the `README.md` row and the skill's sentence
+  had stated the state-layer rule without EVERY.md's "everyone acted, but the last act landed
+  after" limit; both now carry it and the README names the 19. **Open to Meng's ruling** — the
+  machine half (compare the state deadline at each member expiry when it is the earlier of the
+  two) changes which layer, and so which deadline, a barrier anchors at, which the build brief put
+  out of scope; the doc half is applied. The probe, for whoever rules:
+
+  ```l4
+  EVERY Tenant t IN tenants
+      MUST   Sign (EXACTLY t)
+      WITHIN 14
+      ONCE   ALL HAVE WITHIN 10
+      HENCE  FULFILLED
+      LEST   (PARTY ll MUST Refund (EXACTLY ll) WITHIN 5)
+  ```
+
+  Carol signs at 3, Alice at 4, `WAIT UNTIL 20`, Bob never → `BREACHED` reporting 19; a refund at
+  17 → `FULFILLED`; the same rule with no act `WITHIN` → 15.
+
 - Which member a barrier anchors at (the stack settled it); `AFTER`/`BEFORE`; `SOME m OF`.
 
 **Goldens.** Read before promotion, each with the reason the diff is right:
@@ -2476,13 +2535,17 @@ only the first has its residuals pasted on a page.
 
 **For downstream re-pinning (item 9 of the build brief).** The clocks that move: the unanchored
 `LEST` deadline under a missed `MUST`/`DO`/`MAY` — single-party, fork member, and barrier
-member-failure (`JoinFailed` in `lts/p2-stack`'s terms) — from revealing stamp + `d` to deadline
-
-- `d`; and the state-layer `LEST`'s residual stream (events after the state deadline). Unchanged:
-  `memberDue`, `joinStateDue`, `MAY`-lapse routing (an expired `MAY` under a fork spawns no
-  continuation; under a barrier with no `LEST`, `FULFILLED`), the breach stamp, every `HENCE` clock
-  (`JoinExpired`'s included), `THE DEADLINE`, the `SHANT` `LEST`, and the number of times a
-  barrier's `LEST` fires (once).
+member-failure (`JoinFailed` in `lts/p2-stack`'s terms) — from revealing stamp plus `d` to deadline
+plus `d`; **`THE ARMING` of a `LEST` continuation** — what `OF THE ARMING` names one level further
+down, i.e. inside the continuation's own `HENCE`/`LEST` — which is the instant the continuation
+was applied to, so it moves with the clock, from the revealing stamp to the missed deadline
+(`App1` arms a continuation with `armed = time`, `Machine.hs:1133`; found by the adversarial pass,
+witness `run-lest.l4` §10); and the state-layer `LEST`'s residual stream (events after the state
+deadline). Unchanged: `memberDue`, `joinStateDue`, `MAY`-lapse routing (an expired `MAY` under a
+fork spawns no continuation; under a barrier with no `LEST`, `FULFILLED`), the breach stamp, every
+`HENCE` clock and every `HENCE` continuation's `THE ARMING` (`JoinExpired`'s included), `THE
+DEADLINE`, the `SHANT` `LEST` (and its continuation's `THE ARMING`, the violating stamp as
+before), and the number of times a barrier's `LEST` fires (once).
 
 **Not verified here.** The full `etc/verify-branch.sh` as one run (the Verify stage's); the §3.2.1
 evaluation differential (no printer is touched); `jl4-service-test`, `jl4-lsp-test`,
@@ -2490,7 +2553,42 @@ evaluation differential (no printer is touched); `jl4-service-test`, `jl4-lsp-te
 the service (where prefix-drop and filter would differ); `lts/p2-stack` and PR #395's pins, which
 are not in this tree.
 
-**What the adversarial pass of 2026-09-16 changed.** Pending, filled after the refute stage.
+**What the adversarial pass of 2026-09-16 changed.** Round 1: fourteen findings raised, none
+refuted by both checkers, all fourteen applied or routed (`scratchpad/every-lest/FINDINGS-round1.md`
+has both verdicts on each):
+
+- R1-1 (semantics and completeness, a blocker found twice): the at-most-once re-offer rule dropped a
+  timely performance of the third layer of a `LEST` chain and made the verdict at an instant depend
+  on the event count. Fixed: a re-offered copy is marked with its minting deadline and re-offered
+  again while the deadline strictly advances (the termination paragraph above). Goldens:
+  `run-lest.golden` §9 (`WITHIN 3` → `WITHIN 2`; residual → `FULFILLED`), `deontic-breach-semantics.golden`
+  `nested peel` (dated 30 → dated 20), `run-lest.l4` gains `third chance`, `three chances`, §10.
+- R1-3 (semantics): a consume-branch residual printed a stale `WITHIN`. Falls away with R1-1 for
+  every positive `WITHIN`; the non-advancing case is documented (the consume paragraph above).
+- R1-2 (semantics): the README row and the skill line stated the state-layer rule for a "late
+  group" without the "everyone acted" limit. Both qualified; the S2 case (19 not 15) recorded under
+  "What is NOT moved" and routed to Meng.
+- R1-2 (completeness): `THE ARMING` of a `LEST` continuation moved with the clock and was not on the
+  re-pin list. Listed there, stated in the README's anchor table and the entered-at paragraph,
+  pinned by `run-lest.l4` §10 (`OF THE ARMING` two levels down under a `LEST`: 13, and under a
+  `HENCE`: 7).
+- R1-G1: prettier had turned "+ `d`" into a list bullet in the re-pin paragraph; rephrased.
+- R1-G2: `regulative-layer-whole.md` said both that a group breach names one person and that the
+  set is built; lines 121, 123 and 284 rewritten to the built state.
+- R1-G3 and R1-4: §11.0.1's "anchor's VALUE is still the revealing stamp" (twice) past-tensed and
+  annotated; the dangling "(next bullet)" repointed.
+- R1-G4: §5.1.1.1's "tie on the revealing event broken by the earlier deadline" reworded to the
+  first-key ordering.
+- R1-G5: `promissory-note.l4`'s two comments quoted `Days in a month` as 30.4375; corrected to
+  30.436875 (the arithmetic, 41/61/102/44, was already right).
+- R1-G6: the build notes cited the vendored canon file without its `jl4/examples/` prefix;
+  corrected in the notes.
+- R1-3 (completeness): the cite `ContractFrame.hs:145` (which is `ScrutinizeEvents.time`) → the
+  `ResolvePartyFrame.time` field (`:589` on `546965be`, `:591` here); every
+  `Machine.hs` cite in this section re-pinned to the round-1 fix commit, which moved them.
+- R1-5 (completeness): `regulative-rules.md:187` taught that a chained inner window starts from the
+  event that triggered it; rewritten for `HENCE` at the act, `LEST` at the failure, and the
+  anchored form.
 
 ### 5.3 Temporal Forking (MAY Exercise)
 
@@ -3163,8 +3261,9 @@ barrier runs every member before deciding and, with no `LEST`, names every non-c
 order, anchored at the earliest failure; with a `LEST`, runs it once, anchored at the earliest
 failure rather than the first in roll order; `RAND`/`ROR` carry both operands' failures; and
 `BREACH BY` takes a list. §6.1.1 has the decisions, including the two this build did not make: a
-barrier's own `LEST BREACH` still names whom the drafter names, and the anchor's VALUE is still the
-revealing stamp (next bullet).
+barrier's own `LEST BREACH` still names whom the drafter names, and the anchor's VALUE was still
+the revealing stamp until §5.2 was built on 2026-09-16 (next entry; the "Not built" bullet this
+sentence used to point at is gone).
 
 **Built 2026-09-16**, on `every/lest-anchor` (cut from `every/anchors-on-blame`), witnessed by
 `jl4/examples/ok/every/run-lest.l4` — **§5.2's deadline anchor** (R-Q7's unanchored `LEST` default,
@@ -3180,6 +3279,10 @@ barrier's `LEST` counts from the earliest-failing member's deadline with no chan
 (the stack's round-1 finding R1-5, below). §5.2.1 has the mechanism, the decisions (the consume
 branch anchors at the deadline; a kept `SHANT`'s `HENCE` is NOT moved and is recorded as open),
 the goldens that moved with one reason each, the docs, and the clocks downstream re-pins against.
+Its own adversarial pass (round 1, the same day) replaced the at-most-once re-offer rule: an event
+past several `LEST` windows is now offered to each layer in turn while the deadline advances, so a
+chain's third chance sees the performance it was written for; `THE ARMING` of a `LEST` continuation
+is named as a clock that moved; §5.2.1's last paragraph lists the fourteen findings.
 
 **Not built, and each one is a place a run gives a coarser answer than this document specifies:**
 
@@ -3558,7 +3661,9 @@ with Carol last on the roll and due at 5, Bob due at 14, Alice signing at 1:
   the `Barrier5b` frame, `Machine.hs:1915-1918`, `ContractFrame.hs:99`; `earliestFailure`,
   `Machine.hs:2619-2641`), and roll order breaks only a tie on every key, which then names the
   same deadline either way. After the fix: **10 on both rolls.** C's two invariants stand: the
-  `LEST` fires once, and the anchor's value is still the revealing event's stamp (20).
+  `LEST` fires once, and the anchor's value is still the revealing event's stamp (20) — until
+  2026-09-16, §5.2.1; the anchor is now the failure time, Carol's deadline 5, and the two misses
+  no longer tie on the first key at all (`run-stack.l4` §3's rewritten comment).
 - a `SHANT` barrier: Carol smokes at 3 (R-Q5's failure time), Bob at 10; the `LEST` is anchored at
   Carol's violation and `THE DEADLINE` is her window's end, 5 (what a single `SHANT`'s `LEST` is
   handed): refund due **10**, both rolls. The primary key stays the anchor because for `SHANT` the

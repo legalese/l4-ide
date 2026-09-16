@@ -17,7 +17,8 @@
 --       example; it was written MUST pay EXACTLY 100 until R1 retired the
 --       keyword, and a literal in pattern position always meant this).
 --   (f) recursive LEST with a non-positive computed WITHIN terminates:
---       the deadline-revealing event is re-offered AT MOST ONCE.
+--       the deadline-revealing event is re-offered again only while the
+--       deadline it reveals the expiry of keeps advancing.
 --   MAY expiry routes to LEST (default FULFILLED) per the README
 --   default-consequence matrix; HENCE fires only on exercise. The HENCE
 --   and LEST continuations here differ in party AND action so the golden
@@ -133,18 +134,29 @@ GIVETH A DEONTIC Person Action
   WITHIN 2
   LEST (PARTY Alice MUST pay 2 WITHIN 3 LEST (PARTY Bob MUST deliver WITHIN 10))
 
--- Each re-offer peels exactly one HENCE/LEST layer (termination). WAIT@20
+-- One event past several layers is offered to each in turn. WAIT@20
 -- expires layer 1 (deadline 2) and is re-offered to layer 2, which counts
--- from 2 and is due at 5 — so the same WAIT@20, now marked, reveals a
--- second expiry and is CONSUMED; layer 3 counts from 5 and is due at 15.
--- WAIT@30 expires it: no LEST, so a breach dated 30 with deadline 15, and
--- Bob's delivery at 35 is never reached. (Until 2026-09-16 each layer
--- counted from the revealing stamp — deadlines 2, 23, 40 — and the
--- delivery at 35 discharged layer 3: FULFILLED.)
+-- from 2 and is due at 5; the same WAIT@20 expires that too and — the
+-- deadline having advanced, 5 after 2 — is re-offered again to layer 3,
+-- which counts from 5 and is due at 15; it expires that as well, and layer
+-- 3 has no LEST: a breach dated 20 (the event that revealed it) with
+-- deadline 15. WAIT@30 and Bob's delivery at 35 are never reached. (Until
+-- 2026-09-16 each layer counted from the revealing stamp — deadlines 2, 23,
+-- 40 — and the delivery at 35 discharged layer 3: FULFILLED. Until the
+-- adversarial pass of that day an event was re-offered AT MOST once and
+-- consumed on its second expiry, so WAIT@20 stopped at layer 2, layer 3
+-- printed WITHIN 10 as if it had time left, and the breach waited for the
+-- WAIT at 30.)
 #TRACE `nested peel` AT 0 WITH
   (`WAIT UNTIL` 20)
   (`WAIT UNTIL` 30)
   PARTY Bob DOES deliver AT 35
+
+-- Bob's delivery at 12 is past layers 1 and 2 (due 2 and 5) and reaches
+-- layer 3, due at 15, in time: FULFILLED — whether or not anything else was
+-- recorded before it.
+#TRACE `nested peel` AT 0 WITH
+  PARTY Bob DOES deliver AT 12
 
 GIVETH A DEONTIC Person Action
 `one event repairs both alternatives` MEANS
@@ -253,9 +265,11 @@ GIVETH A DEONTIC Person Action
 -- is negative, so each incarnation's deadline is already past at its own
 -- anchor (the previous incarnation's missed deadline: -1, then -2). The
 -- revealing event (Bob's delivery — wrong party, wrong action) is
--- re-offered ONCE to the first LEST incarnation; when it reveals a second
--- expiry there, it is consumed instead of being re-offered again, so
--- evaluation terminates with the recursive obligation as the residual
--- (before the at-most-once rule this trace looped forever).
+-- re-offered to the first LEST incarnation; when it reveals a second expiry
+-- there, at a deadline (-2) NO LATER than the one that minted it (-1), the
+-- chain is not advancing and the event is consumed instead of being
+-- re-offered again, so evaluation terminates with the recursive obligation
+-- as the residual (without that rule this trace looped forever). A chain
+-- whose deadlines DO advance is walked to its end — see `nested peel`.
 #TRACE `recursive lest` AT 0 WITH
   PARTY Bob DOES deliver AT 7

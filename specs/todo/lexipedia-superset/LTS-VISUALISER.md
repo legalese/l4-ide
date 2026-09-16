@@ -1122,13 +1122,18 @@ moved into `barrierStateMissed`'s arms; `Barrier1` classified with a wildcard �
 loud; and the "only extra work is a lazy `NormKey`" claim was narrower than what shipped — widened
 above. Declined, with the reason recorded in "Not built": keying the cast register by activation.
 
-### 4.4 The gotcha the animator must model: an event can be scrutinised twice
+### 4.4 The gotcha the animator must model: an event can be scrutinised twice — or more
 
 Expiry re-offers the revealing event to the continuation, at most once, marked by store address
 (`markReoffered`/`isReoffered`, `Machine.hs:516-524`; the rule is documented at `:1480-1526` and
 again in `ContractFrame.hs:68-75`). It exists to keep recursive `HENCE`/`LEST` continuations with
 non-positive deadlines terminating — the motivating case in the comment being
-`x MEANS PARTY p MUST a WITHIN d LEST x`.
+`x MEANS PARTY p MUST a WITHIN d LEST x`. _(Superseded 2026-09-16 by the `every/lest-anchor`
+branch's round-1 fix: since a `LEST` counts from the missed deadline, one event can be past several
+`LEST` windows, and it is now re-offered to each layer in turn while the deadline strictly
+advances, consumed only when it does not — `EVERY-EACH-QUANTIFIER-SPEC.md` §5.2.1, "The termination
+argument, re-read". An animator must model an event scrutinised k+1 times for k expired layers, not
+at most twice.)_
 
 A naive "one event, one animation frame" misrepresents this. `dsScrutiny` is the explicit
 **witness-versus-consume** distinction, and the scrubber must be able to show the same event
