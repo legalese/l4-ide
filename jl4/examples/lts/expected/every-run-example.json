@@ -979,7 +979,7 @@
         "clock": null,
         "outcome": {
           "anchor": 0,
-          "by": "Tenant OF …",
+          "by": "Tenant OF \"Bob\"",
           "names": [
             {
               "named": true,
@@ -999,7 +999,7 @@
         "clock": null,
         "outcome": {
           "anchor": 0,
-          "by": "Tenant OF …",
+          "by": "Tenant OF \"Bob\"",
           "names": [
             {
               "named": true,
