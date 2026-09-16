@@ -21,12 +21,7 @@ run-in.l4:164:36-47:
     
       theLandlord (at run-in.l4:27:1-12)
     
-    rather than introducing a new name of its own.
-    
-    That is what a name in an action does: it names the thing it names. A
-    placeholder that matches anything has to be a name nothing else is using.
-    This note only appears when the thing named is defined outside the rule,
-    because a name added there later can quietly capture a placeholder here.
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-in.l4:168:1-172:56:
   FULFILLED AND PARTY Landlord OF "Ms Ng" MUST Receipt theLandlord t WITHIN 3 HENCE FULFILLED AND PARTY Landlord OF "Ms Ng" MUST Receipt theLandlord t WITHIN 4 HENCE FULFILLED
 run-in.l4:191:1-193:35:

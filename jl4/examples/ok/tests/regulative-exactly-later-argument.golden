@@ -96,12 +96,7 @@ regulative-exactly-later-argument.l4:93:60-71:
     
       theLandlord (at regulative-exactly-later-argument.l4:43:1-12)
     
-    rather than introducing a new name of its own.
-    
-    That is what a name in an action does: it names the thing it names. A
-    placeholder that matches anything has to be a name nothing else is using.
-    This note only appears when the thing named is defined outside the rule,
-    because a name added there later can quietly capture a placeholder here.
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 regulative-exactly-later-argument.l4:95:1-96:46:
   FULFILLED
 regulative-exactly-later-argument.l4:100:27-32:
@@ -110,24 +105,14 @@ regulative-exactly-later-argument.l4:100:27-32:
     
       alice (at regulative-exactly-later-argument.l4:44:1-6)
     
-    rather than introducing a new name of its own.
-    
-    That is what a name in an action does: it names the thing it names. A
-    placeholder that matches anything has to be a name nothing else is using.
-    This note only appears when the thing named is defined outside the rule,
-    because a name added there later can quietly capture a placeholder here.
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 regulative-exactly-later-argument.l4:100:33-44:
   I found a problem while checking the definition of `notes the landlord, bare`:
     In this action, `theLandlord` refers to
     
       theLandlord (at regulative-exactly-later-argument.l4:43:1-12)
     
-    rather than introducing a new name of its own.
-    
-    That is what a name in an action does: it names the thing it names. A
-    placeholder that matches anything has to be a name nothing else is using.
-    This note only appears when the thing named is defined outside the rule,
-    because a name added there later can quietly capture a placeholder here.
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 regulative-exactly-later-argument.l4:102:1-103:55:
   FULFILLED
 regulative-exactly-later-argument.l4:107:1-108:49:

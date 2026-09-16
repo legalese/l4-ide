@@ -12,12 +12,7 @@ File: every-join-under-party.l4
 
       alice (at every-join-under-party.l4:10:1-6)
 
-    rather than introducing a new name of its own.
-
-    That is what a name in an action does: it names the thing it names. A
-    placeholder that matches anything has to be a name nothing else is using.
-    This note only appears when the thing named is defined outside the rule,
-    because a name added there later can quietly capture a placeholder here.
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 
 File: every-join-under-party.l4
   Hidden: no
