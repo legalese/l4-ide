@@ -31,7 +31,7 @@
       "kind": "go / no-go",
       "quick": true,
       "raised": "2026-09-14",
-      "ask": "lang/whose-opening: 30 commits, self-verified only (etc/verify-branch.sh green before the rebase; the final adversarial round was killed twice by session limits). REBASED by GM 2026-09-15 onto unstable e578654c — 68b1ae35 → 74d4e7fb, clean, 0 behind, NOT rebuilt after the rebase. Options: (a) GM runs a refuter panel, then PRs — recommended; (b) park; (c) PR as-is. The narrowing rule Meng cut on 2026-09-13 is already reflected (a later DECIDE clause is refused outright). WHOSE itself is unbuilt; the branch is S2/S3 section-binder work.",
+      "ask": "lang/whose-opening: 30 commits, self-verified only (etc/verify-branch.sh green before the rebase; the final adversarial round was killed twice by session limits). REBASED by GM 2026-09-15 onto unstable e578654c — 68b1ae35 → 74d4e7fb, clean, 0 behind, NOT rebuilt after the rebase. Options: (a) GM runs a refuter panel, then PRs — recommended; (b) park; (c) PR as-is. The narrowing rule Meng cut on 2026-09-13 is already reflected (a later DECIDE clause is refused outright). WHOSE itself is unbuilt; the branch is S2/S3 section-binder work. UPDATE 2026-09-16: R5 field opening has LANDED (#403), so the sequencing constraint on WHOSE (EVERY-EACH §13.6 'sequenced after R5') is discharged; the go/no-go is the only thing left.",
       "unblocks": "the EVERY-EACH §13.6 direction Meng endorsed 2026-09-08",
       "source": {
         "file": "specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md",
@@ -162,20 +162,16 @@
       }
     },
     {
-      "id": "R5 opening",
-      "owner": "merge-manager (enqueue #403)",
-      "kind": "in queue",
-      "quick": false,
+      "id": "R5 rulings",
+      "owner": "Meng",
+      "kind": "design ruling",
+      "quick": true,
       "raised": "2026-09-16",
-      "ask": "Meng said enqueue (2026-09-16). #403 conflicted with #407 in three files; GM rebased it across #407 on a temp branch (both sides kept), gate 8/8 there (jl4-test 3288/0), docs L4 leg green, then moved the two commits onto the merged unstable: lang/r5-field-opening @ df724009, 0 behind. merge-manager enqueues when CLEAN. RULINGS STILL OWED (PR body): constructor/top-level tier vs opened fields (warning today); opening inside regulatives; synonyms/untyped binders.",
-      "unblocks": "rule bodies reading `bankrupt` instead of p's `bankrupt`; WHOSE (EVERY spec §13.6) is sequenced behind it",
+      "ask": "R5 field opening MERGED as #403 (unstable 7161f864, 2026-09-16). Three rulings the build left open, each a coarser answer today rather than a wrong one: (1) the TIER of constructors and top-level definitions relative to opened fields — today an opened field wins and OpenedFieldShadowsDefinition WARNS (§11.7 ranks 'selectors' last and names neither); (2) whether opening extends INTO regulative, EVENT and inert bodies — today nothing there opens (kept so nothing that resolved before R5 resolves differently; probate-administration-act.l4:2744's `the grantee` still names the constructor), and until it does the EXACTLY-rule interaction has no live case; (3) record SYNONYMS and UNTYPED binders (`GIVEN x`, head-only params) — today they do not open, ~10 sites read `p's f` unchanged. Mark accept/modify per item; the owning section is IMPLICIT-PROPS-DESIGN §11.7.1.",
+      "unblocks": "rule bodies reading `bankrupt` bare inside PARTY … MUST …; a rank with no silent rung",
       "source": {
         "file": "specs/todo/IMPLICIT-PROPS-DESIGN.md",
-        "anchor": "### 11.7 R5 — Field-opening is lexical only. RULED 2026-09-04 (marked accept)."
-      },
-      "verify": {
-        "cmd": "gh pr view 403 --repo legalese/l4-ide --json state --jq .state || true",
-        "pendingWhen": "^OPEN$"
+        "anchor": "#### 11.7.1 What the build built, and what it did not"
       }
     },
     {
