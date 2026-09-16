@@ -118,12 +118,22 @@ in between weaken without refuting; all six are stated before any run exists.
 Wrapper rule 1 forbidden list = the trial cells' list **plus**: this file,
 `PREREGISTRATION-restored.md`, `keys.json`, `keys-restored.json`, `source-defects.md`,
 `README.md`, `FOUNDATION.md`, `PROVENANCE.md`, `l4-probe.md`, all of `trials/**` and `out/**`
-(one hundred prior encodings live there), `jl4/examples/legal/chubb/**`, `artifacts/**`, and
-every `fixtures/` file other than the staged copy. Arm A sandboxes must not see the
+(one hundred prior encodings live there), `jl4/examples/legal/chubb/**`,
+`jl4/examples/canon/us/chubb-hospital-cash/**`, `artifacts/**`, and every `fixtures/` file
+other than the staged copy. Arm A sandboxes must not see the
 as-published fixture; arm B sandboxes must not see anything named `restored`. No web search.
 The integrity reader additionally does not receive the nine questions. T9 discipline: the
 memory index is confirmed finding-free for this project before the first launch, and the check
 is recorded in PROVENANCE.md.
+
+> **Annotation, 2026-09-16 — a path added to the forbidden list, no prediction changed.**
+> The chubb oracle encodings were vendored into the `legalese/canon` mirror and now live
+> under `jl4/examples/canon/us/chubb-hospital-cash/`. `jl4/examples/legal/chubb/**` was
+> written to fence those encodings off; after the move it fences off only the source
+> deposit, so a sandbox obeying rule 1 to the letter could have read the oracle at its new
+> path. The canon path is therefore ADDED, and the original kept (the deposit is still
+> there). This preserves the blind this file already specified rather than revising it;
+> no run exists under this protocol, so nothing measured is affected.
 
 ## 7. What this experiment cannot show
 

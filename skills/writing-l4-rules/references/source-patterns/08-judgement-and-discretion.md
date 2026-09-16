@@ -246,7 +246,7 @@ record catches.
 
 > `-- "(4) Without prejudice to the generality of subsection (2) -- (a) letters of administration may be granted to the husband or widow or next of kin or any of them; (b) when such persons apply for letters of administration, it shall be in the discretion of the court to grant them to any one or more of such persons; ..."`
 >
-> — `jl4/examples/legal/sg-succession/sg-paa.l4:596-601`. The note at `:613-615`: "within rank 1,
+> — `jl4/examples/canon/sg/succession/sg-paa.l4:596-601`. The note at `:613-615`: "within rank 1,
 > s 18(4)(b) puts the choice squarely in the court's discretion, and this module does not pretend
 > otherwise."
 
@@ -301,7 +301,7 @@ residuates to `FULFILLED` rather than a breach, which is what makes it discretio
 
 > `-- "(3) The court or the registrar may for any sufficient reason increase or decrease the number of the sureties, or dispense with them, or reduce the amount of the bond."`
 >
-> — `jl4/examples/legal/sg-succession/sg-paa.l4:917-919`. The note at `:925-929`: "'ordinarily' is
+> — `jl4/examples/canon/sg/succession/sg-paa.l4:917-919`. The note at `:925-929`: "'ordinarily' is
 > doing the same work in s 29(2) and s 29(5): both state a default that s 29(3) lets the registrar
 > move. The encoding computes the default. It does not model s 29(3), because 'for any sufficient
 > reason' is a discretion and not a rule; a registrar's actual order overrides the number below."
@@ -363,7 +363,7 @@ must be exercised before the provision has any content at all.
 >
 > — drafted, not quoted; no instrument under `jl4/examples/legal/` combines the three in one
 > sentence. The nearest corpus witness is the registrar's power at
-> `jl4/examples/legal/sg-succession/sg-paa.l4:917-919`, treated at [8.6](#e8-6), which lacks the
+> `jl4/examples/canon/sg/succession/sg-paa.l4:917-919`, treated at [8.6](#e8-6), which lacks the
 > deontic half because nobody is permitted to do anything by it.
 
 **It is doing** three separable things, and the whole difficulty of the entry is that a model reads

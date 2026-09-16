@@ -866,7 +866,7 @@ GIVETH A BOOLEAN
 _(Checked on the release binary, exit 0, no errors;
 `` #ASSERT `s 36(1)(a) — …` `a claim in tort` `` and the `#ASSERT NOT` for an unscheduled proceeding
 are both satisfied. `Schedule item 2` is elided above for length.)_ The corpus does this at
-`jl4/examples/legal/sg-succession/sg-paa.l4:1582-1591`, where the Probate and Administration Act's
+`jl4/examples/canon/sg/succession/sg-paa.l4:1582-1591`, where the Probate and Administration Act's
 Second Schedule is eight named items gathered into one `LIST`, each carrying its `paragraph` and its
 `text` — kept at its own number, in the file's words, "because the app shows the Schedule as the
 Schedule reads" (`:1572-1573`).

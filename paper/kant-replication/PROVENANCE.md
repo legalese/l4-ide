@@ -108,7 +108,9 @@ also name `bench/schema-restored-{prolog,l4}.md`. Guided sandboxes staged the re
 under the same in-sandbox name `schema.md`, so the cell prompts stayed byte-identical across
 arms (see `bench/setup-restored.sh`).
 
-## 3. The corpus-side oracle encoding: `jl4/examples/legal/chubb/chubb.l4`
+## 3. The corpus-side oracle encoding: `jl4/examples/canon/us/chubb-hospital-cash/blind-inert/chubb.l4`
+
+> **Moved 2026-09-16.** This module was deposited at `jl4/examples/legal/chubb/chubb.l4` for the whole of this study, and every trial and score in this repository was produced against it at that path. It now lives at the path in the heading, having been vendored into the `legalese/canon` mirror; the bytes are unchanged (verified identical across the move). The old path is kept here because §2's wrapper prompts quote it verbatim and are not editable.
 
 Produced **2026-08-31**, before any benchmark trial, as one of **three independent blind
 encodings** (inert, guarded-rows, and record house styles), each written by a separate agent
@@ -122,7 +124,9 @@ the producing session's transcript, not in this repository** — the protocol th
 (inputs shown, blindness rules, style mandates) is described in `FOUNDATION.md`, but the exact
 prompt bytes were not preserved as artifacts. Disclosed gap; see §6.
 
-## 4. The de novo oracle encoding: `jl4/examples/legal/chubb/denovo/chubb-denovo.l4`
+## 4. The de novo oracle encoding: `jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4`
+
+> **Moved 2026-09-16**, as §3 — deposited and measured at `jl4/examples/legal/chubb/denovo/chubb-denovo.l4`, bytes unchanged.
 
 Produced **2026-08-31** under the go-pipeline cleanroom discipline for subject `chubb`
 (`etc/go/subjects/chubb/`): the encoder was given the hash-pinned source deposit —

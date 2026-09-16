@@ -11,7 +11,7 @@ One area of the phrasebook. The index, the preamble and the other ten areas are 
 
 > `-- "8.--(1) Probate may be granted to any executor appointed by a will."`
 >
-> — `jl4/examples/legal/sg-succession/sg-paa.l4:432`, encoded at `:450` as
+> — `jl4/examples/canon/sg/succession/sg-paa.l4:432`, encoded at `:450` as
 > `` `probate may be granted to` p MEANS … ``, a `GIVETH A BOOLEAN`.
 
 **It is doing** stating an **eligibility test**, not conferring a permission. Read who holds the

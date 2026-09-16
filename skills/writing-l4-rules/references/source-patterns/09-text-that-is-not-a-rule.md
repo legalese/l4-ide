@@ -461,7 +461,7 @@ paragraphs say, not what they produce.
 gather them into a list. The corpus states the reason in a comment: "One numbered paragraph of the
 First or Second Schedule, carrying the Schedule's own words. The app shows these; nothing in this
 module reads `text`, which is why it can be verbatim"
-(`jl4/examples/legal/sg-succession/sg-paa.l4:187-189`).
+(`jl4/examples/canon/sg/succession/sg-paa.l4:187-189`).
 
 ```l4
 DECLARE `Rule of application`
@@ -479,7 +479,7 @@ GIVETH A LIST OF `Rule of application`
 ```
 
 (Probe `i5-schedule-prose.l4`, exit 0. The corpus original is
-`jl4/examples/legal/sg-succession/sg-paa.l4:1461-1490`.)
+`jl4/examples/canon/sg/succession/sg-paa.l4:1461-1490`.)
 
 Prefer this to a bare outline when a rule elsewhere has to _select_ the Schedule — the record is
 addressable, so `the application of assets in` can branch on solvency and hand back the right list.

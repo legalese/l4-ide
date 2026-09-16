@@ -11,7 +11,7 @@ One area of the phrasebook. The index, the preamble and the other ten areas are 
 
 > `"ISA s 5: the Act distributes the estates of those dying intestate after 2 June 1967."`
 >
-> — `jl4/examples/legal/sg-succession/sg-isa.l4:420`
+> — `jl4/examples/canon/sg/succession/sg-isa.l4:420`
 
 **It is doing** fixing a boundary in time. Before it, this Act has nothing to say — but **something
 else does**, and the law provides for the handover: savings and transitional provisions reach back
