@@ -96,3 +96,8 @@ registers; Coode/Allen on legal-sentence structure; Ranta on grammars).
   facet; extracts & deepens ICAIL §5.
 - All three draw on the one L4 system; the ICAIL paper remains the broad introduction
   that each facet zooms into.
+
+## Related work
+
+Prior-art triage for this facet, starting with Jersey's Computer-Readable Legislation Project on OSF:
+[`related-work.md`](related-work.md).
