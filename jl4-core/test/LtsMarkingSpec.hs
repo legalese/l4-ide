@@ -341,15 +341,15 @@ spec = describe "LTS-VISUALISER §4.2a: markingOf" $ do
   it "B''. a barrier nobody has acted on: three members with their WITHIN still unforced, Awaiting at 0 of 3" $ do
     rs <- runMarked barrierSrc
     map view (markingAt 2 rs) `shouldBe`
-      [ PInEffect "Tenant OF \"Alice\"" DMust "Sign (EXACTLY t)" (UnforcedDeadline "14") "`the join`" (Just (FBarrier 3))
-      , PInEffect "Tenant OF \"Bob\"" DMust "Sign (EXACTLY t)" (UnforcedDeadline "14") "`the join`" (Just (FBarrier 3))
-      , PInEffect "Tenant OF \"Carol\"" DMust "Sign (EXACTLY t)" (UnforcedDeadline "14") "`the join`" (Just (FBarrier 3))
+      [ PInEffect "Tenant OF \"Alice\"" DMust "Sign (EXACTLY t)" (UnforcedDeadline "14" Nothing) "`the join`" (Just (FBarrier 3))
+      , PInEffect "Tenant OF \"Bob\"" DMust "Sign (EXACTLY t)" (UnforcedDeadline "14" Nothing) "`the join`" (Just (FBarrier 3))
+      , PInEffect "Tenant OF \"Carol\"" DMust "Sign (EXACTLY t)" (UnforcedDeadline "14" Nothing) "`the join`" (Just (FBarrier 3))
       , PAwaiting (Just (0, 3, False)) ]
 
   it "K. a fork with one member done: her continuation runs (its WITHIN unforced, no event seen), the others carry the drafter's HENCE and wait, and there is no Awaiting" $ do
     rs <- runMarked forkSrc
     map view (markingAt 0 rs) `shouldBe`
-      [ PInEffect "theLandlord" DMust "Deliver (EXACTLY t)" (UnforcedDeadline "5") "FULFILLED" Nothing
+      [ PInEffect "theLandlord" DMust "Deliver (EXACTLY t)" (UnforcedDeadline "5" Nothing) "FULFILLED" Nothing
       , PInEffect "Tenant OF \"Bob\"" DMust "Sign (EXACTLY t)" (Remaining 6) "PARTY theLandlord MUST Deliver (EXACTLY t) WITHIN 5" (Just (FFork 3))
       , PInEffect "Tenant OF \"Carol\"" DMust "Sign (EXACTLY t)" (Remaining 6) "PARTY theLandlord MUST Deliver (EXACTLY t) WITHIN 5" (Just (FFork 3)) ]
 
@@ -390,10 +390,10 @@ spec = describe "LTS-VISUALISER §4.2a: markingOf" $ do
   it "S. a drafter's own `the join` as a HENCE is not the sentinel: no Awaiting, with or without a context" $ do
     rs <- runMarked homonymSrc
     map view (markingAt 0 rs) `shouldBe`
-      [PInEffect "Alice" DMust "deliver" (UnforcedDeadline "10") "`the join`" Nothing]
+      [PInEffect "Alice" DMust "deliver" (UnforcedDeadline "10" Nothing) "`the join`" Nothing]
     case rs of
       ((Just v, _, _) : _) -> map view (markingOf noContext v) `shouldBe`
-        [PInEffect "Alice" DMust "deliver" (UnforcedDeadline "10") "`the join`" Nothing]
+        [PInEffect "Alice" DMust "deliver" (UnforcedDeadline "10" Nothing) "`the join`" Nothing]
       _ -> expectationFailure "no residual"
 
   it "placementText says what a list needs to say about a blocked continuation" $ do

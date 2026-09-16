@@ -93,7 +93,7 @@ import L4.Evaluate.ValueLazy hiding (Blame)
 import L4.EvaluateLazy.DeonticStep
 import L4.EvaluateLazy.Machine (joinCheckpointName, pattern ValFulfilled)
 import L4.Parser.SrcSpan (SrcRange)
-import L4.Print (LayoutPrinter, prettyLayout)
+import L4.Print (LayoutPrinter, docText, prettyLayout, printActionPattern)
 import L4.Syntax
 import L4.Utils.Ratio (prettyRatio)
 
@@ -180,7 +180,10 @@ data Bearer
 -- dense time). The machine decrements it per event scrutinised.
 data Countdown
   = NoDeadline
-  | UnforcedDeadline !Text   -- ^ the @WITHIN@ expression, never evaluated
+  | UnforcedDeadline !Text !(Maybe Text)
+    -- ^ the @WITHIN@ duration, never evaluated, and its @OF@ anchor when
+    -- written — kept apart so a list can say "from now" only of a
+    -- countdown that counts from now
   | Remaining !Rational      -- ^ what is left, relative to the last event seen
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
@@ -370,7 +373,9 @@ renderLive ctx raw = MkLiveNorm
   { lnSite   = rangeOf raw.roAction
   , lnBearer = either (UnforcedParty . prettyLayout) (KnownParty . prettyLayout) raw.roParty
   , lnModal  = raw.roAction.modal
-  , lnAction = prettyLayout raw.roAction.action
+    -- the deontic call-site printer, not the generic 'Pattern' one: a
+    -- pinned name prints bare unless the source wrote EXACTLY (#407 §6)
+  , lnAction = docText (printActionPattern raw.roAction.action)
   , lnDue    = countdown raw.roDue
   , lnHence  = prettyLayout raw.roHence
   , lnLest   = prettyLayout <$> raw.roLest
@@ -379,9 +384,9 @@ renderLive ctx raw = MkLiveNorm
   where
     countdown = \ case
       Left Nothing         -> NoDeadline
-      Left (Just e)        -> UnforcedDeadline (prettyLayout e)
+      Left (Just e)        -> UnforcedDeadline (prettyLayout e.duration) (prettyLayout <$> e.anchor)
       Right (ValNumber t)  -> Remaining t
-      Right other          -> UnforcedDeadline (prettyLayout other)
+      Right other          -> UnforcedDeadline (prettyLayout other) Nothing
 
 -- | A 'ValObligation' as the residual holds it, unrendered, for a consumer
 -- that needs the value and not its text — "L4.Lts.WhatIf" builds its
@@ -490,7 +495,7 @@ placementText = \ case
       DDo      -> "DO"
     dueText = \ case
       NoDeadline         -> []
-      UnforcedDeadline t -> ["WITHIN", t]
+      UnforcedDeadline t ma -> ["WITHIN", t] <> maybe [] (\ a -> ["OF", a]) ma
       Remaining r        -> ["WITHIN", prettyRatio r]
     familyText f = case f.faJoin of
       Barrier _    -> "a barrier of " <> textShow f.faTotal

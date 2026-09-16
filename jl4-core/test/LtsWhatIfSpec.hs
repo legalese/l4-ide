@@ -256,7 +256,9 @@ spec = describe "LTS-VISUALISER §2.4 / P2c: the enabled set by replay" $ do
     es.esPosition.posClock `shouldBe` 2
     map row es.esOutcomes `shouldBe`
       [ Row (CouldNot "B" "payment price") Untriable
-      , Row (TickAt 6 ["B"]) (Advances ["in effect: B MUST EXACTLY payment OF fine WITHIN 3"]) ]
+      -- the source writes EXACTLY, so the deontic printer keeps it, in its own
+      -- bracketed form — the same form `l4 run`'s DEONTIC print uses
+      , Row (TickAt 6 ["B"]) (Advances ["in effect: B MUST (EXACTLY (payment OF fine)) WITHIN 3"]) ]
     -- and the reason names the binder
     case es.esOutcomes of
       (o : _) -> o.ocCandidate.cdHypothetical `shouldBe` Left "the action binds `price`, which the what-if cannot choose"

@@ -435,7 +435,9 @@
         "outcome": {
           "operator": "and",
           "result": "pending",
-          "what": "joined"
+          "tieBreak": false,
+          "what": "joined",
+          "winner": null
         },
         "scrutiny": "noEvent"
       },
@@ -444,7 +446,9 @@
         "outcome": {
           "operator": "and",
           "result": "pending",
-          "what": "joined"
+          "tieBreak": false,
+          "what": "joined",
+          "winner": null
         },
         "scrutiny": "noEvent"
       }

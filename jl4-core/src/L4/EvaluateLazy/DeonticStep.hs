@@ -55,6 +55,7 @@ module L4.EvaluateLazy.DeonticStep
   , Side (..)
   , BreachSummary (..)
   , FailureSummary (..)
+  , NamedParty (..)
     -- * The log
   , DeonticLog (..)
   , newDeonticLog
@@ -347,8 +348,23 @@ data BreachSummary = MkBreachSummary
 data FailureSummary
   = MissedSummary !(Maybe Text) !Text !Rational
     -- ^ the party (if forced), the action it owed (printed), the deadline it missed
-  | DeclaredSummary !(Maybe Text) !(Maybe Text)
-    -- ^ @BREACH [BY p] [BECAUSE r]@: the party named (if any, and forced), the reason (if any, and forced)
+  | DeclaredSummary !NamedParty !(Maybe Text)
+    -- ^ @BREACH [BY p] [BECAUSE r]@: whom @BY@ named, the reason (if any, and forced)
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass NFData
+
+-- | Whom a @BREACH BY@ named, as far as forced. Whether the drafter named
+-- anyone is a fact of the SOURCE, known regardless of forcing; whether the
+-- machine has forced that party's cell is a fact of the RUN. The two are
+-- kept apart because the log peeks and never forces: a @BREACH BY LIST bob,
+-- alice@ leaves @bob@'s cell unforced unless something else shares it, and
+-- collapsing "named but not yet known" into "nobody named" made the step
+-- log deny a party the drafter had written (found 2026-09-16, review of the
+-- PR-A absorb).
+data NamedParty
+  = NobodyNamed          -- ^ a bare @BREACH@: no @BY@
+  | PartyNamed !(Maybe Text)
+    -- ^ @BREACH BY p@: the party, if forced; 'Nothing' means named but not yet known
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
 

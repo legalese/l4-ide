@@ -436,7 +436,7 @@ bareBreach = Row Nothing 0 Nothing
   (Breached MkBreachSummary
     { bsBlame = Nothing, bsStamp = Nothing, bsDeadline = Nothing
     -- R-T3: one declared failure, naming nobody, its own anchor
-    , bsFailures = [DeclaredSummary Nothing Nothing], bsAnchor = 0 })
+    , bsFailures = [DeclaredSummary NobodyNamed Nothing], bsAnchor = 0 })
   NoEvent Nothing Nothing Nothing
 
 spec :: Spec

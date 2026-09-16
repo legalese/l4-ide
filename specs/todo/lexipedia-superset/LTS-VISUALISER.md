@@ -999,6 +999,25 @@ Text}` — the sketch left `EventKey` undefined. Party and action are peeked.
 - `Branch` is `ToHence | ToLest | ToBreach` as sketched. Under a barrier the member's slots hold the
   join's sentinels, so for a norm whose `nkMember` is `Barrier`, `ToHence` reads "reported
   satisfied to the join" and `ToLest` "reported failed"; the join's own step follows.
+- **`BreachSummary` after the PR-A absorb (2026-09-16).** PR-A made a breach's reason a `Blame`
+  zipper of `Failure`s (R-T3, EVERY-EACH-QUANTIFIER-SPEC §6.1.1), so the summary now describes the
+  ANCHOR in its three scalars and carries the full list beside them: `bsFailures`, a list of
+  `FailureSummary` (one per failed obligation, in operand / roll / list order), and `bsAnchor`,
+  the anchor's index. A `FailureSummary` is either `MissedSummary party action deadline` or
+  `DeclaredSummary named reason`, where `named` is a `NamedParty`: `NobodyNamed`, or
+  `PartyNamed (Maybe Text)`. That tri-state is a review correction, not the absorb's first shape:
+  the absorb wrote `Maybe Text`,
+  which mapped a `BREACH BY` whose party the machine had not forced to the same value as a bare
+  `BREACH`, and `l4 lts --steps` printed "(nobody named)" for a party the drafter had written —
+  which party depended on incidental heap sharing (`BREACH BY LIST bob, alice`: Bob unnamed, Alice
+  named because the obligation's `PARTY` shared her cell). Whether `BY` named anyone is a fact of
+  the source and is known without forcing; who, only if forced — the two are now kept apart, in
+  the text ("(nobody named)" vs "(party not yet known)") and on the wire (`named: Bool` beside a
+  nullable `party`). The same review made the `joined` step's JSON carry what its text already
+  printed — `winner`, `tieBreak`, and for a breached join `by` / `names` / `anchor` — and gave
+  the list's unforced-`WITHIN` line an anchor-aware wording: "due by 35 (WITHIN 5 OF THE
+  DEADLINE)", never "5 OF THE DEADLINE from now", with `dueAnchor` its own JSON field. None of
+  these move a clock; nothing here waits on PR-B.
 
 The write is `tellDeonticStep :: DeonticStep -> Eval ()` (`Machine.hs:364`), modelled on
 `traceEval`: an optional `IORef (DList DeonticStep)` in the reader env (`EvalState.deonticLog`,

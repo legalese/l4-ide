@@ -511,7 +511,8 @@ breachSummary reason = do
         party <- peekParty partyR
         pure (MissedSummary party (prettyLayout act) d)
       DeclaredBreach mParty mReason -> do
-        party <- maybe (pure Nothing) peekParty mParty
+        -- whether BY named anyone is known without forcing; who, only if forced
+        party <- maybe (pure NobodyNamed) (fmap PartyNamed . peekParty) mParty
         why <- maybe (pure Nothing) peekReason mReason
         pure (DeclaredSummary party why)
     peekReason rf = peekWHNF rf >>= pure . \ case

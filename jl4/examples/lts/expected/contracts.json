@@ -462,7 +462,9 @@
         "outcome": {
           "operator": "or",
           "result": "fulfilled",
-          "what": "joined"
+          "tieBreak": false,
+          "what": "joined",
+          "winner": "right"
         },
         "scrutiny": "noEvent"
       }
@@ -535,7 +537,7 @@
           "kind": "tick",
           "whose": [
             {
-              "action": "payment (EXACTLY n)",
+              "action": "payment n",
               "modal": "MUST",
               "party": "B"
             }
@@ -661,7 +663,9 @@
         "outcome": {
           "operator": "or",
           "result": "fulfilled",
-          "what": "joined"
+          "tieBreak": false,
+          "what": "joined",
+          "winner": "left"
         },
         "scrutiny": "noEvent"
       }
@@ -712,7 +716,9 @@
         "outcome": {
           "operator": "or",
           "result": "fulfilled",
-          "what": "joined"
+          "tieBreak": false,
+          "what": "joined",
+          "winner": "left"
         },
         "scrutiny": "noEvent"
       }

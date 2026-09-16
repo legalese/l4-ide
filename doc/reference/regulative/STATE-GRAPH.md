@@ -23,10 +23,10 @@ you do not see it there yet, that release has not shipped.
 GIVETH A DEONTIC Actor Action              -- ← "Show state graph" appears above this line
 `the tenancy` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
-        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5)
+        HENCE  (PARTY theLandlord MUST Deliver theLandlord WITHIN 5)
         LEST   BREACH
 ```
 
