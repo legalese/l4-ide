@@ -80,7 +80,7 @@ import qualified Base.Map as Map
 import qualified Base.Text as Text
 
 import L4.Annotation (emptyAnno)
-import L4.Evaluate.ValueLazy
+import L4.Evaluate.ValueLazy hiding (Blame)
 import L4.EvaluateLazy
   ( EvalConfig
   , EvalDirectiveResult (..)
@@ -92,7 +92,8 @@ import L4.EvaluateLazy
   , prettyRefusal
   )
 import L4.EvaluateLazy.DeonticStep (DeonticStep (..), NormKey (..), StepOutcome (..))
-import L4.EvaluateLazy.Machine (pattern ValFulfilled)
+import L4.EvaluateLazy.ContractFrame (Lifecycle (..))
+import L4.EvaluateLazy.Machine (pattern ValFulfilled, anchorInstant, lifecycleOf)
 import L4.Lts.Marking
 import L4.Syntax
 import qualified L4.TypeCheck as TypeCheck
@@ -261,14 +262,48 @@ candidatesOf pos = case pos.posResidual of
 -- failure is loud. The expression is read after 'reifyExpr'; if it is
 -- still not a literal, the deadline is not known here and the reason says
 -- so.
+--
+-- An ANCHORED unforced @WITHIN d OF …@ (R-Q7B\/C) is absolute: the anchor's
+-- instant plus @d@, not the clock plus @d@. The anchor is read the way the
+-- machine resolves it at @Contract4@, without re-deriving it (§2.4): a
+-- lifecycle anchor is the binding the enclosing obligation's hand-off left
+-- in this environment ('lifecycleOf', from the machine), THE ARMING with no
+-- enclosing obligation being this obligation's own arming — the clock, by
+-- the reasoning above; an @OF e@ is the value @e@ names; and either is
+-- lowered by the machine's own 'anchorInstant'. An anchor that is not yet
+-- forced, or a lifecycle position this hand-off does not have, leaves the
+-- deadline unknown, and the reason says which.
 deadlineOf :: Rational -> RawObligation NF -> IO (Either Text Rational)
 deadlineOf clock raw = case raw.roDue of
   Right (ValNumber r) -> pure (Right (clock + r))
   Right other         -> pure (Left ("the residual deadline is not a number: " <> Text.pack (show other)))
   Left Nothing        -> pure (Left "no WITHIN: the obligation has no deadline to tick past")
-  Left (Just e)       -> reifyExpr raw.roEnv e >>= pure . \ case
-    Lit _ (NumericLit _ r) -> Right (clock + r)
-    _ -> Left "the WITHIN was never evaluated and is not a literal, so its deadline is not known here"
+  Left (Just (MkDeadline _ e anchor)) -> do
+    duration <- reifyExpr raw.roEnv e >>= pure . \ case
+      Lit _ (NumericLit _ r) -> Right r
+      _ -> Left "the WITHIN was never evaluated and is not a literal, so its deadline is not known here"
+    origin <- case anchor of
+      Nothing -> pure (Right clock)
+      Just a  -> anchorOf a
+    pure ((+) <$> origin <*> duration)
+  where
+    lifecycle = lifecycleOf raw.roEnv
+    anchorOf = \ case
+      AnchorJoin _     -> lifecyclePosition "THE JOIN" (lifecycle >>= (.join))
+      AnchorDeadline _ -> lifecyclePosition "THE DEADLINE" (lifecycle >>= (.deadline))
+      AnchorArming _   -> maybe (pure (Right clock)) (lifecyclePosition "THE ARMING" . Just) ((.armed) <$> lifecycle)
+      AnchorAt _ e     -> case e of
+        Var _ r | Just rf <- Map.lookup (getUnique r) raw.roEnv -> instantOf "the anchor" rf
+        _ -> reifyExpr raw.roEnv e >>= pure . \ case
+          Lit _ (NumericLit _ r) -> Right r
+          _ -> Left "the anchor of the WITHIN is not a literal, so its deadline is not known here"
+    lifecyclePosition name = \ case
+      Nothing -> pure (Left (name <> " names a position the enclosing obligation's hand-off did not have, so the deadline is not known here"))
+      Just rf -> instantOf name rf
+    instantOf name rf = readIORef rf.pointer >>= pure . \ case
+      WHNF v           -> anchorInstant v
+      WHNFWhen _ v _ _ -> anchorInstant v
+      Unevaluated{}    -> Left (name <> " was never forced, so the deadline is not known here")
 
 -- | The stamp that reveals the expiry of deadline @d@ and of no later one:
 -- the machine expires on @stamp > deadline@, so a tick AT @d@ shows

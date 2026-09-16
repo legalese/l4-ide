@@ -54,6 +54,7 @@ module L4.EvaluateLazy.DeonticStep
   , JoinResult (..)
   , Side (..)
   , BreachSummary (..)
+  , FailureSummary (..)
     -- * The log
   , DeonticLog (..)
   , newDeonticLog
@@ -321,12 +322,33 @@ data Side = LeftSide | RightSide | BothSides
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
 
--- | The blame a compound breach carries, as far as the machine has forced it.
+-- | The blame a breach carries, as far as the machine has forced it.
+--
+-- Since R-T3 (EVERY-EACH-QUANTIFIER-SPEC §6.1, built 2026-09-15) a breach
+-- names EVERY obligation that failed — one entry each, no dedup — with one
+-- of them the ANCHOR, the failure the breach's time comes from. The three
+-- scalars here describe the anchor, exactly as the wire's scalars do
+-- (@obligatedParty@ \/ @deadline@ in "L4.Evaluate.ValueLazyJSON"): they are
+-- the headline, and for a single obligation's breach they are the whole
+-- story. 'bsFailures' is the full list, the anchor among it at 'bsAnchor',
+-- so a compound's non-anchor failures are never dropped.
 data BreachSummary = MkBreachSummary
-  { bsBlame    :: !(Maybe Text)     -- ^ the blamed party, keyed as 'nkBearer'
-  , bsStamp    :: !(Maybe Rational) -- ^ when the breach materialised; 'Nothing' for an @ExplicitBreach@
-  , bsDeadline :: !(Maybe Rational) -- ^ the deadline missed; equal to 'bsStamp' for a violated prohibition
+  { bsBlame    :: !(Maybe Text)     -- ^ the ANCHOR's party, keyed as 'nkBearer'; 'Nothing' if unforced or nobody named
+  , bsStamp    :: !(Maybe Rational) -- ^ when the breach materialised (the anchor's revealing stamp); 'Nothing' for an @ExplicitBreach@
+  , bsDeadline :: !(Maybe Rational) -- ^ the anchor's deadline missed; equal to 'bsStamp' for a violated prohibition
+  , bsFailures :: ![FailureSummary] -- ^ every failure the breach names, in operand \/ roll \/ list order
+  , bsAnchor   :: !Int              -- ^ the anchor's index into 'bsFailures' (0-based)
   }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass NFData
+
+-- | One failed obligation of a breach, as far as forced — the log's view of
+-- 'L4.Evaluate.ValueLazy.Failure'.
+data FailureSummary
+  = MissedSummary !(Maybe Text) !Text !Rational
+    -- ^ the party (if forced), the action it owed (printed), the deadline it missed
+  | DeclaredSummary !(Maybe Text) !(Maybe Text)
+    -- ^ @BREACH [BY p] [BECAUSE r]@: the party named (if any, and forced), the reason (if any, and forced)
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
 

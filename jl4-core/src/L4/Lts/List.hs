@@ -352,6 +352,12 @@ candidateLine o = case (o.ocCandidate.cdKind, o.ocCandidate.cdHypothetical) of
 -- | A breach, in words. The machine's own no-party clock event is the
 -- "revealing" act when a deadline is missed on a tick; it has no name a
 -- reader should see, so it is rendered as the clock.
+--
+-- Since R-T3 a breach names every obligation that failed (EVERY-EACH-
+-- QUANTIFIER-SPEC §6.1): the line's headline is the ANCHOR — the failure the
+-- breach's time comes from, which for a single obligation's breach is the
+-- whole story — and a compound's other failures follow it, in the
+-- drafter's order, so none is dropped.
 blameLine :: Blame -> Text
 blameLine b = Text.concat $ catMaybes
   [ Just (maybe "the contract is in breach (no party is named)" (<> " is in breach") b.blParty)
@@ -360,8 +366,16 @@ blameLine b = Text.concat $ catMaybes
   , case (b.blObliged, b.blReason) of
       (Nothing, Just r) -> Just (" — " <> reasonText r)
       _ -> Nothing
+  , case b.blNamed of
+      (_ : _ : _) -> Just ("; the breach names, in order: " <> Text.intercalate ", " (map entryText b.blNamed))
+      _           -> Nothing
   ]
   where
+    entryText e = Text.concat $ catMaybes
+      [ Just (fromMaybe "(nobody named)" e.beParty)
+      , (\ o -> " (" <> o <> maybe "" (\ d -> ", due by " <> prettyRatio d) e.beDeadline <> ")") <$> e.beObliged
+      , (\ r -> " (" <> reasonText r <> ")") <$> e.beReason
+      ]
     revealed = case (b.blAction, b.blStamp) of
       (Just a, Just t)
         | isClockSentinel a -> Just ("; the clock reached " <> prettyRatio t <> " without it")
@@ -429,7 +443,7 @@ renderStep s = Text.unwords $ catMaybes
       GuardFailed      -> "the act matched but its condition did not hold; passed over"
       Matched br       -> "done; " <> branchWords br
       Expired br d     -> "deadline " <> prettyRatio d <> " passed without the act; " <> branchWords br
-      Breached b       -> "BREACH declared" <> maybe "" ((" by " <>) . elide) b.bsBlame
+      Breached b       -> "BREACH declared" <> maybe "" ((" by " <>) . elide) b.bsBlame <> namedWords b
       Joined op note   -> opWords op <> ": " <> joinResultWords note
       JoinReleased     -> "everyone has acted; the shared next step begins"
       JoinExpired br d -> "everyone has acted, but after the group's deadline " <> prettyRatio d <> "; " <> branchWords br
@@ -444,8 +458,16 @@ renderStep s = Text.unwords $ catMaybes
       ValROr  -> "either part"
     joinResultWords note = case note.jnResult of
       JoinFulfilled  -> "fulfilled" <> sideWords note
-      JoinBreached b -> "breached" <> maybe "" ((" by " <>) . elide) b.bsBlame <> sideWords note
+      JoinBreached b -> "breached" <> maybe "" ((" by " <>) . elide) b.bsBlame <> sideWords note <> namedWords b
       JoinPending    -> "still open"
+    -- R-T3: a breach that names more than its anchor lists every failure,
+    -- in order, so the log drops none of them
+    namedWords b = case b.bsFailures of
+      (_ : _ : _) -> "; names, in order: " <> Text.intercalate ", " (map failureWords b.bsFailures)
+      _           -> ""
+    failureWords = \ case
+      MissedSummary p a d -> maybe "(party not yet known)" elide p <> " (" <> elide a <> ", due " <> prettyRatio d <> ")"
+      DeclaredSummary p r -> maybe "(nobody named)" elide p <> maybe "" (\ t -> " (" <> reasonText t <> ")") r
     sideWords note = case note.jnWinner of
       Nothing -> ""
       Just LeftSide  -> " (decided by the first part" <> tie note <> ")"
@@ -570,7 +592,18 @@ blameJson b = Aeson.object $ catMaybes
   , ("due" .=) . ratio <$> b.blDeadline
   , ("seenAt" .=) . ratio <$> b.blStamp
   , ("reason" .=) . reasonText <$> b.blReason
+  -- R-T3: every failure named, the anchor's index among them; the scalars
+  -- above are the anchor's (the same shape as the evaluator's own wire)
+  , Just ("names" .= map entryJson b.blNamed)
+  , Just ("anchor" .= b.blAnchor)
   ]
+  where
+    entryJson e = Aeson.object $ catMaybes
+      [ ("party" .=) <$> e.beParty
+      , ("missed" .=) <$> e.beObliged
+      , ("due" .=) . ratio <$> e.beDeadline
+      , ("reason" .=) . reasonText <$> e.beReason
+      ]
 
 candidateJson :: Outcome -> Aeson.Value
 candidateJson o = case (o.ocCandidate.cdKind, o.ocCandidate.cdHypothetical) of
@@ -604,7 +637,7 @@ stepJson s = Aeson.object $ catMaybes
       GuardFailed      -> Aeson.object ["what" .= ("guardFailed" :: Text)]
       Matched br       -> Aeson.object ["what" .= ("matched" :: Text), "then" .= branchToken br]
       Expired br d     -> Aeson.object ["what" .= ("expired" :: Text), "deadline" .= ratio d, "then" .= branchToken br]
-      Breached b       -> Aeson.object ["what" .= ("breached" :: Text), "by" .= fmap elide b.bsBlame]
+      Breached b       -> Aeson.object ["what" .= ("breached" :: Text), "by" .= fmap elide b.bsBlame, "names" .= map failureJson b.bsFailures, "anchor" .= b.bsAnchor]
       Joined op note   -> Aeson.object ["what" .= ("joined" :: Text), "operator" .= (case op of ValRAnd -> "and"; ValROr -> "or" :: Text), "result" .= joinResultToken note]
       JoinReleased     -> Aeson.object ["what" .= ("joinReleased" :: Text)]
       JoinExpired br d -> Aeson.object ["what" .= ("joinExpired" :: Text), "deadline" .= ratio d, "then" .= branchToken br]
@@ -618,6 +651,10 @@ stepJson s = Aeson.object $ catMaybes
       JoinFulfilled  -> "fulfilled" :: Text
       JoinBreached _ -> "breached"
       JoinPending    -> "pending"
+    -- one object per failure a breach names (R-T3)
+    failureJson = \ case
+      MissedSummary p a d -> Aeson.object ["party" .= fmap elide p, "missed" .= elide a, "due" .= ratio d]
+      DeclaredSummary p r -> Aeson.object ["party" .= fmap elide p, "reason" .= fmap reasonText r]
     -- the join's kind is the discriminator; the counts are the progress
     joinJson = \ case
       MemberSatisfied n m -> Aeson.object ["kind" .= ("barrier" :: Text), "done" .= n, "total" .= m]
