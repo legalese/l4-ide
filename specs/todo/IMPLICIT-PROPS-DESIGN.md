@@ -1128,7 +1128,7 @@ the heading line it was declared on. Measured 2026-09-04: the rival adjacency ru
 reinterpret 160 legal-corpus sites; the indentation rule collides with none. ExactPrint preserves
 what was written; `prettyLayout` emits the indented form; both have round-trip goldens. Detail: `PROPS-REDTEAM-2026-09-03.md` §2.1.
 
-### 11.7 R5 — Field-opening is lexical only. RULED 2026-09-04 (marked accept).
+### 11.7 R5 — Field-opening is lexical only. RULED 2026-09-04 (marked accept). BUILT 2026-09-16, see §11.7.1.
 
 The fields of a record-typed `GIVEN`, function or section, are in scope by bare name within the
 function that declares or sees the binder, never in its callees. Rank, innermost first:
@@ -1148,6 +1148,229 @@ slot (`amount` in `Pay t landlord amount`, inside a rule that also opens a recor
 field) would flip from wildcard to reference under that spec's R1, because this section ranks an
 opened field as a lexical local. That spec takes no position and leaves the question open for
 Meng; this section is not amended pending that ruling.
+(As built, §11.7.1: nothing inside a regulative, `EVENT` or inert body opens, so the interaction has
+no live case until opening is extended into regulatives — which is itself one of the rulings owed.)
+
+#### 11.7.1 What the build built, and what it did not — 2026-09-16
+
+**Built**, on `lang/r5-field-opening`, witnessed by `jl4/examples/ok/field-opening.l4` (every
+rung of the rank, the section form, an imported record, a callee that does not see its caller's
+fields) and `jl4/examples/not-ok/tc/field-opening-collision.l4` (the two-site error):
+
+- **One mechanism, not two.** The computed-field rewrite (`rewriteFieldRefs`, formerly
+  `Desugar.hs:334-437`) was the precedent and it has been _generalised_, not duplicated:
+  `L4.Desugar.openFields` is that traversal with a scope stack of frames in place of one
+  sibling set, and `makeComputedDecide` no longer rewrites anything — the synthetic
+  `GIVEN _self IS A R` opens `_self`'s fields through the same pass as `GIVEN p IS A Person` opens
+  `p`'s. Measured 2026-09-16 (`cabal test jl4-test`, 3145 examples): every jl4-test golden of
+  the ten computed-field witnesses under `ok/tests/` and `not-ok/tc/tests/` (40 `.golden` files)
+  unchanged. Two goldens elsewhere moved, both because the elaborated projection now carries the
+  bare read's source range where the old rewrite's had none: the relational export of
+  `relational/computed.l4` reports `17:15-30` for `age >= 65` instead of `17:19-30`, and the DMN
+  hydrator for `regcf.l4`'s `greater/lesser of annual income or net worth` now folds to
+  `max(...)`/`min(...)` — the range-less node had no inferred type, so `selectIdiomIn` used to
+  decline; `jl4/tests/DmnExport.hs` pinned that as "a stated boundary" and now pins the fold.
+- **The elaboration is the shape ruled.** A bare `f` under a record binder `r` becomes
+  `Proj (Var r) f`, which is `Proj (App r []) f` by the `Var` pattern synonym (`Syntax.hs:395-396`);
+  it is produced before the checker runs (`TypeCheck.hs`, `doCheckProgramWithDependencies`), so
+  `Module Resolved` carries it exactly as a hand-written `r's f` — every backend, the discharge
+  read-set (`Discharge.directBinderReads` sees a read of `r`, so a section binder read bare is
+  `WITH`-suppliable, witnessed by `applicant is solvent` in the ok file), `prettyLayout` (re-emits
+  `r's f`) and the evaluation differential all consume it with no change of their own.
+- **Function-level and section-level binders**, imported records included — the table of record
+  fields is the module's own `DECLARE`s (read before computed fields are stripped) unioned with
+  the import environment's `Selector`/`ComputedSelector` entries, keyed on the record's
+  _unqualified_ spelling because an entity declared under a heading is stored in `entityInfo`
+  under its section-qualified alias (`extendEnv` inserts each alias over the last; the prelude's
+  `Dictionary` is under `§§ Dictionaries` and would otherwise never have opened).
+- **The rank as ruled**, as a lexical stack: a `WHERE`/`LET`/lambda/`CONSIDER`-branch frame binds;
+  a declaration's frame binds its head and parameters and opens its record `GIVEN`s; a section's
+  frame binds its `GIVEN`s and opens the record-typed ones; lookup is innermost frame first, and
+  within a frame a bound name beats an opened field. So `amount's amount` reads the binder, a
+  definition's own name is never rewritten in its own body (which is what kept a computed field's
+  own name out of the old sibling set), and a rule's own opened field beats a section `GIVEN` of
+  the same name (silently, as the rank says; probed 2026-09-16, `own age` in the ok file).
+- **The collision, two-site and companion-only.** Two binders of ONE signature that open the same
+  field name draw an error at each bare read (`OpenedFieldCollisionAtRead`, naming every binder
+  with its declared type and its `GIVEN`-line position) and one at each later binder
+  (`OpenedFieldCollisionAtOpening`, "This input has a field name that an earlier input of the
+  rule also has"), the read elaborated against the first binder so the rest of the module still
+  checks. The declaration-site error is a _companion_ of a bare read: nothing fires for two
+  binders that merely share a field and read it as `r's f`.
+- **The doc page**, `doc/reference/syntax/field-opening.md`, with its limits stated.
+
+**What the fix round added, 2026-09-16** (all of it in the same commit as the build; every item
+below is a finding of the review that followed, with the counter-repro recorded under "what
+review changed"):
+
+- **A computed field's body is walked with NO enclosing frames** (`Desugar.isComputedFieldDecide`).
+  A `DECLARE` is not "the function that declares or sees the binder", so a section `GIVEN` above
+  it opens nothing inside its computed fields. Witnessed by §7 of `ok/field-opening.l4`.
+- **A binder written at a TYPE parameter opens nothing.** `Frame` carries the `tyvars` its
+  signature and its enclosing signatures quantify over; `signatureFrame` subtracts them before it
+  looks a binder's type up. Witnessed by §6 of `ok/field-opening.l4`.
+- **The record table is left-biased and drops ambiguous spellings.** A record the module declares
+  itself wins over an imported one of the same unqualified spelling, and an unqualified spelling
+  two distinct imported records claim contributes nothing at all — not opening is never a meaning
+  change against the pre-R5 tree, guessing is.
+- **Every enclosing section is ONE frame** (`mergeSectionFrames`). §11.7's rank has a single rung
+  for "fields opened from" section `GIVEN`s, so two nested headings that open one field name
+  collide, with the same two-site error a single signature draws. Witnessed in
+  `not-ok/tc/field-opening-collision.l4`.
+- **The elaborated projection carries the read's range on its operand, and TWO `AnnoHole`s.** The
+  range makes a diagnostic about the record expression point at the bare read instead of
+  `1:1-1:1`; the second hole is what the type-checked semantic-token traversal needs to reach the
+  label, without which the editor left every bare opened field unhighlighted. Witnessed by
+  `lsp/semantic-tokens/field-opening.l4` (the first LSP example of the new syntax) and by
+  `relational/field-opening.l4`, the first backend golden over a bare opened field.
+- **The silent rung is now a warning.** `OpenedFieldShadowsDefinition` fires where a bare read
+  resolves to an opened field and a 0-ary constructor or top-level definition of the same name is
+  also in scope (`Desugar.shadowCandidates`). A warning, never an error. The rank itself is
+  unchanged and still unruled — see Not built.
+- **The declaration-site collision error groups by binder.** Two field names shared by one pair of
+  binders drew two errors on the identical range; they are now one message naming both, and the
+  "Neither one" / "Several" degradations match the read-site printer's.
+
+**Not built, and each one is a place the build gives a coarser answer than this ruling:**
+
+- **A binder written without a type does not open.** `GIVEN x` and the head-only parameter
+  (`f p MEANS p's age`) have a type the checker infers later; this pass runs before it and sees
+  none. About ten such sites in `ok/` (`constant.l4`, `identity.l4`, `dates.l4:23`); all read
+  `p's f` today and keep doing so.
+- **A synonym for a record does not open.** `hierarchy.l4`'s `Outline` (= `RoseTree OF Item`)
+  binders read `c1's value` explicitly, which is unchanged. Following synonyms — same-module and
+  through the import environment's `KnownType` expansions — is a small addition once wanted.
+- **Lambda parameters bind but do not open.** The ruling says "function" `GIVEN`; a
+  `GIVEN p IS A Person YIELD bankrupt` is refused as it was before (the selector's type).
+- **Nothing inside an `EVENT`, a regulative (`PARTY ... MUST ...`) or an inert element opens.**
+  The precedent never descended into them and this build keeps the exclusion, so
+  `probate-administration-act.l4:2744`'s `ELSE PARTY `the grantee``under`GIVEN gr IS A Grantee`
+  — a constructor that is also a field of the opened record — still names the constructor. Opening
+  inside regulatives is where the interesting encodings (a contract's parties) live; it is owed,
+  and it needs the constructor question below answered first.
+- **Directive bodies (`#EVAL`, `#ASSERT`) do not open a section binder's fields.** A directive
+  is not a function; it supplies the binder at `WITH`.
+- **Constructors and top-level definitions are below every opened field — and the tier is still
+  unruled.** The ruling ranks "selectors" last and names neither. The build ranks them with the
+  selectors: a bare name that is both an opened field and a same-named 0-ary definition or
+  constructor reads as the field. Since the fix round it is no longer silent — it draws
+  `OpenedFieldShadowsDefinition`, a warning naming both and printing the `r's f` that says the
+  same thing out loud — but a warning is not a ruling, and **Meng owns the tier**. If the tier is
+  ruled the other way the warning becomes an error, or the read stops being rewritten; nothing
+  else in the build has to move. Measured 2026-09-16 on the 681 in-scope files: no live bare-read
+  site of this shape outside the regulative exclusion above (M3; the four `regcf-wizard.l4` pairs
+  are latent, `beard_tax.l4:100/:109`, `cross-section-qualified-additive.l4:47`,
+  `british-citizen-act.l4:89` and `hydration.l4:116` are all applied heads). Confirmed by the
+  fix round: the warning fires nowhere in the goldened corpus, only at the witness written for it.
+- **A local record that shares an imported record's spelling has no witness in the corpus.** The
+  left-bias is measured (the repro is under "what review changed") but no `ok/` or `not-ok/`
+  file exercises it, because the honest witness — a bare read of the imported record's field —
+  is a type error either way and only the message differs.
+- **The opening-site collision errors are not deduplicated across rules.** Two rules of one file
+  that open the same colliding pair each draw their own declaration-site error, which is right;
+  but the grouping is keyed on the binder `Name` occurrences, so nothing merges two rules that
+  happen to be identical. Nobody has wanted that.
+- **No DMN or `l4 export` golden covers a bare opened field.** `relational/field-opening.l4`
+  covers the shared middle end, which is where the annotation shape is consumed; a DMN seed would
+  need its own entry in `jl4/tests-cli/Main.hs` and its two engine runs, and the fix round did
+  not judge that earned. `relational/expected/computed` already pins the same elaborated node
+  from the computed-field side.
+
+**What review changed, 2026-09-16.** A review of the build found one blocker and six defects; all
+were reproduced, all are fixed in this commit, and none was refuted. The repros are recorded
+because each is a one-file check that a later editor can re-run, and because four of them are
+shapes no corpus file has today — the goldens stayed green through the defect, which is a fact
+about this corpus and not about the pass.
+
+- **BLOCKER — a computed field opened its section's fields.** `goSection` pushed the section frame
+  and `goTopDecl` then walked every `Decide`, including the synthetic ones `desugarComputedFields`
+  had just inserted. Repro (`computedsec.l4`): `DECLARE Config HAS `vat rate`, a top-level
+` `vat rate` MEANS 7 ``, then `§ Priced GIVEN cfg IS A Config` and, under it,
+`DECLARE R HAS a IS A NUMBER; b IS A NUMBER MEANS a TIMES `vat rate``. On the `0b640727`
+  baseline `#EVAL out (R WITH a IS 2)` is **14**; on the build as reviewed it was a `CONSIDER`
+  failure (and **200** in the variant where `cfg` can be supplied) — the sibling read had silently
+  stopped meaning the top-level definition. Fixed by `isComputedFieldDecide`; re-measured on the
+  fixed binary, **14**. §7 of `ok/field-opening.l4` pins it.
+- **The field table was keyed on a bare type spelling.** Two repros. (a) `typaram.l4`:
+  `DECLARE Box HAS lid`, then `GIVEN Box IS A TYPE, x IS A Box` with a body reading `lid` — the
+  type variable's binder opened the record's field. (b) `arity2.l4`: a local
+  `DECLARE Dictionary HAS label` beside the prelude's `Dictionary`, whose `contents` the union
+  injected. Both now resolve as the checker does; (a) is witnessed by §6 of `ok/field-opening.l4`.
+- **Nested sections shadowed instead of colliding.** Repro (`nestedsec.l4`): `§ Outer GIVEN owner
+IS A Person` and `§§ Inner GIVEN animal IS A Pet`, both with an `age`, and a rule reading `age`
+  bare returned the Pet's **3** with no diagnostic. §11.7's rank has one rung for section-opened
+  fields, so this is the two-site collision error; `mergeSectionFrames` makes it one.
+- **The projection's operand had no range, and one hole.** Repro (`capture3.l4`): a `WHERE` local
+  named like the binder makes the hand-written `p's age` report an ambiguity at the `p` the author
+  typed and made the opened form report the identical ambiguity at `1:1-1:1`. Separately, a
+  `lsp/semantic-tokens` probe showed the Check phase emitting Keyword/Operator/Number around a
+  bare `age` and **no token at the read itself**, because one `AnnoHole` is spent on the record
+  operand and `flattenConcreteNodes` drops the surplus — so the editor fell back to nothing rather
+  than to the parser tokens. Both fixed in `projectOn`; both witnessed.
+- **Two findings were fixed more narrowly than the review proposed, and neither narrowing is a
+  refutation.** Recorded because a later reader will otherwise read the fix as the review's text.
+  (i) The review's fix for the field table proposed dropping any spelling claimed by more than one
+  record. The build drops only ambiguous _imported_ spellings and lets a module's own `DECLARE`
+  win outright over an imported one, because that is what a binder written with that spelling
+  resolves to; dropping a locally declared record because an imported module happens to use its
+  name would stop opening in a module that had done nothing ambiguous. This is a design choice,
+  not a measurement, and the measurement that bounds it is only that no goldened corpus file
+  changed. (ii) The review's fix for the anchor proposed giving the operand the projection's
+  range-hinted hole. That alone cannot restore the semantic token: `flattenConcreteNodes` pairs
+  a node's `AnnoHole`s against its children positionally and drops the surplus, so one hole on
+  the `Proj` is spent on the record operand and the label is never reached whatever the operand's
+  own anno says. The build makes both changes — the operand gets the range, the `Proj` gets a
+  second hole — and the golden that pins the outcome is
+  `lsp/semantic-tokens/tests/field-opening.golden`, whose Check phase now carries `10:17-20
+SemanticTokenTypes_Variable` at the bare read. Hover was checked separately and is unmoved:
+  `lsp/hover/tests/desc-hover.hover.golden`'s new `bare-opened-field` pin answers `STRING`, the
+  field's type, not the record the operand names.
+
+**What the measurements changed.** Recorded so the next reader knows which sentences of §2.7
+were found false by measurement rather than by design:
+
+- §2.7's "no stage produces the projection today" was false before this build: the computed-field
+  rewrite already produced `Proj (Var _self) f` and it reached `Module Resolved` as such (the
+  `prettyLayout` dump of a computed sibling read prints `` `_self`'s age ``). The build therefore
+  did not add a post-typecheck pass; it generalised the pre-typecheck one, and the "post-typecheck
+  AST every backend consumes" clause of the ruling is satisfied by the checked module carrying the
+  projection, as it always had for computed fields. §2.7's `inferSelector, TypeCheck.hs:1312` is
+  stale; it is defined at `TypeCheck.hs:1641` and called at `:1576`. (An earlier
+  version of this bullet said `:1616`, which was already wrong when written —
+  `:1614-1618` is an unrelated `KnownTerm _ Constructor` test. Checked by
+  `grep -n inferSelector jl4-core/src/L4/TypeCheck.hs`, 2026-09-16.)
+- **"Innermost first" among LOCALS is not today's behaviour and the build does not change it.**
+  A `WHERE`/`LET` local and the function's own `GIVEN` of one name are an `AmbiguousTermError`
+  today (`extendEnv` stacks both `Unique`s and the local tier is flat, `Types.hs:1480-1486`);
+  R5's first two rungs are descriptive of where _opened fields_ sit, not a change to how two
+  locals resolve. Left as it was.
+- **"Bare" means 0-ary.** Five of the six corpus sites M3 predicted would break are applications
+  (`f x`, `f OF x`); the ruling's own text says "a bare opened field", the precedent guards on
+  `null args`, and the build keeps that, so none of them changes meaning. The projection label
+  and `WITH` labels are likewise not term occurrences.
+- **The declaration-site error is companion-only, or the prelude fails to type-check.**
+  `prelude.l4:1007-1023` (`dictUnion`, `dictUnionWith`) opens two `Dictionary` binders in one
+  signature; 50 corpus rules in 19 files (38 under goldened globs) open two records sharing a
+  field name and every one reads `r's f`. An unconditional error at the second binder would have
+  turned the embedded prelude red and every file with it.
+- **Positions in the diagnostic come off the `GIVEN` line, not the `Resolved`.** The
+  `GIVEN x IS A T` + `DECIDE f IS ...` form synthesises its parameter names range-less
+  (`TypeCheck.hs:1257-1259`, the `MkAppForm aann n (clearSourceAnno . getName <$> ...)`
+  line; `:1231-1233` is a comment block about the same reconciliation), so a binder
+  printed via `prettyResolvedWithRange` says
+  `(predefined)`. `OpenedBinderDecl` carries the `GIVEN`-line `Name`.
+- **A design hazard avoided, recorded because the obvious checker-level design has it:**
+  registering opened fields in `localBindings` would have made `f x` with `f` an opened field
+  resolve to the field ALONE (the local restriction runs before the arity filter,
+  `Types.hs:1480-1486` vs `:1572`) and broken four goldened files and the DMN hydration
+  exhibit; and any opened candidate surviving at a projection label (`LocalsSpareSelectors`,
+  `Types.hs:1397-1399`) would have re-opened the `amount's amount` regression of #930. The
+  syntactic pass touches neither resolution path.
+- **One precedent defect fixed on the way.** The old rewrite descended into a `WHERE` local's
+  body without subtracting the local's own parameters, so `adult MEANS f 3 WHERE f age MEANS
+age >= 18` rewrote `f`'s own `age` to `_self's age` — measured 2026-09-16 on the 2026-09-16
+  02:51 baseline binary: `TRUE` for a 50-year-old where `f 3` says `FALSE`; the build says `FALSE`.
+  The frame stack subtracts them; no goldened computed field exercised the bug.
 
 ### 11.8 R6 — The `MAYBE`/`EITHER` propagation sugar is withdrawn. RULED 2026-09-04 (marked accept).
 
@@ -2197,10 +2420,10 @@ which owns the defect; this section owns the ruling and the limit.
   to the call site. `TYPICALLY` therefore has two behaviours today, not the one
   R8 asks for — but they are two, down from three, and `TYPICALLY.md` says which
   is which.
-- **R5, field-opening, is not built.** §11.7 already sequences it after
-  discharge, and §11.7's own note is that the sample which motivated it was
-  re-cut as fourteen scalars under R10, so what remains is bare field names
-  inside a rule.
+- ~~R5, field-opening, is not built.~~ **Built 2026-09-16**, see §11.7.1 for
+  what is in the tree and what is not (typed binders only; no synonyms, no
+  lambdas, nothing inside a regulative or an `EVENT`; constructors and top-level
+  definitions rank with the selectors, below every opened field).
 - **R11, `@reads`, and the hover/index surfaces of §2.9 are not built.** They are
   §6 item 6 with the backends.
 - **A defaulted binder gets no dedicated trace event.** §2.5 asks for one naming

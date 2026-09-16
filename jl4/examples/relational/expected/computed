@@ -17,7 +17,7 @@ predicates:
     pays full price(M_1) :- not isSenior(M_1).  % computed.l4:29:5-21
   computed isSenior/1 : (goal)  % computed.l4:16:5-17:30
     params: Member
-    isSenior(_self_2) :- proj(_self_2, age, Age_3), Age_3 >= 65.  % computed.l4:17:19-30
+    isSenior(_self_2) :- proj(_self_2, age, Age_3), Age_3 >= 65.  % computed.l4:17:15-30
 
 queries:
   EVAL q1: ticket price(M0_4) -> Ticketprice_5 => (expectation from the L4 evaluator)  % computed.l4:31:1-45

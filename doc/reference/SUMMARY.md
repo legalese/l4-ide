@@ -41,6 +41,7 @@
 - [Syntax](syntax/README.md)
   - [Sections](syntax/sections.md)
   - [Section GIVEN](syntax/section-given.md)
+  - [Field opening](syntax/field-opening.md)
 - [Regulative](regulative/README.md)
   - [PARTY](regulative/PARTY.md)
   - [MUST](regulative/MUST.md)

@@ -13,6 +13,7 @@
   - [REFUSE](reference/control-flow/REFUSE.md)
 - [Operators](reference/operators/README.md)
 - [Syntax](reference/syntax/README.md)
+  - [Field opening](reference/syntax/field-opening.md)
 - [Regulative](reference/regulative/README.md)
 - [Built-ins](reference/builtins/README.md)
 - [Libraries](reference/libraries/README.md)

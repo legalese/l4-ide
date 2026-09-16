@@ -43,6 +43,12 @@ hoverGolden evalConfig dir inputFile = do
             , (Position 15 6, "name")
             , (Position 16 6, "salary")
             , (Position 21 32, "name-ref")
+              -- R5 (IMPLICIT-PROPS-DESIGN §11.7): a BARE opened field. The
+              -- elaborated `employee's name` carries the bare read's range on
+              -- BOTH the projection and its record operand, so this pin is
+              -- what says hover still answers with the field's type rather
+              -- than with the record the operand names.
+            , (Position 28 24, "bare-opened-field")
             ]
           hoverResults = map (getHoverAt tcRes nuri) hoverPositions
         in
