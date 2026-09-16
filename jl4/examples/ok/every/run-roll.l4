@@ -46,7 +46,7 @@ noOne       MEANS EMPTY
 --    naming what to write instead.
 GIVETH A DEONTIC Actor Action
 `unrolled` MEANS
-    EVERY Tenant t MUST Sign (EXACTLY t) WITHIN 14
+    EVERY Tenant t MUST Sign (t) WITHIN 14
 
 #TRACE `unrolled` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
@@ -57,7 +57,7 @@ GIVETH A DEONTIC Actor Action
 `tenants only` MEANS
     EVERY Tenant t
         WHO    elem t (LIST alice, theLandlord)
-        MUST   Sign (EXACTLY t)
+        MUST   Sign (t)
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -72,7 +72,7 @@ GIVETH A DEONTIC Actor Action
 `everyone listed` MEANS
     EVERY x
         WHO    elem x (LIST alice, theLandlord)
-        MUST   Sign (EXACTLY x)
+        MUST   Sign (x)
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -89,7 +89,7 @@ GIVETH A DEONTIC Actor Action
 `all but carol` MEANS
     EVERY Tenant t
         WHO    elem t tenants AND NOT (t EQUALS carol)
-        MUST   Sign (EXACTLY t)
+        MUST   Sign (t)
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -107,7 +107,7 @@ GIVETH A DEONTIC Actor Action
 `circular` MEANS
     EVERY Tenant t
         WHO    elem t (LIST t, alice)
-        MUST   Sign (EXACTLY t)
+        MUST   Sign (t)
         WITHIN 14
 
 #TRACE `circular` AT 0 WITH
@@ -119,7 +119,7 @@ GIVETH A DEONTIC Actor Action
 `nobody` MEANS
     EVERY Tenant t
         WHO    elem t noOne
-        MUST   Sign (EXACTLY t)
+        MUST   Sign (t)
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED

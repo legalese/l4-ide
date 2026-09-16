@@ -15,7 +15,7 @@ aContract MEANS
     HENCE (IF price = 20 THEN FULFILLED ELSE PARTY B MUST return WITHIN 10)
     LEST
       PARTY B
-      MUST EXACTLY payment fine
+      MUST payment fine
       WITHIN 3
   WHERE
   fine MEANS 10
@@ -46,7 +46,7 @@ x MEANS
 GIVETH DEONTIC Person Action
 y MEANS 
   PARTY B
-  MUST payment EXACTLY n
+  MUST payment n
   WITHIN 5
   WHERE
   n MEANS 2

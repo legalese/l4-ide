@@ -241,7 +241,7 @@ GIVEN `The action`          IS AN `Action that may have a significant adverse ef
           WHEN NOTHING   THEN FULFILLED
           WHEN JUST date THEN PARTY   Commission
                               MUST    `Render decision on whether or not to approve action`
-                                          EXACTLY `The action`
+                                          `The action`
                               WITHIN  Day date PLUS 30
 
 -- TESTING
