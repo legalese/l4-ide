@@ -289,13 +289,13 @@ l4EvalDirective source line col directiveType =
       (_env, results) <- EL.execEvalModuleWithEnv evalConfig result.tcdEntityInfo importEnv result.tcdModule
       let conFields = extractConstructorFieldNames result.tcdEntityInfo
           targetPos = MkSrcPos line col
-          matchesPos (EL.MkEvalDirectiveResult rng _ _ _) = fmap (.start) rng == Just targetPos
+          matchesPos (EL.MkEvalDirectiveResult rng _ _ _ _) = fmap (.start) rng == Just targetPos
           matchingResult = List.find matchesPos results
       case matchingResult of
         Nothing ->
           pure $ encodeJson $ Aeson.object
             [ "error" .= ("No directive result found at the given position" :: Text) ]
-        Just (EL.MkEvalDirectiveResult mRange res _mtrace _ledger) ->
+        Just (EL.MkEvalDirectiveResult mRange res _mtrace _ledger _notes) ->
           -- `range` mirrors the LSP-server shape: 1-indexed SrcPos
           -- objects {line, column}. The WASM eval path never lacks
           -- a range in practice (we matched on it above), but we
@@ -559,6 +559,9 @@ evalResultToJson fields edr = Aeson.object $
   case edr.range of
     Nothing -> []
     Just r -> ["range" .= rangeToJson r]
+  -- the run's notes (an early act, R-X6; an empty window), only when there
+  -- are any, so a directive with none is unchanged
+  ++ [ "notes" .= edr.notes | not (null edr.notes) ]
   where
     -- "success" is a NULLABLE boolean, and a refusal is the null. Saying
     -- @false@ would tell a consumer the assertion FAILED, which is a laundered

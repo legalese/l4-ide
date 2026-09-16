@@ -1,0 +1,13 @@
+Parsing successful
+Typechecking successful
+Info | [Import Resolution] Resolving import: daydate from after-date-anchored.l4Debug | [Import Resolution] Checking VFS URIs: project:/daydate.l4, daydate.l4, daydate.l4Debug | [Import Resolution] VFS MISS: project:/daydate.l4Debug | [Import Resolution] VFS MISS: daydate.l4Debug | [Import Resolution] VFS MISS: daydate.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/daydate.l4Info | [Import Resolution] Resolving import: daydate from after-date-anchored.l4Debug | [Import Resolution] Checking VFS URIs: project:/daydate.l4, daydate.l4, daydate.l4Debug | [Import Resolution] VFS MISS: project:/daydate.l4Debug | [Import Resolution] VFS MISS: daydate.l4Debug | [Import Resolution] VFS MISS: daydate.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/daydate.l4Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: after-date-anchored.l4
+  Hidden: no
+  Range: 16:54-16:65
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    AFTER <date> names the instant the window opens, so it has nothing to
+    count from and cannot take OF <anchor>. Either drop the anchor (AFTER
+    <date>) or give AFTER a duration to count from it (AFTER d OF <anchor>).

@@ -1,0 +1,20 @@
+Parsing successful
+Typechecking successful
+Info | [Import Resolution] Resolving import: daydate from within-a-date.l4Debug | [Import Resolution] Checking VFS URIs: project:/daydate.l4, daydate.l4, daydate.l4Debug | [Import Resolution] VFS MISS: project:/daydate.l4Debug | [Import Resolution] VFS MISS: daydate.l4Debug | [Import Resolution] VFS MISS: daydate.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/daydate.l4Info | [Import Resolution] Resolving import: daydate from within-a-date.l4Debug | [Import Resolution] Checking VFS URIs: project:/daydate.l4, daydate.l4, daydate.l4Debug | [Import Resolution] VFS MISS: project:/daydate.l4Debug | [Import Resolution] VFS MISS: daydate.l4Debug | [Import Resolution] VFS MISS: daydate.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/daydate.l4Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: within-a-date.l4
+  Hidden: no
+  Range: 15:39-15:54
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The WITHIN clause of a regulative rule is expected to be of type
+
+      NUMBER
+
+    but is here of type
+
+      DATE
+
+    A DATE is an instant, and an instant is BEFORE's: write BEFORE <date> for
+    an absolute deadline, or WITHIN d OF <date> to count a duration from it.

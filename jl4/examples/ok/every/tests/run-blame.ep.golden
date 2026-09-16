@@ -66,10 +66,12 @@ GIVETH A DEONTIC Actor Action
 
 -- 3. A later-in-roll member fails EARLIER in time. Carol, last on the roll,
 --    has five days; Bob, before her, has fourteen. Neither signs. The
---    barrier's LEST is anchored at Carol's failure — revealed at day 8 — so
---    the landlord's three days to refund run out at day 11, and a refund at
---    day 12 is late. Anchored at the first failure in roll order (Bob's,
---    revealed at day 20) the refund would have been on time.
+--    barrier's LEST is anchored at Carol's failure — her missed deadline,
+--    day 5 (§5.2, since 2026-09-16; until then the stamp of the WAIT UNTIL 8
+--    that revealed it) — so the landlord's three days to refund run out at
+--    day 8, and a refund at day 12 is late. Anchored at the first failure
+--    in roll order (Bob's, deadline 14) the refund would have been due at
+--    day 17, and on time.
 GIVEN t IS AN Actor
 GIVETH A NUMBER
 `days allowed to` t MEANS IF t EQUALS carol THEN 5 ELSE 14

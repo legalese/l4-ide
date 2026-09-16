@@ -277,10 +277,11 @@ renderReport withSteps rp = Text.unlines $
 -- puts words to it.
 passOverWords :: PassOver -> Text
 passOverWords = \ case
-  GuardFalse -> "its condition (PROVIDED) does not hold"
-  WrongAct   -> "it is not the act awaited"
-  WrongParty -> "it is not this party's to do"
-  NoTaker    -> "no obligation in force took it"
+  GuardFalse    -> "its condition (PROVIDED) does not hold"
+  TooEarly open -> "the window has not opened yet (it opens at " <> prettyRatio open <> "; an act before then counts for nothing)"
+  WrongAct      -> "it is not the act awaited"
+  WrongParty    -> "it is not this party's to do"
+  NoTaker       -> "no obligation in force took it"
 
 -- | One place on the norm plane, in words. The clock is what a residual
 -- countdown counts from, so the due date can be given absolutely; an
@@ -301,14 +302,40 @@ placementLine confirmed actions clock = \ case
   Lapsed b -> "no longer available (this alternative was lost; the contract stands): " <> blameLine b
   where
     dueWords n known = case (n.lnDue, known) of
-      (NoDeadline, _)               -> ["— no deadline"]
+      (NoDeadline, _)               -> ["— no deadline" <> opensClause]
       -- an unanchored WITHIN counts from now; an anchored one (@WITHIN d OF
       -- anchor@) counts from its anchor, so "from now" would be false of it
-      (UnforcedDeadline t Nothing, Just d)   -> ["— due by " <> prettyRatio d <> " (" <> t <> " from now)"]
-      (UnforcedDeadline t (Just a), Just d)  -> ["— due by " <> prettyRatio d <> " (WITHIN " <> t <> " OF " <> a <> ")"]
-      (UnforcedDeadline t Nothing, Nothing)  -> ["— due within " <> t <> " from now"]
-      (UnforcedDeadline t (Just a), Nothing) -> ["— due WITHIN " <> t <> " OF " <> a]
-      (Remaining r, _)              -> ["— due by " <> prettyRatio (clock + r) <> " (" <> prettyRatio r <> " from now)"]
+      -- — and so would it be of a bare WITHIN beside an AFTER, which counts
+      -- from the instant the window opens (re-anchor, R-X5 as amended):
+      -- that one is worded as the rule wrote it, AFTER n WITHIN d
+      (UnforcedDeadline t Nothing, Just d)
+        | Just o <- unforcedOpening         -> ["— due by " <> prettyRatio d <> " (" <> o <> " WITHIN " <> t <> ")"]
+        | otherwise                         -> ["— due by " <> prettyRatio d <> " (" <> t <> " from now)"]
+      (UnforcedDeadline t (Just a), Just d)  -> ["— due by " <> prettyRatio d <> " (WITHIN " <> t <> " OF " <> a <> ")" <> opensClause]
+      (UnforcedDeadline t Nothing, Nothing)
+        | Just o <- unforcedOpening         -> ["— due " <> o <> " WITHIN " <> t]
+        | otherwise                         -> ["— due within " <> t <> " from now"]
+      (UnforcedDeadline t (Just a), Nothing) -> ["— due WITHIN " <> t <> " OF " <> a <> opensClause]
+      -- a BEFORE date is an instant: no "from now", no anchor
+      (UnforcedBefore t, Just d)             -> ["— due by " <> prettyRatio d <> " (BEFORE " <> t <> ")" <> opensClause]
+      (UnforcedBefore t, Nothing)            -> ["— due BEFORE " <> t <> opensClause]
+      -- a residual due counts from the last event seen — or, while the
+      -- window has still to open, from the OPENING (the machine's
+      -- @relativeDue@): the deadline is then clock + opening + remaining,
+      -- and the reader is told where the window opens
+      (Remaining r, _) -> case n.lnOpens of
+        OpensIn o -> ["— due by " <> prettyRatio (clock + o + r) <> " (" <> prettyRatio (o + r) <> " from now; the window opens at " <> prettyRatio (clock + o) <> ")"]
+        _         -> ["— due by " <> prettyRatio (clock + r) <> " (" <> prettyRatio r <> " from now)"]
+      where
+        -- the AFTER clause as the rule wrote it, for a window not yet evaluated
+        unforcedOpening = case n.lnOpens of
+          UnforcedOpening o ma -> Just ("AFTER " <> o <> maybe "" (" OF " <>) ma)
+          _                    -> Nothing
+        -- a pending opening the due wording does not already carry
+        opensClause = case n.lnOpens of
+          NoOpening            -> ""
+          OpensIn o            -> "; the window opens at " <> prettyRatio (clock + o)
+          UnforcedOpening o ma -> "; the window opens AFTER " <> o <> maybe "" (" OF " <>) ma
     familyWords = \ case
       Nothing -> []
       Just f  -> ["(" <> familyLine f <> ")"]
@@ -449,6 +476,7 @@ renderStep s = Text.unwords $ catMaybes
       PartyMismatch    -> "not this party's event; passed over"
       ActionMismatch   -> "not the act awaited; passed over"
       GuardFailed      -> "the act matched but its condition did not hold; passed over"
+      EarlyAct open    -> "the act came before the window opens at " <> prettyRatio open <> "; it counts for nothing and is passed over"
       Matched br       -> "done; " <> branchWords br
       Expired br d     -> "deadline " <> prettyRatio d <> " passed without the act; " <> branchWords br
       Breached b       -> "BREACH declared" <> maybe "" (" by " <>) (partyText b.bsBlameName b.bsBlame) <> namedWords b
@@ -543,7 +571,7 @@ reportJson withSteps rp = Aeson.object $
   , "discharging" .= [ candidateJson o | o <- rp.rpEnabled, Discharging <- [o.ocVerdict] ]
   , "breaching"  .= [ Aeson.object ["event" .= candidateJson o, "breach" .= blameJson b] | o <- rp.rpEnabled, Breaching b <- [o.ocVerdict] ]
   , "advancing"  .= [ Aeson.object ["event" .= candidateJson o, "then" .= map (placementJson [] [] (stampOf o)) m] | o <- rp.rpEnabled, Advancing m <- [o.ocVerdict] ]
-  , "passedOver" .= [ Aeson.object ["event" .= candidateJson o, "reason" .= passOverToken why, "why" .= passOverWords why] | o <- rp.rpEnabled, PassedOver why <- [o.ocVerdict] ]
+  , "passedOver" .= [ Aeson.object (["event" .= candidateJson o, "reason" .= passOverToken why, "why" .= passOverWords why] <> passOverFields why) | o <- rp.rpEnabled, PassedOver why <- [o.ocVerdict] ]
   , "untried"    .= [ Aeson.object ["event" .= candidateJson o, "why" .= Text.strip why] | o <- rp.rpEnabled, Untried why <- [o.ocVerdict] ]
   , "nextDeadline" .= fmap (\ (d, ns) -> Aeson.object ["at" .= ratio d, "whose" .= map (normJson rp.rpActions) ns]) rp.rpNext
   , "deadlineNotKnown" .= map (normJson rp.rpActions) rp.rpUnknown
@@ -559,9 +587,17 @@ ratio r = Aeson.toJSON (fromRational r :: Double)
 passOverToken :: PassOver -> Text
 passOverToken = \ case
   GuardFalse -> "guardFalse"
+  TooEarly _ -> "tooEarly"
   WrongAct   -> "wrongAct"
   WrongParty -> "wrongParty"
   NoTaker    -> "noTaker"
+
+-- | What a pass-over carries besides its token: the opening a too-early act
+-- missed, on the contract clock.
+passOverFields :: PassOver -> [(Aeson.Key, Aeson.Value)]
+passOverFields = \ case
+  TooEarly open -> ["opensAt" .= ratio open]
+  _             -> []
 
 standingJson :: Standing -> Aeson.Value
 standingJson = \ case
@@ -585,13 +621,27 @@ placementJson confirmed actions clock = \ case
       , "modal"  .= modalWord n.lnModal
       , "action" .= actionText actions n
       ] <> dueFields n <> maybe [] (\ f -> ["group" .= familyJson f]) n.lnMember
-    dueFields n = case (n.lnDue, lookup n confirmed) of
+    dueFields n = opensFields n <> case (n.lnDue, lookup n confirmed) of
       (NoDeadline, _)               -> []
       (UnforcedDeadline t ma, Just d)  -> ["dueBy" .= ratio d, "dueWithin" .= t] <> dueAnchor ma
       (UnforcedDeadline t ma, Nothing) -> ["dueWithin" .= t] <> dueAnchor ma
-      (Remaining r, _)              -> ["dueBy" .= ratio (clock + r), "remaining" .= ratio r]
+      (UnforcedBefore t, Just d)       -> ["dueBy" .= ratio d, "dueBefore" .= t]
+      (UnforcedBefore t, Nothing)      -> ["dueBefore" .= t]
+      -- @remaining@ is from now to the deadline, so a pending opening is
+      -- added to the residual's own number (which counts from the opening)
+      (Remaining r, _)              -> ["dueBy" .= ratio (clock + pending n + r), "remaining" .= ratio (pending n + r)]
     -- @dueWithin@ is the duration alone; the @OF@ anchor, when written, is its own field
     dueAnchor = maybe [] (\ a -> ["dueAnchor" .= a])
+    -- the window's opening edge, while it is still to open: @opensAt@ on
+    -- the contract clock once the residual has measured it, else the
+    -- @AFTER@ as written (@opensAfter@, and @opensAnchor@ when anchored)
+    opensFields n = case n.lnOpens of
+      NoOpening            -> []
+      OpensIn o            -> ["opensAt" .= ratio (clock + o)]
+      UnforcedOpening o ma -> ["opensAfter" .= o] <> maybe [] (\ a -> ["opensAnchor" .= a]) ma
+    pending n = case n.lnOpens of
+      OpensIn o -> o
+      _         -> 0
     thresholdToken = \ case
       AllHave _ -> "allHave" :: Text
 
@@ -656,6 +706,7 @@ stepJson s = Aeson.object $ catMaybes
       PartyMismatch    -> Aeson.object ["what" .= ("partyMismatch" :: Text)]
       ActionMismatch   -> Aeson.object ["what" .= ("actionMismatch" :: Text)]
       GuardFailed      -> Aeson.object ["what" .= ("guardFailed" :: Text)]
+      EarlyAct open    -> Aeson.object ["what" .= ("earlyAct" :: Text), "opensAt" .= ratio open]
       Matched br       -> Aeson.object ["what" .= ("matched" :: Text), "then" .= branchToken br]
       Expired br d     -> Aeson.object ["what" .= ("expired" :: Text), "deadline" .= ratio d, "then" .= branchToken br]
       Breached b       -> Aeson.object ["what" .= ("breached" :: Text), "by" .= partyText b.bsBlameName b.bsBlame, "names" .= map failureJson b.bsFailures, "anchor" .= b.bsAnchor]

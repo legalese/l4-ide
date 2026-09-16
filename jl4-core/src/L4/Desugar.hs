@@ -34,7 +34,12 @@ import qualified Data.Set                 as Set
 import           L4.Annotation            (Anno_ (..), HasAnno (..), HasSrcRange (..), clearSourceAnno, emptyAnno, mkHoleWithSrcRangeHint)
 import           L4.Names
 import           L4.Parser.SrcSpan        (SrcPos (MkSrcPos), SrcRange (MkSrcRange))
-import           L4.Syntax
+-- The wave's @AFTER@ edge is 'L4.Syntax.Opening'; this module's own 'Opening'
+-- (below) is the writer 'openFields' runs in (#403, R5). Hide the syntax
+-- type from the open import and name it qualified where this module
+-- caramelises the edge, so neither name has to move.
+import           L4.Syntax                hiding (Opening)
+import qualified L4.Syntax                as Syntax
 import qualified L4.TypeCheck.Environment as TypeCheck
 import           L4.TypeCheck.Types       (CheckEntity (..), EntityInfo)
 import           Control.Monad.Writer.Strict (Writer, runWriter, tell)
@@ -138,11 +143,12 @@ carameliseEvent = \ case
 
 carameliseDeonton :: HasName n => Deonton n -> Deonton n
 carameliseDeonton = \ case
-  MkDeonton { anno, subject, action, due, join = mjoin, hence, lest} ->
+  MkDeonton { anno, subject, action, opens, due, join = mjoin, hence, lest} ->
     MkDeonton
       { anno
       , subject = carameliseSubject subject
       , action = carameliseRAction action
+      , opens = fmap carameliseOpening opens
       , due = fmap carameliseDeadline due
       , join = fmap carameliseJoin mjoin
       , hence = fmap carameliseExpr hence
@@ -155,8 +161,13 @@ carameliseJoin = \ case
   JoinUpon anno ue due -> JoinUpon anno ue (fmap carameliseDeadline due)
 
 carameliseDeadline :: HasName n => Deadline n -> Deadline n
-carameliseDeadline (MkDeadline anno d ma) =
-  MkDeadline anno (carameliseExpr d) (fmap carameliseAnchor ma)
+carameliseDeadline = \ case
+  MkDeadline anno d ma -> MkDeadline anno (carameliseExpr d) (fmap carameliseAnchor ma)
+  MkBefore anno e      -> MkBefore anno (carameliseExpr e)
+
+carameliseOpening :: HasName n => Syntax.Opening n -> Syntax.Opening n
+carameliseOpening (MkOpening anno d ma) =
+  MkOpening anno (carameliseExpr d) (fmap carameliseAnchor ma)
 
 carameliseAnchor :: HasName n => Anchor n -> Anchor n
 carameliseAnchor = \ case

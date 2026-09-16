@@ -1,0 +1,12 @@
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: after-two-closers.l4
+  Hidden: no
+  Range: 16:42-16:48
+  Source: parser
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+       |
+    16 | bad MEANS PARTY Buyer MUST Pay WITHIN 30 BEFORE (YMD 2026 6 30)
+       |                                          ^
+    One closing edge: WITHIN d [OF anchor] or BEFORE date, not both and not twice. The window is [AFTER d1] then one of WITHIN d2 / BEFORE date; this second closing edge has nothing to close.

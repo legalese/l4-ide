@@ -1,0 +1,19 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: after-empty-window.l4
+  Hidden: no
+  Range: 17:42-17:62
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This window closes before it opens: the WITHIN closes it 5 after its anchor,
+    and the AFTER opens it 30 after that same anchor, or later still — so
+    nothing can ever be performed in time.
+
+    The WITHIN names its anchor (WITHIN d2 OF …), and the AFTER counts from that
+    anchor or from an instant no earlier than it. To open at d1 and stay open
+    for d2 after that — the window [a+d1, a+d1+d2] — drop the anchor from the
+    WITHIN: bare AFTER d1 WITHIN d2 counts the WITHIN from the instant the
+    window opened. To keep both edges on one anchor, make d2 at least d1.

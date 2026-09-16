@@ -39,7 +39,7 @@ Operations for computing and comparing values:
 - **Comparison:** EQUALS, GREATER THAN, LESS THAN, AT MOST, AT LEAST
 - **Logical:** AND, OR, NOT, IMPLIES
 - **String:** CONCAT, APPEND
-- **Temporal:** AT, WITHIN
+- **Temporal:** AT, AFTER, WITHIN, BEFORE
 
 #### [Syntax](syntax/README.md)
 

@@ -1428,7 +1428,9 @@ meets the stream (`armNormKey`, `:454`) — because the `ValObligation` a member
 for its membership and adding one is a value-type change P2b declined. With the log off the
 machine computes nothing for it, but it does carry state it never reads: a lazy `norm :: NormKey`
 through the eleven `Contract*` frame records and `QuantCtx` (`ContractFrame.hs:88` onward), which
-nothing forces; the `ev'reoffered :: Bool` the machine already computed at `Contract2`, now
+nothing forces; the re-offer mark `ev'reoffered` the machine already looked up at `Contract1` (a
+`Bool` as P2b built it; the EVERY wave's LEST pass of 2026-09-16 re-typed it to the mark a
+re-offered copy carries — §4.4 below, `ContractFrame.hs` `data Reoffered`), now
 carried through six more records past `Contract5`, the only frame that consults it
 (`ContractFrame.hs:143-188`); and a `pending :: Maybe DeonticStep` on `ResolvePartyFrame`
 (`:324`), always `Nothing` when the log is off. One hot-path arm was also **restructured**, not
@@ -1632,13 +1634,22 @@ BREACH BY t` (`forkBreachSrc`: the fork of `every-run-example.l4` with Bob never
   traversed, not recomputed, and dropping it would change behaviour for a case the comment names.
   Kept.
 
-### 4.4 The gotcha the animator must model: an event can be scrutinised twice
+### 4.4 The gotcha the animator must model: an event can be scrutinised twice — or more
 
 Expiry re-offers the revealing event to the continuation, at most once, marked by store address
 (`markReoffered`/`isReoffered`, `Machine.hs:767-778`; the rule is documented at `:1808-1839` and
 again in `ContractFrame.hs:68-75`). It exists to keep recursive `HENCE`/`LEST` continuations with
 non-positive deadlines terminating — the motivating case in the comment being
-`x MEANS PARTY p MUST a WITHIN d LEST x`.
+`x MEANS PARTY p MUST a WITHIN d LEST x`. _(Superseded 2026-09-16 by the `every/lest-anchor`
+branch's adversarial pass: since a `LEST` counts from the missed deadline, one event can be past
+several `LEST` windows, and it is now re-offered to every layer in turn, unconditionally (round 1
+re-offered it only while the deadline strictly advanced and consumed it otherwise; round 2 found
+that dropped a timely performance behind a `WITHIN 0` or an already-past anchored layer). The
+only chain that does not end — a continuation that reaches itself with its deadline already
+past — is refused by name after a bounded number of stalled hand-offs, not consumed —
+`EVERY-EACH-QUANTIFIER-SPEC.md` §5.2.1, "The termination argument, re-read". An animator must
+model an event scrutinised k+1 times for k expired layers, not at most twice, and a refusal as a
+possible end of the walk.)_
 
 A naive "one event, one animation frame" misrepresents this. `dsScrutiny` is the explicit
 **witness-versus-consume** distinction, and the scrubber must be able to show the same event
@@ -2167,7 +2178,10 @@ the change with `l4 state-graph` on `ok/every/barrier.l4` and `fork.l4`: the `EV
 `EVERY Tenant t MUST Sign ... [14]` and `EVERY Tenant t MUST Pay ... [7]`, no join anywhere. After:
 `…\nONCE ALL HAVE` and `…\nUPON EACH`, and `once-within.l4` shows `ONCE ALL HAVE WITHIN 30`. The
 pattern at `extractDeonton` is now positional — `(MkDeonton _ subject action due mJoin hence lest)`
-— so the next field the constructor grows is a type error there rather than a silent drop; the
+— so the next field the constructor grows is a type error there rather than a silent drop _(and it
+did: the `AFTER`/`BEFORE` track grew `opens` between `action` and `due` on 2026-09-16, and the
+pattern has been the eight-field `(MkDeonton _anno subject action opens due mJoin hence lest)`
+since; the seven-field quotation is the shape of 2026-09-15)_; the
 `Threshold` and `Join` cases have no wildcard arm for the same reason. Two things the fix found
 that the localisation did not predict: (1) a rule whose only `WITHIN` sits on the join line had its
 `LEST` arm captioned `unreachable: no WITHIN`, contradicting `Machine.hs`'s `memberDue`, which

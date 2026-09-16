@@ -1,0 +1,70 @@
+`cooling off` — after 2 events, the clock stands at 12 (the #TRACE on line 21)
+    PARTY Seller DOES deliver AT 10
+    PARTY Buyer DOES order AT 12
+  Standing: in progress.
+
+  Owed now:
+    - Buyer MUST order — due by 43 (31 from now; the window opens at 13)
+
+  What would put someone in breach:
+    - nothing happens by 43 (the clock reaches 44) → Buyer is in breach: MUST order was due by 43; the clock reached 44 without it
+
+  What the contract would pass over (nothing changes):
+    - Buyer does order now (at 12) — the window has not opened yet (it opens at 13; an act before then counts for nothing)
+
+  Next deadline: 43 (Buyer: order)
+
+  Steps, in order:
+    at 10: Seller does deliver at 10; Seller MUST — done; on to what follows
+    at 12: Buyer does order at 12; Buyer MUST — the act came before the window opens at 13; it counts for nothing and is passed over
+    at 12: Buyer MUST — no more events; still waiting
+
+`cooling off` — after 2 events, the clock stands at 41 (the #TRACE on line 26)
+    PARTY Seller DOES deliver AT 10
+    PARTY Buyer DOES order AT 41
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at 10: Seller does deliver at 10; Seller MUST — done; on to what follows
+    at 41: Buyer does order at 41; Buyer MUST — done; on to what follows
+
+`cooling off` — after 2 events, the clock stands at 44 (the #TRACE on line 31)
+    PARTY Seller DOES deliver AT 10
+    PARTY Buyer DOES order AT 44
+  Standing: BREACHED — Buyer is in breach: MUST order was due by 43; seen at 44, when order happened instead.
+
+  Steps, in order:
+    at 10: Seller does deliver at 10; Seller MUST — done; on to what follows
+    at 10: Buyer does order at 44; Buyer MUST — deadline 43 passed without the act; that is a breach
+
+`two offsets` — after 2 events, the clock stands at 41 (the #TRACE on line 43)
+    PARTY Seller DOES deliver AT 10
+    PARTY Buyer DOES order AT 41
+  Standing: BREACHED — Buyer is in breach: MUST order was due by 40; seen at 41, when order happened instead.
+
+  Steps, in order:
+    at 10: Seller does deliver at 10; Seller MUST — done; on to what follows
+    at 10: Buyer does order at 41; Buyer MUST — deadline 40 passed without the act; that is a breach
+
+vested — after 2 events, the clock stands at 1000 (the #TRACE on line 54)
+    PARTY Seller DOES deliver AT 10
+    PARTY Buyer DOES order AT 1000
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at 10: Seller does deliver at 10; Seller MUST — done; on to what follows
+    at 1000: Buyer does order at 1000; Buyer MAY — done; on to what follows
+
+`by june` — after 1 event, the clock stands at 740135 (the #TRACE on line 64)
+    PARTY Buyer DOES pay OF 100 AT DATE_SERIAL OF (YMD OF 2026, 6, 4)
+  Standing: FULFILLED — nothing more is owed.
+
+  Steps, in order:
+    at 740135: Buyer does pay OF … at 740135; Buyer MUST — done; on to what follows
+
+`by june` — after 1 event, the clock stands at 740132 (the #TRACE on line 67)
+    PARTY Buyer DOES pay OF 100 AT DATE_SERIAL OF (YMD OF 2026, 7, 1)
+  Standing: BREACHED — Buyer is in breach: MUST pay 100 was due by 740161; seen at 740162, when pay OF 100 happened instead.
+
+  Steps, in order:
+    at 740132: Buyer does something at 740162; Buyer MUST — deadline 740161 passed without the act; that is a breach

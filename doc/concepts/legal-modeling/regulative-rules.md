@@ -184,7 +184,7 @@ WITHIN 14
 
 The deadline is `start_time + 14`. As the contract advances through events, the remaining window shrinks: after consuming an event at time 12, what was originally `WITHIN 14` is effectively `WITHIN 2` of any subsequent event.
 
-There is no special syntax for anchoring a deadline to a named event — the timeline is purely numeric, and every `WITHIN` window starts when its obligation becomes active. To express "deliver within 5 days of order confirmation", chain the obligations: the inner window starts from the event that triggered it.
+The timeline is purely numeric, and a plain `WITHIN` window starts when its obligation becomes active. To express "deliver within 5 days of order confirmation", chain the obligations: under `HENCE`, the inner window starts from the act that completed the outer obligation; under `LEST`, it starts from the outer obligation's failure — the deadline that was missed for a `MUST`, `DO` or `MAY`, the forbidden act itself for a `SHANT` — and not from whatever later event brought the miss to light. A deadline can also be anchored outright, with `WITHIN d OF THE JOIN`, `OF THE DEADLINE`, `OF THE ARMING` or `OF` an instant; the [regulative reference](../../reference/regulative/README.md#within-temporal-deadline) has the table.
 
 ```l4
 PARTY Buyer
@@ -210,7 +210,7 @@ HENCE FULFILLED
 LEST  BREACH
 ```
 
-`BEFORE` (absolute deadlines, like "by 1 January 2026") is planned but not yet implemented — use `WITHIN` and a relative duration for now.
+A window can also have an _opening_ edge — _after a three-day cooling-off period, within 30 days_ is `AFTER 3 WITHIN 30`, and an act before the window opens does not count (the run says so) — and either edge has an absolute form: `AFTER (YMD 2026 6 1)`, `BEFORE (YMD 2026 12 31)`. `WITHIN` takes a duration and `BEFORE` a date, as in English. A date lands on the contract's clock only when the trace is stamped in date serials; on a trace that starts at 0 it is refused by name rather than silently misread. The [AFTER](../../reference/regulative/AFTER.md) page has the two readings of a two-edged window and the limit in full.
 
 ---
 

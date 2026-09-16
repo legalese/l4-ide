@@ -13,6 +13,15 @@
 --   continuing per member.
 -- * @contracts@ is the classic corpus: a live position with a candidate
 --   the what-if cannot instantiate, and two explicit breaches.
+-- * @after-example@ is the AFTER reference page's own file: a window with
+--   an opening edge (EVERY-EACH-QUANTIFIER-SPEC §5.1.2), seen from an early
+--   act — the deadline listed from the OPENING, not the clock, the act
+--   "now" passed over as too early, the step log showing the nullity —
+--   plus the two-offset window, a right that vests, and the date forms.
+--   Added 2026-09-17 (adversarial round 1 of the wave's third rebase, F1\/S1\/S2):
+--   no golden had an @AFTER@ before it, and the seam between the wave's
+--   opening-relative residual and this list's clock-relative reading went
+--   unpinned.
 --
 -- And one property over all of them: the default output names no Haskell
 -- constructor. The reader §1.1a has in mind does not know what a
@@ -21,6 +30,7 @@
 module LtsList (spec) where
 
 import Base
+import qualified Base.Map as Map
 import qualified Base.Text as Text
 import qualified Data.Aeson.Encode.Pretty as AesonPretty
 import qualified Data.ByteString.Lazy as BL
@@ -30,11 +40,13 @@ import Test.Hspec
 import Test.Hspec.Golden
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS, TypeCheckWithDepsResult (..))
-import L4.EvaluateLazy (resolveEvalConfig)
-import L4.EvaluateLazy.Machine (emptyEnvironment)
+import L4.Evaluate.ValueLazy (Environment)
+import L4.EvaluateLazy (EvalConfig, execEvalModuleWithEnv, resolveEvalConfig)
+import L4.Import.Resolution (ResolvedImport (..), extractImportNames)
 import L4.Lts.List
 import L4.Lts.WhatIf (Rig (..), Trace, tracesOf)
 import L4.TracePolicy (apiDefaultPolicy)
+import L4.TypeCheck (CheckResult (..))
 
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
 
@@ -62,6 +74,7 @@ cases =
     -- the source tree, and a missing file fails loudly rather than skips.
   , MkCase "every-run-example" (\ d -> repoRoot d </> "doc" </> "reference" </> "regulative" </> "every-run-example.l4") []
   , MkCase "tenancy" (\ d -> d </> "examples" </> "bpmn" </> "tenancy.l4") ["the tenancy", "receipts"]
+  , MkCase "after-example" (\ d -> repoRoot d </> "doc" </> "reference" </> "regulative" </> "after-example.l4") []
   ]
 
 -- | The repository root, from the @jl4@ data dir: one level up. `cabal
@@ -80,7 +93,8 @@ reportsOf c = do
   r <- case checkWithImports emptyVFS src of
     Left errs -> fail (c.csStem <> ": typecheck failed: " <> show errs)
     Right r -> pure r
-  let rig0 = MkRig {rigConfig = cfg, rigEntityInfo = r.tcdEntityInfo, rigEnv = emptyEnvironment, rigModule = r.tcdModule}
+  env <- importsEnv cfg r.tcdResolvedImports
+  let rig0 = MkRig {rigConfig = cfg, rigEntityInfo = r.tcdEntityInfo, rigEnv = env, rigModule = r.tcdModule}
       pick :: Rig -> [Text] -> [Trace] -> IO (Rig, [Trace])
       pick rig [] acc = pure (rig, reverse acc)
       pick rig (n : ns) acc = case freshTrace rig.rigModule n of
@@ -90,6 +104,34 @@ reportsOf c = do
     [] -> pure (rig0, tracesOf r.tcdModule)
     names -> pick rig0 names []
   fmap catMaybes $ for traces \ tr -> reportOf rig tr
+
+-- | The imports' heaps, as `l4 lts` assembles them (jl4-lsp's
+-- @GetLazyEvaluationDependencies@ rule): every resolved import evaluated on
+-- top of its own imports' heaps, dependencies first, and the union handed
+-- to the rig. 'checkWithImports' type-checks the imports and evaluates
+-- nothing, so without this a library VALUE — @YMD@ from @daydate@, which
+-- @after-example@'s date traces stamp their clock with — is "not in
+-- scope" at replay and the trace lists as "could not be worked out".
+-- Added 2026-09-17 with the @after-example@ case; the first three cases
+-- use no library value and list the same with or without it.
+importsEnv :: EvalConfig -> [ResolvedImport] -> IO Environment
+importsEnv cfg imports = fst <$> foldM visit (Map.empty, Map.empty) (Map.keys byName)
+  where
+    byName = Map.fromList [ (ri.riModuleName, ri) | ri <- imports ]
+    -- (every heap evaluated so far, and each module's own heap by name)
+    visit (acc, memo) name = case Map.lookup name memo of
+      Just _  -> pure (acc, memo)
+      Nothing -> case Map.lookup name byName of
+        -- not among the resolved imports: nothing to evaluate; the replay
+        -- reports whatever is missing
+        Nothing -> pure (acc, memo)
+        Just ri -> do
+          let deps = extractImportNames ri.riParsed
+          (acc', memo') <- foldM visit (acc, memo) deps
+          let depEnv = mconcat [ e | d <- deps, Just e <- [Map.lookup d memo'] ]
+          (own, _) <- execEvalModuleWithEnv cfg ri.riTypeChecked.entityInfo depEnv ri.riTypeChecked.program
+          let env = own <> depEnv
+          pure (acc' <> env, Map.insert name env memo')
 
 goldenOf :: String -> String -> Text -> IO (Golden Text)
 goldenOf stem ext output = do
@@ -115,10 +157,11 @@ constructorNames =
   , "ToHence", "ToLest", "ToBreach", "MemberSatisfied", "ForkContinued"
   , "Created", "InEffect", "Violated", "Lapsed", "Awaiting"
   , "Discharging", "Breaching", "Advancing", "PassedOver", "Untried"
-  , "GuardFalse", "WrongAct", "WrongParty", "NoTaker"
+  , "GuardFalse", "TooEarly", "WrongAct", "WrongParty", "NoTaker", "EarlyAct"
   , "ValObligation", "ValBreached", "ValFulfilled", "ValROp", "ValQuantified"
   , "DeadlineMissed", "ExplicitBreach", "MkBlame", "KnownParty", "UnforcedParty"
-  , "NobodyNamed", "PartyNamed", "UnforcedDeadline"
+  , "NobodyNamed", "PartyNamed", "UnforcedDeadline", "UnforcedBefore", "NoDeadline", "Remaining"
+  , "NoOpening", "UnforcedOpening", "OpensIn"
   , "neverMatches", "NEVERMATCHES"
   ]
 

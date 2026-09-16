@@ -251,6 +251,10 @@ data TKeywords
                  --   'specs\/todo\/UPON-EXTERNAL-EVENTS-SPEC.md', status OPEN — is a different
                  --   construct in a different position and is still unbuilt; reserving the word
                  --   here does not build it, and the two are distinguished by position.
+  | TKAfter      -- ^ @AFTER@: the window's OPENING edge, @AFTER d [OF anchor]@ \/ @AFTER \<date\>@
+                 --   (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X5; built 2026-09-16)
+  | TKBefore     -- ^ @BEFORE@: the window's absolute CLOSING edge, @BEFORE \<date\>@ (§5.1.2, R-X5;
+                 --   built 2026-09-16). A duration there is a check error naming @WITHIN@.
   deriving stock (Eq, Generic, Ord, Show)
   deriving anyclass (ToExpr, NFData)
 
@@ -349,6 +353,8 @@ keywords = Map.fromList
   , ("HAVE"       , TKHave       )
   , ("SOME"       , TKSome       )
   , ("UPON"       , TKUpon       )
+  , ("AFTER"      , TKAfter      )
+  , ("BEFORE"     , TKBefore     )
   ]
 
 data TOperators

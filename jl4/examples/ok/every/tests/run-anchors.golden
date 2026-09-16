@@ -1,23 +1,23 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-run-anchors.l4:46:27-32:
+run-anchors.l4:47:27-32:
   I found a problem while checking the definition of `of the join`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:47:43-54:
+run-anchors.l4:48:43-54:
   I found a problem while checking the definition of `of the join`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:50:1-52:51:
+run-anchors.l4:51:1-53:51:
   FULFILLED
-run-anchors.l4:54:1-56:51:
+run-anchors.l4:55:1-57:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -31,23 +31,23 @@ run-anchors.l4:54:1-56:51:
       MUST Deliver theLandlord
     before their deadline, which was at
       13
-run-anchors.l4:66:27-32:
+run-anchors.l4:67:27-32:
   I found a problem while checking the definition of `of the deadline`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:67:43-54:
+run-anchors.l4:68:43-54:
   I found a problem while checking the definition of `of the deadline`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:70:1-72:51:
+run-anchors.l4:71:1-73:51:
   FULFILLED
-run-anchors.l4:74:1-76:51:
+run-anchors.l4:75:1-77:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -61,23 +61,23 @@ run-anchors.l4:74:1-76:51:
       MUST Deliver theLandlord
     before their deadline, which was at
       35
-run-anchors.l4:89:27-32:
+run-anchors.l4:91:27-32:
   I found a problem while checking the definition of `cure from the deadline`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:91:34-39:
+run-anchors.l4:93:34-39:
   I found a problem while checking the definition of `cure from the deadline`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:93:1-94:36:
+run-anchors.l4:95:1-96:36:
   FULFILLED
-run-anchors.l4:96:1-97:36:
+run-anchors.l4:98:1-99:36:
   DEONTIC BREACHED:
     party
       Tenant OF "Alice"
@@ -91,30 +91,30 @@ run-anchors.l4:96:1-97:36:
       MUST Sign alice
     before their deadline, which was at
       15
-run-anchors.l4:111:36-47:
+run-anchors.l4:113:36-47:
   I found a problem while checking the definition of `of the arming`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:112:32-35:
+run-anchors.l4:114:32-35:
   I found a problem while checking the definition of `of the arming`:
     In this action, `bob` refers to
     
-      bob (at run-anchors.l4:34:1-4)
+      bob (at run-anchors.l4:35:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:113:41-46:
+run-anchors.l4:115:41-46:
   I found a problem while checking the definition of `of the arming`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:116:1-119:36:
+run-anchors.l4:118:1-121:36:
   FULFILLED
-run-anchors.l4:121:1-124:36:
+run-anchors.l4:123:1-126:36:
   DEONTIC BREACHED:
     party
       Tenant OF "Alice"
@@ -128,14 +128,14 @@ run-anchors.l4:121:1-124:36:
       MUST Sign alice
     before their deadline, which was at
       45
-run-anchors.l4:131:27-32:
+run-anchors.l4:133:27-32:
   I found a problem while checking the definition of `own arming`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:133:1-134:36:
+run-anchors.l4:135:1-136:36:
   DEONTIC BREACHED:
     party
       Tenant OF "Alice"
@@ -149,14 +149,14 @@ run-anchors.l4:133:1-134:36:
       MUST Sign alice
     before their deadline, which was at
       10
-run-anchors.l4:145:27-32:
+run-anchors.l4:147:27-32:
   I found a problem while checking the definition of `of a number`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:147:1-148:36:
+run-anchors.l4:149:1-150:36:
   DEONTIC BREACHED:
     party
       Tenant OF "Alice"
@@ -170,16 +170,16 @@ run-anchors.l4:147:1-148:36:
       MUST Sign alice
     before their deadline, which was at
       25
-run-anchors.l4:156:27-32:
+run-anchors.l4:158:27-32:
   I found a problem while checking the definition of `by thirty june`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:158:1-159:63:
+run-anchors.l4:160:1-161:63:
   FULFILLED
-run-anchors.l4:161:1-162:62:
+run-anchors.l4:163:1-164:62:
   DEONTIC BREACHED:
     party
       Tenant OF "Alice"
@@ -193,14 +193,14 @@ run-anchors.l4:161:1-162:62:
       MUST Sign alice
     before their deadline, which was at
       740161
-run-anchors.l4:169:27-32:
+run-anchors.l4:171:27-32:
   I found a problem while checking the definition of `already expired`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:171:1-172:62:
+run-anchors.l4:173:1-174:62:
   DEONTIC BREACHED:
     party
       Tenant OF "Alice"
@@ -214,14 +214,14 @@ run-anchors.l4:171:1-172:62:
       MUST Sign alice
     before their deadline, which was at
       740156
-run-anchors.l4:181:27-32:
+run-anchors.l4:183:27-32:
   I found a problem while checking the definition of `applied duration`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:183:1-184:35:
+run-anchors.l4:185:1-186:35:
   DEONTIC BREACHED:
     party
       Tenant OF "Alice"
@@ -235,23 +235,23 @@ run-anchors.l4:183:1-184:35:
       MUST Sign alice
     before their deadline, which was at
       6
-run-anchors.l4:205:48-59:
+run-anchors.l4:207:48-59:
   I found a problem while checking the definition of `the tenancy`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:206:48-59:
+run-anchors.l4:208:48-59:
   I found a problem while checking the definition of `the tenancy`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:208:1-211:51:
+run-anchors.l4:210:1-213:51:
   FULFILLED
-run-anchors.l4:213:1-216:51:
+run-anchors.l4:215:1-218:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -265,7 +265,7 @@ run-anchors.l4:213:1-216:51:
       MUST Deliver theLandlord
     before their deadline, which was at
       19
-run-anchors.l4:218:1-220:50:
+run-anchors.l4:220:1-222:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -279,14 +279,14 @@ run-anchors.l4:218:1-220:50:
       MUST Refund theLandlord
     before their deadline, which was at
       19
-run-anchors.l4:230:48-59:
+run-anchors.l4:232:48-59:
   I found a problem while checking the definition of `the tenancy, bounded as a whole`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:233:1-236:51:
+run-anchors.l4:235:1-238:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -300,14 +300,14 @@ run-anchors.l4:233:1-236:51:
       MUST Deliver theLandlord
     before their deadline, which was at
       35
-run-anchors.l4:249:47-58:
+run-anchors.l4:251:47-58:
   I found a problem while checking the definition of `the tenancy, a member late`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:251:1-254:50:
+run-anchors.l4:253:1-256:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -321,14 +321,14 @@ run-anchors.l4:251:1-254:50:
       MUST Refund theLandlord
     before their deadline, which was at
       19
-run-anchors.l4:266:47-58:
+run-anchors.l4:268:47-58:
   I found a problem while checking the definition of `the tenancy, the group late`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:268:1-271:50:
+run-anchors.l4:270:1-273:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -342,16 +342,16 @@ run-anchors.l4:268:1-271:50:
       MUST Refund theLandlord
     before their deadline, which was at
       35
-run-anchors.l4:293:48-59:
+run-anchors.l4:295:48-59:
   I found a problem while checking the definition of `per member`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:296:1-299:51:
+run-anchors.l4:298:1-301:51:
   FULFILLED
-run-anchors.l4:301:1-304:51:
+run-anchors.l4:303:1-306:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -365,7 +365,7 @@ run-anchors.l4:301:1-304:51:
       MUST Deliver theLandlord
     before their deadline, which was at
       25
-run-anchors.l4:306:1-309:51:
+run-anchors.l4:308:1-311:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -379,14 +379,14 @@ run-anchors.l4:306:1-309:51:
       MUST Deliver theLandlord
     before their deadline, which was at
       25
-run-anchors.l4:322:48-59:
+run-anchors.l4:324:48-59:
   I found a problem while checking the definition of `nobody, bounded as a whole`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:325:1-326:51:
+run-anchors.l4:327:1-328:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -400,44 +400,44 @@ run-anchors.l4:325:1-326:51:
       MUST Deliver theLandlord
     before their deadline, which was at
       35
-run-anchors.l4:334:36-47:
+run-anchors.l4:336:36-47:
   I found a problem while checking the definition of `nobody, act deadline only`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:339:53-64:
+run-anchors.l4:341:53-64:
   I found a problem while checking the definition of `nobody, act deadline only`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:343:1-345:50:
+run-anchors.l4:345:1-347:50:
   WITHIN … OF THE DEADLINE names a position in the life of the obligation this one is the continuation of, and here that position does not exist. One of: this is the HENCE of a barrier whose cast was EMPTY, so nobody had a deadline to meet and the ONCE line names none (THE DEADLINE); this obligation was passed as a value and attached under a LEST, whose join never fired (THE JOIN), or under an obligation with no WITHIN (THE DEADLINE); or it is running with no enclosing obligation at all. Anchor it to THE ARMING or to an instant, give the enclosing obligation the WITHIN, or guard an EVERY that may range over nobody.
-run-anchors.l4:354:36-47:
+run-anchors.l4:356:36-47:
   I found a problem while checking the definition of `after delivery`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:362:1-365:36:
+run-anchors.l4:364:1-367:36:
   FULFILLED
-run-anchors.l4:367:1-370:36:
+run-anchors.l4:369:1-372:36:
   DEONTIC BREACHED:
     BREACH
-run-anchors.l4:382:47-58:
+run-anchors.l4:384:47-58:
   I found a problem while checking the definition of `by instant 105`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:384:1-386:37:
+run-anchors.l4:386:1-388:37:
   FULFILLED
-run-anchors.l4:388:1-391:51:
+run-anchors.l4:390:1-393:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -451,14 +451,14 @@ run-anchors.l4:388:1-391:51:
       MUST Refund theLandlord
     before their deadline, which was at
       106
-run-anchors.l4:407:48-59:
+run-anchors.l4:409:48-59:
   I found a problem while checking the definition of `receipts`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:410:1-413:51:
+run-anchors.l4:412:1-415:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -483,30 +483,30 @@ run-anchors.l4:410:1-413:51:
           MUST Deliver theLandlord
         before their deadline, which was at
           16
-run-anchors.l4:433:25-28:
+run-anchors.l4:435:25-28:
   I found a problem while checking the definition of `after`:
     In this action, `bob` refers to
     
-      bob (at run-anchors.l4:34:1-4)
+      bob (at run-anchors.l4:35:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:439:27-32:
+run-anchors.l4:441:27-32:
   I found a problem while checking the definition of `handed on, the join`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:440:50-61:
+run-anchors.l4:442:50-61:
   I found a problem while checking the definition of `handed on, the join`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:443:1-446:51:
+run-anchors.l4:445:1-448:51:
   FULFILLED
-run-anchors.l4:448:1-451:51:
+run-anchors.l4:450:1-453:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -520,23 +520,23 @@ run-anchors.l4:448:1-451:51:
       MUST Deliver theLandlord
     before their deadline, which was at
       55
-run-anchors.l4:455:27-32:
+run-anchors.l4:457:27-32:
   I found a problem while checking the definition of `handed on, the deadline`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:456:50-61:
+run-anchors.l4:458:50-61:
   I found a problem while checking the definition of `handed on, the deadline`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:459:1-462:52:
+run-anchors.l4:461:1-464:52:
   FULFILLED
-run-anchors.l4:464:1-467:52:
+run-anchors.l4:466:1-469:52:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -550,37 +550,37 @@ run-anchors.l4:464:1-467:52:
       MUST Deliver theLandlord
     before their deadline, which was at
       108
-run-anchors.l4:479:25-28:
+run-anchors.l4:481:25-28:
   I found a problem while checking the definition of `afterBoth`:
     In this action, `bob` refers to
     
-      bob (at run-anchors.l4:34:1-4)
+      bob (at run-anchors.l4:35:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:480:42-45:
+run-anchors.l4:482:42-45:
   I found a problem while checking the definition of `afterBoth`:
     In this action, `bob` refers to
     
-      bob (at run-anchors.l4:34:1-4)
+      bob (at run-anchors.l4:35:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:485:27-32:
+run-anchors.l4:487:27-32:
   I found a problem while checking the definition of `handed on, in a compound, the join`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:486:54-65:
+run-anchors.l4:488:54-65:
   I found a problem while checking the definition of `handed on, in a compound, the join`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:489:1-493:36:
+run-anchors.l4:491:1-495:36:
   FULFILLED
-run-anchors.l4:495:1-499:36:
+run-anchors.l4:497:1-501:36:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -594,23 +594,23 @@ run-anchors.l4:495:1-499:36:
       MUST Deliver theLandlord
     before their deadline, which was at
       55
-run-anchors.l4:503:27-32:
+run-anchors.l4:505:27-32:
   I found a problem while checking the definition of `handed on, in a compound, the deadline`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:504:54-65:
+run-anchors.l4:506:54-65:
   I found a problem while checking the definition of `handed on, in a compound, the deadline`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:507:1-511:37:
+run-anchors.l4:509:1-513:37:
   FULFILLED
-run-anchors.l4:513:1-517:37:
+run-anchors.l4:515:1-519:37:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -624,52 +624,52 @@ run-anchors.l4:513:1-517:37:
       MUST Deliver theLandlord
     before their deadline, which was at
       108
-run-anchors.l4:523:25-28:
+run-anchors.l4:525:25-28:
   I found a problem while checking the definition of `afterEither`:
     In this action, `bob` refers to
     
-      bob (at run-anchors.l4:34:1-4)
+      bob (at run-anchors.l4:35:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:524:41-44:
+run-anchors.l4:526:41-44:
   I found a problem while checking the definition of `afterEither`:
     In this action, `bob` refers to
     
-      bob (at run-anchors.l4:34:1-4)
+      bob (at run-anchors.l4:35:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:529:27-32:
+run-anchors.l4:531:27-32:
   I found a problem while checking the definition of `handed on, either way`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:530:56-67:
+run-anchors.l4:532:56-67:
   I found a problem while checking the definition of `handed on, either way`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:533:1-536:51:
+run-anchors.l4:535:1-538:51:
   FULFILLED
-run-anchors.l4:546:27-32:
+run-anchors.l4:548:27-32:
   I found a problem while checking the definition of `factored out`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:550:49-60:
+run-anchors.l4:552:49-60:
   I found a problem while checking the definition of `cure`:
     I found a problem while checking the definition of `factored out`:
       In this action, `theLandlord` refers to
       
-        theLandlord (at run-anchors.l4:32:1-12)
+        theLandlord (at run-anchors.l4:33:1-12)
       
       If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:552:1-554:50:
+run-anchors.l4:554:1-556:50:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -683,29 +683,29 @@ run-anchors.l4:552:1-554:50:
       MUST Deliver theLandlord
     before their deadline, which was at
       5
-run-anchors.l4:558:27-32:
+run-anchors.l4:560:27-32:
   I found a problem while checking the definition of `factored out, in a compound`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:559:43-46:
+run-anchors.l4:561:43-46:
   I found a problem while checking the definition of `factored out, in a compound`:
     In this action, `bob` refers to
     
-      bob (at run-anchors.l4:34:1-4)
+      bob (at run-anchors.l4:35:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:562:49-60:
+run-anchors.l4:564:49-60:
   I found a problem while checking the definition of `cure`:
     I found a problem while checking the definition of `factored out, in a compound`:
       In this action, `theLandlord` refers to
       
-        theLandlord (at run-anchors.l4:32:1-12)
+        theLandlord (at run-anchors.l4:33:1-12)
       
       If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:564:1-567:35:
+run-anchors.l4:566:1-569:35:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -719,97 +719,97 @@ run-anchors.l4:564:1-567:35:
       MUST Deliver theLandlord
     before their deadline, which was at
       5
-run-anchors.l4:578:25-28:
+run-anchors.l4:580:25-28:
   I found a problem while checking the definition of `unless`:
     In this action, `bob` refers to
     
-      bob (at run-anchors.l4:34:1-4)
+      bob (at run-anchors.l4:35:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:585:25-28:
+run-anchors.l4:587:25-28:
   I found a problem while checking the definition of `unlessBoth`:
     In this action, `bob` refers to
     
-      bob (at run-anchors.l4:34:1-4)
+      bob (at run-anchors.l4:35:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:587:42-45:
+run-anchors.l4:589:42-45:
   I found a problem while checking the definition of `unlessBoth`:
     In this action, `bob` refers to
     
-      bob (at run-anchors.l4:34:1-4)
+      bob (at run-anchors.l4:35:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:592:25-28:
+run-anchors.l4:594:25-28:
   I found a problem while checking the definition of `after, open-ended`:
     In this action, `bob` refers to
     
-      bob (at run-anchors.l4:34:1-4)
+      bob (at run-anchors.l4:35:1-4)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:597:27-32:
+run-anchors.l4:599:27-32:
   I found a problem while checking the definition of `handed under a LEST`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:598:51-62:
+run-anchors.l4:600:51-62:
   I found a problem while checking the definition of `handed under a LEST`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:601:1-604:51:
+run-anchors.l4:603:1-606:51:
   WITHIN … OF THE JOIN names a position in the life of the obligation this one is the continuation of, and here that position does not exist. One of: this is the HENCE of a barrier whose cast was EMPTY, so nobody had a deadline to meet and the ONCE line names none (THE DEADLINE); this obligation was passed as a value and attached under a LEST, whose join never fired (THE JOIN), or under an obligation with no WITHIN (THE DEADLINE); or it is running with no enclosing obligation at all. Anchor it to THE ARMING or to an instant, give the enclosing obligation the WITHIN, or guard an EVERY that may range over nobody.
-run-anchors.l4:608:27-32:
+run-anchors.l4:610:27-32:
   I found a problem while checking the definition of `handed under a LEST, in a compound`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:609:55-66:
+run-anchors.l4:611:55-66:
   I found a problem while checking the definition of `handed under a LEST, in a compound`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:612:1-616:36:
+run-anchors.l4:614:1-618:36:
   WITHIN … OF THE JOIN names a position in the life of the obligation this one is the continuation of, and here that position does not exist. One of: this is the HENCE of a barrier whose cast was EMPTY, so nobody had a deadline to meet and the ONCE line names none (THE DEADLINE); this obligation was passed as a value and attached under a LEST, whose join never fired (THE JOIN), or under an obligation with no WITHIN (THE DEADLINE); or it is running with no enclosing obligation at all. Anchor it to THE ARMING or to an instant, give the enclosing obligation the WITHIN, or guard an EVERY that may range over nobody.
-run-anchors.l4:620:27-32:
+run-anchors.l4:622:27-32:
   I found a problem while checking the definition of `handed to no WITHIN`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:621:64-75:
+run-anchors.l4:623:64-75:
   I found a problem while checking the definition of `handed to no WITHIN`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:624:1-627:51:
+run-anchors.l4:626:1-629:51:
   WITHIN … OF THE DEADLINE names a position in the life of the obligation this one is the continuation of, and here that position does not exist. One of: this is the HENCE of a barrier whose cast was EMPTY, so nobody had a deadline to meet and the ONCE line names none (THE DEADLINE); this obligation was passed as a value and attached under a LEST, whose join never fired (THE JOIN), or under an obligation with no WITHIN (THE DEADLINE); or it is running with no enclosing obligation at all. Anchor it to THE ARMING or to an instant, give the enclosing obligation the WITHIN, or guard an EVERY that may range over nobody.
-run-anchors.l4:643:29-34:
+run-anchors.l4:645:29-34:
   I found a problem while checking the definition of `kept, the join`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:644:43-54:
+run-anchors.l4:646:43-54:
   I found a problem while checking the definition of `kept, the join`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:647:1-649:51:
+run-anchors.l4:649:1-651:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -823,21 +823,21 @@ run-anchors.l4:647:1-649:51:
       MUST Deliver theLandlord
     before their deadline, which was at
       33
-run-anchors.l4:653:29-34:
+run-anchors.l4:655:29-34:
   I found a problem while checking the definition of `kept, the deadline`:
     In this action, `alice` refers to
     
-      alice (at run-anchors.l4:33:1-6)
+      alice (at run-anchors.l4:34:1-6)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:654:43-54:
+run-anchors.l4:656:43-54:
   I found a problem while checking the definition of `kept, the deadline`:
     In this action, `theLandlord` refers to
     
-      theLandlord (at run-anchors.l4:32:1-12)
+      theLandlord (at run-anchors.l4:33:1-12)
     
     If you wanted a placeholder variable that matches any value, choose a name not already taken.
-run-anchors.l4:657:1-658:51:
+run-anchors.l4:659:1-660:51:
   DEONTIC BREACHED:
     party
       Landlord OF "Ms Ng"
@@ -851,17 +851,17 @@ run-anchors.l4:657:1-658:51:
       MUST Deliver theLandlord
     before their deadline, which was at
       13
-run-anchors.l4:668:1-20:
+run-anchors.l4:670:1-20:
   PARTY alice MUST Sign alice WITHIN 30 HENCE (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE JOIN) LEST BREACH
-run-anchors.l4:670:1-671:35:
+run-anchors.l4:672:1-673:35:
   PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE DEADLINE HENCE FULFILLED
-run-anchors.l4:673:1-675:36:
+run-anchors.l4:675:1-677:36:
   PARTY Landlord OF "Ms Ng" MUST Deliver theLandlord WITHIN 15 HENCE FULFILLED
-run-anchors.l4:679:1-57:
+run-anchors.l4:681:1-57:
   PARTY alice MUST Sign alice WITHIN 7 OF THE ARMING HENCE FULFILLED
-run-anchors.l4:679:29-34:
+run-anchors.l4:681:29-34:
   In this action, `alice` refers to
   
-    alice (at run-anchors.l4:33:1-6)
+    alice (at run-anchors.l4:34:1-6)
   
   If you wanted a placeholder variable that matches any value, choose a name not already taken.

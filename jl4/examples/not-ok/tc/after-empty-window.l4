@@ -1,0 +1,17 @@
+-- AFTER 30 WITHIN 5 OF THE JOIN closes before it opens: both edges count
+-- from the join, and 5 < 30 (EVERY-EACH-QUANTIFIER-SPEC §5.1.2.2). With both
+-- offsets literals the checker refuses it; the bare form, AFTER 30 WITHIN 5,
+-- re-anchors and is [join+30, join+35] — never empty.
+
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+
+DECLARE Action IS ONE OF
+    Pay
+    Deliver
+
+GIVETH A DEONTIC Actor Action
+bad MEANS
+    PARTY Seller MUST Deliver WITHIN 10
+    HENCE (PARTY Buyer MUST Pay AFTER 30 WITHIN 5 OF THE JOIN)

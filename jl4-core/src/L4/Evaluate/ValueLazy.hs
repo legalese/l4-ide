@@ -57,11 +57,21 @@ data Value a =
   | ValNil
   | ValCons a a
   | ValClosure (GivenSig Resolved) (Expr Resolved) Environment
-  | ValObligation Environment (Either RExpr (Value a)) (RAction Resolved) (Either (Maybe (Deadline Resolved)) (Value a)) RExpr (Maybe RExpr)
-    -- ^ The fourth field is the deadline: before the first event, the source
-    -- @WITHIN d [OF anchor]@ (or nothing); after it, the REMAINING due as a
-    -- number relative to the obligation's current clock. An anchor is spent
-    -- by that first evaluation ('L4.EvaluateLazy.Machine', @Contract4@).
+  | ValObligation Environment (Either RExpr (Value a)) (RAction Resolved) (Either (Maybe (Opening Resolved)) (Maybe (Value a))) (Either (Maybe (Deadline Resolved)) (Value a)) RExpr (Maybe RExpr)
+    -- ^ The fourth field is the window's OPENING edge (EVERY-EACH-QUANTIFIER-SPEC
+    -- §5.1.2, R-X5, built 2026-09-16): before the first event, the source
+    -- @AFTER d [OF anchor]@ \/ @AFTER date@ (or nothing); after it, the time
+    -- still to run until the window opens, as a number relative to the
+    -- obligation's current clock — @Just@ while the window has not opened,
+    -- @Nothing@ once it has (or when there never was an @AFTER@). The fifth
+    -- is the CLOSING edge: before the first event, the source @WITHIN d [OF
+    -- anchor]@ \/ @BEFORE date@ (or nothing); after it, the REMAINING due as
+    -- a number relative to the same clock — or, while the window has still
+    -- to open, relative to the OPENING instant, so that the two numbers read
+    -- together as the bare re-anchored window they are (@AFTER 1 WITHIN 30@
+    -- is @[clock+1, clock+1+30]@). An anchor, and the re-anchoring of a bare
+    -- @WITHIN@ on its @AFTER@, are spent by that first evaluation
+    -- ('L4.EvaluateLazy.Machine', @Contract4@).
   | ValROp Environment RBinOp (Either RExpr (Value a)) (Either RExpr (Value a))
   | ValQuantified Environment (Deonton Resolved)
     -- ^ An ARMED but not yet run quantified obligation: @EVERY [Cast] v [WHO …]
@@ -281,7 +291,7 @@ instance NFData a => NFData (Value a) where
   rnf (ValAssumed r)              = rnf r
   rnf (ValEnvironment env)        = env `seq` ()
   rnf (ValBreached ev)            = rnf ev `seq` ()
-  rnf (ValObligation env p a t f l) = env `seq` p `deepseq` a `deepseq` t `deepseq` f `deepseq` l `deepseq` ()
+  rnf (ValObligation env p a o t f l) = env `seq` p `deepseq` a `deepseq` o `deepseq` t `deepseq` f `deepseq` l `deepseq` ()
   rnf (ValQuantified env d)       = env `seq` d `deepseq` ()
 
 type MaybeEvaluated = MaybeEvaluated' RExpr

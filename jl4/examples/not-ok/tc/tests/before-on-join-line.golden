@@ -1,0 +1,13 @@
+Parsing successful
+Typechecking successful
+Info | [Import Resolution] Resolving import: daydate from before-on-join-line.l4Debug | [Import Resolution] Checking VFS URIs: project:/daydate.l4, daydate.l4, daydate.l4Debug | [Import Resolution] VFS MISS: project:/daydate.l4Debug | [Import Resolution] VFS MISS: daydate.l4Debug | [Import Resolution] VFS MISS: daydate.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/daydate.l4Info | [Import Resolution] Resolving import: daydate from before-on-join-line.l4Debug | [Import Resolution] Checking VFS URIs: project:/daydate.l4, daydate.l4, daydate.l4Debug | [Import Resolution] VFS MISS: project:/daydate.l4Debug | [Import Resolution] VFS MISS: daydate.l4Debug | [Import Resolution] VFS MISS: daydate.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/daydate.l4Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: before-on-join-line.l4
+  Hidden: no
+  Range: 16:21-16:43
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    BEFORE <date> is not accepted on a join line (ONCE … / UPON EACH …) —
+    only on the act. The join line's deadline is a WITHIN: write the absolute
+    date as WITHIN 0 OF <date>, which counts nothing from that instant.

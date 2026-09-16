@@ -1,0 +1,619 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+run-lest.l4:69:27-32:
+  I found a problem while checking the definition of `sign or refund`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:71:42-53:
+  I found a problem while checking the definition of `sign or refund`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lest.l4:45:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:73:1-74:20:
+  PARTY Landlord OF "Ms Ng" MUST Refund theLandlord WITHIN 1 HENCE FULFILLED
+run-lest.l4:76:1-78:50:
+  FULFILLED
+run-lest.l4:80:1-82:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      18
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      15
+run-lest.l4:88:27-32:
+  I found a problem while checking the definition of `sign or refund, anchored`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:90:42-53:
+  I found a problem while checking the definition of `sign or refund, anchored`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lest.l4:45:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:92:1-93:20:
+  PARTY Landlord OF "Ms Ng" MUST Refund theLandlord WITHIN 1 HENCE FULFILLED
+run-lest.l4:95:1-97:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      18
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      15
+run-lest.l4:105:1-106:50:
+  FULFILLED
+run-lest.l4:108:1-109:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      18
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      15
+run-lest.l4:118:1-119:21:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      100
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      15
+run-lest.l4:139:47-58:
+  I found a problem while checking the definition of `staggered`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lest.l4:45:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:141:1-145:20:
+  FULFILLED
+run-lest.l4:147:1-151:20:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      11
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      10
+run-lest.l4:153:1-157:20:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      11
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      10
+run-lest.l4:164:1-167:50:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      10
+run-lest.l4:169:1-172:50:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      10
+run-lest.l4:183:47-58:
+  I found a problem while checking the definition of `staggered, anchored`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lest.l4:45:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:185:1-189:20:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      11
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      10
+run-lest.l4:206:47-58:
+  I found a problem while checking the definition of `each signs or refund`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lest.l4:45:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:208:1-211:50:
+  FULFILLED
+run-lest.l4:213:1-216:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      19
+run-lest.l4:229:29-34:
+  I found a problem while checking the definition of `no smoking`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:231:42-53:
+  I found a problem while checking the definition of `no smoking`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lest.l4:45:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:233:1-235:49:
+  FULFILLED
+run-lest.l4:237:1-239:49:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      9
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      8
+run-lest.l4:243:29-34:
+  I found a problem while checking the definition of `no smoking, anchored`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:245:42-53:
+  I found a problem while checking the definition of `no smoking, anchored`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lest.l4:45:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:247:1-249:49:
+  FULFILLED
+run-lest.l4:269:47-58:
+  I found a problem while checking the definition of `bounded`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lest.l4:45:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:271:1-276:20:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      15
+run-lest.l4:282:1-287:20:
+  FULFILLED
+run-lest.l4:290:1-294:50:
+  FULFILLED
+run-lest.l4:296:1-300:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      16
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      15
+run-lest.l4:311:47-58:
+  I found a problem while checking the definition of `bounded, anchored`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lest.l4:45:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:313:1-318:20:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      15
+run-lest.l4:328:29-34:
+  I found a problem while checking the definition of `may approve or refund`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:330:42-53:
+  I found a problem while checking the definition of `may approve or refund`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lest.l4:45:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:332:1-333:19:
+  PARTY Landlord OF "Ms Ng" MUST Refund theLandlord WITHIN 2 HENCE FULFILLED
+run-lest.l4:335:1-337:50:
+  FULFILLED
+run-lest.l4:339:1-341:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      11
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      10
+run-lest.l4:346:25-30:
+  I found a problem while checking the definition of `do sign or refund`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:348:42-53:
+  I found a problem while checking the definition of `do sign or refund`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lest.l4:45:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:350:1-351:20:
+  PARTY Landlord OF "Ms Ng" MUST Refund theLandlord WITHIN 1 HENCE FULFILLED
+run-lest.l4:362:27-32:
+  I found a problem while checking the definition of `sign, with a second chance`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:364:34-39:
+  I found a problem while checking the definition of `sign, with a second chance`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:368:1-369:19:
+  PARTY Tenant OF "Alice" MUST Sign alice WITHIN 13 HENCE FULFILLED LEST (BREACH BY alice BECAUSE "the second chance was missed too")
+run-lest.l4:371:1-373:36:
+  FULFILLED
+run-lest.l4:375:1-377:36:
+  DEONTIC BREACHED:
+    BREACH
+    BY Tenant OF "Alice"
+    BECAUSE "the second chance was missed too"
+run-lest.l4:397:27-32:
+  I found a problem while checking the definition of `sign, or try again`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:401:1-402:21:
+  PARTY Tenant OF "Alice" MUST Sign alice WITHIN 2 HENCE FULFILLED LEST `sign, or try again`
+run-lest.l4:404:1-406:37:
+  FULFILLED
+run-lest.l4:414:27-32:
+  I found a problem while checking the definition of `third chance`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:416:34-39:
+  I found a problem while checking the definition of `third chance`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:418:41-46:
+  I found a problem while checking the definition of `third chance`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:422:1-423:37:
+  FULFILLED
+run-lest.l4:425:1-427:37:
+  FULFILLED
+run-lest.l4:433:27-32:
+  I found a problem while checking the definition of `three chances`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:435:34-39:
+  I found a problem while checking the definition of `three chances`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:437:41-46:
+  I found a problem while checking the definition of `three chances`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:441:1-442:21:
+  DEONTIC BREACHED:
+    BREACH
+    BY Tenant OF "Alice"
+    BECAUSE "all three chances missed"
+run-lest.l4:444:1-446:37:
+  DEONTIC BREACHED:
+    BREACH
+    BY Tenant OF "Alice"
+    BECAUSE "all three chances missed"
+run-lest.l4:459:27-32:
+  I found a problem while checking the definition of `arming under lest`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:461:42-53:
+  I found a problem while checking the definition of `arming under lest`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lest.l4:45:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:462:42-45:
+  I found a problem while checking the definition of `arming under lest`:
+    In this action, `bob` refers to
+    
+      bob (at run-lest.l4:47:1-4)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:464:1-467:20:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      16
+    surpassed the deadline of party
+      Tenant OF "Bob"
+    who had to do obligatory action
+      MUST Approve bob
+    before their deadline, which was at
+      13
+run-lest.l4:473:27-32:
+  I found a problem while checking the definition of `arming under hence`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:474:42-53:
+  I found a problem while checking the definition of `arming under hence`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lest.l4:45:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:475:42-45:
+  I found a problem while checking the definition of `arming under hence`:
+    In this action, `bob` refers to
+    
+      bob (at run-lest.l4:47:1-4)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:477:1-480:19:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      8
+    surpassed the deadline of party
+      Tenant OF "Bob"
+    who had to do obligatory action
+      MUST Approve bob
+    before their deadline, which was at
+      7
+run-lest.l4:501:27-32:
+  I found a problem while checking the definition of `stuck in the middle`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:503:34-39:
+  I found a problem while checking the definition of `stuck in the middle`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:505:49-60:
+  I found a problem while checking the definition of `stuck in the middle`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lest.l4:45:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:507:1-508:50:
+  FULFILLED
+run-lest.l4:510:1-512:50:
+  FULFILLED
+run-lest.l4:514:1-515:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      15
+run-lest.l4:517:1-519:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      15
+run-lest.l4:526:27-32:
+  I found a problem while checking the definition of `forthwith`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:528:34-39:
+  I found a problem while checking the definition of `forthwith`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:530:49-60:
+  I found a problem while checking the definition of `forthwith`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-lest.l4:45:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:532:1-533:50:
+  FULFILLED
+run-lest.l4:535:1-537:50:
+  FULFILLED
+run-lest.l4:539:1-540:50:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Refund OF (Landlord OF "Ms Ng")
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Refund theLandlord
+    before their deadline, which was at
+      15
+run-lest.l4:554:27-32:
+  I found a problem while checking the definition of `forthwith, forever`:
+    In this action, `alice` refers to
+    
+      alice (at run-lest.l4:46:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-lest.l4:558:1-559:50:
+  A chain of HENCE or LEST continuations has stalled: the event at 50 has been handed on 1000 times in a row to continuations whose deadlines never advanced past 0, a deadline it had already revealed the expiry of, so no continuation this chain reaches can ever be open to it. A continuation that names itself and is already past its deadline when it is entered - a negative WITHIN, a LEST's WITHIN 0, or an anchored deadline no later than the one just missed - is such a chain. Give it a positive WITHIN, anchor it later than the missed deadline, or end the chain with BREACH. (EVERY-EACH-QUANTIFIER-SPEC section 5.2.1.)

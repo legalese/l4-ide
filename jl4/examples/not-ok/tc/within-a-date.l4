@@ -1,0 +1,15 @@
+-- WITHIN takes a duration, a NUMBER (EVERY-EACH-QUANTIFIER-SPEC §5.1.2,
+-- R-X5: the edges are type-directed). A DATE there is the ordinary type
+-- mismatch, and its wording names the other word: BEFORE <date>.
+IMPORT daydate
+
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+
+DECLARE Action IS ONE OF
+    Pay
+    Deliver
+
+GIVETH A DEONTIC Actor Action
+bad MEANS PARTY Buyer MUST Pay WITHIN (YMD 2026 6 30)

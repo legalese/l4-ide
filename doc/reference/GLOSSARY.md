@@ -91,7 +91,9 @@ For expressing legal obligations, permissions, and prohibitions.
 | **DO**        | Optionality (deontic possibility)                                    | [REGULATIVE](regulative/README.md) |
 | **DOES**      | Action verb in directive                                             | [REGULATIVE](regulative/README.md) |
 | **EXACTLY**   | Deprecated: a name in an action already refers to the thing it names | [REGULATIVE](regulative/README.md) |
+| **AFTER**     | Window's opening edge (relative or absolute)                         | [AFTER](regulative/AFTER.md)       |
 | **WITHIN**    | Temporal deadline (relative)                                         | [REGULATIVE](regulative/README.md) |
+| **BEFORE**    | Temporal deadline (absolute date)                                    | [AFTER](regulative/AFTER.md)       |
 | **HENCE**     | Consequence on fulfillment                                           | [REGULATIVE](regulative/README.md) |
 | **LEST**      | Consequence on breach                                                | [REGULATIVE](regulative/README.md) |
 | **BREACH**    | Terminal violation state                                             | [REGULATIVE](regulative/README.md) |
@@ -198,10 +200,12 @@ For complete documentation, see **[Operators Reference](operators/README.md)**.
 
 ### Temporal Operators
 
-| Operator   | Description              |
-| ---------- | ------------------------ |
-| **AT**     | Point in time            |
-| **WITHIN** | Time duration constraint |
+| Operator   | Description                                |
+| ---------- | ------------------------------------------ |
+| **AT**     | Point in time                              |
+| **AFTER**  | Window opens after a duration or on a date |
+| **WITHIN** | Time duration constraint                   |
+| **BEFORE** | Window closes on a date                    |
 
 ---
 

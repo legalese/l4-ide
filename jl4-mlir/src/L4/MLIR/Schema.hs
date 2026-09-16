@@ -926,6 +926,12 @@ deontonToContract deonton = do
     Nothing                                             -> Just Nothing
     Just (MkDeadline _ e@(Lit _ (NumericLit{})) Nothing) -> Just (Just (Print.prettyLayout e))
     Just _                                              -> Nothing
+  -- The window's opening edge (@AFTER …@, EVERY-EACH-QUANTIFIER-SPEC §5.1.2,
+  -- 2026-09-16) has no WASM counterpart: fail closed rather than export a
+  -- window without the edge that keeps an early act from counting.
+  case deonton.opens of
+    Nothing -> Just ()
+    Just _  -> Nothing
   -- Fail closed on a present-but-unextractable HENCE / LEST branch.
   dcHence_ <- traverse exprToContract deonton.hence
   dcLest_  <- traverse exprToContract deonton.lest

@@ -65,13 +65,15 @@ data Env = Env
   { moduleUri :: NormalizedUri
   , mixfixHints :: MixfixHintRegistry
   , ofIsAnchor :: Bool
-    -- ^ Are we parsing the DURATION of a @WITHIN@? There @OF@ introduces the
-    -- deadline's anchor — @WITHIN 5 OF THE JOIN@, @WITHIN d OF closingDate@
-    -- (EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7A) — and not a function's
-    -- arguments, so 'app' does not take @OF@-arguments while this is set and
-    -- an application spelled @f OF x@ in that slot must be parenthesised.
-    -- Set by 'deadline'; reset by 'paren' and inside the anchor itself
-    -- ('inExprSlot'). Everywhere else it is 'False'.
+    -- ^ Are we parsing the DURATION of a @WITHIN@ (or the offset of an
+    -- @AFTER@)? There @OF@ introduces the edge's anchor — @WITHIN 5 OF THE
+    -- JOIN@, @WITHIN d OF closingDate@, @AFTER 3 OF THE JOIN@
+    -- (EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7A; §5.1.2, R-X5) — and not a
+    -- function's arguments, so 'app' does not take @OF@-arguments while this
+    -- is set and an application spelled @f OF x@ in that slot must be
+    -- parenthesised. Set by 'deadline' and 'opening'; reset by 'paren' and
+    -- inside the anchor itself ('inExprSlot'). Everywhere else it is
+    -- 'False' — including inside a @BEFORE@, which takes no anchor.
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (SOP.Generic)
@@ -2559,11 +2561,19 @@ optionalWithHole :: HasSrcRange a => AnnoParser a -> AnnoParser (Maybe a)
 optionalWithHole p = Just <$> p <|> annoHole (pure Nothing)
 
 -- | A deonton: @PARTY p@ or @EVERY [Cast] v [IN roll] [WHO f]@, then the modal and
--- action, then the optional @WITHIN@ \/ @ONCE …@ \/ @HENCE@ \/ @LEST@ clauses.
+-- action, then the optional @AFTER@ \/ @WITHIN@-or-@BEFORE@ \/ @ONCE …@ \/
+-- @HENCE@ \/ @LEST@ clauses.
 --
 -- The column of the head keyword (@PARTY@ or @EVERY@) is the layout threshold
 -- for every body that follows, exactly as before the quantified form existed.
 -- One hole per field, in field order ('L4.Syntax.Deonton').
+--
+-- The window's two edges are written in ONE order, opening then closing
+-- (@AFTER 3 WITHIN 30@); the other order is a parse error that names the
+-- order ('edgeOrderGuard'). Meng's "order carries meaning" idea — the two
+-- orders reading as the two windows — was put and REJECTED on 2026-09-16 as
+-- a footgun (EVERY-EACH-QUANTIFIER-SPEC §5.1.2): the two readings are told
+-- apart by an anchor, not by word order.
 obligation :: Parser (Deonton Name)
 obligation = do
   current <- Lexer.indentLevel
@@ -2571,10 +2581,38 @@ obligation = do
     MkDeonton emptyAnno
       <$> annoHole (subject current)
       <*> annoHole (must current)
-      <*> optionalWithHole (deadline current)
+      <*> optionalWithHole (opening current)
+      <*> optionalWithHole (closingEdge current)
+      <*  edgeOrderGuard
       <*> optionalWithHole (joinLine current)
       <*> optionalWithHole (hence current)
       <*> optionalWithHole (lest current)
+
+-- | After the closing-edge slot, an @AFTER@ can only be the opening edge
+-- written in the wrong place (@WITHIN 30 AFTER 3@), or a second one; a
+-- @WITHIN@ or @BEFORE@ there can only be a second closing edge (@WITHIN 30
+-- BEFORE date@ — 'closingEdge' is one slot, and the join line's @WITHIN@
+-- follows @ONCE@\/@UPON@, never the act's edge directly). Fail there with
+-- the rule spelled out, rather than with megaparsec's list of what may
+-- follow a @WITHIN@. Consumes nothing and records no hole. Both look-aheads
+-- are 'hidden' so that neither word joins the list of tokens expected
+-- after a @WITHIN@ in every other parse error — they are not accepted
+-- there, so listing them would be a lie (and would move the two
+-- @every-join-misindented@ goldens, which quote that list). The second
+-- look-ahead was added by the adversarial pass of 2026-09-16 (R1-5).
+edgeOrderGuard :: AnnoParser ()
+edgeOrderGuard = wrapAnnoParser $ WithAnno [] <$> do
+  misplaced <- optional (lookAhead (hidden (spacedKeyword_ TKAfter)))
+  for_ misplaced \ _ -> fancyFailure (Set.singleton (ErrorFail orderMsg))
+  secondCloser <- optional (lookAhead (hidden (spacedKeyword_ TKWithin <|> spacedKeyword_ TKBefore)))
+  for_ secondCloser \ _ -> fancyFailure (Set.singleton (ErrorFail oneCloserMsg))
+  where
+    orderMsg = "AFTER, the window's opening edge, comes first and once: \
+          \PARTY p MUST act AFTER 3 WITHIN 30 - one AFTER, then WITHIN or BEFORE. \
+          \This AFTER comes too late: after the closing edge, or after another AFTER."
+    oneCloserMsg = "One closing edge: WITHIN d [OF anchor] or BEFORE date, not both and not twice. \
+          \The window is [AFTER d1] then one of WITHIN d2 / BEFORE date; \
+          \this second closing edge has nothing to close."
 
 -- | The subject of a deonton (EVERY-EACH-QUANTIFIER-SPEC §2.4, RULED 2026-09-07;
 -- the @IN@ roll RULED and built 2026-09-08, §11.0.2):
@@ -2652,18 +2690,22 @@ subject current =
 -- Phase 3 adds the count and measure thresholds (@SOME 2 OF … HAVE@,
 -- @sum OF amount AT LEAST rent@) as further 'Threshold' alternatives, all of
 -- them under @ONCE@.
+--
+-- The deadline slot takes the closing edge's grammar ('closingEdge') so
+-- that a @BEFORE@ written there is refused by the checker by name rather
+-- than as an unexpected token; no @AFTER@ is offered on a join line.
 joinLine :: Pos -> AnnoParser (Join Name)
 joinLine current = annoHole $
       attachAnno
         ( JoinOnce emptyAnno
             <$  indented' (annoLexeme (spacedKeyword_ TKOnce)) current
             <*> annoHole (joinThreshold current)
-            <*> optionalWithHole (deadline current)
+            <*> optionalWithHole (closingEdge current)
         )
   <|> attachAnno
         ( JoinUpon emptyAnno
             <$> annoHole (uponEach current)
-            <*> optionalWithHole (deadline current)
+            <*> optionalWithHole (closingEdge current)
         )
 
 -- | @ONCE@'s threshold. Phase 1 has only the barrier; the count and measure
@@ -2709,8 +2751,48 @@ must current = attachAnno $
       annoLexeme (spacedKeyword_ TKProvided)
         *> annoHole (indentedExpr current)
 
+-- | The act's closing edge: @WITHIN d [OF anchor]@ or @BEFORE date@
+-- (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X5). The two are alternatives in ONE
+-- slot, so the parent records one hole either way and @WITHIN@ and @BEFORE@
+-- cannot both be written. The checker discriminates the argument's type
+-- (a DATE after @WITHIN@ names @BEFORE@, a NUMBER after @BEFORE@ names
+-- @WITHIN@: 'L4.TypeCheck.checkDeadline').
+closingEdge :: Pos -> AnnoParser (Deadline Name)
+closingEdge current = deadline current <|> before current
+
+-- | @BEFORE date@ — the absolute closing edge. One hole, the instant; the
+-- @BEFORE@ keyword is a token of the 'Deadline' node's own 'Anno'. The
+-- instant is parsed as an ordinary expression ('inExprSlot'): a @BEFORE@
+-- takes no anchor, so @OF@ inside it is application, as everywhere else.
+--
+-- Parsed on a join line too, where the checker refuses it by name: a
+-- @BEFORE@ there is not built (it would need 'Barrier3'\/'Barrier4' to
+-- lower a DATE).
+before :: Pos -> AnnoParser (Deadline Name)
+before current = annoHole $ attachAnno $
+  MkBefore emptyAnno
+    <$  annoLexeme (spacedKeyword_ TKBefore)
+    <*> annoHole (inExprSlot (indentedExpr current))
+
+-- | The window's opening edge, @AFTER d [OF anchor]@ or @AFTER date@
+-- (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X5; RE-ANCHORS, §5.1.2.2). The
+-- same shape as 'deadline' — one hole for the offset, one for the optional
+-- anchor, the keyword in the node's own 'Anno' — and the same @OF@ rule:
+-- in the offset slot @OF@ is the anchor, so @AFTER period OF closingDate@
+-- is @period@ anchored at @closingDate@, never @period@ applied. A date
+-- offset with an anchor (@AFTER (YMD 2026 6 1) OF THE JOIN@) parses and is
+-- refused by the checker: a DATE is already an instant.
+--
+-- Act position only ('obligation'); the join line takes no @AFTER@.
+opening :: Pos -> AnnoParser (Opening Name)
+opening current = annoHole $ attachAnno $
+  MkOpening emptyAnno
+    <$  annoLexeme (spacedKeyword_ TKAfter)
+    <*> annoHole (local (\ e -> e { ofIsAnchor = True }) (indentedExpr current))
+    <*> optionalWithHole (anchor current)
+
 -- | @WITHIN d [OF anchor]@, in either position — the act's deadline
--- ('obligation') or the join line's ('joinLine'). One hole for the
+-- ('closingEdge') or the join line's ('joinLine'). One hole for the
 -- duration, one for the optional anchor, in that order ('L4.Syntax.Deadline');
 -- the @WITHIN@ keyword is a token of the 'Deadline' node's own 'Anno'.
 --
@@ -2728,8 +2810,8 @@ deadline current = annoHole $ attachAnno $
     <*> annoHole (local (\ e -> e { ofIsAnchor = True }) (indentedExpr current))
     <*> optionalWithHole (anchor current)
 
--- | The anchor of a deadline, @OF …@ (EVERY-EACH-QUANTIFIER-SPEC §5.1.1,
--- RULED 2026-09-07):
+-- | The anchor of an edge — a deadline's, or an opening's — @OF …@
+-- (EVERY-EACH-QUANTIFIER-SPEC §5.1.1, RULED 2026-09-07):
 --
 -- > OF THE JOIN | OF THE DEADLINE | OF THE ARMING     -- R-Q7B, the lifecycle anchors
 -- > OF e                                              -- R-Q7C, a NUMBER or DATE expression

@@ -142,7 +142,7 @@ evalApp evalConfig entityInfo contextModule evalParams recentViz =
         Nothing -> defaultResponseError "No eval result found"
   where
     evalResultToLadderEvalAppResult :: EL.EvalDirectiveResult -> ExceptT (TResponseError method) m EvalAppResult
-    evalResultToLadderEvalAppResult (EL.MkEvalDirectiveResult _ res _mtrace _ledger) = case res of
+    evalResultToLadderEvalAppResult (EL.MkEvalDirectiveResult _ res _mtrace _ledger _notes) = case res of
       EL.Assertion EL.Holds   -> pure $ EvalAppResult (toUBoolValue True)
       EL.Assertion EL.Fails   -> pure $ EvalAppResult (toUBoolValue False)
       EL.Assertion a@(EL.FailsBecause _) -> defaultResponseError $ EL.prettyAssertionOutcome a

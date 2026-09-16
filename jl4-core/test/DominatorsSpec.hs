@@ -207,8 +207,10 @@ orphanGraph = StateGraph
   , sgInitialState = 0
   }
  where
-  act p a = TransitionLabel (Just p) (Just DMust) a Nothing Nothing Nothing Nothing Nothing
-  timeout = TransitionLabel Nothing (Just DMust) "timeout" Nothing Nothing Nothing Nothing Nothing
+  -- the fourth field is the window's opening edge (AFTER, EVERY-EACH-QUANTIFIER-SPEC §5.1.2);
+  -- the ninth is the site the edge was drawn from (P2g, LTS-VISUALISER §4.8)
+  act p a = TransitionLabel (Just p) (Just DMust) a Nothing Nothing Nothing Nothing Nothing Nothing
+  timeout = TransitionLabel Nothing (Just DMust) "timeout" Nothing Nothing Nothing Nothing Nothing Nothing
 
 --------------------------------------------------------------------------------
 -- Tests

@@ -23,6 +23,7 @@ module L4.EvaluateLazy
 , Refusal(..)
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
+, prettyNotes
 , prettyAssertionOutcome
 , prettyReductionOutcome
 , postprocessTrace
@@ -150,7 +151,10 @@ withFreshLedger :: Eval a -> Eval a
 withFreshLedger m = do
   fresh      <- liftIO (newIORef emptyStore)
   freshParty <- liftIO (newIORef Nothing)
-  local (\s -> s { envLedger = fresh, currentParty = freshParty }) m
+  freshNotes <- liftIO (newIORef mempty)
+  -- the run's notes ('tellNote') are per directive for the same reason the
+  -- ledger is: a note belongs to the directive whose value it qualifies
+  local (\s -> s { envLedger = fresh, currentParty = freshParty, notes = freshNotes }) m
 
 -- | Apply runtime EVAL clauses for the duration of an action,
 -- restoring the previous temporal context afterwards.
@@ -266,6 +270,9 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
   -- is an append and 'ValBreached' does not roll back, so any pre-breach
   -- 'Assign' is already in here.
   directiveLedger <- currentStore
+  -- likewise the notes the run raised while producing this value (R-X6's
+  -- early act, the empty window): read before the fresh ref is discarded
+  directiveNotes <- map (\ (MkNote t) -> t) . toList <$> readEvalRef (.notes)
   let
     v' = case assertKind of
       NotAnAssert -> Reduction
@@ -311,7 +318,7 @@ nfDirectiveWith withSteps (MkEvalDirective r traced assertKind expr env) = withF
           Left exc -> Errored exc
           Right _  -> FailsBecause "expected a refusal, but the expression produced a value"
     quoted t = "\"" <> t <> "\""
-  pure (MkEvalDirectiveResult r v' finalTrace directiveLedger, steps)
+  pure (MkEvalDirectiveResult r v' finalTrace directiveLedger directiveNotes, steps)
   where
     captureSteps :: Eval a -> Eval (a, [DeonticStep])
     captureSteps
@@ -365,6 +372,13 @@ data EvalDirectiveResult =
       -- Newest-last within each ledger. Empty for a directive that wrote nothing
       -- (pure reads / ordinary expressions) — rendered as nothing in that case
       -- so reads do not clutter the output.
+    , notes :: ![Text]
+      -- ^ what the run REPORTED without failing while producing the value
+      -- ('L4.EvaluateLazy.Machine.tellNote'; EVERY-EACH-QUANTIFIER-SPEC
+      -- §5.1.2, 2026-09-16): an act before its window opened (R-X6, a
+      -- nullity the run must not swallow), an explicitly anchored window a
+      -- run found empty. In the order raised. Empty for almost every
+      -- directive, and rendered as nothing then, so no older output moves.
     }
   deriving stock (Generic, Show)
   deriving anyclass NFData
@@ -504,8 +518,9 @@ renderProvenance prov =
 -- the trace if present, and the ledger section if the directive wrote anything.
 --
 prettyEvalDirectiveResult :: EvalDirectiveResult -> Text
-prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led) =
+prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led ns) =
    prettyEvalDirectiveValue res
+   <> prettyNotes ns
    <> prettyLedger led
    <> case mtrace of
         Nothing -> Text.empty
@@ -514,22 +529,31 @@ prettyEvalDirectiveResult (MkEvalDirectiveResult _range res mtrace led) =
 -- | Like 'prettyEvalDirectiveResult' but uses named-field syntax (WITH / IS)
 -- for constructors whose field names are provided.
 prettyEvalDirectiveResultWithFields :: ConstructorFieldNames -> EvalDirectiveResult -> Text
-prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace led) =
+prettyEvalDirectiveResultWithFields fields (MkEvalDirectiveResult _range res mtrace led ns) =
    prettyEvalDirectiveValueWithFields fields res
+   <> prettyNotes ns
    <> prettyLedger led
    <> case mtrace of
         Nothing -> Text.empty
         Just t  -> "\n─────\n" <> prettyLayout t
+
+-- | The run's notes, one @NOTE:@ line each after the value; nothing when
+-- there are none (the usual case), so no older output moves.
+prettyNotes :: [Text] -> Text
+prettyNotes = foldMap (\ n -> "\nNOTE: " <> n)
 
 -- ----------------------------------------------------------------------------
 -- ToJSON instances for batch --json output
 -- ----------------------------------------------------------------------------
 
 instance Aeson.ToJSON EvalDirectiveResult where
-  toJSON (MkEvalDirectiveResult _range res _trace _ledger) = Aeson.object
+  toJSON (MkEvalDirectiveResult _range res _trace _ledger ns) = Aeson.object $
     [ "result" Aeson..= res
     , "trace"  Aeson..= Aeson.Null
     ]
+    -- the run's notes, only when there are any, so the object of a
+    -- directive with none is unchanged
+    <> [ "notes" Aeson..= ns | not (null ns) ]
 
 instance Aeson.ToJSON EvalDirectiveValue where
   toJSON (Assertion Holds) = Aeson.object
@@ -591,10 +615,11 @@ nfAux  d (ValCons r1 r2)             = do
   pure (MkNF (ValCons v1 v2))
 nfAux _d (ValClosure givens e env)   = pure (MkNF (ValClosure givens e env))
 nfAux _d (ValNullaryBuiltinFun b)    = pure (MkNF (ValNullaryBuiltinFun b))
-nfAux d (ValObligation env party act due followup lest) = do
+nfAux d (ValObligation env party act opens due followup lest) = do
   party' <- traverseAndNF d party
+  opens' <- traverse (traverse (traverse (evalAndNF d))) opens
   due' <- traverseAndNF d due
-  pure (MkNF (ValObligation env party' act due' followup lest))
+  pure (MkNF (ValObligation env party' act opens' due' followup lest))
 nfAux _d (ValUnaryBuiltinFun b)      = pure (MkNF (ValUnaryBuiltinFun b))
 nfAux _d (ValBinaryBuiltinFun b)     = pure (MkNF (ValBinaryBuiltinFun b))
 nfAux _d (ValTernaryBuiltinFun b)    = pure (MkNF (ValTernaryBuiltinFun b))
@@ -688,9 +713,10 @@ mkInitialEvalState evalConfig entityInfo moduleUri = do
   reofferedEvents <- newIORef mempty
   envLedger    <- newIORef emptyStore
   currentParty <- newIORef Nothing
+  notes        <- newIORef mempty
   -- P2b: off by default (R5); 'captureDeonticSteps' installs one per directive
   let deonticLog = Nothing
-  pure MkEvalState {moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo, evalTime = actualTime, temporalContext, ctxReads, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, reofferedEvents, deonticLog}
+  pure MkEvalState {moduleUri, stack, supply, evalTrace, envLedger, currentParty, entityInfo, evalTime = actualTime, temporalContext, ctxReads, tracePolicy = evalConfig.tracePolicy, safeMode = evalConfig.safeMode, reofferedEvents, notes, deonticLog}
 
 -- | Build a minimal 'EvalState' and run an 'Eval' action against it, catching
 -- evaluation exceptions at the boundary.

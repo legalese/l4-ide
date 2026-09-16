@@ -78,6 +78,7 @@ import L4.Syntax
   , TopDecl(..)
   , Decide(..)
   , Deonton(..)
+  , Deadline(..)
   , Subject(..)
   , Join(..)
   , Threshold(..)
@@ -158,7 +159,16 @@ data TransitionLabel = TransitionLabel
   { labelParty    :: Maybe Text    -- ^ Party responsible (e.g., "buyer", "seller")
   , labelModal    :: Maybe DeonticModal  -- ^ Deontic modal (MUST, MAY, etc.)
   , labelAction   :: Text          -- ^ Action description
-  , labelDeadline :: Maybe Text    -- ^ Temporal constraint (e.g., "30 days")
+  , labelOpening  :: Maybe Text
+    -- ^ The window's OPENING edge, the body of the @AFTER@ as written
+    -- (@3@, @3 OF THE JOIN@, a date) — EVERY-EACH-QUANTIFIER-SPEC §5.1.2,
+    -- 2026-09-16. Carried so no consumer can drop it silently; the BPMN
+    -- lowering reports it as not drawn ('L4.Bpmn.Lower.openingFindings').
+  , labelDeadline :: Maybe Text
+    -- ^ Temporal constraint, the window's CLOSING edge: the body of the
+    -- @WITHIN@ as written (e.g., "30", "5 OF THE JOIN"), or the whole
+    -- @BEFORE date@ clause, keyword and all, so that a consumer reading it
+    -- as a duration sees at once that it is not one.
   , labelGuard    :: Maybe Text    -- ^ PROVIDED condition
   , labelBranch   :: Maybe BranchGuard
     -- ^ The @IF@-chain arm this edge came from, kept in pieces rather than only
@@ -311,11 +321,10 @@ thresholdText :: Threshold Resolved -> Text
 thresholdText = \case
   AllHave _ -> "ALL HAVE"
 
--- | A deadline's body as re-parseable source: the duration bracketed when it
--- is an application or an operator expression — @(period OF 2) OF THE
--- ARMING@, @(2 TIMES 7) OF THE JOIN@ — exactly as the layout printer prints
--- a @WITHIN@ body ('L4.Print.parensIfNeeded' on the 'Deadline' instance, which
--- is what @mprint "WITHIN"@ applies), and a bare number or name as itself.
+-- | A window edge's body as re-parseable source: the duration bracketed when
+-- it is an application or an operator expression — @(period OF 2) OF THE
+-- ARMING@, @(2 TIMES 7) OF THE JOIN@ — exactly as 'L4.Print.closingClause'
+-- and 'L4.Print.openingClause' print it, and a bare number or name as itself.
 --
 -- Unbracketed, @period OF 2 OF THE ARMING@ is not the source form at all: in
 -- the @WITHIN@ slot the first @OF@ is the anchor ('L4.Parser.deadline'), so
@@ -870,6 +879,7 @@ fanLabel mGuard = TransitionLabel
   { labelParty    = Nothing
   , labelModal    = Nothing
   , labelAction   = ""
+  , labelOpening  = Nothing
   , labelDeadline = Nothing
   -- One source, not two: the text IS the rendering of the structure, so a
   -- consumer reading either gets the same guard.
@@ -888,7 +898,7 @@ fanLabel mGuard = TransitionLabel
 -- and nothing warned. A positional pattern makes the next new field a type
 -- error on this line.
 extractDeonton :: Maybe StateId -> Deonton Resolved -> ExtractM ()
-extractDeonton mFromState (MkDeonton _anno subject action due mJoin hence lest) = do
+extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence lest) = do
   -- Create or get the source state
   fromState <- case mFromState of
     Just sid -> pure sid
@@ -901,8 +911,17 @@ extractDeonton mFromState (MkDeonton _anno subject action due mJoin hence lest) 
       -- An anchored deadline (R-Q7, §5.1.1) prints as its source form,
       -- @5 OF THE JOIN@, the duration bracketed where the source needs it
       -- ('edgeText'); 'L4.Bpmn.Lower.parseDuration' cannot read an anchor and
-      -- the lowering reports it as anchored, which is the stated limit.
-      deadlineText = fmap edgeText due
+      -- the lowering reports it as anchored, which is the stated limit. A
+      -- @BEFORE@ (R-X5, §5.1.2) keeps its keyword in the label for the same
+      -- reason: it is a date, not a duration, and the lowering must be able
+      -- to see that.
+      deadlineText = fmap closingText due
+      closingText = \ case
+        d@MkDeadline{} -> edgeText d
+        d@MkBefore{}   -> "BEFORE " <> edgeText d
+      -- The opening edge (§5.1.2), as its source form; the BPMN lowering
+      -- does not draw it and says so ('L4.Bpmn.Lower.openingFindings').
+      openingText = fmap edgeText opens
       guardText = fmap prettyLayout action.provided
 
       -- Exhaustive on the join and on the threshold, with no wildcard arm, so
@@ -917,9 +936,9 @@ extractDeonton mFromState (MkDeonton _anno subject action due mJoin hence lest) 
             }
       joinLabel = \case
         JoinOnce _ th d ->
-          MkJoinLabel { joinKind = Barrier (thresholdText th), joinDeadline = edgeText <$> d }
+          MkJoinLabel { joinKind = Barrier (thresholdText th), joinDeadline = closingText <$> d }
         JoinUpon _ _ d ->
-          MkJoinLabel { joinKind = Fork, joinDeadline = edgeText <$> d }
+          MkJoinLabel { joinKind = Fork, joinDeadline = closingText <$> d }
 
       -- The key's static half (B1): the same @rangeOf@ of the same
       -- 'RAction' that @armNormKey@ stamps on the runtime step.
@@ -929,6 +948,7 @@ extractDeonton mFromState (MkDeonton _anno subject action due mJoin hence lest) 
         { labelParty    = partyText
         , labelModal    = modalVal
         , labelAction   = actionText
+        , labelOpening  = openingText
         , labelDeadline = deadlineText
         , labelGuard    = guardText
         , labelBranch   = Nothing
@@ -951,6 +971,7 @@ extractDeonton mFromState (MkDeonton _anno subject action due mJoin hence lest) 
         { labelParty    = Nothing
         , labelModal    = modalVal
         , labelAction   = lestArmWording action.modal (memberDeadline label)
+        , labelOpening  = Nothing
         , labelDeadline = Nothing
         , labelGuard    = Nothing
         , labelBranch   = Nothing

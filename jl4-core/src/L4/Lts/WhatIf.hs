@@ -273,9 +273,25 @@ candidatesOf pos = case pos.posResidual of
 -- lowered by the machine's own 'anchorInstant'. An anchor that is not yet
 -- forced, or a lifecycle position this hand-off does not have, leaves the
 -- deadline unknown, and the reason says which.
+--
+-- The window's OPENING edge (@AFTER@, EVERY-EACH-QUANTIFIER-SPEC §5.1.2,
+-- read here since 2026-09-17) moves the origin in two ways, both the
+-- machine's: a residual due is REMAINING from the instant the @WITHIN@
+-- runs from, which while the window has still to open is the opening, not
+-- the clock (@relativeDue@ at @Contract5@; the residual's 'roOpens' then
+-- holds the time still to run until it) — so the opening is added back
+-- first, exactly as @Contract4@ does at the next scrutiny; and a bare
+-- unforced @WITHIN@ beside an @AFTER@ re-anchors on the opening (§5.1.2.2,
+-- R-X5 as amended), so its origin is the opening's instant — the
+-- @AFTER@'s anchor (or the clock) plus its offset, read the same way the
+-- closing edge's anchor is. An @AFTER@ whose offset is not a literal (a
+-- date) leaves the deadline unknown, as an unforced @BEFORE@ does.
 deadlineOf :: Rational -> RawObligation NF -> IO (Either Text Rational)
 deadlineOf clock raw = case raw.roDue of
-  Right (ValNumber r) -> pure (Right (clock + r))
+  Right (ValNumber r) -> pure $ case raw.roOpens of
+    Right (Just (ValNumber untilOpen)) -> Right (clock + untilOpen + r)
+    Right (Just other) -> Left ("the residual opening is not a number: " <> Text.pack (show other))
+    _ -> Right (clock + r)
   Right other         -> pure (Left ("the residual deadline is not a number: " <> Text.pack (show other)))
   Left Nothing        -> pure (Left "no WITHIN: the obligation has no deadline to tick past")
   Left (Just (MkDeadline _ e anchor)) -> do
@@ -283,11 +299,29 @@ deadlineOf clock raw = case raw.roDue of
       Lit _ (NumericLit _ r) -> Right r
       _ -> Left "the WITHIN was never evaluated and is not a literal, so its deadline is not known here"
     origin <- case anchor of
-      Nothing -> pure (Right clock)
+      Nothing -> openingInstant
       Just a  -> anchorOf a
     pure ((+) <$> origin <*> duration)
+  -- a BEFORE date (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X5) is lowered by
+  -- the machine at Contract5, from an application (@YMD …@), not a literal;
+  -- an unforced one is not known here
+  Left (Just (MkBefore _ _)) ->
+    pure (Left "the BEFORE date was never evaluated, so its deadline is not known here")
   where
     lifecycle = lifecycleOf raw.roEnv
+    -- what a bare WITHIN counts from: the window's opening when the act
+    -- has one that is still to open, the clock otherwise
+    openingInstant = case raw.roOpens of
+      Left Nothing  -> pure (Right clock)
+      Right Nothing -> pure (Right clock)
+      Right (Just (ValNumber untilOpen)) -> pure (Right (clock + untilOpen))
+      Right (Just other) -> pure (Left ("the residual opening is not a number: " <> Text.pack (show other)))
+      Left (Just (MkOpening _ offset mAnchor)) -> do
+        off <- reifyExpr raw.roEnv offset >>= pure . \ case
+          Lit _ (NumericLit _ r) -> Right r
+          _ -> Left "the AFTER was never evaluated and is not a literal (a date, or a computed offset), so its deadline is not known here"
+        base <- maybe (pure (Right clock)) anchorOf mAnchor
+        pure ((+) <$> base <*> off)
     anchorOf = \ case
       AnchorJoin _     -> lifecyclePosition "THE JOIN" (lifecycle >>= (.join))
       AnchorDeadline _ -> lifecyclePosition "THE DEADLINE" (lifecycle >>= (.deadline))
@@ -333,6 +367,10 @@ data Verdict
 -- own obligation recorded it ('StepOutcome').
 data PassOver
   = GuardFalse     -- ^ the act matched but its @PROVIDED@ came out false
+  | TooEarly !Rational
+    -- ^ the act matched but came before the window opened (@AFTER@,
+    -- EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X6): a nullity, the obligation
+    -- stands; carries the instant the window opens
   | WrongAct       -- ^ not the act awaited
   | WrongParty     -- ^ not this party's to do
   | NoTaker
@@ -441,6 +479,7 @@ confirmAct kind steps verdict = case (kind, verdict) of
       PartyMismatch   -> False
       ActionMismatch  -> False
       GuardFailed     -> False
+      EarlyAct _      -> False
     reasonFor n =
       let atSite = [ (k, s) | s <- steps, Just k <- [s.dsNorm], k.nkSite == n.lnSite ]
           own = case n.lnBearer of
@@ -449,6 +488,7 @@ confirmAct kind steps verdict = case (kind, verdict) of
       in fromMaybe NoTaker (listToMaybe (mapMaybe reason own <> mapMaybe reason (map snd atSite) <> mapMaybe reason steps))
     reason s = case s.dsOutcome of
       GuardFailed    -> Just GuardFalse
+      EarlyAct open  -> Just (TooEarly open)
       ActionMismatch -> Just WrongAct
       PartyMismatch  -> Just WrongParty
       _              -> Nothing
@@ -471,6 +511,7 @@ confirmTick kind hyp steps verdict = case (kind, hyp) of
       PartyMismatch   -> False
       ActionMismatch  -> False
       GuardFailed     -> False
+      EarlyAct _      -> False
       Matched _       -> False
       Breached _      -> False
       Joined _ _      -> False

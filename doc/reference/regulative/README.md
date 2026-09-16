@@ -26,7 +26,9 @@ Regulative keywords express legal obligations, permissions, prohibitions, and th
 | --------------------- | -------------------------------------------------------------------------------------------------------------- |
 | [PARTY](PARTY.md)     | Who has the obligation/permission                                                                              |
 | [EVERY](EVERY.md)     | Every member of a group has it                                                                                 |
+| [AFTER](AFTER.md)     | When the window opens (a duration, or a date)                                                                  |
 | WITHIN                | Temporal deadline (relative, or absolute with `OF`)                                                            |
+| BEFORE                | Absolute deadline: the window closes on a date                                                                 |
 | HENCE                 | Consequence on fulfillment                                                                                     |
 | LEST                  | Consequence on breach                                                                                          |
 | PROVIDED              | Guard condition on action                                                                                      |
@@ -42,18 +44,13 @@ Regulative keywords express legal obligations, permissions, prohibitions, and th
 | RAND    | Parallel AND -- all must be fulfilled |
 | ROR     | Parallel OR -- any one sufficient     |
 
-### Planned Keywords
-
-| Keyword | Purpose                                                                                                        | Status          |
-| ------- | -------------------------------------------------------------------------------------------------------------- | --------------- |
-| BEFORE  | Absolute deadline, as the window's closing edge (`WITHIN d OF instant` already expresses an absolute deadline) | Not implemented |
-
 ## Basic Rule Structure
 
 ```l4
 PARTY partyName
 MUST/MAY/SHANT/DO action
-WITHIN deadline
+[AFTER opening]
+[WITHIN deadline | BEFORE date]
 ```
 
 ### Example
@@ -70,17 +67,18 @@ paymentObligation MEANS
 
 ## WITHIN (Temporal Deadline)
 
-Specifies a time duration within which an action must/may be performed.
+Specifies a time duration within which an action must/may be performed: the window's **closing edge**. The window's **opening edge**, `AFTER`, has [its own page](AFTER.md); the closing edge's absolute form, `BEFORE date`, is [below](#before-absolute-deadline).
 
 ### Syntax
 
 ```l4
 PARTY ...
 MUST action
+[AFTER opening [OF anchor]]
 WITHIN duration [OF anchor]
 ```
 
-The duration is a `NUMBER` of clock units — the same units the trace's timestamps use (days, if the trace is stamped in days). Written alone, it counts from where the language puts it: an obligation at the top level counts from when it was entered; an obligation under a `HENCE` counts from the moment the previous obligation was completed; an obligation under a `LEST` counts, today, from the event that revealed the miss.
+The duration is a `NUMBER` of clock units — the same units the trace's timestamps use (days, if the trace is stamped in days). Written alone, it counts from where the language puts it: an obligation at the top level counts from when it was entered; an obligation under a `HENCE` counts from the moment the previous obligation was completed; an obligation under a `LEST` counts from the moment the previous obligation _failed_ — its missed deadline for a `MUST`, `DO` or `MAY`, the forbidden act itself for a `SHANT` (the [LEST](#lest-breach-consequence) section has the rule in full).
 
 The duration can be anchored with `OF`, and then the deadline is **absolute**: the anchor's instant plus the duration, whatever the clock read when the obligation was entered. The anchor is one of:
 
@@ -88,16 +86,20 @@ The duration can be anchored with `OF`, and then the deadline is **absolute**: t
 | ----------------- | ----------------------------------------------------------------------------------------------- |
 | `OF THE JOIN`     | the instant the enclosing obligation's `HENCE` fired (under `HENCE` this is the default, named) |
 | `OF THE DEADLINE` | the enclosing obligation's deadline (its `WITHIN`)                                              |
-| `OF THE ARMING`   | the instant the enclosing obligation was entered                                                |
+| `OF THE ARMING`   | the instant the enclosing obligation was entered — under a `LEST`, the failure it repairs       |
 | `OF expression`   | an instant: a `NUMBER` on the trace's clock, or a `DATE`                                        |
 
 "The enclosing obligation" is the one whose `HENCE` or `LEST` this obligation is the continuation of — the one it is attached to when it runs. Usually that is the obligation it is written under; but a continuation can also arrive as a value (a rule with `GIVEN k IS A DEONTIC …` that ends `HENCE k`, or a `WHERE` local), and then the anchors name the obligation it is handed to, not the one it was written under — also when the value is one operand of a `RAND` or `ROR` there. It is the _nearest_ enclosing obligation: two levels down, `THE ARMING` is the middle obligation's arming, not the outermost rule's, so "within 10 days of this agreement" (below) works from one level down, where the phrase is written.
+
+An obligation is _entered_ at the instant its plain `WITHIN` counts from: at the top level, when the trace begins; under a `HENCE`, at the act; under a `LEST`, at the failure — so `THE ARMING` read from inside a reparation's own `HENCE` or `LEST` is the missed deadline (or the forbidden act), not the later event that revealed it (`jl4/examples/ok/every/run-lest.l4` §10).
 
 For a `MUST`, `DO` or `MAY`, the join is the act that completed it. For a prohibition (`SHANT`) that was kept, the `HENCE` fires when the machine _learns_ it was kept — the first event after its deadline, not the deadline itself — and `THE JOIN` is that instant, the same one an unanchored `WITHIN` counts from. To count from the day a prohibition was discharged, anchor to `THE DEADLINE`.
 
 `THE` is a keyword; `JOIN`, `DEADLINE` and `ARMING` are matched by spelling in this one position and are not reserved, so a program may still name a value `DEADLINE`.
 
 Inside the duration, `OF` is always the anchor — everywhere in it, not only at the front — so `WITHIN f OF x` means `f` anchored at `x`, and so does an `OF` inside an `IF` branch, an operator's operand or a `WHERE` in the duration. To apply a function there, bracket the call (`WITHIN (f OF x) OF THE JOIN`) or juxtapose its arguments (`WITHIN f x OF THE JOIN`); the checker's message says so when the duration turns out to be a function.
+
+Beside an `AFTER`, a bare `WITHIN` counts from the instant the window **opened**: `AFTER 3 WITHIN 30` is the window `[a+3, a+33]`, the cooling-off sentence. To measure both edges from one anchor — _not less than 3 nor more than 30 days after delivery_, `[a+3, a+30]` — name the anchor on the closing edge: `AFTER 3 WITHIN 30 OF THE JOIN`. The [AFTER](AFTER.md) page has the two readings and what an act before the window opens does. A `WITHIN` takes a duration, never a date: `WITHIN (YMD 2026 6 30)` is a check error that names `BEFORE`.
 
 ### Examples
 
@@ -138,11 +140,11 @@ absolute MEANS PARTY Seller MUST deliver WITHIN 5 OF closingDate
 
 A unit word is ordinary L4, not syntax: `WITHIN 5 days OF THE DEADLINE` checks once `days` is defined (`GIVEN n IS A NUMBER GIVETH A NUMBER DECIDE n days IS n`). Until it is, the file fails — how depends on what else is in scope. In a file with no imports and no other mixfix definition, like the one above, `5 days` parses as an application and the checker reports _could not find a definition for the identifier `days`_; once any mixfix operator is in scope (after `IMPORT prelude`, say, or one `DECIDE a plus b IS …`), the parser only accepts operator words it knows, and stops at `days` with _unexpected days_. Either way the fix is the one-line definition.
 
-An anchored deadline may already be in the past when the obligation is entered — `WITHIN 5 OF closingDate` on a contract that begins after `closingDate + 5`. That is not an error: the first event reveals the expiry, exactly as if the deadline had been missed by waiting.
+An anchored deadline may already be in the past when the obligation is entered — `WITHIN 5 OF closingDate` on a contract that begins after `closingDate + 5`. That is not an error: the first event reveals the expiry, exactly as if the deadline had been missed by waiting. Its `LEST` then counts from that deadline like any other (see [When the next clock starts](#lest-breach-consequence)), which can put the reparation's own deadline before the obligation it repairs was ever entered: a `WITHIN 5 OF 0` entered at 20 with `LEST … WITHIN 10` is due at 15, and the first event after 20 reveals both misses at once. That is the rule taken literally; whether the reparation's clock should instead start no earlier than the failed obligation's entry is an open question, recorded in the design spec.
 
 ### Dates as anchors
 
-A `DATE` anchor is lowered to its serial (what `DATE_SERIAL` computes), so `WITHIN 0 OF (YMD 2026 6 30)` means _by 30 June 2026_ on a trace whose timestamps are date serials — start it `AT (DATE_SERIAL (YMD 2026 6 1))` and stamp its events the same way (`IMPORT daydate` for `YMD`). Nothing checks that the trace _is_ on that scale: a `DATE` anchor on a trace that starts `AT 0` counts from a serial in the hundreds of thousands, silently.
+A `DATE` anchor is lowered to its serial (what `DATE_SERIAL` computes), so `WITHIN 0 OF (YMD 2026 6 30)` means _by 30 June 2026_ on a trace whose timestamps are date serials — start it `AT (DATE_SERIAL (YMD 2026 6 1))` and stamp its events the same way (`IMPORT daydate` for `YMD`); the one-word spelling of the same deadline is `BEFORE (YMD 2026 6 30)`, [below](#before-absolute-deadline). Nothing declares which scale a trace is on; what the machine does instead is refuse to lower a date onto a clock that no calendar date has a serial for — an obligation entered when the clock read less than `DATE_SERIAL (YMD 1 1 1)`, 365, which is every trace that starts `AT 0` — naming the edge and the date, rather than counting from a serial in the hundreds of thousands silently, as it did before 2026-09-16. A floating trace that starts at 365 or above is not caught.
 
 ### Where an anchor is refused
 
@@ -168,7 +170,7 @@ The evaluator is the only consumer that resolves an anchor. The others carry it 
 
 - The state graph (`l4 state-graph`) labels the edge with the closing edge as the source spells it — `[5 OF THE JOIN]`, `ONCE ALL HAVE WITHIN 30 OF THE ARMING` — an applied duration bracketed, `[(period OF 2) OF THE ARMING]`, so the label re-parses as L4.
 - The BPMN export (`l4 export --to bpmn`) draws a **plain** `WITHIN` as a timer boundary event. An **anchored** `WITHIN` gets no timer: the boundary event is a _conditional_ event whose condition is the text verbatim, and the fidelity report carries a blocking `P-DEADLINE` note on it naming the anchor — _the duration counts from THE JOIN, and this exporter does not resolve anchors_. That holds even where a timer would have been exact (`OF THE JOIN` on a `HENCE` task starts when the task does); the export declines to work that out. The task's `<documentation>` restates the rule with the anchor in it. See [DMN and BPMN](../../exports/dmn-bpmn.md#what-doesnt-survive).
-- The MLIR/WASM export fails closed on an anchored `WITHIN`.
+- The MLIR/WASM export fails closed on an anchored `WITHIN`, as the [AFTER](AFTER.md#what-the-exports-do-with-it) page says.
 
 ### Boundary
 
@@ -176,7 +178,8 @@ The deadline boundary is inclusive: an action arriving _exactly at_ the deadline
 
 ### See Also
 
-- **BEFORE** and **AFTER** (planned, not yet implemented -- the window's absolute closing edge and its opening edge)
+- **[AFTER](AFTER.md)** -- the window's opening edge: `AFTER d [OF anchor]`, `AFTER date`
+- **[BEFORE](#before-absolute-deadline)** -- the closing edge's absolute form, `BEFORE date`
 
 ## HENCE (Fulfillment Consequence)
 
@@ -239,6 +242,18 @@ The meaning of "failure" depends on the deontic modal:
 | `SHANT` | action is taken (prohibition violated)     | `BREACH`           |
 
 Note that SHANT flips the polarity: for prohibitions, the action happening is the failure case (LEST), while the deadline passing without action is the success case (HENCE).
+
+**When the next clock starts.** An obligation written under a `LEST` with a plain `WITHIN d` counts its `d` from the moment the failure happened, not from the later event that brought it to light:
+
+| The obligation that failed                                                                    | Its `LEST` counts from                                                    |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `MUST`, `DO` or `MAY` whose deadline passed                                                   | that deadline                                                             |
+| `SHANT` whose forbidden act was done                                                          | the act's own timestamp                                                   |
+| `EVERY … ONCE ALL HAVE WITHIN d` where everyone acted, but the last act landed after that `d` | the group's deadline (`d` after the `EVERY` was entered, unless anchored) |
+
+The last row applies only when the group did act. A member who never acts at all fails on the first row — its own `WITHIN`, when it has one — even if the `ONCE … WITHIN` deadline was the earlier of the two: with `EVERY Tenant t … WITHIN 14 … ONCE ALL HAVE WITHIN 10 … LEST … WITHIN 5`, one tenant who never signs puts the reparation at 14 + 5 = 19, not 10 + 5 = 15, and it would be 15 only if the members carried no `WITHIN` of their own. (Whether the group deadline should win there is an open question, recorded in the design spec.)
+
+So in the penalty clause below, Alice's 60 days to pay the larger sum run from day 30, whether the miss came to light on day 31 or on day 90 — a party who misses a deadline and then goes quiet does not push back the start of its own cure period. The same instant can be named outright as `WITHIN 60 OF THE DEADLINE` (see [WITHIN](#within-temporal-deadline)); for a missed `MUST`, `DO` or `MAY` the two spellings mean the same thing. They differ for a `SHANT`: there `THE DEADLINE` is the end of the prohibition's window, while the plain `WITHIN` counts from the violation. L4 still only _learns_ of a missed deadline when a later event arrives, and that event is offered to the `LEST` obligation, so a late payment that is the first thing recorded can still discharge the reparation it was written for — if it falls within the reparation's own window, counted from the deadline. When one event is past several windows in a chain of `LEST`s — a first chance, a second, a third — it is offered to each in turn until it reaches the first whose window is still open, and that is the obligation it performs or fails; how many other events the trace carries makes no difference to the verdict, and neither does a layer in the chain whose deadline is no later than the one before it (`WITHIN 0`, or anchored at an instant already past). The one chain that walk cannot finish is a `LEST` that names itself with a window that is never open — `WITHIN 0`, a negative `WITHIN`, or an anchored deadline that never moves — so that every incarnation is already past when it is entered; L4 refuses such a contract by name after a thousand hand-offs in a row rather than walking it forever. A breach, when one is finally reported, is dated at the event that revealed it and carries the deadline that was missed. (Before 2026-09-16 the `LEST` clock started at the revealing event instead. The tutorial [What Follows](../../tutorials/obligations/what-follows.md) works the rule through a late fee and a guarantor.)
 
 ### Syntax
 
@@ -502,23 +517,43 @@ ROR
 
 ---
 
-## BEFORE (NOT YET IMPLEMENTED)
+## BEFORE (Absolute Deadline)
 
-Planned temporal keyword naming an absolute deadline as the closing edge of the window, in one word. An absolute deadline is already expressible today: `WITHIN d OF instant` (see [WITHIN](#within-temporal-deadline)) is `instant + d`, so `WITHIN 0 OF (YMD 2026 6 30)` means "by 30 June 2026". `BEFORE` would be the spelling for the same thing when there is no duration to add.
+Names an absolute deadline as the closing edge of the window, in one word: `BEFORE (YMD 2026 6 30)` is _by 30 June 2026_. It is the same deadline as `WITHIN 0 OF (YMD 2026 6 30)` (see [Dates as anchors](#dates-as-anchors)), spelled the way the sentence is. The edges are told apart by type: `WITHIN` takes a duration, `BEFORE` takes a date, and each refuses the other's argument by naming the other word — `BEFORE 30` says to write `WITHIN 30`.
 
-**Status:** Planned but not yet in the parser. Use `WITHIN d OF instant` for an absolute deadline in the meantime, and a bare `WITHIN d` for a relative one.
-
-### Intended Syntax
+### Syntax
 
 ```l4
 PARTY ...
 MUST action
-BEFORE deadline
+[AFTER opening]
+BEFORE date
 ```
+
+The deadline instant is inclusive, as `WITHIN`'s is: an act stamped on the date itself is timely. `BEFORE` is accepted on the act only; on a join line (`ONCE ALL HAVE …`, `UPON EACH …`) write `WITHIN 0 OF date`, and the checker says so.
+
+### Example
+
+```l4
+IMPORT daydate
+
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF pay HAS amount IS A NUMBER
+
+-- By 30 June, and not before 4 June (the window opens three days after arming on 1 June)
+GIVETH A DEONTIC Person Action
+`by june` MEANS PARTY Buyer MUST pay 100 AFTER 3 BEFORE (YMD 2026 6 30)
+
+#TRACE `by june` AT (DATE_SERIAL (YMD 2026 6 1)) WITH
+  PARTY Buyer DOES pay 100 AT (DATE_SERIAL (YMD 2026 6 4))
+```
+
+**The limit.** A date lands on the trace's clock only when the trace is stamped in date serials, as above. Nothing yet declares a contract's scale, so an obligation entered when the clock read less than `DATE_SERIAL (YMD 1 1 1)` — every trace that starts `AT 0` — has its `BEFORE` refused by name at run time rather than silently compared against a serial in the hundreds of thousands; a floating trace that starts at 365 or above is not caught. The [AFTER](AFTER.md#the-absolute-forms-after-date-before-date) page has the same sentence for `AFTER date`.
 
 ### See Also
 
-- **WITHIN** -- implemented; relative as `WITHIN d`, absolute as `WITHIN d OF instant`
+- **[WITHIN](#within-temporal-deadline)** -- the closing edge as a duration, relative as `WITHIN d`, anchored as `WITHIN d OF instant`
+- **[AFTER](AFTER.md)** -- the opening edge
 
 ---
 
@@ -571,6 +606,7 @@ saleContract MEANS
 
 - **[PARTY](PARTY.md)** - Party declarations
 - **[EVERY](EVERY.md)** - One obligation for every member of a group; the group is given as a list after `IN`, as `EVERY Tenant t IN tenants`
+- **[AFTER](AFTER.md)** - The window's opening edge; the two readings of a two-edged window
 - **[MUST](MUST.md)** - Obligations
 - **[MAY](MAY.md)** - Permissions
 - **[SHANT](SHANT.md)** - Prohibitions (also written MUST NOT)

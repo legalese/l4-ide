@@ -355,7 +355,7 @@
         "scrutiny": "witnessedOnly"
       },
       {
-        "clock": 20,
+        "clock": 14,
         "norm": {
           "activation": 1,
           "modal": "MUST",

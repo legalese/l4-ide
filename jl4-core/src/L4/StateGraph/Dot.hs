@@ -227,6 +227,7 @@ formatTransitionLabel opts TransitionLabel{..} =
         [ labelParty
         , modalPart
         , Just labelAction
+        , if opts.showDeadlines then fmap (\o -> "[AFTER " <> o <> "]") labelOpening else Nothing
         , if opts.showDeadlines then fmap (\d -> "[" <> d <> "]") labelDeadline else Nothing
         , if opts.showGuards then fmap (\g -> "IF " <> g) labelGuard else Nothing
         ]

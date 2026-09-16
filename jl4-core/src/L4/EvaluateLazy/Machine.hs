@@ -43,6 +43,8 @@ module L4.EvaluateLazy.Machine
 , anchorInstant
 , currentLedgerEval
 , readEvalRef
+, Note (..)
+, tellNote
 , Config (..)
 , forwardExpr
 , matchBranches
@@ -281,19 +283,61 @@ data EvalState =
       -- cache-serve time via 'validFor'.
     , tracePolicy :: !TracePolicy  -- controls trace collection and output
     , safeMode   :: !Bool          -- when True, HTTP operations return errors
-    , reofferedEvents :: !(IORef (Set Address))
-      -- ^ addresses of EVENT values that an expiring obligation has re-offered
-      -- to its HENCE/LEST continuation (see the Contract5 expiry NOTE in
-      -- 'backwardContractFrame'). Membership enforces the at-most-once
-      -- re-offer rule: a marked event that reveals a second expiry is
-      -- consumed rather than re-offered again, which bounds evaluation for
-      -- recursive continuations with non-positive deadlines.
+    , reofferedEvents :: !(IORef (Map Address Reoffered))
+      -- ^ the EVENT copies an expiring obligation has re-offered to its
+      -- HENCE/LEST continuation, each keyed by its store address and
+      -- carrying its 'Reoffered' mark: the latest deadline it has revealed
+      -- the expiry of, and how many hand-offs in a row failed to pass it
+      -- (see the Contract5 expiry NOTE in 'backwardContractFrame'). The
+      -- mark never withholds an event from a layer; it only lets the
+      -- machine refuse a chain whose deadlines have stopped advancing,
+      -- loudly, instead of walking it forever.
+    , notes :: !(IORef (DList Note))
+      -- ^ what the run wants REPORTED without failing: a non-fatal note,
+      -- appended by 'tellNote', collected per directive (swapped fresh by
+      -- 'L4.EvaluateLazy.withFreshLedger', read back into the directive's
+      -- result beside the ledger) and printed after the value. The first
+      -- occupant is R-X6's early act (EVERY-EACH-QUANTIFIER-SPEC §5.1.2,
+      -- 2026-09-16): an act before its window opened is a nullity, and a
+      -- silent nullity is how a party loses a deadline it believed it had
+      -- met; the second is the empty window a run reveals. Nothing here is
+      -- an error: the value stands.
     , deonticLog :: !(Maybe DeonticLog)
       -- ^ LTS-VISUALISER §4.3 (P2b): the deontic step log, OPTIONAL and off
       -- by default exactly as 'evalTrace' is (ruling R5, §8). 'Nothing' means
       -- no call site computes anything; 'L4.EvaluateLazy.captureDeonticSteps'
       -- installs one for the duration of a directive.
     }
+
+-- | A note the run reports beside a directive's value ('EvalState.notes').
+-- Plain text: rendered where it is raised, from what the machine has in
+-- hand at that point ('peekNF' for a party).
+newtype Note = MkNote Text
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass NFData
+
+-- | Report something without failing (see 'EvalState.notes'). A note is
+-- reported ONCE per directive: raising the same sentence again — the same
+-- party, act and instants — adds nothing a reader can use, and a @LEST@
+-- chain that re-arms the same empty window a thousand times before the
+-- stall guard refuses it ('stalledChainRefusal') would otherwise print the
+-- note a thousand times beside the refusal (adversarial pass of
+-- 2026-09-16, F4: 1001 copies, 354 KB). The key is the SENTENCE, which
+-- names the party, the act pattern and the instants — not the obligation
+-- that raised it, nor the event. So two obligations that render the same
+-- sentence share one note: the two operands of a @RAND@ with one party,
+-- act and window, two members of an @EVERY@ roll that names one party
+-- twice, or two events at one stamp on one obligation (round 2, R2-2). A
+-- reader is told the fact once; the count is not carried. Keying on the
+-- raising frame instead would bring F4's thousand copies back, since the
+-- re-armed window is a fresh frame each time; keying on the source
+-- position would separate the @RAND@ case only. Whether multiplicity
+-- belongs in the note is a ruling, not taken here.
+tellNote :: Text -> Eval ()
+tellNote t = do
+  notesRef <- asks (.notes)
+  liftIO $ modifyIORef' notesRef \ ns ->
+    if MkNote t `elem` DList.toList ns then ns else ns `DList.snoc` MkNote t
 
 data Stack =
   MkStack
@@ -418,8 +462,12 @@ peekAction rf = fmap prettyLayout <$> peekWHNF rf
 -- form the list compares bearers by ('peekName') while keeping to the
 -- rule that it never changes what the machine evaluates. The depth cutoff
 -- mirrors 'nfAux''s: a cyclic value would otherwise loop.
-peekNF :: WHNF -> Eval (Maybe (Value NF))
-peekNF = go maximumStackSize
+--
+-- Not 'peekNF', which is the partial reading a diagnostic's wording wants
+-- (an unevaluated part prints as @…@); this one is all-or-nothing, because
+-- a name with an @…@ in it compares equal to nothing.
+peekWholeNF :: WHNF -> Eval (Maybe (Value NF))
+peekWholeNF = go maximumStackSize
   where
     go d v
       | d < 0     = pure Nothing
@@ -431,9 +479,9 @@ peekNF = go maximumStackSize
 -- | The party as "L4.Lts.Marking" renders a live norm's bearer: the
 -- 'prettyLayout' of its @Value NF@, so that a step's 'nkBearerName' and a
 -- 'LiveNorm''s @lnBearer@ compare by equality. 'Nothing' unless every
--- field has been forced; see 'peekNF'.
+-- field has been forced; see 'peekWholeNF'.
 peekName :: WHNF -> Eval (Maybe Text)
-peekName v = fmap prettyLayout <$> peekNF v
+peekName v = fmap prettyLayout <$> peekWholeNF v
 
 -- | The event key for a scrutiny, from the pieces the frame holds. The
 -- stamp is always in hand (it is what the deadline was compared with);
@@ -448,9 +496,12 @@ eventKeyAt stamp mParty actRef = do
     { ekStamp = stamp, ekParty = partyKeyWHNF <$> mParty, ekPartyName = name, ekAction = action }
 
 -- | The scrutiny an event-bearing step reports (§4.4): a re-offered event's
--- second look is always 'Reoffered'; otherwise the site says.
-scrutinyOf :: Bool -> Scrutiny -> Scrutiny
-scrutinyOf reoffered s = if reoffered then Reoffered else s
+-- second look is always 'Reoffered'; otherwise the site says. The argument
+-- is the frame's @ev'reoffered@ — the mark a re-offered copy carries, or
+-- 'Nothing' for a fresh event (spec §5.2.1; the mark's payload is the
+-- machine's business, and the log reads only whether there is one).
+scrutinyOf :: Maybe mark -> Scrutiny -> Scrutiny
+scrutinyOf reoffered s = if isJust reoffered then Reoffered else s
 
 -- | The key an obligation is armed with when it meets its event stream (the
 -- @App1@ arm below). With the log off this is a lazy record that nothing
@@ -804,19 +855,51 @@ putTemporalContext ctx = do
   r <- asks (.temporalContext)
   liftIO (writeIORef r ctx)
 
--- | Record that an EVENT value (identified by its store address) has been
--- re-offered to a HENCE/LEST continuation after revealing a deadline expiry.
--- See the Contract5 expiry NOTE in 'backwardContractFrame'.
-markReoffered :: Reference -> Eval ()
-markReoffered rf = do
+-- | Record that an EVENT value (identified by its store address) is a copy
+-- re-offered to a HENCE/LEST continuation, with its 'Reoffered' mark. See
+-- the Contract5 expiry NOTE in 'backwardContractFrame'.
+markReoffered :: Reference -> Reoffered -> Eval ()
+markReoffered rf mark = do
   r <- asks (.reofferedEvents)
-  liftIO (modifyIORef' r (Set.insert rf.address))
+  liftIO (modifyIORef' r (Map.insert rf.address mark))
 
--- | Has this EVENT value already been re-offered once? (see 'markReoffered')
-isReoffered :: Reference -> Eval Bool
+-- | Is this EVENT value a re-offered copy, and if so what is its mark?
+-- (see 'markReoffered')
+isReoffered :: Reference -> Eval (Maybe Reoffered)
 isReoffered rf = do
   r <- asks (.reofferedEvents)
-  liftIO (Set.member rf.address <$> readIORef r)
+  liftIO (Map.lookup rf.address <$> readIORef r)
+
+-- | How many hand-offs in a row a re-offered event may make to a
+-- continuation whose deadline is no later than one it has already revealed
+-- the expiry of, before the machine refuses the chain as one that cannot
+-- end ('stalledChainRefusal'). Deliberately generous: a stalled layer costs
+-- about a microsecond, and the number decides only how soon an ill-founded
+-- chain is reported, not whether — a chain of DISTINCT layers is finite by
+-- its syntax and never comes near it. See the Contract5 expiry NOTE.
+maximumStalledReoffers :: Int
+maximumStalledReoffers = 1_000
+
+-- | What the machine says when a re-offered event has walked
+-- 'maximumStalledReoffers' continuations in a row without the deadline
+-- advancing: a continuation that names itself (or reaches itself) and is
+-- already past its deadline when it is entered — a LEST with a
+-- non-positive @WITHIN@ (its clock is the missed deadline), a kept SHANT's
+-- HENCE with a negative one (its clock is the revealing stamp), or an
+-- anchored deadline no later than the one just missed.
+stalledChainRefusal :: Rational -> Rational -> Text
+stalledChainRefusal highWater stamp = Text.unwords
+  [ "A chain of HENCE or LEST continuations has stalled: the event at " <> prettyRatio stamp
+  , "has been handed on " <> Text.textShow maximumStalledReoffers <> " times in a row to"
+  , "continuations whose deadlines never advanced past " <> prettyRatio highWater <> ","
+  , "a deadline it had already revealed the expiry of, so no continuation this"
+  , "chain reaches can ever be open to it. A continuation that names itself and"
+  , "is already past its deadline when it is entered - a negative WITHIN, a"
+  , "LEST's WITHIN 0, or an anchored deadline no later than the one just"
+  , "missed - is such a chain. Give it a positive WITHIN, anchor it later than"
+  , "the missed deadline, or end the chain with BREACH."
+  , "(EVERY-EACH-QUANTIFIER-SPEC section 5.2.1.)"
+  ]
 
 -----------------------------------------------------------------------------
 -- STATE-AS-LEDGER: the ledger operations as direct 'Eval' actions.
@@ -1207,10 +1290,10 @@ forwardExpr env = \ case
     env' <- evalRecLocalDecls env ds
     let combinedEnv = Map.union env' env
     continueExpr combinedEnv e
-  Regulative _ann deonton@(MkDeonton _ subject action due _join followup lest) ->
+  Regulative _ann deonton@(MkDeonton _ subject action opens due _join followup lest) ->
     case subject of
       Party _ party ->
-        continueBackward (ValObligation env (Left party) action (Left due) (fromMaybe fulfilExpr followup) lest)
+        continueBackward (ValObligation env (Left party) action (Left opens) (Left due) (fromMaybe fulfilExpr followup) lest)
       Every{} ->
         -- EVERY-EACH-QUANTIFIER-SPEC phase 2. A quantified obligation cannot
         -- become one obligation here, because it does not yet know its cast:
@@ -1383,7 +1466,7 @@ backward val = withPoppedFrame $ \ case
         continueExpr (Map.union env'' env') e
       ValUnappliedConstructor r ->
         continueBackward (ValConstructor r rs)
-      ValObligation env party act due followup lest -> do
+      ValObligation env party act opens due followup lest -> do
         (time, events) <- case rs of
           [t, r] -> pure (t, r)
           rs' -> internalException $ RuntimeTypeError $
@@ -1818,7 +1901,7 @@ backwardContractFrame val = \ case
         whenDeonticLog \ l -> do
           clock <- peekClock time
           logStep l (plainStep clock Nothing NoEvent norm Waiting)
-        continueBackward (ValObligation env party act due followup lest)
+        continueBackward (ValObligation env party act opens due followup lest)
       _ -> internalException $ RuntimeTypeError $
         "expected LIST EVENT but found: " <> prettyLayout val <> " when scrutinizing regulative events"
   Contract2 ScrutinizeEvent {..} -> case val of
@@ -1830,53 +1913,85 @@ backwardContractFrame val = \ case
   Contract3 CurrentTimeWHNF {..} -> do
     pushCFrame (Contract4 ScrutinizeDue {ev'time = val, ..})
     continueRef time
-  Contract4 ScrutinizeDue {..} -> do
-    case due of
-       Right due' -> do
-         pushCFrame (Contract5 CheckTiming {time = val, anchorT = Nothing, ..})
-         continueBackward due'
-       -- The source deadline, met for the first time. This is the arming
-       -- point as far as the deadline is concerned: no event has advanced
-       -- 'time' yet, so an anchor is resolved ONCE, here, in the
-       -- obligation's own environment and at its arming clock (R-Q7C:
-       -- "evaluated once at arming"). After 'Contract5' the due is a
-       -- relative number and the anchor is spent.
-       Left (Just (MkDeadline _ duration Nothing)) -> do
-         pushCFrame (Contract5 CheckTiming {time = val, anchorT = Nothing, ..})
-         continueExpr env duration
-       Left (Just (MkDeadline _ duration (Just anchor))) -> do
-         pushCFrame (Contract4b ScrutinizeAnchor {time = val, ..})
-         case anchor of
-           -- an expression: a NUMBER on the trace's clock, or a DATE
-           AnchorAt _ e     -> continueExpr env e
-           -- the lifecycle positions of the ENCLOSING obligation, bound into
-           -- this environment at its hand-off ('bindLifecycle'); THE ARMING
-           -- with no enclosing obligation is this obligation's own arming
-           AnchorJoin _     -> continueRef =<< lifecycleRef env anchor lifecycleJoinUnique Nothing
-           AnchorDeadline _ -> continueRef =<< lifecycleRef env anchor lifecycleDeadlineUnique Nothing
-           AnchorArming _   -> continueRef =<< lifecycleRef env anchor lifecycleArmingUnique (Just armed)
-       Left Nothing -> do
-         -- NOTE: we skip the timing step, hence we need to immediately update the current time to the event time
-         -- because normally the timing check does that.
-         pushCFrame (Contract6 PartyWHNF {time = ev'time, ..})
-         maybeEvaluate env party
+  Contract4 frame@ScrutinizeDue {..} -> do
+    -- 'val' is the frame's clock, forced. The window's OPENING edge comes
+    -- first (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X5, 2026-09-16), because a
+    -- bare WITHIN beside an AFTER counts from the instant the window opens
+    -- (R-X5 as amended, §5.1.2.2: re-anchor). Like the deadline it is
+    -- resolved ONCE, at the first event, when 'time' is still the arming
+    -- time; after 'Contract5' it is a relative number ('MaybeOpened').
+    case opens of
+      -- the opening already resolved: the window opens 'rel' after the clock
+      Right (Just rel) -> do
+        time' <- assertTime val
+        rel' <- assertTime rel
+        scrutinizeDue val (Just (time' + rel')) False frame
+      -- no opening edge, or the window already open
+      Right Nothing -> scrutinizeDue val Nothing False frame
+      Left Nothing  -> scrutinizeDue val Nothing False frame
+      Left (Just (MkOpening _ offset Nothing)) -> do
+        pushCFrame (Contract4o ScrutinizeOpening {time = val, openAnchorT = Nothing, ..})
+        continueExpr env offset
+      Left (Just (MkOpening _ offset (Just anchor))) -> do
+        pushCFrame (Contract4oa ScrutinizeOpeningAnchor {time = val, ..})
+        resolveAnchor env armed anchor
+  Contract4oa ScrutinizeOpeningAnchor {..} -> do
+    instant <- lowerInstant "The anchor of the AFTER" armed val
+    pushCFrame (Contract4o ScrutinizeOpening {openAnchorT = Just instant, ..})
+    continueExpr env offset
+  Contract4o frame@ScrutinizeOpening {..} -> do
+    -- the offset, forced: a duration from the opening's anchor (or from the
+    -- clock, i.e. the arming on this first evaluation), or a DATE — the
+    -- opening instant itself — lowered by its serial (the checker has
+    -- refused an anchor on a DATE)
+    time' <- assertTime time
+    (open, absolute) <- case val of
+      ValNumber d -> pure (fromMaybe time' openAnchorT + d, False)
+      ValDate _   -> (, True) <$> lowerInstant "AFTER" armed val
+      v -> internalException $ RuntimeTypeError $
+        "expected a NUMBER or a DATE after AFTER but got: " <> prettyLayout v
+    scrutinizeDue time (Just open) absolute (dueFrameOfOpening frame)
   Contract4b ScrutinizeAnchor {..} -> do
     -- the anchor's instant, lowered to the trace's clock: a DATE by its
-    -- serial (what DATE_SERIAL computes), a NUMBER as it is ('anchorInstant')
-    instant <- either (internalException . RuntimeTypeError) pure (anchorInstant val)
-    pushCFrame (Contract5 CheckTiming {anchorT = Just instant, ..})
+    -- serial (what DATE_SERIAL computes), a NUMBER as it is ('lowerInstant',
+    -- which guards 'anchorInstant' with the floating-clock refusal)
+    instant <- lowerInstant "The anchor of the WITHIN" armed val
+    pushCFrame (Contract5 CheckTiming {origin = Just instant, ..})
     continueExpr env duration
   Contract5 CheckTiming {..} -> do
     stamp <- assertTime ev'time
-    due' <- assertTime val
     time' <- assertTime time
+    -- The closing edge, forced. A NUMBER is a duration: unanchored and with
+    -- no AFTER, it counts from the obligation's clock — its arming, on this
+    -- first evaluation — and after that evaluation it is the REMAINING due
+    -- relative to the clock, so the same sum holds. Anchored (@WITHIN d OF
+    -- …@, R-Q7) it is ABSOLUTE, the anchor's instant plus @d@, which may
+    -- already be in the past at arming; then this very event reveals the
+    -- expiry, which is right and not an error. Beside an AFTER, a bare
+    -- WITHIN counts from the instant the window opens ('origin' is that
+    -- instant: R-X5 as amended, re-anchor). A DATE is a @BEFORE@: the
+    -- instant itself, lowered by its serial ('lowerInstant' refuses a clock
+    -- that is not on that scale).
+    deadline <- case val of
+      ValNumber due' -> pure (fromMaybe time' origin + due')
+      ValDate _      -> lowerInstant "BEFORE" armed val
+      v -> internalException $ RuntimeTypeError $
+        "expected a NUMBER or a DATE as the closing edge but got: " <> prettyLayout v
+    -- The empty window (§5.1.2.2): a window that closes before it opens.
+    -- The explicitly anchored @AFTER d1 WITHIN d2 OF …@ with @d1 > d2@ from
+    -- one anchor is the ruled case, and the checker catches it when both
+    -- offsets are literals; a run reports it here, once, when both instants
+    -- are first known — and says which shape it met (a @BEFORE@ date
+    -- earlier than the opening, two anchors, a negative bare @WITHIN@), for
+    -- the note's wording is per shape (adversarial pass of 2026-09-16, F3).
+    -- The obligation then runs as written: every act is early or late, and
+    -- the expiry is what ends it.
+    case (opens, due) of
+      (Left (Just opening), Left (Just closing)) -> forM_ openT \ open ->
+        when (open > deadline) $
+          tellNote (emptyWindowNote opening closing openAbsolute (origin == Just time') open deadline)
+      _ -> pure ()
     let
-      -- Unanchored, the deadline counts from the obligation's clock — its
-      -- arming, on this first evaluation. Anchored (@WITHIN d OF …@, R-Q7),
-      -- it is ABSOLUTE: the anchor's instant plus @d@, which may already be
-      -- in the past at arming; then this very event reveals the expiry,
-      -- which is right and not an error.
-      deadline = fromMaybe time' anchorT + due'
       -- NOTE: the new due is the current due minus the time that has passed
       -- by observing the current event e.g. if the thing
       -- was due within 3, then if the last current time
@@ -1885,7 +2000,12 @@ backwardContractFrame val = \ case
       -- now earlier, it is  due within 2, i.e. 3 - (3 - 2).
       -- For an anchored deadline the same invariant — the absolute deadline
       -- is @time + due@ — is what makes the remaining due @deadline - stamp@.
-      newDue = deadline - stamp
+      -- While the window has still to OPEN, the remaining due is relative
+      -- to the opening instead ('relativeDue'): the residual then prints as
+      -- the bare re-anchored window it is (@AFTER 1 WITHIN 30@ at 12 is
+      -- @[13, 43]@, not @[13, 44]@), and the next scrutiny adds it back to
+      -- the same instant ('scrutinizeDue', 'origin').
+      newDue = deadline - relativeDue openT stamp
     -- NOTE: the deadline comparison is strict: an event arriving EXACTLY at
     -- the deadline instant is timely; expiry requires stamp strictly greater.
     -- The spec (doc/reference/regulative/README.md) speaks of the deadline
@@ -1902,24 +2022,73 @@ backwardContractFrame val = \ case
       -- continuation, which then processes the event). So we re-offer the
       -- revealing event to the HENCE/LEST continuation — e.g. a payment
       -- arriving after the deadline must still be able to discharge the LEST
-      -- reparation it was authored for. The continuation's clock is anchored
-      -- at the revealing event's stamp (the README is silent on the anchor;
-      -- this is the historical behavior), so the re-offered event decrements
-      -- the continuation's WITHIN by zero.
+      -- reparation it was authored for.
       --
-      -- Termination: an event is re-offered AT MOST ONCE. Peeling one
-      -- syntactic HENCE/LEST layer per re-offer is NOT enough on its own,
-      -- because a continuation may recursively reference the enclosing
-      -- obligation (e.g. @x MEANS PARTY p MUST a WITHIN d LEST x@): the
-      -- continuation re-anchors at the revealing stamp, so a non-positive
-      -- computed WITHIN makes its deadline already expired for the very same
-      -- event, and unconditional re-offering would loop forever. Hence each
-      -- re-offered event is marked (by store address, 'markReoffered'); when
-      -- a marked event reveals yet another expiry, the continuation consumes
-      -- it — the pre-re-offer behavior — instead of re-offering it again
-      -- ('ev'reoffered', computed at Contract1). Each real event thus funds
-      -- at most one extra scrutiny, and the event list strictly shrinks on
-      -- every other step, so evaluation terminates.
+      -- The continuation's CLOCK — what an unanchored WITHIN inside it
+      -- counts from (R-Q7's default, spec §5.1/§5.2) — depends on the slot:
+      --
+      --   * under LEST it is the FAILURE TIME, which R-Q5 fixes by modal:
+      --     for MUST/DO/MAY the deadline that was just missed (§5.2, built
+      --     2026-09-16), so a defaulting party's silence cannot postpone
+      --     the start of its own cure period; the re-offered event then
+      --     decrements the continuation's WITHIN by the time that had
+      --     already passed since the deadline. It is the SAME reference
+      --     THE DEADLINE reads in that continuation ('lifecycleAt'), so
+      --     @WITHIN d@ and @WITHIN d OF THE DEADLINE@ agree under LEST by
+      --     construction. (For SHANT the failure is a violation, handled
+      --     at 'Contract10' with the violating event's own stamp.)
+      --   * under HENCE — here, a kept prohibition — it is the hand-off,
+      --     i.e. the revealing event's stamp, which is also THE JOIN there
+      --     (spec §5.1.1.1; moving a kept SHANT's join to its deadline is
+      --     a separate decision, not taken here).
+      --
+      -- Before 2026-09-16 both slots used the revealing event's stamp,
+      -- which made the re-offered event decrement a LEST's WITHIN by zero.
+      --
+      -- Termination. Because a LEST continuation counts from the missed
+      -- deadline, its own deadline can lie BEFORE the re-offered event's
+      -- stamp — the ordinary case whenever the miss came to light late —
+      -- so the very same event reveals a second expiry, a third, and so
+      -- on down a chain of LEST layers (or a continuation that names the
+      -- enclosing obligation, @x MEANS PARTY p MUST a WITHIN d LEST x@).
+      -- Every one of those layers is a real obligation whose window the
+      -- event is past, and the event must reach the first layer whose
+      -- window it is NOT past: that is the layer it can perform, or fail
+      -- (spec §5.2, R-Q5). So a re-offered copy is ALWAYS handed on to the
+      -- next layer, whatever that layer's deadline: a chain of DISTINCT
+      -- layers is finite by its syntax, and withholding the copy from any
+      -- of them is a wrong answer (round 2 of the adversarial pass of
+      -- 2026-09-16: a middle layer anchored at or before the missed
+      -- deadline, or a @WITHIN 0@, swallowed the next layer's timely
+      -- performance, and the verdict at an instant depended on how many
+      -- events the trace carried). The only chain that does not end is
+      -- one that reaches ITSELF without the deadline advancing — a
+      -- self-naming LEST with a non-positive WITHIN, or anchored at an
+      -- instant no later than the deadline just missed — whose every
+      -- incarnation is already past when it is entered. That is an
+      -- ill-founded contract, and the machine refuses it by name rather
+      -- than walking it forever: the copy carries a 'Reoffered' mark
+      -- ('markReoffered', read back at Contract1 as 'ev'reoffered') with
+      -- the latest deadline it has revealed the expiry of and the number
+      -- of hand-offs in a row that failed to pass that mark; past
+      -- 'maximumStalledReoffers' of those the walk stops with
+      -- 'stalledChainRefusal'. A chain whose deadlines advance is finite
+      -- whenever the durations are bounded away from zero (the deadlines
+      -- are increasing and bounded above by the stamp); the one chain
+      -- neither bound catches is a Zeno chain — durations shrinking
+      -- geometrically, so the deadlines advance forever without reaching
+      -- the stamp — which is left to the machine's 'StackOverflow' guard
+      -- ('maximumFrameDepth': every nested hand-off leaves a
+      -- 'RestoreCurrentParty' frame on the stack, so a 1,500,000-layer
+      -- chain of cheap steps reports the overflow in about a second); a
+      -- halving chain's rationals grow a bit per layer, so it hangs long
+      -- before that guard is reached — as ordinary non-terminating
+      -- recursion (@f x MEANS f (x PLUS 1)@, a tail call that pushes no
+      -- frame) hangs too. Until round 2 of the adversarial pass a copy
+      -- whose deadline had not advanced was CONSUMED — applied to the
+      -- events after it — which dropped it before the first layer whose
+      -- window it was not past; until round 1 it was consumed on its
+      -- second expiry, whatever the deadline did (spec §5.2.1).
       --
       -- STATE-AS-LEDGER (M4) integration: rather than calling 'continueWithFollowup'
       -- directly (as the re-offer logic did before the ledger landed),
@@ -1932,14 +2101,22 @@ backwardContractFrame val = \ case
         -- What the continuation may anchor to (R-Q7B): the deadline that
         -- just passed, this obligation's arming, and — only when the
         -- continuation is the HENCE, i.e. the join fired — the hand-off
-        -- clock as THE JOIN.
+        -- clock as THE JOIN. Under LEST the hand-off clock IS 'deadlineR'
+        -- (§5.2): one reference, read both as the unanchored default and
+        -- as THE DEADLINE, so the two cannot drift apart. A barrier member
+        -- hands that same reference to the failure sentinel as its anchor
+        -- ('continueWithFollowup', 'sentinelArgs'), which is how the
+        -- barrier's LEST comes to count from the failing member's deadline
+        -- without a mechanism of its own ('barrierFail').
         deadlineR <- allocateValue (ValNumber deadline)
         -- P2b: the 'Expired' step. It is built here, where the deadline and
         -- the revealing event are in hand, but LOGGED at the ResolveParty
         -- frame for the routed cases, because that is where the party gets
-        -- forced and the key wants the bearer. Consumed-vs-witnessed follows
-        -- the re-offer rule above: a first look is re-offered onward
-        -- ('WitnessedOnly'); a second look is 'Reoffered' and consumed.
+        -- forced and the key wants the bearer. The scrutiny follows the
+        -- re-offer rule above: a fresh event's look is 'WitnessedOnly' (it
+        -- is re-offered onward), a re-offered copy's look is 'Reoffered' —
+        -- and since round 2 of the LEST pass (spec §5.2.1, 2026-09-16) the
+        -- copy is handed on again either way, never consumed.
         let expiredStep :: DS.Branch -> Maybe WHNF -> Eval (Maybe DeonticStep)
             expiredStep branch mBearer = asks (.deonticLog) >>= \ case
               Nothing -> pure Nothing
@@ -1953,22 +2130,29 @@ backwardContractFrame val = \ case
               { join = if isHence then Just t else Nothing
               , deadline = Just deadlineR
               , armed }
+            clockAt isHence stampR = if isHence then stampR else deadlineR
             reofferResolve isHence followup' branch = do
               pending <- expiredStep branch Nothing
-              if ev'reoffered
-                then do
-                  -- this event was already re-offered once and has now
-                  -- revealed a second expiry: consume it (see NOTE above)
-                  t <- allocateValue ev'time
-                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events, time = t, pending, seen, lifecycle = lifecycleAt isHence t})
-                  maybeEvaluate env party
-                else do
-                  ev'timeR <- allocateValue ev'time
-                  evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
-                  markReoffered evR
-                  eventsR <- allocateValue (ValCons evR events)
-                  pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = ev'timeR, pending, seen, lifecycle = lifecycleAt isHence ev'timeR})
-                  maybeEvaluate env party
+              -- The mark the copy carries on: a fresh event starts the walk
+              -- at this deadline; a copy that has revealed an earlier
+              -- expiry advances its high-water mark when this deadline
+              -- passes it, and otherwise counts one more stalled hand-off
+              -- — refused, by name, once there have been too many in a row
+              -- (see NOTE above). The failure time is the deadline whether
+              -- the event that revealed the miss was fresh or already
+              -- marked.
+              mark <- case ev'reoffered of
+                Nothing -> pure MkReoffered {highWater = deadline, stalled = 0}
+                Just m
+                  | deadline > m.highWater -> pure MkReoffered {highWater = deadline, stalled = 0}
+                  | m.stalled >= maximumStalledReoffers -> userException (UserError (stalledChainRefusal m.highWater stamp))
+                  | otherwise -> pure m {stalled = m.stalled + 1}
+              ev'timeR <- allocateValue ev'time
+              evR <- allocateValue (ValEvent ev'party ev'act ev'timeR)
+              markReoffered evR mark
+              eventsR <- allocateValue (ValCons evR events)
+              pushCFrame (ResolveParty ResolvePartyFrame {followup = followup', env, events = eventsR, time = clockAt isHence ev'timeR, pending, seen, lifecycle = lifecycleAt isHence ev'timeR})
+              maybeEvaluate env party
         case act.modal of
           DMustNot ->
             -- Prohibition was RESPECTED: the prohibited action didn't occur before deadline
@@ -1977,12 +2161,17 @@ backwardContractFrame val = \ case
           DMay ->
             -- Permission was NOT EXERCISED: per the README default-consequence
             -- matrix, expiry of a MAY routes to LEST (default FULFILLED);
-            -- HENCE fires only when the permitted action is taken.
+            -- HENCE fires only when the permitted action is taken. The
+            -- LEST counts from the deadline, as a MUST's does (R-Q5: a MAY
+            -- fails at its deadline).
             reofferResolve False (fromMaybe fulfilExpr lest) ToLest
           _ -> -- DMust, DDo: deadline passed = failure
             case lest of
               Nothing -> do
                 -- NOTE: this is not too nice, but not wanting this would require to change `App1` to take MaybeEvaluated's
+                -- The breach is DATED at the revealing event ('stamp') and
+                -- carries the deadline it missed; §5.2 moves the LEST's
+                -- clock, not this stamp (spec §3.4's last paragraph).
                 partyR <- either (`allocate_` env) allocateValue party
                 -- P2b: no continuation to force the party in; the bearer is
                 -- what the breach's own party cell holds, if anything has
@@ -1997,7 +2186,9 @@ backwardContractFrame val = \ case
         -- NOTE: we have observed the event and do not branch, either, the
         -- only thing that may now happen is that we try a new event. Hence we
         -- drop the ev'time, set our time to ev'time and set our due to the new due
-        pushCFrame (Contract6 PartyWHNF {time = ev'time, due = Right $ ValNumber newDue, ..})
+        -- (and the opening edge, when there is one, to what is still to run
+        -- until the window opens — 'relOpening')
+        pushCFrame (Contract6 PartyWHNF {time = ev'time, opens = relOpening openT stamp opens, due = Right $ ValNumber newDue, ..})
         maybeEvaluate env party
   Contract6 PartyWHNF {..} -> do
     -- P2b: the party is forced now; every later frame's key knows the bearer.
@@ -2038,6 +2229,37 @@ backwardContractFrame val = \ case
         "expected environment but found: " <> prettyLayout val
   Contract10 ScrutinizeActions {..} ->
     case val of
+      -- THE act, by THIS party, BEFORE the window opened (R-X6, RULED
+      -- 2026-09-07, EVERY-EACH-QUANTIFIER-SPEC §5.1.2): a NULLITY. It is not
+      -- performance (MUST/MAY/DO), and not a violation (SHANT: the
+      -- prohibition has not started). The obligation is unchanged — its
+      -- absolute deadline is what it was, its opening instant too — and the
+      -- party may act again once the window opens; the event is passed over
+      -- exactly as a non-matching one is. What R-X6 adds is that the run
+      -- REPORTS it: a silent nullity is how a party loses a deadline it
+      -- believed it had met. This is the only place that can know the act
+      -- was the act: party, action and PROVIDED have all matched here.
+      ValBool True | Right (Just untilOpen) <- opens -> do
+        stamp <- assertTime time
+        rel <- assertTime untilOpen
+        partyNF <- peekNF party
+        -- the remaining due is measured from the opening while the window
+        -- is still to open ('relativeDue'), which it is here
+        let open = stamp + rel
+            deadlineAt = case due of
+              Right (ValNumber remaining) -> Just (open + remaining)
+              _                           -> Nothing
+        tellNote (earlyActNote act.modal partyNF act.action stamp open deadlineAt)
+        -- P2b: the look is logged, as every other look at an event is (one
+        -- record per scrutiny, 'DeonticStep'): a pass-over that names the
+        -- opening, so a what-if can say WHY the act was not taken and a
+        -- step log shows the event at all. 'WitnessedOnly': the event stays
+        -- on the stream (or 'Reoffered', for a copy handed down a LEST chain).
+        whenDeonticLog \ l -> do
+          ev <- eventKeyAt stamp (Just ev'party) ev'act
+          logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered WitnessedOnly) norm (EarlyAct open))
+        newTime <- allocateValue time
+        tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
       ValBool True -> do
         -- P2b: the match, routed per modal. Logged before the continuation
         -- is entered, so the log reads in machine order.
@@ -2054,9 +2276,15 @@ backwardContractFrame val = \ case
             -- Prohibition violated: action was done, trigger LEST clause
             Just lestFollowup -> do
               matchedStep ToLest
+              -- The LEST counts from the violating event's own stamp,
+              -- which 'time' already is here ('Contract6' set it): R-Q5's
+              -- failure time for SHANT, the one modal whose failure is an
+              -- act rather than a lapse (spec §5.2). The violating event
+              -- is consumed, not re-offered — 'events' is what followed it.
               timeR <- allocateValue time
               deadlineR <- absoluteDeadline time due
-              -- LEST: the join did not fire, so no THE JOIN (R-Q7B)
+              -- LEST: the join did not fire, so no THE JOIN (R-Q7B); THE
+              -- DEADLINE is the window's end, which is NOT the clock here
               let lifecycle = MkLifecycle {join = Nothing, deadline = deadlineR, armed}
               continueWithFollowup (Just (partyKeyWHNF party)) lifecycle (env `Map.union` henceEnv) lestFollowup events timeR seen
             -- No LEST clause: immediate breach
@@ -2107,6 +2335,8 @@ backwardContractFrame val = \ case
     -- 'val' is the obligation party, now forced to WHNF by 'maybeEvaluate env party'
     -- on the deadline-passed / LEST path. Key it exactly as the matched HENCE path
     -- does, so a RECORD in the followup/reparation attributes to the real party.
+    -- 'time' is the continuation's clock as 'Contract5' chose it: the
+    -- missed deadline under LEST, the revealing event's stamp under HENCE.
     continueWithFollowup (Just (partyKeyWHNF val)) lifecycle env followup events time seen
   -- R-Q7B: the continuation's value, about to meet its [time, events]: make
   -- the anchors inside it name THIS hand-off's obligation, whatever
@@ -2163,13 +2393,16 @@ backwardContractFrame val = \ case
       -- barrier's LEST needs — so it runs ONCE, after every member has been
       -- run ('barrierFinish'), anchored at the EARLIEST failure, and no
       -- member is ever applied to the stream a second time. The anchor is
-      -- forced here so the failures can be ordered. The sentinel also
-      -- carries the stream position of the event that revealed the miss
-      -- (its third argument; forced next, 'Barrier5c') and the member's
-      -- missed deadline (its fourth, when it had one; 'Barrier5b'), which is
-      -- what OF THE DEADLINE in the LEST names (R-Q5's act layer, R-Q7B):
-      -- kept beside the anchor, so the LEST is handed the deadline of the
-      -- member whose failure anchors it.
+      -- forced here so the failures can be ordered; it is R-Q5's failure
+      -- time as 'Contract5' and 'Contract10' compute it for a single
+      -- obligation — the member's missed deadline for MUST/DO/MAY (§5.2),
+      -- its violating event's stamp for SHANT. The sentinel also carries
+      -- the stream position of the event that revealed the miss (its third
+      -- argument; forced next, 'Barrier5c') and the member's deadline (its
+      -- fourth, when it had one; 'Barrier5b'), which is what OF THE
+      -- DEADLINE in the LEST names (R-Q7B): kept beside the anchor, so the
+      -- LEST is handed the deadline of the member whose failure anchors it
+      -- — for MUST/DO/MAY the very same reference as the anchor.
       ValConstructor n args
         | Just fp <- failpoint, n `sameResolved` fp
         , Just (dRef, pRef, tRef, evRef) <- sentinelArgs args -> do
@@ -2227,8 +2460,11 @@ backwardContractFrame val = \ case
   -- is forced next ('Barrier5c'): it breaks a tie between two failures at
   -- one stamp that two DIFFERENT events revealed (a SHANT barrier, where the
   -- failure is the member's own violating event). Then the member's
-  -- deadline, when it had one ('Barrier5b'): it breaks a tie between two
-  -- failures the SAME event revealed.
+  -- deadline, when it had one ('Barrier5b'). Since the anchor became the
+  -- deadline for MUST/DO/MAY (§5.2, 2026-09-16) the third key can no
+  -- longer separate what the first two tied: two such members with one
+  -- anchor have one deadline, and are revealed by one event. It is kept,
+  -- and documented as redundant, rather than half-removed.
   Barrier5 BarrierFailStampFrame {..} -> do
     stamp <- assertTime val
     pushCFrame (Barrier5c BarrierFailPosFrame {step, failAt = stamp, timeRef, evsRef, dueRef})
@@ -2282,6 +2518,7 @@ backwardContractFrame val = \ case
       Just (MkDeadline _ _ (Just (AnchorAt _ e))) -> continueExpr ctx.env e
       Just (MkDeadline _ _ (Just a@AnchorJoin{}))     -> unreachableAnchor a
       Just (MkDeadline _ _ (Just a@AnchorDeadline{})) -> unreachableAnchor a
+      Just MkBefore{} -> beforeOnJoinLine
       _ -> continueRef ctx.time
   Barrier4 BarrierArmingFrame {..} -> do
     -- the state deadline's origin, forced (see 'Barrier3'): a NUMBER, or a
@@ -2294,6 +2531,33 @@ backwardContractFrame val = \ case
         tRef <- allocateValue (ValNumber joinTime)
         dRef <- allocateValue (ValNumber stateDeadline)
         fireBarrierHence ctx (Just dRef) tRef joinEvents
+  -- EVERY, the barrier, the state layer's LEST ('barrierStateMissed'): the
+  -- walk from the barrier's arming to the first event stamped after the
+  -- state deadline, one cons cell per step — the cell, then its event, then
+  -- the event's stamp — so the LEST is handed the stream from that event
+  -- on, as the act layer hands its LEST the stream from the revealing
+  -- event on. The walk stops at the FIRST such event and keeps everything
+  -- after it (a trace is stamp-sorted, so that is also every such event).
+  BarrierTrim BarrierTrimFrame {..} -> case val of
+    ValNil -> barrierStateLest ctx lestExpr cutoffRef cell
+    ValCons e es -> do
+      pushCFrame (BarrierTrimEvent BarrierTrimCellFrame {rest = es, ..})
+      continueRef e
+    _ -> internalException $ RuntimeTypeError $
+      "expected LIST EVENT but found: " <> prettyLayout val <> " when trimming a barrier's stream to its state deadline"
+  BarrierTrimEvent BarrierTrimCellFrame {..} -> case val of
+    ValEvent _ _ tR -> do
+      pushCFrame (BarrierTrimStamp BarrierTrimCellFrame {..})
+      continueRef tR
+    _ -> internalException $ RuntimeTypeError $
+      "expected an EVENT but found: " <> prettyLayout val <> " when trimming a barrier's stream to its state deadline"
+  BarrierTrimStamp BarrierTrimCellFrame {..} -> do
+    stamp <- assertTime val
+    if stamp > cutoff
+      then barrierStateLest ctx lestExpr cutoffRef cell
+      else do
+        pushCFrame (BarrierTrim BarrierTrimFrame {cell = rest, ..})
+        continueRef rest
   RBinOp1 MkRBinOp1 {..}
     -- NOTE: this is weirdly asymmetric because
     -- in case of AND we can never abort earlier but have to instead
@@ -2431,6 +2695,83 @@ backwardContractFrame val = \ case
     tryNextEvent frame events = do
       pushCFrame (Contract1 frame)
       continueRef events
+
+    -- The closing edge, once the opening instant (if any) is known: what
+    -- 'Contract4' did on its own before the window had an opening edge.
+    -- @timeW@ is the frame's clock, forced; @openT@ the absolute instant the
+    -- window opens, when it has one, and @openAbsolute@ whether it was a
+    -- DATE (for the empty window's note). Three shapes of closing edge, plus none:
+    --
+    --   * an already-evaluated remaining due, relative to the clock;
+    --   * the source deadline, met for the first time — the arming point as
+    --     far as the deadline is concerned: no event has advanced 'time' yet,
+    --     so an anchor is resolved ONCE, here, in the obligation's own
+    --     environment and at its arming clock (R-Q7C: "evaluated once at
+    --     arming"). After 'Contract5' the due is a relative number and the
+    --     anchor is spent. A bare WITHIN beside an AFTER takes the opening
+    --     instant as its origin (re-anchor, §5.1.2.2); an anchored one takes
+    --     its anchor's; a BEFORE is a DATE and has no origin to add to;
+    --   * no closing edge at all: the timing step is skipped, so the clock
+    --     is advanced to the event's stamp here, which the timing step would
+    --     otherwise have done — and the opening edge, when the act has one
+    --     (@AFTER@ alone: a window that opens and never closes), is still
+    --     re-relativised to that stamp, so 'Contract10' can see whether the
+    --     window has opened.
+    scrutinizeDue :: WHNF -> Maybe Rational -> Bool -> ScrutinizeDue -> Machine Config
+    scrutinizeDue timeW openT openAbsolute ScrutinizeDue {..} = case due of
+      -- the remaining due is relative to the instant the WITHIN runs from:
+      -- the window's opening while that is still ahead, the clock otherwise
+      -- ('relativeDue'); 'openT' is that opening exactly when it is ahead
+      Right due' -> do
+        pushCFrame (Contract5 CheckTiming {time = timeW, origin = openT, openT, openAbsolute, ..})
+        continueBackward due'
+      Left (Just (MkDeadline _ duration Nothing)) -> do
+        pushCFrame (Contract5 CheckTiming {time = timeW, origin = openT, openT, openAbsolute, ..})
+        continueExpr env duration
+      Left (Just (MkDeadline _ duration (Just anchor))) -> do
+        pushCFrame (Contract4b ScrutinizeAnchor {time = timeW, openT, openAbsolute, ..})
+        resolveAnchor env armed anchor
+      Left (Just (MkBefore _ instant)) -> do
+        pushCFrame (Contract5 CheckTiming {time = timeW, origin = Nothing, openT, openAbsolute, ..})
+        continueExpr env instant
+      Left Nothing -> do
+        stamp <- assertTime ev'time
+        pushCFrame (Contract6 PartyWHNF {time = ev'time, opens = relOpening openT stamp opens, ..})
+        maybeEvaluate env party
+
+    -- An anchor, put to the machine: an expression is evaluated in the
+    -- obligation's environment (a NUMBER on the trace's clock, or a DATE);
+    -- the lifecycle positions of the ENCLOSING obligation are read from the
+    -- bindings its hand-off made ('bindLifecycle'); THE ARMING with no
+    -- enclosing obligation is this obligation's own arming. Shared by both
+    -- edges (R-Q7 for the WITHIN, R-X5 for the AFTER).
+    resolveAnchor :: Environment -> Reference -> Anchor Resolved -> Machine Config
+    resolveAnchor env armed anchor = case anchor of
+      AnchorAt _ e     -> continueExpr env e
+      AnchorJoin _     -> continueRef =<< lifecycleRef env anchor lifecycleJoinUnique Nothing
+      AnchorDeadline _ -> continueRef =<< lifecycleRef env anchor lifecycleDeadlineUnique Nothing
+      AnchorArming _   -> continueRef =<< lifecycleRef env anchor lifecycleArmingUnique (Just armed)
+
+    -- The opening edge re-relativised to an event's stamp, for the frames
+    -- after 'Contract5' and for the residual: what is still to run until the
+    -- window opens while it has not, nothing once it has. An act with no
+    -- opening edge keeps its @Left Nothing@.
+    relOpening :: Maybe Rational -> Rational -> MaybeOpened -> MaybeOpened
+    relOpening openT stamp opens = case openT of
+      Nothing   -> opens
+      Just open
+        | open > stamp -> Right (Just (ValNumber (open - stamp)))
+        | otherwise    -> Right Nothing
+
+    -- The instant a remaining due is measured from: the window's opening
+    -- while that is still ahead of the stamp, the stamp otherwise.
+    relativeDue :: Maybe Rational -> Rational -> Rational
+    relativeDue openT stamp = maybe stamp (max stamp) openT
+
+    -- 'Contract4o' carries the same fields as 'Contract4' plus the opening's
+    -- anchor; hand the deadline scrutiny the frame it expects.
+    dueFrameOfOpening :: ScrutinizeOpening -> ScrutinizeDue
+    dueFrameOfOpening ScrutinizeOpening {..} = ScrutinizeDue {time = armed, ..}
 
     pushCFrame = pushFrame . ContractFrame
 
@@ -2726,10 +3067,24 @@ data MemberDue
   | DemotedJoinDue (Deadline Resolved)    -- ^ the join line's WITHIN, bounding each act because the act has none
 
 -- | The deadline a member obligation is built with.
-memberDueExpr :: MemberDue -> Maybe (Deadline Resolved)
-memberDueExpr = \ case
+--
+-- A demoted join-line @WITHIN@ bounds the whole from the EVERY's arming
+-- (R-T2), whatever the act line says; so when the act has an @AFTER@
+-- (§5.1.2, 2026-09-16), the bare join-line duration is handed to the member
+-- anchored @OF THE ARMING@ explicitly — which 'memberEnv' binds to the
+-- EVERY's arming — rather than as a bare @WITHIN@, which beside an @AFTER@
+-- would count from the instant the member's window opened (re-anchor,
+-- §5.1.2.2). Without an @AFTER@ the two readings coincide and the deadline
+-- is handed over as written, so no residual of an older program prints
+-- differently.
+memberDueExpr :: Maybe (Opening Resolved) -> MemberDue -> Maybe (Deadline Resolved)
+memberDueExpr mopen = \ case
   NoMemberDue      -> Nothing
   MemberDue d      -> Just d
+  -- the anchor carries 'emptyAnno', and nothing a drafter writes does: that
+  -- is how 'emptyWindowNote' knows not to tell them to drop it
+  DemotedJoinDue (MkDeadline a d Nothing)
+    | isJust mopen -> Just (MkDeadline a d (Just (AnchorArming emptyAnno)))
   DemotedJoinDue d -> Just d
 
 -- | A member's environment: the EVERY's, with the member variable bound —
@@ -2781,7 +3136,7 @@ memberObligation :: QuantCtx -> RExpr -> Maybe RExpr -> MemberDue -> CastMember 
 memberObligation ctx hence lest mdue (mref, mval) =
   ValObligation
     (memberEnv ctx mdue mref)
-    (Right mval) ctx.deonton.action (Left (memberDueExpr mdue)) hence lest
+    (Right mval) ctx.deonton.action (Left ctx.deonton.opens) (Left (memberDueExpr ctx.deonton.opens mdue)) hence lest
 
 -- | @A AND B AND C@, right-nested, as the source-level 'RAnd' would build it.
 randFoldWHNF :: Environment -> WHNF -> [WHNF] -> WHNF
@@ -2818,7 +3173,7 @@ barrierMember
   :: QuantCtx -> Resolved -> Reference -> Maybe (Resolved, Reference)
   -> MemberDue -> CastMember -> WHNF
 barrierMember ctx cp cpRef mfail mdue (mref, mval) =
-  ValObligation env' (Right mval) ctx.deonton.action (Left (memberDueExpr mdue))
+  ValObligation env' (Right mval) ctx.deonton.action (Left ctx.deonton.opens) (Left (memberDueExpr ctx.deonton.opens mdue))
     (Var emptyAnno cp)
     (fmap (\ (fp, _) -> Var emptyAnno fp) mfail)
   where
@@ -2831,6 +3186,13 @@ barrierMember ctx cp cpRef mfail mdue (mref, mval) =
 -- stream every continuation receives, then the stream position of the event
 -- the hand-off happened at, then the member's absolute deadline when it had
 -- one. See 'barrierMember' and 'continueWithFollowup'.
+--
+-- For a MUST\/DO\/MAY member's failure the first and the fourth are the SAME
+-- reference (§5.2: the LEST's clock is the missed deadline, and 'Contract5'
+-- hands one 'deadlineR' as both). That is deliberate, not a duplicate to
+-- fold away: the fourth argument is what OF THE DEADLINE reads and exists
+-- for the checkpoint and the SHANT failure too, where it differs from the
+-- first.
 sentinelArgs :: [Reference] -> Maybe (Maybe Reference, Reference, Reference, Reference)
 sentinelArgs = \ case
   [tRef, evRef, pRef]       -> Just (Nothing, pRef, tRef, evRef)
@@ -2914,28 +3276,27 @@ barrierNext step = case step.queue of
 --     ('BarrierFailedAt'). The @LEST@ runs ONCE, with the anchor, the
 --     residual stream AND the missed deadline (R-Q7B's @THE DEADLINE@) of
 --     the EARLIEST failure. The ordering key is the sentinel's own anchor,
---     forced ('failAt' is the same reference the @LEST@ is handed), so
---     whatever §5.2 makes that anchor read, the ordering follows it. Today
---     it reads the revealing event's stamp. For @MUST@\/@DO@\/@MAY@ that
---     orders by the missed deadline UP TO TIES: every member scans the same
---     stream, so an earlier deadline is revealed by an earlier-or-equal
---     event; two deadlines revealed by the same event tie. For @SHANT@ the
---     stamp is the violating event's own, which the window's end does not
---     order, and two members violated at one stamp are two DIFFERENT events
---     with two different residuals — a tie there is NOT the same event. So
---     a tie on the stamp is broken first by the stream position ('failPos':
---     the failure the stream reached first, whose residual still holds
---     whatever followed it; measured before this key, a refund between two
---     same-stamp violations was dropped from the chosen residual and the
---     verdict flipped, spec §11.0.1 round 1), which only the same event
---     ties — hence the same anchor and the same residual, but not the same
---     deadline, and @OF THE DEADLINE@ in the @LEST@ reads the chosen
---     member's, so that tie is broken by the deadline missed ('failDue';
---     measured before this key: `LIST alice, bob, carol` reported 19 and the
---     reversed roll 10 for the same events) — and only a tie on all three
---     keeps the first in roll order, which then names the same anchor,
---     residual and deadline either way. §5.2's change of what the anchor IS
---     is not built here.
+--     forced ('failAt' is the same reference the @LEST@ is handed), and
+--     since 2026-09-16 that anchor IS R-Q5's failure time (§5.2): for
+--     @MUST@\/@DO@\/@MAY@ the member's missed deadline, for @SHANT@ its
+--     violating event's stamp — so the primary key orders by the failure
+--     time directly, for every modal. For @MUST@\/@DO@\/@MAY@ a tie on it
+--     is two members with one deadline, which the same event reveals, so
+--     the later keys tie too and roll order names the same anchor, residual
+--     and deadline either way. For @SHANT@ the window's end does not order
+--     the failures at all, and two members violated at one stamp are two
+--     DIFFERENT events with two different residuals — a tie there is NOT
+--     the same event. So a tie on the stamp is broken first by the stream
+--     position ('failPos': the failure the stream reached first, whose
+--     residual still holds whatever followed it; measured before this key,
+--     a refund between two same-stamp violations was dropped from the
+--     chosen residual and the verdict flipped, spec §11.0.1 round 1), which
+--     only the same event ties; then by the deadline ('failDue', added when
+--     the anchor was still the revealing stamp and one event could reveal
+--     two deadlines — measured then: `LIST alice, bob, carol` reported 19
+--     and the reversed roll 10 for the same events; now redundant for every
+--     modal, kept rather than half-removed), and only a tie on all three
+--     keeps the first in roll order.
 --   * with no @LEST@, each failure is the member's own breach
 --     ('BarrierBreached'). The verdict is ONE breach: anchored at the
 --     earliest failure — the smallest missed deadline for @MUST@\/@DO@, the
@@ -3057,6 +3418,15 @@ barrierJoined ctx t evs dueLatest = case joinStateDue ctx of
     pushFrame (ContractFrame
       (Barrier3 BarrierStateDueFrame {ctx, joinTime = t, joinEvents = evs}))
     continueExpr ctx.env duration
+  Just MkBefore{} -> beforeOnJoinLine
+
+-- | A @BEFORE@ on a join line is refused by the checker
+-- ('L4.TypeCheck.checkDeadline', @BeforeOnJoinLine@); the machine never
+-- lowers one there. Named, so that a checker regression shows as this and
+-- not as a type error on a DATE.
+beforeOnJoinLine :: Machine Config
+beforeOnJoinLine = internalException $ RuntimeTypeError
+  "BEFORE on a join line is refused by the type checker and is not lowered here; please report this as a bug"
 
 -- | The join fires. The HENCE is anchored at the last completion and sees the
 -- stream that followed it (R-Q7, §5.1: unanchored, a HENCE counts from the
@@ -3093,10 +3463,12 @@ fireBarrierHence ctx deadlineRef timeRef eventsRef = do
 -- stream twice.
 --
 -- The anchor is therefore the machine's usual one for a single-party
--- obligation — the revealing event's stamp, not the missed deadline. §5.2
--- rules that this should become the deadline, for the single-party path and
--- this one together; making only this one diverge would leave the language
--- with two anchors.
+-- obligation, by construction: the member IS a single obligation, and its
+-- 'Contract5' (a missed MUST\/DO\/MAY: the deadline, §5.2 since 2026-09-16)
+-- or 'Contract10' (a SHANT violation: the event's stamp) chose the clock
+-- before the sentinel ever saw it. There is one anchor mechanism in the
+-- language and this function adds nothing to it — which is why it did not
+-- change when the single-party clock did.
 --
 -- The LEST is the drafter's expression, run as written: a bare @LEST BREACH@
 -- names nobody, and @LEST BREACH BY LIST a, b@ names whom the drafter named.
@@ -3132,7 +3504,16 @@ barrierFail ctx deadlineRef timeRef eventsRef = case ctx.deonton.lest of
 -- deadline, which bounds the whole (R-T2).
 --
 -- The LEST is anchored at the state deadline, which is also what THE
--- DEADLINE names in it (R-Q5's state layer, R-Q7B).
+-- DEADLINE names in it (R-Q5's state layer, R-Q7B), and it is handed the
+-- events AFTER that deadline — the same shape the act layer gives its LEST
+-- (from the revealing event on), found here by walking the barrier's stream
+-- from its arming to the first event stamped past the deadline
+-- ('BarrierTrim'). Until 2026-09-16 the LEST was handed the WHOLE stream
+-- from the arming, so a reparation performed before the deadline was
+-- missed, even before anyone had acted, discharged it (spec §11.0.1,
+-- "Stacking B on C" round 1, R1-5); the join's own residual — what followed
+-- the LAST completion — is wrong the other way, since that completion is
+-- what landed after the deadline.
 --
 -- P2b logs the 'JoinExpired' step here, in each arm beside the routing it
 -- records, so the log cannot classify the routing differently from the
@@ -3142,18 +3523,27 @@ barrierStateMissed ctx joinTime deadline = case ctx.deonton.lest of
   Just lestExpr -> do
     tellDeonticStep $ plainStep (Just joinTime) Nothing NoEvent ctx.norm (JoinExpired ToLest deadline)
     tRef <- allocateValue (ValNumber deadline)
-    mOriginal <- getCurrentParty
-    putCurrentParty Nothing
-    pushFrame (RestoreCurrentParty mOriginal)
-    pushFrame (App1 [tRef, ctx.events] Nothing)
-    let lifecycle = MkLifecycle {join = Nothing, deadline = Just tRef, armed = ctx.time}
-    pushFrame (ContractFrame (Handoff lifecycle))
-    continueExpr (bindLifecycle lifecycle ctx.env) lestExpr
+    pushFrame (ContractFrame (BarrierTrim BarrierTrimFrame
+      {ctx, lestExpr, cutoff = deadline, cutoffRef = tRef, cell = ctx.events}))
+    continueRef ctx.events
   Nothing -> do
     tellDeonticStep $ plainStep (Just joinTime) Nothing NoEvent ctx.norm (JoinExpired ToBreach deadline)
     reason <- allocateValue (ValString
       "every member acted, but the last of them acted after the ONCE line's WITHIN deadline")
     continueBackward (ValBreached (ExplicitBreach (singleBlame (DeclaredBreach Nothing (Just reason)))))
+
+-- | The state-layer LEST, applied to the trimmed stream ('BarrierTrim'):
+-- @cellRef@ is the first cell of the barrier's stream whose event is
+-- stamped after the state deadline (or the empty list).
+barrierStateLest :: QuantCtx -> RExpr -> Reference -> Reference -> Machine Config
+barrierStateLest ctx lestExpr tRef cellRef = do
+  mOriginal <- getCurrentParty
+  putCurrentParty Nothing
+  pushFrame (RestoreCurrentParty mOriginal)
+  pushFrame (App1 [tRef, cellRef] Nothing)
+  let lifecycle = MkLifecycle {join = Nothing, deadline = Just tRef, armed = ctx.time}
+  pushFrame (ContractFrame (Handoff lifecycle))
+  continueExpr (bindLifecycle lifecycle ctx.env) lestExpr
 
 -- * The lifecycle bindings an anchored WITHIN reads
 --
@@ -3219,8 +3609,8 @@ bindLifecycle lc =
 -- sentinel, FULFILLED, a breach) has no anchors and passes through.
 rebindLifecycle :: Lifecycle -> WHNF -> WHNF
 rebindLifecycle lc = \ case
-  ValObligation env party act due followup lest ->
-    ValObligation (bindLifecycle lc env) party act due followup lest
+  ValObligation env party act opens due followup lest ->
+    ValObligation (bindLifecycle lc env) party act opens due followup lest
   ValQuantified env deonton -> ValQuantified (bindLifecycle lc env) deonton
   ValROp env op r1 r2       -> ValROp (bindLifecycle lc env) op r1 r2
   v                         -> v
@@ -3270,6 +3660,8 @@ lifecycleRef env a u fallback =
 -- line names none), and a continuation that arrived as a VALUE and is
 -- attached where the position does not exist — under a LEST for THE JOIN,
 -- under an obligation with no WITHIN for THE DEADLINE, or at the top level.
+-- The anchor may sit on either edge (a WITHIN, or since 2026-09-16 an
+-- AFTER); the wording names the anchor, which is what was refused.
 lifecycleRefusal :: Anchor Resolved -> Text
 lifecycleRefusal a = Text.unwords
   [ "WITHIN … OF " <> Text.strip (prettyLayout a) <> " names a position in the life of the"
@@ -3285,8 +3677,9 @@ lifecycleRefusal a = Text.unwords
 
 -- | An anchor's instant on the trace's clock (R-Q7C): a NUMBER as it is, a
 -- DATE by its serial — the same arithmetic as @DATE_SERIAL@, not a call
--- through it. This is the ONE place the lowering is defined: 'Contract4b'
--- (an act line's anchor) and 'Barrier4' (a join line's) apply it, and
+-- through it. This is the ONE place the lowering is defined: 'Barrier4' (a
+-- join line's anchor) applies it directly, the act line's edges apply it
+-- through 'lowerInstant' (which adds the floating-clock refusal, R-X5), and
 -- "L4.Lts.WhatIf" reads an unforced anchored deadline through it rather
 -- than re-deriving it (LTS-VISUALISER §2.4).
 anchorInstant :: WHNF -> Either Text Rational
@@ -5684,6 +6077,190 @@ diffTimeFraction dt =
   let seconds :: Pico
       seconds = realToFrac dt
   in toRational seconds / secondsPerDay
+
+-- | An instant, forced, lowered to the trace's clock: a NUMBER as it is; a
+-- DATE by its serial — the same arithmetic as @DATE_SERIAL@, not a call
+-- through it (an 'App' inserted into the AST would have no tokens and would
+-- break exactprint). Used for an anchor (@WITHIN d OF …@, @AFTER d OF …@,
+-- R-Q7C) and for the absolute edges (@AFTER date@, @BEFORE date@, R-X5).
+--
+-- A DATE is refused when the obligation's clock, at arming, reads an
+-- instant that no calendar date has a serial for — anything below
+-- @DATE_SERIAL (YMD 1 1 1)@ ('earliestDateSerial'), which is every trace
+-- that starts @AT 0@. Until 2026-09-16 such a date was silently a serial in
+-- the hundreds of thousands, so on an @AT 0@ trace every act was "in time"
+-- for a @WITHIN 0 OF (YMD …)@ and every act would have been for a
+-- @BEFORE (YMD …)@, exit 0 (EVERY-EACH-QUANTIFIER-SPEC §5.1.2.1, T1: the
+-- origin is not declared at the contract level, and the sorts are not
+-- separated — neither is built; this is the machine's answer meanwhile,
+-- and it is a heuristic: a floating trace that starts at 365 or above is
+-- not caught, and the doc page says so in one sentence). @what@ names the
+-- edge for the refusal.
+--
+-- The lowering itself is 'anchorInstant', the one place it is defined (and
+-- what "L4.Lts.WhatIf" reads an unforced anchored deadline through); this
+-- is the machine's guard around it.
+lowerInstant :: Text -> Reference -> WHNF -> Machine Rational
+lowerInstant what armed v = do
+  case v of
+    ValDate d -> do
+      armedT <- readThunk armed >>= \ case
+        WHNF (ValNumber t)         -> pure (Just t)
+        WHNFWhen _ (ValNumber t) _ _ -> pure (Just t)
+        _                          -> pure Nothing
+      -- the arming instant is a forced NUMBER on every path that reaches an
+      -- edge ('App1' hands the frames the trace's clock); should it not be,
+      -- the date is lowered without the check rather than refused for a
+      -- reason that is not the drafter's
+      case armedT of
+        Just t | t < earliestDateSerial -> userException (UserError (floatingClockRefusal what d t))
+        _ -> pure ()
+    _ -> pure ()
+  case anchorInstant v of
+    Right t -> pure t
+    Left _  -> internalException $ RuntimeTypeError $
+      what <> " is expected to be a NUMBER or a DATE but got: " <> prettyLayout v
+
+-- | The serial of the earliest calendar date, @DATE_SERIAL (YMD 1 1 1)@: a
+-- clock reading below it is not on the date-serial scale ('lowerInstant').
+earliestDateSerial :: Rational
+earliestDateSerial = fromIntegral (dayNumberFromDay (Time.fromGregorian 1 1 1))
+
+floatingClockRefusal :: Text -> Time.Day -> Rational -> Text
+floatingClockRefusal what d t = Text.unwords
+  [ what <> " names the date " <> Text.pack (Time.showGregorian d) <> ", but this obligation's clock"
+  , "read " <> prettyRatio t <> " when it was entered, which is not a date serial (DATE_SERIAL"
+  , "(YMD 1 1 1) is " <> prettyRatio earliestDateSerial <> "): the trace counts in floating"
+  , "units from an origin such as 0, and a date has no place on that scale."
+  , "Start the trace at a date serial — #TRACE … AT (DATE_SERIAL (YMD …)) with"
+  , "the events stamped the same way — or write the edge as a duration."
+  , "(EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.1.)"
+  ]
+
+-- | R-X6's report (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, RULED 2026-09-07):
+-- the act came before the window opened, so it does not count — and the
+-- run says so rather than swallowing it.
+--
+-- In a window that closes before it opens (§5.1.2.2, reported by
+-- 'emptyWindowNote') the act can never be repeated in time, so the note
+-- says that instead of "once the window is open" (round 2, R2-4).
+--
+-- The act is printed through 'printActionPattern', the deontic-action
+-- printer (PATTERN-REFERENCE-RULE-SPEC §6): a bare name the checker resolved
+-- as a reference is printed bare, as the source spelled it. The generic
+-- 'Pattern' printer would re-emit it as @(EXACTLY name)@, the deprecated
+-- spelling, for a source that never wrote it.
+earlyActNote :: DeonticModal -> NF -> Pattern Resolved -> Rational -> Rational -> Maybe Rational -> Text
+earlyActNote modal partyNF actPat stamp open deadlineAt = Text.unwords $
+  [ "PARTY " <> prettyLayout partyNF <> " did " <> Text.strip (docText (printActionPattern actPat))
+  , "at " <> prettyRatio stamp <> ", before the window opened at " <> prettyRatio open <> ":"
+  ] <> case (modal, closedBeforeOpen) of
+    (DMustNot, Just d) ->
+      [ "the prohibition had not started, so this is not a violation. It stays"
+      , "in force until " <> prettyRatio d <> ", before the window opens, so nothing"
+      , "can violate it." ]
+    (DMustNot, Nothing) ->
+      [ "the prohibition had not started, so this is not a violation. It stays"
+      , "in force" <> untilClose <> "." ]
+    (_, Just d) ->
+      [ "the act does not count as performance. The obligation stays live, but"
+      , "its window closes at " <> prettyRatio d <> ", before it opens, so no act can"
+      , "be in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)" ]
+    (_, Nothing) ->
+      [ "the act does not count as performance. The obligation stays live," <> clockClause
+      , "and may be performed once the window is open."
+      , "(EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)" ]
+  where
+    -- the closing instant when it precedes the opening: the empty window
+    closedBeforeOpen = case deadlineAt of
+      Just d | d < open -> Just d
+      _                 -> Nothing
+    -- with a closing edge the deadline is what the early act leaves alone;
+    -- without one (AFTER alone) there is no deadline to speak of
+    clockClause = case deadlineAt of
+      Just d  -> " with its deadline untouched (the window closes at " <> prettyRatio d <> "),"
+      Nothing -> " with no closing edge,"
+    untilClose = maybe "" (\ d -> " (the window closes at " <> prettyRatio d <> ")") deadlineAt
+
+-- | An empty window met at run time (§5.1.2.2): the closing instant is
+-- before the opening one. Worded per the shape of the two edges as written
+-- — the checker sees only the explicitly anchored form with literal
+-- offsets, so this is the one report the other shapes get, and the first
+-- cut's single wording ("both edges count from one anchor … drop the
+-- anchor from the WITHIN") was false for every shape but that one
+-- (adversarial pass of 2026-09-16, F3\/R1-3): a @BEFORE@ date has no
+-- anchor to drop, two anchors are two origins, and a demoted join-line
+-- @WITHIN@ reaches here anchored @OF THE ARMING@ by the machine's own
+-- hand, not the drafter's ('memberDueExpr' gives that anchor 'emptyAnno',
+-- which is how it is told from a written one). The first Bool says whether
+-- the opening instant was written as a DATE (@AFTER (YMD …)@), which counts
+-- from nothing — the frames carry only the lowered instant, and the
+-- @(YMD …)@ is an application, not a literal, so the source node cannot
+-- tell (round 2, R2-3: the first wording called it an offset from the
+-- WITHIN's anchor). The second says whether the @WITHIN@'s anchor instant
+-- IS the obligation's own clock — the join under @HENCE@, say — in which
+-- case a bare @AFTER@ shares it and the ruled advice applies.
+emptyWindowNote :: Opening Resolved -> Deadline Resolved -> Bool -> Bool -> Rational -> Rational -> Text
+emptyWindowNote (MkOpening _ _ moa) closing openAbsolute anchorIsClock open close = Text.unwords $
+  [ "This window closes at " <> prettyRatio close <> ", before it opens at " <> prettyRatio open <> ":" ]
+  <> shape
+  <> [ "so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)" ]
+  where
+    shape = case (closing, moa) of
+      -- the absolute closing edge: a date, before the instant the AFTER reaches
+      (MkBefore _ _, _) ->
+        [ "the BEFORE date is earlier than the instant the AFTER opens the window," ]
+      -- bare WITHIN beside an AFTER re-anchors, so only a negative offset gets here
+      (MkDeadline _ _ Nothing, _) ->
+        [ "the WITHIN counts from the opening and its offset is negative," ]
+      -- the join line's WITHIN, demoted to the member and anchored by the machine
+      (MkDeadline _ _ (Just ca), _) | demoted ca ->
+        [ "the join line's WITHIN bounds each member from the arming, and the"
+        , "member's AFTER opens later than that," ]
+      -- the absolute opening edge: a date, later than the instant the anchored WITHIN reaches
+      (MkDeadline _ _ (Just ca), _) | openAbsolute ->
+        [ "the AFTER date is later than the instant the WITHIN, counted from"
+        , words' ca <> ", closes the window," ]
+      -- one anchor on both edges: the ruled case, with the ruled advice
+      (MkDeadline _ _ (Just ca), Just oa) | sameNoun oa ca ->
+        oneAnchor (words' ca)
+      (MkDeadline _ _ (Just ca), Nothing) | anchorIsClock ->
+        oneAnchor (words' ca <> " (the obligation's own clock here)")
+      -- two anchors, two origins
+      (MkDeadline _ _ (Just ca), Just oa) ->
+        [ "the AFTER counts from " <> words' oa <> " and the WITHIN from " <> words' ca <> "," ]
+      -- a bare AFTER counts from the obligation's own clock, whatever the WITHIN names
+      (MkDeadline _ _ (Just ca), Nothing) ->
+        [ "the WITHIN counts from " <> words' ca <> " and the AFTER from the"
+        , "obligation's own clock," ]
+    oneAnchor a =
+      [ "both edges count from " <> a <> " and the opening offset is the larger."
+      , "Drop the anchor from the WITHIN to count it from the instant the window"
+      , "opens, or make the closing offset at least the opening one —" ]
+    words' a = Text.strip (prettyLayout a)
+    sameNoun a b = case (a, b) of
+      (AnchorJoin{},     AnchorJoin{})     -> True
+      (AnchorDeadline{}, AnchorDeadline{}) -> True
+      (AnchorArming{},   AnchorArming{})   -> True
+      _                                    -> False
+    demoted = \ case
+      AnchorArming a -> isEmptyAnno a
+      _              -> False
+
+-- | A value as far as it has already been evaluated, for a note's wording:
+-- references whose thunks are in WHNF are followed, anything still
+-- unevaluated prints as @…@ ('Omitted'). Forces nothing, so it can be
+-- called mid-step; a party that has just been matched against an event
+-- ('runBinOpEquals' forces the fields it compares) prints whole.
+peekNF :: WHNF -> Machine NF
+peekNF = go (8 :: Int)
+  where
+    go 0 _ = pure Omitted
+    go d v = MkNF <$> traverse (peekRef (d - 1)) v
+    peekRef d r = readThunk r >>= \ case
+      WHNF w           -> go d w
+      WHNFWhen _ w _ _ -> go d w
+      Unevaluated{}    -> pure Omitted
 
 dayNumberFromDay :: Time.Day -> Integer
 dayNumberFromDay day =

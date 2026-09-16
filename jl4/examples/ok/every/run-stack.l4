@@ -13,12 +13,19 @@ IMPORT prelude
 -- — the earliest failure — wherever that member stands on the roll. Two
 -- failures at the same stamp are ordered by the stream first (two SHANT
 -- violations at one stamp are two events, and the LEST gets the residual
--- of the one the stream reached first), then by the deadline missed (two
--- misses the same event revealed), and only then by roll position, which by
--- then names the same anchor, residual and deadline either way. Every trace
--- below pins the number that rule produces, for each of the four modals
--- (MUST §1-3, MAY §3b, DO §3c, SHANT §4-4b); the comment says what a
--- different rule would have produced instead.
+-- of the one the stream reached first), then by the deadline missed, and
+-- only then by roll position, which by then names the same anchor, residual
+-- and deadline either way. Every trace below pins the number that rule
+-- produces, for each of the four modals (MUST §1-3, MAY §3b, DO §3c, SHANT
+-- §4-4b); the comment says what a different rule would have produced
+-- instead.
+--
+-- Since 2026-09-16 (§5.2) the anchor IS the failure time — the missed
+-- deadline for MUST/DO/MAY, the violating stamp for SHANT — rather than the
+-- stamp of the event that revealed it. Every number in this file is the
+-- same under both readings, because every LEST here is `OF THE DEADLINE`;
+-- what changed is how the tie cases in §3 and §3b are decided (the comment
+-- there says so). The unanchored form is pinned in run-lest.l4.
 
 DECLARE Actor IS ONE OF
     Landlord HAS name IS A STRING
@@ -95,14 +102,16 @@ GIVETH A DEONTIC Actor Action
 § `3. a tie: both misses revealed by the SAME event`
 
 -- Nothing happens between Carol's deadline (5) and Bob's (14): WAIT UNTIL 20
--- reveals both at once. The LEST's anchor (the revealing stamp, 20) and its
--- residual stream are the same whichever member is chosen, so for the blame
--- set alone the tie did not matter; THE DEADLINE is 5 or 14 depending on
--- it. The earliest failure by R-Q5 is Carol's (5 < 14) from either roll, so
--- the tie is broken by the deadline missed and the refund at 21 reports
--- 5 + 5 = 10 on BOTH rolls. (Broken by roll order it reported 19 on
--- `tenants` and 10 on `tenants, reversed` — measured 2026-09-16 before the
--- tie-break was added.)
+-- reveals both at once. The residual stream is the same whichever member is
+-- chosen; THE DEADLINE is 5 or 14 depending on it. The earliest failure by
+-- R-Q5 is Carol's (5 < 14) from either roll, and the refund at 21 reports
+-- 5 + 5 = 10 on BOTH rolls. Since 2026-09-16 (§5.2) the anchor is the
+-- missed deadline itself, so the two failures do not tie at all — Carol's
+-- 5 is before Bob's 14 on the first key. Before that the anchor was the
+-- revealing stamp, 20 for both, and this was a real tie, broken by the
+-- deadline missed (a key that stays in place, redundant now). Broken by
+-- roll order it reported 19 on `tenants` and 10 on `tenants, reversed` —
+-- measured 2026-09-16 before the tie-break was added.
 #TRACE `staggered` tenants AT 0 WITH
   PARTY alice DOES Sign alice AT 1
   (`WAIT UNTIL` 20)
@@ -123,10 +132,11 @@ GIVETH A DEONTIC Actor Action
 -- miss is. Alice approves at 1. Carol's permission (window 5) expires
 -- unexercised, revealed by WAIT UNTIL 8; Bob's (14) by WAIT UNTIL 20. THE
 -- DEADLINE under the LEST is Carol's 5, so the refund is due 10: at 10
--- FULFILLED, at 11 BREACHED reporting 10, on both rolls. The tie — WAIT
--- UNTIL 20 reveals both expiries at once — is broken by the deadline,
--- 5 < 14: the refund at 21 reports 10 on both rolls. When everybody
--- approves in time the join fires: FULFILLED.
+-- FULFILLED, at 11 BREACHED reporting 10, on both rolls. When WAIT UNTIL 20
+-- reveals both expiries at once the anchor still orders them, 5 < 14 (§5.2:
+-- the anchor is the deadline, not the revealing stamp), and the refund at
+-- 21 reports 10 on both rolls. When everybody approves in time the join
+-- fires: FULFILLED.
 GIVEN roll IS A LIST OF Actor
 GIVETH A DEONTIC Actor Action
 `may approve` roll MEANS
