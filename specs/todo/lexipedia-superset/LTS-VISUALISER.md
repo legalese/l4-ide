@@ -1361,8 +1361,16 @@ this block records where the built types depart from it, and why.
   member's own breach was an explicit `BREACH`. (Written as "two" until 2026-09-16, when review
   found the barrier-without-`LEST` steps logged `Nothing` unconditionally at `Machine.hs`'s
   `Barrier1` frame although a `DeadlineMissed` member carries its stamp; that `JoinFailed` is now
-  clocked with the stamp, matching what `barrierFail` peeks for the `LEST` case.) The log **peeks and never forces** (`peekWHNF`,
-  `Machine.hs:394`); that rule decides every `Maybe` below.
+  clocked with the stamp. Until #412 that matched what `barrierFail` peeks for the `LEST` case;
+  since #412 the two differ **by design** — `JoinFailed ToBreach` is clocked at the anchoring
+  failure's _revealing_ stamp (`barrierFinish`, `Machine.hs:3333-3337`), while `JoinFailed ToLest`
+  is clocked at the missed _deadline_ the `LEST` counts from (`barrierFail`, `Machine.hs:3494`,
+  peeking the sentinel's `failTimeRef`; EVERY-EACH-QUANTIFIER-SPEC §5.2). Pinned:
+  `DeonticStepSpec.hs` case 15 row `:721` (`Just 14`, the deadline) beside case 17 row `:747`
+  (`Just 20`, the stamp); `--steps` words them `a member did not come through; on to the
+fallback` / `…; that is a breach` (`List.hs:486`), the first at `at 14:` in
+  `every-run-example.txt:31`.) The log **peeks and never forces** (`peekWHNF`,
+  `Machine.hs:443`); that rule decides every `Maybe` below.
 - `dsNorm :: Maybe NormKey`, not `NormKey`. A `Joined` step belongs to an `AND`/`OR` compound,
   which is not a norm instance (§2.3 gives places to obligations, not connectives) and, because
   `ValROp` carries no annotation, has no site. Every other step has a key.
@@ -1440,28 +1448,31 @@ whether the tie-break chose it. Checked by hand: `vt == vt'` now falls through t
 picks the same operand the old `<=` branch did for both operators; the strict cases are
 unchanged. The equality case is pinned by fixture 5; the strict cases rest on the golden suite.
 
-**Call sites, as committed** (line numbers re-anchored 2026-09-16 at reconciliation, after
-`lts/p2b-bearer` moved every site below `Contract5`; the July table above is stale):
+**Call sites, as committed** (line numbers re-anchored **2026-09-17 on `caf1738dc`**, the merged
+tree, after the merges of #399, #411 and #412 moved every site again; the 2026-09-16 table,
+measured at reconciliation after `lts/p2b-bearer` moved every site below `Contract5`, was ~840
+lines off by then — `barrierFail` was cited at 2649, where `startRollCall` now sits. The July
+table above is staler still):
 
-| Site                                  | `Machine.hs` | Step                                                                                           |
-| ------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------- |
-| `Breach` expression (`forwardExpr`)   | 1225–1237    | `Breached summary`: the explicit `BREACH`; no norm, no clock                                   |
-| `App1` on `ValObligation`             | 1343         | `armNormKey`: the entry into the site; bumps `nkActivation`                                    |
-| `Contract1` / `ValNil`                | 1754–1759    | `Waiting`, clock peeked                                                                        |
-| `Contract5` expiry                    | 1847–1895    | `Expired branch deadline`, built here; routed cases logged at `ResolveParty`, breach case here |
-| `Contract6`                           | 1904         | bearer refreshed                                                                               |
-| `Contract8` / `False`                 | 1924         | `PartyMismatch`, `WitnessedOnly`                                                               |
-| `Contract10`                          | 1939–1987    | `Matched ToHence/ToLest/ToBreach`, `Consumed`; `GuardFailed`                                   |
-| `ResolveParty`                        | 1992–1998    | the pending `Expired`, bearer filled, join progress worked out                                 |
-| `Barrier1` verdict arms               | 2059–2073    | `JoinFailed ToBreach` on `ValBreached`, `JoinStalled` on `ValFulfilled`, throw otherwise       |
-| `RBinOp1` (the `ROR` short-circuit)   | 2101–2111    | `Joined ValROr JoinFulfilled LeftSide` — the OR's commonest success path                       |
-| `RBinOp2` (six arms, one unreachable) | 2123–2219    | `Joined op note`; the fulfilled-LEFT `ROR` arm at `:2207` is unreachable past `RBinOp1`        |
-| `startRollCall`                       | 2398         | `armJoinKey`: the join's own entry                                                             |
-| `assembleQuantified`                  | 2433–2444    | `registerCast` (distributive 2433, fork 2434, barrier 2444)                                    |
-| `fireBarrierHence`                    | 2618         | `JoinReleased`                                                                                 |
-| `barrierFail`                         | 2649         | `JoinFailed ToLest`                                                                            |
-| `barrierStateMissed`                  | 2665, 2673   | `JoinExpired ToLest` beside the `LEST` push, `JoinExpired ToBreach` beside the breach          |
-| `patternMatchFailure`                 | 2980         | `ActionMismatch`, `WitnessedOnly`                                                              |
+| Site                                    | `Machine.hs`                   | Step                                                                                                            |
+| --------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `Breach` expression (`declareBreach`)   | 626–633 (from 1366, 2500–2503) | `Breached summary`: the explicit `BREACH`; no norm, no clock; called for no-`BY` and at `BreachBy`'s end        |
+| `App1` on `ValObligation`               | 1476                           | `armNormKey`: the entry into the site; bumps `nkActivation`                                                     |
+| `Contract1` / `ValNil`                  | 1898–1903                      | `Waiting`, clock peeked                                                                                         |
+| `Contract5` expiry                      | 1961–2192                      | `Expired branch deadline`, built at 2120–2128; routed cases logged at `ResolveParty`, breach case at 2182       |
+| `Contract6`                             | 2193                           | bearer refreshed                                                                                                |
+| `Contract8` / `False`                   | 2211–2215                      | `PartyMismatch`, `WitnessedOnly`                                                                                |
+| `Contract10`                            | 2230–2324                      | `EarlyAct` (2260, since #412), `Matched ToHence/ToLest/ToBreach` `Consumed` (2266–2270); `GuardFailed` (2323)   |
+| `ResolveParty`                          | 2328–2334                      | the pending `Expired`, bearer filled, join progress worked out                                                  |
+| `barrierFinish` (was `Barrier1`'s arms) | 3337, 3343                     | `JoinFailed ToBreach` once the verdict is decided, `JoinStalled` on a lapsed `MAY`                              |
+| `RBinOp1` (the `ROR` short-circuit)     | 2561–2572                      | `Joined ValROr JoinFulfilled LeftSide` — the OR's commonest success path                                        |
+| `RBinOp2` (six arms, one unreachable)   | 2585–2691                      | `Joined op note` via `joinedStep` (2791); the fulfilled-LEFT `ROR` arm at `:2679` is unreachable past `RBinOp1` |
+| `startRollCall`                         | 2997                           | `armJoinKey`: the join's own entry                                                                              |
+| `assembleQuantified`                    | 3032–3043                      | `registerCast` (distributive 3032, fork 3033, barrier 3043)                                                     |
+| `fireBarrierHence`                      | 3450                           | `JoinReleased`                                                                                                  |
+| `barrierFail`                           | 3494                           | `JoinFailed ToLest`                                                                                             |
+| `barrierStateMissed`                    | 3524, 3530                     | `JoinExpired ToLest` beside the `LEST` push, `JoinExpired ToBreach` beside the breach                           |
+| `patternMatchFailure`                   | 4014                           | `ActionMismatch`, `WitnessedOnly`                                                                               |
 
 Seventeen sites. `JoinExpired` is logged inside `barrierStateMissed`'s two arms rather than at
 `Barrier4`, so the log's `ToLest`/`ToBreach` is the machine's own routing and not a second copy of
@@ -1586,10 +1597,15 @@ Ng"`, and the event party alongside; on fixture 15's expiry the `Expired` step a
   act advances. Cases 1, 4 and 5 and `LtsWhatIfSpec` are unchanged.
 - The renderer (`List.hs:528`, `partyText`) prints the name when the log had it and the elided
   key otherwise, in text and JSON. Goldens: `every-run-example.txt`/`.json` moved **only** in
-  party text — `git diff lts/p2-followups...HEAD -- jl4/examples/lts/expected/every-run-example.txt
-| grep -c '^[-+] '` = 78 (39 pairs, every one carrying `Tenant OF`/`Landlord OF`), and 144 on
-  the `.json` (72 pairs: 71 `"party"`, 1 `"by"`), checked by `diff` before blessing (the commit
-  message's 72/71 were the first pass's counts, before the `by` lines named the fork's breach);
+  party text — measured on the bearer commit itself, `git diff 351d0d9cc^ 351d0d9cc --
+jl4/examples/lts/expected/every-run-example.txt | grep -c '^[-+] '` = 78 (39 pairs, every one
+  carrying `Tenant OF`/`Landlord OF`), and 144 on the `.json` (72 pairs: 71 `"party"`, 1 `"by"`),
+  checked by `diff` before blessing (the commit message's 72/71 were the first pass's counts,
+  before the `by` lines named the fork's breach). (Re-pinned 2026-09-17: the command was first
+  written against the branch names `lts/p2-followups...HEAD`, which have since moved under it —
+  on the merged tree that pair diffs 0 lines. Against `origin/unstable` @ `d7581074c` the `.txt`
+  still diffs 78 and the `.json` 148: the extra two pairs are the `"by"` lines `d8d67dc37`
+  named later, and the #412 `at 20`→`at 14` clock is on both sides.);
   `contracts.*` (nullary parties) and `tenancy.*` (fresh positions: `Waiting` before any
   comparison, still `Tenant OF …`) did not move. The CLI's output is byte-identical to the
   blessed goldens — measured against an `exe:l4` rebuilt from HEAD (the first pass ran the diff
@@ -1631,7 +1647,9 @@ Sign OF … at 1; Tenant OF …, … MUST (member 2 of 2) — not this party's e
   and, in `DeonticStepSpec.hs` fixture 20, a `bsBlameName` assertion on a record-shaped `LEST
 BREACH BY t` (`forkBreachSrc`: the fork of `every-run-example.l4` with Bob never signing;
   `Breached` carries `bsBlame = Just "Tenant OF &…"`, `bsBlameName = Just "Tenant OF \"Bob\""`).
-  `JL4_LIBRARY_PATH=$PWD/jl4-core/libraries cabal test jl4-core-test`: 651 examples, 0 failures.
+  `JL4_LIBRARY_PATH=$PWD/jl4-core/libraries cabal test jl4-core-test`: 651 examples, 0 failures
+  as measured then, before the merge of #412; **671 examples, 0 failures** on the merged tree
+  (`caf1738dc`, re-run 2026-09-17 — #412 brought its own specs in).
 - Not changed: `reasonFor`'s middle fallback (`mapMaybe reason (map snd atSite)`) was reviewed as
   a duplicate of `own` for an `UnforcedParty` candidate. It is — but for a `KnownParty` it is the
   documented "no step with the bearer's name at the site" fallback, `atSite` is `let`-bound and
