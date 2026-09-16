@@ -587,7 +587,32 @@ attribute and which this ruling does not reach.
 separate file from `etc/check-retired-terms.mjs` on purpose: that one blanks code spans and fenced
 blocks before searching, because its terms are prose words, and this rule lives only inside code.
 Exceptions are either a `CLITIC-VERB-OK` marker on the line, or — for a name used in many places —
-an entry in the checker's `EXEMPT` list with its reason.
+an entry in the checker's `EXEMPT` list with its reason. Neither script runs in CI; both are tools
+you run by hand.
+
+**Repair.** `etc/apply-clitic-sweep.mjs` performs the rename the checker asks for. It **imports** the
+checker's regexes, `EXEMPT` list and scanner rather than restating them, so the two cannot drift —
+two earlier appliers were written with their own patterns and thrown away.
+
+```
+node etc/apply-clitic-sweep.mjs --check    <dir>...   # exit 1 if any rename is pending
+node etc/apply-clitic-sweep.mjs --dry-run  <dir>...   # show them without writing
+node etc/apply-clitic-sweep.mjs            <dir>...   # apply
+node etc/apply-clitic-sweep.mjs --selftest
+```
+
+Three things it will not do, each for a measured reason. It rewrites only **delimited** occurrences
+— `` `name` ``, `"name"`, and the escaped `` \`name\` `` that L4-inside-a-JS-template-literal uses —
+because the same words appear in a quotation of the statute and in comments, where editing them
+would make the corpus say something the Act does not. It never enters `tests/`, because goldens are
+regenerated from swept sources and hand-editing one blesses output nothing produced. And it
+**refuses to write inside `jl4/examples/canon/`**, the vendored mirror: a sweep applied there makes
+the mirror disagree with the SHA in `etc/canon-pin.json`. Sweep in canon, then bump the pin.
+
+A rename whose target name is **already bound** is listed and held back, never forced — the checker
+reports it as outstanding until a human decides. That is not a limitation but the interesting case:
+in canon, `is the natural father` wanted a name already taken by a test fixture, and the resolution
+was to rename the fixture first.
 
 ### Spell the last connective — `..` … `OR`, and `...` … `AND`
 
