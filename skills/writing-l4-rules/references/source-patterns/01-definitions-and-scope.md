@@ -149,8 +149,8 @@ subtree, and a rule that reaches two at once is an error naming both.
 
 ## 1.3 "a person ('P')", "(the 'Purchaser')" — the parenthetical label
 
-**If the source says** — this device does **not** occur in the encoded corpus. Checked across all 26
-files under `jl4/examples/legal/`: no `("P")`, no `(the "Purchaser")`, no `(hereinafter …)`, in
+**If the source says** — this device does **not** occur in the encoded corpus. Checked across all 35
+files under `jl4/examples/legal/` and `jl4/examples/canon/` (measured 2026-09-16): no `("P")`, no `(the "Purchaser")`, no `(hereinafter …)`, in
 quoted text or in comments. Modern United Kingdom drafting uses it constantly, and the encoded slice
 of the British Nationality Act 1981 does not reach one. The nearest corpus analogue is the role
 parameter `GIVEN person IS A PersonProfile` (`jl4/examples/legal/bna/bna.l4:257`, and 28 more

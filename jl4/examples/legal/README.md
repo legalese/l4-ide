@@ -43,12 +43,18 @@ Their goldens moved with them. **45 files left this directory; not one was lost.
 **Two things stayed, and both are deliberate.**
 
 **`sg-succession/cleanroom-2026-08/`** — 6 `.l4` and 24 goldens — is an encoding
-canon holds but the pin does **not** bless: two of its files fail `l4 check` on
-today's binary while canon's goldens for them claim success. **The copy here is
-the healthy one.** Deleting it would have dropped six corpus files from the
-regression suite to match a staler copy elsewhere. It is fully self-contained —
-every import is a sibling inside it — so it stands alone now that its parent's
-top-level files have gone. Re-blessing canon's copy from this one is boarded as a
+canon holds but the pin does **not** bless, so **the mirror carries none of it**.
+That is why it stayed: deleting it would have dropped six corpus files and their
+goldens from the regression suite with nothing to replace them. It is fully
+self-contained — every import is a sibling inside it — so it stands alone now that
+its parent's top-level files have gone.
+
+An earlier draft of this paragraph said the copy here was "the healthy one". It is
+not, and the claim is retracted: the two copies' goldens are byte-identical but for
+one column count, both were blessed by an older binary, and the diagnostic that
+makes two files exit non-zero is Info-level and comes from `daydate.l4:104`, a
+library neither copy owns. This copy is partly swept for clitic verbs and canon's
+is not — less dirty, not healthy. Re-blessing canon's copy is boarded as a
 canon-side job.
 
 **The deposit JSONs** — `chubb/denovo/*.json` and

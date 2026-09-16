@@ -361,8 +361,8 @@ must be exercised before the provision has any content at all.
 > "Where the Contractor works more than 160 hours in a month, the Company may, in its reasonable
 > opinion, reject any hours above 160."
 >
-> — drafted, not quoted; no instrument under `jl4/examples/legal/` combines the three in one
-> sentence. The nearest corpus witness is the registrar's power at
+> — drafted, not quoted; no instrument under `jl4/examples/legal/` and `jl4/examples/canon/` combines the three in
+> one sentence. The nearest corpus witness is the registrar's power at
 > `jl4/examples/canon/sg/succession/sg-paa.l4:917-919`, treated at [8.6](#e8-6), which lacks the
 > deontic half because nobody is permitted to do anything by it.
 

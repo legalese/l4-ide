@@ -110,7 +110,14 @@ arms (see `bench/setup-restored.sh`).
 
 ## 3. The corpus-side oracle encoding: `jl4/examples/canon/us/chubb-hospital-cash/blind-inert/chubb.l4`
 
-> **Moved 2026-09-16.** This module was deposited at `jl4/examples/legal/chubb/chubb.l4` for the whole of this study, and every trial and score in this repository was produced against it at that path. It now lives at the path in the heading, having been vendored into the `legalese/canon` mirror; the bytes are unchanged (verified identical across the move). The old path is kept here because §2's wrapper prompts quote it verbatim and are not editable.
+> **Moved 2026-09-16.** This module was deposited at `jl4/examples/legal/chubb/chubb.l4` for the
+> whole of this study, and every trial and score in this repository was produced against it at
+> that path. It now lives at the path in the heading, having been vendored into the
+> `legalese/canon` mirror; the bytes are unchanged (verified identical across the move). The old
+> path is kept here because §2's wrapper prompts quote it verbatim and are not editable.
+>
+> The four `denovo/…` deposits named in §4 did NOT move — they are spelled absolutely there for
+> that reason.
 
 Produced **2026-08-31**, before any benchmark trial, as one of **three independent blind
 encodings** (inert, guarded-rows, and record house styles), each written by a separate agent
@@ -126,15 +133,17 @@ prompt bytes were not preserved as artifacts. Disclosed gap; see §6.
 
 ## 4. The de novo oracle encoding: `jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4`
 
-> **Moved 2026-09-16**, as §3 — deposited and measured at `jl4/examples/legal/chubb/denovo/chubb-denovo.l4`, bytes unchanged.
+> **Moved 2026-09-16**, as §3 — deposited and measured at
+> `jl4/examples/legal/chubb/denovo/chubb-denovo.l4`, bytes unchanged. The source deposit it
+> cites below stayed at that old path and is spelled in full.
 
 Produced **2026-08-31** under the go-pipeline cleanroom discipline for subject `chubb`
 (`etc/go/subjects/chubb/`): the encoder was given the hash-pinned source deposit —
-`denovo/source-policy.txt`, whose assembly from the arXiv PDF is specified byte-for-byte in
-`denovo/source-bundle.json` (PDF sha256, extraction rule, whitespace-normalised diff check) —
-and **not** `chubb.l4`. Its interpretive choices are recorded in `denovo/fork-register.json`
+`jl4/examples/legal/chubb/denovo/source-policy.txt`, whose assembly from the arXiv PDF is specified byte-for-byte in
+`jl4/examples/legal/chubb/denovo/source-bundle.json` (PDF sha256, extraction rule, whitespace-normalised diff check) —
+and **not** `chubb.l4`. Its interpretive choices are recorded in `jl4/examples/legal/chubb/denovo/fork-register.json`
 (28 entries, each with both readings and the one taken) and its input pins in
-`denovo/surface-map.json`. The phase _instructions_ are split: the pipeline contract is
+`jl4/examples/legal/chubb/denovo/surface-map.json`. The phase _instructions_ are split: the pipeline contract is
 committed (`etc/go/go.sh`, `subject.json`), but the phase-executing agents' session prompts are,
 again, transcript material. The independence claim a reviewer can check without any transcript:
 the fork register documents readings the corpus encoding did not take, and the §8 oracle's 107

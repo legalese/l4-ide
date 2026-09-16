@@ -458,13 +458,13 @@ that shape, three rungs deep: pay, then pay with penalty, then pay everything ou
 >
 > — Probate and Administration Act 1934 s 42, at
 > `jl4/examples/legal/sg-succession/cleanroom-2026-08/source/PAA1934.txt:842-853`, whose running
-> header between `:845` and `:849` the quotation elides. **No offence in `jl4/examples/legal/` is
-> encoded**. The word "offence" appears there in exactly three `.l4` files, and in each it
+> header between `:845` and `:849` the quotation elides. **No offence in `jl4/examples/legal/` and `jl4/examples/canon/`
+> is encoded**. The word "offence" appears there in exactly three `.l4` files, and in each it
 > is a scope-out: that module lists "the s 42 offence" among the provisions it deliberately leaves
 > out (`probate-administration-act.l4:2883-2884`), as does its earlier draft (`sg-paa.l4:1082`), and
 > the Jersey charities module puts "offences" out of scope in its opening note
 > (`jl4/examples/legal/charities-cleanroom/charity-test.l4:21-23`). The count is of
-> `jl4/examples/legal/` only. `jl4/experiments/`, which entry [5.10](#e5-10) draws on for the
+> `jl4/examples/legal/` and `jl4/examples/canon/` only. `jl4/experiments/`, which entry [5.10](#e5-10) draws on for the
 > housing grounds, holds offence vocabulary of its own — `macma2.l4` declares an `Offence` type and
 > predicates over it — but no offence-creating rule: not one of its files that mentions an offence
 > carries a `SHANT` or a `MUST NOT`. The pattern below is therefore written from the source, not
