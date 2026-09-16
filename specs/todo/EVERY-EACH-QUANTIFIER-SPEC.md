@@ -2328,20 +2328,25 @@ revealed; firing still waits for an event, so no timer is needed.
 
 Built on `every/lest-anchor`, cut from `every/anchors-on-blame` at `6a8295bf` (nine commits over
 `origin/unstable` `0b640727`), so it lands AFTER that branch. Witness:
-`jl4/examples/ok/every/run-lest.l4` (33 directives, nine sections: the spec's own probe with its
+`jl4/examples/ok/every/run-lest.l4` (47 directives, twelve sections: the spec's own probe with its
 anchored twin, silence, the barrier unanchored beside `run-stack.l4`'s anchored form, the fork,
-`SHANT`, the state layer, `MAY` and `DO`, a chain, a `LEST` that names itself). Line numbers below
+`SHANT`, the state layer, `MAY` and `DO`, a chain, a `LEST` that names itself, `THE ARMING` under
+`LEST` and `HENCE`, a layer whose deadline does not advance, and the chain that cannot end; 33 in
+nine sections on the build commit, 39 in ten after round 1). Line numbers below
 are on the round-1 fix commit of the adversarial pass (subject `lang(every): apply round 1 of the
 LEST pass …`, the commit after `546965be`, which moved `Machine.hs` by up to 31 lines and
 `ContractFrame.hs` by 2); the cites of the two earlier commits were re-pinned there, and they are
-NOT re-cited by later commits, which say so in their own ledger entries.
+NOT re-cited by later commits, which say so in their own ledger entries (round 2 moved `Machine.hs`
+by one line up from `:551` and by up to 36 down from `:566` — the new bound and refusal after
+`isReoffered`, and the rewritten NOTE — and `ContractFrame.hs` by 12 from `:168`; its cites are in
+the round-2 paragraphs and entry below, on the round-2 fix commit `a6b077d1`).
 
 **The mechanism: one place, one reference.** `Contract5`'s expiry branch already computed the
 absolute deadline (`Machine.hs:1612`) and allocated it as `deadlineR` for `THE DEADLINE` (`:1718`).
 The change is that under `LEST` the continuation's CLOCK is that same reference: `clockAt`
 (`:1723`) picks `deadlineR` for a `LEST` hand-off and the revealing event's stamp for a `HENCE`
 hand-off, on both the re-offer branch and the consume branch (`:1733`, `:1742`; one branch since
-round 2, `:1760-1779` on the round-2 commit), and `ResolveParty`
+round 2, `:1760-1780` on the round-2 commit), and `ResolveParty`
 carries it to `continueWithFollowup` as the `time` the continuation is applied to (`:1851`;
 `ResolvePartyFrame.time`, `ContractFrame.hs:591`). So `WITHIN d` and `WITHIN d OF THE DEADLINE`
 under a `LEST` read one reference and cannot drift apart (item 4 of the build brief: they coincide
@@ -2398,7 +2403,7 @@ whose window was still open at the copy's stamp: a refund at 12 under layers due
 the third layer as an untouched residual alone and gave `FULFILLED` after a `WAIT` at 11, the
 round-1 signature exactly. **The rule since the round-2 fix commit: a re-offered copy is always
 handed on to the next layer, whatever that layer's deadline.** The mark it carries
-(`Reoffered`, `ContractFrame.hs:168-174`: `highWater`, the latest deadline the copy has revealed
+(`Reoffered`, `ContractFrame.hs:168-176`: `highWater`, the latest deadline the copy has revealed
 the expiry of, and `stalled`, the hand-offs in a row that failed to pass it; `reofferedEvents`
 is a `Map Address Reoffered`, `ev'reoffered :: Maybe Reoffered` through the five scrutiny frames)
 no longer withholds the event from anything; it exists only so that the one chain the walk cannot
@@ -2406,7 +2411,7 @@ end — a continuation that reaches ITSELF with its deadline already past when i
 self-naming `LEST` with `WITHIN 0` or a negative `WITHIN`, a kept `SHANT`'s `HENCE` with a
 negative one, an anchored deadline that never moves — is refused **by name** rather than walked
 forever: past `maximumStalledReoffers` (1,000, `Machine.hs:570`) consecutive stalled hand-offs
-`reofferResolve` (`:1760-1779`) raises `stalledChainRefusal` (`:580`), a `UserError` that names
+`reofferResolve` (`:1760-1780`) raises `stalledChainRefusal` (`:580`), a `UserError` that names
 the stamp, the high-water deadline, the three shapes and the three repairs. The bound is
 deliberately generous and decides only how soon an ill-founded chain is reported, not whether: a
 stalled layer costs about a microsecond, and no finite chain of distinct layers comes near it
