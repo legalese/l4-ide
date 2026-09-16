@@ -110,15 +110,15 @@
     },
     {
       "id": "EVERY residue",
-      "owner": "Meng",
+      "owner": "every-each (build tracks) · Meng (order + the bench below)",
       "kind": "scope",
       "quick": false,
-      "raised": "2026-09-08",
-      "ask": "CORRECTED 2026-09-15 — an earlier version of this card said the EVERY/EACH arc was ruled-not-built; that was a stale memory note and was false of the tree. BUILT AND MERGED: the front end (#360, 2026-09-07), evaluation (#370, 2026-09-08) and `EVERY Cast v IN xs` (#374, 2026-09-08) — EVERY + WHO filter, ONCE ALL HAVE barrier, UPON EACH fork, the distributive form, all four modals, the join deadline, nesting; 14 witnesses under jl4/examples/ok/every/ with goldens. NOT BUILT, each verified against Lexer.hs/Parser.hs on unstable e578654c: (1) R-T3 blame set §6.1 — a failed barrier names ONE non-completer, roll order, because ReasonForBreach carries one party; (2) §5.2 deadline anchor — LEST anchored at the revealing event, not the missed deadline, deliberately matching the single-party path so it is one change in one place; (3) §11.1 BarrierRuntime — an unfinished barrier's residual lacks the join line (only a resuming service cares); (4) per-member performer/actor check; (5) §13.2 partial-completion visibility and §2.2.7.4 count/measure joins (RT4 `Aggregate OF`, RT5 `SOME m OF` — TKSome is lexed, zero parser uses); (6) R-Q7A–C anchors `OF THE JOIN/DEADLINE/ARMING` + date expression §5.1.1 — zero parser mentions; (7) R-X5 AFTER/BEFORE edges, R-X6 early-act nullity, T1 origin §5.1.2 — AFTER/BEFORE not lexed; (8) §5.1.3 anchor as trace expression — direction only; (9) WHOSE §13.6 — endorsed as a direction, not ruled, not lexed (lang/whose-opening is S2/S3 section work, not this). Also owed: doc/reference/regulative/README.md:86,96 still teach `WITHIN 5 days OF notice`, a parse error (§2.5). Separate arc, also not built: R5 field opening for rule bodies (IMPLICIT-PROPS-DESIGN.md §11.7, :2193). The question for Meng is sequencing: which of (1)–(9) first.",
-      "unblocks": "the next EVERY build session starting from the true residue rather than re-deriving it",
+      "raised": "2026-09-17",
+      "ask": "REWRITTEN 2026-09-17 from every-each's list (outbox/20260916T212814Z-every-residue-after-wave.md, every line checked against the spec on #412's tip). LANDED BY THE WAVE (#411 + #412, unstable 083dc8b4): R-T3 the blame set (§6.1) · R-Q7A/B/C the anchored `WITHIN … OF THE JOIN | THE DEADLINE | THE ARMING | <instant>` (§5.1.1) · §5.2 the LEST clock (missed deadline / violating stamp / state deadline; stream trim; re-offer-to-every-layer with the stalled-chain refusal) · AFTER/BEFORE with R-X5 AMENDED (bare `AFTER d1 WITHIN d2` re-anchors; two-offset is `WITHIN d2 OF THE JOIN`) and R-X6 (early act = reported nullity; the `notes` channel) · the Pile-of-Law window-phrase evidence card · EXACTLY swept per #407. OWED, build tracks in the order every-each would cut them, all from post-#412 unstable: (1) Track 5 (+3): the count and measure joins — `ONCE SOME m OF … HAVE` / `AT LEAST m OF` / `ANY OF` (§2.2.7.4; SOME is a keyword, the join is not built), measure joins, §13.2 partial-completion visibility, and the residual of an unfinished barrier carrying its join line (§11.1 BarrierRuntime as a real value — today a resumed residual would run the members and never the join); consumer lts-diagrams-2; the n=0 triple as witnesses. (2) The performer/actor agreement check per member (checkDeonton's comment says phase 2 does it at run time; the machine checks the EVENT's party, not the ACTION's actor). (3) A front-end fix the run time compensates for: a barrier's HENCE/LEST naming the member is refused at run time; the right fix is checkDeonton dropping the variable from scope under a JoinOnce. (4) T1 (§5.1.2.1): no COMMENCING keyword, no separation of the instant sorts — a run-time refusal of a DATE below DATE_SERIAL (YMD 1 1 1) stands in; with it a join-line AFTER, backward windows from a future event, a negative AFTER offset. (5) §5.1.3 the anchor slot as a trace expression — direction only; needs Meng's marks on B1, B3–B9. (6) WHOSE (R-W1–R-W3) — parked by Meng 'until we resolve the WITHIN / AFTER', which is now resolved; type of the expression still open; EACH matched by spelling, NO/WHOSE not keywords, ALL/NO semantics open since 2026-09-06. (7) `BY EVERY t` as a spelling for a set-valued breach: not ruled, not built. CROSS-TRACK, not EVERY's: BPMN blame-set fidelity note (lts-diagrams); state-layer LEST re-looks marked Reoffered at the hand-off, O1/O2 (lts-diagrams-2, after #401).",
+      "unblocks": "the join family lts-diagrams-2 consumes; WHOSE; a residual a service can resume",
       "source": {
         "file": "specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md",
-        "anchor": "### 11.0.1 What phase 2 built, and what it did not"
+        "anchor": "### 11.0.1"
       }
     },
     {
@@ -250,6 +250,19 @@
       "source": {
         "file": "CLAUDE.md",
         "anchor": "the copies are **byte-identical**"
+      }
+    },
+    {
+      "id": "EVERY bench",
+      "owner": "Meng",
+      "kind": "design ruling",
+      "quick": false,
+      "raised": "2026-09-17",
+      "ask": "One bench of rulings the wave's tracks marked 'open to Meng' (every-each's words, outbox/20260916T212814Z-every-residue-after-wave.md): §5.2 (a) maximumStalledReoffers = 1000 as the stalled-chain bound; (b) a LEST under an anchored deadline already past at arming counts from a deadline EARLIER than the failed obligation's own entry — a max(deadline, arming) floor proposed, not applied; (c) a kept SHANT's HENCE clock is NOT moved (stays the revealing stamp) — §3.4 gives a reading under which it should. §5.1.1.1: an anchored ONCE-line deadline already past at the arming sends an EMPTY cast to the LEST, not the HENCE — chosen, marked open. 'May an empty cast be silent?' — a barrier over nobody fires its continuation on a vacuous join ('once all tenants have signed, the landlord must deliver' delivers when there are no tenants) while a fork over nobody fulfils; options: silent (today) / a run-time note through the notes channel / refuse the barrier over an empty cast / §10.3's static 'might be empty' warning. AFTER/BEFORE: the service notes schema; the text-dedup key for notes; a negative AFTER offset. Ledger, measured not decided: a RECORD inside a LEST continuation is stamped with the ROOT evaluation clock, never the contract clock. Say the word and GM sets these up as a cards page like the APPLIES bench; otherwise mark them here.",
+      "unblocks": "the §5.2/§5.1.1.1 defaults becoming rulings rather than build choices; the empty-cast question",
+      "source": {
+        "file": "specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md",
+        "anchor": "### 11.0.1"
       }
     }
   ]
