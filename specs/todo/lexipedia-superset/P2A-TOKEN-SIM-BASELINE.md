@@ -160,6 +160,16 @@ straight to Breach, no `RAND` ever started), `offering.happy.png` (finished; two
 
 ### 3.3 `handover` — a named deadline, a `RAND`, a `ROR` of permissions, lapse timers
 
+> **Element names below are as measured, and two of them have since changed.** On 2026-09-17
+> `handover.bpmn`'s four synthesised `Lapse_n` boundary events became ordinary `Boundary_n` ones:
+> `L4.StateGraph` now draws a permission's lapse as a real `LEST` edge, so `L4.Bpmn.Lower` no
+> longer synthesises a timer of its own. The measurements in this table still hold — the diagram's
+> shape, its flows and its terminals did not move, because `handover`'s permissions all route to
+> the same Fulfilled end either way — but `Lapse_2`/`Lapse_4` are now `Boundary_2`/`Boundary_4`.
+> The ids are left as measured rather than edited, because editing them would claim a re-run that
+> has not happened. `etc/bpmn-token-sim/out/handover.{json,png}` is stale for the same reason and
+> wants regenerating by whoever next runs the simulator.
+
 | question                               | what the simulator shows                                                                                                                                                                                                                                                                                                                                                                                           | tag      |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
 | the named deadline (`P-DEADLINE`)      | `Boundary_0` is a conditional boundary carrying `` `grace period` `` as text. The simulator offered it as a play button exactly like a timer (`started.triggers: […, "Boundary_0"]`). That its duration is a _name_ the L4 source resolves to 14 is invisible; that it is not a timer at all is invisible.                                                                                                         | MEASURED |

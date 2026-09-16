@@ -12,10 +12,11 @@ did not. Predicates are a different matter, and belong to the ladder; see
 | Fixture           | Covers                                                                                                                                       |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `offering.l4`     | Three parties, a four-way `RAND` (concurrent obligations with different bearers), two `SHANT`s, timer boundary events, a breach terminal      |
-| `handover.l4`     | A deadline that is a _name_ (no timer, no invented duration), a `RAND` and a `ROR`, and permissions whose deadlines are drawn as lapse timers |
+| `handover.l4`     | A deadline that is a _name_ (no timer, no invented duration), a `RAND` and a `ROR`, and four permissions whose deadlines are drawn as lapse arms |
 | `consultation.l4` | The only one that draws a converging parallel gateway: a `RAND` of deadline-free permissions, one branch of which is a chain                  |
 | `../legal/regcf/regcf.l4` | The real 992-line Reg CF corpus — **three** rules, so three golden pairs (`regcf-reporting`, `regcf-advertising`, `regcf-resale`): a renewing obligation drawn as a loop, `IF`-headed duties with guarded gateway arms, named deadlines, two prohibitions. Read from `examples/legal/`, not copied here — see below |
 | `tenancy.l4`      | A quantified obligation (`EVERY`) under each join — **two** rules, so two golden pairs (`tenancy-barrier`, `tenancy-fork`): a parallel multi-instance task, `P-CAST` on both, `P-FORK` on the fork alone. The witness that a barrier and a fork export differently; see below |
+| `option.l4`       | A single `PARTY … MAY` whose `HENCE` is another party's obligation: the one shape in which a permission's lapse and its `HENCE` have different destinations. The witness that the lapse arm ends the rule fulfilled instead of creating the seller's duty; see below |
 | `modals.l4`       | The other modal × join cells — **six** rules, six golden pairs (`modals-*`): a `SHANT` barrier completing on the first act, a `MAY` barrier whose lapse goes to fulfilled, their fork twins, and the two-deadline shapes. Cut after the 2026-09-15 review found the marker inverted two of these and nothing exercised them |
 
 ## The Reg CF goldens are cut from the corpus itself
@@ -123,6 +124,44 @@ byte-identical fidelity report, because `L4.StateGraph.extractDeonton` never rea
 - **A deadline written only on the join line arms the boundary timer** (`memberDeadline` in
   `L4.StateGraph`, mirroring the evaluator). When the act has a deadline of its own, that one is
   on the timer and the join line's is reported undrawn as `P-JOIN-DEADLINE` (lossy).
+
+## A permission's lapse is its own arm
+
+`option.l4` is an option to purchase. Exercise it and the seller owes a transfer; let it expire and
+nobody owes anything. Those are two destinations, and which one you reach is decided by the
+deadline:
+
+```
+PARTY  theBuyer
+MAY    Exercise (EXACTLY theBuyer)
+WITHIN 30
+HENCE  (PARTY theSeller MUST Transfer (EXACTLY theSeller) (EXACTLY theBuyer) WITHIN 14)
+```
+
+The emitted diagram hangs an interrupting timer on the buyer's task and sends its arm to the
+**Fulfilled** end event, while the task's own outgoing flow goes on to the seller's obligation:
+
+```
+<bpmn:boundaryEvent id="Boundary_0" name="after P30D" attachedToRef="Task_0" cancelActivity="true">
+  <bpmn:documentation>the permission lapses: it is not exercised within 30, so the rule ends fulfilled</bpmn:documentation>
+<bpmn:sequenceFlow id="Flow_Task_0__Task_1"     sourceRef="Task_0"     targetRef="Task_1" />
+<bpmn:sequenceFlow id="Flow_Boundary_0__End_2"  sourceRef="Boundary_0" targetRef="End_2" />
+```
+
+Until 2026-09-17 it drew the timer's arm into `Task_1` instead — the seller's obligation — so the
+file said that a buyer who let the option expire obliged the seller to transfer the shares anyway.
+The cause was upstream: `L4.StateGraph` emitted no `LEST` edge for a single-party `MAY`, so the
+exporter had nothing to follow and synthesised a timer of its own, routed "wherever `HENCE` lands".
+
+It survived every golden in this directory because no other fixture has the shape. A permission
+with no `HENCE`, or with `HENCE FULFILLED`, sends both arms to the same end event — `handover`'s
+four permissions all do — and there the guess is invisible. That is why this file exists: it is
+small, it is the only fixture where the two arms disagree, and it is the one that would go wrong
+again first.
+
+It is also the second file here that jBPM compiles and runs without an objection (the other is
+`consultation`); every `EVERY` golden is still refused for its missing collection, which is what
+`P-CAST` predicts.
 
 ## What can be joined, and why so little of it
 

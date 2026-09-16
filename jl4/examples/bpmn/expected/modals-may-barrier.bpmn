@@ -30,11 +30,11 @@
     </bpmn:laneSet>
     <bpmn:startEvent id="Start_0" />
     <bpmn:task id="Task_0" name="MAY Approve ...">
-      <bpmn:documentation>EVERY Director d IN board MAY Approve ... WITHIN 30 ONCE ALL HAVE — one instance per member of the cast, each bound to ‘d’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). ONCE ALL HAVE: what follows arises only if every member exercises the permission; a member whose permission lapses ends the rule as fulfilled with nothing following, which is where the lapse timer routes.</bpmn:documentation>
+      <bpmn:documentation>EVERY Director d IN board MAY Approve ... WITHIN 30 ONCE ALL HAVE — one instance per member of the cast, each bound to ‘d’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). ONCE ALL HAVE: what follows arises only if every member exercises the permission; a member whose permission lapses ends the rule as fulfilled with nothing following, which is where the timer on this activity routes.</bpmn:documentation>
       <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Task_0" isSequential="false" />
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_0" name="after P30D" attachedToRef="Task_0" cancelActivity="true">
-      <bpmn:documentation>LEST: the obligation is not discharged within 30</bpmn:documentation>
+      <bpmn:documentation>the permission lapses: it is not exercised within 30, so the rule ends fulfilled</bpmn:documentation>
       <bpmn:timerEventDefinition id="Timer_Boundary_0">
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P30D</bpmn:timeDuration>
       </bpmn:timerEventDefinition>

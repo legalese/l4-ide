@@ -157,9 +157,14 @@ to the description `addJoin` gives of the code it replaced:
 > An earlier version counted rewired edges and required two or more, which
 > passes happily for a branch containing an interrupting boundary event
 > (`cancelActivity="true"` makes its two arms mutually exclusive: two edges, one
-> token), a `ROR` (an exclusive gateway: n edges, one token), or a lapse timer
-> (same shape again). Each of those emits a join that waits forever for a token
-> nothing will ever send.
+> token) or a `ROR` (an exclusive gateway: n edges, one token). Each of those
+> emits a join that waits forever for a token nothing will ever send.
+
+(The comment listed a third case, "a lapse timer (same shape again)", until
+2026-09-17. It was the same shape because it _was_ a boundary event — one the
+exporter synthesised for itself. A permission's expiry is now drawn as an
+ordinary interrupting boundary event on the first of those two, so the third
+entry named no distinct case and was dropped.)
 
 All three hand-written files are `../expected/consultation.bpmn` — the one
 fixture that legitimately draws a converging parallel gateway — with a single

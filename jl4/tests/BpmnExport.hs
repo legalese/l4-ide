@@ -188,6 +188,29 @@ shantForkSrc = modalJoinSrc "SHANT notify" "UPON EACH"
 mayBarrierSrc = modalJoinSrc "MAY pay" "ONCE ALL HAVE"
 mayForkSrc = modalJoinSrc "MAY pay" "UPON EACH"
 
+-- | A single-party permission whose @HENCE@ is somebody else's OBLIGATION: the
+-- shape in which the lapse arm and the HENCE arm have different destinations.
+-- Exercising it obliges Bob; letting it expire obliges nobody. The exporter
+-- used to synthesise a lapse timer and send it "wherever HENCE lands", which
+-- here drew Bob owing a delivery because Alice did nothing.
+--
+-- 'permissionNoDeadlineSrc' is the control: with no @WITHIN@ there is no expiry
+-- event, so there is no arm and no boundary to hang it on.
+permissionHenceObligationSrc, permissionNoDeadlineSrc :: [Text]
+permissionHenceObligationSrc =
+  [ "`rule` MEANS"
+  , "  PARTY Alice"
+  , "  MAY pay"
+  , "  WITHIN 5"
+  , "  HENCE (PARTY Bob MUST deliver WITHIN 10)"
+  ]
+permissionNoDeadlineSrc =
+  [ "`rule` MEANS"
+  , "  PARTY Alice"
+  , "  MAY pay"
+  , "  HENCE (PARTY Bob MUST deliver WITHIN 10)"
+  ]
+
 modalJoinSrc :: Text -> Text -> [Text]
 modalJoinSrc act joinLine =
   [ "`group` MEANS"
@@ -1959,6 +1982,43 @@ spec = do
     it "and with both written, the act's is the one on the timer" $
       map (.nodeKind) (boundaries both) `shouldBe` [Boundary "Task_0" (TimerAfter "P3D")]
 
+  -- The same rule for a permission that has no quantifier at all. Until
+  -- 2026-09-17 L4.StateGraph drew no LEST arm for a single-party MAY, so this
+  -- exporter synthesised a timer node of its own and routed it "wherever HENCE
+  -- lands". Where HENCE is absent or is FULFILLED that guess is invisible,
+  -- which is why every golden in this corpus survived it; where HENCE is an
+  -- obligation it drew a duty the rule does not create. jl4/examples/bpmn/
+  -- option.l4 is the golden witness for the same shape.
+  describe "a single-party permission" $ do
+    let permission = exportOf defaultBpmnOptions "rule" permissionHenceObligationSrc
+        noDeadline = exportOf defaultBpmnOptions "rule" permissionNoDeadlineSrc
+        -- Task_1 is the obligation HENCE creates and carries a timer of its
+        -- own, so every assertion here is about the permission's task alone.
+        onTask0 bx =
+          [ (b.nodeId, [f.flowTo | f <- bx.bxProcess.procFlows, f.flowFrom == b.nodeId])
+          | b <- boundaries bx
+          , Boundary "Task_0" _ <- [b.nodeKind]
+          ]
+    it "hangs the lapse on the permission's own task, as an ordinary timer" $
+      [k | b <- boundaries permission, let k = b.nodeKind, Boundary "Task_0" _ <- [k]]
+        `shouldBe` [Boundary "Task_0" (TimerAfter "P5D")]
+    it "ends the rule fulfilled when the permission lapses, not at the obligation HENCE creates" $
+      case onTask0 permission of
+        [(_, [tgt])] ->
+          -- The destination is the Fulfilled end event, and NOT Bob's task,
+          -- which is what the old synthesis drew. The name is asserted as well
+          -- as the kind: "is an end event" would still pass if the graph grew
+          -- a second one and the flow went to the wrong end.
+          map (\n -> (n.nodeKind, n.nodeName)) (maybeToList (nodeNamed permission tgt))
+            `shouldBe` [(EndEvent False, "Fulfilled")]
+        other -> expectationFailure ("expected one boundary on Task_0 with one flow, got " <> show other)
+    it "draws no arm at all when the permission has no deadline to lapse at" $ do
+      onTask0 noDeadline `shouldBe` []
+      -- and the obligation its HENCE creates keeps its own timer, so this is
+      -- the permission losing an arm it cannot use, not a timer going missing.
+      map (.nodeKind) (boundaries noDeadline)
+        `shouldBe` [Boundary "Task_1" (TimerAfter "P10D")]
+
   describe "the join exhibit (consultation.l4)" $ do
     it "really does draw a converging gateway, and reports no loss for it" $ do
       bx <- exportOfFile "consultation" "the consultation"
@@ -2185,6 +2245,7 @@ spec = do
     , ("bpmn" </> "modals.l4", "no subletting, severally", "modals-shant-fork")
     , ("bpmn" </> "modals.l4", "quorum by ten", "modals-must-barrier-both-deadlines")
     , ("bpmn" </> "modals.l4", "approve, or else", "modals-must-fork-join-deadline")
+    , ("bpmn" </> "option.l4", "the option", "option")
     ]
 
   regcfCorpus = "legal" </> "regcf" </> "regcf.l4"

@@ -297,20 +297,30 @@ longer gates on, or is gated by, the new picture.
 >
 > **What the answer inherits** is §1.1b's three blind spots unchanged — it is sound in the
 > direction "this act is on every drawn route" and says nothing about whether each drawn
-> route is live — **plus one in the opposite direction**: a bare single-party `PARTY … MAY`
-> whose `HENCE` leads on to another obligation lapses straight to `FULFILLED` in the evaluator,
-> and the graph does not draw that route (`StateGraph.hs`, the `DMay` NOTE in `extractDeonton`).
-> Measured: `PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)` with a
-> stray event AT 6 evaluates to `FULFILLED`, while `--dominators` lists both `pay` and `deliver`
-> as on every path to `FULFILLED`. So "listed ⇒ necessary" fails below a single party's lapsing
-> `MAY`. The user page (`doc/reference/regulative/STATE-GRAPH.md`, "What the answer does not
-> know", item 4) says so; fixing the drawing for `PARTY MAY` is a separate change and would
-> retire the caveat. **Narrowed 2026-09-16:** the quantified form no longer has the gap. After
-> `6daf1d9d` (barrier) and `d544ed22` (fork) the `DMay` arm draws an `EVERY … MAY`'s lapse as a
-> `LEST` edge to `Fulfilled` under either join. Re-measured on `jl4/examples/bpmn/modals.l4`,
-> `--dominators` answers "nothing in particular" for `FULFILLED` on both `the resolution`
-> (barrier) and `each approval is published` (fork), which is right — the chair's publication
-> can be bypassed. The `PARTY MAY` fixture above still lists both acts.
+> route is live. It used to inherit **one in the opposite direction** as well, and that one is
+> now closed.
+>
+> ~~a bare single-party `PARTY … MAY` whose `HENCE` leads on to another obligation lapses
+> straight to `FULFILLED` in the evaluator, and the graph does not draw that route~~ —
+> **CLOSED 2026-09-17.** The history is worth keeping because it is a case of a defect being
+> narrowed twice before it was fixed, and of the narrowing making the remaining half look
+> smaller than it was. Measured when it was live, on the fixture
+> `PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)`:
+> it evaluates to `FULFILLED` on expiry, while `--dominators` listed both `pay` and `deliver`
+> as on every path to `FULFILLED`, so "listed ⇒ necessary" failed below a
+> single party's lapsing `MAY`. **Narrowed 2026-09-16** to the single-party case, after
+> `6daf1d9d` (barrier) and `d544ed22` (fork) drew an `EVERY … MAY`'s lapse as a `LEST` edge to
+> `Fulfilled` under either join. **Closed 2026-09-17**: the `DMay` arm now draws that edge for
+> any permission carrying a `WITHIN`, quantified or not — the quantifier was never what the
+> rule turned on, the deadline was. Re-measured on the fixture above, verbatim:
+> `--dominators` now answers "nothing in particular (there is more than one route)" for
+> `FULFILLED`, which is right, because Alice can let the permission expire.
+> `jl4/examples/bpmn/option.l4` is the golden witness, and it also pins the exporter half:
+> `L4.Bpmn.Lower` no longer synthesises a lapse timer and routes it "wherever HENCE lands",
+> which in that shape
+> drew the seller owing a transfer because the buyer did nothing. What is left is the
+> permission with no `WITHIN`: no deadline, no expiry event, no arm — and there the drawn
+> routes are the only routes.
 
 ### 1.1d So what is left of the existence argument
 

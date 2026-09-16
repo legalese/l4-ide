@@ -144,13 +144,11 @@ stateGraphToBpmn opts sg =
     StateChain
       { scNodes = nodes
       , scBoundary = boundary
-      , scLapse = lapse
       , scFindings =
           taskFindings
             <> quantifierFindings
             <> branchGuardFindings
             <> boundaryFindings
-            <> lapseFindings
             <> undrawnDeadlineFindings
             <> danglingFindings
       }
@@ -266,38 +264,6 @@ stateGraphToBpmn opts sg =
             )
       _ -> (Nothing, [])
 
-    -- A permission with a deadline and no LEST still has somewhere for its
-    -- timer to go: expiry of an unexercised MAY routes to FULFILLED, the same
-    -- place HENCE goes. So synthesise the boundary event and draw the lapse
-    -- rather than dropping the WITHIN and filing a note about it. Confessing a
-    -- loss you could have avoided is not honesty.
-    --
-    -- The word for it comes from 'lestArmWording', not from a literal here:
-    -- this node draws the very arm that function names, and two spellings of
-    -- one vocabulary is the shape smucclaw/l4-ide#927 was about. The guard
-    -- below only fires with a deadline in hand, which is the case in which
-    -- 'lestArmWording' says @lapses@.
-    (lapse, lapseFindings) = case (modal, lestOf sid, deadline, taskNodes) of
-      (Just DMay, Nothing, Just d, host : _) ->
-        let lid = "Lapse_" <> tag
-            lapseWord = lestArmWording DMay (Just d)
-            (trigger, finds) = boundaryTrigger opts modal lid lapseWord deadline
-         in ( Just
-                FlowNode
-                  { nodeId = lid
-                  , nodeName = triggerName modal deadline trigger lapseWord
-                  , nodeKind = Boundary host.nodeId trigger
-                  , nodeDoc =
-                      Just
-                        "the permission lapses: the deadline passes without it \
-                        \being exercised, which routes where HENCE routes"
-                  , nodeLane = host.nodeLane
-                  , nodeMultiInstance = Nothing
-                  }
-            , finds
-            )
-      _ -> (Nothing, [])
-
     -- What is left is DO, which requires an explicit HENCE/LEST and so offers
     -- no target to infer. Its WITHIN is drawn nowhere, and a temporal
     -- constraint disappearing in silence is what this report exists to prevent.
@@ -318,7 +284,6 @@ stateGraphToBpmn opts sg =
             \element's <documentation>"
         }
       | isNothing boundary
-      , isNothing lapse
       , Just d <- [deadline]
       , tn <- take 1 taskNodes
       ]
@@ -437,7 +402,7 @@ stateGraphToBpmn opts sg =
 
   baseNodes :: [FlowNode]
   baseNodes =
-    concat [c.scNodes <> maybeToList c.scBoundary <> maybeToList c.scLapse | (_, c) <- chains]
+    concat [c.scNodes <> maybeToList c.scBoundary | (_, c) <- chains]
 
   -- Which state each node came from; needed to tell a flow that leaves a
   -- parallel branch from one that merely happens to end at the same place.
@@ -446,7 +411,7 @@ stateGraphToBpmn opts sg =
     Map.fromList
       [ (n.nodeId, sid)
       | (sid, c) <- chains
-      , n <- c.scNodes <> maybeToList c.scBoundary <> maybeToList c.scLapse
+      , n <- c.scNodes <> maybeToList c.scBoundary
       ]
 
   -- Where an edge from ANOTHER state lands when it arrives here.
@@ -488,9 +453,6 @@ stateGraphToBpmn opts sg =
 
   boundaryOf :: StateId -> Maybe Text
   boundaryOf sid = chainOf sid >>= \c -> (.nodeId) <$> c.scBoundary
-
-  lapseOf :: StateId -> Maybe Text
-  lapseOf sid = chainOf sid >>= \c -> (.nodeId) <$> c.scLapse
 
   ------------------------------------------------------------------
   -- Pass 2: flows
@@ -549,40 +511,7 @@ stateGraphToBpmn opts sg =
             , Just src <- [gatewayOf sid <|> lastChainNode sid]
             , Just tgt <- [entryOf t.transTo]
             ]
-          -- The lapse timer lands wherever HENCE lands.
-          --
-          -- KNOWN WRONG in one shape, and not fixed here. The evaluator routes
-          -- an unexercised MAY's expiry through @fromMaybe fulfilExpr lest@,
-          -- i.e. to FULFILLED — which is where HENCE goes only when HENCE is
-          -- absent or is FULFILLED. Give a bare MAY a HENCE that points at
-          -- another obligation and the two part company. Measured:
-          --
-          --   PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)
-          --     (`WAIT UNTIL` 100)          ==> FULFILLED
-          --     PARTY Alice DOES pay AT 3   ==> PARTY Bob MUST deliver WITHIN 10
-          --
-          -- so in that shape this flow draws the lapse arriving at Bob's
-          -- obligation, which it never does. The quantified MAY used to be a
-          -- second such shape — a fork-joined EVERY … MAY with a HENCE lapses
-          -- to FULFILLED at runtime (measured 2026-09-16, ok/every/run-modals.l4
-          -- §7) and this synthesis drew its lapse into the chair's duty — until
-          -- the state graph started drawing a LEST edge to Fulfilled for a
-          -- quantified MAY under either join (the barrier on 2026-09-15, the
-          -- fork in d544ed22; the DMay arm in 'extractDeonton'), after which
-          -- 'chainFor' synthesises no lapse node for it (its guard wants
-          -- @lestOf sid@ to be Nothing) and 'lapses' below is empty. The
-          -- root cause for the shape that remains is upstream —
-          -- 'L4.StateGraph.extractDeonton' emits no LEST edge for a bare MAY, so
-          -- there is nothing here to follow and this synthesis is guessing. See
-          -- the NOTE at that site; fixing it retires this whole branch.
-          lapses =
-            [ plainEdge src tgt Nothing
-            | t <- outOf sid
-            , t.transType == HenceTransition
-            , Just src <- [lapseOf sid]
-            , Just tgt <- [entryOf t.transTo]
-            ]
-       in hence <> lest <> branches <> lapses
+       in hence <> lest <> branches
 
     lastChainNode sid = chainOf sid >>= \c -> (.nodeId) <$> listToMaybe (reverse c.scNodes)
 
@@ -877,7 +806,7 @@ stateGraphToBpmn opts sg =
   -- and required two or more, which passes happily for a branch containing an
   -- interrupting boundary event (@cancelActivity="true"@ makes its two arms
   -- mutually exclusive: two edges, one token), a @ROR@ (an exclusive gateway:
-  -- n edges, one token), or a lapse timer (same shape again). Each of those
+  -- n edges, one token). Each of those
   -- emits a join that waits forever for a token nothing will ever send, and the
   -- emitted BPMN deadlocks — a strictly worse failure than not drawing the
   -- gateway at all, because a reader can see a missing gateway and cannot see a
@@ -966,9 +895,9 @@ stateGraphToBpmn opts sg =
           Left
             ( "one of its branches reaches the join by "
                 <> Text.pack (show (length several))
-                <> " different routes — an interrupting boundary event, a ROR, \
-                   \or a lapse timer — of which at most one will fire, whereas \
-                   \a parallel join would wait for every one of them"
+                <> " different routes — an interrupting boundary event or a \
+                   \ROR — of which at most one will fire, whereas a parallel \
+                   \join would wait for every one of them"
             )
 
     exitsOf b = Set.filter (\s -> null (Map.findWithDefault [] s succsOf)) (reachFrom b)
@@ -1388,10 +1317,6 @@ decideDoc c =
 data StateChain = StateChain
   { scNodes :: [FlowNode]
   , scBoundary :: Maybe FlowNode
-  , -- | A synthesised timer for a permission that lapses; see 'chainFor'. It
-    -- is a boundary event like 'scBoundary', but its outflow goes to the HENCE
-    -- target rather than the LEST one.
-    scLapse :: Maybe FlowNode
   , scFindings :: [FidelityNote]
   }
 
@@ -1512,7 +1437,7 @@ quantifierDoc l = case l.labelQuantifier of
             " ONCE " <> th <> ": what follows arises only if every member \
             \exercises the permission; a member whose permission lapses ends \
             \the rule as fulfilled with nothing following, which is where the \
-            \lapse timer routes."
+            \timer on this activity routes."
           _ ->
             " ONCE " <> th <> ": the outgoing flow fires once, when every \
             \instance has completed \8212 which is what a parallel multi-instance \
@@ -1661,9 +1586,27 @@ boundaryDoc (Just DMustNot) Nothing =
   \performed, so this is the HENCE arm — but the rule sets no WITHIN, so \
   \nothing reaches it: a prohibition with no deadline is discharged by neither \
   \the clock nor the act"
--- a BEFORE's label carries its own keyword ('closingClause'), so the
--- preposition is the label's, not ours: "not discharged BEFORE date", never
--- "within BEFORE date" (adversarial pass of 2026-09-16, G8)
+-- A permission is not an obligation and does not fail to be discharged: it
+-- LAPSES, and the rule then ends fulfilled. Before 2026-09-17 a bare permission
+-- never reached this function — L4.Bpmn.Lower synthesised its own timer node
+-- with its own wording — so the sentence below only had to cover the other
+-- modals. Now that L4.StateGraph draws the lapse as a real LEST edge, this is
+-- the node that carries it, and it has to say so.
+--
+-- Both equations below carry the BEFORE guard, because a BEFORE label supplies
+-- its OWN preposition ('closingClause'): "not exercised BEFORE date", never
+-- "not exercised within BEFORE date" (adversarial pass of 2026-09-16, G8). The
+-- guard and the permission wording arrived on separate branches and are both
+-- needed — taking either side of that merge alone would have restored the other
+-- one's defect.
+boundaryDoc (Just DMay) (Just d)
+  | "BEFORE " `Text.isPrefixOf` d =
+      "the permission lapses: it is not exercised " <> d <> ", so the rule ends fulfilled"
+  | otherwise =
+      "the permission lapses: it is not exercised within " <> d <> ", so the rule ends fulfilled"
+boundaryDoc (Just DMay) Nothing =
+  "the permission would lapse when its deadline passed unexercised — but the \
+  \rule sets no WITHIN, so nothing reaches this arm"
 boundaryDoc _ (Just d)
   | "BEFORE " `Text.isPrefixOf` d = "LEST: the obligation is not discharged " <> d
   | otherwise                     = "LEST: the obligation is not discharged within " <> d
