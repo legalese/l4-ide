@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_fork"
+                  targetNamespace="https://l4.legalese.com/bpmn"
+                  exporter="jl4 (L4.Bpmn)"
+                  exporterVersion="1">
+  <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
+  <bpmn:escalation id="Escalation_breach" name="Breach" escalationCode="BREACH" />
+  <bpmn:itemDefinition id="Item_tenants" structureRef="java.util.List" />
+  <bpmn:itemDefinition id="Item_t" structureRef="String" />
+  <bpmn:process id="Process_fork" name="a fork drawn as a multi-instance sub-process" isExecutable="false">
+    <bpmn:property id="tenants" name="tenants" itemSubjectRef="Item_tenants" />
+    <bpmn:startEvent id="Start_0" />
+    <bpmn:subProcess id="Sub_0" name="EVERY Tenant t IN tenants">
+      <bpmn:ioSpecification id="IO_Sub_0">
+        <bpmn:dataInput id="Sub_0_input" name="MultiInstanceInput" itemSubjectRef="Item_tenants" />
+        <bpmn:inputSet id="InputSet_Sub_0">
+          <bpmn:dataInputRefs>Sub_0_input</bpmn:dataInputRefs>
+        </bpmn:inputSet>
+        <bpmn:outputSet id="OutputSet_Sub_0" />
+      </bpmn:ioSpecification>
+      <bpmn:dataInputAssociation id="DIA_Sub_0">
+        <bpmn:sourceRef>tenants</bpmn:sourceRef>
+        <bpmn:targetRef>Sub_0_input</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Sub_0" isSequential="false">
+        <bpmn:loopDataInputRef>Sub_0_input</bpmn:loopDataInputRef>
+        <bpmn:inputDataItem id="t" name="t" itemSubjectRef="Item_t" />
+      </bpmn:multiInstanceLoopCharacteristics>
+      <bpmn:startEvent id="Start_Sub_0" />
+      <bpmn:task id="Task_0" name="MUST Pay ...">
+        <bpmn:documentation>one instance per member, bound to t</bpmn:documentation>
+      </bpmn:task>
+      <bpmn:boundaryEvent id="Boundary_0" name="after P7D" attachedToRef="Task_0" cancelActivity="true">
+        <bpmn:timerEventDefinition id="Timer_Boundary_0">
+          <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P7D</bpmn:timeDuration>
+        </bpmn:timerEventDefinition>
+      </bpmn:boundaryEvent>
+      <bpmn:task id="Task_1" name="MUST Receipt ..." />
+      <bpmn:boundaryEvent id="Boundary_1" name="after P5D" attachedToRef="Task_1" cancelActivity="true">
+        <bpmn:timerEventDefinition id="Timer_Boundary_1">
+          <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P5D</bpmn:timeDuration>
+        </bpmn:timerEventDefinition>
+      </bpmn:boundaryEvent>
+      <bpmn:endEvent id="End_Sub_ok" name="Fulfilled" />
+      <bpmn:endEvent id="End_Sub_breach_0" name="Breach">
+        <bpmn:escalationEventDefinition id="EscDef_End_Sub_breach_0" escalationRef="Escalation_breach" />
+      </bpmn:endEvent>
+      <bpmn:endEvent id="End_Sub_breach_1" name="Breach">
+        <bpmn:escalationEventDefinition id="EscDef_End_Sub_breach_1" escalationRef="Escalation_breach" />
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="Flow_s0" sourceRef="Start_Sub_0" targetRef="Task_0" />
+      <bpmn:sequenceFlow id="Flow_s1" sourceRef="Task_0" targetRef="Task_1" />
+      <bpmn:sequenceFlow id="Flow_s2" sourceRef="Task_1" targetRef="End_Sub_ok" />
+      <bpmn:sequenceFlow id="Flow_s3" sourceRef="Boundary_0" targetRef="End_Sub_breach_0" />
+      <bpmn:sequenceFlow id="Flow_s4" sourceRef="Boundary_1" targetRef="End_Sub_breach_1" />
+    </bpmn:subProcess>
+    <bpmn:boundaryEvent id="Boundary_Sub_0_esc" name="a member breached" attachedToRef="Sub_0" cancelActivity="false">
+      <bpmn:escalationEventDefinition id="EscDef_Boundary_Sub_0" escalationRef="Escalation_breach" />
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="End_2" name="Fulfilled" />
+    <bpmn:endEvent id="End_3" name="Breach">
+      <bpmn:errorEventDefinition id="ErrorDef_End_3" errorRef="Error_breach" />
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_t0" sourceRef="Start_0" targetRef="Sub_0" />
+    <bpmn:sequenceFlow id="Flow_t1" sourceRef="Sub_0" targetRef="End_2" />
+    <bpmn:sequenceFlow id="Flow_t2" sourceRef="Boundary_Sub_0_esc" targetRef="End_3" />
+  </bpmn:process>
+</bpmn:definitions>

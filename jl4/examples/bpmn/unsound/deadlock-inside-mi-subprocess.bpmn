@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A deadlock INSIDE a multi-instance sub-process: an exclusive split feeding a
+     parallel join, so each instance takes one arm and then waits forever for the
+     other. It is the `deadlock-ror-in-rand` defect moved one scope inward.
+
+     This fixture exists because that move used to hide it completely. Before the
+     expansion, a <subProcess> was refused outright and the file was NOT CHECKED,
+     so a deadlock in the one construct most able to deadlock was the one place
+     the gate could not look. It is caught at 2 instances; at 0 there are no
+     copies and nothing inside runs, which is why the verdict is read across the
+     counts rather than within one. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_deadlock_in_scope"
+                  targetNamespace="https://l4.legalese.com/bpmn">
+  <bpmn:itemDefinition id="Item_cast" structureRef="java.util.List" />
+  <bpmn:itemDefinition id="Item_member" structureRef="String" />
+  <bpmn:process id="Process_deadlock_in_scope" name="a deadlock inside an instance" isExecutable="false">
+    <bpmn:property id="the_cast" name="the_cast" itemSubjectRef="Item_cast" />
+    <bpmn:startEvent id="Start_0" />
+    <bpmn:subProcess id="Sub_0" name="EVERY member">
+      <bpmn:ioSpecification id="IO_Sub_0">
+        <bpmn:dataInput id="Sub_0_input" name="MultiInstanceInput" itemSubjectRef="Item_cast" />
+        <bpmn:inputSet id="InputSet_Sub_0">
+          <bpmn:dataInputRefs>Sub_0_input</bpmn:dataInputRefs>
+        </bpmn:inputSet>
+        <bpmn:outputSet id="OutputSet_Sub_0" />
+      </bpmn:ioSpecification>
+      <bpmn:dataInputAssociation id="DIA_Sub_0">
+        <bpmn:sourceRef>the_cast</bpmn:sourceRef>
+        <bpmn:targetRef>Sub_0_input</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:multiInstanceLoopCharacteristics id="MI_Sub_0" isSequential="false">
+        <bpmn:loopDataInputRef>Sub_0_input</bpmn:loopDataInputRef>
+        <bpmn:inputDataItem id="member" name="member" itemSubjectRef="Item_member" />
+      </bpmn:multiInstanceLoopCharacteristics>
+      <bpmn:startEvent id="Start_Sub" />
+      <bpmn:exclusiveGateway id="Split_x" name="one of" />
+      <bpmn:task id="Task_a" name="this arm" />
+      <bpmn:task id="Task_b" name="or this one" />
+      <bpmn:parallelGateway id="Join_p" name="but wait for both" />
+      <bpmn:endEvent id="End_Sub" name="done" />
+      <bpmn:sequenceFlow id="F_s0" sourceRef="Start_Sub" targetRef="Split_x" />
+      <bpmn:sequenceFlow id="F_s1" sourceRef="Split_x" targetRef="Task_a" />
+      <bpmn:sequenceFlow id="F_s2" sourceRef="Split_x" targetRef="Task_b" />
+      <bpmn:sequenceFlow id="F_s3" sourceRef="Task_a" targetRef="Join_p" />
+      <bpmn:sequenceFlow id="F_s4" sourceRef="Task_b" targetRef="Join_p" />
+      <bpmn:sequenceFlow id="F_s5" sourceRef="Join_p" targetRef="End_Sub" />
+    </bpmn:subProcess>
+    <bpmn:endEvent id="End_1" name="Fulfilled" />
+    <bpmn:sequenceFlow id="F_t0" sourceRef="Start_0" targetRef="Sub_0" />
+    <bpmn:sequenceFlow id="F_t1" sourceRef="Sub_0" targetRef="End_1" />
+  </bpmn:process>
+</bpmn:definitions>
