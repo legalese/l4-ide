@@ -3439,6 +3439,16 @@ branch merges, by whoever holds the BPMN track (the lts-diagrams session has off
 note in `L4.Bpmn.Lower` and a dated line in `specs/todo/lexipedia-superset/LTS-VISUALISER.md` §4.9
 (the note that raised this named the file and a `quantifierNotes` list by other names; neither is
 in this tree at this HEAD — check before citing). `L4.Bpmn.Lower` is not touched on this branch.
+(Scoped 2026-09-16, round 1 of the pass on the second rebase: "this branch" is `every/blame-set`,
+commits 1–3, where the sentence was written and where it holds — `git diff origin/unstable
+9d620c355 -- jl4-core/src/L4/Bpmn/Lower.hs` is empty. The anchored-WITHIN and AFTER/BEFORE
+tracks that follow it on the same chain do touch `Lower.hs` and `StateGraph.hs`, for the window
+edges — +113/−23 at PR-A's head, +260/−32 at the wave's tip — not for the blame set, which both
+renderers still drop by name: `l4 export --to bpmn --fidelity-report` of a rule whose `LEST` is
+`BREACH BY (LIST theLandlord, t) BECAUSE …` emits the one shared `Error_breach` end event and a
+report with no note naming the set, and `l4 state-graph` draws one `Breach` terminal
+(`StateGraph.hs:647`, `Breach _ _ _ -> getTerminalState "Breach"`). The `TODO` at
+`Lower.hs:1914` records the owed F-class note; `l4 run` and `--json` do carry every `BY` line.)
 
 **Measured on the branch's HEAD.** Goldens that moved against `e578654c`: one existing golden set
 — `ok/tests/deontic-breach-semantics.golden` (its four both-breached traces, now one entry each with
@@ -3807,7 +3817,7 @@ failure rather than the first in roll order; `RAND`/`ROR` carry both operands' f
 `BREACH BY` takes a list. §6.1.1 has the decisions, including the two this build did not make: a
 barrier's own `LEST BREACH` still names whom the drafter names, and the anchor's VALUE was still
 the revealing stamp until §5.2 was built on 2026-09-16 (next entry; the "Not built" bullet this
-sentence used to point at is gone).
+sentence used to point at is gone). Independently replicated 2026-09-16 by session lts-diagrams on `unstable` `2e34d4ee` (PR #407's parent line, after #395, before this chain) with a `SHANT` fork over `LIST alice, bob, carol`: with Carol offending at 3 and Bob at 5 the forward roll named Bob and the reversed roll named Carol; on this chain both rolls name both, in roll order (probe `every-land/probes/probe-order{,-rev}.l4` in the session scratch).
 
 **Built 2026-09-16**, on `every/lest-anchor` (cut from `every/anchors-on-blame`), witnessed by
 `jl4/examples/ok/every/run-lest.l4` — **§5.2's deadline anchor** (R-Q7's unanchored `LEST` default,
@@ -4477,8 +4487,7 @@ The eighteen commits of the four branches (`every/blame-set` 3, `every/anchors-o
 `every/lest-anchor` 14, `every/after-before` 18, each the previous plus its own) were rebased as ONE
 chain from `0b640727` onto `origin/unstable` `2a2432d6`, which by then carried PR #395
 (`fix/join-on-state-graph`, merged `3abe4602`) — the state graph's join line, the multi-instance BPMN
-task and the two pin suites — plus #398, #400, #402, #404–#406 (#403 is an open PR, not on
-unstable). Every conflict was resolved inside the commit that raised it; no fix-up commit exists; the
+task and the two pin suites — plus #398, #400, #402, #404–#406 (#403 was an open PR at `2a2432d6`, not yet on `unstable`; it merged as `4c803b94` at 07:48 UTC that day, before the second rebase below — dated 2026-09-16, round 2). Every conflict was resolved inside the commit that raised it; no fix-up commit exists; the
 eighteen messages and both trailers are unchanged (but see the round-1 paragraph below: three
 messages later gained a closing paragraph); the four branch tips were re-pointed to the rebased
 commits 3, 9, 14 and — for `every/after-before` — this entry's own commit, the nineteenth, on top of 18. Three commits conflicted:
@@ -4589,8 +4598,7 @@ one way "the eighteen messages are unchanged" above is no longer literally true.
   opening edge (AFTER) says what shape of closing edge it met"); `AFTER.md`'s export bullet and
   `dmn-bpmn.md` say so. No golden carried the old sentence.
 - **Into this commit.** _Intent R1-1, R1-2:_ the two sentences above corrected (the tip is this
-  entry's own commit, on top of 18; unstable carried #398, #400, #402, #404–#406 — #403 is an open
-  PR). _Intent R1-4 and semantics R1-3:_ the `TODO` at `quantifierNotes` sits above the haddock, not
+  entry's own commit, on top of 18; unstable carried #398, #400, #402, #404–#406 — #403 was then an open PR, merged as `4c803b94` before the second rebase below). _Intent R1-4 and semantics R1-3:_ the `TODO` at `quantifierNotes` sits above the haddock, not
   between the signature and the equation, and — as the sentence above now says — the error end event
   names **no** party (one shared `Error_breach`; `L4.Bpmn.Emit`), not one; "one party" was a claim
   borrowed from the brief and sharpened, contradicting §6.1.1. _Semantics R1-4 (minor, pre-existing
@@ -4686,6 +4694,190 @@ tip (this commit) by `etc/verify-branch.sh --base 2a2432d6`: EXIT 0 — `cabal b
 (measured on this commit's tree before this sentence was written into it; the amend that wrote it
 is spec-text-only and was re-gated with `--quick`).
 
+**Rebased again (2026-09-16, evening), onto `unstable` `e966996f` — over #407 and #403, as TWO
+PRs split at commit 9.** `origin/unstable` had moved 25 commits past `2a2432d6` while the
+paragraph above was being written, to `e966996f` (the merge of #410; it did not move again
+during this pass — re-fetched at the end). Among them PR #407 (`cb07560d`, the `EXACTLY`
+retirement and R4's retirement of `QuantifierVariableRebound`), #403 (`lang/r5-field-opening`,
+a record-typed `GIVEN` opens its fields by bare name) and #409 (the sunset date, 2026-10-01).
+The chain was rebased in two halves by two agents in sequence, commits 1–9 first
+(`git rebase --onto origin/unstable 2a2432d6 <commit 9>`), then 10–19 onto the first half's
+swept tip; `rerere` off; every conflict resolved inside the commit that raised it; all nineteen
+messages byte-identical to `bd080aff`'s (one nearly was not: `git rebase --continue` treated
+the line of commit 19's message that begins `#402, #404–#406` as a comment and stripped it —
+restored by an amend with `--cleanup=whitespace`; it is the one rebased message that had to be
+put back by hand). The brief's nine merge-tree paths all conflicted, and so did five more that
+the first half's sweep (below) created:
+
+- **Commit 2** (`a18d98a22`): `ok/tests/deontic-breach-semantics.golden` — #407 swept the `.l4`
+  (two lines longer, every range +2) and re-blessed; the wave's blame-list output. The wave's
+  side of the conflicted hunks, re-blessed at the PR-A tip.
+- **Commit 4** (`49e02d470`): `TypeCheck.hs` ×2 — `updateMixfix … MkCheckEnv` keeps BOTH #407's
+  `apos` and the wave's `eo`; the `EVERY` arm keeps the wave's `checkDeontonBody … (hasJoinDeadline
+mjoin)` call and DROPS the `forM_ (patternBinders …) … QuantifierVariableRebound` loop (#407's
+  R4 comment above the call stands; `patternBinders` no longer exists). `Types.hs` `rangeOf`:
+  #407's `ActionPatternReference`/`ActionPatternNotComparable` beside the wave's two anchor
+  constructors; the `QuantifierVariableRebound` line dropped. The wave never declared the
+  constructor itself (it was hunk context), so nothing else had to go.
+- **Commit 6** (`5279a1317`): `regulative/README.md`'s keyword table — #407's table (its
+  `EXACTLY (deprecated)` row) with the wave's `WITHIN` wording.
+- **Commit 10** (`02ce554e7`, the `LEST` clock): `regulative-layer-whole.md`'s built/proposed
+  table — the wave's rows (the blame set and the `LEST` clock moved to "built") with #407's
+  `EXACTLY`-free row in place of the wave's `EXACTLY` row; `what-follows.md`'s two pasted
+  residuals — #407's spelling (`Pay Alice `Ms Ng` 1550`) with the wave's numbers (`WITHIN 13`,
+  `WITHIN 6`; re-run on the tip, they match); six goldens (`contracts`, `deontic-breach-semantics`,
+  `promissory-note`, `run-anchors`, `run-blame`, `run-stack`) — the wave's side, re-blessed at the
+  PR-B tip. The last three are the first half's sweep meeting the wave's later output changes.
+- **Commit 16** (`fdf4f83db`, `AFTER`/`BEFORE`): `TypeCheck.hs` — #407's R4 comment kept, the
+  wave's five-tuple `checkDeontonBody … opens …` call kept, the rebind loop dropped; `Types.hs`
+  `rangeOf` — the wave's six constructors (`AnchorUnavailable`/`AnchorNotAnInstant` now three
+  fields) beside #407's two; `EVERY.md`'s type-checking bullet — the wave's `AFTER`/`BEFORE`
+  clauses ending in the dated retirement sentence PR-A's sweep wrote ("Until 2026-09-16 … #407
+  retired that error the same day"), not "an action that rebinds the variable is rejected";
+  `regulative/README.md` — #407's table gains the wave's `AFTER` and `BEFORE` rows. Two conflicts
+  in this commit were SEMANTIC, found at build and at the differential, not by git: (a) the wave's
+  `L4.Syntax.Opening` (the `AFTER` edge) collides with #403's `type Opening = Writer …` in
+  `L4.Desugar`, which imports `L4.Syntax` open — seven "ambiguous occurrence" errors; resolved in
+  `Desugar.hs` by `import L4.Syntax hiding (Opening)` plus `import qualified L4.Syntax as Syntax`
+  and `carameliseOpening :: … Syntax.Opening n -> Syntax.Opening n`, so neither name moves and
+  #403's code is untouched. (b) `earlyActNote` (the R-X6 nullity report) printed the act with
+  `prettyLayout`, the generic `Pattern` printer — which since #407 re-emits a checker-synthesised
+  reference as `(EXACTLY name)`: the swept `run-after.l4`, whose source says `Order buyer`, printed
+  `did Order (EXACTLY buyer)`. It now prints through `L4.Print.printActionPattern`, the
+  deontic-action printer #407 split out for exactly this reason (PATTERN-REFERENCE-RULE-SPEC §6),
+  and the note reads `did Order buyer`. Found because the differential's first run showed the two
+  sides equal only after normalising the pre-sweep side — i.e. the swept side was still spelling
+  the keyword.
+- **Commits 17 and 18** (`aef7cd323`, `14812b231`): `EVERY.md`'s type-checking bullet again (each
+  round rewrote it; each keeps the retirement sentence) and `GLOSSARY.md`'s keyword table (#407's
+  `EXACTLY` row, the wave's `AFTER`/`BEFORE` rows). Commit 18 also re-resolved the `earlyActNote`
+  haddock (round 2's paragraph and the printer paragraph both kept).
+- **Commit 19** (`8e83f3de8`, this entry's own commit): §11.0.1 itself — the paragraph above and
+  PR-A's `#### EXACTLY retired by #407` note were added at the same place; both kept, the rebase
+  entry first.
+
+**The two-PR shape** is merge-manager's ruling of 2026-09-16 18:40 SGT, verbatim: "#399 needs
+anchors-on-blame's commits actually landed on unstable, not lest-anchor or after-before … Two PRs
+gets you most of your savings while keeping #399 unblocked the moment PR-A lands." and "Sweep
+EXACTLY at the tip of each PR (not distributed into every intermediate commit)." PR-A =
+commits 1–9 plus their sweep, branch `every/anchors-on-blame` @ `f4b1b11bb`, into `unstable`;
+PR-B = commits 10–19 plus their sweep plus this record, branch `every/after-before`, based on
+PR-A's head. One correction to the ruling's wording: it placed `spec/r-x5-reanchor` "under 9";
+it is commit 15 (`d520f85d2`), in PR-B. `every/blame-set` (rebased commit 3, `9d620c355`) and
+`every/lest-anchor` (rebased commit 14, `ac08e3d36`) are informational tips, not PR heads.
+
+**The two sweeps.** House style since #407 is to drop the keyword, not to bless the warnings. Each
+sweep applied EXACTLY the replacement each `DeprecatedExactly` warning printed on the rebased
+tip's own binary (all `DropTheKeyword` of a bare name; neither "cannot simply be dropped" kind
+occurred), then dropped the parentheses that had held the keyword. PR-A (`f4b1b11bb`):
+`run-anchors.l4` 71, `run-blame.l4` 12, `run-stack.l4` 11, `every-example.l4` 3,
+`anchor-on-join-line.l4` 2, `semantic-tokens/anchors.l4` 2, and six lines the wave had added to
+`EVERY.md`. PR-B (`377e18377`): `run-after.l4` 61, `run-lest.l4` 44, `semantic-tokens/after.l4`
+3, `before-on-join-line.l4` 1 — 109 lines, each mechanically equal to its pre-image minus the
+keyword and its parentheses; no doc or skill page in PR-B's diff adds a line with the keyword
+outside this document's historical snippets, which keep it as a record. **The differentials**
+(the same snapshot binary on the pre-sweep copy and the swept file; the pre-sweep side's own
+`(EXACTLY x)` normalised to `x`; both runs asserted to have happened, same exit code, equal block
+counts): PR-A, `Result:` blocks, SAME for 85 directives (50 + 11 + 24); PR-B, every block from
+`Evaluation[n] @` to `Trace:` with the path stripped, SAME for 122 (75 + 47) — the only header
+change is the end column of the four one-line `#EVAL`s at `run-after.l4:740–743`, ten shorter.
+Both witness files exit 1 on both sides by design (the date-on-a-floating-clock and
+stalled-chain refusals). **The positive controls** (corrected 2026-09-16, round 1 of the
+adversarial pass on this rebase): the control this paragraph first recorded — PR-B's,
+``#TRACE `cooling off` AT 0`` → `AT 1` in a copy of the pre-sweep `run-after.l4` — was vacuous. The edit
+moves no verdict (the window is anchored at the delivery at 10, not at the arming: with both
+sides cut and normalised alike, 0 of 75 blocks differ), and the DIFF it printed was the
+instrument's own one-sided normalisation (`Order buyer` on the normalised pre side against
+`Order (EXACTLY buyer)` on the un-normalised edited copy, `opened at 13` on both). PR-A had run
+no control at all. Genuine controls were then run in the real configuration — the pre-sweep copy
+in the pre slot, the SWEPT file with one verdict-moving edit in the post slot, the tip binary
+snapshotted: PR-A's instrument on `run-blame.l4` with line 51 ``(`WAIT UNTIL` 20)`` → `10`
+reports `DIFF at result 1` (`DEONTIC BREACHED … at 20` → the two residual obligations, `WITHIN
+4`); PR-B's on `run-after.l4` with line 61 `AT 12` → `AT 14` reports `DIFF at block 1` (the
+early-act nullity note → `FULFILLED`); and the real pairs re-run on the same snapshot are SAME
+(50/50, 11/11, 24/24; 75/75, 47/47). The SAME verdicts stood throughout; only the claim about
+the control was wrong.
+
+**Goldens, delete-and-run-twice, each read.** PR-A regenerated 18 (3394 examples: run 1 created
+exactly those, run 2 green); PR-B 19 (3452 examples; the same), seven of them byte-identical.
+Against the wave's own goldens at `bd080aff`, `run-{after,lest,anchors,blame,stack}.golden`
+differ ONLY by #407's pattern-reference Info notice for each top-level name in an action (56,
+39, 61, 7, 7 blocks; `buyer`, `shop`, `theLandlord`, `alice`, `bob`), the swept spelling of
+echoed actions (`MUST Sign t`, `did Order buyer`) and the end column of one-line `#EVAL`
+headers — no Result, verdict, deadline or note changed; the `.ep.golden` equal their sources;
+`semantic-tokens/{anchors,after}.golden` lose the `(`, `EXACTLY`, `)` tokens; the three
+merge-tree goldens are the wave's output in #407's spelling on #407's line numbers
+(`promissory-note` also gains three `The Lender` notices; `contracts` keeps the `LEST` clock's
+`FULFILLED` → `BREACHED` flip, which is commit 10's own). No `.golden` other than an `.ep.golden`
+carries the keyword; `grep -c /Users/` is 0 on each.
+
+**Gates.** PR-A's head, `etc/verify-branch.sh --base e966996f`: EXIT 0 — `cabal build all`,
+`jl4-test` 3394/0, `l4-cli-test` 368/0 (83 pending), `jl4-core-test` 560/0,
+`check-corpus-goldens` 483 files, `doc/test-docs.sh --no-l4` 1511 links / 0 orphans, prettier
+3.4.2, trailers 10/10; separately `jl4-test -m "quantified obligation"` 15/0, `-m "bpmn export"`
+346/0, `jl4-core-test -m "join line"` 13/0, `doc/test-docs.sh` with the worktree binary 103 L4
+files valid; #395's `StateGraphSpec.hs` byte-identical to unstable, `BpmnExport.hs` +93/−0.
+PR-B's tip, `etc/verify-branch.sh --base every/anchors-on-blame`: EXIT 0 (run in full at the sweep commit `377e18377`, the tip before this record; again in full at `f310b84ab`, this record as amended by round 1; and again in full at `af9fc1ba5`, as amended by round 2 — the record is spec text only, and the three runs report the same numbers; the amend that adds this sentence was gated in full again after it was written, its result in the round-2 BUILD-NOTES and the outbox result file, since a commit cannot report its own run) — `cabal build all`, `jl4-test` 3452/0, `l4-cli-test` 369/0 (83 pending), `jl4-core-test` 560/0, `check-corpus-goldens` 494 files, `doc/test-docs.sh --no-l4` 1544 links / 255 linked / 0 orphans, prettier 3.4.2, trailers 11/11; separately `jl4-test -m "quantified obligation"` 16/0, `-m "bpmn export"` 355/0, `jl4-core-test -m "join line"` 13/0, `doc/test-docs.sh` with the tip binary first on PATH 104 L4 files valid; `StateGraphSpec.hs` byte-identical to unstable, `BpmnExport.hs` +217/−2 (the two positional labels commit 16 widens). The gate's `L4/Print.hs CHANGED` flag is inherited from the wave's own commits; no resolution in this rebase touched `Print.hs`, so no new §3.2.1 differential is owed by it. Ahead/behind `origin/unstable` at the tip: 22 / 0. Commits 1,
+2, 5–8 and 10–15, 17, 18 were not built individually on this base (their conflicts are in
+goldens, docs and the spec; 16's two source resolutions were built at the tip); bisectability
+of the intermediate commits on this base is inferred, not measured. **What is known without
+building them: the intermediate commits are red on `jl4-test` for the goldens each PR re-blesses
+only at its tip** (merge-manager's "sweep at the tip of each PR", above). In PR-A, commits 2–9
+carry `ok/tests/deontic-breach-semantics.golden` with the wave's pre-#407 source ranges
+(`49:1-50:22` where the `.l4` at each of those commits has the directive at line 51; commit 1
+and 9a say 51) — 9a re-blessed it. In PR-B, commit 10 took the wave's side of the six conflict
+goldens, so between 10 and 18 `run-anchors`, `run-blame` and `run-stack.golden` carry 0 of the
+61/7/7 pattern-reference notices #407's checker emits for their (already swept) sources and
+`run-anchors.golden` still echoes `(EXACTLY …)` on four lines (`Sign (EXACTLY alice)`,
+`Deliver (EXACTLY theLandlord)`), and `contracts.golden` / `promissory-note.golden` print the
+keyword in a regulative action (two lines and one) for sources that no longer spell it there —
+S re-blessed all six. The merge queue tests each PR's tip; a bisect across either PR should expect those files
+red on the intermediate commits. Re-blessing inside commits 2 and 10 instead was declined in
+round 1 (it distributes the sweep into the intermediate commits, which the ruling above
+forbids, and costs two rebuilds, a re-rebase of everything after each, and both gates again).
+
+**Round 1 of the adversarial pass on this rebase (2026-09-16, evening)** — two refuters per
+finding, nine findings, none refuted by both; every one applied in this record commit (no
+commit at or below PR-A's head changed, so PR-A's head and gate stand). Applied: the vacuous
+positive control (above, corrected and re-run genuinely); the #407 note's eight-file list
+(corrected in the note below); the double full stop in the gate sentence; the intermediate
+commits' golden redness stated in terms (above) rather than left as "inferred"; §6.1.1's
+"`L4.Bpmn.Lower` is not touched on this branch" scoped, dated, to `every/blame-set`, with the
+BPMN and state-graph renderers' silence about the blame set named there (a documented, owed gap
+— `Lower.hs:1914`, LTS-VISUALISER §4.9 — not a wave regression: `l4 run` and `--json` carry
+every `BY` line). Recorded, not fixed, because it is #407's residue and not the wave's: `l4
+render` and the `.nlg.golden` linearise a checker-synthesised reference through the generic
+pattern arm, `Nlg.hs:389` `PatExpr _ expr -> hcat ["is", "exactly", lin expr]` (byte-identical
+on `unstable`, `:366`), so the tip's `run-after.nlg.golden` (4 lines) and
+`run-anchors.nlg.golden` (1) read ``… `Order` has is exactly `buyer` …`` for a source that says
+`MAY Order buyer` — the same phrase `unstable`'s own `run-in.nlg.golden` already carries for a
+swept source. Neither sweep commit touched an `.nlg.golden` (the wave's were first blessed
+while the sources still spelt the keyword), so an evaluation differential cannot see it. Owed
+by #407's follow-up: print a synthesised reference as the bare name, as `printActionPattern`
+does (`Print.hs:1116–1135`), keep "is exactly" for a source-written form, re-bless the three.
+Two findings about the hand-off (no outbox result file for this base; a BUILD-NOTES sentence
+calling `AFTER.md:43–44` "byte-identical to the run" when it is identical, dedented, to the eval
+diagnostic the run prints on stderr while stdout frames the same text under `Result:` /
+`Notes:` without the `NOTE:` prefix) were fixed outside the tree. The re-bless-inside-commits-2-
+and-10 option was declined as above.
+
+**Round 2 of the adversarial pass on this rebase (2026-09-16, evening)** — two refuters per
+finding, two findings, both minor, both confirmed by both, none refuted; both applied in this
+record commit, again the only commit that changed (PR-A's head `f4b1b11bb`, its gate and the
+two branch pointers stand; commits 10–19 were not re-rebased). Both are spec sentences that
+were true at the commit that wrote them and became false only on this chain: PR-A's sweep
+commit wrote the #407 note's cut-off "before 2026-09-16" at a head whose only keyword-spelling
+snippets are dated 2026-09-08, and commits 12 and 13 then put five same-day probe snippets
+(§5.2.1) under it — the note now says "before #407 merged", with the correction marked in
+place; commit 19 (`bd080aff` before this rebase) wrote "#403 is an open PR, not on unstable" when it was, and
+this entry's second paragraph then rebased the chain over #403's merge (`4c803b94`, 07:48 UTC)
+— the first entry's two parentheticals are dated, past tense, in place (commit 19's message
+keeps the phrase; it is the record of the first rebase and is byte-identical to `bd080aff`'s
+by this pass's rule). Neither fix went into the commit that wrote the sentence: 9a's sentence
+is correct at 9a and a fix there costs PR-A's full gate, two `branch -f` and a re-rebase of
+10–19 over its five conflict stops; commit 19's is the first rebase's record, whose content
+this pass carries as rebased. Raised and refuted by both, round 2: none.
+
 #### `EXACTLY` retired by #407 (2026-09-16) — the wave's files swept, PR-A
 
 PR #407 (`lang/action-binder-reference`, merged to `unstable` as `cb07560d`, 2026-09-16;
@@ -4699,8 +4891,8 @@ told the author to write `Sign (EXACTLY t)`); its fixture moved from
 spelling is now a positive witness, and the four `not-ok/tc` goldens were deleted (`1b0b5bfef`,
 `559004560`, `2a54689ae`); `EXACTLY` in a regulative action is
 deprecated, with a `DeprecatedExactly` warning carrying the replacement, until the sunset recorded
-by #409 (2026-10-01). Snippets in this document written before 2026-09-16 keep the `EXACTLY`
-spelling as a record of what was built and measured at the time; they are not rewritten.
+by #409 (2026-10-01). Snippets in this document written before #407 merged (2026-09-16, 06:52 UTC) keep the `EXACTLY`
+spelling as a record of what was built and measured at the time; they are not rewritten. (**Corrected 2026-09-16, round 2:** as first written, the cut-off was "before 2026-09-16", which read out §5.2.1's five probe snippets — `MUST Sign (EXACTLY t)`, `Refund (EXACTLY ll)`, `Sign (EXACTLY alice) WITHIN 100`, `Approve (EXACTLY bob)`, `Refund (EXACTLY bob)` — built that morning by commits 12 and 13, `e1c232d4` 00:03 UTC and `0a1c6773` 00:55 UTC, before the retirement; the cut-off is the merge, not the date. At PR-A's head, where the sentence was written, the only lines spelling the keyword outside this note are three inline snippets dated 2026-09-08, so it was true there and became a day too early only once PR-B's commits sat on top of it.)
 
 The wave's own files were swept in the commit that carries this note (PR-A, `every/anchors-on-blame`,
 rebased onto `unstable` `e966996f`): every `DeprecatedExactly` warning the rebased tip's own `l4
@@ -4714,11 +4906,22 @@ fenced L4, three in a pasted breach print, which now reads `MUST Sign t` as the 
 The verdict-preserving differential — the same snapshot binary running the pre-sweep copy and the
 swept file, `Result:` blocks only, the pre-sweep side's own `(EXACTLY x)` normalised to `x` —
 was SAME for all 85 directives (`run-anchors` 50, `run-blame` 11, `run-stack` 24; the other three
-files carry no directive), with the same exit code on both sides. The files commits 10–19 add or
-re-introduce the keyword into (`run-lest.l4`, `run-after.l4`, `ok/contracts.l4`,
-`legal/promissory-note.l4`, `lsp/semantic-tokens/after.l4`, `not-ok/tc/before-on-join-line.l4`,
-`AFTER.md`, `what-follows.md`, …) are NOT swept here: PR-B (`every/after-before`) owes its own
-sweep commit at its tip, which had not been made when this note was written.
+files carry no directive), with the same exit code on both sides. The files commits 10–19 add
+the keyword to are NOT swept here: PR-B (`every/after-before`) owes its own sweep commit at its
+tip, which had not been made when this note was written. (Made later the same day,
+`377e18377`; the second rebase paragraph above records both sweeps. **Corrected 2026-09-16,
+round 1:** as first written, this sentence listed eight files — `run-lest.l4`, `run-after.l4`,
+`ok/contracts.l4`, `legal/promissory-note.l4`, `lsp/semantic-tokens/after.l4`,
+`not-ok/tc/before-on-join-line.l4`, `AFTER.md`, `what-follows.md` — as the ones commits 10–19
+"add or re-introduce the keyword into". That was an expectation carried over from the
+pre-rebase chain, not a measurement. Measured per rebased commit (`git show <c> -- '*.l4' |
+grep '^+.*EXACTLY'`), the keyword enters only `run-lest.l4` (25 + 12 + 7 lines, commits 10, 12, 13) and `run-after.l4` (35 + 17 + 9, commits 16, 17, 18), plus `lsp/semantic-tokens/after.l4`
+(3) and `not-ok/tc/before-on-join-line.l4` (1) in commit 16 — the four files `377e18377` swept,
+61/44/3/1. `ok/contracts.l4`, `legal/promissory-note.l4`, `AFTER.md` and `what-follows.md` gain
+no `EXACTLY` line on the rebased chain: the rebase's auto-merge carried #407's spelling into
+them, and the net `git diff origin/unstable..<tip> -- doc skills` adds none. Only their GOLDENS
+met the keyword — commit 10 took the wave's side of `contracts.golden` and
+`promissory-note.golden`, which `377e18377` re-blessed.)
 
 ### 11.0.2 The roll, said outright: `EVERY Cast v IN xs` — RULED 2026-09-08 (Meng), BUILT
 
