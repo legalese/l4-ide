@@ -899,10 +899,29 @@ function deonticDeadlineMissedNode(
       eventParty: deonticRenderEventParty(ev.party, obligation, ctx),
       eventAction: deonticRenderEnumName(ev.action),
       timestamp: stamp,
+      obligatedParty: deonticEvaluatedParty(obligation, ctx),
       obligationAction: resolveDeonticExpr(obligation.action, ctx),
       deadline: absoluteDeadline,
     },
   };
+}
+
+// The obligation's OWN party, rendered as jl4-service renders the obligated
+// party of a DeadlineMissed breach: the breach is normalised before it is
+// serialized, so the party is always the EVALUATED value — a record tagged
+// with its L4 type name, a constructor by its plain name — never the source
+// spelling (compare the residual-obligation case in
+// 'deonticObligationToWire', where an unobserved party keeps its backticks).
+function deonticEvaluatedParty(obligation, ctx) {
+  const resolvedParty = resolveDeonticExpr(obligation.party, ctx);
+  if (
+    obligation.party &&
+    typeof obligation.party === "object" &&
+    obligation.party.param != null
+  ) {
+    return deonticTagRecord(resolvedParty, ctx, obligation.party.param);
+  }
+  return deonticStripBackticks(resolvedParty);
 }
 
 // Render an event's party the way jl4-service serializes 'ev'party':
@@ -964,11 +983,20 @@ function deonticBreachToWire(b) {
   // "BREACH" string. There are two shapes:
   //
   //   * DeadlineMissed — a MUST/DO obligation lapsed with no LEST clause
-  //     (Jl4.hs:1216). Built by 'deonticDeadlineMissedNode' and tagged with
-  //     '_deadlineMissed'.
+  //     (Jl4.hs serializeBreachReason). Built by 'deonticDeadlineMissedNode'
+  //     and tagged with '_deadlineMissed'.
   //   * ExplicitBreach — an explicit @LEST BREACH [BY p] [BECAUSE r]@ (or a
   //     top-level BREACH). Emitted for EVERY explicit breach, including the
-  //     clause-less @LEST BREACH@ where party/detail are null (Jl4.hs:1228).
+  //     clause-less @LEST BREACH@ where party/detail are null.
+  //
+  // Both carry the BLAME LIST (R-T3, EVERY-EACH-QUANTIFIER-SPEC §6.1, built
+  // 2026-09-15; per-entry detail and no dedup RULED the same day): beside the
+  // scalars, which describe the ANCHORING failure, the reference emits
+  // 'obligatedParties' / 'parties' (every party named, in order, with
+  // duplicates), 'failures' (one object per failed obligation, in the same
+  // order) and 'anchor' (the anchor's index into 'failures'). This runtime
+  // models one obligation at a time (no RAND / EVERY), so its arrays are
+  // always the singleton of the scalar's failure, and 'anchor' is 0.
   if (b && b._deadlineMissed) {
     const d = b._deadlineMissed;
     // 'deadline' (absolute, = obligationStart + WITHIN) and 'timestamp'
@@ -978,9 +1006,20 @@ function deonticBreachToWire(b) {
     // "5.0000000000000044e-2").
     return {
       BREACH: {
+        anchor: 0,
         deadline: ratToAesonValue(d.deadline),
         eventAction: d.eventAction,
         eventParty: d.eventParty,
+        failures: [
+          {
+            action: d.obligationAction,
+            deadline: ratToAesonValue(d.deadline),
+            party: d.obligatedParty,
+            reason: "deadline_missed",
+          },
+        ],
+        obligatedParties: [d.obligatedParty],
+        obligatedParty: d.obligatedParty,
         obligationAction: d.obligationAction,
         reason: "deadline_missed",
         timestamp: ratToAesonValue(d.timestamp),
@@ -994,7 +1033,16 @@ function deonticBreachToWire(b) {
   const party = b == null ? null : b.by;
   return {
     BREACH: {
+      anchor: 0,
       detail: detail == null ? null : detail,
+      failures: [
+        {
+          detail: detail == null ? null : detail,
+          party: party == null ? null : party,
+          reason: "explicit",
+        },
+      ],
+      parties: party == null ? [] : [party],
       party: party == null ? null : party,
       reason: "explicit",
     },

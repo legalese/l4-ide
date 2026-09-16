@@ -1,0 +1,35 @@
+relational program — field-opening.l4
+
+records:
+  Person  % field-opening.l4:15:1-16:20
+    age : NUMBER
+
+predicates:
+  input age/1 : NUMBER  % <no source range>
+    params: Person
+    (no clauses)
+  computed exported adult bare/1 : (goal)  % field-opening.l4:19:1-21:39
+    params: Person
+    adult bare(P_0) :- proj(P_0, age, Age_1), Age_1 >= 18.  % field-opening.l4:21:24-39
+  computed exported adult spelled out/1 : (goal)  % field-opening.l4:24:1-26:50
+    params: Person
+    adult spelled out(P_2) :- proj(P_2, age, Age_3), Age_3 >= 18.  % field-opening.l4:26:31-50
+
+queries:
+  EVAL q1: adult bare(P0_4) => (expectation from the L4 evaluator)  % field-opening.l4:28:1-43
+    facts: age(P0_4, 20)
+  EVAL q2: adult spelled out(P0_5) => (expectation from the L4 evaluator)  % field-opening.l4:30:1-50
+    facts: age(P0_5, 20)
+
+dependencies:
+  adult bare -> age (+)
+  adult spelled out -> age (+)
+
+stratification:
+  stratified
+    0  adult bare
+    0  adult spelled out
+    0  age
+
+fidelity report — relational
+  (nothing lost)

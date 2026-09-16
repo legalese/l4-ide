@@ -379,10 +379,10 @@ GIVEN borrower IS A Person
   IF     NOT `conditions precedent are met`
   THEN   FULFILLED
   ELSE   PARTY lender
-         MUST  EXACTLY send capital to borrower
+         MUST  send capital to borrower
          WITHIN closing
          HENCE    PARTY  borrower
-                  MUST   EXACTLY send accrued to lender
+                  MUST   send accrued to lender
                   WITHIN repayment
   WHERE
     send money to person MEANS
@@ -395,7 +395,7 @@ GIVEN borrower IS A Person
 - Conditions precedent gate the entire obligation chain. If not met, the contract is FULFILLED (no obligations arise).
 - HENCE chains sequential obligations: the lender must fund first, then the borrower must repay.
 - WHERE defines helper functions (the mixfix `send money to person`) and computed values (`accrued`).
-- `EXACTLY` constrains the action to the precise amount specified.
+- A name in the action slot (`capital`, `accrued`) requires that value: the payment must match it exactly. A name that named nothing there would instead be a placeholder matching any payment.
 - This pattern combines conditionals, deontic rules, HENCE chaining, WHERE bindings, and mixfix definitions in a single coherent structure.
 - See the [Regulative reference](../regulative/README.md) for full details on PARTY, MUST, HENCE, LEST, and other deontic keywords.
 

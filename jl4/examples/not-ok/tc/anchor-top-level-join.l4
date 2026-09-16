@@ -1,0 +1,22 @@
+-- WITHIN d OF THE JOIN names the instant the ENCLOSING obligation's join
+-- fired (EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7B). A rule that is not inside
+-- any HENCE or LEST has no enclosing obligation, so there is no join to name.
+-- THE DEADLINE is refused for the same reason; THE ARMING is not, because at
+-- the top level it is the obligation's own arming — the default.
+
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+
+DECLARE Action IS ONE OF
+    Pay
+    Deliver
+
+GIVETH A DEONTIC Actor Action
+bad MEANS PARTY Buyer MUST Pay WITHIN 5 OF THE JOIN
+
+GIVETH A DEONTIC Actor Action
+`also bad` MEANS PARTY Buyer MUST Pay WITHIN 5 OF THE DEADLINE
+
+GIVETH A DEONTIC Actor Action
+fine MEANS PARTY Buyer MUST Pay WITHIN 5 OF THE ARMING

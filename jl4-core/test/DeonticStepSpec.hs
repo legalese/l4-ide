@@ -482,7 +482,10 @@ allSrcs =
 -- | The 'Breached' step an explicit @BREACH@ with no @BY@ logs.
 bareBreach :: Row
 bareBreach = Row Nothing 0 Nothing
-  (Breached MkBreachSummary {bsBlame = Nothing, bsBlameName = Nothing, bsStamp = Nothing, bsDeadline = Nothing})
+  (Breached MkBreachSummary
+    { bsBlame = Nothing, bsBlameName = Nothing, bsStamp = Nothing, bsDeadline = Nothing
+    -- R-T3: one declared failure, naming nobody, its own anchor
+    , bsFailures = [DeclaredSummary NobodyNamed Nothing], bsAnchor = 0 })
   NoEvent Nothing Nothing Nothing
 
 spec :: Spec
@@ -530,7 +533,12 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
       , Row (Just "Bob")   1 (Just DMust) (Expired ToBreach 3) WitnessedOnly (Just 5) (Just 0) Nothing
       , Row Nothing 0 Nothing
           (Joined ValROr MkJoinNote
-            { jnResult   = JoinBreached MkBreachSummary {bsBlame = Just "Bob", bsBlameName = Just "Bob", bsStamp = Just 5, bsDeadline = Just 3}
+            { jnResult   = JoinBreached MkBreachSummary
+                { bsBlame = Just "Bob", bsBlameName = Just "Bob", bsStamp = Just 5, bsDeadline = Just 3
+                -- R-T3: the compound names BOTH failures, left operand first,
+                -- anchored at Bob's (the right, by ROR's tie-break)
+                , bsFailures = [MissedSummary (Just "Alice") "MUST deliver" 3, MissedSummary (Just "Bob") "MUST pay 50" 3]
+                , bsAnchor = 1 }
             , jnWinner   = Just RightSide
             , jnTieBreak = True })
           NoEvent Nothing Nothing Nothing

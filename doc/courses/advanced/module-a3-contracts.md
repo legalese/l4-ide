@@ -160,7 +160,7 @@ GIVETH A DEONTIC Party `Loan Action`
     IF outstanding's `the amount` > 0
     THEN
         PARTY `the borrower party` debtor
-        MUST `pay installment` EXACTLY creditor
+        MUST `pay installment` creditor
                                `the amount paid` PROVIDED `the amount paid`'s `the amount` >= `the payment due`'s `the amount`
         WITHIN `the next due date`
         HENCE
@@ -191,7 +191,7 @@ GIVETH A DEONTIC Party `Loan Action`
 `late payment handling` MEANS
     -- Grace period with penalty interest
     PARTY `the borrower party` debtor
-    MUST `pay installment` EXACTLY creditor
+    MUST `pay installment` creditor
                            `the amount paid` PROVIDED `the amount paid`'s `the amount` >= `the payment with penalty`'s `the amount`
     WITHIN (`the next due date` + terms's `the penalty terms`'s `the grace period`)
     HENCE
@@ -222,8 +222,8 @@ GIVEN terms IS A `Loan Terms`
 GIVETH A DEONTIC Party `Loan Action`
 `default handling` MEANS
     PARTY `the borrower party` debtor
-    MUST `pay installment` EXACTLY creditor
-                           EXACTLY outstanding  -- Full balance required
+    MUST `pay installment` creditor
+                           outstanding  -- Full balance required
     WITHIN terms's `the days until default`
     HENCE FULFILLED
     LEST BREACH BY (`the borrower party` debtor) BECAUSE "loan default"
@@ -300,13 +300,13 @@ sellerProcuresDelivery MEANS Procure OF Seller, deliverByLogistics
 GIVETH A DEONTIC Actor ContractAction
 `seller arranges delivery` MEANS
     PARTY Seller
-    MUST EXACTLY sellerProcuresDelivery
+    MUST sellerProcuresDelivery
     WITHIN 14
     HENCE FULFILLED
     LEST BREACH BY Seller BECAUSE "seller failed to arrange delivery"
 
 -- ❌ rejected: `sellerProcuresDelivery` is performed by `Seller`, not by `Buyer`
--- bad MEANS PARTY Buyer MUST EXACTLY sellerProcuresDelivery WITHIN 14 ...
+-- bad MEANS PARTY Buyer MUST sellerProcuresDelivery WITHIN 14 ...
 ```
 
 Procurement nests — `Procure(X, Procure(Y, ...))` models a delegation chain. A
@@ -315,7 +315,7 @@ wrapper) in the obligation slot: the obligated party must perform personally.
 
 See [Actors and Actions](../../concepts/legal-modeling/actors-and-actions.md) for
 the full performer-rule reference, duplex actions, and parameterised
-(`EXACTLY`-applied) actions.
+(rule-applied) actions.
 
 ---
 

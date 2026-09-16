@@ -1,0 +1,66 @@
+-- R4 of specs/todo/PATTERN-REFERENCE-RULE-SPEC.md. This file was
+-- not-ok/tc/every-rebinds-variable.l4: a NEGATIVE fixture, pinning the
+-- `QuantifierVariableRebound` error, which refused `EVERY Tenant t MUST Sign t`
+-- and told the author to write `Sign (EXACTLY t)` instead.
+--
+-- That error is retired, and the same text is now the positive case. Under R1
+-- the quantifier's variable `t` is a lexical local, so the `t` in the action
+-- REFERS to the member. It cannot be a fresh binder, because the name
+-- resolves. The error's own message ("this would be a fresh name matching
+-- anyone") became false the moment R1 landed, which is why the check went
+-- rather than being reworded.
+--
+-- The traces are what the file is for: a STRANGER's signature must not
+-- discharge the member's duty, and the member's own must.
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+    Stranger
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+    Countersign HAS signer IS AN Actor, `on behalf of` IS AN Actor
+
+alice   MEANS Tenant OF "Alice"
+bob     MEANS Tenant OF "Bob"
+tenants MEANS LIST alice, bob
+
+GIVETH A DEONTIC Actor Action
+`each tenant signs` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign t
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+-- A STRANGER's signature does not discharge anyone's duty.
+#TRACE `each tenant signs` AT 0 WITH
+    PARTY Stranger DOES Sign Stranger AT 3
+
+-- Each member signs. The barrier is satisfied and the HENCE fires.
+#TRACE `each tenant signs` AT 0 WITH
+    PARTY alice DOES Sign alice AT 3
+    PARTY bob   DOES Sign bob   AT 4
+
+-- The same narrowing in an argument slot the actor-agreement check does NOT
+-- police. `Countersign t t` obliges each tenant to countersign ON HER OWN
+-- behalf; before R1 the second `t` was a fresh binder matching ANY principal,
+-- so Alice countersigning on Bob's behalf discharged her own duty. It no
+-- longer does.
+GIVETH A DEONTIC Actor Action
+`each tenant countersigns for herself` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Countersign t t
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `each tenant countersigns for herself` AT 0 WITH
+    PARTY alice DOES Countersign alice bob   AT 3
+    PARTY bob   DOES Countersign bob   alice AT 4
+
+#TRACE `each tenant countersigns for herself` AT 0 WITH
+    PARTY alice DOES Countersign alice alice AT 3
+    PARTY bob   DOES Countersign bob   bob   AT 4

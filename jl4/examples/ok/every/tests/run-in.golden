@@ -4,7 +4,7 @@ Evaluation successful
 run-in.l4:44:1-47:35:
   FULFILLED
 run-in.l4:61:1-62:35:
-  PARTY Tenant OF "Bob" MUST Sign (EXACTLY t) WITHIN 13 HENCE `the join` LEST `the join fails` AND PARTY Tenant OF "Carol" MUST Sign (EXACTLY t) WITHIN 13 HENCE `the join` LEST `the join fails`
+  PARTY Tenant OF "Bob" MUST Sign t WITHIN 13 HENCE `the join` LEST `the join fails` AND PARTY Tenant OF "Carol" MUST Sign t WITHIN 13 HENCE `the join` LEST `the join fails`
 run-in.l4:76:1-78:35:
   FULFILLED
 run-in.l4:91:1-92:35:
@@ -15,11 +15,18 @@ run-in.l4:123:1-124:35:
   FULFILLED
 run-in.l4:138:1-140:35:
   FULFILLED
+run-in.l4:164:36-47:
+  I found a problem while checking the definition of `fork in`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-in.l4:27:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-in.l4:168:1-172:56:
-  FULFILLED AND PARTY Landlord OF "Ms Ng" MUST Receipt (EXACTLY theLandlord) (EXACTLY t) WITHIN 3 HENCE FULFILLED AND PARTY Landlord OF "Ms Ng" MUST Receipt (EXACTLY theLandlord) (EXACTLY t) WITHIN 4 HENCE FULFILLED
+  FULFILLED AND PARTY Landlord OF "Ms Ng" MUST Receipt theLandlord t WITHIN 3 HENCE FULFILLED AND PARTY Landlord OF "Ms Ng" MUST Receipt theLandlord t WITHIN 4 HENCE FULFILLED
 run-in.l4:191:1-193:35:
   FULFILLED
 run-in.l4:206:1-207:35:
   FULFILLED
-run-in.l4:215:1-91:
-  EVERY Tenant t IN tenants WHO (NOT t EQUALS carol) MUST Sign (EXACTLY t) WITHIN 14
+run-in.l4:215:1-81:
+  EVERY Tenant t IN tenants WHO (NOT t EQUALS carol) MUST Sign t WITHIN 14

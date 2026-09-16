@@ -1,2 +1,16 @@
 Parsing successful
 Typechecking successful
+fork.l4:30:22-33:
+  I found a problem while checking the definition of `each payment gets a receipt`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at fork.l4:25:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+fork.l4:34:36-47:
+  I found a problem while checking the definition of `each payment gets a receipt`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at fork.l4:25:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.

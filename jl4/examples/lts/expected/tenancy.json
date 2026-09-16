@@ -124,7 +124,12 @@
     ],
     "breaching": [
       {
-        "breach": {},
+        "breach": {
+          "anchor": 0,
+          "names": [
+            {}
+          ]
+        },
         "event": {
           "at": 15,
           "deadline": 14,
@@ -275,6 +280,18 @@
     "breaching": [
       {
         "breach": {
+          "anchor": 0,
+          "names": [
+            {
+              "party": "Tenant OF \"Alice\""
+            },
+            {
+              "party": "Tenant OF \"Bob\""
+            },
+            {
+              "party": "Tenant OF \"Carol\""
+            }
+          ],
           "party": "Tenant OF \"Alice\""
         },
         "event": {
@@ -418,7 +435,9 @@
         "outcome": {
           "operator": "and",
           "result": "pending",
-          "what": "joined"
+          "tieBreak": false,
+          "what": "joined",
+          "winner": null
         },
         "scrutiny": "noEvent"
       },
@@ -427,7 +446,9 @@
         "outcome": {
           "operator": "and",
           "result": "pending",
-          "what": "joined"
+          "tieBreak": false,
+          "what": "joined",
+          "winner": null
         },
         "scrutiny": "noEvent"
       }

@@ -189,15 +189,28 @@ MUST `pay invoice` amount PROVIDED amount >= 100
 WITHIN 30
 ```
 
-### EXACTLY Keyword
+### A name in an action requires the value it names
 
-Require exact value matching:
+By default, a name written in an action requires that exact value — a `GIVEN`
+input, a rule's own local, or a literal all work the same way:
 
 ```l4
-PARTY Buyer
-MUST EXACTLY `pay invoice` 500
-WITHIN 30
+GIVEN requiredAmount IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`exact payment required` MEANS
+    PARTY Buyer
+    MUST `pay invoice` requiredAmount
+    WITHIN 30
+    HENCE FULFILLED
+    LEST BREACH
 ```
+
+A name that refers to nothing in scope is a placeholder instead, matching any
+value (see [Action Patterns: Reference or Wildcard](README.md#action-patterns-reference-or-wildcard)
+for the full rule). The `EXACTLY` keyword used to be required to say "this is
+a value, not a placeholder" — ``MUST EXACTLY `pay invoice` 500`` — and it still
+parses and still works, but it is deprecated: the checker now makes this
+decision on its own.
 
 ### WAIT UNTIL
 

@@ -1,0 +1,56 @@
+-- R3 of specs/todo/PATTERN-REFERENCE-RULE-SPEC.md, and the one operand class
+-- where the keyword CANNOT be dropped even though everything in sight
+-- type-checks.
+--
+-- `red` names two things here: a Colour constructor, and a GIVEN carrying a
+-- Colour. The two spellings of the action disagree, and both are legal:
+--
+--   MUST paint (EXACTLY red)   -- EXACTLY evaluates `red` as an expression,
+--                                 which finds the GIVEN, i.e. whatever colour
+--                                 was supplied
+--   MUST paint red             -- R1 row 1: a name that is also a constructor
+--                                 is the constructor pattern, i.e. the colour
+--                                 red itself
+--
+-- The traces below supply green for the GIVEN and then paint green. The first
+-- rule is discharged; the second is not. So a deprecation warning offering
+-- "write `red` in place of the EXACTLY" here would silently change which
+-- events discharge the obligation -- which is what the warning did until the
+-- review of 2026-09-16. It now refuses to offer the drop, and says why.
+--
+-- The residual printed by the second trace is the other half of the same
+-- hazard (§6): the printer keeps EXACTLY for a pinned pattern whose source
+-- wrote it, because dropping it there would re-parse as the constructor.
+
+DECLARE Actor IS ONE OF
+    Buyer
+
+DECLARE Colour IS ONE OF
+    red
+    green
+
+DECLARE Action IS ONE OF
+    paint HAS c IS A Colour
+
+GIVEN red IS A Colour
+GIVETH A DEONTIC Actor Action
+`the colour supplied` MEANS
+    PARTY Buyer MUST paint (EXACTLY red) WITHIN 30 HENCE FULFILLED LEST BREACH
+
+GIVEN red IS A Colour
+GIVETH A DEONTIC Actor Action
+`the colour red` MEANS
+    PARTY Buyer MUST paint red WITHIN 30 HENCE FULFILLED LEST BREACH
+
+-- supplied green, painted green: the reference is satisfied, the constructor
+-- pattern is not
+#TRACE `the colour supplied` green AT 0 WITH
+    PARTY Buyer DOES paint green AT 1
+#TRACE `the colour red` green AT 0 WITH
+    PARTY Buyer DOES paint green AT 1
+
+-- supplied green, painted red: the other way round
+#TRACE `the colour supplied` green AT 0 WITH
+    PARTY Buyer DOES paint red AT 1
+#TRACE `the colour red` green AT 0 WITH
+    PARTY Buyer DOES paint red AT 1

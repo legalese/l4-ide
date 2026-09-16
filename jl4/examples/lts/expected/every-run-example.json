@@ -211,7 +211,12 @@
     "owed": [],
     "passedOver": [],
     "standing": {
-      "breach": {},
+      "breach": {
+        "anchor": 0,
+        "names": [
+          {}
+        ]
+      },
       "status": "breached"
     },
     "steps": [
@@ -365,7 +370,15 @@
       {
         "clock": null,
         "outcome": {
+          "anchor": 0,
           "by": null,
+          "names": [
+            {
+              "named": false,
+              "party": null,
+              "reason": null
+            }
+          ],
           "what": "breached"
         },
         "scrutiny": "noEvent"
@@ -657,7 +670,9 @@
         "outcome": {
           "operator": "and",
           "result": "fulfilled",
-          "what": "joined"
+          "tieBreak": false,
+          "what": "joined",
+          "winner": "both"
         },
         "scrutiny": "noEvent"
       },
@@ -666,7 +681,9 @@
         "outcome": {
           "operator": "and",
           "result": "fulfilled",
-          "what": "joined"
+          "tieBreak": false,
+          "what": "joined",
+          "winner": "both"
         },
         "scrutiny": "noEvent"
       }
@@ -694,6 +711,12 @@
     "passedOver": [],
     "standing": {
       "breach": {
+        "anchor": 0,
+        "names": [
+          {
+            "party": "Tenant OF \"Bob\""
+          }
+        ],
         "party": "Tenant OF \"Bob\""
       },
       "status": "breached"
@@ -854,7 +877,15 @@
       {
         "clock": null,
         "outcome": {
+          "anchor": 0,
           "by": "Tenant OF \"Bob\"",
+          "names": [
+            {
+              "named": true,
+              "party": "Tenant OF …",
+              "reason": null
+            }
+          ],
           "what": "breached"
         },
         "scrutiny": "noEvent"
@@ -947,18 +978,40 @@
       {
         "clock": null,
         "outcome": {
+          "anchor": 0,
+          "by": "Tenant OF …",
+          "names": [
+            {
+              "named": true,
+              "party": "Tenant OF …",
+              "reason": null
+            }
+          ],
           "operator": "and",
           "result": "breached",
-          "what": "joined"
+          "tieBreak": false,
+          "what": "joined",
+          "winner": "left"
         },
         "scrutiny": "noEvent"
       },
       {
         "clock": null,
         "outcome": {
+          "anchor": 0,
+          "by": "Tenant OF …",
+          "names": [
+            {
+              "named": true,
+              "party": "Tenant OF …",
+              "reason": null
+            }
+          ],
           "operator": "and",
           "result": "breached",
-          "what": "joined"
+          "tieBreak": false,
+          "what": "joined",
+          "winner": "right"
         },
         "scrutiny": "noEvent"
       }

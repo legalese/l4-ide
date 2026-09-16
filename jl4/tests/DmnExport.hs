@@ -1959,7 +1959,8 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         _              -> expectationFailure "expected a boxed literal expression"
 
     it "requires every DECISION a computed field's body names" $ do
-      -- 'Desugar.rewriteFieldRefs' rewrites only the record's OWN field names,
+      -- 'Desugar.openFields' rewrites only the record's OWN field names in a
+      -- computed field's body ('Desugar.isComputedFieldDecide'),
       -- so a MEANS body may reference any module-level decision and the
       -- context entry renders it by name. A hydrator whose only edge was its
       -- source instance left that name unbound: KIE 8.44 reports "Required
@@ -2048,18 +2049,18 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       [n.code | n <- drgNotesAll drg, n.element == "decision_reads"]
         `shouldSatisfy` all (`elem` ["D-LITERALEXPR", "D-NONFEELOUTPUT", "D-SUMTYPE"])
 
-    it "does not fold the SELECT idiom inside a hydrator -- a stated boundary" $ do
-      -- A KNOWN divergence, pinned so the golden cannot move unexplained.
-      -- `IF a AT LEAST b THEN a ELSE b` folds to `max(a, b)` everywhere else,
-      -- including through a SOURCE-written projection (`max(p.x, p.y)`), but
-      -- not inside a hydrator: 'Desugar.rewriteFieldRefs' builds the sibling
-      -- read as `Proj emptyAnno (Var emptyAnno _self) n`, and a node with no
-      -- source range carries no inferred type, so 'feelOrderable' cannot
-      -- answer and 'selectIdiomIn' declines. Both forms are FullFeel and both
-      -- evaluate (33/33 on KIE 8.44 and zeebe-dmn 8.7.6), so the cost is
-      -- legibility, not fidelity -- which is why this is recorded rather than
-      -- repaired in L4.Desugar, whose output every computed-field module and
-      -- the exactprint goldens depend on.
+    it "folds the SELECT idiom inside a hydrator, as everywhere else" $ do
+      -- Until 2026-09-16 this was a pinned KNOWN divergence: the computed-field
+      -- rewrite built each sibling read as `Proj emptyAnno (Var emptyAnno
+      -- _self) n`, a node with no source range carries no inferred type, so
+      -- 'feelOrderable' could not answer and 'selectIdiomIn' declined, leaving
+      -- `(if x >= y then x else y)` where a source-written projection got
+      -- `max(p.x, p.y)`. R5 (IMPLICIT-PROPS-DESIGN §11.7) replaced that rewrite
+      -- with 'L4.Desugar.openFields', whose projection carries the bare read's
+      -- range, so the operand now types and the fold applies. Both forms are
+      -- FullFeel and both evaluated (33/33 on KIE 8.44 and zeebe-dmn 8.7.6);
+      -- the gain is legibility. Pinned so that the golden cannot move back
+      -- unexplained.
       let drg = drgOf $ Text.unlines
             [ "DECLARE P HAS"
             , "    `x` IS A NUMBER"
@@ -2073,7 +2074,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       case (decisionNamed "p" drg).dcnLogic of
         LogicContext es ->
           [e.ceExpr.feText | e <- es, e.ceName == "bigger"]
-            `shouldBe` ["(if x >= y then x else y)"]
+            `shouldBe` ["max(x, y)"]
         _ -> expectationFailure "expected a boxed context"
 
   describe "engine flavors (R7)" $ do

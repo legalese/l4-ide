@@ -357,11 +357,11 @@ GIVETH A DEONTIC OF `Award Participant`, `Award Action`
     IF      `Forfeiture Applies` `award state`
     THEN    PARTY   `Elon Musk`
             MUST    `forfeit unvested shares`
-                        EXACTLY `Forfeiture Reason` `award state`
+                        (`Forfeiture Reason` `award state`)
     ELSE    IF      `Immediate Vesting Applies` `award state`
             THEN    PARTY   `Elon Musk`
                     MAY     `vest immediately`
-                                EXACTLY `Immediate Vesting Reason` `award state`
+                                (`Immediate Vesting Reason` `award state`)
             ELSE    PARTY   `Elon Musk`
                     MUST    `maintain eligible service status` `Service Status` PROVIDED
                                 `Service Status` EQUALS `Chief Executive Officer`
@@ -369,7 +369,7 @@ GIVETH A DEONTIC OF `Award Participant`, `Award Action`
                     WITHIN  `Date to days` (`Performance End Date` MINUS `award state`'s `Current Date`)
                     LEST    PARTY   `Elon Musk`
                             MUST    `forfeit unvested shares`
-                                        EXACTLY "Cessation of Eligible Service"
+                                        "Cessation of Eligible Service"
 
 GIVEN `tranche` IS A NUMBER
       `award state` IS A `CEO Award State`
@@ -412,11 +412,11 @@ GIVETH A DEONTIC OF `Award Participant`, `Award Action`
             WITHIN  1
             HENCE   PARTY   `Elon Musk`
                     MUST    `pay offset amount`
-                                EXACTLY (`Offset Amount For Tranche` `tranche`)
+                                (`Offset Amount For Tranche` `tranche`)
                     WITHIN  30
                     HENCE   PARTY   `Elon Musk`
                             MUST    `hold shares for period`
-                                        EXACTLY 5
+                                        5
                             WITHIN  `Date to days` (`holding period end` MINUS `award state`'s `Current Date`)
                             WHERE
                                 `holding period end` MEANS `years after` 5 `earn date`

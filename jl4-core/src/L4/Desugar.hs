@@ -8,6 +8,12 @@ module L4.Desugar (
   desugarComputedFields,
   detectComputedFieldCycles,
   extractComputedFieldNames,
+  -- * Field opening (R5)
+  --
+  RecordFieldTable,
+  recordFieldTable,
+  shadowCandidates,
+  openFields,
   -- * Type Synonyms
   --
   detectTypeSynonymCycles,
@@ -25,11 +31,13 @@ import           Base
 import           Data.Graph               (stronglyConnComp, SCC(..))
 import qualified Data.Map.Strict          as Map
 import qualified Data.Set                 as Set
-import           L4.Annotation            (Anno_ (..), HasAnno (..), HasSrcRange (..), emptyAnno, mkHoleWithSrcRangeHint)
+import           L4.Annotation            (Anno_ (..), HasAnno (..), HasSrcRange (..), clearSourceAnno, emptyAnno, mkHoleWithSrcRangeHint)
 import           L4.Names
 import           L4.Parser.SrcSpan        (SrcPos (MkSrcPos), SrcRange (MkSrcRange))
 import           L4.Syntax
 import qualified L4.TypeCheck.Environment as TypeCheck
+import           L4.TypeCheck.Types       (CheckEntity (..), EntityInfo)
+import           Control.Monad.Writer.Strict (Writer, runWriter, tell)
 import Control.Category ((>>>))
 import qualified Optics
 
@@ -135,7 +143,7 @@ carameliseDeonton = \ case
       { anno
       , subject = carameliseSubject subject
       , action = carameliseRAction action
-      , due = fmap carameliseExpr due
+      , due = fmap carameliseDeadline due
       , join = fmap carameliseJoin mjoin
       , hence = fmap carameliseExpr hence
       , lest = fmap carameliseExpr lest
@@ -143,8 +151,17 @@ carameliseDeonton = \ case
 
 carameliseJoin :: HasName n => Join n -> Join n
 carameliseJoin = \ case
-  JoinOnce anno th due -> JoinOnce anno th (fmap carameliseExpr due)
-  JoinUpon anno ue due -> JoinUpon anno ue (fmap carameliseExpr due)
+  JoinOnce anno th due -> JoinOnce anno th (fmap carameliseDeadline due)
+  JoinUpon anno ue due -> JoinUpon anno ue (fmap carameliseDeadline due)
+
+carameliseDeadline :: HasName n => Deadline n -> Deadline n
+carameliseDeadline (MkDeadline anno d ma) =
+  MkDeadline anno (carameliseExpr d) (fmap carameliseAnchor ma)
+
+carameliseAnchor :: HasName n => Anchor n -> Anchor n
+carameliseAnchor = \ case
+  AnchorAt anno e -> AnchorAt anno (carameliseExpr e)
+  a               -> a
 
 carameliseSubject :: HasName n => Subject n -> Subject n
 carameliseSubject = \ case
@@ -274,7 +291,7 @@ desugarCFDeclare dAnn (MkDeclare declAnn tysig appForm (RecordDecl rAnn mCon tns
       -- Extract type parameters from the DECLARE's GIVEN (e.g., GIVEN a IS A TYPE)
       MkTypeSig _ (MkGivenSig _ typeParams) _ = tysig
       storedFields = [tn | tn@(MkTypedName _ _ _ _mTypically Nothing) <- tns]
-      syntheticDecides = mapMaybe (makeComputedDecide appForm typeParams tns) tns
+      syntheticDecides = mapMaybe (makeComputedDecide appForm typeParams) tns
       newDeclare = Declare dAnn (MkDeclare declAnn tysig appForm (RecordDecl rAnn mCon storedFields))
     in newDeclare : map (uncurry Decide) syntheticDecides
 desugarCFDeclare dAnn decl = [Declare dAnn decl]
@@ -293,17 +310,19 @@ isComputed _ = False
 -- adult _self MEANS _self's age >= 18
 -- @
 --
--- Bare field references in the MEANS expression are rewritten to projections
--- on @_self@.  This avoids introducing LET bindings that would create
--- duplicate names in scope (the selector and the LET local), which causes
--- ambiguity errors with polymorphic operators like @=@.
-makeComputedDecide :: AppForm Name -> [OptionallyTypedName Name] -> [TypedName Name] -> TypedName Name -> Maybe (Anno, Decide Name)
-makeComputedDecide appForm typeParams allFields (MkTypedName fieldAnn fieldName fieldType _mTypically (Just meansExpr)) =
+-- Bare sibling-field references in the MEANS expression are NOT rewritten
+-- here. The synthetic @DECIDE@ has a record-typed @GIVEN@ like any other, and
+-- 'openFields' — which runs after this pass over the whole module — opens
+-- @_self@'s fields in its body exactly as it opens @p@'s fields in a rule
+-- written @GIVEN p IS A Person@. One mechanism (IMPLICIT-PROPS-DESIGN §11.7):
+-- until R5 this function carried its own rewrite of the same shape.
+makeComputedDecide :: AppForm Name -> [OptionallyTypedName Name] -> TypedName Name -> Maybe (Anno, Decide Name)
+makeComputedDecide appForm typeParams (MkTypedName fieldAnn fieldName fieldType _mTypically (Just meansExpr)) =
   let
     -- Extract record name and type args from the DECLARE's AppForm
     MkAppForm _ recordName typeArgs _ = appForm
     -- Create a self parameter name
-    selfName = MkName emptyAnno (NormalName "_self")
+    selfName = MkName emptyAnno computedSelfName
     -- Build the record type: RecordName arg1 arg2 ...
     recordType = TyApp emptyAnno recordName (map (\n -> TyApp emptyAnno n []) typeArgs)
     -- Type signature: GIVEN <typeParams>, _self IS A <RecordType> GIVETH A <FieldType>
@@ -315,126 +334,473 @@ makeComputedDecide appForm typeParams allFields (MkTypedName fieldAnn fieldName 
       (Just (MkGivethSig emptyAnno fieldType))
     -- App form: <fieldName> _self
     decideAppForm = MkAppForm fieldAnn fieldName [selfName] Nothing
-    -- Sibling field names (excluding the field being defined)
-    siblingNames = Set.fromList
-      [ rawName sibName
-      | MkTypedName _ sibName _ _ _ <- allFields
-      , rawName sibName /= rawName fieldName
+  in Just (fieldAnn, MkDecide fieldAnn decideTypeSig decideAppForm meansExpr)
+makeComputedDecide _ _ _ = Nothing  -- stored field, no DECIDE needed
+
+-- | The name 'makeComputedDecide' gives a computed field's record parameter.
+computedSelfName :: RawName
+computedSelfName = NormalName "_self"
+
+-- | Is this @DECIDE@ one 'makeComputedDecide' synthesised for a computed
+-- field, rather than something the author wrote?
+--
+-- It matters to 'openFields': a computed field's body is the body of a
+-- @DECLARE@, and a @DECLARE@ is not "the function that declares or sees the
+-- binder" of an enclosing section @GIVEN@ (§11.7). Walking it with the
+-- section's frames in scope silently rebound a sibling read — measured
+-- 2026-09-16, see §11.7.1 "what review changed": a computed field reading a
+-- top-level @\`vat rate\` MEANS 7@ started reading @cfg's \`vat rate\`@ merely
+-- because an unrelated @§ ... GIVEN cfg IS A Config@ sat above the @DECLARE@.
+--
+-- The test is the synthesis's own shape: the last @GIVEN@ binder and the sole
+-- head argument are both @_self@. An author who writes that shape by hand
+-- gets the same (narrower) scope, which is a boundary, not a defect.
+isComputedFieldDecide :: Decide Name -> Bool
+isComputedFieldDecide (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) (MkAppForm _ _ args _) _) =
+  not (null otns)
+    && rawName (getName (last otns)) == computedSelfName
+    && map rawName args == [computedSelfName]
+
+-- ----------------------------------------------------------------------------
+-- Field opening (IMPLICIT-PROPS-DESIGN §11.7, R5)
+-- ----------------------------------------------------------------------------
+
+-- | The fields every record type a module can name declares, keyed by the
+-- type's spelling (and each @AKA@ alias of it).
+--
+-- Two sources, unioned: the module's own @DECLARE@s — read off the /parsed/
+-- module, so that computed fields are still in their record, before
+-- 'desugarComputedFields' moves them out — and the records of every imported
+-- module, which the checker knows only through their selectors
+-- ('recordFieldTable'). A synonym for a record (@DECLARE Outline IS A RoseTree
+-- OF Item@) is not followed: a binder declared at the synonym does not open.
+type RecordFieldTable = Map RawName (Set RawName)
+
+-- | The record field table a module is checked against.
+--
+-- Left-biased, NOT unioned: a record the module declares itself is what a
+-- binder written with that spelling resolves to, so its fields are the ones
+-- that open. Unioning the two made a local @DECLARE Dictionary HAS label@
+-- open the prelude @Dictionary@'s @contents@ as well, and a bare read of
+-- @contents@ then elaborated to a projection the checker refused
+-- (@expected to be of type Dictionary OF k, v but is here of type
+-- Dictionary@) — found in review 2026-09-16, see §11.7.1.
+recordFieldTable :: EntityInfo -> Module Name -> RecordFieldTable
+recordFieldTable ei m =
+  Map.union (recordFieldsDeclared m) (recordFieldsImported ei)
+
+recordFieldsDeclared :: Module Name -> RecordFieldTable
+recordFieldsDeclared (MkModule _ _ section) = goSection section
+ where
+  goSection (MkSection _ _ _ _ decls) = Map.unionsWith Set.union (map goTopDecl decls)
+  goTopDecl = \ case
+    Declare _ (MkDeclare _ _ (MkAppForm _ recName _ mAka) (RecordDecl _ _ tns)) ->
+      let fields = Set.fromList [ rawName fn | MkTypedName _ fn _ _ _ <- tns ]
+          spellings = rawName recName : maybe [] (\ (MkAka _ ns) -> map rawName ns) mAka
+      in Map.fromList [ (sp, fields) | sp <- spellings ]
+    Section _ s -> goSection s
+    _ -> Map.empty
+
+-- | The records the checker's environment already knows, read back off their
+-- selectors: a @KnownTerm@ of kind 'Selector' or 'ComputedSelector' has the
+-- type @FUNCTION FROM R ... TO t@ (quantified over @R@'s parameters), and @R@
+-- is the record. This is how a record declared in an imported module opens;
+-- it is the selector-side twin of
+-- 'L4.TypeCheck.constructorsInScopeFromEntityInfo'.
+--
+-- Both spellings are taken UNqualified. An entity declared under a section
+-- heading is recorded in 'EntityInfo' under its last-registered alias, which
+-- is the section-qualified one ('L4.TypeCheck.Types.extendEnv' inserts each
+-- alias of one 'Unique' over the previous); the prelude's @Dictionary@ lives
+-- under @§§ Dictionaries@, and would otherwise not open at all.
+--
+-- A spelling more than one /distinct/ record claims contributes nothing. Two
+-- imported records with the same unqualified name cannot both be what a
+-- binder written with that name resolves to, and unioning their fields opened
+-- fields the binder does not have. Not opening is never a meaning change
+-- against the pre-R5 tree; guessing is (review 2026-09-16, §11.7.1).
+recordFieldsImported :: EntityInfo -> RecordFieldTable
+recordFieldsImported ei =
+  Map.mapMaybe onlyOneRecord $
+    Map.fromListWith (Map.unionWith Set.union)
+      [ ( unqualified (rawName (getName r))
+        , Map.singleton (getUnique r) (Set.singleton (unqualified (rawName fieldName)))
+        )
+      | (_, (fieldName, KnownTerm ty kind)) <- Map.toList ei
+      , kind == Selector || kind == ComputedSelector
+      , Just r <- [selectorRecord ty]
       ]
-    -- Rewrite bare field references to _self's field projections
-    body = rewriteFieldRefs siblingNames selfName meansExpr
-  in Just (fieldAnn, MkDecide fieldAnn decideTypeSig decideAppForm body)
-makeComputedDecide _ _ _ _ = Nothing  -- stored field, no DECIDE needed
+ where
+  onlyOneRecord :: Map Unique (Set RawName) -> Maybe (Set RawName)
+  onlyOneRecord byRecord = case Map.elems byRecord of
+    [fields] -> Just fields
+    _        -> Nothing
 
--- | Rewrite bare variable references to field projections on a record.
--- @rewriteFieldRefs fieldNames self expr@ replaces every @Var _ n@ where
--- @rawName n ∈ fieldNames@ with @Proj _ (Var _ self) n@.
--- Respects shadowing: binding forms (WHERE, LET, Lam) remove their bound
--- names from the rewrite set before descending into their bodies.
-rewriteFieldRefs :: Set RawName -> Name -> Expr Name -> Expr Name
-rewriteFieldRefs fields self = go fields
-  where
-    go flds expr = case expr of
-      -- Variable/application: rewrite if it's a bare field reference
-      App ann n args
-        | null args && rawName n `Set.member` flds ->
-            Proj emptyAnno (Var emptyAnno self) n
-        | otherwise ->
-            App ann n (map (go flds) args)
-      -- Binary operators
-      And ann e1 e2       -> And ann (go flds e1) (go flds e2)
-      Or ann e1 e2        -> Or ann (go flds e1) (go flds e2)
-      RAnd ann e1 e2      -> RAnd ann (go flds e1) (go flds e2)
-      ROr ann e1 e2       -> ROr ann (go flds e1) (go flds e2)
-      Implies ann e1 e2   -> Implies ann (go flds e1) (go flds e2)
-      Equals ann e1 e2    -> Equals ann (go flds e1) (go flds e2)
-      Not ann e           -> Not ann (go flds e)
-      Plus ann e1 e2      -> Plus ann (go flds e1) (go flds e2)
-      Minus ann e1 e2     -> Minus ann (go flds e1) (go flds e2)
-      Times ann e1 e2     -> Times ann (go flds e1) (go flds e2)
-      DividedBy ann e1 e2 -> DividedBy ann (go flds e1) (go flds e2)
-      Modulo ann e1 e2    -> Modulo ann (go flds e1) (go flds e2)
-      Cons ann e1 e2      -> Cons ann (go flds e1) (go flds e2)
-      Leq ann e1 e2       -> Leq ann (go flds e1) (go flds e2)
-      Geq ann e1 e2       -> Geq ann (go flds e1) (go flds e2)
-      Lt ann e1 e2        -> Lt ann (go flds e1) (go flds e2)
-      Gt ann e1 e2        -> Gt ann (go flds e1) (go flds e2)
-      -- Projection: rewrite the record expression, but NOT the field name
-      Proj ann e n        -> Proj ann (go flds e) n
-      -- Control flow
-      IfThenElse ann c t e -> IfThenElse ann (go flds c) (go flds t) (go flds e)
-      MultiWayIf ann gs e ->
-        MultiWayIf ann (map (goGuarded flds) gs) (go flds e)
-      Consider ann e bs   -> Consider ann (go flds e) (map (goBranch flds) bs)
-      -- Binding forms: remove bound names from the rewrite set
-      Where ann e locals  ->
-        let boundNames = localDeclNames locals
-            flds' = flds `Set.difference` boundNames
-        in Where ann (go flds' e) (map (goLocal flds') locals)
-      LetIn ann locals e  ->
-        let boundNames = localDeclNames locals
-            flds' = flds `Set.difference` boundNames
-        in LetIn ann (map (goLocal flds') locals) (go flds' e)
-      Lam ann sig e       ->
-        let boundNames = givenSigNames sig
-            flds' = flds `Set.difference` boundNames
-        in Lam ann sig (go flds' e)
-      -- Containers
-      List ann es         -> List ann (map (go flds) es)
-      Concat ann es       -> Concat ann (map (go flds) es)
-      Percent ann e       -> Percent ann (go flds e)
-      AsString ann e      -> AsString ann (go flds e)
-      -- Named application
-      AppNamed ann n nes order ->
-        AppNamed ann n (map (goNamed flds) nes) order
-      -- Leaf nodes and everything else: unchanged
-      Lit {} -> expr
-      Fetch ann e         -> Fetch ann (go flds e)
-      Env ann e           -> Env ann (go flds e)
-      Post ann u h b      -> Post ann (go flds u) (go flds h) (go flds b)
-      Record ann mp c v off mh -> Record ann (fmap (go flds) mp) (go flds c) (go flds v) off (fmap (go flds) mh)
-      ReadCell ann mp off mode c -> ReadCell ann (fmap (go flds) mp) off mode (go flds c)
-      Breach ann mp mr    -> Breach ann (fmap (go flds) mp) (fmap (go flds) mr)
-      Refuse ann msg      -> Refuse ann (go flds msg)
-      Event {}            -> expr  -- regulative events are complex; leave as-is
-      Regulative {}       -> expr  -- regulative rules: leave as-is
-      Inert {}            -> expr
+  unqualified :: RawName -> RawName
+  unqualified (QualifiedName _ n) = NormalName n
+  unqualified rn                  = rn
 
-    goGuarded flds (MkGuardedExpr ann c e) =
-      MkGuardedExpr ann (go flds c) (go flds e)
+  selectorRecord :: Type' Resolved -> Maybe Resolved
+  selectorRecord = \ case
+    Forall _ _ t -> selectorRecord t
+    Fun _ [MkOptionallyNamedType _ _ (TyApp _ r _)] _ -> Just r
+    _ -> Nothing
 
-    goBranch flds (MkBranch ann lhs e) =
-      let flds' = flds `Set.difference` branchLhsNames lhs
-      in MkBranch ann lhs (go flds' e)
+-- | The names an opened field can outrank silently: 0-ary constructors and
+-- 0-ary definitions, from this module and from the import environment.
+--
+-- This is not the checker's resolution — it cannot be, it runs before the
+-- checker — but it is the shape that the rank decides without saying so, and
+-- it is what 'L4.TypeCheck.Types.OpenedFieldShadowsDefinition' warns about.
+-- Deliberately 0-ary only: an applied head is never opened in the first
+-- place, so a function of the same name is not at risk.
+shadowCandidates :: EntityInfo -> Module Name -> Map RawName ShadowedByOpening
+shadowCandidates ei (MkModule _ _ section) =
+  Map.union (goSection section) imported
+ where
+  imported =
+    Map.fromList
+      [ (rawName (getName nm), kindOf kind)
+      | (_, (nm, KnownTerm ty kind)) <- Map.toList ei
+      , kind /= Selector && kind /= ComputedSelector
+      , not (isFunctionType ty)
+      ]
+  kindOf Constructor = ShadowedConstructor
+  kindOf _           = ShadowedDefinition
 
-    goLocal flds (LocalDecide ann d) =
-      let MkDecide dAnn ts af body = d
-      in LocalDecide ann (MkDecide dAnn ts af (go flds body))
-    goLocal _ ld = ld  -- LocalAssume: unchanged
+  isFunctionType = \ case
+    Forall _ _ t -> isFunctionType t
+    Fun {}       -> True
+    _            -> False
 
-    goNamed flds (MkNamedExpr ann n e) = MkNamedExpr ann n (go flds e)
+  goSection (MkSection _ _ _ _ decls) = Map.unions (map goTopDecl decls)
+  goTopDecl = \ case
+    Section _ s -> goSection s
+    Declare _ (MkDeclare _ _ _ (EnumDecl _ conDecls)) ->
+      Map.fromList
+        [ (rawName (getName cd), ShadowedConstructor)
+        | cd@(MkConDecl _ _ tns) <- conDecls
+        , null tns
+        ]
+    Decide _ (MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) (MkAppForm _ n args _) _)
+      | null otns, null args -> Map.singleton (rawName n) ShadowedDefinition
+    Assume _ (MkAssume _ (MkTypeSig _ (MkGivenSig _ otns) _) (MkAppForm _ n args _) _ _)
+      | null otns, null args -> Map.singleton (rawName n) ShadowedDefinition
+    _ -> Map.empty
 
-    -- Extract names bound by local declarations
-    localDeclNames :: [LocalDecl Name] -> Set RawName
-    localDeclNames = Set.fromList . mapMaybe localName
-      where
-        localName (LocalDecide _ (MkDecide _ _ (MkAppForm _ n _ _) _)) = Just (rawName n)
-        localName _ = Nothing
+-- | One rung of the scope a bare name is resolved against, innermost first.
+--
+-- A declaration contributes one frame: the names it binds itself (its head,
+-- its parameters), and the fields its record-typed @GIVEN@s open. Within a
+-- frame a bound name beats an opened field — a binder named like one of its
+-- own fields is the binder (the @amount's amount@ style, PROPS-REDTEAM
+-- §2.7) — and the definition's own head name is bound too, so a reference to
+-- it in its own body is never rewritten to a field of the same name (which is
+-- what kept a computed field's own name out of its sibling set before R5, and
+-- is why 'makeComputedDecide' no longer has to subtract it). A @WHERE@,
+-- @LET@, lambda or @CONSIDER@ branch contributes a frame that only binds.
+data Frame =
+  MkFrame
+    { bound  :: !(Set RawName)
+    , opened :: !(Map RawName [OpenedBinderDecl])
+      -- ^ In declaration order; more than one binder is a collision.
+    , tyvars :: !(Set RawName)
+      -- ^ The TYPE parameters this frame's signature quantifies over. A
+      -- binder declared at one of them (@GIVEN Box IS A TYPE, x IS A Box@)
+      -- is a universally quantified type, never the record that happens to
+      -- share the spelling, so it opens nothing.
+    , site   :: !OpeningSite
+    }
 
-    -- Extract names bound by a GIVEN signature
-    givenSigNames :: GivenSig Name -> Set RawName
-    givenSigNames (MkGivenSig _ otns) =
-      Set.fromList [rawName (getName otn) | otn <- otns]
+bindingFrame :: Set RawName -> Frame
+bindingFrame names = MkFrame names Map.empty Set.empty DeclarationOpening
 
-    -- Extract names bound by a branch LHS (pattern)
-    branchLhsNames :: BranchLhs Name -> Set RawName
-    branchLhsNames (When _ pat) = patternNames pat
-    branchLhsNames (Otherwise _) = Set.empty
+-- | The frame a signature contributes: its binders, and the fields opened from
+-- those of its binders whose declared type is a record in the table.
+--
+-- Only a binder written with a type opens. An un-annotated @GIVEN x@, or a
+-- parameter that appears in the head alone (@f p MEANS ...@), has a type the
+-- checker infers later, which this pass cannot see.
+-- A binder whose type names a TYPE parameter in scope — this signature's own,
+-- or an enclosing one's — opens nothing: it is a universally quantified type
+-- variable, and the record that shares its spelling is not what the checker
+-- resolves it to.
+signatureFrame :: RecordFieldTable -> OpeningSite -> Set RawName -> [RawName] -> [OptionallyTypedName Name] -> Frame
+signatureFrame table site outerTyVars extraBound otns =
+  MkFrame bound opened tyvars site
+ where
+  bound = Set.fromList (extraBound <> [ rawName (getName otn) | otn <- otns ])
+  tyvars =
+    outerTyVars
+      <> Set.fromList [ rawName n | MkOptionallyTypedName _ n (Just (Type _)) _ <- otns ]
+  opened =
+    Map.fromListWith (flip (<>))
+      [ (field, [MkOpenedBinderDecl n ty])
+      | MkOptionallyTypedName _ n (Just ty) _ <- otns
+      , TyApp _ tyName _ <- [ty]
+      , not (rawName tyName `Set.member` tyvars)
+      , Just fields <- [Map.lookup (rawName tyName) table]
+      , field <- Set.toList fields
+      , not (field `Set.member` bound)
+      ]
 
-    patternNames :: Pattern Name -> Set RawName
-    patternNames (PatApp _ _ pats) = Set.unions (map patternNames pats)
-    patternNames (PatVar _ n) = Set.singleton (rawName n)
-    patternNames _ = Set.empty
+-- | Every TYPE parameter a stack of frames has in scope.
+tyVarsInScope :: [Frame] -> Set RawName
+tyVarsInScope = foldMap (.tyvars)
+
+-- | Two enclosing sections' opened fields are ONE tier of the rank, so they
+-- share one frame: a name both open is a collision, not a silent shadow.
+-- Binding still beats opening, because 'lookupBare' consults @bound@ first
+-- and the merged frame binds both sections' binder names.
+mergeSectionFrames :: Frame -> Frame -> Frame
+mergeSectionFrames outer inner =
+  MkFrame
+    { bound  = outer.bound <> inner.bound
+    , opened = Map.unionWith (<>) outer.opened inner.opened
+    , tyvars = outer.tyvars <> inner.tyvars
+    , site   = SectionOpening
+    }
+
+-- | The writer 'openFields' runs in: collisions, and the silent-rank warnings.
+type Opening = Writer ([OpenedFieldCollision], [OpenedFieldShadow])
+
+-- | What a bare name resolves to under a stack of frames.
+data Lookup
+  = Unchanged
+    -- ^ Bound at some rung before any opened field of that name, or nothing
+    -- in the stack knows it: the checker resolves it as it always did.
+  | Opened OpenedBinderDecl
+  | Collided OpeningSite (NonEmpty OpenedBinderDecl)
+
+lookupBare :: RawName -> [Frame] -> Lookup
+lookupBare _ [] = Unchanged
+lookupBare n (f : fs)
+  | n `Set.member` f.bound = Unchanged
+  | otherwise =
+      case Map.lookup n f.opened of
+        Just [b]       -> Opened b
+        Just (b : bs)  -> Collided f.site (b :| bs)
+        _              -> lookupBare n fs
+
+-- | Open the fields of record-typed binders inside the bodies that see them.
+--
+-- The ruling (IMPLICIT-PROPS-DESIGN §11.7, R5). The fields of a record-typed
+-- @GIVEN@ — a declaration's own, or a section's — are in scope by bare name
+-- within the body that declares or sees the binder, and never in its callees.
+-- Rank, innermost first: @WHERE@\/@LET@ locals; the function's own @GIVEN@;
+-- fields opened from it; section @GIVEN@s; fields opened from those; and then
+-- whatever the checker resolves a bare name to today. A bare occurrence @f@
+-- of an opened field of binder @r@ becomes @r's f@ — the same
+-- @Proj (App r []) f@ the author could have written, checked and consumed by
+-- every backend exactly as if they had. @r's f@ is always available.
+--
+-- What "bare" means, precisely: an @App n []@ in expression position. An
+-- applied head (@f x@, @f OF x@), the label of a projection, a @WITH@ label,
+-- and anything inside an @EVENT@, a regulative (@PARTY ... MUST ...@) or an
+-- inert element are left alone — the four exclusions the computed-field
+-- rewrite this pass replaced always had, kept so that nothing which resolved
+-- before R5 resolves differently after it.
+--
+-- Collisions. When two binders of ONE signature open the same field name, a
+-- bare read of it is reported ('OpenedFieldCollision') and elaborated against
+-- the first binder so the rest of the module still checks; the caller reports
+-- it at the read and at the later binder's declaration. Nothing is reported
+-- unless the name is actually read bare: the prelude itself declares
+-- @dict1 IS A Dictionary k v, dict2 IS A Dictionary k v@ and reads both
+-- explicitly. A field opened at two different rungs is a silent shadow, as the
+-- rank says — but NOT between two enclosing sections: every enclosing
+-- section's binders share ONE frame, because the ruling's rank has one tier
+-- for "fields opened from" section @GIVEN@s, so two nested sections that open
+-- the same field name collide rather than shadowing (review 2026-09-16).
+--
+-- Runs after 'desugarComputedFields', so a computed field's synthetic
+-- @GIVEN _self IS A R@ opens its siblings through this pass and no other; the
+-- table is nevertheless read off the module BEFORE that pass, so the computed
+-- siblings are in it. A synthetic computed-field @DECIDE@ is walked with NO
+-- enclosing frames: a @DECLARE@ is not a rule that sees its section's binder,
+-- and giving its computed fields the section's opened fields silently changed
+-- what a body already in the corpus meant ('isComputedFieldDecide').
+--
+-- 'shadowCandidates' names what the checker would otherwise have resolved a
+-- bare name to — a 0-ary constructor or definition. An opened field that
+-- outranks one of those is reported as a warning ('OpenedFieldShadow'); it is
+-- not an error, because the rank is what it is, but it is the one silent case
+-- of the rank worth saying out loud.
+openFields
+  :: RecordFieldTable
+  -> Map RawName ShadowedByOpening
+  -> Module Name
+  -> (Module Name, [OpenedFieldCollision], [OpenedFieldShadow])
+openFields table shadowed (MkModule mAnn uri sect) =
+  let (sect', (collisions, shadows)) = runWriter (goSection [] sect)
+  in (MkModule mAnn uri sect', collisions, shadows)
+ where
+  goSection :: [Frame] -> Section Name -> Opening (Section Name)
+  goSection frames (MkSection sAnn mn maka mgiven decls) = do
+    let frames' = case mgiven of
+          Just (MkGivenSig _ otns) ->
+            let inner = signatureFrame table SectionOpening (tyVarsInScope frames) [] otns
+            in case frames of
+                 -- One tier for every enclosing section, as the rank says.
+                 (outer : rest) -> mergeSectionFrames outer inner : rest
+                 []             -> [inner]
+          Nothing                  -> frames
+    MkSection sAnn mn maka mgiven <$> traverse (goTopDecl frames') decls
+
+  goTopDecl :: [Frame] -> TopDecl Name -> Opening (TopDecl Name)
+  goTopDecl frames = \ case
+    Section a s -> Section a <$> goSection frames s
+    Decide a d
+      | isComputedFieldDecide d -> Decide a <$> goDecide [] d
+      | otherwise               -> Decide a <$> goDecide frames d
+    other       -> pure other
+
+  goDecide :: [Frame] -> Decide Name -> Opening (Decide Name)
+  goDecide frames (MkDecide dAnn tysig@(MkTypeSig _ (MkGivenSig _ otns) _) af@(MkAppForm _ hd args _) body) = do
+    let frame =
+          signatureFrame table DeclarationOpening (tyVarsInScope frames)
+            (rawName hd : map rawName args) otns
+    MkDecide dAnn tysig af <$> go (frame : frames) body
+
+  opened :: Anno -> OpenedBinderDecl -> Name -> Opening (Expr Name)
+  opened ann b n = do
+    case Map.lookup (rawName n) shadowed of
+      Nothing   -> pure ()
+      Just what -> tell ([], [MkOpenedFieldShadow n b what])
+    pure (projectOn ann b n)
+
+  go :: [Frame] -> Expr Name -> Opening (Expr Name)
+  go frames expr = case expr of
+    -- Variable/application: elaborate a bare opened field, leave an applied head alone
+    App ann n args
+      | null args ->
+          case lookupBare (rawName n) frames of
+            Unchanged   -> pure expr
+            Opened b    -> opened ann b n
+            Collided site bs@(b :| _) -> do
+              tell ([MkOpenedFieldCollision n site (toList bs)], [])
+              opened ann b n
+      | otherwise ->
+          App ann n <$> traverse (go frames) args
+    -- Binary operators
+    And ann e1 e2       -> And ann <$> go frames e1 <*> go frames e2
+    Or ann e1 e2        -> Or ann <$> go frames e1 <*> go frames e2
+    RAnd ann e1 e2      -> RAnd ann <$> go frames e1 <*> go frames e2
+    ROr ann e1 e2       -> ROr ann <$> go frames e1 <*> go frames e2
+    Implies ann e1 e2   -> Implies ann <$> go frames e1 <*> go frames e2
+    Equals ann e1 e2    -> Equals ann <$> go frames e1 <*> go frames e2
+    Not ann e           -> Not ann <$> go frames e
+    Plus ann e1 e2      -> Plus ann <$> go frames e1 <*> go frames e2
+    Minus ann e1 e2     -> Minus ann <$> go frames e1 <*> go frames e2
+    Times ann e1 e2     -> Times ann <$> go frames e1 <*> go frames e2
+    DividedBy ann e1 e2 -> DividedBy ann <$> go frames e1 <*> go frames e2
+    Modulo ann e1 e2    -> Modulo ann <$> go frames e1 <*> go frames e2
+    Cons ann e1 e2      -> Cons ann <$> go frames e1 <*> go frames e2
+    Leq ann e1 e2       -> Leq ann <$> go frames e1 <*> go frames e2
+    Geq ann e1 e2       -> Geq ann <$> go frames e1 <*> go frames e2
+    Lt ann e1 e2        -> Lt ann <$> go frames e1 <*> go frames e2
+    Gt ann e1 e2        -> Gt ann <$> go frames e1 <*> go frames e2
+    -- Projection: the record expression, but NOT the label
+    Proj ann e n        -> (\ e' -> Proj ann e' n) <$> go frames e
+    -- Control flow
+    IfThenElse ann c t e -> IfThenElse ann <$> go frames c <*> go frames t <*> go frames e
+    MultiWayIf ann gs e ->
+      MultiWayIf ann <$> traverse (goGuarded frames) gs <*> go frames e
+    Consider ann e bs   -> Consider ann <$> go frames e <*> traverse (goBranch frames) bs
+    -- Binding forms push a frame that only binds; each local's own body then
+    -- gets its own signature frame on top of that
+    Where ann e locals  -> do
+      let frames' = bindingFrame (localDeclNames locals) : frames
+      Where ann <$> go frames' e <*> traverse (goLocal frames') locals
+    LetIn ann locals e  -> do
+      let frames' = bindingFrame (localDeclNames locals) : frames
+      LetIn ann <$> traverse (goLocal frames') locals <*> go frames' e
+    Lam ann sig e       ->
+      -- A lambda's parameters bind but do not open (§11.7 says "function"
+      -- GIVEN; a lambda declares a binder without being a definition).
+      Lam ann sig <$> go (bindingFrame (givenSigNames sig) : frames) e
+    -- Containers
+    List ann es         -> List ann <$> traverse (go frames) es
+    Concat ann es       -> Concat ann <$> traverse (go frames) es
+    Percent ann e       -> Percent ann <$> go frames e
+    AsString ann e      -> AsString ann <$> go frames e
+    -- Named application: the arguments, never the labels
+    AppNamed ann n nes order ->
+      (\ nes' -> AppNamed ann n nes' order) <$> traverse (goNamed frames) nes
+    -- Leaf nodes and everything else: unchanged
+    Lit {} -> pure expr
+    Fetch ann e         -> Fetch ann <$> go frames e
+    Env ann e           -> Env ann <$> go frames e
+    Post ann u h b      -> Post ann <$> go frames u <*> go frames h <*> go frames b
+    Record ann mp c v off mh ->
+      Record ann <$> traverse (go frames) mp <*> go frames c <*> go frames v <*> pure off <*> traverse (go frames) mh
+    ReadCell ann mp off mode c ->
+      (\ mp' c' -> ReadCell ann mp' off mode c') <$> traverse (go frames) mp <*> go frames c
+    Breach ann mp mr    -> Breach ann <$> traverse (go frames) mp <*> traverse (go frames) mr
+    Refuse ann msg      -> Refuse ann <$> go frames msg
+    Event {}            -> pure expr  -- regulative events are complex; leave as-is
+    Regulative {}       -> pure expr  -- regulative rules: leave as-is
+    Inert {}            -> pure expr
+
+  -- @r's f@, carrying the bare read's source range on the projection AND on
+  -- its record operand, so that a diagnostic on either still points at what
+  -- the author wrote. The holes are range-hinted and token-free, as
+  -- 'elaborateSectionBinder' explains; the binder /occurrence/ is range-less
+  -- (its 'Name' has 'clearSourceAnno' applied) so the read is not recorded as
+  -- a reference at the GIVEN line.
+  --
+  -- TWO holes, as the parser's own projection has (@hole e@, @'s@, @hole n@).
+  -- 'flattenConcreteNodes' zips holes against child node-lists positionally
+  -- and drops the surplus, so with one hole the label @n@ was never reached:
+  -- the type-checked semantic-token pass emitted nothing at the bare read and
+  -- the editor left it unhighlighted (review 2026-09-16, witnessed by
+  -- @lsp\/semantic-tokens\/field-opening.l4@).
+  projectOn :: Anno -> OpenedBinderDecl -> Name -> Expr Name
+  projectOn ann b n =
+    Proj (Anno mempty (rangeOf ann) [ hole, mkHoleWithSrcRangeHint (rangeOf n) ])
+      (Var (Anno mempty (rangeOf ann) [hole]) (clearSourceAnno b.binderName))
+      n
+   where
+    hole = mkHoleWithSrcRangeHint (rangeOf ann)
+
+  goGuarded frames (MkGuardedExpr ann c e) =
+    MkGuardedExpr ann <$> go frames c <*> go frames e
+
+  goBranch frames (MkBranch ann lhs e) =
+    MkBranch ann lhs <$> go (bindingFrame (branchLhsNames lhs) : frames) e
+
+  goLocal frames (LocalDecide ann d) = LocalDecide ann <$> goDecide frames d
+  goLocal _ ld = pure ld  -- LocalAssume: no body
+
+  goNamed frames (MkNamedExpr ann n e) = MkNamedExpr ann n <$> go frames e
+
+  -- Extract names bound by local declarations
+  localDeclNames :: [LocalDecl Name] -> Set RawName
+  localDeclNames = Set.fromList . map localName
+   where
+    localName (LocalDecide _ (MkDecide _ _ (MkAppForm _ n _ _) _)) = rawName n
+    localName (LocalAssume _ (MkAssume _ _ (MkAppForm _ n _ _) _ _)) = rawName n
+
+  -- Extract names bound by a GIVEN signature
+  givenSigNames :: GivenSig Name -> Set RawName
+  givenSigNames (MkGivenSig _ otns) =
+    Set.fromList [rawName (getName otn) | otn <- otns]
+
+  -- Extract names bound by a branch LHS (pattern)
+  branchLhsNames :: BranchLhs Name -> Set RawName
+  branchLhsNames (When _ pat) = patternNames pat
+  branchLhsNames (Otherwise _) = Set.empty
+
+  -- A 0-ary 'PatApp' binds its name unless it is a constructor; the checker
+  -- decides which ('L4.TypeCheck.inferPatternVar'), and this pass cannot, so
+  -- it treats the name as bound either way — the choice that leaves a
+  -- constructor pattern's body resolving exactly as it did before R5.
+  patternNames :: Pattern Name -> Set RawName
+  patternNames (PatApp _ n [])   = Set.singleton (rawName n)
+  patternNames (PatApp _ _ pats) = Set.unions (map patternNames pats)
+  patternNames (PatVar _ n)      = Set.singleton (rawName n)
+  patternNames (PatCons _ p1 p2) = patternNames p1 <> patternNames p2
+  patternNames _ = Set.empty
 
 -- ----------------------------------------------------------------------------
 -- Cycle Detection for Computed Fields

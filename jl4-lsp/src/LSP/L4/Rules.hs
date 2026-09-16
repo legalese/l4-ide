@@ -981,11 +981,14 @@ jl4Rules evalConfig rootDirectory recorder = do
         , _codeDescription = Nothing
         , _source = Just "check"
         , _message = Text.unlines (TypeCheck.prettyCheckError checkError.kind)
-          -- The deprecation warning is tagged so that editors render the
-          -- ASSUME the way they render any other deprecated spelling
-          -- (typically struck through), on top of the warning squiggle.
+          -- A deprecation warning is tagged so that editors render the retired
+          -- spelling the way they render any other deprecated one (typically
+          -- struck through), on top of the warning squiggle. Two spellings are
+          -- being retired: ASSUME, and EXACTLY in a regulative action (R3 of
+          -- specs/todo/PATTERN-REFERENCE-RULE-SPEC.md).
         , _tags = case checkError.kind of
             TypeCheck.CheckWarning (TypeCheck.DeprecatedAssume {}) -> Just [LSP.DiagnosticTag_Deprecated]
+            TypeCheck.CheckWarning (TypeCheck.DeprecatedExactly {}) -> Just [LSP.DiagnosticTag_Deprecated]
             _                                                      -> Nothing
         , _relatedInformation = Nothing
         , _data_ = Nothing

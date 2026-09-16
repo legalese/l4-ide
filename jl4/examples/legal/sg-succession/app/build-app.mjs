@@ -13,7 +13,9 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const data = JSON.parse(readFileSync(join(HERE, "outcomes.json"), "utf8"));
 
 // the assertion count the footer cites, read from the corpus rather than typed
-const CORPUS = join(HERE, "..");
+// The committed encoding moved to the vendored canon mirror (2026-09-16); the
+// deposit data and this app stayed. Read-only, so pointing at the mirror is safe.
+const CORPUS = join(HERE, "..", "..", "..", "canon", "sg", "succession");
 const modules = ["sg-wills.l4", "sg-paa.l4", "sg-succession-cases.l4"];
 data.assertions = modules.reduce(
   (n, m) => n + (readFileSync(join(CORPUS, m), "utf8").match(/^#ASSERT/gm) || []).length, 0);

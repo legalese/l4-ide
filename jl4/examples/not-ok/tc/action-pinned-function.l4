@@ -1,0 +1,31 @@
+-- R7 of specs/todo/PATTERN-REFERENCE-RULE-SPEC.md, extended by the review of
+-- 2026-09-16: an action can pin only a value that can be COMPARED.
+--
+-- `g` names a function, so under R1 the action says "apply that exact
+-- function" -- and matching an event against a pinned value is an equality
+-- test, which two functions do not support. No event could ever match.
+--
+-- Until this was refused at check time the file checked clean and died at the
+-- first trace with "trying to check equality on types that do not support
+-- it", naming neither `g` nor the slot. Before R1 it was worse and quieter: a
+-- bare name in an argument slot was a fresh placeholder, so the rule was
+-- discharged by an event applying ANY function.
+--
+-- The EXACTLY spelling is refused the same way, because both spellings become
+-- the same pinned pattern.
+
+DECLARE Actor IS ONE OF
+    Buyer
+
+DECLARE Action IS ONE OF
+    apply HAS f IS A FUNCTION FROM NUMBER TO NUMBER
+
+GIVEN g IS A FUNCTION FROM NUMBER TO NUMBER
+GIVETH A DEONTIC Actor Action
+`pins a function` MEANS
+    PARTY Buyer MUST apply g WITHIN 30 HENCE FULFILLED LEST BREACH
+
+GIVEN g IS A FUNCTION FROM NUMBER TO NUMBER
+GIVETH A DEONTIC Actor Action
+`pins a function, the old spelling` MEANS
+    PARTY Buyer MUST apply (EXACTLY g) WITHIN 30 HENCE FULFILLED LEST BREACH

@@ -12,13 +12,13 @@ Deep dive on L4's regulative machinery: obligations, permissions, prohibitions, 
 - [Deontic modals: MUST, MAY, SHANT, DO](#deontic-modals-must-may-shant-do)
 - [HENCE and LEST — the success and failure paths](#hence-and-lest--the-success-and-failure-paths)
 - [BREACH, FULFILLED, and BECAUSE](#breach-fulfilled-and-because)
-- [PROVIDED and EXACTLY — action matching](#provided-and-exactly--action-matching)
+- [PROVIDED and action patterns — reference and wildcard matching](#provided-and-action-patterns--reference-and-wildcard-matching)
 - [WITHIN — deadlines](#within--deadlines)
 - [Composition: RAND and ROR](#composition-rand-and-ror)
 - [EVERY — one obligation per member of a group](#every--one-obligation-per-member-of-a-group)
   - [The group must be given as a list, after `IN`](#1-the-group-must-be-given-as-a-list-after-in)
   - [The join line is mandatory whenever there is a `HENCE` or a `LEST`](#2-the-join-line-is-mandatory-whenever-there-is-a-hence-or-a-lest)
-  - [Write `EXACTLY t` in the action, not `t`](#3-write-exactly-t-in-the-action-not-t)
+  - [`t` already refers to the member — no `EXACTLY` needed](#3-t-already-refers-to-the-member--no-exactly-needed)
   - [Do not write the deprecated `WHO elem` roll](#do-not-write-the-deprecated-who-elem-roll)
 - [Recursive obligations](#recursive-obligations)
 - [#TRACE — simulating contract execution](#trace--simulating-contract-execution)
@@ -123,7 +123,7 @@ Reference: <https://legalese.com/l4/reference/regulative/BECAUSE.md>
 
 ---
 
-## PROVIDED and EXACTLY — action matching
+## PROVIDED and action patterns — reference and wildcard matching
 
 ### PROVIDED — guard condition
 
@@ -141,20 +141,54 @@ MUST `Amount Transferred`
      PROVIDED `Amount Transferred` AT LEAST `Payment Due`
 ```
 
-### EXACTLY — equality match
+### Reference and wildcard names
 
-Without `EXACTLY`, the action is a **pattern** (matched structurally, with variable binding). With `EXACTLY`, the action is an **expression** that is evaluated and compared for equality.
+A bare name in an action's argument position does one of two things, and the checker decides which
+by looking the name up — you never have to say which you mean:
+
+- **If it names something already in scope** — a `GIVEN`, a lambda parameter, a `WHERE`/`LET`
+  local, a name an enclosing action already bound, a `CONSIDER` or `EVERY` variable, or a
+  top-level, section-level, `ASSUME`d, or imported term — the pattern **refers** to that thing: the
+  event must equal it.
+- **If it names nothing in scope** (or only a field selector of the action's own record type) the
+  pattern is a **wildcard**: a fresh name, bound to whatever the event supplies, matching anything.
 
 ```l4
--- Pattern: matches any pay-shaped event
-PARTY buyer MUST pay
+-- Wildcard: matches any pay-shaped event, binding `amount` to whatever was paid
+PARTY buyer MUST pay amount
 
--- Expression equality: the event must equal the result of this expression
-PARTY lender MUST EXACTLY send capital to borrower
+-- Reference: price is a GIVEN, so this matches only an event paying exactly `price`
+GIVEN price IS A NUMBER
+PARTY Alice MUST pay price WITHIN 30
 
--- Exact value
-PARTY Alice MUST pay price EXACTLY 100 WITHIN 30
+-- Literal: already an exact value, no keyword needed
+PARTY Alice MUST pay 100 WITHIN 30
 ```
+
+A name that refers to a top-level, section-level, `ASSUME`d, or imported term (as opposed to a
+lexical local) also gets a notice, naming what it refers to and where it is defined — the one case a
+reader cannot see just by looking at the rule: a name defined elsewhere in the file that turns what
+used to be a wildcard into a reference. The notice asks for nothing; it is information, not a
+diagnostic to fix.
+
+### `EXACTLY` — deprecated
+
+`EXACTLY e` still parses and still means what it always meant. But it no longer changes anything a
+bare name would not already do on its own: the checker resolves a bare name to a reference
+automatically wherever `EXACTLY` used to be needed. Every remaining use warns, with the
+meaning-preserving replacement:
+
+| written today    | replacement | why                                       |
+| ---------------- | ----------- | ----------------------------------------- |
+| `EXACTLY name`   | `name`      | the name already resolves to a reference  |
+| `EXACTLY (expr)` | `(expr)`    | keep the parentheses around an expression |
+
+Write plain names and parenthesised expressions in new rules; do not write new `EXACTLY`.
+
+One case gets no suggested replacement: `EXACTLY someName` where `someName` names nothing in scope
+at all. Dropping the keyword there would turn a compile error into a wildcard matching anything —
+the exact defect the reference rule exists to prevent — so the warning says the keyword is retiring
+without offering to remove it until the name itself is fixed.
 
 ---
 
@@ -168,16 +202,35 @@ record the unit once in a comment or in the name of the constant.
 PARTY Alice  MUST pay 100 WITHIN 30          -- days, by this file's convention
 ```
 
-Neither `WITHIN 5 days` nor ``WITHIN 5 days OF `order confirmation` `` parses
-in this release (measured 2026-09-04: the first reads `days` as a function
-applied to `5`; the second stops at `OF`). See
+`WITHIN d OF anchor` anchors the deadline (built 2026-09-15): `OF THE JOIN`,
+`OF THE DEADLINE` or `OF THE ARMING` name the enclosing obligation's completion,
+deadline or entry, and `OF e` an instant — a `NUMBER` on the trace's clock or a
+`DATE`; the deadline is then the anchor plus `d`, absolute. Everywhere inside an
+unbracketed duration `OF` is the anchor, never a call — also inside an `IF`
+branch, an operand or a `WHERE` there — so an applied duration is bracketed,
+`WITHIN (f OF x) OF THE JOIN`, or juxtaposed, `WITHIN f x OF THE JOIN`. In a
+barrier's `LEST`, `THE DEADLINE` is the deadline of the member who failed
+EARLIEST — the same member the `LEST`'s clock is anchored at — not the first
+non-actor on the roll (built 2026-09-16, `run-stack.l4`).
+
+`WITHIN 5 days` does not check unless `days` is defined; one line,
+`GIVEN n IS A NUMBER GIVETH A NUMBER DECIDE n days IS n`, makes it check. HOW it
+fails depends on what is in scope (measured 2026-09-15): with no import and no
+other mixfix definition in the file, `days` is read as a function applied to
+`5` and the checker reports `could not find a definition for the identifier`;
+with any mixfix operator in scope (`IMPORT prelude` is enough) the parser only
+accepts operator words it knows and stops at `days` with `unexpected days`. The
+same is true of ``WITHIN 5 days OF `order confirmation` ``, which since
+2026-09-15 parses — the `OF` is the anchor — and then checks only if both
+`days` and `` `order confirmation` `` are defined. See
 [source-patterns/04-dates-and-periods.md](source-patterns/04-dates-and-periods.md#e4-3),
 entry 4.3, for the measured forms.
 
 **There is no `BEFORE` for an absolute deadline in this release.** `MUST pay BEFORE 30` does not
 read as a deadline at all — the parser takes it as applying the action to two arguments, and the
 check fails with `You are giving 2 inputs to pay … but it is not a function, so it takes none`
-(probe `g14-before-deadline.l4`, exit 1). Use `WITHIN`.
+(probe `g14-before-deadline.l4`, exit 1). Use `WITHIN`: relative as `WITHIN d`, absolute as
+`WITHIN d OF instant` — `WITHIN 0 OF (YMD 2026 6 30)` is "by 30 June 2026".
 
 ---
 
@@ -185,8 +238,9 @@ check fails with `You are giving 2 inputs to pay … but it is not a function, s
 
 `RAND` and `ROR` compose obligations in parallel.
 
-- **`RAND`** — parallel AND. All components must be fulfilled; if any side breaches, the compound breaches.
-- **`ROR`** — parallel OR. Fulfilling any one side fulfills the compound.
+- **`RAND`** — parallel AND. All components must be fulfilled; if any side breaches, the compound breaches. When both sides are lost the breach names both sides' failures, left first, one line each with that side's own action-and-deadline or `BECAUSE` (`BY seller BECAUSE "…"` / `BY buyer BECAUSE "…"`).
+- **`ROR`** — parallel OR. Fulfilling any one side fulfills the compound; it breaches only when every side is lost, and then names every side's failure the same way.
+- **Which side dates a compound breach.** Only a missed deadline carries a time (the stamp of the event that revealed it); a declared `LEST BREACH` carries none. When both sides carry a time, the breach is dated at the earlier stamp for `RAND` and the later for `ROR`. When **either** side is a declared `LEST BREACH`, the pair counts as simultaneous and the date falls to the left side for `RAND` and the right for `ROR` — regardless of which side was actually lost first — which may mean no date at all. Only the date is affected; every side's own reason or deadline is printed either way.
 - **Precedence:** `RAND` binds tighter than `ROR`, so `A ROR B RAND C` means `A ROR (B RAND C)`.
 
 ```l4
@@ -215,7 +269,7 @@ ROR
 
 ```l4
 EVERY Tenant t IN tenants          -- one obligation per tenant, all live at once
-    MUST   Sign (EXACTLY t)
+    MUST   Sign t
     WITHIN 14
     ONCE   ALL HAVE                -- the JOIN LINE: fires once, at the last signature
     HENCE  FULFILLED
@@ -261,17 +315,25 @@ The line goes **between the act's `WITHIN` and the `HENCE`**, indented past the 
 
 **Clause order silently decides which deadline you wrote.** A `WITHIN` _before_ the join line bounds each member's act; the same `WITHIN` _after_ it bounds the whole group. Both parse, both check, and the formatter prints either back unchanged, so nothing will tell you which one you got. Write the act's `WITHIN` first, as every example here does.
 
-### 3. Write `EXACTLY t` in the action, not `t`
+### 3. `t` already refers to the member — no `EXACTLY` needed
 
-The action is a **pattern**, exactly as it is under `PARTY`. A bare name in a pattern is a _new_ name matching anything — so `MUST Sign t` does not mean "t signs"; it introduces a second `t` that matches any signer at all, and a stranger's signature would discharge the tenant's duty.
-
-The checker catches this one:
+`t` is the quantifier's own variable, in scope for the action exactly as a `GIVEN` would be, so
+`MUST Sign t` means what it reads: the member signs. This used to need `MUST Sign (EXACTLY t)` —
+under the older rule every bare name in an action was a **fresh** name regardless of what it
+matched elsewhere, so plain `t` silently introduced a second `t` matching any signer at all, and the
+checker refused the rule:
 
 > The action of this EVERY binds a new name `t` … which is spelled like the quantifier's own variable `t`. An action is a pattern, so this would be a fresh name matching anyone, not a reference to the member. To mean the member, write `EXACTLY t` in that position.
 
-It only checks the **innermost** `EVERY`, though. In a nested rule an inner action writing the _outer_ quantifier's variable is accepted and silently binds a fresh name. Write `EXACTLY` for every quantifier variable you mean, at every depth.
+That check (`QuantifierVariableRebound`) is retired: a name already in scope now refers to it rather
+than shadowing it, at every depth of nesting, so the old advice to write `EXACTLY` for an _outer_
+quantifier's variable in a nested rule is also no longer needed — it too now just refers. `EXACTLY
+t` still parses and still means the same reference, but it is the deprecated spelling; write plain
+`t`.
 
-Other arguments may still be patterns: `MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount` pins payer and payee and binds `amount` to whatever was paid, which is then in scope in `PROVIDED`, `HENCE` and `LEST`.
+Other arguments still work the same way: `MUST Pay t theLandlord amount` pins payer and payee by
+reference (`t` to the member, `theLandlord` to whatever it names in scope) and leaves `amount` a
+wildcard, bound to whatever was paid and then in scope in `PROVIDED`, `HENCE` and `LEST`.
 
 ### `WHO` narrows the group
 
@@ -306,7 +368,7 @@ An `elem` condition **beside** an `IN` roll is an ordinary narrowing condition a
 
 Say these plainly to a user rather than letting them discover them:
 
-- **A failed barrier's breach names NOBODY.** A barrier's `LEST` belongs to the join, not to any member, so it may not name `t` — the checker refuses `LEST BREACH BY t` — and a bare `LEST BREACH` yields a bare `BREACH` with no party. A constant works (`LEST BREACH BY theLandlord BECAUSE "…"`) but is a party you chose, not the one who failed. Who is outstanding shows up in the **residual**, not the breach. Use the fork if the failure has to name the member.
+- **A barrier's own `LEST BREACH` names NOBODY.** A barrier's `LEST` belongs to the join, not to any member, so it may not name `t` — the run refuses `LEST BREACH BY t` — and a bare `LEST BREACH` yields a bare `BREACH` with no party. A constant works, one party or a list (`LEST BREACH BY LIST theLandlord, theAgent BECAUSE "…"`), but is a party you chose, not the one who failed. Leave the `LEST` off and the breach names **every** member who failed, in roll order, each with their own deadline (built 2026-09-15); with a `LEST` that has to stay, who is outstanding shows up in the **residual**, not the breach. Use the fork if the failure has to name the member.
 - **The count and measure joins are not built.** `ONCE SOME 2 OF … HAVE` and `ONCE sum OF amount AT LEAST rent` do not parse. Only `ONCE ALL HAVE` and `UPON EACH` do.
 - **`NO Tenant t MAY …`** is designed but not built; write the `SHANT` form.
 - **A residual barrier loses its join line**, so feeding a residual more events runs the members and not the join. Run the whole stream at once.

@@ -16,7 +16,7 @@ _Status (2026-09-08): pieces 1 and 2 are **built**; piece 3, "enough of them", i
 
 - a follow-on that fires _once_, after _all_ of a group have acted;
 - a deadline on the _total_ paid, rather than on each payment;
-- a breach that names _everyone_ who failed, rather than one of them.
+- a breach that names _everyone_ who failed, rather than one of them — closed on 15 September 2026 for the shapes you can already write: `RAND`, `ROR` and the group below now name everyone.
 
 All three have the same cause. Today, the things you can combine are obligations you have written out by hand, one per person, and the only place a follow-on can go is inside one of them. There is no way to say "these people, as a group", and so no way to hang anything on the group.
 
@@ -33,14 +33,14 @@ Three flatmates must sign, and when the last of them has, the tenancy begins. In
 ```l4
 -- BUILT (2026-09-08). This runs.
 EVERY Flatmate f IN flatmates       -- the group, given as a list
-    MUST   Sign (EXACTLY f)
+    MUST   Sign f
     WITHIN 14
     ONCE   ALL HAVE                 -- the line that says when the follow-on fires
     HENCE  `the tenancy begins`     -- fires once, when the last of them has signed
     LEST   `the lease falls through`
 ```
 
-Three things in that block were not in the first draft of this page. `IN flatmates` names the group as a list, which is what makes the rule runnable at all — see [Where the group comes from](../../reference/regulative/EVERY.md#where-the-group-comes-from-the-roll). `ONCE ALL HAVE` is a line of its own saying when the follow-on fires, and it is required whenever there is one; it was ruled on 7 September 2026. And `EXACTLY f` is how you say "this flatmate" inside the action; a bare `f` there would match anybody's signature.
+Two things in that block were not in the first draft of this page. `IN flatmates` names the group as a list, which is what makes the rule runnable at all — see [Where the group comes from](../../reference/regulative/EVERY.md#where-the-group-comes-from-the-roll). `ONCE ALL HAVE` is a line of its own saying when the follow-on fires, and it is required whenever there is one; it was ruled on 7 September 2026. And `f` inside the action is how you say "this flatmate": `f` is the quantifier's own variable, already in scope, so it requires that flatmate rather than matching anybody's signature.
 
 (`IN` was ruled a day later, on 8 September 2026. Examples written before that put the same list inside the `WHO` condition, as `WHO elem f flatmates`. **That older spelling is deprecated**, ruled on the same day: it still runs, and nothing warns you if you write it, but `IN` is the one to use and everything we ship has been moved across. You will still meet the old shape in material written earlier, which is why it is worth being able to recognise; the [reference page](../../reference/regulative/EVERY.md#the-older-spelling-now-deprecated-a-roll-read-out-of-the-who-condition) gives the two-line rewrite.)
 
@@ -48,7 +48,7 @@ Read `EVERY Flatmate f` as "for every flatmate, call them f": one obligation per
 
 ![Run of the barrier: three signatures; ONCE ALL HAVE fires once, on day 9; one delivery follows, its clock starting that day](../../reference/regulative/figures/every-barrier-run.svg)
 
-The thing to see is the clock on the follow-on: the landlord's five days start on day 9, the last signature, and not on day 1 or day 2. (The compiler's own picture of the rule's _shape_ — one edge for the whole group, with `ONCE ALL HAVE` written on it — is on the reference page, under [Seen as a diagram](../../reference/regulative/EVERY.md#seen-as-a-diagram).) If somebody does not sign, the `LEST` fires once for the group — and here is the third gap this page opened with, still open, and wider than this page used to say: the breach names **nobody**. Not all of the flatmates who failed, and not one of them either. It cannot: the `LEST` under a barrier belongs to the group and not to any one member, so there is no member for it to name, and writing `LEST BREACH BY f` is refused when the rule is checked. What you get is a bare breach. If you need to know who did not sign, ask the rule what is still outstanding instead — that answer does list them by name.
+The thing to see is the clock on the follow-on: the landlord's five days start on day 9, the last signature, and not on day 1 or day 2. (The compiler's own picture of the rule's _shape_ — one edge for the whole group, with `ONCE ALL HAVE` written on it — is on the reference page, under [Seen as a diagram](../../reference/regulative/EVERY.md#seen-as-a-diagram).) If somebody does not sign, the `LEST` fires once for the group. And here the third gap this page opened with is half closed (15 September 2026). Leave the `LEST` off, and the breach names **every** flatmate who did not sign, in the order the list gave them. Write a `LEST`, as above, and what fires is the `LEST` you wrote: it belongs to the group and not to any one member, so there is no member for it to name — `LEST BREACH BY f` is refused when the rule is run — and a bare `LEST BREACH` is a bare breach. You may name people in it yourself, one or several (`LEST BREACH BY LIST alice, bob`), but those are names you chose. If you need to know who did not sign and the `LEST` has to stay, ask the rule what is still outstanding instead — that answer does list them by name.
 
 ---
 
@@ -61,11 +61,11 @@ A different sentence, and a different shape. Each flatmate who pays a share is t
 ```l4
 -- BUILT (2026-09-08). This runs.
 EVERY Flatmate f IN flatmates
-    MUST   Pay (EXACTLY f) (EXACTLY theLandlord) amount
+    MUST   Pay f theLandlord amount
     WITHIN 7
     UPON   EACH                     -- the fork: once per flatmate who pays
     HENCE  (PARTY theLandlord
-                MUST   Receipt (EXACTLY theLandlord) (EXACTLY f) (EXACTLY amount)
+                MUST   Receipt theLandlord f amount
                 WITHIN 5)
     LEST   BREACH BY f
 ```
@@ -124,9 +124,9 @@ And all three sit beside `RAND` and `ROR` rather than replacing them. `RAND` and
 
 ## What Would Make The Rest Of This Page True
 
-Pieces 1 and 2 landed on 8 September 2026, and what remains is piece 3, "enough of them". The specification lists what it needs, and this page repeats it so that a reader can check the state of things without opening the design document: a way for L4 to read a `ONCE` line that carries a count or a total rather than the word `ALL`; a way to run it, which is a running total kept where the group is counted; a breach that carries a set of people rather than one; and test files for the rent by total and by share and for the quorum.
+Pieces 1 and 2 landed on 8 September 2026, and what remains is piece 3, "enough of them". The specification lists what it needs, and this page repeats it so that a reader can check the state of things without opening the design document: a way for L4 to read a `ONCE` line that carries a count or a total rather than the word `ALL`; a way to run it, which is a running total kept where the group is counted; a breach that carries a set of people rather than one — **built on 15 September 2026**: a breach now carries a list of failures, one per person and per way they failed, and `BREACH BY LIST …` writes one by hand; and test files for the rent by total and by share and for the quorum.
 
-One of those — **a breach that names everyone who failed** — is still missing for pieces 1 and 2 as well, and by a wider margin than an earlier version of this page said. A group obligation that fails today names **no** member at all: not everyone who did not act, and not one of them as a stand-in. So the third of the three gaps this page opened with is the one still open, it is open for all three pieces, and what is missing is the whole of it rather than the last part of it.
+What is still missing of the third gap is narrower than an earlier version of this page said. A group obligation with no `LEST` now names everyone who did not act. What no `LEST` can yet do is name them itself: `LEST BREACH BY EVERY Flatmate`, in the block above, is the spelling the design proposes for that, and it is not ruled. Until it is, a barrier's `LEST` names whom you wrote, or nobody.
 
 When piece 3 lands, this page is deleted and the material moves into [Several Parties](several-parties.md), where the gaps it fills were shown.
 

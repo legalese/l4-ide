@@ -183,6 +183,21 @@ testEvents MEANS LIST EVENT Seller (`deliver goods` "standard package") 5, EVENT
     PARTY Seller DOES `deliver goods` "merchandise" AT 10
     PARTY Buyer DOES `pay invoice` 500 AT 30
 
+-- Test 4b: Sale contract - a mismatched payment does not discharge the duty.
+-- `price` above is a GIVEN parameter, not a fresh name: it names the 500 this
+-- contract fixed, so a payment of 300 does not fit the pattern and is passed
+-- over. The buyer's obligation is still outstanding when the trace ends...
+#TRACE `sale contract` 500 AT 0 WITH
+    PARTY Seller DOES `deliver goods` "merchandise" AT 10
+    PARTY Buyer DOES `pay invoice` 300 AT 30
+
+-- ...and running the clock past the deadline without a matching payment
+-- turns that into a breach, blamed on the buyer.
+#TRACE `sale contract` 500 AT 0 WITH
+    PARTY Seller DOES `deliver goods` "merchandise" AT 10
+    PARTY Buyer DOES `pay invoice` 300 AT 30
+    (`WAIT UNTIL` 41)
+
 -- Test 5: Mutual obligations with RAND
 #TRACE `mutual obligations` AT 0 WITH
     PARTY Seller DOES `deliver goods` "item A" AT 10
@@ -227,16 +242,19 @@ GIVETH A DEONTIC Actor Action
     PARTY Buyer DOES `pay invoice` 50 AT 20
 
 -- ============================================================
--- § Advanced: EXACTLY for Precise Matching
+-- § A GIVEN name in an action requires that value, by default
 -- ============================================================
 
--- EXACTLY requires an exact value match in patterns
+-- requiredAmount is a GIVEN parameter, so it names a value, not a blank:
+-- the action requires a payment of exactly that value. (Before this rule
+-- shipped, this needed writing as `MUST EXACTLY `pay invoice` requiredAmount`;
+-- the keyword still parses and still works, but is no longer needed here.)
 
 GIVEN requiredAmount IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `exact payment required` MEANS
     PARTY Buyer
-    MUST EXACTLY `pay invoice` requiredAmount
+    MUST `pay invoice` requiredAmount
     WITHIN 30
     HENCE FULFILLED
     LEST BREACH

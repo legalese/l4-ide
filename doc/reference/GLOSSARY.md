@@ -81,26 +81,26 @@ Keywords are reserved words that form the structure of L4 programs.
 
 For expressing legal obligations, permissions, and prohibitions.
 
-| Keyword       | Purpose                            | Reference                          |
-| ------------- | ---------------------------------- | ---------------------------------- |
-| **PARTY**     | Declares a legal party             | [PARTY](regulative/PARTY.md)       |
-| **MUST**      | Obligation (deontic necessity)     | [MUST](regulative/MUST.md)         |
-| **MAY**       | Permission (deontic possibility)   | [MAY](regulative/MAY.md)           |
-| **SHANT**     | Prohibition                        | [SHANT](regulative/SHANT.md)       |
-| **MUST NOT**  | Prohibition (synonym for SHANT)    | [SHANT](regulative/SHANT.md)       |
-| **DO**        | Optionality (deontic possibility)  | [REGULATIVE](regulative/README.md) |
-| **DOES**      | Action verb in directive           | [REGULATIVE](regulative/README.md) |
-| **EXACTLY**   | Exact value matching on action     | [REGULATIVE](regulative/README.md) |
-| **WITHIN**    | Temporal deadline (relative)       | [REGULATIVE](regulative/README.md) |
-| **HENCE**     | Consequence on fulfillment         | [REGULATIVE](regulative/README.md) |
-| **LEST**      | Consequence on breach              | [REGULATIVE](regulative/README.md) |
-| **BREACH**    | Terminal violation state           | [REGULATIVE](regulative/README.md) |
-| **FULFILLED** | Terminal success state             | [REGULATIVE](regulative/README.md) |
-| **BECAUSE**   | Justification or reason for breach | [BECAUSE](regulative/BECAUSE.md)   |
-| **PROVIDED**  | Guard condition on action          | [REGULATIVE](regulative/README.md) |
-| **AT**        | Temporal specification             | [REGULATIVE](regulative/README.md) |
-| **RAND**      | Parallel AND of obligations        | [REGULATIVE](regulative/README.md) |
-| **ROR**       | Parallel OR of obligations         | [REGULATIVE](regulative/README.md) |
+| Keyword       | Purpose                                                              | Reference                          |
+| ------------- | -------------------------------------------------------------------- | ---------------------------------- |
+| **PARTY**     | Declares a legal party                                               | [PARTY](regulative/PARTY.md)       |
+| **MUST**      | Obligation (deontic necessity)                                       | [MUST](regulative/MUST.md)         |
+| **MAY**       | Permission (deontic possibility)                                     | [MAY](regulative/MAY.md)           |
+| **SHANT**     | Prohibition                                                          | [SHANT](regulative/SHANT.md)       |
+| **MUST NOT**  | Prohibition (synonym for SHANT)                                      | [SHANT](regulative/SHANT.md)       |
+| **DO**        | Optionality (deontic possibility)                                    | [REGULATIVE](regulative/README.md) |
+| **DOES**      | Action verb in directive                                             | [REGULATIVE](regulative/README.md) |
+| **EXACTLY**   | Deprecated: a name in an action already refers to the thing it names | [REGULATIVE](regulative/README.md) |
+| **WITHIN**    | Temporal deadline (relative)                                         | [REGULATIVE](regulative/README.md) |
+| **HENCE**     | Consequence on fulfillment                                           | [REGULATIVE](regulative/README.md) |
+| **LEST**      | Consequence on breach                                                | [REGULATIVE](regulative/README.md) |
+| **BREACH**    | Terminal violation state                                             | [REGULATIVE](regulative/README.md) |
+| **FULFILLED** | Terminal success state                                               | [REGULATIVE](regulative/README.md) |
+| **BECAUSE**   | Justification or reason for breach                                   | [BECAUSE](regulative/BECAUSE.md)   |
+| **PROVIDED**  | Guard condition on action                                            | [REGULATIVE](regulative/README.md) |
+| **AT**        | Temporal specification                                               | [REGULATIVE](regulative/README.md) |
+| **RAND**      | Parallel AND of obligations                                          | [REGULATIVE](regulative/README.md) |
+| **ROR**       | Parallel OR of obligations                                           | [REGULATIVE](regulative/README.md) |
 
 ### Arithmetic Keywords
 
@@ -388,7 +388,7 @@ Key concepts in L4 legal modeling, alphabetically ordered.
 | **actor-correctness**            | The well-formedness property enforced at compile time: in `PARTY p MUST a` and `PARTY p DOES a`, the party `p` must equal the _performer_ of action `a`. Violations produce a diagnostic naming the performer: `` `eat` is performed by `Eater`, not by `Drinker`. `` The check is value-level (complements type-level checks) and is silent when the actor or action cannot be resolved statically.                                                                                                             |
 | **duplex action**                | An action type that carries **both directions** of a bilateral event. The performer is identified by position (the subject-first canon), so the same type covers both `aliceToBob` (performer: Alice) and `bobToAlice` (performer: Bob) without requiring two separate action types. See [actors-and-actions.md §3](../concepts/legal-modeling/actors-and-actions.md).                                                                                                                                           |
 | **non-delegable duty**           | An obligation that the bound party must discharge personally, modelled by requiring a bare `Perform` action (no `Procure` wrapper) in that obligation slot. Contrast with a delegable duty, which permits a `Procure`-wrapped action. See _procurement_ and [actors-and-actions.md §6](../concepts/legal-modeling/actors-and-actions.md).                                                                                                                                                                        |
-| **parameterised action**         | An action whose actors are not fixed at definition time but supplied as arguments at the use site. Introduced in a deontic slot with `EXACTLY` (e.g., `PARTY Alice MUST EXACTLY send Alice Bob WITHIN 10`). Without `EXACTLY`, an applied action expression does not parse in the action slot.                                                                                                                                                                                                                   |
+| **parameterised action**         | An action whose actors are not fixed at definition time but supplied as arguments at the use site, e.g. `PARTY Alice MUST send Alice Bob WITHIN 10`. (Before the pattern-reference rule shipped, this needed the deprecated `EXACTLY` keyword: `MUST EXACTLY send Alice Bob`.)                                                                                                                                                                                                                                   |
 | **performer**                    | The actor who must carry out an action — the **first actor-typed field in positional order** in the action record (the subject-first canon). For an obligation `PARTY p MUST a`, the compiler checks that `p` equals `a`'s performer.                                                                                                                                                                                                                                                                            |
 | **procurement / Procure**        | A higher-order action pattern: `Procure HAS procurer IS AN Actor, inner IS AN Action`. It models "X undertakes to procure that Y performs action*Y" — the outer obligation binds the \_procurer*; the inner action retains its own performer. Procurement nests (delegation chains). A stranger cannot procure an instance that already names another procurer; the principal cannot directly perform the inner action either. See [actors-and-actions.md §6](../concepts/legal-modeling/actors-and-actions.md). |
 | **subject-first canon**          | The positional convention by which the performer of an action is the **first actor-typed field in the record**, mirroring English Subject–Verb–Object order. This makes multi-actor actions duplex and unambiguous without extra type-system machinery. See [ACTOR-ACTIONS-THEORY.md §2](../concepts/legal-modeling/ACTOR-ACTIONS-THEORY.md).                                                                                                                                                                    |

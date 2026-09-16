@@ -1,0 +1,87 @@
+-- R2 of specs/todo/PATTERN-REFERENCE-RULE-SPEC.md: an expression may be
+-- written in an action's pattern position without a keyword. It is evaluated
+-- and compared for equality, which is what EXACTLY always did.
+--
+-- Before R2, `MUST pay (price PLUS 50)` was a PARSER error, `unexpected PLUS`
+-- at the operator. Literals already worked without the keyword; arithmetic did
+-- not. The parser now tries the pattern reading first and falls back to the
+-- expression reading only where the pattern reading cannot apply, so
+-- `pay (Money 1000 "USD")` below is still a constructor PATTERN, unchanged.
+--
+-- This file is the acceptance list from R2, one rule per case, each with a
+-- mismatching and a matching event.
+
+DECLARE Thing IS ONE OF
+    Widget
+    Gadget
+
+DECLARE Actor IS ONE OF
+    Landlord
+    Tenant
+
+DECLARE Money HAS amount IS A NUMBER
+                  currency IS A STRING
+
+DECLARE Person HAS who IS AN Actor
+                   landlord IS AN Actor
+
+DECLARE Action IS ONE OF
+    pay HAS `how much` IS A NUMBER
+    payMoney HAS m IS A Money
+    Deliver HAS sender IS AN Actor
+                recipient IS AN Actor
+                what IS A Thing
+    Receipt HAS issuer IS AN Actor
+                `to` IS AN Actor
+                sum IS A NUMBER
+
+-- (1) arithmetic: MUST pay (price PLUS 50)
+GIVEN price IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`arithmetic operand` MEANS
+    PARTY Tenant MUST pay (price PLUS 50) WITHIN 10 HENCE FULFILLED LEST BREACH
+
+#TRACE `arithmetic operand` 100 AT 0 WITH
+    PARTY Tenant DOES pay 100 AT 1
+#TRACE `arithmetic operand` 100 AT 0 WITH
+    PARTY Tenant DOES pay 150 AT 1
+
+-- (2) a projection: MUST Deliver Tenant (p's landlord) what
+GIVEN p IS A Person
+      what IS A Thing
+GIVETH A DEONTIC Actor Action
+`projection operand` MEANS
+    PARTY Tenant MUST Deliver Tenant (p's landlord) what WITHIN 10 HENCE FULFILLED LEST BREACH
+
+#TRACE `projection operand` (Person Tenant Landlord) Widget AT 0 WITH
+    PARTY Tenant DOES Deliver Tenant Tenant Widget AT 1
+#TRACE `projection operand` (Person Tenant Landlord) Widget AT 0 WITH
+    PARTY Tenant DOES Deliver Tenant Landlord Widget AT 1
+
+-- (3) a constructor application stays a PATTERN: MUST pay (Money 1000 "USD")
+GIVETH A DEONTIC Actor Action
+`constructor operand` MEANS
+    PARTY Tenant MUST payMoney (Money 1000 "USD") WITHIN 10 HENCE FULFILLED LEST BREACH
+
+#TRACE `constructor operand` AT 0 WITH
+    PARTY Tenant DOES payMoney (Money 1 "USD") AT 1
+#TRACE `constructor operand` AT 0 WITH
+    PARTY Tenant DOES payMoney (Money 1000 "USD") AT 1
+
+-- (4) an expression alongside plain references:
+--     MUST Receipt landlord t (amount MINUS 5)
+GIVEN amount IS A NUMBER
+      t IS AN Actor
+      landlord IS AN Actor
+GIVETH A DEONTIC Actor Action
+`mixed operands` MEANS
+    PARTY landlord
+    MUST Receipt landlord t (amount MINUS 5)
+    WITHIN 10
+    HENCE FULFILLED
+    LEST BREACH
+
+#TRACE `mixed operands` 1000 Tenant Landlord AT 0 WITH
+    PARTY Landlord DOES Receipt Landlord Tenant 1000 AT 1
+#TRACE `mixed operands` 1000 Tenant Landlord AT 0 WITH
+    PARTY Landlord DOES Receipt Landlord Tenant 995 AT 1

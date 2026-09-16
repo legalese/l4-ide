@@ -8,6 +8,8 @@
     "Measured 2026-08-18 against the binary built in this worktree, on",
     "jl4/examples/legal/sg-succession/sg-succession.l4.",
     "",
+    "(That module has since moved to jl4/examples/canon/sg/succession/sg-succession.l4 — vendored into the canon mirror on 2026-09-16. The path above is left as measured, because this records a command run on 2026-08-18, when the file was at that path.)",
+    "",
     "`regulative_rules` IS DELIBERATELY EMPTY, and that is a fact about the",
     "corpus rather than a gap in the measurement. This encoding is entirely",
     "CONSTITUTIVE: it decides who takes what and when a deadline falls, and it",

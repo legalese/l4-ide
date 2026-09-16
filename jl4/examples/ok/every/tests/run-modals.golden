@@ -14,7 +14,7 @@ run-modals.l4:33:1-35:31:
     surpassed the deadline of party
       Director OF "B"
     who had to do obligatory action
-      MUST Approve (EXACTLY d)
+      MUST Approve d
     before their deadline, which was at
       10
 run-modals.l4:48:1-50:30:
@@ -51,7 +51,7 @@ run-modals.l4:119:1-123:29:
     surpassed the deadline of party
       Director OF "B"
     who had to do obligatory action
-      MUST Sublet (EXACTLY e)
+      MUST Sublet e
     before their deadline, which was at
       7
 run-modals.l4:141:1-142:45:

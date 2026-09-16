@@ -21,6 +21,8 @@
     "the ones regcf pinned on 2026-08-02 and sg-succession on 2026-08-18, which is",
     "the expected result and is recorded rather than assumed.",
     "",
+    "(That module has since moved to jl4/examples/canon/us/chubb-hospital-cash/blind-inert/chubb.l4 — vendored into the canon mirror on 2026-09-16. The path above is left as measured, because this records a command run on 2026-08-31, when the file was at that path.)",
+    "",
     "`regulative_rules` IS DELIBERATELY EMPTY, and that is a fact about the",
     "fixture rather than a gap in the measurement. Both the committed encoding and",
     "the guarded-2026-08 arm are entirely CONSTITUTIVE: they decide whether a",

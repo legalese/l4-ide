@@ -54,6 +54,8 @@ module L4.EvaluateLazy.DeonticStep
   , JoinResult (..)
   , Side (..)
   , BreachSummary (..)
+  , FailureSummary (..)
+  , NamedParty (..)
     -- * The log
   , DeonticLog (..)
   , newDeonticLog
@@ -343,13 +345,49 @@ data Side = LeftSide | RightSide | BothSides
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
 
--- | The blame a compound breach carries, as far as the machine has forced it.
+-- | The blame a breach carries, as far as the machine has forced it.
+--
+-- Since R-T3 (EVERY-EACH-QUANTIFIER-SPEC §6.1, built 2026-09-15) a breach
+-- names EVERY obligation that failed — one entry each, no dedup — with one
+-- of them the ANCHOR, the failure the breach's time comes from. The three
+-- scalars here describe the anchor, exactly as the wire's scalars do
+-- (@obligatedParty@ \/ @deadline@ in "L4.Evaluate.ValueLazyJSON"): they are
+-- the headline, and for a single obligation's breach they are the whole
+-- story. 'bsFailures' is the full list, the anchor among it at 'bsAnchor',
+-- so a compound's non-anchor failures are never dropped.
 data BreachSummary = MkBreachSummary
-  { bsBlame     :: !(Maybe Text)     -- ^ the blamed party, keyed as 'nkBearer'
-  , bsBlameName :: !(Maybe Text)     -- ^ the blamed party, rendered as 'nkBearerName' when its fields were forced
-  , bsStamp    :: !(Maybe Rational) -- ^ when the breach materialised; 'Nothing' for an @ExplicitBreach@
-  , bsDeadline :: !(Maybe Rational) -- ^ the deadline missed; equal to 'bsStamp' for a violated prohibition
+  { bsBlame     :: !(Maybe Text)     -- ^ the ANCHOR's party, keyed as 'nkBearer'; 'Nothing' if unforced or nobody named
+  , bsBlameName :: !(Maybe Text)     -- ^ the anchor's party, rendered as 'nkBearerName' when its fields were forced
+  , bsStamp     :: !(Maybe Rational) -- ^ when the breach materialised (the anchor's revealing stamp); 'Nothing' for an @ExplicitBreach@
+  , bsDeadline  :: !(Maybe Rational) -- ^ the anchor's deadline missed; equal to 'bsStamp' for a violated prohibition
+  , bsFailures  :: ![FailureSummary] -- ^ every failure the breach names, in operand \/ roll \/ list order
+  , bsAnchor    :: !Int              -- ^ the anchor's index into 'bsFailures' (0-based)
   }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass NFData
+
+-- | One failed obligation of a breach, as far as forced — the log's view of
+-- 'L4.Evaluate.ValueLazy.Failure'.
+data FailureSummary
+  = MissedSummary !(Maybe Text) !Text !Rational
+    -- ^ the party (if forced), the action it owed (printed), the deadline it missed
+  | DeclaredSummary !NamedParty !(Maybe Text)
+    -- ^ @BREACH [BY p] [BECAUSE r]@: whom @BY@ named, the reason (if any, and forced)
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass NFData
+
+-- | Whom a @BREACH BY@ named, as far as forced. Whether the drafter named
+-- anyone is a fact of the SOURCE, known regardless of forcing; whether the
+-- machine has forced that party's cell is a fact of the RUN. The two are
+-- kept apart because the log peeks and never forces: a @BREACH BY LIST bob,
+-- alice@ leaves @bob@'s cell unforced unless something else shares it, and
+-- collapsing "named but not yet known" into "nobody named" made the step
+-- log deny a party the drafter had written (found 2026-09-16, review of the
+-- PR-A absorb).
+data NamedParty
+  = NobodyNamed          -- ^ a bare @BREACH@: no @BY@
+  | PartyNamed !(Maybe Text)
+    -- ^ @BREACH BY p@: the party, if forced; 'Nothing' means named but not yet known
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
 

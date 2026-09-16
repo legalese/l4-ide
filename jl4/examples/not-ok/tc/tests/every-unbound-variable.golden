@@ -3,6 +3,23 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: every-unbound-variable.l4
   Hidden: no
+  Range: 11:31-11:38
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    EXACTLY is being retired, but here it cannot simply be dropped.
+
+    What follows it does not name anything in scope. Written without the
+    keyword it would not be a reference at all: it would be a brand new
+    name, and a new name in an action matches anything. So removing the
+    keyword would change what this rule requires.
+
+    Say what the name should refer to, or -- if a placeholder really is
+    what you want -- give it a spelling that says so.
+
+File: every-unbound-variable.l4
+  Hidden: no
   Range: 11:39-11:40
   Source: check
   Severity: DiagnosticSeverity_Error

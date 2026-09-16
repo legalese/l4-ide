@@ -118,6 +118,7 @@ constructorNames =
   , "GuardFalse", "WrongAct", "WrongParty", "NoTaker"
   , "ValObligation", "ValBreached", "ValFulfilled", "ValROp", "ValQuantified"
   , "DeadlineMissed", "ExplicitBreach", "MkBlame", "KnownParty", "UnforcedParty"
+  , "NobodyNamed", "PartyNamed", "UnforcedDeadline"
   , "neverMatches", "NEVERMATCHES"
   ]
 

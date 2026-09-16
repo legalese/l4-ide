@@ -440,6 +440,8 @@ DECIDE `is adult under sub 2` IF
 
 **The section `GIVEN`:** A rule is told some facts about the case in front of it (its **"inputs"**, the names listed after `GIVEN`). A `GIVEN` indented under a section heading declares one of those names once for the whole section — a **"section `GIVEN`"** — instead of every rule in the section repeating it in its own `GIVEN`. See [The section `GIVEN`](section-given.md) and [section-given-example.l4](section-given-example.l4).
 
+**Field opening:** inside a rule whose input is a record, the record's fields can be read by their bare names — `bankrupt` for `person's `bankrupt``. See [Field opening](field-opening.md) and [field-opening-example.l4](field-opening-example.l4).
+
 **Section aliases:** Use AKA to create shorter names for qualified references:
 
 ```l4

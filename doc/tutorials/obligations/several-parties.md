@@ -30,19 +30,19 @@ Three obligations, one per flatmate, each with its own share, its own deadline a
 GIVETH A DEONTIC Actor Action
 `each pays a share` MEANS
     (PARTY  Alice
-     MUST   EXACTLY (Pay Alice `Ms Ng` 500)
+     MUST   (Pay Alice `Ms Ng` 500)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY Alice BECAUSE "Alice's share was not paid")
     RAND
     (PARTY  Bob
-     MUST   EXACTLY (Pay Bob `Ms Ng` 500)
+     MUST   (Pay Bob `Ms Ng` 500)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY Bob BECAUSE "Bob's share was not paid")
     RAND
     (PARTY  Carol
-     MUST   EXACTLY (Pay Carol `Ms Ng` 500)
+     MUST   (Pay Carol `Ms Ng` 500)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY Carol BECAUSE "Carol's share was not paid")
@@ -72,7 +72,7 @@ Two have paid and one has not:
 
 ```
 Result:
-  FULFILLED AND FULFILLED AND PARTY Carol MUST EXACTLY Pay OF Carol, `Ms Ng`, 500 WITHIN 4 HENCE FULFILLED LEST (BREACH BY Carol BECAUSE "Carol's share was not paid")
+  FULFILLED AND FULFILLED AND PARTY Carol MUST Pay Carol `Ms Ng` 500 WITHIN 4 HENCE FULFILLED LEST (BREACH BY Carol BECAUSE "Carol's share was not paid")
 ```
 
 The "still owed" line has three slots, joined by `AND` — that is how the screen writes `RAND` — and two of them are done. Read it as a checklist: Alice, done; Bob, done; Carol, $500 within four days.
@@ -89,11 +89,11 @@ Only Alice pays, and day 8 arrives:
 Result:
   DEONTIC BREACHED:
     BREACH
-    BY Bob
-    BECAUSE "Bob's share was not paid"
+    BY Bob BECAUSE "Bob's share was not paid"
+    BY Carol BECAUSE "Carol's share was not paid"
 ```
 
-Bob and Carol both failed, and the screen names Bob. When several sides of a `RAND` fail together, today's screen reports the first of the failing sides as written, not the list; [What Follows](what-follows.md) met the same thing with `ROR`. Keep it in mind when you read a breach from a group: the `BY` is one of the people at fault, not necessarily all of them.
+Bob and Carol both failed, and the screen names both, in the order the rule wrote them, each with the reason written on their own side. When several sides of a `RAND` fail, the breach carries one line per failing side — whom, and why — so nothing about one person's failure is read off another's. The same person can appear twice, if two sides of theirs both failed. [What Follows](what-follows.md) met the same thing with `ROR`.
 
 And the case that shows what kind of arrangement this is. Alice, feeling generous, pays $500 twice, and Carol pays hers:
 
@@ -106,7 +106,7 @@ And the case that shows what kind of arrangement this is. Alice, feeling generou
 
 ```
 Result:
-  FULFILLED AND PARTY Bob MUST EXACTLY Pay OF Bob, `Ms Ng`, 500 WITHIN 2 HENCE FULFILLED LEST (BREACH BY Bob BECAUSE "Bob's share was not paid") AND FULFILLED
+  FULFILLED AND PARTY Bob MUST Pay Bob `Ms Ng` 500 WITHIN 2 HENCE FULFILLED LEST (BREACH BY Bob BECAUSE "Bob's share was not paid") AND FULFILLED
 ```
 
 Alice's second $500 did nothing for Bob. His obligation is his own, and only a payment _from Bob_ discharges it; Ms Ng has $1,500 and Bob is still two days from breach. That is what a divided debt means, and it is exactly what the lease said. If it is not what the lease meant, the arrangement is one of the next three.
@@ -154,25 +154,25 @@ rent MEANS 1500
 GIVETH A DEONTIC Actor Action
 `any one pays the rent` MEANS
     (PARTY  Alice
-     MUST   EXACTLY (Pay Alice `Ms Ng` rent)
+     MUST   (Pay Alice `Ms Ng` rent)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY Alice BECAUSE "the rent was not paid")
     ROR
     (PARTY  Bob
-     MUST   EXACTLY (Pay Bob `Ms Ng` rent)
+     MUST   (Pay Bob `Ms Ng` rent)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY Bob BECAUSE "the rent was not paid")
     ROR
     (PARTY  Carol
-     MUST   EXACTLY (Pay Carol `Ms Ng` rent)
+     MUST   (Pay Carol `Ms Ng` rent)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY Carol BECAUSE "the rent was not paid")
 ```
 
-(`rent` is now a defined figure rather than a number written out, and the payment is written ``EXACTLY (Pay Bob `Ms Ng` rent)`` around the whole act. [What Follows](what-follows.md) said why: with a named figure, that is the spelling that works.)
+(`rent` is now a defined figure rather than a number written out, and the payment is written ``Pay Bob `Ms Ng` rent`` — no different from writing the number directly. A name in an act requires the value it names, the same as a literal does; there is no longer a spelling that only works for one of the two.)
 
 Bob pays the whole rent on day 3:
 
@@ -195,7 +195,7 @@ Everyone is discharged: one payment, by anyone, ends the whole. Bob pays $1,000 
 
 ```
 Result:
-  PARTY Alice MUST EXACTLY Pay OF Alice, `Ms Ng`, rent WITHIN 4 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent was not paid") OR PARTY Bob MUST EXACTLY Pay OF Bob, `Ms Ng`, rent WITHIN 4 HENCE FULFILLED LEST (BREACH BY Bob BECAUSE "the rent was not paid") OR PARTY Carol MUST EXACTLY Pay OF Carol, `Ms Ng`, rent WITHIN 4 HENCE FULFILLED LEST (BREACH BY Carol BECAUSE "the rent was not paid")
+  PARTY Alice MUST Pay Alice `Ms Ng` rent WITHIN 4 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent was not paid") OR PARTY Bob MUST Pay Bob `Ms Ng` rent WITHIN 4 HENCE FULFILLED LEST (BREACH BY Bob BECAUSE "the rent was not paid") OR PARTY Carol MUST Pay Carol `Ms Ng` rent WITHIN 4 HENCE FULFILLED LEST (BREACH BY Carol BECAUSE "the rent was not paid")
 ```
 
 Not the rent, so nothing is discharged, and all three alternatives stand with four days left. (The screen writes `rent` by name in the "still owed" line; it is $1,500.) And if nobody pays by the seventh:
@@ -209,11 +209,12 @@ Not the rent, so nothing is discharged, and all three alternatives stand with fo
 Result:
   DEONTIC BREACHED:
     BREACH
-    BY Carol
-    BECAUSE "the rent was not paid"
+    BY Alice BECAUSE "the rent was not paid"
+    BY Bob BECAUSE "the rent was not paid"
+    BY Carol BECAUSE "the rent was not paid"
 ```
 
-All three of them failed. The screen names Carol — the last of the three as written. This is the honest defect of `ROR` for a shared debt: the law says the three are in breach together, and today's screen reports one. Nothing on the screen is false; it is incomplete, and you should know that it is.
+All three of them failed, and the screen names all three, as written, one line each. That is what the law says of a shared debt: the three are in breach together. (Before 15 September 2026 the screen named only the last of them; if you have older output, that is why.)
 
 ---
 
@@ -225,20 +226,20 @@ The commonest real arrangement adds a second half to Step 3: whoever pays the re
 GIVETH A DEONTIC Actor Action
 `one pays, the other repays` MEANS
     (PARTY  Alice
-     MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+     MUST   (Pay Alice `Ms Ng` 1500)
      WITHIN 7
      HENCE  PARTY  Bob
-            MUST   EXACTLY (Reimburse Bob Alice 750)
+            MUST   (Reimburse Bob Alice 750)
             WITHIN 30
             HENCE  FULFILLED
             LEST   BREACH BY Bob BECAUSE "Bob did not repay his half"
      LEST   BREACH BY Alice BECAUSE "the rent was not paid")
     ROR
     (PARTY  Bob
-     MUST   EXACTLY (Pay Bob `Ms Ng` 1500)
+     MUST   (Pay Bob `Ms Ng` 1500)
      WITHIN 7
      HENCE  PARTY  Alice
-            MUST   EXACTLY (Reimburse Alice Bob 750)
+            MUST   (Reimburse Alice Bob 750)
             WITHIN 30
             HENCE  FULFILLED
             LEST   BREACH BY Alice BECAUSE "Alice did not repay her half"
@@ -267,7 +268,7 @@ Stop after Bob's payment, and look carefully at what is owed:
 
 ```
 Result:
-  PARTY Alice MUST EXACTLY Pay OF Alice, `Ms Ng`, 1500 WITHIN 4 HENCE (PARTY Bob MUST EXACTLY Reimburse OF Bob, Alice, 750 WITHIN 30 HENCE FULFILLED LEST (BREACH BY Bob BECAUSE "Bob did not repay his half")) LEST (BREACH BY Alice BECAUSE "the rent was not paid") OR PARTY Alice MUST EXACTLY Reimburse OF Alice, Bob, 750 WITHIN 30 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "Alice did not repay her half")
+  PARTY Alice MUST Pay Alice `Ms Ng` 1500 WITHIN 4 HENCE (PARTY Bob MUST Reimburse Bob Alice 750 WITHIN 30 HENCE FULFILLED LEST (BREACH BY Bob BECAUSE "Bob did not repay his half")) LEST (BREACH BY Alice BECAUSE "the rent was not paid") OR PARTY Alice MUST Reimburse Alice Bob 750 WITHIN 30 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "Alice did not repay her half")
 ```
 
 The right-hand side of the `OR` is what you expect: Alice must repay Bob $750 within thirty days. But the left-hand side is still there — Alice's own obligation to pay the rent, with four days left, and inside its brackets the repayment Bob would owe her if she did, which is not owed now — even though Ms Ng has been paid. Why? Because a `ROR` is settled only when one of its sides reaches the end of _its_ chain, and Bob's side has not: its chain runs on into the repayment. Until Alice repays, the choice is still open, and the file still regards Alice paying the rent herself as one way of closing it. Let day 7 pass with Bob paid and Alice not yet having repaid him:
@@ -283,7 +284,7 @@ Result:
   DEONTIC BREACHED:
     BREACH
     BY Alice
-    BECAUSE "the rent was not paid" OR PARTY Alice MUST EXACTLY Reimburse OF Alice, Bob, 750 WITHIN 25 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "Alice did not repay her half")
+    BECAUSE "the rent was not paid" OR PARTY Alice MUST Reimburse Alice Bob 750 WITHIN 25 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "Alice did not repay her half")
 ```
 
 Read that carefully, because it looks like a fourth kind of screen. The left-hand side has lapsed and prints as a breach, under the `DEONTIC BREACHED:` heading; the right-hand side, after the `OR`, is still live. The whole is not broken — a choice is broken only when every side is lost — and Alice's repayment on day 20 still ends it `FULFILLED`. A breach heading over an `OR` means one side is gone, not that the matter is closed.
@@ -298,7 +299,7 @@ Push that to its odd conclusion. Alice, not knowing Bob has paid, pays the rent 
 
 ```
 Result:
-  PARTY Bob MUST EXACTLY Reimburse OF Bob, Alice, 750 WITHIN 30 HENCE FULFILLED LEST (BREACH BY Bob BECAUSE "Bob did not repay his half") OR PARTY Alice MUST EXACTLY Reimburse OF Alice, Bob, 750 WITHIN 28 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "Alice did not repay her half")
+  PARTY Bob MUST Reimburse Bob Alice 750 WITHIN 30 HENCE FULFILLED LEST (BREACH BY Bob BECAUSE "Bob did not repay his half") OR PARTY Alice MUST Reimburse Alice Bob 750 WITHIN 28 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "Alice did not repay her half")
 ```
 
 Now the file says that _either_ Bob repays Alice _or_ Alice repays Bob will do — and whichever happens first closes the choice, leaving the other repayment unowed. Ms Ng has been paid twice, and the encoding has an opinion about the $750 that no lease would share.
@@ -384,7 +385,7 @@ Result:
 
 L4 says the rent was paid in time. It was not: two-thirds of it arrived after the seventh. The reason is in the rule. Each `HENCE` gives a _fresh_ obligation, and a fresh obligation gets a fresh `WITHIN 7`, counted from the payment that produced it. The lease has one deadline on the total; the rule has a new deadline after every instalment. You might think to fix it by handing the days left down along with the balance — but the rule has no way to see _when_ a payment happened, only how much it was, so it cannot count the days down.
 
-**When nobody pays, one flatmate is blamed.** Day 8 arrives with nothing paid:
+**When nobody pays, everyone is blamed.** Day 8 arrives with nothing paid:
 
 ```l4
 #TRACE `rent still owed` 1500 AT 0 WITH
@@ -395,13 +396,14 @@ L4 says the rent was paid in time. It was not: two-thirds of it arrived after th
 Result:
   DEONTIC BREACHED:
     BREACH
-    BY Carol
-    BECAUSE "the rent was not paid in full"
+    BY Alice BECAUSE "the rent was not paid in full"
+    BY Bob BECAUSE "the rent was not paid in full"
+    BY Carol BECAUSE "the rent was not paid in full"
 ```
 
-This is Step 3's defect again, and it bites harder here: the debt is everyone's, and the screen names the flatmate written last.
+The debt is everyone's, and the screen says so. What it still cannot say is the one deadline on the total.
 
-Both defects have the same root. What the lease describes is a single obligation on a _state_ — the amount received — with one deadline and one group in breach; what L4 lets you write today is a race between obligations on _acts_, each with its own deadline and its own breach. The proposal on the next page is a way to write the first thing directly: one line saying when enough has been paid, one deadline on that line, and a breach that names everyone.
+The root of it: what the lease describes is a single obligation on a _state_ — the amount received — with one deadline; what L4 lets you write today is a race between obligations on _acts_, each with its own deadline. The proposal on the next page is a way to write the first thing directly: one line saying when enough has been paid, and one deadline on that line.
 
 ---
 
@@ -426,9 +428,9 @@ Read the last column as the agenda for [What Is Coming](what-is-coming.md).
 
 - **`RAND` is all of these**: every side must reach its end; the "still owed" line is a checklist joined by `AND`; one person's act discharges only that person's side.
 - **`ROR` is any of these**: the first side to reach its end settles the whole; the "still owed" line is joined by `OR`; the whole is broken only when every side is lost.
-- **A breach from a group names one person**, not all who failed together: the first written for `RAND`, the last for `ROR`. Read the `BY` as one of the people at fault.
+- **A breach from a group names everyone who failed together**, in the order written, one line each with that side's own `BECAUSE`.
 - **A follow-on belongs to one obligation, not to a group or a choice**, so "when all have done this, then that, once" cannot be written in one place today, and a repayment nested inside one side of a choice joins the race.
-- **A rule that uses itself** turns a debt into instalments — with a clock that restarts on every instalment and a breach that names one payer.
+- **A rule that uses itself** turns a debt into instalments — with a clock that restarts on every instalment.
 - **Six arrangements of one debt** are told apart by whether one payment discharges the others, and by where the follow-on attaches. Two run with nothing missing; the other four each run with a stated gap.
 
 ---

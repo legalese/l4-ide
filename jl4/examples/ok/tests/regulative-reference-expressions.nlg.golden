@@ -1,0 +1,8 @@
+executing contract `arithmetic operand` with 100 at 0 with the following events:  party `Tenant` did `pay` with 100 at 1
+executing contract `arithmetic operand` with 100 at 0 with the following events:  party `Tenant` did `pay` with 150 at 1
+executing contract `projection operand` with `Person` with `Tenant` and `Landlord` and `Widget` at 0 with the following events:  party `Tenant` did `Deliver` with `Tenant`, `Tenant` and `Widget` at 1
+executing contract `projection operand` with `Person` with `Tenant` and `Landlord` and `Widget` at 0 with the following events:  party `Tenant` did `Deliver` with `Tenant`, `Landlord` and `Widget` at 1
+executing contract `constructor operand` at 0 with the following events:  party `Tenant` did `payMoney` with `Money` with 1 and USD at 1
+executing contract `constructor operand` at 0 with the following events:  party `Tenant` did `payMoney` with `Money` with 1000 and USD at 1
+executing contract `mixed operands` with 1000, `Tenant` and `Landlord` at 0 with the following events:  party `Landlord` did `Receipt` with `Landlord`, `Tenant` and 1000 at 1
+executing contract `mixed operands` with 1000, `Tenant` and `Landlord` at 0 with the following events:  party `Landlord` did `Receipt` with `Landlord`, `Tenant` and 995 at 1

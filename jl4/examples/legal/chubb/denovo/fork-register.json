@@ -9,7 +9,7 @@
    "kind": "encoding-placement",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`benefit is payable`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy, the document as a whole",
@@ -83,7 +83,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`length of the policy term in months`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 1.2",
@@ -149,7 +149,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`the policy was in effect at the time of the hospitalization`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 1.1",
@@ -220,7 +220,7 @@
    "materialisation": "delegated-to-fact",
    "delegated_field": "`Claim`'s `month of the hospitalization`",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`Claim`'s `month of the hospitalization`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 1.1",
@@ -292,7 +292,7 @@
    "materialisation": "delegated-to-fact",
    "delegated_field": "`Claim`'s `the hospitalization was for` (`Hospitalization Ground`)",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`Claim`'s `the hospitalization was for` (`Hospitalization Ground`)",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 1.1",
@@ -370,7 +370,7 @@
    "kind": "fact-convention",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`Claim`'s `the applicable premium for the policy period has been paid`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 1.1(2)",
@@ -439,7 +439,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`the clause 1.3 condition is still pending`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 1.1(3)",
@@ -503,7 +503,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`the clause 1.3 condition is still pending`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 1.1(3)",
@@ -582,7 +582,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`a conforming wellness visit had occurred` / `conforming written confirmation had been supplied`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 1.3",
@@ -658,7 +658,7 @@
    "kind": "encoding-placement",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`a conforming wellness visit had occurred`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 1.1(3)",
@@ -733,7 +733,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`the policy has been canceled`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 1.2",
@@ -811,7 +811,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`the policy has been canceled`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 1.2"
@@ -874,7 +874,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`Claim`'s `there is fraud`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 1.2"
@@ -936,7 +936,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`the policy term had expired at the time of the hospitalization`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 1.2",
@@ -1012,7 +1012,7 @@
    "kind": "encoding-placement",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`the policy term had begun at the time of the hospitalization`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 3.6",
@@ -1089,7 +1089,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`an exclusion in clause 2.1 applies`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 2.1"
@@ -1153,7 +1153,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`an exclusion in clause 2.1 applies`, row 5",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 2.1",
@@ -1219,7 +1219,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`Cause` / `Claim`'s `the event arose directly or indirectly out of`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 2.1",
@@ -1287,7 +1287,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`Cause`'s `service in the military` / `service as a fire fighter` / `service in the police`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 2.1(2)",
@@ -1354,7 +1354,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`an exclusion in clause 2.1 applies`, row 5",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 2.1(5)"
@@ -1416,7 +1416,7 @@
    "materialisation": "delegated-to-fact",
    "delegated_field": "`Claim`'s `a dispute or disagreement has arisen`",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`Claim`'s `a dispute or disagreement has arisen`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 3.2.1"
@@ -1483,7 +1483,7 @@
    "materialisation": "delegated-to-fact",
    "delegated_field": "`Claim`'s `month the parties were unable to settle the dispute`",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`Claim`'s `month the parties were unable to settle the dispute`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 3.2.1"
@@ -1545,7 +1545,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`the right to make a claim has been extinguished under clause 3.2.1`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 3.2.1"
@@ -1610,7 +1610,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`you may seek to recover on the policy now`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 3.2.1"
@@ -1676,7 +1676,7 @@
    "kind": "fact-convention",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`proof of claim waiting period in months`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 3.2.1"
@@ -1743,7 +1743,7 @@
    "kind": "encoding-placement",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`you may seek to recover on the policy now`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 3.2.1"
@@ -1808,7 +1808,7 @@
    "kind": "statutory-wording",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "`the right to make a claim has been extinguished under clause 3.2.1`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 3.2.1",
@@ -1871,7 +1871,7 @@
    "kind": "encoding-placement",
    "materialisation": "resolved-at-encode",
    "site": {
-    "file": "jl4/examples/legal/chubb/denovo/chubb-denovo.l4",
+    "file": "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4",
     "anchor": "section `7A. The parts of Section 3 that are NOT operative on payability`",
     "provisions": [
      "Codex Insurance Limited hospitalization policy clause 3.1.1"

@@ -217,6 +217,14 @@ instance ToSemTokens Context PosToken (Threshold Name) where
 -- keyword it acts as.
 instance ToSemTokens Context PosToken UponEach where
   toSemTokens ue = withTokenType identIsKeyword $ genericToSemTokens ue
+instance ToSemTokens Context PosToken (Deadline Name) where
+-- The anchor's words live in its own Anno (R-Q7B: JOIN, DEADLINE and ARMING
+-- are identifier tokens shown as the keywords they act as); the expression
+-- form has no such words, and its identifiers are highlighted as themselves.
+instance ToSemTokens Context PosToken (Anchor Name) where
+  toSemTokens a = case a of
+    AnchorAt{} -> genericToSemTokens a
+    _          -> withTokenType identIsKeyword $ genericToSemTokens a
 -- DeonticModal has no tokens to highlight
 instance ToSemTokens Context PosToken DeonticModal where
   toSemTokens _ = pure []
@@ -340,6 +348,12 @@ instance ToSemTokens () PosToken (Threshold Resolved) where
 -- See the Name-phase instance above: EACH is an identifier shown as a keyword.
 instance ToSemTokens () PosToken UponEach where
   toSemTokens ue = withTokenType identIsKeyword $ genericToSemTokens ue
+instance ToSemTokens () PosToken (Deadline Resolved) where
+-- See the Name-phase instance above.
+instance ToSemTokens () PosToken (Anchor Resolved) where
+  toSemTokens a = case a of
+    AnchorAt{} -> genericToSemTokens a
+    _          -> withTokenType identIsKeyword $ genericToSemTokens a
 -- DeonticModal has no tokens to highlight
 instance ToSemTokens () PosToken DeonticModal where
   toSemTokens _ = pure []

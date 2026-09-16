@@ -34,10 +34,10 @@ DECLARE Action IS ONE OF
 GIVETH A DEONTIC Actor Action
 `rent, then receipt` MEANS
     PARTY  Alice
-    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    MUST   (Pay Alice `Ms Ng` 1500)
     WITHIN 7
     HENCE  PARTY  `Ms Ng`
-           MUST   EXACTLY (Receipt `Ms Ng` Alice 1500)
+           MUST   (Receipt `Ms Ng` Alice 1500)
            WITHIN 5
            HENCE  FULFILLED
            LEST   BREACH BY `Ms Ng` BECAUSE "no receipt was issued"
@@ -69,11 +69,11 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `rent, with a late fee` MEANS
     PARTY  Alice
-    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    MUST   (Pay Alice `Ms Ng` 1500)
     WITHIN 7
     HENCE  FULFILLED
     LEST   PARTY  Alice
-           MUST   EXACTLY (Pay Alice `Ms Ng` 1550)
+           MUST   (Pay Alice `Ms Ng` 1550)
            WITHIN 14
            HENCE  FULFILLED
            LEST   BREACH BY Alice BECAUSE "the rent and the late fee were not paid"
@@ -107,7 +107,7 @@ GIVEN who    IS AN Actor
 GIVETH A DEONTIC Actor Action
 `a receipt to` who amount MEANS
     PARTY  `Ms Ng`
-    MUST   EXACTLY (Receipt `Ms Ng` who amount)
+    MUST   (Receipt `Ms Ng` who amount)
     WITHIN 5
     HENCE  FULFILLED
     LEST   BREACH BY `Ms Ng` BECAUSE "no receipt was issued"
@@ -147,11 +147,11 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `rent, guaranteed by Mr Lim` MEANS
     PARTY  Alice
-    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    MUST   (Pay Alice `Ms Ng` 1500)
     WITHIN 7
     HENCE  FULFILLED
     LEST   PARTY  `Mr Lim`
-           MUST   EXACTLY (Pay `Mr Lim` `Ms Ng` 1500)
+           MUST   (Pay `Mr Lim` `Ms Ng` 1500)
            WITHIN 14
            HENCE  FULFILLED
            LEST   BREACH BY `Mr Lim` BECAUSE "the guarantor did not pay the rent"
@@ -186,13 +186,13 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `rent, Alice or Mr Lim` MEANS
     (PARTY  Alice
-     MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+     MUST   (Pay Alice `Ms Ng` 1500)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY Alice BECAUSE "the rent was not paid by the seventh day")
     ROR
     (PARTY  `Mr Lim`
-     MUST   EXACTLY (Pay `Mr Lim` `Ms Ng` 1500)
+     MUST   (Pay `Mr Lim` `Ms Ng` 1500)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY `Mr Lim` BECAUSE "the guarantor did not pay the rent")

@@ -76,6 +76,7 @@ module L4.Lts.Marking
   , Bearer (..)
   , Countdown (..)
   , Blame (..)
+  , BlameEntry (..)
   , Family (..)
   , Progress (..)
   , thresholdMet
@@ -97,11 +98,11 @@ import qualified Base.Text as Text
 import Base.Text (textShow)
 
 import L4.Annotation (HasSrcRange (..))
-import L4.Evaluate.ValueLazy
+import L4.Evaluate.ValueLazy hiding (Blame)
 import L4.EvaluateLazy.DeonticStep
 import L4.EvaluateLazy.Machine (joinCheckpointName, pattern ValFulfilled)
 import L4.Parser.SrcSpan (SrcRange)
-import L4.Print (LayoutPrinter, prettyLayout)
+import L4.Print (LayoutPrinter, docText, prettyLayout, printActionPattern)
 import L4.Syntax
 import L4.Utils.Ratio (prettyRatio)
 
@@ -188,16 +189,27 @@ data Bearer
 -- dense time). The machine decrements it per event scrutinised.
 data Countdown
   = NoDeadline
-  | UnforcedDeadline !Text   -- ^ the @WITHIN@ expression, never evaluated
+  | UnforcedDeadline !Text !(Maybe Text)
+    -- ^ the @WITHIN@ duration, never evaluated, and its @OF@ anchor when
+    -- written — kept apart so a list can say "from now" only of a
+    -- countdown that counts from now
   | Remaining !Rational      -- ^ what is left, relative to the last event seen
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
 
 -- | What a breach value blames, as the residual carries it
 -- ('ReasonForBreach'). Everything is pretty-printed: the marking is a list.
+--
+-- Since R-T3 (EVERY-EACH-QUANTIFIER-SPEC §6.1, built 2026-09-15) a breach
+-- names EVERY obligation that failed, one entry each, with one of them the
+-- ANCHOR — the failure the breach's time comes from. The scalar fields
+-- describe the anchor, which is the headline (and, for a single
+-- obligation's breach, the whole story); 'blNamed' is the full list in the
+-- drafter's order with the anchor among it, so nothing a compound breach
+-- says is dropped.
 data Blame = MkBlame
   { blParty    :: !(Maybe Text)
-    -- ^ who breached; 'Nothing' for a bare @BREACH@
+    -- ^ who breached — the anchor's party; 'Nothing' for a bare @BREACH@
   , blAction   :: !(Maybe Text)
     -- ^ what they did (a @DeadlineMissed@ names the revealing act)
   , blStamp    :: !(Maybe Rational)
@@ -209,6 +221,20 @@ data Blame = MkBlame
   , blDeadline :: !(Maybe Rational)
   , blReason   :: !(Maybe Text)
     -- ^ the @BECAUSE@, when written
+  , blNamed    :: ![BlameEntry]
+    -- ^ every failure the breach names, in order (R-T3); the anchor is
+    -- 'blNamed !! blAnchor'
+  , blAnchor   :: !Int
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass NFData
+
+-- | One failed obligation a breach names ('Failure'), pretty-printed.
+data BlameEntry = MkBlameEntry
+  { beParty    :: !(Maybe Text)   -- ^ the party, if the entry names one
+  , beObliged  :: !(Maybe Text)   -- ^ the obligation missed, as @MUST …@; 'Nothing' for a declared breach
+  , beDeadline :: !(Maybe Rational)
+  , beReason   :: !(Maybe Text)   -- ^ the @BECAUSE@, for a declared breach
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
@@ -356,7 +382,9 @@ renderLive ctx raw = MkLiveNorm
   { lnSite   = rangeOf raw.roAction
   , lnBearer = either (UnforcedParty . prettyLayout) (KnownParty . prettyLayout) raw.roParty
   , lnModal  = raw.roAction.modal
-  , lnAction = prettyLayout raw.roAction.action
+    -- the deontic call-site printer, not the generic 'Pattern' one: a
+    -- pinned name prints bare unless the source wrote EXACTLY (#407 §6)
+  , lnAction = docText (printActionPattern raw.roAction.action)
   , lnDue    = countdown raw.roDue
   , lnHence  = prettyLayout raw.roHence
   , lnLest   = prettyLayout <$> raw.roLest
@@ -365,9 +393,9 @@ renderLive ctx raw = MkLiveNorm
   where
     countdown = \ case
       Left Nothing         -> NoDeadline
-      Left (Just e)        -> UnforcedDeadline (prettyLayout e)
+      Left (Just e)        -> UnforcedDeadline (prettyLayout e.duration) (prettyLayout <$> e.anchor)
       Right (ValNumber t)  -> Remaining t
-      Right other          -> UnforcedDeadline (prettyLayout other)
+      Right other          -> UnforcedDeadline (prettyLayout other) Nothing
 
 -- | A 'ValObligation' as the residual holds it, unrendered, for a consumer
 -- that needs the value and not its text — "L4.Lts.WhatIf" builds its
@@ -377,7 +405,7 @@ data RawObligation a = MkRawObligation
   { roEnv    :: !Environment
   , roParty  :: !(Either RExpr (Value a))
   , roAction :: !(RAction Resolved)
-  , roDue    :: !(Either (Maybe RExpr) (Value a))
+  , roDue    :: !(Either (Maybe (Deadline Resolved)) (Value a))
   , roHence  :: !RExpr
   , roLest   :: !(Maybe RExpr)
   }
@@ -403,25 +431,52 @@ isCheckpoint = \ case
   _           -> False
 
 blameOf :: LayoutPrinter a => ReasonForBreach a -> Blame
-blameOf = \ case
-  DeadlineMissed evParty evAction stamp party act deadline -> MkBlame
-    { blParty    = Just (prettyLayout party)
-    , blAction   = Just (prettyLayout evAction)
+blameOf reason = case reason of
+  DeadlineMissed evParty evAction stamp blame -> (anchored blame.anchor)
+    { blAction   = Just (prettyLayout evAction)
     , blStamp    = Just stamp
-    , blObliged  = Just (prettyLayout act)
-    , blSite     = rangeOf act
-    , blDeadline = Just deadline
-    , blReason   = Just ("revealed by " <> prettyLayout evParty <> " doing " <> prettyLayout evAction)
+    , blReason   = case blame.anchor of
+        MissedDeadline {} -> Just ("revealed by " <> prettyLayout evParty <> " doing " <> prettyLayout evAction)
+        DeclaredBreach _ mReason -> prettyLayout <$> mReason
+    , blNamed    = named
+    , blAnchor   = anchorIndex blame
     }
-  ExplicitBreach mParty mReason -> MkBlame
-    { blParty    = prettyLayout <$> mParty
-    , blAction   = Nothing
-    , blStamp    = Nothing
-    , blObliged  = Nothing
-    , blSite     = Nothing
-    , blDeadline = Nothing
-    , blReason   = prettyLayout <$> mReason
-    }
+  ExplicitBreach blame -> (anchored blame.anchor)
+    { blNamed  = named
+    , blAnchor = anchorIndex blame }
+  where
+    named = map entry (toList (blameList (breachBlame reason)))
+    -- the scalars describe the anchor, whichever kind it is
+    anchored = \ case
+      MissedDeadline party act deadline -> MkBlame
+        { blParty    = Just (prettyLayout party)
+        , blAction   = Nothing
+        , blStamp    = Nothing
+        , blObliged  = Just (prettyLayout act)
+        , blSite     = rangeOf act
+        , blDeadline = Just deadline
+        , blReason   = Nothing
+        , blNamed    = []
+        , blAnchor   = 0
+        }
+      DeclaredBreach mParty mReason -> MkBlame
+        { blParty    = prettyLayout <$> mParty
+        , blAction   = Nothing
+        , blStamp    = Nothing
+        , blObliged  = Nothing
+        , blSite     = Nothing
+        , blDeadline = Nothing
+        , blReason   = prettyLayout <$> mReason
+        , blNamed    = []
+        , blAnchor   = 0
+        }
+    entry = \ case
+      MissedDeadline party act deadline -> MkBlameEntry
+        { beParty = Just (prettyLayout party), beObliged = Just (prettyLayout act)
+        , beDeadline = Just deadline, beReason = Nothing }
+      DeclaredBreach mParty mReason -> MkBlameEntry
+        { beParty = prettyLayout <$> mParty, beObliged = Nothing
+        , beDeadline = Nothing, beReason = prettyLayout <$> mReason }
 
 -- | One line per place: the list §1.1a proposes as the picture's rival.
 placementText :: NormPlacement -> Text
@@ -449,7 +504,7 @@ placementText = \ case
       DDo      -> "DO"
     dueText = \ case
       NoDeadline         -> []
-      UnforcedDeadline t -> ["WITHIN", t]
+      UnforcedDeadline t ma -> ["WITHIN", t] <> maybe [] (\ a -> ["OF", a]) ma
       Remaining r        -> ["WITHIN", prettyRatio r]
     familyText f = case f.faJoin of
       Barrier _    -> "a barrier of " <> textShow f.faTotal
@@ -463,4 +518,15 @@ placementText = \ case
       , (\ d -> "due " <> prettyRatio d) <$> b.blDeadline
       , (\ t -> "at " <> prettyRatio t) <$> b.blStamp
       , ("because " <>) <$> b.blReason
+      , namedText b
+      ]
+    -- a compound breach (R-T3) names more than its anchor: say so
+    namedText b = case b.blNamed of
+      (_ : _ : _) -> Just ("; names, in order: " <> Text.intercalate ", " (map entryText b.blNamed))
+      _           -> Nothing
+    entryText e = Text.unwords $ catMaybes
+      [ Just (fromMaybe "(nobody named)" e.beParty)
+      , ("missed " <>) <$> e.beObliged
+      , (\ d -> "due " <> prettyRatio d) <$> e.beDeadline
+      , ("because " <>) <$> e.beReason
       ]

@@ -2267,7 +2267,8 @@ named `perm3 — negation over a group`.
   linter has no way to tell apart:
 
   - the `NOT`'s operand may already be **closed by a parenthesis**, in which case the deeper
-    connective binds outside it and the site is safe — `sg-succession.l4:127-129`,
+    connective binds outside it and the site is safe — `jl4/examples/canon/sg/succession/sg-succession.l4:127-129`
+    (moved there from `legal/sg-succession/` by the canon migration; lines re-verified),
     `IF (NOT (…))` ⏎ `AND (NOT (…))`;
   - the connectives may be **inside** a parenthesised operand on purpose —
     `blawx/alcohol.l4:172-174`, `AND NOT (` ⏎ `AND …` ⏎ `AND …)`.

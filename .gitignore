@@ -1,6 +1,7 @@
 
 *~
 *.actual
+.scenarios-generated.l4
 build
 .continue
 .claude/settings.local.json

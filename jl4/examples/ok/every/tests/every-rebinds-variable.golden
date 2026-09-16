@@ -1,0 +1,11 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+every-rebinds-variable.l4:38:1-39:43:
+  PARTY Tenant OF "Alice" MUST Sign t WITHIN 11 HENCE `the join` LEST `the join fails` AND PARTY Tenant OF "Bob" MUST Sign t WITHIN 11 HENCE `the join` LEST `the join fails`
+every-rebinds-variable.l4:42:1-44:37:
+  FULFILLED
+every-rebinds-variable.l4:60:1-62:50:
+  PARTY Tenant OF "Alice" MUST Countersign t t WITHIN 10 HENCE `the join` LEST `the join fails` AND PARTY Tenant OF "Bob" MUST Countersign t t WITHIN 10 HENCE `the join` LEST `the join fails`
+every-rebinds-variable.l4:64:1-66:50:
+  FULFILLED

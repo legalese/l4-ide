@@ -66,6 +66,69 @@ data SectionBinderDecl =
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
 
+-- ----------------------------------------------------------------------------
+-- Field opening (IMPLICIT-PROPS-DESIGN §11.7, R5)
+-- ----------------------------------------------------------------------------
+
+-- | One record-typed binder whose fields 'L4.Desugar.openFields' has put in
+-- scope by bare name: the @GIVEN@-line occurrence of the binder, and the type
+-- it was declared with. Kept unresolved for the same reason
+-- 'SectionBinderDecl' is: it is read off the parsed module, and a diagnostic
+-- wants the spelling the author wrote.
+--
+-- The name is the /declaring/ occurrence, which carries the @GIVEN@ line's
+-- source range. That matters: the checker synthesises the parameter names of
+-- a @GIVEN x IS A T@ + @DECIDE f IS ...@ declaration without a range
+-- ('L4.TypeCheck.checkTermAppFormTypeSigConsistency'), so a diagnostic that
+-- took the binder's position from its 'Resolved' would print @(predefined)@.
+data OpenedBinderDecl =
+  MkOpenedBinderDecl
+    { binderName   :: !Name
+    , declaredType :: !(Type' Name)
+    }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
+-- | Which kind of signature opened the binders: a declaration's own @GIVEN@,
+-- or a section's. Only the wording of the diagnostic depends on it.
+data OpeningSite = DeclarationOpening | SectionOpening
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
+-- | A bare read of a field name that two or more opened binders of ONE
+-- signature share. Carries the read occurrence and every binder that opens
+-- the name, in declaration order.
+data OpenedFieldCollision =
+  MkOpenedFieldCollision
+    { fieldRead :: !Name
+    , site      :: !OpeningSite
+    , binders   :: ![OpenedBinderDecl]
+    }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
+-- | What an opened field outranked at a bare read.
+--
+-- The ruling's rank (§11.7) ends at "selectors" and names neither
+-- constructors nor top-level definitions; the build ranks both with the
+-- selectors, which is the precedent's behaviour and means an opened field
+-- wins silently. Until the tier is ruled, a read of this shape draws a
+-- warning rather than nothing at all.
+data ShadowedByOpening = ShadowedConstructor | ShadowedDefinition
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
+-- | A bare read that an opened field won, over a name the checker would
+-- otherwise have resolved.
+data OpenedFieldShadow =
+  MkOpenedFieldShadow
+    { fieldRead :: !Name
+    , binder    :: !OpenedBinderDecl
+    , shadowed  :: !ShadowedByOpening
+    }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
 -- | Is this top-level declaration the /elaboration/ of one of the section-binder
 -- parameters named in @ns@ — the 0-ary @ASSUME@ that
 -- 'L4.Desugar.elaborateSectionBinder' prepends for it?

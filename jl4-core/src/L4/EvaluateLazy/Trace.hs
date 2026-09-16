@@ -548,10 +548,8 @@ nfFromTrace m = \ case
     MkNF (ValAssumed n)
   ValEnvironment env ->
     MkNF (ValEnvironment env)
-  ValBreached (DeadlineMissed ev'party ev'act ev'timestamp party act deadline) ->
-    MkNF (ValBreached (DeadlineMissed (rec ev'party) (rec ev'act) ev'timestamp (rec party) act deadline))
-  ValBreached (ExplicitBreach mParty mReason) ->
-    MkNF (ValBreached (ExplicitBreach (fmap rec mParty) (fmap rec mReason)))
+  ValBreached reason ->
+    MkNF (ValBreached (fmap rec reason))
   ValROp env op l r ->
     MkNF (ValROp env op (fmap (fmap rec) l) (fmap (fmap rec) r))
   ValQuantified env d ->

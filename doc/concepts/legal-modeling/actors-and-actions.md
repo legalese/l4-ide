@@ -242,9 +242,9 @@ arguments (overloading / "duplex by parameter").
 aliceToBob MEANS SendMessage OF Alice, Bob, "hi"
 ```
 
-**Unpinned** — a function over actors, supplied at the use site. Note the
-`EXACTLY` keyword: an applied action is an _expression_, not a pattern, so it
-must be introduced with `EXACTLY`.
+**Unpinned** — a function over actors, supplied at the use site. Calling a
+rule in the action slot is read the way any other action is: L4 evaluates the
+call and compares the result against the event.
 
 ```l4
 GIVEN from IS AN Actor
@@ -257,37 +257,25 @@ send from to MEANS SendMessage OF from, to, "hi"
 
 ```l4
 GIVETH DEONTIC Actor SendMessage
-okFwd MEANS PARTY Alice MUST EXACTLY send Alice Bob WITHIN 10   -- performer Alice ✓
-okRev MEANS PARTY Bob   MUST EXACTLY send Bob Alice WITHIN 10   -- performer Bob   ✓ (duplex)
+okFwd MEANS PARTY Alice MUST send Alice Bob WITHIN 10   -- performer Alice ✓
+okRev MEANS PARTY Bob   MUST send Bob Alice WITHIN 10   -- performer Bob   ✓ (duplex)
 ```
 
 ❌ **Rejected** — wrong performer at the call site:
 
 ```l4
-bad MEANS PARTY Bob MUST EXACTLY send Alice Bob WITHIN 10
+bad MEANS PARTY Bob MUST send Alice Bob WITHIN 10
 ```
 
 ```
   `send` is performed by `Alice`, not by `Bob`.
 ```
 
-⚠️ **Gotcha** — the _bare_ applied form is not read as a rule being used. The
-action slot is a pattern, so `send` is taken for a pattern name that nothing
-defines, and the check fails:
-
-```l4
-oops MEANS PARTY Alice MUST send Alice Bob WITHIN 10   -- ERROR: use EXACTLY
-```
-
-```
-I could not find a definition for the identifier
-
-  send
-
-which I have inferred to be of type:
-
-  FUNCTION FROM Actor AND Actor TO SendMessage
-```
+Before this rule shipped, the action slot had to be written
+`MUST EXACTLY send Alice Bob`: the bare applied form was read as a pattern
+nothing defines, and the check refused it ("I could not find a definition for
+the identifier `send`"). `EXACTLY` still parses and still works — it is just
+not needed here any more.
 
 **A named cast (some actors).** To allow a _specific subset_ of actors and no
 others, declare an actor **type** that lists exactly them, and use it as the
@@ -302,8 +290,8 @@ GIVETH A TAction
 negotiate who MEANS TAction OF who, "negotiate"
 
 GIVETH DEONTIC Tenant TAction
-okR MEANS PARTY Renter   MUST EXACTLY negotiate Renter   WITHIN 5   -- ✓
-okL MEANS PARTY Landlord MUST EXACTLY negotiate Landlord WITHIN 5   -- ✓
+okR MEANS PARTY Renter   MUST negotiate Renter   WITHIN 5   -- ✓
+okL MEANS PARTY Landlord MUST negotiate Landlord WITHIN 5   -- ✓
 -- PARTY Court … is a type error: Court is not a Tenant.
 ```
 
@@ -333,13 +321,13 @@ performer. So the principal/agent distinction is type-checked:
 
 ```l4
 GIVETH DEONTIC Actor Action
-goodProcure MEANS PARTY X MUST EXACTLY xProcuresShip WITHIN 10   -- performer X ✓
+goodProcure MEANS PARTY X MUST xProcuresShip WITHIN 10   -- performer X ✓
 ```
 
 ❌ **Rejected** — a stranger cannot procure _this_ instance:
 
 ```l4
-strangerProcure MEANS PARTY Z MUST EXACTLY xProcuresShip WITHIN 10
+strangerProcure MEANS PARTY Z MUST xProcuresShip WITHIN 10
 ```
 
 ```
@@ -349,7 +337,7 @@ strangerProcure MEANS PARTY Z MUST EXACTLY xProcuresShip WITHIN 10
 ❌ **Rejected** — X cannot directly _perform_ Y's action, only _procure_ it:
 
 ```l4
-xCannotPerform MEANS PARTY X MUST EXACTLY shipByY WITHIN 10
+xCannotPerform MEANS PARTY X MUST shipByY WITHIN 10
 ```
 
 ```
