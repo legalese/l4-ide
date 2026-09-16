@@ -38,6 +38,7 @@ module L4.Bpmn.IR
     -- * Flow nodes and sequence flows
   , FlowNode (..)
   , NodeKind (..)
+  , MultiInstance (..)
   , GatewayKind (..)
   , GatewayFlow (..)
   , BoundaryTrigger (..)
@@ -226,6 +227,33 @@ data NodeKind
 data GatewayKind = ExclusiveGateway | ParallelGateway
   deriving stock (Eq, Show)
 
+-- | @\<multiInstanceLoopCharacteristics isSequential="false"\>@ on a task: one
+-- instance per member of an @EVERY@'s cast, all live at once.
+--
+-- Deliberately without a @loopCardinality@ and without a @loopDataInputRef@.
+-- L4 fixes the cast only when the rule runs (EVERY-EACH-QUANTIFIER-SPEC R-T6),
+-- so the file can say "many, in parallel" and cannot say how many; inventing
+-- either attribute would be a claim the source does not make. @P-CAST@ tells
+-- the reader an engine will need one supplied.
+--
+-- The completion rule of a parallel multi-instance activity — the outgoing
+-- flow fires once, when the last instance has completed — is exactly the
+-- barrier (@ONCE ALL HAVE@) for an obligation, which is why a @MUST@ barrier
+-- needs no further shape. It is the WRONG rule for a prohibition: under
+-- @SHANT@ one member's act is the breach (EVERY-EACH-QUANTIFIER-SPEC R-Q5,
+-- §3.4), and "completes when every director has sublet" would exonerate the
+-- first one — measured 2026-09-15 on @ok\/every\/run-modals.l4@'s
+-- @no subletting@, whose golden says BREACH with one act. So a prohibition's
+-- activity completes on the FIRST instance to complete, via a
+-- @\<completionCondition\>@ that is derived from the source, not invented.
+-- The fork (@UPON EACH@) is the shape BPMN cannot draw this way; see @P-FORK@.
+data MultiInstance
+  = -- | completes when every instance has: the barrier, for @MUST@\/@MAY@\/@DO@
+    CompleteWhenAll
+  | -- | completes on the first instance to: a prohibition, where one act breaches
+    CompleteOnFirst
+  deriving stock (Eq, Show)
+
 -- | BPMN 2.0 §10.5.1 Table 10.100 makes @gatewayDirection@ a /claim about the
 -- edges/, not a caption: @Diverging@ MUST NOT have multiple incoming flows,
 -- @Converging@ MUST NOT have multiple outgoing, @Mixed@ has both, and
@@ -260,6 +288,8 @@ data FlowNode = FlowNode
     nodeDoc :: !(Maybe Text)
   , -- | The party this node belongs to; 'Nothing' lands in the default lane.
     nodeLane :: !(Maybe Text)
+  , -- | Set on the task of an @EVERY@ obligation and on nothing else.
+    nodeMultiInstance :: !(Maybe MultiInstance)
   }
   deriving stock (Eq, Show)
 

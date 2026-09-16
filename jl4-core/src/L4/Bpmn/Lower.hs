@@ -147,6 +147,7 @@ stateGraphToBpmn opts sg =
       , scLapse = lapse
       , scFindings =
           taskFindings
+            <> quantifierFindings
             <> branchGuardFindings
             <> boundaryFindings
             <> lapseFindings
@@ -165,6 +166,7 @@ stateGraphToBpmn opts sg =
         , nodeKind = StartEvent
         , nodeDoc = Nothing
         , nodeLane = Nothing
+        , nodeMultiInstance = Nothing
         }
       | s.stateType == InitialState
       ]
@@ -179,6 +181,7 @@ stateGraphToBpmn opts sg =
         , nodeKind = Gateway (fanGateway s.stateFan) Unspecified
         , nodeDoc = Just (fanDoc s.stateFan)
         , nodeLane = Nothing
+        , nodeMultiInstance = Nothing
         }
       | s.stateFan /= Linear
       ]
@@ -190,8 +193,14 @@ stateGraphToBpmn opts sg =
             { nodeId = "Task_" <> tag
             , nodeName = taskName t.transLabel
             , nodeKind = Task
-            , nodeDoc = Just (restateRule t.transLabel <> taskArmNote t.transLabel.labelModal)
+            , nodeDoc =
+                Just
+                  ( restateRule t.transLabel
+                      <> taskArmNote t.transLabel.labelModal
+                      <> quantifierDoc t.transLabel
+                  )
             , nodeLane = t.transLabel.labelParty
+            , nodeMultiInstance = multiInstanceFor t.transLabel
             }
         ]
 
@@ -202,6 +211,7 @@ stateGraphToBpmn opts sg =
         , nodeKind = EndEvent (s.stateType == TerminalBreach)
         , nodeDoc = Nothing
         , nodeLane = Nothing
+        , nodeMultiInstance = Nothing
         }
       | s.stateType == TerminalFulfilled || s.stateType == TerminalBreach
       ]
@@ -216,6 +226,7 @@ stateGraphToBpmn opts sg =
         , nodeKind = EndEvent False
         , nodeDoc = Just "no outgoing transition in the source state graph"
         , nodeLane = Nothing
+        , nodeMultiInstance = Nothing
         }
       | null startNodes && null gatewayNodes && null taskNodes && null endNodes
       ]
@@ -223,7 +234,11 @@ stateGraphToBpmn opts sg =
     nodes = startNodes <> gatewayNodes <> taskNodes <> endNodes <> danglingNodes
 
     modal = obligation >>= (.transLabel.labelModal)
-    deadline = obligation >>= (.transLabel.labelDeadline)
+    -- The act's own WITHIN, else the join line's: 'memberDeadline' is the
+    -- evaluator's rule for when a member's obligation expires, and the timer
+    -- below draws that expiry. Reading 'labelDeadline' alone drew a rule whose
+    -- only WITHIN sat on its ONCE line as having no trigger at all.
+    deadline = obligation >>= (memberDeadline . (.transLabel))
 
     -- The deadline hangs off the task as an interrupting boundary event. The
     -- trigger is the same for every modal — the WITHIN running out — because
@@ -245,6 +260,7 @@ stateGraphToBpmn opts sg =
                   , nodeKind = Boundary host.nodeId trigger
                   , nodeDoc = Just (boundaryDoc modal deadline)
                   , nodeLane = host.nodeLane
+                  , nodeMultiInstance = Nothing
                   }
             , finds
             )
@@ -276,6 +292,7 @@ stateGraphToBpmn opts sg =
                         "the permission lapses: the deadline passes without it \
                         \being exercised, which routes where HENCE routes"
                   , nodeLane = host.nodeLane
+                  , nodeMultiInstance = Nothing
                   }
             , finds
             )
@@ -308,6 +325,10 @@ stateGraphToBpmn opts sg =
 
     taskFindings = case (obligation, taskNodes) of
       (Just t, tn : _) -> modalityFinding tn t.transLabel <> guardFindings tn t.transLabel
+      _ -> []
+
+    quantifierFindings = case (obligation, taskNodes) of
+      (Just t, tn : _) -> quantifierNotes tn t.transLabel (isJust boundary)
       _ -> []
 
     -- The @IF@ that chose between arms. This is the branch-edge counterpart of
@@ -794,6 +815,7 @@ stateGraphToBpmn opts sg =
                 , nodeKind = BusinessRule wg.wgCall
                 , nodeDoc = Just (decideDoc wg.wgCall)
                 , nodeLane = Nothing
+                , nodeMultiInstance = Nothing
                 }
             redirect e
               | e.edTo == gw = e {edTo = did}
@@ -897,6 +919,7 @@ stateGraphToBpmn opts sg =
                             "every branch of the RAND must complete; each \
                             \delivers exactly one token"
                       , nodeLane = Nothing
+                      , nodeMultiInstance = Nothing
                       }
                in ( nodes <> [joinNode]
                   , map redirect edges <> [plainEdge jid tgt Nothing]
@@ -1410,16 +1433,88 @@ taskArmNote (Just DMustNot) =
 taskArmNote _ = ""
 
 -- | The source rule, restated for @\<documentation\>@.
+--
+-- An @EVERY@ subject already begins with its own keyword, so it is not
+-- prefixed @PARTY@; and its join line is part of the rule, so it is restated
+-- too — it is the one clause that says whether what follows fires once or
+-- once per member.
 restateRule :: TransitionLabel -> Text
 restateRule l =
   Text.intercalate " " $
     catMaybes
-      [ fmap ("PARTY " <>) l.labelParty
+      [ fmap subjectWords l.labelParty
       , fmap modalWord l.labelModal
       , Just l.labelAction
       , fmap ("WITHIN " <>) l.labelDeadline
       , fmap ("PROVIDED " <>) l.labelGuard
+      , joinWords <$> (l.labelQuantifier >>= (.quantJoin))
       ]
+ where
+  subjectWords p = case l.labelQuantifier of
+    Just _ -> p
+    Nothing -> "PARTY " <> p
+
+-- | A join line as the source spells it.
+joinWords :: JoinLabel -> Text
+joinWords j =
+  ( case j.joinKind of
+      Barrier th -> "ONCE " <> th
+      Fork -> "UPON EACH"
+  )
+    <> maybe "" (" WITHIN " <>) j.joinDeadline
+
+-- | What the @\<documentation\>@ of an @EVERY@'s task adds after the restated
+-- rule: what the multi-instance marker means here, and — for a fork — what it
+-- cannot mean.
+--
+-- The barrier sentence is gated on the modal, because the completion rule of
+-- a multi-instance activity is the barrier only for an obligation. It was
+-- once emitted unconditionally, on a @SHANT@ whose drawing exonerated a
+-- breach and on a @MAY@ whose drawing manufactured a duty; an assurance in the
+-- same breath as the report is the failure mode the report exists to prevent.
+quantifierDoc :: TransitionLabel -> Text
+quantifierDoc l = case l.labelQuantifier of
+  Nothing -> ""
+  Just q ->
+    " \8212 one instance per member of the cast, each bound to \8216"
+      <> q.quantVar
+      <> "\8217; the cast is fixed only when the rule runs, so the activity \
+         \carries no cardinality (P-CAST)."
+      <> case (.joinKind) <$> q.quantJoin of
+        Nothing -> ""
+        Just (Barrier th) -> case l.labelModal of
+          Just DMustNot ->
+            " ONCE " <> th <> ": for a prohibition one member's act is the \
+            \breach, so the activity completes on the FIRST instance to \
+            \complete (completionCondition nrOfCompletedInstances >= 1) and \
+            \its completion is the LEST arm."
+          Just DMay ->
+            " ONCE " <> th <> ": what follows arises only if every member \
+            \exercises the permission; a member whose permission lapses ends \
+            \the rule as fulfilled with nothing following, which is where the \
+            \lapse timer routes."
+          _ ->
+            " ONCE " <> th <> ": the outgoing flow fires once, when every \
+            \instance has completed \8212 which is what a parallel multi-instance \
+            \activity's completion means, so this barrier is drawn faithfully."
+        Just Fork ->
+          " UPON EACH: in the source, what follows fires once per member as \
+          \that member completes. A multi-instance activity fires its outgoing \
+          \flow once, after the last instance, so what follows is drawn once \
+          \(P-FORK), and the timer on this activity cancels every instance \
+          \(P-FORK-CANCEL)."
+
+-- | How an @EVERY@'s activity completes. Keyed on the MODAL as well as on the
+-- quantifier: the positional pattern in 'L4.StateGraph.extractDeonton' guards
+-- against a field going unread, and nothing guards the modal × join product
+-- but this function and the goldens cut per cell from
+-- @jl4\/examples\/bpmn\/modals.l4@.
+multiInstanceFor :: TransitionLabel -> Maybe MultiInstance
+multiInstanceFor l = case l.labelQuantifier of
+  Nothing -> Nothing
+  Just _ -> Just $ case l.labelModal of
+    Just DMustNot -> CompleteOnFirst
+    _ -> CompleteWhenAll
 
 -- | The boundary event's name — the words a reader sees on the diagram, with no
 -- @\<documentation\>@ open.
@@ -1694,6 +1789,173 @@ numberWithUnit t = do
 --------------------------------------------------------------------------------
 -- Findings raised while building nodes
 --------------------------------------------------------------------------------
+
+-- | What an @EVERY@ costs in BPMN, in notes that fire independently.
+--
+-- @P-CAST@ is 'Advisory' because the quantifier itself is drawn faithfully —
+-- a parallel multi-instance activity is one act per member, all live at once
+-- — and what is forfeited is a target-side capability: an engine cannot run
+-- the activity until someone supplies the cardinality the source never fixed.
+--
+-- @P-PROHIBITION-FIRST@ is 'Advisory': the completion condition on a @SHANT@
+-- is derived from the source (one act breaches), and the note exists so a
+-- reader knows why this activity completes differently from its neighbours.
+--
+-- @P-FORK@ and @P-FORK-CANCEL@ are 'Lossy' because the drawing says something
+-- the rule does not: one continuation, after the group, where the source
+-- fires it per member; and every instance cancelled when the timer fires,
+-- where the source lets a member who has already acted keep the continuation
+-- that act spawned. The second is the fork's largest loss — an obligation
+-- that arose in L4 is absent from the diagram, and the party who breached it
+-- is exonerated — and it was unnamed until the review of 2026-09-15.
+--
+-- Both are written "the diagram says X; the rule says Y", because 'Lossy'
+-- reads as "something is missing" and invites filling it in from the source,
+-- whereas here the reader has to DISBELIEVE what is drawn.
+--
+-- @P-JOIN-DEADLINE@ fires only when the act has a deadline of its own,
+-- because otherwise the join's deadline is the one on the boundary timer —
+-- see 'L4.StateGraph.memberDeadline'. Under a BARRIER it is 'Lossy', for the
+-- reason @P-DEADLINE-UNDRAWN@ is: a constraint the drafter wrote and the
+-- runtime enforces is drawn nowhere. Under a FORK it is 'Advisory', because
+-- the runtime does not enforce it either (@joinStateDue@ in Machine.hs is
+-- @Nothing@ for @JoinUpon@; measured 2026-09-15, a fork with
+-- @UPON EACH WITHIN 3@ and a last act on day 20 is FULFILLED): nothing is
+-- lost between source and diagram, but the clause is dead in both, and the
+-- reader should learn that rather than be told BPMN dropped it.
+quantifierNotes :: FlowNode -> TransitionLabel -> Bool -> [FidelityNote]
+quantifierNotes n l hasCancellingTimer = case l.labelQuantifier of
+  Nothing -> []
+  Just q ->
+    [ MkFidelityNote
+        { code = "P-CAST"
+        , severity = Advisory
+        , element = n.nodeId
+        , range = Nothing
+        , message =
+            "The obligation binds every member of a cast (\8216"
+              <> fromMaybe "EVERY" l.labelParty
+              <> "\8217), drawn as a parallel multi-instance activity with no \
+                 \loopCardinality and no loopDataInputRef: L4 fixes the cast only \
+                 \when the rule runs, so this file cannot say how many instances \
+                 \there are."
+              <> maybe
+                ""
+                ( \roll ->
+                    " The source draws the cast from \8216"
+                      <> roll
+                      <> "\8217; an engine needs that list supplied as the activity's \
+                         \collection, which this exporter does not emit because the \
+                         \graph it lowers carries no data objects."
+                )
+                q.quantRoll
+        , lost =
+            "the cardinality as something an engine could read; one of \
+            \loopCardinality or a collection has to be supplied before this \
+            \activity can execute (measured 2026-09-15: jbpm-bpmn2 7.74.1 \
+            \rejects the file as it stands \8212 \8216ForEach has no collection \
+            \expression\8217)"
+        }
+    ]
+      <> [ MkFidelityNote
+             { code = "P-PROHIBITION-FIRST"
+             , severity = Advisory
+             , element = n.nodeId
+             , range = Nothing
+             , message =
+                 "This activity completes on the FIRST instance to complete \
+                 \(completionCondition nrOfCompletedInstances >= 1), not the last: \
+                 \under a prohibition one member's act is the breach, so one act \
+                 \has to reach the LEST arm. The condition is read off the rule, \
+                 \not chosen."
+             , lost =
+                 "nothing the rule says; but an engine that ignores \
+                 \completionCondition would wait for every member to offend"
+             }
+         | Just DMustNot <- [l.labelModal]
+         ]
+      <> [ MkFidelityNote
+             { code = "P-FORK"
+             , severity = Lossy
+             , element = n.nodeId
+             , range = Nothing
+             , message =
+                 "The diagram says: what follows this activity happens once, after \
+                 \the last instance completes. The rule says: the join line is UPON \
+                 \EACH, and what follows fires once per member, as that member \
+                 \completes. BPMN has shapes for once-per-member \8212 a \
+                 \multi-instance subProcess enclosing the continuation, or a None \
+                 \completion behaviour caught by a non-interrupting boundary event \
+                 \\8212 and this exporter emits neither."
+             , lost =
+                 "the per-member firing of the continuation; what is drawn fires \
+                 \once, for the group"
+             }
+         | Just j <- [q.quantJoin]
+         , Fork <- [j.joinKind]
+         ]
+      <> [ MkFidelityNote
+             { code = "P-FORK-CANCEL"
+             , severity = Lossy
+             , element = n.nodeId
+             , range = Nothing
+             , message =
+                 "The diagram says: when the timer on this activity fires, every \
+                 \instance is cancelled and nothing drawn after the activity is \
+                 \reached. The rule says: a member who has already acted has \
+                 \already started their own continuation, which another member's \
+                 \failure does not touch \8212 so an obligation that arose in L4 \
+                 \is absent from the diagram, and a party who breached it is \
+                 \drawn as owing nothing."
+             , lost =
+                 "every continuation spawned before the timer fired, and the \
+                 \breaches of those continuations"
+             }
+         | Just j <- [q.quantJoin]
+         , Fork <- [j.joinKind]
+         , hasCancellingTimer
+         -- Not for a prohibition: there the timer is the COMPLIANCE arm, and
+         -- cancelling every instance when it fires is right — nobody
+         -- offended, everybody's prohibition is discharged. What a SHANT fork
+         -- loses instead is that the first offender completes the activity
+         -- for all, which is the once-for-the-group loss P-FORK already names.
+         , l.labelModal /= Just DMustNot
+         ]
+      <> [ MkFidelityNote
+             { code = "P-JOIN-DEADLINE"
+             , severity = case j.joinKind of Barrier _ -> Lossy; Fork -> Advisory
+             , element = n.nodeId
+             , range = Nothing
+             , message = case j.joinKind of
+                 Barrier _ ->
+                   "The join line's own deadline \8216"
+                     <> jd
+                     <> "\8217 is not drawn: the boundary timer carries the act's \8216"
+                     <> ad
+                     <> "\8217, which is what expires a member, and this exporter draws \
+                        \one timer per obligation. The rule does enforce it: a barrier \
+                        \whose last act lands after it fails."
+                 Fork ->
+                   "The join line's own deadline \8216"
+                     <> jd
+                     <> "\8217 is not drawn \8212 and the L4 runtime does not enforce it \
+                        \on a fork either (a fork has no join event to check it at; \
+                        \only the act's \8216"
+                     <> ad
+                     <> "\8217 expires a member). Nothing is lost between source and \
+                        \diagram; the clause is dead in both."
+             , lost = case j.joinKind of
+                 Barrier _ ->
+                   "the deadline on the joined state as a drawn constraint; it \
+                   \survives only in the element's <documentation>"
+                 Fork ->
+                   "nothing the runtime honours; but the drafter wrote a deadline \
+                   \that neither the run nor the diagram applies"
+             }
+         | Just j <- [q.quantJoin]
+         , Just jd <- [j.joinDeadline]
+         , Just ad <- [l.labelDeadline]
+         ]
 
 modalityFinding :: FlowNode -> TransitionLabel -> [FidelityNote]
 modalityFinding n l =

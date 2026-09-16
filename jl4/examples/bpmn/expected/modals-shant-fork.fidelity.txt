@@ -1,0 +1,22 @@
+fidelity report — BPMN 2.0
+  [F1] blocking — Task_0
+      A prohibition is not an activity at all and BPMN has no negative shape for one, so read literally this diagram instructs the reader to perform the very act the rule forbids.
+      lost: the difference between a required act and a forbidden one; only the SHANT in the label and the <documentation> say otherwise, and neither has any notational force
+  [P-CAST] advisory — Task_0
+      The obligation binds every member of a cast (‘EVERY Director d IN board’), drawn as a parallel multi-instance activity with no loopCardinality and no loopDataInputRef: L4 fixes the cast only when the rule runs, so this file cannot say how many instances there are. The source draws the cast from ‘board’; an engine needs that list supplied as the activity's collection, which this exporter does not emit because the graph it lowers carries no data objects.
+      lost: the cardinality as something an engine could read; one of loopCardinality or a collection has to be supplied before this activity can execute (measured 2026-09-15: jbpm-bpmn2 7.74.1 rejects the file as it stands — ‘ForEach has no collection expression’)
+  [P-PROHIBITION-FIRST] advisory — Task_0
+      This activity completes on the FIRST instance to complete (completionCondition nrOfCompletedInstances >= 1), not the last: under a prohibition one member's act is the breach, so one act has to reach the LEST arm. The condition is read off the rule, not chosen.
+      lost: nothing the rule says; but an engine that ignores completionCondition would wait for every member to offend
+  [P-FORK] lossy — Task_0
+      The diagram says: what follows this activity happens once, after the last instance completes. The rule says: the join line is UPON EACH, and what follows fires once per member, as that member completes. BPMN has shapes for once-per-member — a multi-instance subProcess enclosing the continuation, or a None completion behaviour caught by a non-interrupting boundary event — and this exporter emits neither.
+      lost: the per-member firing of the continuation; what is drawn fires once, for the group
+  [P-DEADLINE-UNIT] advisory — Boundary_0
+      Deadline ‘30’ carries no unit, because nothing in L4 fixes one — WITHIN is typed as a bare NUMBER (TypeCheck.hs) and the evaluator only ever adds it to an event timestamp. It is read here as days (P30D), following the commonest convention in the corpus, where event clocks are day counts (libraries/daydate.l4, `Day` AKA `Date to days`). A model stamping events in abstract ticks will need this edited.
+      lost: certainty about the unit — if this model's clock is not days, the duration needs editing
+  [F2] lossy — Process_no_subletting__severally
+      A lane says who performs the work, where L4's PARTY says who owes the obligation, and this diagram can only show the first (lanes here: EVERY Director d IN board).
+      lost: the bearer, as distinct from the performer — the two come apart whenever an agent acts for a principal
+  [F5] advisory — Process_no_subletting__severally
+      BPMN has no as-of date, so any threshold or deadline that does appear in this diagram is a value someone must remember to edit when the rule changes.
+      lost: asking the same question as of a different rule date, which the L4 source can still answer

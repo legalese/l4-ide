@@ -1,0 +1,69 @@
+-- The modal × join cells of a quantified obligation, on the BPMN exporter.
+--
+-- tenancy.l4 covers MUST under each join. The review of 2026-09-15 found that
+-- the multi-instance marker, right for MUST, inverted two other cells — a
+-- SHANT barrier drawn as breaching only when EVERY member had offended, and a
+-- MAY barrier whose lapse timer manufactured the duty that follows a passed
+-- resolution — and that no golden could have caught either, because none
+-- exercised them. These rules are cut from ok/every/run-modals.l4 and the
+-- review's own probes, with the traces left out; the ones that exercise the
+-- runtime are there. One golden pair per rule, so a change to any cell moves
+-- exactly one pair.
+
+DECLARE Actor IS ONE OF
+    Chair    HAS name IS A STRING
+    Director HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Approve HAS who IS AN Actor
+    Sublet  HAS who IS AN Actor
+    Publish HAS who IS AN Actor
+
+theChair MEANS Chair OF "Ms Ng"
+a MEANS Director OF "A"
+b MEANS Director OF "B"
+board MEANS LIST a, b
+
+-- MAY × barrier, with a continuation: the corporate resolution (spec §2.2.1
+-- Pattern B). If any director's permission lapses the resolution did not
+-- pass and the chair owes nothing.
+GIVETH A DEONTIC Actor Action
+`the resolution` MEANS
+    EVERY Director d IN board MAY Approve (EXACTLY d) WITHIN 30
+        ONCE ALL HAVE
+        HENCE (PARTY theChair MUST Publish (EXACTLY theChair) WITHIN 5)
+
+-- SHANT × barrier: one director subletting is the breach (R-Q5).
+GIVETH A DEONTIC Actor Action
+`no subletting` MEANS
+    EVERY Director d IN board SHANT Sublet (EXACTLY d) WITHIN 30
+        ONCE ALL HAVE HENCE FULFILLED LEST BREACH
+
+-- MAY × fork: each director who approves earns their own publication.
+GIVETH A DEONTIC Actor Action
+`each approval is published` MEANS
+    EVERY Director d IN board MAY Approve (EXACTLY d) WITHIN 30
+        UPON EACH
+        HENCE (PARTY theChair MUST Publish (EXACTLY theChair) WITHIN 5)
+
+-- SHANT × fork: each director who sublets breaches on their own.
+GIVETH A DEONTIC Actor Action
+`no subletting, severally` MEANS
+    EVERY Director d IN board SHANT Sublet (EXACTLY d) WITHIN 30
+        UPON EACH HENCE FULFILLED LEST BREACH BY d
+
+-- MUST × barrier with a deadline in both positions (R-T2): the join's is
+-- enforced on the whole, and is not drawn.
+GIVETH A DEONTIC Actor Action
+`quorum by ten` MEANS
+    EVERY Director d IN board MUST Approve (EXACTLY d) WITHIN 30
+        ONCE ALL HAVE WITHIN 10 HENCE FULFILLED
+
+-- MUST × fork with the deadline on the join line alone: it is each member's,
+-- and it is the timer.
+GIVETH A DEONTIC Actor Action
+`approve, or else` MEANS
+    EVERY Director d IN board MUST Approve (EXACTLY d)
+        UPON EACH WITHIN 10
+        HENCE FULFILLED
+        LEST  BREACH BY d

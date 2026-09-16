@@ -1323,7 +1323,17 @@ branch was in the merge queue at the time):
   `Desugar`, `TypeCheck`, `TypeCheck.Annotation`, `Parser.ResolveAnnotation`, `Print`, `Nlg`,
   `EvaluateLazy.Machine`) and in **no** `L4/Bpmn/*.hs` and **not** in `StateGraph.hs`. The fix is
   scoped as **P2h** in `specs/todo/lexipedia-superset/LTS-VISUALISER.md` §4.9 and §7.2, which also
-  records what it does to that track's `DeonticStep` and correlation key. It moves P1's goldens.
+  records what it does to that track's `DeonticStep` and correlation key.
+  **FIXED 2026-09-15** (`fix/join-on-state-graph`, P2h first half): the state graph carries the join
+  (`TransitionLabel.labelQuantifier`), `l4 state-graph` draws `ONCE ALL HAVE` / `UPON EACH` on the
+  edge, and `l4 export --to bpmn` lowers an `EVERY` to a parallel multi-instance task — the barrier
+  is that activity's own completion; the fork is reported as `P-FORK` (lossy), since BPMN can only
+  say once-per-member with a multi-instance subProcess the exporter does not emit. `P-CAST`
+  (advisory) says the cardinality is a run-time fact and names the roll; `P-JOIN-DEADLINE` (lossy)
+  says when the join line's own `WITHIN` is not drawn. The sentence "it moves P1's goldens" that
+  stood here was a prediction, and it was wrong: no BPMN golden source contained an `EVERY`, so the
+  six existing goldens did not move; two new ones (`jl4/examples/bpmn/tenancy.l4`) are the witness.
+  `doc/reference/regulative/EVERY.md` corrected in the same change.
 - `doc/reference/regulative/README.md:82-95` documents `WITHIN 5 days OF notice` as an anchored form.
   **Probed 2026-09-07:** it is a parse error (`unexpected OF` at the `OF`) on the installed binary of
   27 August and on the 4 September probe binary, with or without `days`. The page is owed a correction
