@@ -1537,31 +1537,35 @@ member ordinal was doing the reader's work of telling members apart. The cause w
 addresses. Fixed by recording a second rendering **where the machine forces the fields**, not
 at arming:
 
-- `NormKey.nkBearerName :: Maybe Text` (`DeonticStep.hs:138`) is the party's `Value NF`
+- `NormKey.nkBearerName :: Maybe Text` (`DeonticStep.hs:153`) is the party's `Value NF`
   rendered through `prettyLayout` — the same printer and shape `L4.Lts.Marking.renderLive` uses
-  for `lnBearer` (`Marking.hs:357`) — so the two compare by `==`. `nkBearer` is **kept**, not
+  for `lnBearer` (`Marking.hs:415`) — so the two compare by `==`. `nkBearer` is **kept**, not
   repurposed: it is the key the cast register (`dlMembers`) is looked up by at `armNormKey`, and
   it exists before any field has been forced, which the name does not. `EventKey.ekPartyName`
-  (`:205`) and `BreachSummary.bsBlameName` (`:349`) are the same rendering for the event's party
+  (`:220`) and `BreachSummary.bsBlameName` (`:387`) are the same rendering for the event's party
   and a breach's blame.
-- The rendering is `peekNF` (`Machine.hs:416`): a `traverse` over the `Value` that reads each
+- The rendering is `peekWholeNF` (`Machine.hs:469`; it was `peekNF` until the merge of #412 on
+  2026-09-17, which brought its own `peekNF :: WHNF -> Machine NF` — the PARTIAL reading a
+  note's wording wants, `…` for an unevaluated part — so the all-or-nothing one was renamed;
+  a name with an `…` in it compares equal to nothing): a `traverse` over the `Value` that reads each
   reference with `peekWHNF` and answers `Nothing` as soon as one is still a thunk, with
-  `nfAux`'s depth cutoff. **It never forces.** `peekName` (`:430`) is its `prettyLayout`.
-- Where it is read: `Contract8` (`:1914`, `naming party norm`) — the party equality at `Contract7`
+  `nfAux`'s depth cutoff. **It never forces.** `peekName` (`:483`) is its `prettyLayout`.
+- Where it is read: `Contract8` (`:2200`, `naming party norm`) — the party equality at `Contract7`
   has just forced the fields (all of them on a match, up to the first difference on a mismatch),
   and the named key is carried into `Contract9`/`Contract11`/`Contract1` so `GuardFailed`,
-  `ActionMismatch`, `Matched` and the following `Waiting` all carry it; `ResolveParty` (`:1997`)
-  for the expiry path; `Contract5`'s no-`LEST` breach and `breachSummary` (`:526`) peek the
-  breach's party cell the same way; `armNormKey` (`:468`) peeks at arming too, which is `Nothing`
+  `ActionMismatch`, `Matched` and the following `Waiting` all carry it; `ResolveParty` (`:2328`)
+  for the expiry path; `Contract5`'s no-`LEST` breach and `breachSummary` (`:584`) peek the
+  breach's party cell the same way; `armNormKey` (`:510`) peeks at arming too, which is `Nothing`
   unless something earlier forced the fields. **The mismatch half of that parenthesis is a
   limit, not a footnote** (MEASURED 2026-09-16, below): the equality (`EqConstructor3`,
-  `Machine.hs:1520`) answers `FALSE` at the first field pair that differs and never touches the
+  `Machine.hs:1662`) answers `FALSE` at the first field pair that differs and never touches the
   rest, so a `PartyMismatch` step for a party whose _earlier_ field differed from the actor's has
   `nkBearerName = Nothing`, and so does the `Waiting` after it. Every party in the corpus and in
-  fixtures 18 / case 6 has one field, where "the first difference" is also the last, which is
+  fixtures 20 / case 6 has one field, where "the first difference" is also the last, which is
   why the first write-up read as if a mismatch named the party too. With the log off, `naming` is the old pure
   `bearing` behind one `asks`.
-- Measured, `jl4-core/test/DeonticStepSpec.hs` fixture 18 (`:682`): on fixture 6's barrier every
+- Measured, `jl4-core/test/DeonticStepSpec.hs` fixture 20 (`:791`; it was fixture 18 until the
+  merge of #412 on 2026-09-17, whose own 18 and 19 took the numbers): on fixture 6's barrier every
   member step names `Tenant OF "Alice"` / `Tenant OF "Bob"`, the landlord's `Landlord OF "Ms
 Ng"`, and the event party alongside; on fixture 15's expiry the `Expired` step at
   `ResolveParty` is named and the join's own step and the `Breached` are not; at the barrier's
@@ -1569,8 +1573,8 @@ Ng"`, and the event party alongside; on fixture 15's expiry the `Expired` step a
   `nkBearer` is still the `Tenant OF &…` form — the log did not force the fields for its own
   sake; a nullary `PARTY Alice` renders `Alice` both ways. The log-off equivalence test covers
   the new fixture.
-- `confirmAct` (`WhatIf.hs:391`) now finds the candidate's own step by **site and bearer**
-  (`:412`: `nkBearerName == Just name` for a `KnownParty`), and the most-specific-reason rank is
+- `confirmAct` (`WhatIf.hs:464`) now finds the candidate's own step by **site and bearer**
+  (`:486`: `nkBearerName == Just name` for a `KnownParty`), and the most-specific-reason rank is
   **retired**. The candidate's own step is named for a narrower reason than "the comparison ran":
   the hypothetical act is _by_ the candidate's bearer, so its own obligation's party comparison
   matched, and a match forces every field; the other members' mismatch steps may carry no name
@@ -1580,7 +1584,7 @@ Ng"`, and the event party alongside; on fixture 15's expiry the `Expired` step a
   barrier of two with `PROVIDED t EQUALS bob` — Alice's act is `PassedOver GuardFalse` and the
   step that carried it has her name, the other member's look at the same event has Bob's; Bob's
   act advances. Cases 1, 4 and 5 and `LtsWhatIfSpec` are unchanged.
-- The renderer (`List.hs:468`, `partyText`) prints the name when the log had it and the elided
+- The renderer (`List.hs:528`, `partyText`) prints the name when the log had it and the elided
   key otherwise, in text and JSON. Goldens: `every-run-example.txt`/`.json` moved **only** in
   party text — `git diff lts/p2-followups...HEAD -- jl4/examples/lts/expected/every-run-example.txt
 | grep -c '^[-+] '` = 78 (39 pairs, every one carrying `Tenant OF`/`Landlord OF`), and 144 on
@@ -1624,7 +1628,7 @@ Sign OF … at 1; Tenant OF …, … MUST (member 2 of 2) — not this party's e
   is unaffected, for the reason now written beside it.
 - Pinned: `LtsListSpec.hs` case 7 (the two-field barrier: verdicts as case 6; the other member's
   `PartyMismatch` step has `nkBearerName = Nothing`; `--steps` prints the two elided lines above)
-  and, in `DeonticStepSpec.hs` fixture 18, a `bsBlameName` assertion on a record-shaped `LEST
+  and, in `DeonticStepSpec.hs` fixture 20, a `bsBlameName` assertion on a record-shaped `LEST
 BREACH BY t` (`forkBreachSrc`: the fork of `every-run-example.l4` with Bob never signing;
   `Breached` carries `bsBlame = Just "Tenant OF &…"`, `bsBlameName = Just "Tenant OF \"Bob\""`).
   `JL4_LIBRARY_PATH=$PWD/jl4-core/libraries cabal test jl4-core-test`: 651 examples, 0 failures.
