@@ -2307,9 +2307,70 @@ patternAsExpr = \ case
   PatVar ann v      -> Just (Var ann v)
   PatLit ann l      -> Just (Lit ann l)
   PatExpr _ e       -> Just e
-  PatApp ann v []   -> Just (Var ann v)
+  PatApp ann v []   -> Just (Var (soleHoleAnno ann) v)
   PatApp ann v ps   -> App ann v <$> traverse patternAsExpr ps
   PatCons{}         -> Nothing
+
+{- Note [Hole arity of a synthesised reference]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'flattenConcreteNodes' walks a node's annotation and fills each 'AnnoHole' from
+that node's children, one child per hole in order. A hole with no child left to
+fill it is an error ('InsufficientHoleFit'). So an annotation may only be moved
+onto a constructor with the SAME number of annotated fields as the one it came
+from.
+
+R1 moves annotations across exactly that boundary: it rewrites @PatApp ann n []@
+into a 'PatExpr' holding a reference, and the constructors do not agree.
+'L4.Parser.nameAsPatApp' builds TWO holes — one for the name, one for the
+(always empty) argument list — while 'PatExpr' and 'Var' have one field each.
+Reusing @ann@ verbatim on either leaves the second hole unfilled.
+
+__It fails silently, which is the reason for the note.__ Nothing in @l4 check@,
+@l4 run@, the evaluator or exactprint walks the /checked/ AST's annotations, so
+a broken annotation costs nothing on any path with an exit code. The one
+consumer is the LSP's type-checked semantic tokens, and its rule turns the error
+into 'Nothing' — which means no tokens for the WHOLE file, no diagnostic, and
+an editor that silently falls back to parser-level highlighting
+('LSP.L4.Rules.TypeCheckedSemanticTokens'). The corpus witness is
+@jl4/examples/lsp/semantic-tokens/every.l4@, whose golden is the only one that
+covers a regulative rule at this phase.
+
+The two helpers below are the fix, and they split the tokens so that each one
+is emitted exactly once: the wrapper contributes nothing and delegates, the
+inner node keeps every concrete token it had. -}
+
+-- | The annotation for a synthesised /wrapper/: one hole and no concrete
+-- tokens of its own, keeping the range and extra of the node it replaces. Its
+-- single child carries the tokens. See Note [Hole arity of a synthesised
+-- reference].
+wrapperAnno :: Anno -> Anno
+wrapperAnno ann =
+  fixAnnoSrcRange
+    Anno
+      { extra   = ann.extra
+      , range   = ann.range
+      , payload = [mkHoleWithSrcRangeHint ann.range]
+      }
+
+-- | Keep every concrete token and the FIRST hole, dropping later holes. Only
+-- for moving a @PatApp n []@ annotation onto a one-field node: the hole that
+-- goes is the empty argument list, which has no tokens to lose. See
+-- Note [Hole arity of a synthesised reference].
+soleHoleAnno :: Anno -> Anno
+soleHoleAnno ann =
+  fixAnnoSrcRange
+    Anno
+      { extra   = ann.extra
+      , range   = ann.range
+      , payload = go ann.payload
+      }
+  where
+    go [] = []
+    go (e@(AnnoHole _) : rest) = e : filter (not . isHole) rest
+    go (e : rest)              = e : go rest
+
+    isHole (AnnoHole _) = True
+    isHole _            = False
 
 -- | Run a check as the __head__ of a regulative action pattern (R1 on, R5 off).
 enterActionPattern :: Check a -> Check a
@@ -3773,7 +3834,9 @@ inferPattern g@(PatApp ann n [])   = errorContext (WhileCheckingPattern g) do
         asReference
   where
     -- A reference reads exactly as the explicit @EXACTLY@ form always did.
-    asReference = inferPattern (PatExpr ann (Var ann n))
+    -- The two annotations are deliberately different: see
+    -- Note [Hole arity of a synthesised reference].
+    asReference = inferPattern (PatExpr (wrapperAnno ann) (Var (soleHoleAnno ann) n))
     asBinder    = inferPatternApp ann n [] `orElse` inferPatternVar n
 inferPattern g@(PatApp ann n ps)   = errorContext (WhileCheckingPattern g) do
   -- R1, applied form. @MUST `pay invoice` (`fee for` tier)@ — a head that
@@ -3794,11 +3857,14 @@ inferPattern g@(PatApp ann n ps)   = errorContext (WhileCheckingPattern g) do
   -- same text is refused outright today.
   pos <- asks (.actionPatternPos)
   reading <- if pos == NotInActionPattern then pure ReadsAsConstructor else actionNameReading n
+  -- The 'PatExpr' wrapper gets an annotation of its own; @e@ keeps @ann@,
+  -- whose holes match 'App' field for field. Note [Hole arity of a
+  -- synthesised reference].
   case (reading, patternAsExpr (PatApp ann n ps)) of
-    (ReadsAsLexicalReference, Just e)  -> inferPattern (PatExpr ann e)
+    (ReadsAsLexicalReference, Just e)  -> inferPattern (PatExpr (wrapperAnno ann) e)
     (ReadsAsOuterReference o, Just e)  -> do
       when (pos == InActionArgument) $ addError (ActionPatternReference n o)
-      inferPattern (PatExpr ann e)
+      inferPattern (PatExpr (wrapperAnno ann) e)
     _                                  -> inferPatternApp ann n ps
 inferPattern g@(PatCons ann p1 p2) = errorContext (WhileCheckingPattern g) do
   (rp1, rt1, extend1) <- descendActionPattern (inferPattern p1)
