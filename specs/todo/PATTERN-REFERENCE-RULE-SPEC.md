@@ -354,6 +354,22 @@ Per R6 this is not fallout for §10: the criterion was applied and it decided. W
 whether `CONSIDER` should ever get a **different** treatment (for instance, a notice when a branch
 binder shadows a same-typed lexical local), which is a separate question this spec does not open.
 
+**RULED 2026-09-16 (Meng), superseding the deontic-only outcome above for the sunset:** _"regarding removing
+the keyword from CONSIDER: ruling: remove it everywhere and spell a pinned name as a guard, with two corpus
+sites to rewrite."_ So on 2026-10-01 the keyword leaves `CONSIDER` too. Measured the same day on this tree:
+`CONSIDER` arms have **no guard production** (`Syntax.hs`: `BranchLhs = When Pattern | Otherwise`; the parser's
+`branch` reads `WHEN <pattern>` or `OTHERWISE`; `CONSIDER.md` is silent), and the two corpus sites are degenerate —
+`ok/contracts.l4:56` `WHEN EXACTLY 3` (a literal already pins) and `ok/consider-exactly-enum.l4:14`
+`WHEN EXACTLY red` (`red` is a constructor) — both become the bare pattern with the same meaning, and the enum
+file's regression purpose (an expression pattern mid-match vs. exhaustiveness) is re-pointed at a literal. The
+general case, a pinned **non-constructor name** in a `WHEN`, has zero corpus uses. **GM recommendation, awaiting
+Meng's confirmation of the spelling:** a new production `WHEN <pattern> PROVIDED <cond> THEN …`, mirroring the
+action guard that already exists (`MUST payment price PROVIDED price >= 20`, `ok/contracts.l4:13`): a failed guard
+falls through to the later arms (a nested `IF` cannot), a guarded arm counts as non-covering for exhaustiveness,
+and the keyword is already lexed. To land before 2026-10-01, ahead of the removal PR. The removal PR then deletes
+the lexer/parser/printer/warning code, rewrites the two sites, deletes the eight warning fixtures, and turns the
+docs' deprecation notes into "removed 2026-10-01".
+
 ### R7. What remains an error, and why the principle does not reach it
 
 A reference whose type does not fit the slot — `GIVEN amount IS A NUMBER` and `MUST Deliver amount`
@@ -566,12 +582,34 @@ LSP golden covers a regulative rule at all); hover is a SHOULD if it is cheap in
 
 ## 10. Open, for Meng
 
-1. **Keyword removal.** When, after the deprecation has shipped on at least one shelf cut.
-2. **R5 severity.** The count is now known — **19** notices over the swept corpus by the
+1. **Keyword removal.** RULED 2026-09-16 (Meng): _"sunset date for EXACTLY: 1 Oct"_ — removed on
+   **2026-10-01**, everywhere (see §4 R6, RULED the same day). Counts at the ruling, `git grep -w EXACTLY`
+   over tracked `.l4`: l4-ide `unstable` before #407: 205 tokens / 51 files (149 on code lines); after #407:
+   47 / 17 (10 on code lines — 8 in fixtures whose purpose is the deprecation warning, 2 in `CONSIDER`);
+   canon `main` 0; canon `mengwong/drafts` 7, all English prose in comments. `.md` outside `specs/`: 196 → 42.
+2. **R5 severity.** RULED 2026-09-16 (Meng): stays **Info**; the diagnostic must say what to do. Wording,
+   Meng's words verbatim (his verdict on the built text: _"is inscrutable"_; "free-variable pattern match"
+   considered and withdrawn as non-standard — a pattern variable is the binding occurrence, the opposite of
+   free; "placeholder variable" chosen for the first-time reader):
+
+   ```
+   In this action, `theLandlord` refers to
+     theLandlord (defined at line 18)
+   If you wanted a placeholder variable that matches any value, choose a name not already taken.
+   ```
+
+   An ERROR here was considered and rejected: it would forbid naming a top-level value in an action
+   without a marker, and the marker is what R3 retires. **No notice at the action head** (Meng: _"i don't
+   think we need to touch the action head"_; the head has a declared expected type, so an accidental capture
+   is a type mismatch, and the 11 head references are parametric action values). _Earlier text:_ The count is now known — **19** notices over the swept corpus by the
    golden-text measure (§4 R5), or 59 by the broader whole-corpus `l4 check` measure that also
    reaches the two non-goldened `jerseyCharities2` files (§4 R5, "Phase D's raw count"). Meng's to
    set (`SInfo` today); nothing in the build depends on which way this goes.
-3. **R5 field opening** (`IMPLICIT-PROPS-DESIGN.md` §11.7, in build on `lang/r5-field-opening`).
+
+3. **R5 field opening** — as built (legalese/l4-ide#403, `IMPLICIT-PROPS-DESIGN.md` §11.7.1), nothing inside a
+   regulative, `EVENT` or inert body opens, so this interaction has **no live case** until opening is extended
+   into regulatives, which is one of that PR's own owed rulings. _Original note:_ (`IMPLICIT-PROPS-DESIGN.md`
+   §11.7, in build on `lang/r5-field-opening`).
    An opened field spelled like the action's own slot — `amount` in `Pay t landlord amount` inside
    a rule that opens a record with an `amount` — would flip from wildcard to reference under R1 if
    opened fields are lexical locals. Rule when R5 lands; this spec takes no position.
