@@ -149,23 +149,6 @@
       }
     },
     {
-      "id": "Canon corpus",
-      "owner": "merge-manager (enqueue #404) · go-pipeline-diagram (applier PR next)",
-      "kind": "in queue",
-      "quick": true,
-      "raised": "2026-09-15",
-      "ask": "#398 MERGED (11b7534b). Step B BUILT and VERIFIED by GM: PR #404 (mengwong/canon-migrate @ b7eb2ecc, rebased onto e0f7dc91, 0 behind, merge-tree clean) — pin bumped to mengwong/drafts@5f248326 (re-bless + clitic sweep 21→0 + fixture rename all merged into the shelf), legal/chubb and legal/sg-succession committed encodings deleted (45 files, every one in the mirror; chubb's source deposit and cleanroom-2026-08 stay), 60 silent path references repaired under the rule 'a locator must resolve; a record must not be rewritten but must point forward'; nine references dangle deliberately, dated. Gate 8/8; sync-canon --check matches the pin; check-clitic-verbs over jl4/examples/canon = 0. merge-manager will enqueue when CLEAN. OWED after: the clitic applier PR (etc/apply-clitic-sweep.mjs, briefed to go-pipeline-diagram, off unstable). Filed on the way: smucclaw#964 (check-subject-ci-coverage hardcodes jl4/examples/legal — canon subjects invisible), smucclaw#965 (chubb fork-register fails the schema; its x-rules never run). RETRACTED: 'l4-ide's copy of cleanroom-2026-08 is the healthy one' — both copies' goldens are byte-identical bar one column count; the directory stays because the mirror carries none of it.",
-      "unblocks": "a clitic-clean canon mirror; regressions read from canon at a pin; the applier PR",
-      "source": {
-        "file": "specs/todo/CANON-REGRESSION-CORPUS-SPEC.md",
-        "anchor": "UNDER THE HARNESS"
-      },
-      "verify": {
-        "cmd": "gh pr view 404 --repo legalese/l4-ide --json state --jq .state || true",
-        "pendingWhen": "^OPEN$"
-      }
-    },
-    {
       "id": "APPLIES I1",
       "owner": "UNASSIGNED — a build session (ultracode)",
       "kind": "queued build",
@@ -249,16 +232,20 @@
     },
     {
       "id": "EXACTLY retirement",
-      "owner": "GM workflow wf_8a91a677-de7 (running)",
-      "kind": "in build",
+      "owner": "Meng (enqueue #407; rulings 1–4)",
+      "kind": "PR open",
       "quick": false,
       "raised": "2026-09-16",
-      "ask": "RULED 2026-09-16 (Meng): a bare name in a deontic action argument refers to what it names — a lexical local, or any other in-scope non-selector term (with an Info notice) — and is a fresh wildcard only when it names nothing or only a field selector; expressions admitted in pattern position; EXACTLY deprecated with a warning giving the replacement, not removed; the EVERY rebind error retired; corpus swept and goldens reset in the same PR; CONSIDER measured first and extended only if its survey shows no deliberate wildcard collision. Principle: \"if we know enough to call it an error, we know enough to correct the error.\" LAUNCHED ~04:10Z as a 15-agent workflow (sonnet build/survey/sweep/record, opus checker/bless/verify/fix) on branch lang/action-binder-reference, worktree ~/src/legalese/l4wt/exactly-lexical, base 11b7534b. After merge Meng rules: keyword removal date, R5 notice severity, the opened-field-spelled-like-a-slot interaction with R5 field opening.",
-      "unblocks": "smucclaw#955; the 33 corpus sites where an obligation silently accepts anyone/any amount (incl. the reference manual's own example); a simpler EVERY page",
+      "ask": "BUILT 2026-09-16 by workflow wf_8a91a677-de7 (15 agents): PR #407 (lang/action-binder-reference @ 29819243, 14 commits, gate 8/8 at 41809c4d, evaluation differential over 392 files clean of branch-caused differences). A bare name in a deontic action argument refers to what it names (lexical local silently; other in-scope non-selector term with an Info notice); wildcard only when it names nothing or only a selector; parenthesised expressions admitted in pattern position; EXACTLY deprecated with a warning that says drop / keep-unbound / keep-constructor-shadowed; EVERY rebind error retired. CONSIDER kept as-is BY MEASUREMENT: 22 collisions, all 22 deliberate wildcards (prelude's `WHEN JUST x` idiom would become `x == JUST x`). 302 tokens dropped, 1 kept; 54 goldens re-blessed and read; one real regression (semantic tokens silently lost) caught by a golden and fixed; 21 review findings → 8 fixed + docs, 2 declined with reasons in the spec. MENG: (1) enqueue #407; (2) keyword REMOVAL date (after one prerelease cut with the warning live); (3) R5 notice severity — 59 notices over the corpus, listed in the spec; (4) whether the action HEAD should also notice (11 sites, all top-level DECIDE references); (5) an ASSUME'd term referenced from a pattern now fails loudly at run time where the base silently fulfilled — accept as recorded, or change. After merge: close smucclaw#955; hand-port the skill to l4-plugin (needs the CLAUDE.md §1.0 yes).",
+      "unblocks": "smucclaw#955; the 33 silent wildcard sites; a simpler EVERY page; the marker-free reading Meng asked for",
       "source": {
         "file": "specs/todo/PATTERN-REFERENCE-RULE-SPEC.md",
         "anchor": "## 1. The ruling",
-        "ref": "lang/action-binder-reference"
+        "ref": "origin/lang/action-binder-reference"
+      },
+      "verify": {
+        "cmd": "gh pr view 407 --repo legalese/l4-ide --json state --jq .state || true",
+        "pendingWhen": "^OPEN$"
       }
     },
     {
