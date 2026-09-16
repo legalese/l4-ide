@@ -22,7 +22,12 @@
 --      other members are untouched;
 --   7. the partition helpers agree with the verdicts;
 --   8. a tick that reveals no expiry is refused, not reported as an
---      advance: the deadline arithmetic is held to the machine's word.
+--      advance: the deadline arithmetic is held to the machine's word;
+--   9. a window with an opening edge (AFTER): the act "now" is passed over
+--      as too early — the machine's word, read from its EarlyAct step —
+--      and the tick past opening + WITHIN breaches, both before any event
+--      (the WITHIN re-anchored on the opening) and after an early act (the
+--      residual's due counted from the opening, not the clock).
 module LtsWhatIfSpec (spec) where
 
 import qualified Data.Text as Text
@@ -168,6 +173,22 @@ aContractSrc = Text.unlines
   , ""
   , "#TRACE aContract AT 0 WITH"
   , "  PARTY S DOES delivery AT 2"
+  ]
+
+-- 9. the window's opening edge: AFTER 5 WITHIN 10 is [5, 15]. Two
+--    positions: before any event (the edges unforced, the WITHIN
+--    re-anchored on the opening — R-X5 as amended) and after an early act
+--    at 2 (the residual then holds the opening as 3-to-go and the due as
+--    10-from-the-opening, EVERY-EACH-QUANTIFIER-SPEC §5.1.2).
+afterSrc :: Text.Text
+afterSrc = Text.unlines $ prologue <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS PARTY Alice MUST deliver AFTER 5 WITHIN 10"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY Alice DOES deliver AT 2"
   ]
 
 everyPrologue :: [Text.Text]
@@ -341,6 +362,26 @@ spec = describe "LTS-VISUALISER §2.4 / P2c: the enabled set by replay" $ do
     case raw of
       Advancing m -> map placementText m `shouldBe` ["in effect: Alice MUST deliver WITHIN 0"]
       other -> expectationFailure ("expected Advancing, got " <> show other)
+
+  it "9. AFTER: the act now is passed over as too early, and the tick past opening + WITHIN breaches — before any event and after an early act" $ do
+    -- Pinned from the runtime on 2026-09-17 (adversarial round 1 of the
+    -- wave's third rebase, F1/S1/S2). Before it: the act read as taken by
+    -- nobody (NoTaker — the early act logged no step), and the tick was
+    -- computed at clock + 10 (10, then 12), landed short of the real
+    -- deadline 15, revealed no expiry and was reported Untried.
+    es <- enabledAt 0 afterSrc
+    es.esPosition.posClock `shouldBe` 0
+    map placementText es.esPosition.posMarking `shouldBe` ["in effect: Alice MUST deliver AFTER 5 WITHIN 10"]
+    map row es.esOutcomes `shouldBe`
+      [ Row (ActOf "Alice" "deliver" 0) (Passed (TooEarly 5))
+      , Row (TickAt 16 ["Alice"]) (Breaches (Just "Alice")) ]
+    es' <- enabledAt 1 afterSrc
+    es'.esPosition.posClock `shouldBe` 2
+    -- the residual: 3 to the opening, 10 from the opening to the close
+    map placementText es'.esPosition.posMarking `shouldBe` ["in effect: Alice MUST deliver AFTER 3 WITHIN 10"]
+    map row es'.esOutcomes `shouldBe`
+      [ Row (ActOf "Alice" "deliver" 2) (Passed (TooEarly 5))
+      , Row (TickAt 16 ["Alice"]) (Breaches (Just "Alice")) ]
 
   it "tickPast lands one unit past a lone deadline, and half-way to a nearer next one" $ do
     tickPast [10] 10 `shouldBe` 11

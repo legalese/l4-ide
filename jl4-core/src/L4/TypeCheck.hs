@@ -90,6 +90,7 @@ import L4.Annotation
 import L4.Names
 import L4.Parser.SrcSpan (prettySrcRange, prettySrcRangeM, SrcRange (..), zeroSrcPos)
 import L4.Print (hasInferenceVariable, prettyLayout, prettyTypeForDisplay, quotedName)
+import L4.Utils.Ratio (prettyRatio)
 import L4.Syntax
 import L4.TypeCheck.Annotation
 import L4.TypeCheck.Environment as X
@@ -2141,18 +2142,18 @@ checkMultiWayIf ann es e t = do
 
 checkDeonton
   :: Anno -> Subject Name -> RAction Name
-  -> Maybe (Deadline Name) -> Maybe (Join Name) -> Maybe (Expr Name) -> Maybe (Expr Name)
+  -> Maybe (Opening Name) -> Maybe (Deadline Name) -> Maybe (Join Name) -> Maybe (Expr Name) -> Maybe (Expr Name)
   -> Type' Resolved -> Type' Resolved -> Check (Deonton Resolved)
-checkDeonton ann subject action due mjoin hence lest partyT actionT =
+checkDeonton ann subject action opens due mjoin hence lest partyT actionT =
   case subject of
     Party sann party -> do
       partyR <- checkExpr ExpectRegulativePartyContext party partyT
       -- A join says when a cast's continuation fires; one PARTY is not a cast.
       forM_ mjoin (addError . JoinWithoutEvery)
       joinR <- traverse checkJoin mjoin
-      (actionR, dueR, henceR, lestR) <-
-        checkDeontonBody (Just partyR) partyT actionT action due (hasJoinDeadline mjoin) hence lest
-      pure (MkDeonton ann (Party sann partyR) actionR dueR joinR henceR lestR)
+      (actionR, opensR, dueR, henceR, lestR) <-
+        checkDeontonBody (Just partyR) partyT actionT action opens due (hasJoinDeadline mjoin) hence lest
+      pure (MkDeonton ann (Party sann partyR) actionR opensR dueR joinR henceR lestR)
     Every sann mCast v mRoll mFilter -> do
       -- EVERY-EACH-QUANTIFIER-SPEC §2.1/§2.4: the bound variable has the
       -- contract's party type (from @GIVETH DEONTIC Party Action@, or inferred
@@ -2222,9 +2223,9 @@ checkDeonton ann subject action due mjoin hence lest partyT actionT =
         -- why 'QuantifierVariableRebound' — which used to refuse this very
         -- spelling and tell the author to write @Sign (EXACTLY t)@ — is
         -- retired (R4). Its message would now be false.
-        (actionR, dueR, henceR, lestR) <-
-          checkDeontonBody Nothing partyT actionT action due (hasJoinDeadline mjoin) hence lest
-        pure (MkDeonton ann (Every sann mCastR rv' mRollR filterR) actionR dueR joinR henceR lestR)
+        (actionR, opensR, dueR, henceR, lestR) <-
+          checkDeontonBody Nothing partyT actionT action opens due (hasJoinDeadline mjoin) hence lest
+        pure (MkDeonton ann (Every sann mCastR rv' mRollR filterR) actionR opensR dueR joinR henceR lestR)
 
 -- | The @ONCE@ line: its threshold carries no expression in phase 1; its
 -- @WITHIN@ bounds the joined state and is a NUMBER like the act's (R-T2).
@@ -2253,24 +2254,87 @@ hasJoinDeadline = \ case
 -- things in the two (see 'checkAnchor').
 data DeadlinePosition = ActDeadline | JoinLineDeadline
 
--- | @WITHIN d [OF anchor]@ (EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7A\/B\/C;
--- built 2026-09-15). The duration is a NUMBER in either position; the anchor,
--- when written, is one of the three lifecycle positions or an expression.
+-- | The closing edge (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X5, type-directed):
+--
+--   * @WITHIN d [OF anchor]@ (§5.1.1, R-Q7A\/B\/C; built 2026-09-15): the
+--     duration is a NUMBER in either position; the anchor, when written, is
+--     one of the three lifecycle positions or an expression. A DATE after
+--     @WITHIN@ is the ordinary mismatch, whose wording then names @BEFORE@
+--     ('prettyTypeMismatch').
+--   * @BEFORE date@ (built 2026-09-16): the instant is a DATE; a NUMBER
+--     there is the mismatch whose wording names @WITHIN@. Act position only:
+--     on a join line it is refused by name ('BeforeOnJoinLine') — the barrier
+--     does not lower a DATE there, and saying so beats an internal error.
 checkDeadline :: DeadlinePosition -> Deadline Name -> Check (Deadline Resolved)
-checkDeadline pos (MkDeadline dann d ma) = do
-  dR <- checkExpr ctx d number
-  maR <- traverse (checkAnchor pos) ma
-  pure (MkDeadline dann dR maR)
+checkDeadline pos = \ case
+  MkDeadline dann d ma -> do
+    dR <- checkExpr (durationCtx ma) d number
+    maR <- traverse (checkAnchor EdgeWithin pos) ma
+    pure (MkDeadline dann dR maR)
+  edge@(MkBefore dann e) -> do
+    case pos of
+      JoinLineDeadline -> addError (BeforeOnJoinLine edge)
+      ActDeadline      -> pure ()
+    eR <- checkExpr ExpectBeforeInstantContext e date
+    pure (MkBefore dann eR)
   where
     -- An anchored deadline's duration is everything before OF, and inside
     -- an unbracketed duration OF is never application ('L4.Parser.deadline',
     -- @ofIsAnchor@). The commonest way to get a non-NUMBER there is to have
     -- meant @f OF x@ as a call, so a mismatch next to an anchor says so; the
     -- unanchored wording is kept for the unanchored form (its goldens hold).
-    ctx = case (pos, ma) of
+    durationCtx ma = case (pos, ma) of
       (_, Just _)              -> ExpectAnchoredDurationContext
       (ActDeadline, Nothing)      -> ExpectRegulativeDeadlineContext
       (JoinLineDeadline, Nothing) -> ExpectJoinDeadlineContext
+
+-- | The opening edge, @AFTER d [OF anchor]@ \/ @AFTER date@
+-- (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X5; built 2026-09-16). The offset
+-- is inferred and read back, as the anchor expression is ('checkAnchor'):
+-- a NUMBER is a duration and may carry an anchor; a DATE is the instant
+-- itself and an anchor on it is refused ('AbsoluteEdgeAnchored'); anything
+-- else is refused naming both ('OpeningNotAnInstant'). The choice is biased
+-- the same way: an offset of a not-yet-known type is taken as a NUMBER.
+-- Act position only — the join line takes no @AFTER@ — so the anchor is
+-- checked in the act position.
+checkOpening :: Opening Name -> Check (Opening Resolved)
+checkOpening (MkOpening oann d ma) = do
+  (dR, dT) <- softprune $ errorContext (WhileCheckingExpression d) do
+    (re, rt) <- inferExpr d
+    t <- accept number rt `orElse` accept date rt `orElse` (number <$ addError (OpeningNotAnInstant d rt))
+    re' <- setAnnResolvedType t Nothing re
+    pure (re', t)
+  maR <- traverse (checkAnchor EdgeAfter ActDeadline) ma
+  when (plainTypeEq dT date) $ forM_ ma (addError . AbsoluteEdgeAnchored)
+  pure (MkOpening oann dR maR)
+  where
+    accept :: Type' Resolved -> Type' Resolved -> Check (Type' Resolved)
+    accept t rt = do
+      ok <- unify t rt
+      if ok then pure t else empty
+
+-- | The empty-window check (EVERY-EACH-QUANTIFIER-SPEC §5.1.2.2, RULED
+-- 2026-09-16): it applies ONLY to the explicitly anchored closing edge.
+-- Bare @AFTER d1 WITHIN d2@ re-anchors — the window is @[a+d1, a+d1+d2]@ —
+-- and can never be empty. @AFTER d1 WITHIN d2 OF anchor@ measures both
+-- edges from one anchor when the @AFTER@ is bare or names the SAME anchor,
+-- and then @d1 > d2@ closes the window before it opens: a check error when
+-- both offsets are literals (here), a run-time note otherwise
+-- ('L4.EvaluateLazy.Machine', @Contract5@). An @AFTER@ anchored elsewhere
+-- (@AFTER 3 OF THE ARMING WITHIN 30 OF THE JOIN@) has two origins and no
+-- literal comparison to make.
+checkWindowNotEmpty :: Maybe (Opening Name) -> Maybe (Deadline Name) -> Check ()
+checkWindowNotEmpty mopen mdue = case (mopen, mdue) of
+  (Just (MkOpening _ (Lit _ (NumericLit _ d1)) moa), Just edge@(MkDeadline _ (Lit _ (NumericLit _ d2)) (Just ca)))
+    | sameOrigin moa ca, d1 > d2 -> addError (EmptyWindow edge d1 d2)
+  _ -> pure ()
+  where
+    sameOrigin moa ca = case moa of
+      Nothing -> True
+      Just oa -> anchorWords oa == anchorWords ca && not (isAt oa)
+    isAt = \ case
+      AnchorAt{} -> True
+      _          -> False
 
 -- | The anchor after @OF@.
 --
@@ -2293,8 +2357,11 @@ checkDeadline pos (MkDeadline dann d ma) = do
 -- or a DATE, which the machine lowers with @DATE_SERIAL@; anything else is
 -- refused naming both. The choice is biased: an expression of a
 -- not-yet-known type is taken as a NUMBER.
-checkAnchor :: DeadlinePosition -> Anchor Name -> Check (Anchor Resolved)
-checkAnchor pos a = case a of
+--
+-- The same slot serves the opening edge (@AFTER d OF …@, §5.1.2, built
+-- 2026-09-16): the 'EdgeWord' only chooses the diagnostic's keyword.
+checkAnchor :: EdgeWord -> DeadlinePosition -> Anchor Name -> Check (Anchor Resolved)
+checkAnchor edge pos a = case a of
   AnchorJoin aann     -> AnchorJoin aann     <$ lifecycle (\ enc -> case enc.slot of
                                                              InLest  -> Just JoinUnderLest
                                                              InHence -> Nothing)
@@ -2306,17 +2373,17 @@ checkAnchor pos a = case a of
     -- refuse per position, then per what the enclosing obligation has
     lifecycle :: (EnclosingObligation -> Maybe AnchorRefusal) -> Check ()
     lifecycle refuseWithin = case pos of
-      JoinLineDeadline -> addError (AnchorUnavailable a OnJoinLine)
+      JoinLineDeadline -> addError (AnchorUnavailable edge a OnJoinLine)
       ActDeadline -> do
         menc <- asks (.enclosingObligation)
         case menc of
-          Nothing  -> addError (AnchorUnavailable a NoEnclosingObligation)
-          Just enc -> forM_ (refuseWithin enc) (addError . AnchorUnavailable a)
+          Nothing  -> addError (AnchorUnavailable edge a NoEnclosingObligation)
+          Just enc -> forM_ (refuseWithin enc) (addError . AnchorUnavailable edge a)
 
     checkAnchorAt :: Expr Name -> Check (Expr Resolved)
     checkAnchorAt e = softprune $ errorContext (WhileCheckingExpression e) do
       (re, rt) <- inferExpr e
-      t <- accept number rt `orElse` accept date rt `orElse` (number <$ addError (AnchorNotAnInstant e rt))
+      t <- accept number rt `orElse` accept date rt `orElse` (number <$ addError (AnchorNotAnInstant edge e rt))
       setAnnResolvedType t Nothing re
 
     accept :: Type' Resolved -> Type' Resolved -> Check (Type' Resolved)
@@ -2331,11 +2398,18 @@ checkAnchor pos a = case a of
 -- deonton, so that a nested obligation's anchored @WITHIN@ can be checked
 -- against what this one has ('checkAnchor'). The nearest enclosing
 -- obligation wins, which is also what the machine binds at run time.
+--
+-- The window's two edges are checked here too, the opening before the
+-- closing as in the source; neither sees the pattern's binders (a @WITHIN@
+-- never did, and an @AFTER@ is read at the same moment). 'hasDeadline' is
+-- about the CLOSING edge only: @THE DEADLINE@ under an obligation that has
+-- an @AFTER@ and no @WITHIN@ is refused, as the machine has no deadline to
+-- bind there.
 checkDeontonBody
   :: Maybe (Expr Resolved) -> Type' Resolved -> Type' Resolved
-  -> RAction Name -> Maybe (Deadline Name) -> Bool -> Maybe (Expr Name) -> Maybe (Expr Name)
-  -> Check (RAction Resolved, Maybe (Deadline Resolved), Maybe (Expr Resolved), Maybe (Expr Resolved))
-checkDeontonBody mPartyR partyT actionT action due joinHasDeadline hence lest = do
+  -> RAction Name -> Maybe (Opening Name) -> Maybe (Deadline Name) -> Bool -> Maybe (Expr Name) -> Maybe (Expr Name)
+  -> Check (RAction Resolved, Maybe (Opening Resolved), Maybe (Deadline Resolved), Maybe (Expr Resolved), Maybe (Expr Resolved))
+checkDeontonBody mPartyR partyT actionT action opens due joinHasDeadline hence lest = do
   (actionR, boundByPattern) <- checkAction action actionT
   checkPartyActionAgreement partyT actionT
   forM_ mPartyR \partyR ->
@@ -2343,10 +2417,12 @@ checkDeontonBody mPartyR partyT actionT action due joinHasDeadline hence lest = 
   let rTy = contract partyT actionT
       hasDeadline = isJust due || joinHasDeadline
       inSlot slot = local \ env -> env { enclosingObligation = Just (MkEnclosingObligation slot hasDeadline) }
+  opensR <- traverse checkOpening opens
   dueR <- traverse (checkDeadline ActDeadline) due
+  checkWindowNotEmpty opens due
   henceR <- traverse (\e -> extendKnownMany boundByPattern $ inSlot InHence $ checkExpr ExpectRegulativeFollowupContext e rTy) hence
   lestR <- traverse (\e -> inSlot InLest $ checkExpr ExpectRegulativeFollowupContext e rTy) lest
-  pure (actionR, dueR, henceR, lestR)
+  pure (actionR, opensR, dueR, henceR, lestR)
 
 -- | The cast of an @EVERY Cast v@: a data constructor whose result type is the
 -- party type. A constructor with a payload (@Tenant HAS name IS A STRING@) has
@@ -3685,10 +3761,10 @@ inferExpr' g =
       v <- fresh (NormalName "multiwayif")
       re <- checkMultiWayIf ann es e v
       pure (re, v)
-    Regulative ann (MkDeonton ann'' subj e2 me3 mj me4 me5) -> do
+    Regulative ann (MkDeonton ann'' subj e2 mo me3 mj me4 me5) -> do
       party <- fresh (NormalName "party")
       action <- fresh (NormalName "action")
-      ob <- checkDeonton ann'' subj e2 me3 mj me4 me5 party action
+      ob <- checkDeonton ann'' subj e2 mo me3 mj me4 me5 party action
       pure (Regulative ann ob, contract party action)
     Consider ann e branches -> do
       v <- fresh (NormalName "consider")
@@ -6063,12 +6139,15 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
 
     goNamed ctx' (MkNamedExpr ann n e) = MkNamedExpr ann n (go False ctx' e)
     goGuarded ctx' (MkGuardedExpr ann c f) = MkGuardedExpr ann (go True ctx' c) (go False ctx' f)
-    goObl ctx' (MkDeonton ann subj action due mjoin hence lest) =
-      MkDeonton ann (goSubject ctx' subj) (goRAction ctx' action) (fmap (goDeadline ctx') due) (fmap (goJoin ctx') mjoin) (fmap (go False ctx') hence) (fmap (go False ctx') lest)
+    goObl ctx' (MkDeonton ann subj action opens due mjoin hence lest) =
+      MkDeonton ann (goSubject ctx' subj) (goRAction ctx' action) (fmap (goOpening ctx') opens) (fmap (goDeadline ctx') due) (fmap (goJoin ctx') mjoin) (fmap (go False ctx') hence) (fmap (go False ctx') lest)
     goJoin ctx' = \ case
       JoinOnce ann th due -> JoinOnce ann th (fmap (goDeadline ctx') due)
       JoinUpon ann ue due -> JoinUpon ann ue (fmap (goDeadline ctx') due)
-    goDeadline ctx' (MkDeadline ann d ma) = MkDeadline ann (go False ctx' d) (fmap (goAnchor ctx') ma)
+    goDeadline ctx' = \ case
+      MkDeadline ann d ma -> MkDeadline ann (go False ctx' d) (fmap (goAnchor ctx') ma)
+      MkBefore ann e      -> MkBefore ann (go False ctx' e)
+    goOpening ctx' (MkOpening ann d ma) = MkOpening ann (go False ctx' d) (fmap (goAnchor ctx') ma)
     goAnchor ctx' = \ case
       AnchorAt ann e -> AnchorAt ann (go False ctx' e)
       a              -> a
@@ -6711,7 +6790,7 @@ prettyCheckError (ContinuationWithoutJoin _) =
   , "past the EVERY. There is no default: the two readings differ, and guessing"
   , "one would silently change the rule."
   ]
-prettyCheckError (AnchorUnavailable a reason) =
+prettyCheckError (AnchorUnavailable edge a reason) =
   case reason of
     NoEnclosingObligation ->
       [ "OF " <> word <> " names a position in the life of the obligation this one"
@@ -6720,10 +6799,10 @@ prettyCheckError (AnchorUnavailable a reason) =
       , "checker cannot see which obligation (if any) it will be attached to."
       , ""
       , "Write the anchored obligation inline, under the HENCE or LEST whose " <> noun
-      , "it means, or anchor it to an instant instead: WITHIN d OF <a NUMBER or"
+      , "it means, or anchor it to an instant instead: " <> kw <> " d OF <a NUMBER or"
       , "DATE expression>. (OF THE ARMING is allowed here: it is the arming of"
       , "whatever obligation this one is attached to when it runs, or its own"
-      , "when there is none, which is where an unanchored WITHIN already counts"
+      , "when there is none, which is where an unanchored " <> kw <> " already counts"
       , "from.)"
       ]
     OnJoinLine ->
@@ -6736,12 +6815,12 @@ prettyCheckError (AnchorUnavailable a reason) =
       , "instant, a NUMBER or DATE expression."
       ]
     JoinUnderLest ->
-      [ "OF THE JOIN cannot anchor a WITHIN under LEST."
+      [ "OF THE JOIN cannot anchor " <> article <> " " <> kw <> " under LEST."
       , ""
       , "LEST runs because the obligation was NOT completed — its join did not"
       , "fire — so there is no join to count from. Under LEST, anchor to"
       , "OF THE DEADLINE (the deadline that was missed), to OF THE ARMING, or to"
-      , "an instant; or leave the WITHIN unanchored."
+      , "an instant; or leave the " <> kw <> " unanchored."
       ]
     EnclosingHasNoDeadline ->
       [ "OF THE DEADLINE names the deadline of the obligation this one is the"
@@ -6753,16 +6832,52 @@ prettyCheckError (AnchorUnavailable a reason) =
       ]
   where
     word = anchorWords a
+    kw = edgeWordText edge
+    article = case edge of
+      EdgeWithin -> "a"
+      EdgeAfter  -> "an"
     noun = case a of
       AnchorJoin{}     -> "join"
       AnchorDeadline{} -> "deadline"
       AnchorArming{}   -> "arming"
       AnchorAt{}       -> "anchor"
-prettyCheckError (AnchorNotAnInstant _ given) =
-  [ "The anchor after OF in a WITHIN is expected to be an instant — a NUMBER on"
+prettyCheckError (AnchorNotAnInstant edge _ given) =
+  [ "The anchor after OF in " <> article <> " " <> edgeWordText edge <> " is expected to be an instant — a NUMBER on"
   , "the trace's own clock, or a DATE — but is here of type"
   , ""
   , "  " <> prettyTypeForDisplay given
+  ]
+  where
+    article = case edge of
+      EdgeWithin -> "a"
+      EdgeAfter  -> "an"
+prettyCheckError (OpeningNotAnInstant _ given) =
+  [ "AFTER opens the window: after a duration (a NUMBER, counted from the anchor"
+  , "or from the obligation's own clock) or after an instant (a DATE). Its"
+  , "argument is here of type"
+  , ""
+  , "  " <> prettyTypeForDisplay given
+  ]
+prettyCheckError (AbsoluteEdgeAnchored _) =
+  [ "AFTER <date> names the instant the window opens, so it has nothing to"
+  , "count from and cannot take OF <anchor>. Either drop the anchor (AFTER"
+  , "<date>) or give AFTER a duration to count from it (AFTER d OF <anchor>)."
+  ]
+prettyCheckError (EmptyWindow _ d1 d2) =
+  [ "This window closes before it opens: it opens " <> prettyRatio d1
+      <> " after the anchor and closes " <> prettyRatio d2 <> " after the same anchor,"
+  , "so nothing can ever be performed in time."
+  , ""
+  , "Both edges count from one anchor because the WITHIN names it (WITHIN d2 OF"
+  , "…) and the AFTER counts from the same place. To open at d1 and stay open"
+  , "for d2 after that — the window [a+d1, a+d1+d2] — drop the anchor from the"
+  , "WITHIN: bare AFTER d1 WITHIN d2 counts the WITHIN from the instant the"
+  , "window opened. To keep both edges on one anchor, make d2 at least d1."
+  ]
+prettyCheckError (BeforeOnJoinLine _) =
+  [ "BEFORE <date> is not accepted on a join line (ONCE … / UPON EACH …) —"
+  , "only on the act. The join line's deadline is a WITHIN: write the absolute"
+  , "date as WITHIN 0 OF <date>, which counts nothing from that instant."
   ]
 prettyCheckError (RegulativeActorMismatch party performer actionName) =
   [ "An actor may only perform its own actions."
@@ -7166,6 +7281,7 @@ prettyTypeMismatch (ExpectActionPatternReferenceContext n) expected given =
        ]
 prettyTypeMismatch ExpectRegulativeDeadlineContext expected given =
   standardTypeMismatch [ "The WITHIN clause of a regulative rule is expected to be of type" ] expected given
+  <> withinGotDate given
 prettyTypeMismatch ExpectRegulativeFollowupContext expected given =
   standardTypeMismatch [ "The HENCE clause of a regulative rule is expected to be of type" ] expected given
 prettyTypeMismatch ExpectRegulativeContractContext expected given =
@@ -7209,6 +7325,7 @@ prettyTypeMismatch ExpectQuantifierRollContext expected given =
     ] expected given
 prettyTypeMismatch ExpectJoinDeadlineContext expected given =
   standardTypeMismatch [ "The WITHIN on a join line (the deadline on the whole) is expected to be of type" ] expected given
+  <> withinGotDate given
 prettyTypeMismatch ExpectAnchoredDurationContext expected given =
   standardTypeMismatch
     [ "In WITHIN d OF anchor, everything before OF is the duration d, and inside"
@@ -7217,6 +7334,30 @@ prettyTypeMismatch ExpectAnchoredDurationContext expected given =
     , "juxtapose its arguments (WITHIN f x OF ...). The duration is expected to"
     , "be of type"
     ] expected given
+  <> withinGotDate given
+prettyTypeMismatch ExpectBeforeInstantContext expected given =
+  standardTypeMismatch
+    [ "BEFORE closes the window at an instant, so it is expected to be of type" ]
+    expected given
+  <> if plainTypeEq given number
+       then [ ""
+            , "A NUMBER is a duration, and a duration is WITHIN's: write WITHIN d for a"
+            , "deadline d after the clock starts, or WITHIN d OF <anchor> to count it"
+            , "from somewhere else." ]
+       else []
+
+-- | The sentence a @WITHIN@ mismatch gains when what it was given is a DATE
+-- (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X5: each edge word's mismatch names
+-- the other word). Empty otherwise, so every older wording holds byte for
+-- byte.
+withinGotDate :: Type' Resolved -> [Text]
+withinGotDate given
+  | plainTypeEq given date =
+      [ ""
+      , "A DATE is an instant, and an instant is BEFORE's: write BEFORE <date> for"
+      , "an absolute deadline, or WITHIN d OF <date> to count a duration from it."
+      ]
+  | otherwise = []
 
 -- | Best effort, only small numbers will occur"
 prettyOrdinal :: Int -> Text

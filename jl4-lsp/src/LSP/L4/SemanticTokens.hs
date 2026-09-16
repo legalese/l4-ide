@@ -218,6 +218,9 @@ instance ToSemTokens Context PosToken (Threshold Name) where
 instance ToSemTokens Context PosToken UponEach where
   toSemTokens ue = withTokenType identIsKeyword $ genericToSemTokens ue
 instance ToSemTokens Context PosToken (Deadline Name) where
+-- AFTER is a keyword token of the node's own Anno, so the derived instance
+-- places it like WITHIN's (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, 2026-09-16).
+instance ToSemTokens Context PosToken (Opening Name) where
 -- The anchor's words live in its own Anno (R-Q7B: JOIN, DEADLINE and ARMING
 -- are identifier tokens shown as the keywords they act as); the expression
 -- form has no such words, and its identifiers are highlighted as themselves.
@@ -349,6 +352,7 @@ instance ToSemTokens () PosToken (Threshold Resolved) where
 instance ToSemTokens () PosToken UponEach where
   toSemTokens ue = withTokenType identIsKeyword $ genericToSemTokens ue
 instance ToSemTokens () PosToken (Deadline Resolved) where
+instance ToSemTokens () PosToken (Opening Resolved) where
 -- See the Name-phase instance above.
 instance ToSemTokens () PosToken (Anchor Resolved) where
   toSemTokens a = case a of

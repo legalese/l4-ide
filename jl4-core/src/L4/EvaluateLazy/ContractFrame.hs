@@ -24,6 +24,17 @@ data ContractFrame
   -- ^ the deadline is anchored (@WITHIN d OF …@, R-Q7): the anchor's instant
   -- has just been forced; lower it to the trace's clock (a DATE via its
   -- serial), then evaluate the duration for 'Contract5'
+  | Contract4o ScrutinizeOpening
+  -- ^ the window has an opening edge (@AFTER …@, EVERY-EACH-QUANTIFIER-SPEC
+  -- §5.1.2, R-X5): its offset has just been forced — a NUMBER to add to the
+  -- opening's anchor (or to the obligation's own clock), or a DATE, the
+  -- instant itself, lowered by its serial. The opening instant is then
+  -- known, and the closing edge is scrutinised as 'Contract4' would have
+  -- ('L4.EvaluateLazy.Machine.scrutinizeDue').
+  | Contract4oa ScrutinizeOpeningAnchor
+  -- ^ the opening edge is anchored (@AFTER d OF …@): the anchor's instant
+  -- has just been forced; lower it, then evaluate the offset for
+  -- 'Contract4o'
   | Contract5 CheckTiming
   -- ^ scrutinizes the current time, the timestamp of the event and the due time
   -- We check if the event happens within the due time, if that's the case, we continue
@@ -141,8 +152,18 @@ data ContractFrame
   -- is not reached by rebinding the compound.
   deriving stock Show
 
+-- | The window's opening edge as the act frames carry it (EVERY-EACH-QUANTIFIER-SPEC
+-- §5.1.2, R-X5, built 2026-09-16): the source @AFTER …@ before the first
+-- event ('Left'; 'Nothing' when the act has none), and after it the time
+-- still to run until the window opens, relative to the frame's @time@ —
+-- @Right (Just n)@ while the window has not opened, @Right Nothing@ once it
+-- has. Mirrors the fourth field of 'L4.Evaluate.ValueLazy.ValObligation',
+-- which is what a residual is rebuilt from. An act met while this is
+-- @Right (Just _)@ is EARLY: a nullity, reported (R-X6, @Contract10@).
+type MaybeOpened = Either (Maybe (Opening Resolved)) (Maybe WHNF)
+
 data ScrutinizeEvents = ScrutinizeEvents
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , time :: Reference
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
@@ -183,7 +204,7 @@ data Reoffered = MkReoffered
   deriving stock Show
 
 data ScrutinizeEvent = ScrutinizeEvent
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered
   , env :: Environment
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
@@ -197,7 +218,7 @@ data ScrutinizeEvent = ScrutinizeEvent
   deriving stock Show
 
 data CurrentTimeWHNF = CurrentTimeWHNF
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: Reference
   , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered
   , env :: Environment
@@ -212,7 +233,7 @@ data CurrentTimeWHNF = CurrentTimeWHNF
   deriving stock Show
 
 data ScrutinizeDue = ScrutinizeDue
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
   , events :: Reference, time :: Reference, ev'reoffered :: Maybe Reoffered
   , env :: Environment
@@ -229,7 +250,7 @@ data ScrutinizeDue = ScrutinizeDue
 -- | The anchor of an anchored deadline has been forced ('Contract4b' is what
 -- receives it); the duration is still to evaluate.
 data ScrutinizeAnchor = ScrutinizeAnchor
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
   , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered
   , env :: Environment
@@ -240,11 +261,48 @@ data ScrutinizeAnchor = ScrutinizeAnchor
   , armed :: Reference
   , duration :: RExpr        -- ^ the @d@ of @WITHIN d OF …@, evaluated once the anchor is known
   , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
+  , openT :: Maybe Rational  -- ^ the instant the window opens, when the act has an @AFTER@ (see 'CheckTiming')
+  }
+  deriving stock Show
+
+-- | The opening edge is anchored (@AFTER d OF …@) and its anchor has been
+-- forced ('Contract4oa' receives it); the offset is still to evaluate.
+data ScrutinizeOpeningAnchor = ScrutinizeOpeningAnchor
+  { party :: MaybeEvaluated, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
+  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered
+  , env :: Environment
+  , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
+  , armed :: Reference
+  , offset :: RExpr          -- ^ the @d@ of @AFTER d OF …@, evaluated once the anchor is known
+  }
+  deriving stock Show
+
+-- | The opening edge's offset has been forced ('Contract4o' receives it).
+data ScrutinizeOpening = ScrutinizeOpening
+  { party :: MaybeEvaluated, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
+  , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered
+  , env :: Environment
+  , norm :: NormKey  -- ^ the step log's key for this obligation (P2b); lazy, and never forced when the log is off
+  , seen :: Int
+    -- ^ how many events this scan has taken from its stream: the position
+    -- of the event under scrutiny, counted from the stream the obligation
+    -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
+  , armed :: Reference
+  , openAnchorT :: Maybe Rational
+    -- ^ the opening's anchor on the trace's clock, when the @AFTER@ names
+    -- one (@AFTER d OF …@); the window then opens at @openAnchorT + d@
+    -- rather than at @time + d@
   }
   deriving stock Show
 
 data CheckTiming = CheckTiming
-  { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  { party :: MaybeEvaluated, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
   , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered
   , env :: Environment
@@ -255,17 +313,28 @@ data CheckTiming = CheckTiming
     -- was armed on (R-T3 on R-Q7B, spec §11.0.1 "Stacking B on C" round 1)
   , armed :: Reference
     -- ^ when this obligation was entered: what @THE ARMING@ names in its continuation (R-Q7B)
-  , anchorT :: Maybe Rational
-    -- ^ the anchor's instant on the trace's clock, when the deadline is
-    -- anchored (@WITHIN d OF …@): the deadline is then @anchorT + d@,
-    -- absolute, rather than @time + d@. Set once, at the first event, when
-    -- @time@ is still the arming time; after this frame the remaining due
-    -- is relative again ('Right (ValNumber newDue)') and the anchor is spent.
+  , origin :: Maybe Rational
+    -- ^ what a DURATION in the closing edge is added to, when it is not
+    -- the frame's own clock: the anchor's instant for @WITHIN d OF …@
+    -- (R-Q7: the deadline is then @anchor + d@, absolute), or the instant
+    -- the window OPENS for a bare @WITHIN d@ beside an @AFTER@ (R-X5 as
+    -- amended 2026-09-16, §5.1.2.2: bare @AFTER d1 WITHIN d2@ re-anchors,
+    -- the deadline is @open + d2@). @Nothing@ for an unanchored @WITHIN@
+    -- with no @AFTER@, for an already-evaluated remaining due, and for a
+    -- @BEFORE@ (whose value is a DATE, absolute by itself). Set once, at
+    -- the first event, when @time@ is still the arming time; after this
+    -- frame the remaining due is relative again ('Right (ValNumber newDue)')
+    -- and the anchor is spent.
+  , openT :: Maybe Rational
+    -- ^ the instant the window opens, absolute, when the act has an
+    -- @AFTER@ and the window has not yet opened; what the residual's
+    -- opening edge is re-relativised from after this frame, and what the
+    -- explicitly anchored empty window is diagnosed against
   }
   deriving stock Show
 
 data PartyWHNF = PartyWHNF
-  { act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  { act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference
   , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered
   , env :: Environment
@@ -280,7 +349,7 @@ data PartyWHNF = PartyWHNF
   deriving stock Show
 
 data PartyEqual = PartyEqual
-  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  { party :: WHNF, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference
   , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered
   , env :: Environment
@@ -295,7 +364,7 @@ data PartyEqual = PartyEqual
   deriving stock Show
 
 data ScrutinizeParty = ScrutinizeParty
-  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  { party :: WHNF, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered
   , env :: Environment
@@ -310,7 +379,7 @@ data ScrutinizeParty = ScrutinizeParty
   deriving stock Show
 
 data ScrutinizeEnvironment = ScrutinizeEnvironment
-  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  { party :: WHNF, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered
   , env :: Environment
@@ -325,7 +394,7 @@ data ScrutinizeEnvironment = ScrutinizeEnvironment
   deriving stock Show
 
 data ScrutinizeActions = ScrutinizeActions
-  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  { party :: WHNF, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered
   , env :: Environment, henceEnv :: Environment -- ^ the environment to extend by when evaluating the hence clause
@@ -339,7 +408,7 @@ data ScrutinizeActions = ScrutinizeActions
   deriving stock Show
 
 data ActionDoesn'tmatch = ActionDoesn'tmatch
-  { party :: WHNF, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
+  { party :: WHNF, act :: RAction Resolved, opens :: MaybeOpened, due :: MaybeEvaluated' (Maybe (Deadline Resolved)), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: WHNF, ev'act :: Reference
   , events :: Reference, time :: WHNF, ev'reoffered :: Maybe Reoffered
   , env :: Environment

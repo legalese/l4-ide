@@ -140,7 +140,7 @@ nlgExpr = \ case
         pure $ MkGuardedExpr ann' c' f'
       e' <- nlgExpr e
       pure $ MultiWayIf ann es' e'
-    Regulative ann (MkDeonton ann'' subj (MkAction ann' modal rule provided) deadline mjoin followup lest) -> do
+    Regulative ann (MkDeonton ann'' subj (MkAction ann' modal rule provided) opens deadline mjoin followup lest) -> do
       subj' <- case subj of
         Party sann party -> Party sann <$> nlgExpr party
         Every sann mCast v mRoll mFilter ->
@@ -150,8 +150,12 @@ nlgExpr = \ case
       let nlgAnchor = \ case
             AnchorAt aann e -> AnchorAt aann <$> nlgExpr e
             a               -> pure a
-          nlgDeadline (MkDeadline dann d ma) =
-            MkDeadline dann <$> nlgExpr d <*> traverse nlgAnchor ma
+          nlgDeadline = \ case
+            MkDeadline dann d ma -> MkDeadline dann <$> nlgExpr d <*> traverse nlgAnchor ma
+            MkBefore dann e      -> MkBefore dann <$> nlgExpr e
+          nlgOpening (MkOpening oann d ma) =
+            MkOpening oann <$> nlgExpr d <*> traverse nlgAnchor ma
+      opens' <- traverse nlgOpening opens
       deadline' <- traverse nlgDeadline deadline
       let nlgJoin = \ case
             JoinOnce jann th d -> JoinOnce jann th <$> traverse nlgDeadline d
@@ -159,7 +163,7 @@ nlgExpr = \ case
       join' <- traverse nlgJoin mjoin
       followup' <- traverse nlgExpr followup
       lest' <- traverse nlgExpr lest
-      pure $ Regulative ann (MkDeonton ann'' subj' (MkAction ann' modal rule' provided') deadline' join' followup' lest')
+      pure $ Regulative ann (MkDeonton ann'' subj' (MkAction ann' modal rule' provided') opens' deadline' join' followup' lest')
     Consider ann e branches  -> do
       e' <- nlgExpr e
       -- Since the bindings in the branches bring new variables into

@@ -324,7 +324,7 @@ stateGraphToBpmn opts sg =
       ]
 
     taskFindings = case (obligation, taskNodes) of
-      (Just t, tn : _) -> modalityFinding tn t.transLabel <> guardFindings tn t.transLabel
+      (Just t, tn : _) -> modalityFinding tn t.transLabel <> guardFindings tn t.transLabel <> openingFindings tn t.transLabel
       _ -> []
 
     quantifierFindings = case (obligation, taskNodes) of
@@ -1445,7 +1445,8 @@ restateRule l =
       [ fmap subjectWords l.labelParty
       , fmap modalWord l.labelModal
       , Just l.labelAction
-      , fmap ("WITHIN " <>) l.labelDeadline
+      , fmap ("AFTER " <>) l.labelOpening
+      , fmap closingClause l.labelDeadline
       , fmap ("PROVIDED " <>) l.labelGuard
       , joinWords <$> (l.labelQuantifier >>= (.quantJoin))
       ]
@@ -1454,6 +1455,15 @@ restateRule l =
     Just _ -> p
     Nothing -> "PARTY " <> p
 
+-- | The window's closing edge as a clause: a @WITHIN@'s label is its body,
+-- a @BEFORE@'s carries its own keyword ('L4.StateGraph.extractDeonton'), and
+-- the join line's deadline is rendered the same way, so a date is never
+-- restated as a duration.
+closingClause :: Text -> Text
+closingClause d
+  | "BEFORE " `Text.isPrefixOf` d = d
+  | otherwise                     = "WITHIN " <> d
+
 -- | A join line as the source spells it.
 joinWords :: JoinLabel -> Text
 joinWords j =
@@ -1461,7 +1471,7 @@ joinWords j =
       Barrier th -> "ONCE " <> th
       Fork -> "UPON EACH"
   )
-    <> maybe "" (" WITHIN " <>) j.joinDeadline
+    <> maybe "" ((" " <>) . closingClause) j.joinDeadline
 
 -- | What the @\<documentation\>@ of an @EVERY@'s task adds after the restated
 -- rule: what the multi-instance marker means here, and — for a fork — what it
@@ -1694,10 +1704,26 @@ boundaryTrigger opts modal elemId lestLabel = \case
       )
     Unparsed -> (WhenCondition raw, [unparsedNote raw])
  where
-  -- The shapes 'parseDuration' cannot read, each said as what it is
+  -- The three shapes 'parseDuration' cannot read, each said as what it is
   -- (adversarial pass of 2026-09-16, R1-2: an anchored deadline used to be
   -- reported as a missing unit, which is not what is wrong with it).
   unparsedNote raw
+    -- A BEFORE date (R-X5, EVERY-EACH-QUANTIFIER-SPEC §5.1.2) is an instant,
+    -- not a duration with a unit to read; the label carries the keyword so
+    -- this arm can see it ('L4.StateGraph.extractDeonton').
+    | "BEFORE " `Text.isPrefixOf` raw =
+        note
+          "P-DEADLINE"
+          Blocking
+          ( "Deadline "
+              <> quoted raw
+              <> " is a date, an absolute instant, and this exporter draws a \
+                 \timer only from a duration \8212 it does not compute a \
+                 \timeDate from L4's calendar \8212 so the boundary event \
+                 \carries the text verbatim as a condition rather than a timer."
+          )
+          "the deadline as a machine-checkable timer; the date survives only \
+          \in the condition's text"
     -- An anchored WITHIN (R-Q7, §5.1.1): the unit may well be readable; what
     -- this exporter cannot do is resolve the anchor.
     | Just anchor <- deadlineAnchor raw =
@@ -1801,9 +1827,13 @@ isNat t = not (Text.null t) && Text.all isDigit t
 -- brackets count for nothing ('labelWords'). Without that, @WITHIN `days OF
 -- grace`@ was reported as anchored at @grace`@ (adversarial pass of
 -- 2026-09-16, round 2, R2-SEM-2).
+-- A @BEFORE@ has no anchor: it is a date, not a duration from anything.
 deadlineAnchor :: Text -> Maybe Text
-deadlineAnchor raw = go (0 :: Int) (labelWords (Text.strip raw))
+deadlineAnchor raw
+  | "BEFORE " `Text.isPrefixOf` t = Nothing
+  | otherwise = go (0 :: Int) (labelWords t)
  where
+  t = Text.strip raw
   go _ [] = Nothing
   go 0 ("OF" : rest@(_ : _)) = Just (Text.unwords rest)
   go d (w : rest) = go (d + bracketDepth w) rest
@@ -2065,6 +2095,37 @@ modalityFinding n l =
       , "the deontic modality, which survives in the label and the \
         \<documentation> but has no notational force"
       )
+
+-- | The window's opening edge (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, 2026-09-16)
+-- is not drawn: the task is enabled as soon as the token reaches it, and
+-- an act before the window opens — a nullity in L4 (R-X6) — is a completion
+-- in BPMN. The boundary timer, when there is one, is the closing edge as
+-- written, which a bare @WITHIN@ measures from the opening instant
+-- (re-anchor, §5.1.2.2), not from the task's start — so it is not the
+-- duration a modeller would put on the timer either. Both are said here.
+openingFindings :: FlowNode -> TransitionLabel -> [FidelityNote]
+openingFindings n l = case l.labelOpening of
+  Nothing -> []
+  Just o ->
+    [ MkFidelityNote
+        { code = "P-WINDOW-OPENING"
+        , severity = Blocking
+        , element = n.nodeId
+        , range = Nothing
+        , message =
+            "This obligation's window opens AFTER \8216"
+              <> o
+              <> "\8217, and BPMN has no way to hold a task closed until then: \
+                 \the activity is enabled as soon as it is reached, so an act \
+                 \the rule would treat as a nullity (performed before the window \
+                 \opened) reads here as a completion. A bare WITHIN beside the \
+                 \AFTER counts from the instant the window opens, so the boundary \
+                 \timer, if one is drawn, is measured from the wrong point too."
+        , lost =
+            "the opening edge, and the point the closing edge is measured from; \
+            \both survive only in the <documentation>"
+        }
+    ]
 
 guardFindings :: FlowNode -> TransitionLabel -> [FidelityNote]
 guardFindings n l = case l.labelGuard of

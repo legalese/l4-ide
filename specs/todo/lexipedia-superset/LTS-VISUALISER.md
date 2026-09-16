@@ -1444,7 +1444,10 @@ the change with `l4 state-graph` on `ok/every/barrier.l4` and `fork.l4`: the `EV
 `EVERY Tenant t MUST Sign ... [14]` and `EVERY Tenant t MUST Pay ... [7]`, no join anywhere. After:
 `…\nONCE ALL HAVE` and `…\nUPON EACH`, and `once-within.l4` shows `ONCE ALL HAVE WITHIN 30`. The
 pattern at `extractDeonton` is now positional — `(MkDeonton _ subject action due mJoin hence lest)`
-— so the next field the constructor grows is a type error there rather than a silent drop; the
+— so the next field the constructor grows is a type error there rather than a silent drop _(and it
+did: the `AFTER`/`BEFORE` track grew `opens` between `action` and `due` on 2026-09-16, and the
+pattern has been the eight-field `(MkDeonton _anno subject action opens due mJoin hence lest)`
+since; the seven-field quotation is the shape of 2026-09-15)_; the
 `Threshold` and `Join` cases have no wildcard arm for the same reason. Two things the fix found
 that the localisation did not predict: (1) a rule whose only `WITHIN` sits on the join line had its
 `LEST` arm captioned `unreachable: no WITHIN`, contradicting `Machine.hs`'s `memberDue`, which

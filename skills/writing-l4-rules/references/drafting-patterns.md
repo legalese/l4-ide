@@ -446,9 +446,11 @@ The clamp-immune way to go _backward_ — decrement the YEAR (`ground-2ZD.l4`, "
 **Statute:** Part I grounds are **mandatory** ("the court … shall … make an order"); Part II grounds are
 **discretionary** ("the court may … if it considers it reasonable").
 **Shape:** Part I → `PARTY Court MUST \`order possession\``; Part II → `PARTY Court MAY \`order possession\``(with a reasonableness conjunct). This rides the MUST/MAY default semantics: **MUST** — omission ⇒`BREACH`;
-**MAY** — benign omission ⇒ `FULFILLED` (no breach), which is exactly what makes the ground *discretionary*.
-The deadline keyword is **`WITHIN <number>` only** (`BEFORE` is not valid). See [regulative.md](regulative.md)
-for the full HENCE/LEST default table.
+**MAY** — benign omission ⇒ `FULFILLED` (no breach), which is exactly what makes the ground _discretionary_.
+See [regulative.md](regulative.md) for the full HENCE/LEST default table.
+
+The deadline keyword is `WITHIN <number>` for a duration and `BEFORE <date>` for a date (`BEFORE 30`
+is a check error naming `WITHIN`); `AFTER` opens the window. See [regulative.md](regulative.md).
 
 ```l4
 -- Part I (ground-6.l4): mandatory

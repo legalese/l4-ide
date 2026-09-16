@@ -1,0 +1,212 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+run-after.l4:59:1-61:37:
+  PARTY Customer OF "Alice" MUST Order (EXACTLY buyer) AFTER 1 WITHIN 30 HENCE FULFILLED
+  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 12, before the window opened at 13: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 43), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:64:1-66:37:
+  FULFILLED
+run-after.l4:69:1-71:37:
+  FULFILLED
+run-after.l4:74:1-76:37:
+  FULFILLED
+run-after.l4:79:1-81:37:
+  DEONTIC BREACHED:
+    party
+      Customer OF "Alice"
+    who did action
+      Order OF (Customer OF "Alice")
+    at
+      44
+    surpassed the deadline of party
+      Customer OF "Alice"
+    who had to do obligatory action
+      MUST Order (EXACTLY buyer)
+    before their deadline, which was at
+      43
+run-after.l4:84:1-87:37:
+  FULFILLED
+  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 12, before the window opened at 13: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 43), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:99:1-101:37:
+  PARTY Customer OF "Alice" MAY Order (EXACTLY buyer) AFTER 1 WITHIN 30 HENCE FULFILLED
+  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 12, before the window opened at 13: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 43), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:103:1-105:37:
+  FULFILLED
+run-after.l4:118:1-120:37:
+  FULFILLED
+run-after.l4:122:1-124:37:
+  DEONTIC BREACHED:
+    party
+      Customer OF "Alice"
+    who did action
+      Order OF (Customer OF "Alice")
+    at
+      41
+    surpassed the deadline of party
+      Customer OF "Alice"
+    who had to do obligatory action
+      MUST Order (EXACTLY buyer)
+    before their deadline, which was at
+      40
+run-after.l4:136:1-138:37:
+  FULFILLED
+run-after.l4:140:1-142:37:
+  DEONTIC BREACHED:
+    party
+      Customer OF "Alice"
+    who did action
+      Order OF (Customer OF "Alice")
+    at
+      44
+    surpassed the deadline of party
+      Customer OF "Alice"
+    who had to do obligatory action
+      MUST Order (EXACTLY buyer)
+    before their deadline, which was at
+      43
+run-after.l4:152:1-154:37:
+  DEONTIC BREACHED:
+    party
+      Customer OF "Alice"
+    who did action
+      Order OF (Customer OF "Alice")
+    at
+      41
+    surpassed the deadline of party
+      Customer OF "Alice"
+    who had to do obligatory action
+      MUST Order (EXACTLY buyer)
+    before their deadline, which was at
+      40
+run-after.l4:165:1-167:37:
+  FULFILLED
+run-after.l4:182:1-183:37:
+  PARTY Customer OF "Alice" MUST Order (EXACTLY buyer) AFTER 1 WITHIN 30 HENCE FULFILLED
+  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 32, before the window opened at 33: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 63), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:185:1-186:37:
+  FULFILLED
+run-after.l4:195:1-196:37:
+  FULFILLED
+run-after.l4:198:1-199:37:
+  DEONTIC BREACHED:
+    party
+      Customer OF "Alice"
+    who did action
+      Order OF (Customer OF "Alice")
+    at
+      64
+    surpassed the deadline of party
+      Customer OF "Alice"
+    who had to do obligatory action
+      MUST Order (EXACTLY buyer)
+    before their deadline, which was at
+      63
+run-after.l4:213:1-215:39:
+  FULFILLED
+run-after.l4:217:1-219:37:
+  PARTY Customer OF "Alice" MAY Order (EXACTLY buyer) AFTER 1 HENCE FULFILLED
+  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 12, before the window opened at 13: the act does not count as performance. The obligation stays live, with its deadline untouched, and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:221:1-222:37:
+  PARTY buyer MAY Order (EXACTLY buyer) AFTER 3 HENCE FULFILLED
+run-after.l4:238:1-239:63:
+  PARTY Customer OF "Alice" MUST Order (EXACTLY buyer) AFTER 1 WITHIN 26 HENCE FULFILLED LEST BREACH
+  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 740134, before the window opened at 740135: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 740161), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:241:1-242:63:
+  FULFILLED
+run-after.l4:244:1-245:64:
+  FULFILLED
+run-after.l4:247:1-248:63:
+  DEONTIC BREACHED:
+    BREACH
+run-after.l4:257:1-258:63:
+  PARTY Customer OF "Alice" MUST Order (EXACTLY buyer) AFTER 1 WITHIN 5 HENCE FULFILLED LEST BREACH
+  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 740140, before the window opened at 740141: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 740146), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:260:1-261:64:
+  FULFILLED
+run-after.l4:263:1-264:64:
+  DEONTIC BREACHED:
+    BREACH
+run-after.l4:271:1-272:36:
+  BEFORE names the date 2026-06-30, but this obligation's clock read 0 when it was entered, which is not a date serial (DATE_SERIAL (YMD 1 1 1) is 365): the trace counts in floating units from an origin such as 0, and a date has no place on that scale. Start the trace at a date serial — #TRACE … AT (DATE_SERIAL (YMD …)) with the events stamped the same way — or write the edge as a duration. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.1.)
+run-after.l4:274:1-275:36:
+  AFTER names the date 2026-06-10, but this obligation's clock read 0 when it was entered, which is not a date serial (DATE_SERIAL (YMD 1 1 1) is 365): the trace counts in floating units from an origin such as 0, and a date has no place on that scale. Start the trace at a date serial — #TRACE … AT (DATE_SERIAL (YMD …)) with the events stamped the same way — or write the edge as a duration. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.1.)
+run-after.l4:286:1-287:36:
+  The anchor of the WITHIN names the date 2026-06-30, but this obligation's clock read 0 when it was entered, which is not a date serial (DATE_SERIAL (YMD 1 1 1) is 365): the trace counts in floating units from an origin such as 0, and a date has no place on that scale. Start the trace at a date serial — #TRACE … AT (DATE_SERIAL (YMD …)) with the events stamped the same way — or write the edge as a duration. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.1.)
+run-after.l4:289:1-290:63:
+  FULFILLED
+run-after.l4:305:1-308:51:
+  PARTY Landlord OF "Ms Ng" MUST Deliver (EXACTLY theLandlord) AFTER 1 WITHIN 30 HENCE FULFILLED
+  NOTE: PARTY Landlord OF "Ms Ng" did Deliver (EXACTLY theLandlord) at 10, before the window opened at 11: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 41), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:310:1-313:51:
+  FULFILLED
+run-after.l4:315:1-318:51:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      42
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver (EXACTLY theLandlord)
+    before their deadline, which was at
+      41
+run-after.l4:330:1-332:31:
+  PARTY Tenant OF "Alice" MUST Sign (EXACTLY t) WITHIN 29 HENCE `the join` LEST `the join fails`
+  NOTE: PARTY Tenant OF "Alice" did Sign (EXACTLY t) at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 33), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:334:1-337:35:
+  FULFILLED
+  NOTE: PARTY Tenant OF "Alice" did Sign (EXACTLY t) at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 33), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:351:1-354:32:
+  FULFILLED
+  NOTE: PARTY Tenant OF "Alice" did Sign (EXACTLY t) at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 33), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:358:1-360:32:
+  PARTY Tenant OF "Alice" MUST Sign (EXACTLY t) WITHIN 0 HENCE FULFILLED LEST BREACH AND FULFILLED
+  NOTE: PARTY Tenant OF "Alice" did Sign (EXACTLY t) at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 33), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:376:1-378:32:
+  PARTY Tenant OF "Alice" MUST Sign (EXACTLY t) WITHIN 0 HENCE FULFILLED LEST BREACH AND FULFILLED
+  NOTE: PARTY Tenant OF "Alice" did Sign (EXACTLY t) at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 30), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:380:1-383:36:
+  DEONTIC BREACHED:
+    BREACH
+  NOTE: PARTY Tenant OF "Alice" did Sign (EXACTLY t) at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 30), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:398:1-399:36:
+  PARTY Customer OF "Alice" MUST NOT Smoke (EXACTLY buyer) AFTER 1 WITHIN 30 HENCE FULFILLED LEST BREACH
+  NOTE: PARTY Customer OF "Alice" did Smoke (EXACTLY buyer) at 2, before the window opened at 3: the prohibition had not started, so this is not a violation. It stays in force (the window closes at 33).
+run-after.l4:401:1-402:36:
+  DEONTIC BREACHED:
+    BREACH
+run-after.l4:404:1-406:37:
+  FULFILLED
+  NOTE: PARTY Customer OF "Alice" did Smoke (EXACTLY buyer) at 2, before the window opened at 3: the prohibition had not started, so this is not a violation. It stays in force (the window closes at 33).
+run-after.l4:425:1-427:51:
+  DEONTIC BREACHED:
+    party
+      Landlord OF "Ms Ng"
+    who did action
+      Deliver OF (Landlord OF "Ms Ng")
+    at
+      20
+    surpassed the deadline of party
+      Landlord OF "Ms Ng"
+    who had to do obligatory action
+      MUST Deliver (EXACTLY theLandlord)
+    before their deadline, which was at
+      13
+  NOTE: This window closes at 13, before it opens at 38: both edges count from one anchor (the WITHIN names it, and the AFTER counts from the same place), so no act can be performed in time. Drop the anchor from the WITHIN to count it from the instant the window opens, or make the closing offset at least the opening one. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
+run-after.l4:429:1-431:51:
+  PARTY Landlord OF "Ms Ng" MUST Deliver (EXACTLY theLandlord) AFTER 28 WITHIN -25 HENCE FULFILLED
+  NOTE: This window closes at 13, before it opens at 38: both edges count from one anchor (the WITHIN names it, and the AFTER counts from the same place), so no act can be performed in time. Drop the anchor from the WITHIN to count it from the instant the window opens, or make the closing offset at least the opening one. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
+  NOTE: PARTY Landlord OF "Ms Ng" did Deliver (EXACTLY theLandlord) at 10, before the window opened at 38: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 13), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:443:1-445:51:
+  FULFILLED
+run-after.l4:453:1-62:
+  PARTY buyer MAY Order (EXACTLY buyer) AFTER 3 WITHIN 30 HENCE FULFILLED
+run-after.l4:454:1-90:
+  PARTY buyer MAY Order (EXACTLY buyer) AFTER 3 OF THE ARMING WITHIN 30 OF THE ARMING HENCE FULFILLED
+run-after.l4:455:1-76:
+  PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 BEFORE (YMD OF 2026, 6, 30) HENCE FULFILLED
+run-after.l4:456:1-66:
+  PARTY buyer MAY Order (EXACTLY buyer) AFTER (YMD OF 2026, 6, 10) HENCE FULFILLED

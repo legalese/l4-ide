@@ -26,7 +26,9 @@ Regulative keywords express legal obligations, permissions, prohibitions, and th
 | --------------------- | -------------------------------------------------------------------------------------------------------------- |
 | [PARTY](PARTY.md)     | Who has the obligation/permission                                                                              |
 | [EVERY](EVERY.md)     | Every member of a group has it                                                                                 |
+| [AFTER](AFTER.md)     | When the window opens (a duration, or a date)                                                                  |
 | WITHIN                | Temporal deadline (relative, or absolute with `OF`)                                                            |
+| BEFORE                | Absolute deadline: the window closes on a date                                                                 |
 | HENCE                 | Consequence on fulfillment                                                                                     |
 | LEST                  | Consequence on breach                                                                                          |
 | PROVIDED              | Guard condition on action                                                                                      |
@@ -42,18 +44,13 @@ Regulative keywords express legal obligations, permissions, prohibitions, and th
 | RAND    | Parallel AND -- all must be fulfilled |
 | ROR     | Parallel OR -- any one sufficient     |
 
-### Planned Keywords
-
-| Keyword | Purpose                                                                                                        | Status          |
-| ------- | -------------------------------------------------------------------------------------------------------------- | --------------- |
-| BEFORE  | Absolute deadline, as the window's closing edge (`WITHIN d OF instant` already expresses an absolute deadline) | Not implemented |
-
 ## Basic Rule Structure
 
 ```l4
 PARTY partyName
 MUST/MAY/SHANT/DO action
-WITHIN deadline
+[AFTER opening]
+[WITHIN deadline | BEFORE date]
 ```
 
 ### Example
@@ -70,13 +67,14 @@ paymentObligation MEANS
 
 ## WITHIN (Temporal Deadline)
 
-Specifies a time duration within which an action must/may be performed.
+Specifies a time duration within which an action must/may be performed: the window's **closing edge**. The window's **opening edge**, `AFTER`, has [its own page](AFTER.md); the closing edge's absolute form, `BEFORE date`, is [below](#before-absolute-deadline).
 
 ### Syntax
 
 ```l4
 PARTY ...
 MUST action
+[AFTER opening [OF anchor]]
 WITHIN duration [OF anchor]
 ```
 
@@ -100,6 +98,8 @@ For a `MUST`, `DO` or `MAY`, the join is the act that completed it. For a prohib
 `THE` is a keyword; `JOIN`, `DEADLINE` and `ARMING` are matched by spelling in this one position and are not reserved, so a program may still name a value `DEADLINE`.
 
 Inside the duration, `OF` is always the anchor — everywhere in it, not only at the front — so `WITHIN f OF x` means `f` anchored at `x`, and so does an `OF` inside an `IF` branch, an operator's operand or a `WHERE` in the duration. To apply a function there, bracket the call (`WITHIN (f OF x) OF THE JOIN`) or juxtapose its arguments (`WITHIN f x OF THE JOIN`); the checker's message says so when the duration turns out to be a function.
+
+Beside an `AFTER`, a bare `WITHIN` counts from the instant the window **opened**: `AFTER 3 WITHIN 30` is the window `[a+3, a+33]`, the cooling-off sentence. To measure both edges from one anchor — _not less than 3 nor more than 30 days after delivery_, `[a+3, a+30]` — name the anchor on the closing edge: `AFTER 3 WITHIN 30 OF THE JOIN`. The [AFTER](AFTER.md) page has the two readings and what an act before the window opens does. A `WITHIN` takes a duration, never a date: `WITHIN (YMD 2026 6 30)` is a check error that names `BEFORE`.
 
 ### Examples
 
@@ -144,7 +144,7 @@ An anchored deadline may already be in the past when the obligation is entered �
 
 ### Dates as anchors
 
-A `DATE` anchor is lowered to its serial (what `DATE_SERIAL` computes), so `WITHIN 0 OF (YMD 2026 6 30)` means _by 30 June 2026_ on a trace whose timestamps are date serials — start it `AT (DATE_SERIAL (YMD 2026 6 1))` and stamp its events the same way (`IMPORT daydate` for `YMD`). Nothing checks that the trace _is_ on that scale: a `DATE` anchor on a trace that starts `AT 0` counts from a serial in the hundreds of thousands, silently.
+A `DATE` anchor is lowered to its serial (what `DATE_SERIAL` computes), so `WITHIN 0 OF (YMD 2026 6 30)` means _by 30 June 2026_ on a trace whose timestamps are date serials — start it `AT (DATE_SERIAL (YMD 2026 6 1))` and stamp its events the same way (`IMPORT daydate` for `YMD`); the one-word spelling of the same deadline is `BEFORE (YMD 2026 6 30)`, [below](#before-absolute-deadline). Nothing declares which scale a trace is on; what the machine does instead is refuse to lower a date onto a clock that no calendar date has a serial for — an obligation entered when the clock read less than `DATE_SERIAL (YMD 1 1 1)`, 365, which is every trace that starts `AT 0` — naming the edge and the date, rather than counting from a serial in the hundreds of thousands silently, as it did before 2026-09-16. A floating trace that starts at 365 or above is not caught.
 
 ### Where an anchor is refused
 
@@ -170,7 +170,7 @@ The evaluator is the only consumer that resolves an anchor. The others carry it 
 
 - The state graph (`l4 state-graph`) labels the edge with the closing edge as the source spells it — `[5 OF THE JOIN]`, `ONCE ALL HAVE WITHIN 30 OF THE ARMING` — an applied duration bracketed, `[(period OF 2) OF THE ARMING]`, so the label re-parses as L4.
 - The BPMN export (`l4 export --to bpmn`) draws a **plain** `WITHIN` as a timer boundary event. An **anchored** `WITHIN` gets no timer: the boundary event is a _conditional_ event whose condition is the text verbatim, and the fidelity report carries a blocking `P-DEADLINE` note on it naming the anchor — _the duration counts from THE JOIN, and this exporter does not resolve anchors_. That holds even where a timer would have been exact (`OF THE JOIN` on a `HENCE` task starts when the task does); the export declines to work that out. The task's `<documentation>` restates the rule with the anchor in it. See [DMN and BPMN](../../exports/dmn-bpmn.md#what-doesnt-survive).
-- The MLIR/WASM export fails closed on an anchored `WITHIN`.
+- The MLIR/WASM export fails closed on an anchored `WITHIN`, as the [AFTER](AFTER.md#what-the-exports-do-with-it) page says.
 
 ### Boundary
 
@@ -178,7 +178,8 @@ The deadline boundary is inclusive: an action arriving _exactly at_ the deadline
 
 ### See Also
 
-- **BEFORE** and **AFTER** (planned, not yet implemented -- the window's absolute closing edge and its opening edge)
+- **[AFTER](AFTER.md)** -- the window's opening edge: `AFTER d [OF anchor]`, `AFTER date`
+- **[BEFORE](#before-absolute-deadline)** -- the closing edge's absolute form, `BEFORE date`
 
 ## HENCE (Fulfillment Consequence)
 
@@ -516,23 +517,43 @@ ROR
 
 ---
 
-## BEFORE (NOT YET IMPLEMENTED)
+## BEFORE (Absolute Deadline)
 
-Planned temporal keyword naming an absolute deadline as the closing edge of the window, in one word. An absolute deadline is already expressible today: `WITHIN d OF instant` (see [WITHIN](#within-temporal-deadline)) is `instant + d`, so `WITHIN 0 OF (YMD 2026 6 30)` means "by 30 June 2026". `BEFORE` would be the spelling for the same thing when there is no duration to add.
+Names an absolute deadline as the closing edge of the window, in one word: `BEFORE (YMD 2026 6 30)` is _by 30 June 2026_. It is the same deadline as `WITHIN 0 OF (YMD 2026 6 30)` (see [Dates as anchors](#dates-as-anchors)), spelled the way the sentence is. The edges are told apart by type: `WITHIN` takes a duration, `BEFORE` takes a date, and each refuses the other's argument by naming the other word — `BEFORE 30` says to write `WITHIN 30`.
 
-**Status:** Planned but not yet in the parser. Use `WITHIN d OF instant` for an absolute deadline in the meantime, and a bare `WITHIN d` for a relative one.
-
-### Intended Syntax
+### Syntax
 
 ```l4
 PARTY ...
 MUST action
-BEFORE deadline
+[AFTER opening]
+BEFORE date
 ```
+
+The deadline instant is inclusive, as `WITHIN`'s is: an act stamped on the date itself is timely. `BEFORE` is accepted on the act only; on a join line (`ONCE ALL HAVE …`, `UPON EACH …`) write `WITHIN 0 OF date`, and the checker says so.
+
+### Example
+
+```l4
+IMPORT daydate
+
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF pay HAS amount IS A NUMBER
+
+-- By 30 June, and not before 4 June (the window opens three days after arming on 1 June)
+GIVETH A DEONTIC Person Action
+`by june` MEANS PARTY Buyer MUST pay 100 AFTER 3 BEFORE (YMD 2026 6 30)
+
+#TRACE `by june` AT (DATE_SERIAL (YMD 2026 6 1)) WITH
+  PARTY Buyer DOES pay 100 AT (DATE_SERIAL (YMD 2026 6 4))
+```
+
+**The limit.** A date lands on the trace's clock only when the trace is stamped in date serials, as above. Nothing yet declares a contract's scale, so an obligation entered when the clock read less than `DATE_SERIAL (YMD 1 1 1)` — every trace that starts `AT 0` — has its `BEFORE` refused by name at run time rather than silently compared against a serial in the hundreds of thousands; a floating trace that starts at 365 or above is not caught. The [AFTER](AFTER.md#the-absolute-forms-after-date-before-date) page has the same sentence for `AFTER date`.
 
 ### See Also
 
-- **WITHIN** -- implemented; relative as `WITHIN d`, absolute as `WITHIN d OF instant`
+- **[WITHIN](#within-temporal-deadline)** -- the closing edge as a duration, relative as `WITHIN d`, anchored as `WITHIN d OF instant`
+- **[AFTER](AFTER.md)** -- the opening edge
 
 ---
 
@@ -585,6 +606,7 @@ saleContract MEANS
 
 - **[PARTY](PARTY.md)** - Party declarations
 - **[EVERY](EVERY.md)** - One obligation for every member of a group; the group is given as a list after `IN`, as `EVERY Tenant t IN tenants`
+- **[AFTER](AFTER.md)** - The window's opening edge; the two readings of a two-edged window
 - **[MUST](MUST.md)** - Obligations
 - **[MAY](MAY.md)** - Permissions
 - **[SHANT](SHANT.md)** - Prohibitions (also written MUST NOT)

@@ -375,7 +375,7 @@ processRow opts evalConfig filteredSource exportFn givenParams assumeParams sche
 -- | Pretty-printed exception messages for any @#EVAL@ result that reduced
 -- to an evaluation exception. An empty list means the row evaluated cleanly.
 resultExceptionMsgs :: EvalDirectiveResult -> [Text]
-resultExceptionMsgs (MkEvalDirectiveResult _ res _ _) = case res of
+resultExceptionMsgs (MkEvalDirectiveResult _ res _ _ _) = case res of
   Reduction (ReducedErrored exc) -> prettyEvalException exc
   Assertion (Errored exc)        -> prettyEvalException exc
   -- A refusal is deliberately NOT counted here: it is not an exception, and
@@ -385,7 +385,7 @@ resultExceptionMsgs (MkEvalDirectiveResult _ res _ _) = case res of
 -- | Refusal reasons for any directive in the row that REFUSED. An empty list
 -- means nothing in the row declined to answer.
 resultRefusalMsgs :: EvalDirectiveResult -> [Text]
-resultRefusalMsgs (MkEvalDirectiveResult _ res _ _) = case res of
+resultRefusalMsgs (MkEvalDirectiveResult _ res _ _ _) = case res of
   Reduction (ReducedRefused r) -> prettyRefusal r
   Assertion (Refused r)        -> prettyRefusal r
   _                            -> []

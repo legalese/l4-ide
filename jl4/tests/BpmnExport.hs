@@ -293,6 +293,19 @@ quotedDeadlineSrc, quotedAnchoredDeadlineSrc :: [Text]
 quotedDeadlineSrc = anchoredSrc "WITHIN `days OF grace`"
 quotedAnchoredDeadlineSrc = anchoredSrc "WITHIN `days OF grace` OF THE ARMING"
 
+-- | The closing edge as an absolute date (@BEFORE date@, R-X5).
+beforeDeadlineSrc :: [Text]
+beforeDeadlineSrc =
+  [ "ASSUME closing IS A DATE"
+  , ""
+  , "`dated` MEANS"
+  , "  PARTY Alice"
+  , "  MUST pay"
+  , "  BEFORE closing"
+  , "  HENCE FULFILLED"
+  , "  LEST BREACH"
+  ]
+
 anchoredSrc :: Text -> [Text]
 anchoredSrc closing =
   [ "GIVEN n IS A NUMBER"
@@ -377,6 +390,7 @@ edge src dst ty act =
           { labelParty = Just "Alice"
           , labelModal = Just DMust
           , labelAction = act
+          , labelOpening = Nothing
           , labelDeadline = Nothing
           , labelGuard = Nothing
           , labelBranch = Nothing
@@ -838,8 +852,8 @@ graphWithDeadline due =
         , ContractState 2 "Breach" TerminalBreach Linear
         ]
     , sgTransitions =
-        [ Transition 0 1 (TransitionLabel (Just "Alice") (Just DMust) "pay" (Just due) Nothing Nothing Nothing) HenceTransition
-        , Transition 0 2 (TransitionLabel Nothing Nothing "timeout" Nothing Nothing Nothing Nothing) LestTransition
+        [ Transition 0 1 (TransitionLabel (Just "Alice") (Just DMust) "pay" Nothing (Just due) Nothing Nothing Nothing) HenceTransition
+        , Transition 0 2 (TransitionLabel Nothing Nothing "timeout" Nothing Nothing Nothing Nothing Nothing) LestTransition
         ]
     , sgInitialState = 0
     }
@@ -1118,6 +1132,18 @@ spec = do
         f <- theNote quotedAnchored
         f `shouldSatisfy` mentions "counts from THE ARMING,"
         f `shouldSatisfy` not . mentions "counts from grace"
+
+      -- and the third shape parseDuration cannot read: a BEFORE date, which is
+      -- an instant, not a duration with a unit
+      it "a BEFORE date is reported as a date, not as unitless" $ do
+        let dated = exportOf defaultBpmnOptions "dated" beforeDeadlineSrc
+        map (.nodeKind) (boundaries dated)
+          `shouldBe` [Boundary "Task_0" (WhenCondition "BEFORE closing")]
+        f <- theNote dated
+        f.severity `shouldBe` Blocking
+        f `shouldSatisfy` mentions "is a date, an absolute instant"
+        f `shouldSatisfy` not . mentions "no unit could be read"
+        f `shouldSatisfy` not . mentions "is anchored"
 
   -- An interrupting boundary event is a race between "the activity completed"
   -- and "the trigger fired". For a prohibition the L4 runtime races them the

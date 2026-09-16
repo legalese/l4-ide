@@ -210,7 +210,7 @@ HENCE FULFILLED
 LEST  BREACH
 ```
 
-`BEFORE` (absolute deadlines, like "by 1 January 2026") is planned but not yet implemented — use `WITHIN` and a relative duration for now.
+A window can also have an _opening_ edge — _after a three-day cooling-off period, within 30 days_ is `AFTER 3 WITHIN 30`, and an act before the window opens does not count (the run says so) — and either edge has an absolute form: `AFTER (YMD 2026 6 1)`, `BEFORE (YMD 2026 12 31)`. `WITHIN` takes a duration and `BEFORE` a date, as in English. A date lands on the contract's clock only when the trace is stamped in date serials; on a trace that starts at 0 it is refused by name rather than silently misread. The [AFTER](../../reference/regulative/AFTER.md) page has the two readings of a two-edged window and the limit in full.
 
 ---
 

@@ -1081,17 +1081,23 @@ valueToFnLiteral ei = \case
   Eval.ValPartialTernary{} -> throwError $ InterpreterError "#EVAL produced partial closure."
   Eval.ValPartialTernary2{} -> throwError $ InterpreterError "#EVAL produced partial closure."
   -- Deontic values: serialize as structured JSON objects
-  Eval.ValObligation _env party action due _followup _lest -> do
+  Eval.ValObligation _env party action opens due _followup _lest -> do
     partyLit <- serializeEitherValue ei party
     let actionLit = serializeRAction action
+    opensLit <- serializeOpening ei opens
     dueLit <- serializeDue ei due
     pure $ FnObject
       [ ("OBLIGATION", FnObject
-          [ ("party", partyLit)
-          , ("modal", actionLit.modal)
-          , ("action", actionLit.actionPat)
-          , ("deadline", dueLit)
-          ])
+          ( [ ("party", partyLit)
+            , ("modal", actionLit.modal)
+            , ("action", actionLit.actionPat)
+            ]
+            -- the window's opening edge (EVERY-EACH-QUANTIFIER-SPEC §5.1.2),
+            -- present only when the obligation has one still to reach, so
+            -- the object of an obligation without an AFTER is unchanged
+            <> [ ("opens", o) | Just o <- [opensLit] ]
+            <> [ ("deadline", dueLit) ]
+          ))
       ]
 
   Eval.ValBreached reason -> do
@@ -1244,8 +1250,24 @@ serializeEitherValue ei (Right val)  = valueToFnLiteral ei val
 -- the remaining due, a number.
 serializeDue :: (Monad m) => EntityInfo -> Either (Maybe (Deadline Resolved)) (Eval.Value Eval.NF) -> ExceptT EvaluatorError m FnLiteral
 serializeDue _  (Left Nothing)   = pure FnUnknown
-serializeDue _  (Left (Just dl)) = pure $ FnLitString (Print.prettyLayout dl)
+serializeDue _  (Left (Just dl)) = pure $ FnLitString (closingText dl)
+  where
+    -- a BEFORE carries its keyword, so that a client can tell the absolute
+    -- edge from a duration; a WITHIN is its body, as before (R-Q7)
+    closingText = \ case
+      d@MkDeadline{} -> Print.prettyLayout d
+      d@MkBefore{}   -> "BEFORE " <> Print.prettyLayout d
 serializeDue ei (Right val)      = valueToFnLiteral ei val
+
+-- | Serialize the window's opening edge (EVERY-EACH-QUANTIFIER-SPEC §5.1.2,
+-- built 2026-09-16): its source form before the first event (@3 OF THE
+-- JOIN@), the time still to run until it opens after — and nothing at all
+-- when there is no opening edge or the window has already opened.
+serializeOpening :: (Monad m) => EntityInfo -> Either (Maybe (Opening Resolved)) (Maybe (Eval.Value Eval.NF)) -> ExceptT EvaluatorError m (Maybe FnLiteral)
+serializeOpening _  (Left Nothing)    = pure Nothing
+serializeOpening _  (Left (Just o))   = pure (Just (FnLitString (Print.prettyLayout o)))
+serializeOpening _  (Right Nothing)   = pure Nothing
+serializeOpening ei (Right (Just val)) = Just <$> valueToFnLiteral ei val
 
 -- | Serialize a breach reason to FnLiteral.
 --

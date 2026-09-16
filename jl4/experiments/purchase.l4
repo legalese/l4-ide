@@ -94,11 +94,16 @@ WITH   deal     IS A Deal -- import the attributes into lexical scope so we don'
 UPON   bothPartiesReady
 PARTY  buyer
 MAY    send money (amount = price, to = seller)
-BEFORE 30 days -- relative temporal referent: when the UPON first starts to be true
+WITHIN 30 days -- relative temporal referent: when the UPON first starts to be true
+               -- (was BEFORE 30 days until 2026-09-16, when BEFORE became the keyword for an
+               -- absolute DATE and WITHIN the word for a duration, EVERY-EACH-QUANTIFIER-SPEC
+               -- §5.1.2 R-X5; the seven BEFORE n days in this file migrated then. This file is
+               -- an aspirational sketch that has never parsed — PERSON, SHOULD, IF … AT, UPDATE
+               -- and an undefined `days` — and still does not.)
 HENCE  -- "external choice" state transition: if we read from the trace that the party takes the action by the deadline, we proceed to new location
        PARTY   seller
        MUST    send item (to = buyer)
-       BEFORE  14 days
+       WITHIN  14 days
        HENCE   Fulfilled
        LEST    Breach
 LEST   Fulfilled
@@ -131,7 +136,7 @@ PARTY  buyer
   MAY  `apply for loan` (with = bank, amount = 2000)
 HENCE  PARTY   bank
        MAY     `grant loan` (to = buyer, amount = grantedAmount) -- grantedAmount is unified from reading the event trace
-       BEFORE  15 days
+       WITHIN  15 days
        HENCE   PARTY buyer
                MAY   `visit` bank
                HENCE UPDATE  buyer's cash += grantedAmount
@@ -150,23 +155,24 @@ HENCE  § seller preparation - de Bruijn 1
        PARTY   seller
        MAY     `water plant`
        AFTER   5 days
-       BEFORE  8 days
+       WITHIN  8 days OF THE JOIN   -- the two-offset window [join+5, join+8] this file always meant:
+                                    -- a bare WITHIN beside an AFTER re-anchors (§5.1.2.2, 2026-09-16)
        HENCE   § seller preparation - de Bruijn 2
                PARTY   seller
                DO      `apply fertilizer`
                IF      `moon is full` AT currentTime
                AFTER   7 days
-               BEFORE  14 days
+               WITHIN  14 days OF THE JOIN
                HENCE   § seller preparation - de Bruijn 3
                        PARTY   seller
                        DO      `water plant`
                        AFTER   2 days
-                       BEFORE  4 days
+                       WITHIN  4 days OF THE JOIN
                        HENCE   § seller preparation - de Bruijn 4
                                PARTY   seller
                                DO      `harvest`
                                AFTER   14 days
-                               BEFORE  28 days
+                               WITHIN  28 days OF THE JOIN
                                HENCE   § seller preparation - de Bruijn 5
                                        UPDATE seller's inv's item's count += 60
                                               seller's inv's item's expiry = CURRENT + 16 days

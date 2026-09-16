@@ -39,6 +39,8 @@
 --  18. a barrier whose last completion comes after the ONCE … WITHIN, and
 --      whose LEST is an obligation — the state layer's LEST looks at the
 --      members' own completion again, unmarked;
+--  19. an act before the window's opening edge (AFTER) — a nullity, logged
+--      as EarlyAct and passed over; then the act in the window;
 --
 -- plus: the log-off path returns the same results as the log-on path, and
 -- a directive with no regulative content logs nothing.
@@ -445,6 +447,30 @@ joinLestSrc = Text.unlines $ everyPrologue <>
   , "  PARTY theLandlord DOES Deliver theLandlord AT 12"
   ]
 
+-- 19. the window's opening edge (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X6):
+--     an act before the window opens is a nullity — logged, since 2026-09-17,
+--     as EarlyAct carrying the opening; the obligation stands and the act in
+--     the window is the match. The SHANT reads the same way: an early act
+--     is not a violation.
+earlyActSrc :: Text.Text
+earlyActSrc = Text.unlines $ prologue <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS"
+  , "  PARTY Alice MUST deliver AFTER 5 WITHIN 10"
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "d MEANS"
+  , "  PARTY Alice SHANT deliver AFTER 5 WITHIN 10"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  , "  PARTY Alice DOES deliver AT 2"
+  , "  PARTY Alice DOES deliver AT 7"
+  , ""
+  , "#TRACE d AT 0 WITH"
+  , "  PARTY Alice DOES deliver AT 2"
+  , "  PARTY Bob DOES deliver AT 16"
+  ]
+
 -- Off-path proof: every fixture, both ways, same rendered result.
 allSrcs :: [(String, Text.Text)]
 allSrcs =
@@ -453,7 +479,7 @@ allSrcs =
   , ("or-left", orLeftSrc), ("waiting", waitingSrc), ("barrier-waiting", barrierWaitingSrc)
   , ("prohibition", prohibitionSrc), ("guard", guardSrc), ("action-mismatch", actionMismatchSrc)
   , ("barrier-fail", barrierFailSrc), ("barrier-stall", barrierStallSrc), ("barrier-breach", barrierBreachSrc)
-  , ("join-lest", joinLestSrc) ]
+  , ("join-lest", joinLestSrc), ("early-act", earlyActSrc) ]
 
 -- | The 'Breached' step an explicit @BREACH@ with no @BY@ logs.
 bareBreach :: Row
@@ -694,6 +720,24 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
     -- the same event, twice, and neither look carries the mark
     length [ s | s <- ss, Just e <- [s.dsEvent], e.ekStamp == 9 ] `shouldBe` 2
     [ s.dsScrutiny | s <- ss, s.dsScrutiny == Reoffered ] `shouldBe` []
+
+  it "19. an act before the window opens is EarlyAct, WitnessedOnly, carrying the opening; the obligation stands, and the act in the window matches" $ do
+    rs <- runLogged earlyActSrc
+    -- MUST: the early act at 2 is a nullity (R-X6), logged with the
+    -- opening at 5; the act at 7 is the match. Pinned from the runtime on
+    -- 2026-09-17 (adversarial round 1 of the third rebase, S2): before it
+    -- the early act logged nothing, and a what-if reading the log took
+    -- the act as one no obligation in force had looked at.
+    map row (stepsOf 0 rs) `shouldBe`
+      [ Row (Just "Alice") 1 (Just DMust) (EarlyAct 5)      WitnessedOnly (Just 2) (Just 2) Nothing
+      , Row (Just "Alice") 1 (Just DMust) (Matched ToHence) Consumed      (Just 7) (Just 7) Nothing
+      ]
+    -- SHANT: the early act is not a violation; the prohibition then runs
+    -- its window [5, 15] out, revealed by Bob's event at 16 — kept, to HENCE
+    map row (stepsOf 1 rs) `shouldBe`
+      [ Row (Just "Alice") 1 (Just DMustNot) (EarlyAct 5)          WitnessedOnly (Just 2)  (Just 2) Nothing
+      , Row (Just "Alice") 1 (Just DMustNot) (Expired ToHence 15)  WitnessedOnly (Just 16) (Just 2) Nothing
+      ]
 
   it "the log-off path is unchanged: every fixture renders the same result both ways" $
     for_ allSrcs \(name, src) -> do

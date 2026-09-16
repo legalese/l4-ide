@@ -1,0 +1,68 @@
+IMPORT prelude
+IMPORT daydate
+-- AFTER, the window's opening edge: the examples from AFTER.md, with a trace
+-- each so the instants the window produces are visible.
+
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF pay HAS amount IS A NUMBER
+                         deliver
+                         order
+
+-- The cooling-off window. The seller delivers at 10; the buyer may order
+-- again after a three-day cooling-off period, within 30 days of that:
+-- the window is [13, 43].
+GIVETH A DEONTIC Person Action
+`cooling off` MEANS
+  PARTY Seller MUST deliver WITHIN 30
+  HENCE (PARTY Buyer MUST order AFTER 3 WITHIN 30)
+  LEST  BREACH
+
+-- 12 is before the window opens: not performance, and the run says so
+#TRACE `cooling off` AT 0 WITH
+  PARTY Seller DOES deliver AT 10
+  PARTY Buyer DOES order AT 12
+
+-- 41 is in time: the window closes at 43, not at 40
+#TRACE `cooling off` AT 0 WITH
+  PARTY Seller DOES deliver AT 10
+  PARTY Buyer DOES order AT 41
+
+-- 44 is late
+#TRACE `cooling off` AT 0 WITH
+  PARTY Seller DOES deliver AT 10
+  PARTY Buyer DOES order AT 44
+
+-- The statutory two-offset window, "not less than 3 nor more than 30 days
+-- after delivery": both edges from the delivery, [13, 40]. 41 is late.
+GIVETH A DEONTIC Person Action
+`two offsets` MEANS
+  PARTY Seller MUST deliver WITHIN 30
+  HENCE (PARTY Buyer MUST order AFTER 3 WITHIN 30 OF THE JOIN)
+  LEST  BREACH
+
+#TRACE `two offsets` AT 0 WITH
+  PARTY Seller DOES deliver AT 10
+  PARTY Buyer DOES order AT 41
+
+-- A right that vests and never expires: from 13 on, whenever.
+GIVETH A DEONTIC Person Action
+vested MEANS
+  PARTY Seller MUST deliver WITHIN 30
+  HENCE (PARTY Buyer MAY order AFTER 3)
+  LEST  BREACH
+
+#TRACE vested AT 0 WITH
+  PARTY Seller DOES deliver AT 10
+  PARTY Buyer DOES order AT 1000
+
+-- The absolute forms, on a trace whose clock is date serials: opens three
+-- days after 1 June, closes on 30 June.
+GIVETH A DEONTIC Person Action
+`by june` MEANS
+  PARTY Buyer MUST pay 100 AFTER 3 BEFORE (YMD 2026 6 30)
+
+#TRACE `by june` AT (DATE_SERIAL (YMD 2026 6 1)) WITH
+  PARTY Buyer DOES pay 100 AT (DATE_SERIAL (YMD 2026 6 4))
+
+#TRACE `by june` AT (DATE_SERIAL (YMD 2026 6 1)) WITH
+  PARTY Buyer DOES pay 100 AT (DATE_SERIAL (YMD 2026 7 1))

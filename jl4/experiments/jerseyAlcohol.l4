@@ -85,7 +85,9 @@ PERSON enforcementOfficer
 
   HENCE PERSON proprietor
         SHOULD `correct priceList to the satisfaction of` enforcementOfficer
-        BEFORE 5 days
+        WITHIN 5 days   -- was BEFORE 5 days until 2026-09-16, when BEFORE became the keyword for
+                        -- an absolute DATE (EVERY-EACH-QUANTIFIER-SPEC §5.1.2); this sketch never
+                        -- parsed (PERSON, SHOULD) and still does not
 
           LEST PERSON enforcementOfficer
                   MAY `cancel` registration OF hotel

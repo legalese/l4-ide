@@ -66,6 +66,7 @@ module L4.Lts.Marking
   , LiveNorm (..)
   , Bearer (..)
   , Countdown (..)
+  , Opens (..)
   , Blame (..)
   , BlameEntry (..)
   , Family (..)
@@ -141,6 +142,9 @@ data LiveNorm = MkLiveNorm
   , lnAction :: !Text
     -- ^ the action pattern, pretty-printed
   , lnDue    :: !Countdown
+  , lnOpens  :: !Opens
+    -- ^ the window's opening edge (@AFTER@), when the window has one and
+    -- it has not opened; what 'lnDue' counts from while it is pending
   , lnHence  :: !Text
     -- ^ the @HENCE@ as the residual prints it; for a barrier member this is
     -- the machine's sentinel, @`the join`@
@@ -184,7 +188,34 @@ data Countdown
     -- ^ the @WITHIN@ duration, never evaluated, and its @OF@ anchor when
     -- written — kept apart so a list can say "from now" only of a
     -- countdown that counts from now
-  | Remaining !Rational      -- ^ what is left, relative to the last event seen
+  | UnforcedBefore !Text
+    -- ^ the @BEFORE date@ closing edge, never evaluated (EVERY-EACH-QUANTIFIER-SPEC
+    -- §5.1.2, R-X5): an instant, so neither "from now" nor an anchor applies
+  | Remaining !Rational
+    -- ^ what is left, relative to the last event seen — or, while the
+    -- window has still to open ('OpensIn'), relative to the OPENING: the
+    -- machine measures the remaining due from the instant the @WITHIN@ runs
+    -- from (@relativeDue@ at @Contract5@), so a reader that adds a
+    -- 'Remaining' to the clock adds the opening first
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass NFData
+
+-- | The window's OPENING edge (@AFTER@, EVERY-EACH-QUANTIFIER-SPEC §5.1.2,
+-- R-X5), as the residual holds it beside the 'Countdown'. Read since
+-- 2026-09-17 (adversarial round 1 of the third rebase, F1\/S1): before that
+-- the marking bound the field as @_opens@ and the list printed a pending
+-- window's deadline from the clock instead of from the opening — @AFTER 5
+-- WITHIN 10@ seen at 2 listed as due by 12, for a window closing at 15.
+data Opens
+  = NoOpening
+    -- ^ no @AFTER@, or the window has opened
+  | UnforcedOpening !Text !(Maybe Text)
+    -- ^ the @AFTER@ offset (a duration, or a date), never evaluated, and its
+    -- @OF@ anchor when written
+  | OpensIn !Rational
+    -- ^ the window opens this much after the last event seen; an act
+    -- before then is a nullity (R-X6), and a 'Remaining' countdown beside
+    -- this counts from the opening, not from the clock
   deriving stock (Eq, Show, Generic)
   deriving anyclass NFData
 
@@ -299,6 +330,7 @@ contextOf steps = MkMarkingContext
       PartyMismatch   -> False
       ActionMismatch  -> False
       GuardFailed     -> False
+      EarlyAct _      -> False
       Matched _       -> False
       Expired _ _     -> False
       Breached _      -> False
@@ -327,8 +359,8 @@ markingOf ctx v0 = places <> joins
     go = \ case
       ValFulfilled -> ([], [])
       ValBreached r -> ([Violated (blameOf r)], [])
-      ValObligation env party act due hence lest ->
-        let raw = MkRawObligation {roEnv = env, roParty = party, roAction = act, roDue = due, roHence = hence, roLest = lest}
+      ValObligation env party act opens due hence lest ->
+        let raw = MkRawObligation {roEnv = env, roParty = party, roAction = act, roOpens = opens, roDue = due, roHence = hence, roLest = lest}
             live = renderLive ctx raw
             barrier
               | Just f <- live.lnMember, isBarrier f.faJoin = [(f.faJoinSite, live.lnMember)]
@@ -377,6 +409,7 @@ renderLive ctx raw = MkLiveNorm
     -- pinned name prints bare unless the source wrote EXACTLY (#407 §6)
   , lnAction = docText (printActionPattern raw.roAction.action)
   , lnDue    = countdown raw.roDue
+  , lnOpens  = opening raw.roOpens
   , lnHence  = prettyLayout raw.roHence
   , lnLest   = prettyLayout <$> raw.roLest
   , lnMember = Map.lookup (rangeOf raw.roAction) ctx.mcCasts
@@ -384,9 +417,19 @@ renderLive ctx raw = MkLiveNorm
   where
     countdown = \ case
       Left Nothing         -> NoDeadline
-      Left (Just e)        -> UnforcedDeadline (prettyLayout e.duration) (prettyLayout <$> e.anchor)
+      Left (Just (MkDeadline _ d a)) -> UnforcedDeadline (prettyLayout d) (prettyLayout <$> a)
+      Left (Just (MkBefore _ d))     -> UnforcedBefore (prettyLayout d)
       Right (ValNumber t)  -> Remaining t
       Right other          -> UnforcedDeadline (prettyLayout other) Nothing
+    -- the same reading of the opening edge: the source clause until the
+    -- first event, a number relative to the clock while the window is still
+    -- to open, nothing once it has (the machine's @relOpening@)
+    opening = \ case
+      Left Nothing                    -> NoOpening
+      Left (Just (MkOpening _ d a))   -> UnforcedOpening (prettyLayout d) (prettyLayout <$> a)
+      Right Nothing                   -> NoOpening
+      Right (Just (ValNumber t))      -> OpensIn t
+      Right (Just other)              -> UnforcedOpening (prettyLayout other) Nothing
 
 -- | A 'ValObligation' as the residual holds it, unrendered, for a consumer
 -- that needs the value and not its text — "L4.Lts.WhatIf" builds its
@@ -396,6 +439,8 @@ data RawObligation a = MkRawObligation
   { roEnv    :: !Environment
   , roParty  :: !(Either RExpr (Value a))
   , roAction :: !(RAction Resolved)
+  , roOpens  :: !(Either (Maybe (Opening Resolved)) (Maybe (Value a)))
+    -- ^ the opening edge, as 'L4.Evaluate.ValueLazy.ValObligation' holds it
   , roDue    :: !(Either (Maybe (Deadline Resolved)) (Value a))
   , roHence  :: !RExpr
   , roLest   :: !(Maybe RExpr)
@@ -404,8 +449,8 @@ data RawObligation a = MkRawObligation
 -- | The obligations in force, in marking order.
 liveObligations :: Value a -> [RawObligation a]
 liveObligations = \ case
-  ValObligation env party act due hence lest ->
-    [MkRawObligation {roEnv = env, roParty = party, roAction = act, roDue = due, roHence = hence, roLest = lest}]
+  ValObligation env party act opens due hence lest ->
+    [MkRawObligation {roEnv = env, roParty = party, roAction = act, roOpens = opens, roDue = due, roHence = hence, roLest = lest}]
   ValROp _ _ l r -> operand l <> operand r
   _ -> []
   where
@@ -475,6 +520,7 @@ placementText = \ case
   Created {crSource} -> "created, not entered: " <> crSource
   InEffect n -> Text.unwords $
     [ "in effect:", bearerText n.lnBearer, modalText n.lnModal, n.lnAction ]
+    <> opensText n.lnOpens
     <> dueText n.lnDue
     <> maybe [] (\ m -> ["(member of " <> familyText m <> ")"]) n.lnMember
   Violated b -> "violated: " <> blameText b
@@ -493,9 +539,15 @@ placementText = \ case
       DMay     -> "MAY"
       DMustNot -> "SHANT"
       DDo      -> "DO"
+    -- the window as the residual prints it: AFTER n WITHIN d
+    opensText = \ case
+      NoOpening             -> []
+      UnforcedOpening t ma  -> ["AFTER", t] <> maybe [] (\ a -> ["OF", a]) ma
+      OpensIn r             -> ["AFTER", prettyRatio r]
     dueText = \ case
       NoDeadline         -> []
       UnforcedDeadline t ma -> ["WITHIN", t] <> maybe [] (\ a -> ["OF", a]) ma
+      UnforcedBefore t   -> ["BEFORE", t]
       Remaining r        -> ["WITHIN", prettyRatio r]
     familyText f = case f.faJoin of
       Barrier _    -> "a barrier of " <> textShow f.faTotal

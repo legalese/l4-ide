@@ -301,14 +301,20 @@ traceTextModeReader = eitherReader \input ->
     other -> Left $ "Invalid trace MODE: " <> Text.unpack other <> " (expected none|full)"
 
 renderEvalOutput :: TraceTextMode -> Int -> EvalDirectiveResult -> Text
-renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, trace = mTrace, ledger = led} =
+renderEvalOutput traceMode idx MkEvalDirectiveResult{range = mRange, result, trace = mTrace, ledger = led, notes = ns} =
   Text.intercalate "\n\n" $ catMaybes
     [ Just headerLine
     , Just ("Result:\n" <> indentBlockText (renderEvalValue result))
+    , notesSection
     , ledgerSection
     , traceSection
     ]
   where
+    -- what the run reported without failing (an early act, R-X6; an empty
+    -- window): dropped when there is nothing, like the ledger
+    notesSection = case ns of
+      [] -> Nothing
+      _  -> Just ("Notes:\n" <> indentBlockText (Text.intercalate "\n" ns))
     headerLine =
       let idxText = Text.pack (show idx)
           rangeText = maybe "" (\rng -> " @ " <> prettySrcRange rng) mRange

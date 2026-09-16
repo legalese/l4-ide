@@ -246,11 +246,30 @@ same is true of ``WITHIN 5 days OF `order confirmation` ``, which since
 [source-patterns/04-dates-and-periods.md](source-patterns/04-dates-and-periods.md#e4-3),
 entry 4.3, for the measured forms.
 
-**There is no `BEFORE` for an absolute deadline in this release.** `MUST pay BEFORE 30` does not
-read as a deadline at all — the parser takes it as applying the action to two arguments, and the
-check fails with `You are giving 2 inputs to pay … but it is not a function, so it takes none`
-(probe `g14-before-deadline.l4`, exit 1). Use `WITHIN`: relative as `WITHIN d`, absolute as
-`WITHIN d OF instant` — `WITHIN 0 OF (YMD 2026 6 30)` is "by 30 June 2026".
+**The window has two edges since 2026-09-16, and each has a duration form and a date form.**
+`AFTER` opens it and `WITHIN`/`BEFORE` close it; `AFTER` and `BEFORE` are keywords now, so a
+program may not name a value `AFTER` (a backticked name is unaffected).
+
+- `AFTER 3 WITHIN 30` — the cooling-off idiom: opens 3 after the clock, closes 30 after it
+  OPENED (the window `[a+3, a+33]`; a bare `WITHIN` beside an `AFTER` re-anchors).
+- `AFTER 3 WITHIN 30 OF THE JOIN` — the statutory two-offset window, "not less than 3 nor more
+  than 30 days after delivery": both edges from the anchor named, `[a+3, a+30]`. A window that
+  closes before it opens, `AFTER 30 WITHIN 5 OF THE JOIN`, is a check error with literal offsets.
+- `AFTER 3 OF THE DEADLINE WITHIN 30` — either edge may name an anchor; under a `LEST` the
+  bare form already counts from the missed deadline.
+- `AFTER 3` alone — a right that vests and never expires.
+- `AFTER (YMD 2026 6 10)`, `BEFORE (YMD 2026 6 30)` — the absolute forms. `WITHIN` takes a
+  duration and `BEFORE` a date; `WITHIN (YMD …)` and `BEFORE 30` are check errors that name the
+  other word. A date is refused by name at run time on a trace that starts `AT 0` (the clock is
+  not on the date-serial scale); stamp the trace `AT (DATE_SERIAL (YMD …))`.
+- Order: `AFTER` first, then `WITHIN` or `BEFORE`; `WITHIN 30 AFTER 3` is a parse error that
+  says so. No `AFTER` on a join line; `BEFORE` on a join line is refused — write the date there
+  as `WITHIN 0 OF date`.
+
+An act before the window opens is a **nullity with a diagnostic** (R-X6): not performance, not a
+breach; the obligation stays live with its deadline untouched, and `l4 run` prints a `NOTE:`
+beside the result. For a `SHANT` the early act is not a violation. See
+`doc/reference/regulative/AFTER.md` and `jl4/examples/ok/every/run-after.l4`.
 
 ---
 

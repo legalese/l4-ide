@@ -256,15 +256,34 @@ data CheckError =
     -- silently decide barrier-or-fork, and the barrier reading reverses what a
     -- single-party @MAY … HENCE@ means today. Carries the first continuation
     -- present, for its source range.
-  | AnchorUnavailable (Anchor Name) AnchorRefusal
+  | AnchorUnavailable EdgeWord (Anchor Name) AnchorRefusal
     -- ^ A lifecycle anchor (@WITHIN d OF THE JOIN@ \/ @THE DEADLINE@ \/
-    -- @THE ARMING@, EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7B) written where
-    -- the position it names does not exist. Carries the anchor for its
-    -- source range and the reason (see 'AnchorRefusal').
-  | AnchorNotAnInstant (Expr Name) (Type' Resolved)
-    -- ^ The expression after @OF@ in a @WITHIN@ (R-Q7C) is neither a NUMBER
-    -- (an instant on the trace's own clock) nor a DATE. Carries the
-    -- expression, for its range, and the type it was found to have.
+    -- @THE ARMING@, EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7B; on an @AFTER@
+    -- since 2026-09-16, §5.1.2) written where the position it names does
+    -- not exist. Carries the edge's keyword (for the wording), the anchor
+    -- for its source range and the reason (see 'AnchorRefusal').
+  | AnchorNotAnInstant EdgeWord (Expr Name) (Type' Resolved)
+    -- ^ The expression after @OF@ in a @WITHIN@ or an @AFTER@ (R-Q7C) is
+    -- neither a NUMBER (an instant on the trace's own clock) nor a DATE.
+    -- Carries the edge's keyword, the expression, for its range, and the
+    -- type it was found to have.
+  | OpeningNotAnInstant (Expr Name) (Type' Resolved)
+    -- ^ The expression after @AFTER@ (EVERY-EACH-QUANTIFIER-SPEC §5.1.2,
+    -- R-X5) is neither a NUMBER (a duration) nor a DATE (the instant the
+    -- window opens). Carries the expression, for its range, and its type.
+  | AbsoluteEdgeAnchored (Anchor Name)
+    -- ^ @AFTER date OF anchor@: a DATE is already an instant, so it has
+    -- nothing to count from. Carries the anchor, for its range.
+  | EmptyWindow (Deadline Name) Rational Rational
+    -- ^ @AFTER d1 WITHIN d2 OF anchor@ with both offsets literals and
+    -- @d1 > d2@ from the same anchor: the window closes before it opens
+    -- (§5.1.2.2, RULED 2026-09-16: the check applies only to the explicitly
+    -- anchored form — bare @AFTER d1 WITHIN d2@ re-anchors and cannot be
+    -- empty). Carries the closing edge, for its range, and the two offsets.
+  | BeforeOnJoinLine (Deadline Name)
+    -- ^ @BEFORE date@ on a join line (@ONCE … BEFORE@, @UPON EACH BEFORE@):
+    -- not built there (2026-09-16); the act position takes it. Carries the
+    -- edge, for its range.
   | RegulativeActorMismatch Resolved Resolved Resolved
     -- ^ A regulative @PARTY p MUST a@ (or a @PARTY p DOES a@ event) binds a
     -- party to an action belonging to a different actor. In a value-actor
@@ -523,8 +542,23 @@ data ExpectationContext =
   | ExpectQuantifierRollContext -- the IN clause of an EVERY is the LIST the cast is drawn from
   | ExpectJoinDeadlineContext -- a join line's WITHIN bounds the joined state
   | ExpectAnchoredDurationContext -- the duration of an anchored WITHIN: everything before OF, where OF is not application
+  | ExpectBeforeInstantContext -- the instant after BEFORE, the window's absolute closing edge: a DATE (a duration is WITHIN's)
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
+
+-- | Which edge of the window an anchor or an instant was written on, for
+-- the wording of a diagnostic: @WITHIN@ (the closing edge, R-Q7) or @AFTER@
+-- (the opening edge, R-X5, 2026-09-16). The @WITHIN@ wordings are the ones
+-- of 2026-09-15, byte for byte; the @AFTER@ ones substitute the word.
+data EdgeWord = EdgeWithin | EdgeAfter
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | The keyword an 'EdgeWord' stands for.
+edgeWordText :: EdgeWord -> Text
+edgeWordText = \ case
+  EdgeWithin -> "WITHIN"
+  EdgeAfter  -> "AFTER"
 
 -- | Why a lifecycle anchor was refused ('AnchorUnavailable'). Each names a
 -- position in the life of the ENCLOSING obligation — the one whose @HENCE@
@@ -680,8 +714,12 @@ instance HasSrcRange CheckError where
   rangeOf (ContinuationWithoutJoin e)       = rangeOf e
   rangeOf (ActionPatternReference n _)      = rangeOf n
   rangeOf (ActionPatternNotComparable e _)  = rangeOf e
-  rangeOf (AnchorUnavailable a _)           = rangeOf a
-  rangeOf (AnchorNotAnInstant e _)          = rangeOf e
+  rangeOf (AnchorUnavailable _ a _)         = rangeOf a
+  rangeOf (AnchorNotAnInstant _ e _)        = rangeOf e
+  rangeOf (OpeningNotAnInstant e _)         = rangeOf e
+  rangeOf (AbsoluteEdgeAnchored a)          = rangeOf a
+  rangeOf (EmptyWindow d _ _)               = rangeOf d
+  rangeOf (BeforeOnJoinLine d)              = rangeOf d
   rangeOf (FixityAnnotationMalformed mr _)  = mr
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr

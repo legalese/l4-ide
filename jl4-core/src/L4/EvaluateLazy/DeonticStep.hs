@@ -241,6 +241,16 @@ data StepOutcome
     -- ^ @Contract11@, the action pattern did not match; next event
   | GuardFailed
     -- ^ @Contract10@, the @PROVIDED@ came out false; next event
+  | EarlyAct !Rational
+    -- ^ @Contract10@, the act by this party, the pattern and the @PROVIDED@
+    -- all matched — but before the window's opening edge (@AFTER@,
+    -- EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X6): a NULLITY, neither
+    -- performance nor a violation. The obligation stands unchanged and the
+    -- next event is tried; the run's note reports the act. Carries the
+    -- instant the window opens, on the contract clock. Logged since
+    -- 2026-09-17 (adversarial round 1 of the third rebase, S2): without it
+    -- the log had no record of the look, and a what-if read the act as
+    -- taken by nobody
   | Matched !Branch
     -- ^ @Contract10@, the action matched and the guard held; routed per modal
     -- (a @SHANT@ routes to @LEST@, or to a breach when it has none)

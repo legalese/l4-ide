@@ -112,7 +112,7 @@ parseErrorToDiagnostic err = SimpleDiagnostic
 -- Failed assertions, and assertions whose expression raised, get Error
 -- severity; a REFUSED assertion gets Warning; successful evaluations get Info.
 evalResultToDiagnostic :: EL.EvalDirectiveResult -> SimpleDiagnostic
-evalResultToDiagnostic r@(EL.MkEvalDirectiveResult mrange res _mtrace _ledger) = SimpleDiagnostic
+evalResultToDiagnostic r@(EL.MkEvalDirectiveResult mrange res _mtrace _ledger _notes) = SimpleDiagnostic
   { sdLocation = RangeLoc <$> mrange
   , sdSeverity = case res of
       -- A refusal is a DESIGNED outcome, not a defect: the model declined to

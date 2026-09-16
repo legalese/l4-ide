@@ -41,8 +41,11 @@
 >   clock — R-Q7's unanchored default and R-Q5's failure time — BUILT 2026-09-16 on
 >   `every/lest-anchor`, witness `jl4/examples/ok/every/run-lest.l4`, mechanism and decisions
 >   under §5.2.1**; **R-X5 (the window's edges, modified) and R-X6 (the early act, ruled),
->   §5.1.2, 2026-09-07, not built; R-X5 AMENDED 2026-09-16 — bare `AFTER d1 WITHIN d2` re-anchors,
->   two-offset is `WITHIN d2 OF THE JOIN` (§5.1.2.2)**; and three on 2026-09-08 — **W3, `THE OPENING` declined and
+>   §5.1.2, 2026-09-07; R-X5 AMENDED 2026-09-16 — bare `AFTER d1 WITHIN d2` re-anchors,
+>   two-offset is `WITHIN d2 OF THE JOIN` (§5.1.2.2); BUILT 2026-09-16 on `every/after-before`,
+>   witness `jl4/examples/ok/every/run-after.l4`, mechanism and the T1 decision — a run-time
+>   refusal of a date on a clock below `DATE_SERIAL (YMD 1 1 1)` — under §5.1.2's build block and
+>   §11.0.1**; and three on 2026-09-08 — **W3, `THE OPENING` declined and
 >   the anchor slot ruled to become a trace expression (§5.1.3, direction only, not built)**, and
 >   **the roll call, how a run gets its cast (§11.0, ANSWERED and BUILT)**, and
 >   **the roll said outright, `EVERY Cast v IN xs` (§11.0.2, RULED by Meng and BUILT)**.
@@ -1056,8 +1059,14 @@ TemporalConstraint ::= 'WITHIN' Duration ['OF' Anchor]   -- 'OF' Anchor: the nam
                                       -- The connective is 'OF' and only 'OF' (R-Q7A, §5.1.1). BUILT 2026-09-15
                                       -- ('L4.Parser.deadline', Parser.hs:2724): in the Duration slot OF is the
                                       -- anchor, so an application there is written '(f OF x)' or 'f x'.
-                     | 'BEFORE' Expr                      -- R-X5: an absolute DATE, the closing edge; 'BEFORE' Duration is refused. Unbuilt
-                     | 'AFTER' (Duration ['OF' Anchor] | Expr)   -- R-X5: the opening edge, duration or DATE. RE-ANCHORS (RULED 2026-09-16, §5.1.2.2): the WITHIN beside it counts from this edge; two-offset is 'WITHIN d OF THE JOIN'. Unbuilt
+                     | 'BEFORE' Expr                      -- R-X5: an absolute DATE, the closing edge; 'BEFORE' Duration is refused
+                                      -- naming WITHIN. BUILT 2026-09-16 ('L4.Parser.before', Parser.hs:2763;
+                                      -- the second constructor of 'L4.Syntax.Deadline', Syntax.hs:581).
+                                      -- Act position only: on a join line it is refused by name ('BeforeOnJoinLine').
+                     | 'AFTER' (Duration ['OF' Anchor] | Expr)   -- R-X5: the opening edge, duration or DATE. RE-ANCHORS (RULED 2026-09-16, §5.1.2.2): the WITHIN beside it counts from this edge; two-offset is 'WITHIN d OF THE JOIN'.
+                                      -- BUILT 2026-09-16 ('L4.Parser.opening', Parser.hs:2779; the node is
+                                      -- 'L4.Syntax.Opening', Syntax.hs:602, a field of 'Deonton' between the action and the deadline).
+                                      -- The edges are written in ONE order, AFTER then WITHIN/BEFORE ('L4.Parser.edgeOrderGuard'); the join line takes no AFTER.
                      | 'BY' Deadline                      -- unruled and unbuilt; TKBy serves FOLLOWED BY, DIVIDED BY, BREACH BY
 
 Anchor ::= 'THE' ('JOIN' | 'DEADLINE' | 'ARMING' | 'OPENING')   -- 'OPENING' proposed by R-X5 (§5.1.2), DECLINED (§5.1.3), unbuilt   -- R-Q7B: the three lifecycle positions. THE is already
@@ -1326,10 +1335,10 @@ branch was in the merge queue at the time):
   "Six Ways to Owe One Debt" page (an artifact, §2.2.7.6) describes the same pair.
 - The build's `doc/` page for the quantifier owes the `RAND`/`ROR` worked example of §8.3 (R-Q2,
   Meng's note).
-- `doc/reference/regulative/README.md:104` promises `BEFORE` for absolute deadlines. **R-X5
-  (2026-09-07, §5.1.2) keeps that reading**, so the page becomes true when `BEFORE` is built rather
-  than needing correction; `jl4/experiments/purchase.l4`'s seven `BEFORE n days` lines migrate to
-  `WITHIN`.
+- `doc/reference/regulative/README.md:104` promised `BEFORE` for absolute deadlines. **R-X5
+  (2026-09-07, §5.1.2) keeps that reading**, and the page became true on 2026-09-16 when `BEFORE`
+  was built (its section is now `## BEFORE (Absolute Deadline)`); `jl4/experiments/purchase.l4`'s
+  seven `BEFORE n days` lines migrated to `WITHIN` in the same change.
 - **The BPMN export cannot tell a barrier from a fork, and its fidelity report does not say so.**
   Measured 2026-09-07 by the GM on a binary built from `every/build-1`: one rule exported twice,
   once with `ONCE ALL HAVE` and once with `UPON EACH`, gives **byte-identical** BPMN XML and a
@@ -1382,9 +1391,11 @@ branch was in the merge queue at the time):
   spellings (R-Q7) were ruled the same day and are recorded at §5.1.1** — `OF` alone as the connective,
   `OF THE JOIN`/`OF THE DEADLINE`/`OF THE ARMING` for the lifecycle positions, and a date-valued
   expression admitted in the slot. Ruled 2026-09-07; **BUILT 2026-09-15** (§5.1.1's build block).
-- Opened by those rulings, and owed to nobody yet: **the `AFTER` window** (§5.1.2, sketched on Meng's
-  request and not ruled — it owes the early-act semantics, the empty-window check, and its meaning
-  under `LEST`); **an anchor picked by an expression** rather than named, which R-Q7B's note flags as
+- Opened by those rulings: **the `AFTER` window** (§5.1.2 — sketched on Meng's request, then ruled:
+  the early-act semantics R-X6 on 2026-09-07, the empty-window check scoped to the explicitly
+  anchored form and the re-anchoring default on 2026-09-16, §5.1.2.2; its meaning under `LEST` falls
+  out of §5.2's clock; **BUILT 2026-09-16**, §5.1.2's build block); and, owed to nobody yet,
+  **an anchor picked by an expression** rather than named, which R-Q7B's note flags as
   the natural place for that pressure to arrive; and **a date library** with plain days, business
   days, officially recognised holidays, widely observed non-holidays, and weeks free of public
   holidays in a named jurisdiction (R-Q7C's note). The last is a library, not a language change:
@@ -1783,7 +1794,8 @@ Singapore` `` are all already expressible through mixfix and backticked names; w
 calendar for them to consult, which is a library to write and not a keyword to reserve. The corpus
 already writes `` WITHIN `five business days` `` 11 times, which is exactly this move made by hand.
 
-**What these three do not settle.** The `AFTER` window (§5.1.2, sketched and not ruled); an anchor
+**What these three do not settle.** The `AFTER` window (§5.1.2 — ruled since, on 2026-09-07 and
+2026-09-16, and built 2026-09-16); an anchor
 picked by an expression rather than named (R-Q7B's note); the date library (R-Q7C's note); and
 whether an anchored `WITHIN` under `LEST` may name `THE JOIN` at all, which is a well-formedness
 question — under `LEST` the join did not fire. (The build below takes the conservative reading of
@@ -2045,21 +2057,27 @@ highlights `JOIN`/`DEADLINE`/`ARMING` as keywords by the `UponEach` device
 (`SemanticTokens.hs:224`); the service serialises an unevaluated anchored deadline as its source
 text.
 
-**Not built here.** `AFTER` (held, §5.1.2 — the next track, stacked on this branch); §5.2's `LEST`
+**Not built here.** `AFTER` (held, §5.1.2 — built 2026-09-16 by the next track, stacked on this
+branch: §5.1.2's build block); §5.2's `LEST`
 default (a different stack — `OF THE DEADLINE` on a `LEST` is that clock said explicitly, witness
 `cure from the deadline`, and was the workaround until §5.2 landed on 2026-09-16, §5.2.1; the two
 spellings now agree for every failure but a `SHANT` violation); T1's `COMMENCING`/sort
-separation (§5.1.2.1) — so nothing separates a floating-origin trace from a date-serial one, and a
-`DATE` anchor on a trace that starts `AT 0` counts from a serial in the hundreds of thousands,
-silently, which the doc page says in one sentence; §5.1.3's expression-over-trace slot; `THE
+separation (§5.1.2.1) — so nothing separates a floating-origin trace from a date-serial one; a
+`DATE` anchor on a trace that starts `AT 0` counted from a serial in the hundreds of thousands,
+silently, until the `AFTER`/`BEFORE` track (2026-09-16) made the machine refuse a date on a clock
+below `DATE_SERIAL (YMD 1 1 1)` by name, for the anchor as for the new edges (§5.1.2's build block;
+the doc page says the remaining limit in one sentence); §5.1.3's expression-over-trace slot; `THE
 OPENING` (declined); `SOME m OF`. Also not done: a residual re-armed on a SECOND `App1` (nothing in
 `l4 run` does this) would resolve an unevaluated anchor at its second arming, not its first.
 
-#### 5.1.2 `AFTER` and `BEFORE`: the window's two edges — MODIFIED 2026-09-07 (R-X5); the early act RULED (R-X6); the origin the absolute forms needed RULED 2026-09-09 (T1, §5.1.2.1); **`AFTER … WITHIN` RE-ANCHORS, RULED 2026-09-16 (R-X5 amended, §5.1.2.2)**; not built
+#### 5.1.2 `AFTER` and `BEFORE`: the window's two edges — MODIFIED 2026-09-07 (R-X5); the early act RULED (R-X6); the origin the absolute forms needed RULED 2026-09-09 (T1, §5.1.2.1); **`AFTER … WITHIN` RE-ANCHORS, RULED 2026-09-16 (R-X5 amended, §5.1.2.2)**; BUILT 2026-09-16
 
 This section answers the question in R-Q7A's note ("Shall we try to sketch a design for that now?").
 R-X6 is ruled and R-X5 is a design Meng modified and asked to have worked through; both are
-recorded below. **Nothing here is built.**
+recorded below, and both are **built** — the block at the end of this section ("BUILT 2026-09-16")
+records the mechanism, the diagnostic channel R-X6 needed, the decision taken on T1's hole, and
+what the build decided that no ruling had. The prose between here and there is the design as it
+was ruled, with its "not built" sentences corrected in place.
 
 **The gap.** `WITHIN d` gives a window one edge, the closing one; the opening edge is the anchor
 itself, so an obligation is performable from the instant it arms. Meng's cooling-off example is the
@@ -2131,7 +2149,11 @@ relative and closes absolute, a real contract shape.
 promises `BEFORE` for absolute deadlines, becomes **true when built** instead of corrected.
 `jl4/experiments/purchase.l4` migrates by one word per line — its `BEFORE n days` at `:97`, `:101`,
 `:134`, `:153`, `:159`, `:164`, `:169` become `WITHIN n days` — with meaning preserved, because its
-`AFTER` never re-anchored either. R-Q7C stands (a date as an **anchor**, `WITHIN 5 OF closingDate`,
+`AFTER` never re-anchored either. (Corrected 2026-09-16, when §5.1.2.2 made the bare form
+re-anchor: the four lines that sit under an `AFTER` — `:153`, `:159`, `:164`, `:169` — migrated to
+`WITHIN n days OF THE JOIN`, which is the two-offset window the file always meant; the three bare
+ones to `WITHIN n days`; `jerseyAlcohol.l4:88`, not named here, the same way. Done with the
+build.) R-Q7C stands (a date as an **anchor**, `WITHIN 5 OF closingDate`,
 is still needed) but its awkward idiom for the degenerate case, `WITHIN 0 OF (YMD …)`, is no longer
 the natural spelling; `BEFORE (YMD …)` is.
 
@@ -2162,7 +2184,8 @@ count as performance; the obligation stays live with its clock untouched; the pa
 once the window opens; and the machine reports that the act fell outside the window rather than
 swallowing it. A silent nullity is how a party loses a deadline it believed it had met. The card
 offered "defer to the bounded-deontics discussion" as a legitimate mark and it was not taken.
-**Not built.**
+**Built 2026-09-16** — the diagnostic is a `NOTE:` line beside the directive's result, through a
+channel `l4 run` did not have and now does (the build block below).
 
 **Cost, measured 2026-09-07 on this branch.** `AFTER` and `BEFORE` are **not** keywords
 (`jl4-core/src/L4/Lexer.hs`; the keyword table is an exact, case-sensitive `Map.lookup` on the raw
@@ -2174,10 +2197,173 @@ backticked section names in `housing-act-ground-5F.l4:605,:726`, and a backticke
 the keyword table. Zero goldened corpus files, zero canon files, zero `doc/` files — the same shape
 `UPON` measured at before it was taken.
 
-**What this sketch owes before it could be ruled**: the early-act semantics above; whether `BEFORE`'s
-offset is checked against `AFTER`'s at compile time (`AFTER 30 BEFORE 5` is an empty window and
-should be an error, not a rule that can never fire); and what the pair means under `LEST`, where the
-anchor is a missed deadline rather than a performance.
+**What this sketch owed before it could be ruled — each now settled**: the early-act semantics
+above (R-X6, ruled 2026-09-07, built 2026-09-16); whether `BEFORE`'s offset is checked against
+`AFTER`'s at compile time (`AFTER 30 BEFORE 5` is an empty window and should be an error, not a
+rule that can never fire — scoped on 2026-09-16 to the explicitly anchored `WITHIN d OF …` form,
+§5.1.2.2, and built: a check error for literal offsets, a run-time note otherwise); and what the
+pair means under `LEST`, where the anchor is a missed deadline rather than a performance (it falls
+out of §5.2's clock with no plumbing of its own: `AFTER 3 WITHIN 30` under a `LEST` is
+`[deadline+3, deadline+33]`, witnessed). What the section still owes is in the build block's
+residue.
+
+##### 5.1.2.0 BUILT 2026-09-16 — the mechanism, the diagnostic channel, and the T1 decision
+
+Built on `every/after-before`, cut from `every/lest-anchor` `162e9382` plus the R-X5 ruling commit
+`85d4b1c2` (fifteen commits over `origin/unstable` `0b640727`), so it lands AFTER `every/lest-anchor`.
+Witness: `jl4/examples/ok/every/run-after.l4` (51 directives in ten sections: the cooling-off
+window with `MUST` and `MAY`, the two-offset spelling and the four anchor combinations, the `LEST`
+clock, `AFTER` alone, the absolute forms and their refusal on a floating trace, a barrier's
+`HENCE`, barrier members, a fork and a fork bounded as a whole, a `SHANT`, the empty window a run
+reveals, and the printers); refusals witnessed by
+`jl4/examples/not-ok/tc/{within-a-date,before-a-duration,after-empty-window,after-wrong-order,after-date-anchored,after-not-an-instant,before-on-join-line}.l4`;
+highlighting by `jl4/examples/lsp/semantic-tokens/after.l4`; the doc page
+`doc/reference/regulative/AFTER.md` with `after-example.l4`. **Line numbers below are on the build
+commit of this track** (subject `lang(every): the window's two edges …`), and are NOT re-cited by
+later commits unless their ledger entries say so.
+
+**Syntax.** `AFTER` and `BEFORE` are keywords (`Lexer.hs:254`, `:256`; the table
+`:356`). Measured before reserving them (the survey of 2026-09-16, re-run on this HEAD): every
+occurrence in a goldened glob, under `doc/`, in the libraries and in canon is inside a comment or a
+backticked name; the non-comment hits are all in `jl4/experiments/` (no glob), and those in
+`purchase.l4` migrated with this change (`BEFORE n days` → `WITHIN n days`, its `AFTER n days` kept
+— that file still does not parse, for the reasons it never did: `PERSON`, `SHOULD`, an undefined
+`days`). `Deonton` gains a field, `opens :: Maybe (Opening n)`, between the action and the deadline
+(`Syntax.hs:429`), in source order as the exactprint zip requires; `Opening n =
+MkOpening Anno (Expr n) (Maybe (Anchor n))` mirrors `Deadline` (`:602`), and `Deadline` gains a second
+constructor, `MkBefore Anno (Expr n)` (`:581`), so the closing edge stays ONE hole of the parent
+and `WITHIN` and `BEFORE` cannot both be written. The parser (`obligation`,
+`Parser.hs:2578`) takes `opening` then `closingEdge` (`deadline <|> before`), then a guard that
+fails by name when an `AFTER` follows the closing slot (`edgeOrderGuard`, `:2600`; its
+look-ahead is `hidden`, so `AFTER` does not join the expected-token list of every parse error after
+a `WITHIN`, which is how the two `every-join-misindented` goldens did not move). Inside the
+`AFTER`'s offset, `OF` is the anchor by the same flag `WITHIN` uses (`ofIsAnchor`); inside a
+`BEFORE`, which takes no anchor, `OF` is application. The join line's deadline slot takes
+`closingEdge` too, so that a `BEFORE` written there is refused by the checker by name rather than
+as an unexpected token; no `AFTER` is offered on a join line, as the brief required.
+
+**Type checker.** Type-directed, as R-X5 says. `checkOpening` (`TypeCheck.hs:2202`) infers the
+offset and reads it back with `checkAnchorAt`'s bias — `NUMBER` first (a duration, an anchor
+allowed), then `DATE` (the instant; an anchor is refused, `AbsoluteEdgeAnchored`), else
+`OpeningNotAnInstant` naming both. `checkDeadline` (`:2170`) keeps `checkExpr … number` for a
+`WITHIN`, unchanged, and `checkExpr ExpectBeforeInstantContext … date` for a `BEFORE`; the
+"name the other word" rule lives in the mismatch wording (`withinGotDate`, `:6913`; the
+`ExpectBeforeInstantContext` arm), which appends a sentence only when the given type IS a `DATE`
+(or a `NUMBER` after `BEFORE`), so every older mismatch wording holds byte for byte. The
+empty-window check (`checkWindowNotEmpty`, `:2228`) fires only for two literal offsets
+under a `WITHIN` that names an anchor which the `AFTER` shares (bare, or the same lifecycle
+noun) — §5.1.2.2's scoping; two different origins, or an `OF e` on either side, make no literal
+comparison. The anchor refusals of §5.1.1.1 apply to an `AFTER`'s anchor unchanged
+(`checkAnchor` takes an `EdgeWord`, `Types.hs:449`, which only chooses the keyword in the
+wording — the `WITHIN` wordings are the 2026-09-15 ones byte for byte, so the five `anchor-*`
+goldens did not move). `hasDeadline` stays about the closing edge: `THE DEADLINE` under an
+`AFTER`-only obligation is refused, and the machine binds none there.
+
+**Machine.** The opening edge is resolved ONCE, at the first event, before the closing edge,
+because a bare `WITHIN` beside it counts from it: `Contract4` (`Machine.hs:1618`) dispatches on the
+opening — an anchored one through `Contract4oa` (the anchor, `resolveAnchor`, shared with the
+deadline's), then `Contract4o` (the offset: a NUMBER added to the anchor or to the arming clock, a
+DATE lowered by its serial) — and then hands the closing edge to `scrutinizeDue`
+(`:2315`), which is what `Contract4` used to do on its own, with one more input: the
+opening instant. `Contract5`'s `anchorT` became `origin` (`ContractFrame.hs:302`): what a duration
+is added to — the anchor's instant for `WITHIN d OF …`, the opening instant for a bare `WITHIN`
+beside an `AFTER` (re-anchor), the frame's clock otherwise; a `BEFORE`'s value is a DATE and is
+absolute by itself (`:1676`). The four combinations are witnessed: bare/bare `[13, 43]`,
+bare/`OF THE JOIN` `[13, 40]`, `OF THE JOIN`/bare `[13, 43]`, `OF THE JOIN`/`OF THE JOIN`
+`[13, 40]`, and two origins (`OF THE ARMING`/`OF THE JOIN`) `[3, 40]`. Under a `LEST` the
+continuation's clock is already the missed deadline (§5.2.1), so `AFTER 3 WITHIN 30` there is
+`[deadline+3, deadline+33]` with no plumbing of its own (witness `cure, bare`: 63 in time, 64
+late); under a barrier's `HENCE` it is `[t_last+3, t_last+33]` (witness `barrier then window`).
+After the first evaluation the value carries the opening as what is still to run until it opens
+(`ValObligation`'s fourth field, `ValueLazy.hs:60`; `MaybeOpened` on every act frame,
+`ContractFrame.hs:162`), `Just` while the window has not opened and `Nothing` once it has, and the
+remaining due is measured from the OPENING while that is ahead (`relativeDue`,
+`:2363`) — so a residual prints as the bare re-anchored window it is: `AFTER 1 WITHIN 30`
+at 12 is `[13, 43]`, where the first cut printed `AFTER 1 WITHIN 31`, which under the bare reading
+is `[13, 44]` — a wrong answer in the residual's own notation, caught by the first probe. `AFTER`
+alone takes the `Left Nothing` shortcut with the opening still re-relativised, so `Contract10` can
+see whether the window has opened. The early act (R-X6) is caught at `Contract10`
+(`:1902`), the one frame at which party, action and `PROVIDED` have all matched: the note is
+raised, and the event is passed over exactly as a non-matching one is — the absolute deadline is
+untouched by construction (the `time + due` invariant), and the party may act again. For a
+`SHANT` the same arm applies and the note says the prohibition had not started: not a violation
+(witness `no smoking later`: 2 reported and ignored, 5 the violation, 2-then-40 kept). A member's
+opening is threaded through `memberObligation` and `barrierMember` from the deonton, so a fork or
+barrier member has its window; and a demoted join-line `WITHIN` beside a member's `AFTER` is
+handed to the member anchored `OF THE ARMING` explicitly (`memberDueExpr`, `:2660`), because a
+join-line deadline bounds the whole from the `EVERY`'s arming (R-T2) and must not re-anchor on the
+act's opening (witness `fork bounded as a whole`: `[3, 30]`, not `[3, 33]`); without an `AFTER`
+the demoted deadline is handed over as written, so no older residual prints differently.
+
+**The diagnostic channel, which did not exist.** `l4 run`'s per-directive outputs were the value,
+the trace and the ledger; nothing non-fatal reached a golden. Built: `EvalState.notes`
+(`Machine.hs:280`), appended by `tellNote`, swapped fresh per directive beside the ledger
+(`withFreshLedger`, `EvaluateLazy.hs:146`), read into `EvalDirectiveResult.notes`
+(`:342`) and printed as `NOTE: …` lines after the value by `prettyEvalDirectiveResult`
+(what the goldens see), as a `Notes:` section by `l4 run`, and as a `"notes"` key in the JSON only
+when there are any — so no directive that raises none prints a byte differently. Twenty-one
+positional pattern and construction sites across four packages (`jl4-core`, `jl4`, `jl4-lsp`,
+`jl4-repl`; counted with `grep -rn MkEvalDirectiveResult`, the declaration and the record-syntax
+sites excluded) took the new field; the price of "the goldens can see it", paid once. A note's party is rendered by `peekNF` (`Machine.hs:5689`), which follows references
+already in WHNF and forces nothing — a party that has just been matched against an event prints
+whole. Two notes exist: R-X6's early act (`earlyActNote`), and the explicitly anchored window a
+run finds empty (`emptyWindowNote`, raised once at `Contract5` when both instants are first known,
+for offsets the checker could not compare; witness `window of` 30 5).
+
+**The T1 decision (the brief's item 4): (a), a run-time refusal, with the heuristic stated.**
+`AFTER date` and `BEFORE date` are parsed and lower through the date's serial (the same arithmetic
+as `DATE_SERIAL`, `lowerInstant`, `Machine.hs:5620`). What the machine can see at that
+point is the obligation's arming instant, and what it checks is whether a calendar date could
+have that serial at all: an arming below `DATE_SERIAL (YMD 1 1 1)` (365; `earliestDateSerial`,
+computed, not a literal) is not on the date-serial scale, and the date is refused by name — the
+edge, the date, the clock's reading, and what to do instead (witnesses `by june` and `from june`
+`AT 0`). That catches every `AT 0` trace in the corpus and lets every `AT (DATE_SERIAL …)` trace
+through; a floating trace that starts at 365 or above is not caught, and the doc page says so in
+one sentence. (b) — parse and refuse always, naming T1 — was rejected because it would have
+left `WITHIN 0 OF (YMD …)` silently running on the same floating trace while the one-word spelling
+of the same deadline refused; (c) — not parsing the absolute forms — because R-X5's table is
+type-directed and the absolute column is half of it. **A deviation the reviewer may reverse:** the
+same refusal now guards the pre-existing anchor form, `WITHIN d OF date` (the code path is one
+function), because the survey had probed it silently `FULFILLED` on an `AT 0` trace (§5.1.2.1's
+point 2, the anchor half) and the doc page would otherwise have had to explain why the one-word
+form refuses where the two-word form does not. No golden moved: every `DATE` anchor in the
+corpus runs on a date-serial trace (measured before the change, confirmed by the suite). What T1
+still owes is unchanged: a contract-level `COMMENCING` in both forms, and date/duration/instant as
+distinct sorts, so that the check is a type and not a heuristic on the clock's reading.
+
+**Printers.** The keyword moved from the caller into the node — `closingClause`/`openingClause`,
+`Print.hs:940` — because the closing edge has two keywords now; `prettyObligation` takes the
+window already rendered, and `residualWindow` (`:962`) prints a run-time residual's
+`AFTER n` only while the window has still to open. Exactprint is byte-identical (the two new
+nodes' keywords live in their own `Anno`s; the `.ep.golden`s of the witnesses equal their
+sources), `prettyLayout` round-trips the whole corpus with the witness included and no exclusion
+list, NLG says `after 3 within 30 of that` for the bare window (`Nlg.hs:252`), the document
+export folds the window into one phrase with its own prepositions (`Document.hs:1120`; `CDeontic`'s
+deadline slot now carries "within 30" rather than "30", and the three renderers stopped prefixing
+"within" — no test or golden reads that slot), the state graph carries the opening as its own label
+field and a `BEFORE` with its keyword (`StateGraph.hs:684`; the record pattern named the new
+field rather than ignoring it), the BPMN lowering reports the opening edge as not drawn
+(`P-WINDOW-OPENING`, blocking, `Bpmn/Lower.hs:1746`) and carries a `BEFORE` verbatim as a
+condition through the existing unparsed-deadline path, the MLIR schema fails closed on any
+opening (`Schema.hs:931`), the LSP highlights the two keywords through the derived
+instances, and the service serialises an unevaluated opening as its source text and adds an
+`opens` key to the `OBLIGATION` object only while there is one to reach.
+
+**Existing goldens.** None moved: no eval, exactprint, NLG, schema, parse-error or semantic-token
+golden of a pre-existing file changed (run 1 of the suite failed on exactly the 33 goldens it
+created — four for the witness, four each for seven `not-ok/tc` witnesses, one for the LSP
+fixture; run 2 on the extended witness was 4 created; run 3 green). The two things that would
+have moved goldens were avoided deliberately: `AFTER` joining the expected-token list after a
+`WITHIN` (the `hidden` look-ahead above), and a `WITHIN` mismatch wording that changed for the
+non-`DATE` case (the sentence is appended only for a `DATE`).
+
+**Residue, owed by this section.** Backward windows from a future event ("not less than 10 days
+before the meeting" — the corpus's common two-offset case, §5.1.2.2's measurement) are not
+expressible: both edges count forward from an anchor. T1's `COMMENCING` and sorts, above. A
+join-line `AFTER`. `THE OPENING` stays declined. The noun `JOIN` (§5.1.2.2, footnote 1) stays
+open.
+
+**What the adversarial pass of 2026-09-16 changed.** Pending, filled after the refute stage.
 
 ##### 5.1.2.1 The absolute forms need an origin, and now have one — RULED 2026-09-09 (T1)
 
@@ -2241,9 +2427,10 @@ commencement has to defer to run time. Option a's text ("absolute edges lower to
 form. R-X5's lowering is therefore **two mechanisms, not one**, and a design that assumes the
 compile-time one will be surprised by the floating case.
 
-**Not built.** No `COMMENCING` keyword exists, the sorts are not separated, and R-X5 itself remains
-unbuilt. What has changed is that R-X5 is no longer blocked on an unanswered question, and that the
-two things to build are named.
+**Not built** (T1 itself): no `COMMENCING` keyword exists and the sorts are not separated; those
+are the two things to build, named here, and they stay named. R-X5 no longer waits for them: it
+was built on 2026-09-16 (§5.1.2's build block), with a run-time refusal standing in for the
+type — a date is refused on a clock that no calendar date has a serial for — until T1 is.
 
 ##### 5.1.2.2 `AFTER d1 WITHIN d2` re-anchors — RULED 2026-09-16 (Meng; R-X5 amended)
 
@@ -2271,7 +2458,8 @@ Two-offset explicitly `WITHIN … OF THE JOIN`."_ So:
 - **What changes downstream:** the empty-window check this section owed ("`AFTER 30 BEFORE 5` is an
   empty window and should be an error") now applies only to the explicitly anchored form — bare
   `AFTER 30 WITHIN 5` is `[a+30, a+35]` and can never be empty. `doc/reference/regulative/README.md`
-  and the `AFTER` page owed by track 7 teach the re-anchored reading first.
+  and the `AFTER` page (`doc/reference/regulative/AFTER.md`, written with the build on 2026-09-16)
+  teach the re-anchored reading first.
 
 **What decided it — three measurements, none of them the L4 corpus.**
 
@@ -2618,7 +2806,9 @@ arming)` when the anchored deadline predates the arming. No code change; `README
   moves (no corpus file has an unanchored `LEST` under a past-anchored obligation), and the
   barrier path's sentinel anchor needs the same floor.
 
-- Which member a barrier anchors at (the stack settled it); `AFTER`/`BEFORE`; `SOME m OF`.
+- Which member a barrier anchors at (the stack settled it); `AFTER`/`BEFORE` (built by the next
+  track on 2026-09-16, §5.1.2's build block; under a `LEST` the window counts from this section's
+  clock with no plumbing of its own); `SOME m OF`.
 
 **Goldens.** Read before promotion, each with the reason the diff is right:
 
@@ -3642,9 +3832,11 @@ under a LEST`, `handed under a LEST, in a compound`, `handed to no WITHIN` — t
   (`within-example.l4`), `EVERY.md`'s "Anchored deadlines under a join", and the
   `writing-l4-rules` skill's three copies of the "does not parse" claim corrected.
 
-**Not built**, each named in §5.1.1.1's last paragraph: `AFTER`; §5.2's `LEST` default (built
+**Not built**, each named in §5.1.1.1's last paragraph: `AFTER` (built 2026-09-16 by its own
+track, §5.1.2's build block and the entry below); §5.2's `LEST` default (built
 2026-09-16 by its own track, §5.2.1); T1's epoch
-and sorts (so the floating-origin/date-serial confusion is a stated limit, not a check); §5.1.3's
+and sorts (so the floating-origin/date-serial confusion is a stated limit, not a check — since the
+`AFTER` track, a run-time refusal on a clock below `DATE_SERIAL (YMD 1 1 1)`); §5.1.3's
 expression-over-trace slot; `THE OPENING`; `SOME m OF`; a way for a deep continuation to name a
 non-nearest obligation's arming.
 
@@ -3756,6 +3948,46 @@ Deliver AT 14`, the machine stable-sorts a trace by `AT`, so the delivery at 14 
   as the README.
 
 Raised and refuted by both checkers in round 2: none.
+
+#### Built 2026-09-16 — the window's two edges (R-X5, R-X5 amended, R-X6; §5.1.2), on `every/after-before`
+
+**Built**, witnessed by `jl4/examples/ok/every/run-after.l4` (the mechanism and every decision are
+in §5.1.2's build block; this is the ledger entry):
+
+- the keywords `AFTER` and `BEFORE`; the grammar `AFTER d [OF anchor]` \| `AFTER date` for the
+  opening edge and `WITHIN d [OF anchor]` \| `BEFORE date` for the closing edge, in one order,
+  on the act line only (the join line takes no `AFTER`; a `BEFORE` there is refused by name);
+- the type-directed checks: a `DATE` after `WITHIN` and a `NUMBER` after `BEFORE` refused naming
+  the other word, an anchor on `AFTER date` refused, a non-instant after `AFTER` refused naming
+  both, the literal empty window under a shared anchor refused, the anchor refusals of §5.1.1.1
+  applied to an `AFTER`'s anchor with the keyword substituted in the wording;
+- the machine: the opening resolved once at the first event, before the closing edge; the bare
+  `WITHIN` re-anchored on the opening (R-X5 amended), the anchored one on its anchor, a
+  `BEFORE` absolute; the remaining due measured from the opening while it is ahead, so the
+  residual prints as the window it is; `AFTER` alone as a window that never closes; the early
+  act at `Contract10` as a nullity with a note, for every modal (R-X6); the opening threaded to
+  fork and barrier members, and a demoted join-line deadline kept on the arming beside a
+  member's `AFTER`; a run-time note for the empty window the checker could not see;
+- the notes channel: `EvalState.notes`, `EvalDirectiveResult.notes`, printed after the value by
+  every renderer and only when non-empty;
+- the T1 decision: a date on either edge, and on a `WITHIN`'s anchor, refused by name when the
+  obligation's clock at arming is below `DATE_SERIAL (YMD 1 1 1)`; the remaining limit (a floating
+  trace at 365 or above) on the doc page in one sentence;
+- all four printers (exactprint byte-identical, `prettyLayout` round-tripping, NLG, document
+  export), the state graph's label and the BPMN fidelity note, the MLIR schema failing closed,
+  LSP highlighting, the service's `opens` key;
+- `doc/reference/regulative/AFTER.md` with `after-example.l4`, linked from `doc/SUMMARY.md` and
+  the regulative README; the README's `WITHIN` section, its `BEFORE` section rewritten to what
+  shipped, `EVERY.md`'s "What runs today", the concepts page's `BEFORE` sentence, and the
+  `writing-l4-rules` skill's three copies of the "no `BEFORE`" claim corrected;
+  `jl4/experiments/purchase.l4` migrated.
+
+**Not built**: T1's `COMMENCING` and sorts (§5.1.2.1); a join-line `AFTER`; backward windows from a
+future event; `THE OPENING` (declined); `SOME m OF`.
+
+**Existing goldens.** None moved (§5.1.2's build block says which two moves were avoided and how).
+
+**What the adversarial pass of 2026-09-16 changed.** Pending, filled after the refute stage.
 
 #### Stacking B on C (2026-09-16) — `every/anchors` rebased onto `every/blame-set`, branch `every/anchors-on-blame`
 
@@ -4905,8 +5137,11 @@ filter ::= 'WHO' boolean_expr       (* the bound variable is free in boolean_exp
 
 deontic_modal ::= 'MUST' | 'MAY' | 'SHANT' | 'DO'
 
-temporal_constraint ::= 'WITHIN' duration_expr ['OF' anchor]   (* anchor: R-Q7, §5.1; unbuilt *)
-                      | 'BEFORE' time_expr                      (* planned, unbuilt *)
+temporal_constraint ::= ['AFTER' (duration_expr ['OF' anchor] | date_expr)]   (* the opening edge: R-X5, §5.1.2; built 2026-09-16;
+                                                                                act line only; written before the closing edge *)
+                        ( 'WITHIN' duration_expr ['OF' anchor]   (* anchor: R-Q7, §5.1; built 2026-09-15. Beside an AFTER a bare
+                                                                    WITHIN re-anchors on the opening (§5.1.2.2) *)
+                        | 'BEFORE' date_expr )                   (* the absolute closing edge: R-X5; built 2026-09-16; act line only *)
                       | 'BY' time_expr                          (* unruled, unbuilt *)
 
 hence_clause ::= 'HENCE' continuation

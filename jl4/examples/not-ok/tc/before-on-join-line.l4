@@ -1,0 +1,18 @@
+-- BEFORE <date> is accepted on the act only. On a join line it is refused
+-- by name (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, built 2026-09-16: the barrier
+-- does not lower a DATE there); WITHIN 0 OF <date> is the join line's way to
+-- say an absolute date.
+IMPORT daydate
+
+DECLARE Actor IS ONE OF
+    Tenant HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+GIVETH A DEONTIC Actor Action
+bad MEANS
+    EVERY Tenant t MUST Sign (EXACTLY t)
+      ONCE ALL HAVE BEFORE (YMD 2026 6 30)
+    HENCE FULFILLED
+    LEST BREACH

@@ -1,0 +1,13 @@
+-- BEFORE takes an instant, a DATE (EVERY-EACH-QUANTIFIER-SPEC §5.1.2,
+-- R-X5). A NUMBER there is a duration, and the mismatch names WITHIN.
+
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+
+DECLARE Action IS ONE OF
+    Pay
+    Deliver
+
+GIVETH A DEONTIC Actor Action
+bad MEANS PARTY Buyer MUST Pay BEFORE 30

@@ -43,6 +43,8 @@ module L4.EvaluateLazy.Machine
 , anchorInstant
 , currentLedgerEval
 , readEvalRef
+, Note (..)
+, tellNote
 , Config (..)
 , forwardExpr
 , matchBranches
@@ -82,6 +84,7 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Vector as Vector
 import qualified Data.Text.Read as TR
 import qualified Data.Char as Char
+import Data.Either (isLeft)
 import Data.Fixed (Pico)
 import Data.Time (UTCTime)
 import qualified Data.Time as Time
@@ -290,12 +293,35 @@ data EvalState =
       -- mark never withholds an event from a layer; it only lets the
       -- machine refuse a chain whose deadlines have stopped advancing,
       -- loudly, instead of walking it forever.
+    , notes :: !(IORef (DList Note))
+      -- ^ what the run wants REPORTED without failing: a non-fatal note,
+      -- appended by 'tellNote', collected per directive (swapped fresh by
+      -- 'L4.EvaluateLazy.withFreshLedger', read back into the directive's
+      -- result beside the ledger) and printed after the value. The first
+      -- occupant is R-X6's early act (EVERY-EACH-QUANTIFIER-SPEC §5.1.2,
+      -- 2026-09-16): an act before its window opened is a nullity, and a
+      -- silent nullity is how a party loses a deadline it believed it had
+      -- met; the second is the empty window a run reveals. Nothing here is
+      -- an error: the value stands.
     , deonticLog :: !(Maybe DeonticLog)
       -- ^ LTS-VISUALISER §4.3 (P2b): the deontic step log, OPTIONAL and off
       -- by default exactly as 'evalTrace' is (ruling R5, §8). 'Nothing' means
       -- no call site computes anything; 'L4.EvaluateLazy.captureDeonticSteps'
       -- installs one for the duration of a directive.
     }
+
+-- | A note the run reports beside a directive's value ('EvalState.notes').
+-- Plain text: rendered where it is raised, from what the machine has in
+-- hand at that point ('peekNF' for a party).
+newtype Note = MkNote Text
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass NFData
+
+-- | Report something without failing (see 'EvalState.notes').
+tellNote :: Text -> Eval ()
+tellNote t = do
+  notesRef <- asks (.notes)
+  liftIO (modifyIORef' notesRef (`DList.snoc` MkNote t))
 
 data Stack =
   MkStack
@@ -1196,10 +1222,10 @@ forwardExpr env = \ case
     env' <- evalRecLocalDecls env ds
     let combinedEnv = Map.union env' env
     continueExpr combinedEnv e
-  Regulative _ann deonton@(MkDeonton _ subject action due _join followup lest) ->
+  Regulative _ann deonton@(MkDeonton _ subject action opens due _join followup lest) ->
     case subject of
       Party _ party ->
-        continueBackward (ValObligation env (Left party) action (Left due) (fromMaybe fulfilExpr followup) lest)
+        continueBackward (ValObligation env (Left party) action (Left opens) (Left due) (fromMaybe fulfilExpr followup) lest)
       Every{} ->
         -- EVERY-EACH-QUANTIFIER-SPEC phase 2. A quantified obligation cannot
         -- become one obligation here, because it does not yet know its cast:
@@ -1372,7 +1398,7 @@ backward val = withPoppedFrame $ \ case
         continueExpr (Map.union env'' env') e
       ValUnappliedConstructor r ->
         continueBackward (ValConstructor r rs)
-      ValObligation env party act due followup lest -> do
+      ValObligation env party act opens due followup lest -> do
         (time, events) <- case rs of
           [t, r] -> pure (t, r)
           rs' -> internalException $ RuntimeTypeError $
@@ -1807,7 +1833,7 @@ backwardContractFrame val = \ case
         whenDeonticLog \ l -> do
           clock <- peekClock time
           logStep l (plainStep clock Nothing NoEvent norm Waiting)
-        continueBackward (ValObligation env party act due followup lest)
+        continueBackward (ValObligation env party act opens due followup lest)
       _ -> internalException $ RuntimeTypeError $
         "expected LIST EVENT but found: " <> prettyLayout val <> " when scrutinizing regulative events"
   Contract2 ScrutinizeEvent {..} -> case val of
@@ -1819,53 +1845,79 @@ backwardContractFrame val = \ case
   Contract3 CurrentTimeWHNF {..} -> do
     pushCFrame (Contract4 ScrutinizeDue {ev'time = val, ..})
     continueRef time
-  Contract4 ScrutinizeDue {..} -> do
-    case due of
-       Right due' -> do
-         pushCFrame (Contract5 CheckTiming {time = val, anchorT = Nothing, ..})
-         continueBackward due'
-       -- The source deadline, met for the first time. This is the arming
-       -- point as far as the deadline is concerned: no event has advanced
-       -- 'time' yet, so an anchor is resolved ONCE, here, in the
-       -- obligation's own environment and at its arming clock (R-Q7C:
-       -- "evaluated once at arming"). After 'Contract5' the due is a
-       -- relative number and the anchor is spent.
-       Left (Just (MkDeadline _ duration Nothing)) -> do
-         pushCFrame (Contract5 CheckTiming {time = val, anchorT = Nothing, ..})
-         continueExpr env duration
-       Left (Just (MkDeadline _ duration (Just anchor))) -> do
-         pushCFrame (Contract4b ScrutinizeAnchor {time = val, ..})
-         case anchor of
-           -- an expression: a NUMBER on the trace's clock, or a DATE
-           AnchorAt _ e     -> continueExpr env e
-           -- the lifecycle positions of the ENCLOSING obligation, bound into
-           -- this environment at its hand-off ('bindLifecycle'); THE ARMING
-           -- with no enclosing obligation is this obligation's own arming
-           AnchorJoin _     -> continueRef =<< lifecycleRef env anchor lifecycleJoinUnique Nothing
-           AnchorDeadline _ -> continueRef =<< lifecycleRef env anchor lifecycleDeadlineUnique Nothing
-           AnchorArming _   -> continueRef =<< lifecycleRef env anchor lifecycleArmingUnique (Just armed)
-       Left Nothing -> do
-         -- NOTE: we skip the timing step, hence we need to immediately update the current time to the event time
-         -- because normally the timing check does that.
-         pushCFrame (Contract6 PartyWHNF {time = ev'time, ..})
-         maybeEvaluate env party
+  Contract4 frame@ScrutinizeDue {..} -> do
+    -- 'val' is the frame's clock, forced. The window's OPENING edge comes
+    -- first (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X5, 2026-09-16), because a
+    -- bare WITHIN beside an AFTER counts from the instant the window opens
+    -- (R-X5 as amended, §5.1.2.2: re-anchor). Like the deadline it is
+    -- resolved ONCE, at the first event, when 'time' is still the arming
+    -- time; after 'Contract5' it is a relative number ('MaybeOpened').
+    case opens of
+      -- the opening already resolved: the window opens 'rel' after the clock
+      Right (Just rel) -> do
+        time' <- assertTime val
+        rel' <- assertTime rel
+        scrutinizeDue val (Just (time' + rel')) frame
+      -- no opening edge, or the window already open
+      Right Nothing -> scrutinizeDue val Nothing frame
+      Left Nothing  -> scrutinizeDue val Nothing frame
+      Left (Just (MkOpening _ offset Nothing)) -> do
+        pushCFrame (Contract4o ScrutinizeOpening {time = val, openAnchorT = Nothing, ..})
+        continueExpr env offset
+      Left (Just (MkOpening _ offset (Just anchor))) -> do
+        pushCFrame (Contract4oa ScrutinizeOpeningAnchor {time = val, ..})
+        resolveAnchor env armed anchor
+  Contract4oa ScrutinizeOpeningAnchor {..} -> do
+    instant <- lowerInstant "The anchor of the AFTER" armed val
+    pushCFrame (Contract4o ScrutinizeOpening {openAnchorT = Just instant, ..})
+    continueExpr env offset
+  Contract4o frame@ScrutinizeOpening {..} -> do
+    -- the offset, forced: a duration from the opening's anchor (or from the
+    -- clock, i.e. the arming on this first evaluation), or a DATE — the
+    -- opening instant itself — lowered by its serial (the checker has
+    -- refused an anchor on a DATE)
+    time' <- assertTime time
+    open <- case val of
+      ValNumber d -> pure (fromMaybe time' openAnchorT + d)
+      ValDate _   -> lowerInstant "AFTER" armed val
+      v -> internalException $ RuntimeTypeError $
+        "expected a NUMBER or a DATE after AFTER but got: " <> prettyLayout v
+    scrutinizeDue time (Just open) (dueFrameOfOpening frame)
   Contract4b ScrutinizeAnchor {..} -> do
     -- the anchor's instant, lowered to the trace's clock: a DATE by its
-    -- serial (what DATE_SERIAL computes), a NUMBER as it is ('anchorInstant')
-    instant <- either (internalException . RuntimeTypeError) pure (anchorInstant val)
-    pushCFrame (Contract5 CheckTiming {anchorT = Just instant, ..})
+    -- serial (what DATE_SERIAL computes), a NUMBER as it is ('lowerInstant',
+    -- which guards 'anchorInstant' with the floating-clock refusal)
+    instant <- lowerInstant "The anchor of the WITHIN" armed val
+    pushCFrame (Contract5 CheckTiming {origin = Just instant, ..})
     continueExpr env duration
   Contract5 CheckTiming {..} -> do
     stamp <- assertTime ev'time
-    due' <- assertTime val
     time' <- assertTime time
+    -- The closing edge, forced. A NUMBER is a duration: unanchored and with
+    -- no AFTER, it counts from the obligation's clock — its arming, on this
+    -- first evaluation — and after that evaluation it is the REMAINING due
+    -- relative to the clock, so the same sum holds. Anchored (@WITHIN d OF
+    -- …@, R-Q7) it is ABSOLUTE, the anchor's instant plus @d@, which may
+    -- already be in the past at arming; then this very event reveals the
+    -- expiry, which is right and not an error. Beside an AFTER, a bare
+    -- WITHIN counts from the instant the window opens ('origin' is that
+    -- instant: R-X5 as amended, re-anchor). A DATE is a @BEFORE@: the
+    -- instant itself, lowered by its serial ('lowerInstant' refuses a clock
+    -- that is not on that scale).
+    deadline <- case val of
+      ValNumber due' -> pure (fromMaybe time' origin + due')
+      ValDate _      -> lowerInstant "BEFORE" armed val
+      v -> internalException $ RuntimeTypeError $
+        "expected a NUMBER or a DATE as the closing edge but got: " <> prettyLayout v
+    -- The explicitly anchored empty window (§5.1.2.2): @AFTER d1 WITHIN d2
+    -- OF …@ with @d1 > d2@ from one anchor closes before it opens. The
+    -- checker catches it when both offsets are literals; a run reports it
+    -- here, once, when both instants are first known. The obligation then
+    -- runs as written: every act is early or late, and the expiry is what
+    -- ends it.
+    when (isLeft due) $ forM_ openT \ open ->
+      when (open > deadline) $ tellNote (emptyWindowNote open deadline)
     let
-      -- Unanchored, the deadline counts from the obligation's clock — its
-      -- arming, on this first evaluation. Anchored (@WITHIN d OF …@, R-Q7),
-      -- it is ABSOLUTE: the anchor's instant plus @d@, which may already be
-      -- in the past at arming; then this very event reveals the expiry,
-      -- which is right and not an error.
-      deadline = fromMaybe time' anchorT + due'
       -- NOTE: the new due is the current due minus the time that has passed
       -- by observing the current event e.g. if the thing
       -- was due within 3, then if the last current time
@@ -1874,7 +1926,12 @@ backwardContractFrame val = \ case
       -- now earlier, it is  due within 2, i.e. 3 - (3 - 2).
       -- For an anchored deadline the same invariant — the absolute deadline
       -- is @time + due@ — is what makes the remaining due @deadline - stamp@.
-      newDue = deadline - stamp
+      -- While the window has still to OPEN, the remaining due is relative
+      -- to the opening instead ('relativeDue'): the residual then prints as
+      -- the bare re-anchored window it is (@AFTER 1 WITHIN 30@ at 12 is
+      -- @[13, 43]@, not @[13, 44]@), and the next scrutiny adds it back to
+      -- the same instant ('scrutinizeDue', 'origin').
+      newDue = deadline - relativeDue openT stamp
     -- NOTE: the deadline comparison is strict: an event arriving EXACTLY at
     -- the deadline instant is timely; expiry requires stamp strictly greater.
     -- The spec (doc/reference/regulative/README.md) speaks of the deadline
@@ -2055,7 +2112,9 @@ backwardContractFrame val = \ case
         -- NOTE: we have observed the event and do not branch, either, the
         -- only thing that may now happen is that we try a new event. Hence we
         -- drop the ev'time, set our time to ev'time and set our due to the new due
-        pushCFrame (Contract6 PartyWHNF {time = ev'time, due = Right $ ValNumber newDue, ..})
+        -- (and the opening edge, when there is one, to what is still to run
+        -- until the window opens — 'relOpening')
+        pushCFrame (Contract6 PartyWHNF {time = ev'time, opens = relOpening openT stamp opens, due = Right $ ValNumber newDue, ..})
         maybeEvaluate env party
   Contract6 PartyWHNF {..} -> do
     -- P2b: the party is forced now; every later frame's key knows the bearer.
@@ -2091,6 +2150,37 @@ backwardContractFrame val = \ case
         "expected environment but found: " <> prettyLayout val
   Contract10 ScrutinizeActions {..} ->
     case val of
+      -- THE act, by THIS party, BEFORE the window opened (R-X6, RULED
+      -- 2026-09-07, EVERY-EACH-QUANTIFIER-SPEC §5.1.2): a NULLITY. It is not
+      -- performance (MUST/MAY/DO), and not a violation (SHANT: the
+      -- prohibition has not started). The obligation is unchanged — its
+      -- absolute deadline is what it was, its opening instant too — and the
+      -- party may act again once the window opens; the event is passed over
+      -- exactly as a non-matching one is. What R-X6 adds is that the run
+      -- REPORTS it: a silent nullity is how a party loses a deadline it
+      -- believed it had met. This is the only place that can know the act
+      -- was the act: party, action and PROVIDED have all matched here.
+      ValBool True | Right (Just untilOpen) <- opens -> do
+        stamp <- assertTime time
+        rel <- assertTime untilOpen
+        partyNF <- peekNF party
+        -- the remaining due is measured from the opening while the window
+        -- is still to open ('relativeDue'), which it is here
+        let open = stamp + rel
+            deadlineAt = case due of
+              Right (ValNumber remaining) -> Just (open + remaining)
+              _                           -> Nothing
+        tellNote (earlyActNote act.modal partyNF act.action stamp open deadlineAt)
+        -- P2b: the look is logged, as every other look at an event is (one
+        -- record per scrutiny, 'DeonticStep'): a pass-over that names the
+        -- opening, so a what-if can say WHY the act was not taken and a
+        -- step log shows the event at all. 'WitnessedOnly': the event stays
+        -- on the stream (or 'Reoffered', for a copy handed down a LEST chain).
+        whenDeonticLog \ l -> do
+          ev <- eventKeyAt stamp (Just (partyKeyWHNF ev'party)) ev'act
+          logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered WitnessedOnly) norm (EarlyAct open))
+        newTime <- allocateValue time
+        tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
       ValBool True -> do
         -- P2b: the match, routed per modal. Logged before the continuation
         -- is entered, so the log reads in machine order.
@@ -2348,6 +2438,7 @@ backwardContractFrame val = \ case
       Just (MkDeadline _ _ (Just (AnchorAt _ e))) -> continueExpr ctx.env e
       Just (MkDeadline _ _ (Just a@AnchorJoin{}))     -> unreachableAnchor a
       Just (MkDeadline _ _ (Just a@AnchorDeadline{})) -> unreachableAnchor a
+      Just MkBefore{} -> beforeOnJoinLine
       _ -> continueRef ctx.time
   Barrier4 BarrierArmingFrame {..} -> do
     -- the state deadline's origin, forced (see 'Barrier3'): a NUMBER, or a
@@ -2524,6 +2615,82 @@ backwardContractFrame val = \ case
     tryNextEvent frame events = do
       pushCFrame (Contract1 frame)
       continueRef events
+
+    -- The closing edge, once the opening instant (if any) is known: what
+    -- 'Contract4' did on its own before the window had an opening edge.
+    -- @timeW@ is the frame's clock, forced; @openT@ the absolute instant the
+    -- window opens, when it has one. Three shapes of closing edge, plus none:
+    --
+    --   * an already-evaluated remaining due, relative to the clock;
+    --   * the source deadline, met for the first time — the arming point as
+    --     far as the deadline is concerned: no event has advanced 'time' yet,
+    --     so an anchor is resolved ONCE, here, in the obligation's own
+    --     environment and at its arming clock (R-Q7C: "evaluated once at
+    --     arming"). After 'Contract5' the due is a relative number and the
+    --     anchor is spent. A bare WITHIN beside an AFTER takes the opening
+    --     instant as its origin (re-anchor, §5.1.2.2); an anchored one takes
+    --     its anchor's; a BEFORE is a DATE and has no origin to add to;
+    --   * no closing edge at all: the timing step is skipped, so the clock
+    --     is advanced to the event's stamp here, which the timing step would
+    --     otherwise have done — and the opening edge, when the act has one
+    --     (@AFTER@ alone: a window that opens and never closes), is still
+    --     re-relativised to that stamp, so 'Contract10' can see whether the
+    --     window has opened.
+    scrutinizeDue :: WHNF -> Maybe Rational -> ScrutinizeDue -> Machine Config
+    scrutinizeDue timeW openT ScrutinizeDue {..} = case due of
+      -- the remaining due is relative to the instant the WITHIN runs from:
+      -- the window's opening while that is still ahead, the clock otherwise
+      -- ('relativeDue'); 'openT' is that opening exactly when it is ahead
+      Right due' -> do
+        pushCFrame (Contract5 CheckTiming {time = timeW, origin = openT, openT, ..})
+        continueBackward due'
+      Left (Just (MkDeadline _ duration Nothing)) -> do
+        pushCFrame (Contract5 CheckTiming {time = timeW, origin = openT, openT, ..})
+        continueExpr env duration
+      Left (Just (MkDeadline _ duration (Just anchor))) -> do
+        pushCFrame (Contract4b ScrutinizeAnchor {time = timeW, openT, ..})
+        resolveAnchor env armed anchor
+      Left (Just (MkBefore _ instant)) -> do
+        pushCFrame (Contract5 CheckTiming {time = timeW, origin = Nothing, openT, ..})
+        continueExpr env instant
+      Left Nothing -> do
+        stamp <- assertTime ev'time
+        pushCFrame (Contract6 PartyWHNF {time = ev'time, opens = relOpening openT stamp opens, ..})
+        maybeEvaluate env party
+
+    -- An anchor, put to the machine: an expression is evaluated in the
+    -- obligation's environment (a NUMBER on the trace's clock, or a DATE);
+    -- the lifecycle positions of the ENCLOSING obligation are read from the
+    -- bindings its hand-off made ('bindLifecycle'); THE ARMING with no
+    -- enclosing obligation is this obligation's own arming. Shared by both
+    -- edges (R-Q7 for the WITHIN, R-X5 for the AFTER).
+    resolveAnchor :: Environment -> Reference -> Anchor Resolved -> Machine Config
+    resolveAnchor env armed anchor = case anchor of
+      AnchorAt _ e     -> continueExpr env e
+      AnchorJoin _     -> continueRef =<< lifecycleRef env anchor lifecycleJoinUnique Nothing
+      AnchorDeadline _ -> continueRef =<< lifecycleRef env anchor lifecycleDeadlineUnique Nothing
+      AnchorArming _   -> continueRef =<< lifecycleRef env anchor lifecycleArmingUnique (Just armed)
+
+    -- The opening edge re-relativised to an event's stamp, for the frames
+    -- after 'Contract5' and for the residual: what is still to run until the
+    -- window opens while it has not, nothing once it has. An act with no
+    -- opening edge keeps its @Left Nothing@.
+    relOpening :: Maybe Rational -> Rational -> MaybeOpened -> MaybeOpened
+    relOpening openT stamp opens = case openT of
+      Nothing   -> opens
+      Just open
+        | open > stamp -> Right (Just (ValNumber (open - stamp)))
+        | otherwise    -> Right Nothing
+
+    -- The instant a remaining due is measured from: the window's opening
+    -- while that is still ahead of the stamp, the stamp otherwise.
+    relativeDue :: Maybe Rational -> Rational -> Rational
+    relativeDue openT stamp = maybe stamp (max stamp) openT
+
+    -- 'Contract4o' carries the same fields as 'Contract4' plus the opening's
+    -- anchor; hand the deadline scrutiny the frame it expects.
+    dueFrameOfOpening :: ScrutinizeOpening -> ScrutinizeDue
+    dueFrameOfOpening ScrutinizeOpening {..} = ScrutinizeDue {time = armed, ..}
 
     pushCFrame = pushFrame . ContractFrame
 
@@ -2819,10 +2986,22 @@ data MemberDue
   | DemotedJoinDue (Deadline Resolved)    -- ^ the join line's WITHIN, bounding each act because the act has none
 
 -- | The deadline a member obligation is built with.
-memberDueExpr :: MemberDue -> Maybe (Deadline Resolved)
-memberDueExpr = \ case
+--
+-- A demoted join-line @WITHIN@ bounds the whole from the EVERY's arming
+-- (R-T2), whatever the act line says; so when the act has an @AFTER@
+-- (§5.1.2, 2026-09-16), the bare join-line duration is handed to the member
+-- anchored @OF THE ARMING@ explicitly — which 'memberEnv' binds to the
+-- EVERY's arming — rather than as a bare @WITHIN@, which beside an @AFTER@
+-- would count from the instant the member's window opened (re-anchor,
+-- §5.1.2.2). Without an @AFTER@ the two readings coincide and the deadline
+-- is handed over as written, so no residual of an older program prints
+-- differently.
+memberDueExpr :: Maybe (Opening Resolved) -> MemberDue -> Maybe (Deadline Resolved)
+memberDueExpr mopen = \ case
   NoMemberDue      -> Nothing
   MemberDue d      -> Just d
+  DemotedJoinDue (MkDeadline a d Nothing)
+    | isJust mopen -> Just (MkDeadline a d (Just (AnchorArming emptyAnno)))
   DemotedJoinDue d -> Just d
 
 -- | A member's environment: the EVERY's, with the member variable bound —
@@ -2874,7 +3053,7 @@ memberObligation :: QuantCtx -> RExpr -> Maybe RExpr -> MemberDue -> CastMember 
 memberObligation ctx hence lest mdue (mref, mval) =
   ValObligation
     (memberEnv ctx mdue mref)
-    (Right mval) ctx.deonton.action (Left (memberDueExpr mdue)) hence lest
+    (Right mval) ctx.deonton.action (Left ctx.deonton.opens) (Left (memberDueExpr ctx.deonton.opens mdue)) hence lest
 
 -- | @A AND B AND C@, right-nested, as the source-level 'RAnd' would build it.
 randFoldWHNF :: Environment -> WHNF -> [WHNF] -> WHNF
@@ -2911,7 +3090,7 @@ barrierMember
   :: QuantCtx -> Resolved -> Reference -> Maybe (Resolved, Reference)
   -> MemberDue -> CastMember -> WHNF
 barrierMember ctx cp cpRef mfail mdue (mref, mval) =
-  ValObligation env' (Right mval) ctx.deonton.action (Left (memberDueExpr mdue))
+  ValObligation env' (Right mval) ctx.deonton.action (Left ctx.deonton.opens) (Left (memberDueExpr ctx.deonton.opens mdue))
     (Var emptyAnno cp)
     (fmap (\ (fp, _) -> Var emptyAnno fp) mfail)
   where
@@ -3156,6 +3335,15 @@ barrierJoined ctx t evs dueLatest = case joinStateDue ctx of
     pushFrame (ContractFrame
       (Barrier3 BarrierStateDueFrame {ctx, joinTime = t, joinEvents = evs}))
     continueExpr ctx.env duration
+  Just MkBefore{} -> beforeOnJoinLine
+
+-- | A @BEFORE@ on a join line is refused by the checker
+-- ('L4.TypeCheck.checkDeadline', @BeforeOnJoinLine@); the machine never
+-- lowers one there. Named, so that a checker regression shows as this and
+-- not as a type error on a DATE.
+beforeOnJoinLine :: Machine Config
+beforeOnJoinLine = internalException $ RuntimeTypeError
+  "BEFORE on a join line is refused by the type checker and is not lowered here; please report this as a bug"
 
 -- | The join fires. The HENCE is anchored at the last completion and sees the
 -- stream that followed it (R-Q7, §5.1: unanchored, a HENCE counts from the
@@ -3338,8 +3526,8 @@ bindLifecycle lc =
 -- sentinel, FULFILLED, a breach) has no anchors and passes through.
 rebindLifecycle :: Lifecycle -> WHNF -> WHNF
 rebindLifecycle lc = \ case
-  ValObligation env party act due followup lest ->
-    ValObligation (bindLifecycle lc env) party act due followup lest
+  ValObligation env party act opens due followup lest ->
+    ValObligation (bindLifecycle lc env) party act opens due followup lest
   ValQuantified env deonton -> ValQuantified (bindLifecycle lc env) deonton
   ValROp env op r1 r2       -> ValROp (bindLifecycle lc env) op r1 r2
   v                         -> v
@@ -3389,6 +3577,8 @@ lifecycleRef env a u fallback =
 -- line names none), and a continuation that arrived as a VALUE and is
 -- attached where the position does not exist — under a LEST for THE JOIN,
 -- under an obligation with no WITHIN for THE DEADLINE, or at the top level.
+-- The anchor may sit on either edge (a WITHIN, or since 2026-09-16 an
+-- AFTER); the wording names the anchor, which is what was refused.
 lifecycleRefusal :: Anchor Resolved -> Text
 lifecycleRefusal a = Text.unwords
   [ "WITHIN … OF " <> Text.strip (prettyLayout a) <> " names a position in the life of the"
@@ -3404,8 +3594,9 @@ lifecycleRefusal a = Text.unwords
 
 -- | An anchor's instant on the trace's clock (R-Q7C): a NUMBER as it is, a
 -- DATE by its serial — the same arithmetic as @DATE_SERIAL@, not a call
--- through it. This is the ONE place the lowering is defined: 'Contract4b'
--- (an act line's anchor) and 'Barrier4' (a join line's) apply it, and
+-- through it. This is the ONE place the lowering is defined: 'Barrier4' (a
+-- join line's anchor) applies it directly, the act line's edges apply it
+-- through 'lowerInstant' (which adds the floating-clock refusal, R-X5), and
 -- "L4.Lts.WhatIf" reads an unforced anchored deadline through it rather
 -- than re-deriving it (LTS-VISUALISER §2.4).
 anchorInstant :: WHNF -> Either Text Rational
@@ -5803,6 +5994,116 @@ diffTimeFraction dt =
   let seconds :: Pico
       seconds = realToFrac dt
   in toRational seconds / secondsPerDay
+
+-- | An instant, forced, lowered to the trace's clock: a NUMBER as it is; a
+-- DATE by its serial — the same arithmetic as @DATE_SERIAL@, not a call
+-- through it (an 'App' inserted into the AST would have no tokens and would
+-- break exactprint). Used for an anchor (@WITHIN d OF …@, @AFTER d OF …@,
+-- R-Q7C) and for the absolute edges (@AFTER date@, @BEFORE date@, R-X5).
+--
+-- A DATE is refused when the obligation's clock, at arming, reads an
+-- instant that no calendar date has a serial for — anything below
+-- @DATE_SERIAL (YMD 1 1 1)@ ('earliestDateSerial'), which is every trace
+-- that starts @AT 0@. Until 2026-09-16 such a date was silently a serial in
+-- the hundreds of thousands, so on an @AT 0@ trace every act was "in time"
+-- for a @WITHIN 0 OF (YMD …)@ and every act would have been for a
+-- @BEFORE (YMD …)@, exit 0 (EVERY-EACH-QUANTIFIER-SPEC §5.1.2.1, T1: the
+-- origin is not declared at the contract level, and the sorts are not
+-- separated — neither is built; this is the machine's answer meanwhile,
+-- and it is a heuristic: a floating trace that starts at 365 or above is
+-- not caught, and the doc page says so in one sentence). @what@ names the
+-- edge for the refusal.
+--
+-- The lowering itself is 'anchorInstant', the one place it is defined (and
+-- what "L4.Lts.WhatIf" reads an unforced anchored deadline through); this
+-- is the machine's guard around it.
+lowerInstant :: Text -> Reference -> WHNF -> Machine Rational
+lowerInstant what armed v = do
+  case v of
+    ValDate d -> do
+      armedT <- readThunk armed >>= \ case
+        WHNF (ValNumber t)         -> pure (Just t)
+        WHNFWhen _ (ValNumber t) _ _ -> pure (Just t)
+        _                          -> pure Nothing
+      -- the arming instant is a forced NUMBER on every path that reaches an
+      -- edge ('App1' hands the frames the trace's clock); should it not be,
+      -- the date is lowered without the check rather than refused for a
+      -- reason that is not the drafter's
+      case armedT of
+        Just t | t < earliestDateSerial -> userException (UserError (floatingClockRefusal what d t))
+        _ -> pure ()
+    _ -> pure ()
+  case anchorInstant v of
+    Right t -> pure t
+    Left _  -> internalException $ RuntimeTypeError $
+      what <> " is expected to be a NUMBER or a DATE but got: " <> prettyLayout v
+
+-- | The serial of the earliest calendar date, @DATE_SERIAL (YMD 1 1 1)@: a
+-- clock reading below it is not on the date-serial scale ('lowerInstant').
+earliestDateSerial :: Rational
+earliestDateSerial = fromIntegral (dayNumberFromDay (Time.fromGregorian 1 1 1))
+
+floatingClockRefusal :: Text -> Time.Day -> Rational -> Text
+floatingClockRefusal what d t = Text.unwords
+  [ what <> " names the date " <> Text.pack (Time.showGregorian d) <> ", but this obligation's clock"
+  , "read " <> prettyRatio t <> " when it was entered, which is not a date serial (DATE_SERIAL"
+  , "(YMD 1 1 1) is " <> prettyRatio earliestDateSerial <> "): the trace counts in floating"
+  , "units from an origin such as 0, and a date has no place on that scale."
+  , "Start the trace at a date serial — #TRACE … AT (DATE_SERIAL (YMD …)) with"
+  , "the events stamped the same way — or write the edge as a duration."
+  , "(EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.1.)"
+  ]
+
+-- | R-X6's report (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, RULED 2026-09-07):
+-- the act came before the window opened, so it does not count — and the
+-- run says so rather than swallowing it.
+--
+-- The act is printed through 'printActionPattern', the deontic-action
+-- printer (PATTERN-REFERENCE-RULE-SPEC §6): a bare name the checker resolved
+-- as a reference is printed bare, as the source spelled it. The generic
+-- 'Pattern' printer would re-emit it as @(EXACTLY name)@, the deprecated
+-- spelling, for a source that never wrote it.
+earlyActNote :: DeonticModal -> NF -> Pattern Resolved -> Rational -> Rational -> Maybe Rational -> Text
+earlyActNote modal partyNF actPat stamp open deadlineAt = Text.unwords $
+  [ "PARTY " <> prettyLayout partyNF <> " did " <> Text.strip (docText (printActionPattern actPat))
+  , "at " <> prettyRatio stamp <> ", before the window opened at " <> prettyRatio open <> ":"
+  ] <> case modal of
+    DMustNot ->
+      [ "the prohibition had not started, so this is not a violation. It stays"
+      , "in force" <> untilClose <> "." ]
+    _ ->
+      [ "the act does not count as performance. The obligation stays live, with"
+      , "its deadline untouched" <> untilClose <> ", and may be performed once"
+      , "the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)" ]
+  where
+    untilClose = maybe "" (\ d -> " (the window closes at " <> prettyRatio d <> ")") deadlineAt
+
+-- | The explicitly anchored empty window, met at run time (§5.1.2.2): the
+-- offsets were not literals, so the checker could not see it.
+emptyWindowNote :: Rational -> Rational -> Text
+emptyWindowNote open close = Text.unwords
+  [ "This window closes at " <> prettyRatio close <> ", before it opens at " <> prettyRatio open <> ":"
+  , "both edges count from one anchor (the WITHIN names it, and the AFTER"
+  , "counts from the same place), so no act can be performed in time. Drop"
+  , "the anchor from the WITHIN to count it from the instant the window"
+  , "opens, or make the closing offset at least the opening one."
+  , "(EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)"
+  ]
+
+-- | A value as far as it has already been evaluated, for a note's wording:
+-- references whose thunks are in WHNF are followed, anything still
+-- unevaluated prints as @…@ ('Omitted'). Forces nothing, so it can be
+-- called mid-step; a party that has just been matched against an event
+-- ('runBinOpEquals' forces the fields it compares) prints whole.
+peekNF :: WHNF -> Machine NF
+peekNF = go (8 :: Int)
+  where
+    go 0 _ = pure Omitted
+    go d v = MkNF <$> traverse (peekRef (d - 1)) v
+    peekRef d r = readThunk r >>= \ case
+      WHNF w           -> go d w
+      WHNFWhen _ w _ _ -> go d w
+      Unevaluated{}    -> pure Omitted
 
 dayNumberFromDay :: Time.Day -> Integer
 dayNumberFromDay day =

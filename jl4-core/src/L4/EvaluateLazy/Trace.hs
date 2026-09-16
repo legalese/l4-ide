@@ -526,8 +526,8 @@ nfFromTrace m = \ case
     MkNF (ValCons (rec r1) (rec r2))
   ValClosure givens e env ->
     MkNF (ValClosure givens e env)
-  ValObligation env party act due followup lest ->
-    MkNF (ValObligation env (fmap (fmap rec) party) act (fmap (fmap rec) due) followup lest)
+  ValObligation env party act opens due followup lest ->
+    MkNF (ValObligation env (fmap (fmap rec) party) act (fmap (fmap (fmap rec)) opens) (fmap (fmap rec) due) followup lest)
   ValNullaryBuiltinFun b ->
     MkNF (ValNullaryBuiltinFun b)
   ValUnaryBuiltinFun b ->

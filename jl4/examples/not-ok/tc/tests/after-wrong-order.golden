@@ -1,0 +1,13 @@
+Parsing successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: after-wrong-order.l4
+  Hidden: no
+  Range: 15:42-15:47
+  Source: parser
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+       |
+    15 | bad MEANS PARTY Buyer MUST Pay WITHIN 30 AFTER 3
+       |                                          ^
+    AFTER, the window's opening edge, comes first and once: PARTY p MUST act AFTER 3 WITHIN 30 - one AFTER, then WITHIN or BEFORE. This AFTER comes too late: after the closing edge, or after another AFTER.
