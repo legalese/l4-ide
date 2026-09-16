@@ -51,13 +51,19 @@
 // Usage:  node etc/check-clitic-verbs.mjs --dir doc/tutorials
 //         node etc/check-clitic-verbs.mjs --dir <dir> [<dir> ...]
 //         node etc/check-clitic-verbs.mjs <file> ...
-//         node etc/check-clitic-verbs.mjs --selftest      (also what CI runs)
+//         node etc/check-clitic-verbs.mjs --selftest
+//
+// NOT RUN BY CI. An earlier version of this line said `--selftest` is "also what
+// CI runs"; measured 2026-09-16, no workflow under .github/ mentions this script
+// at all. It is a tool you run by hand, and `etc/apply-clitic-sweep.mjs --check`
+// is the companion that answers "is there anything to sweep?".
 // Exit:   0 clean · 1 findings · 2 usage
 
-import { readFileSync, readdirSync, lstatSync } from "node:fs";
+import { readFileSync, readdirSync, lstatSync, realpathSync } from "node:fs";
 import { join, extname } from "node:path";
+import { pathToFileURL } from "node:url";
 
-const SKIP_DIRS = new Set([
+export const SKIP_DIRS = new Set([
   ".git",
   "node_modules",
   "dist-newstyle",
@@ -66,8 +72,8 @@ const SKIP_DIRS = new Set([
   "target",
 ]);
 
-const EXTS = new Set([".l4", ".md"]);
-const MARKER = "CLITIC-VERB-OK";
+export const EXTS = new Set([".l4", ".md"]);
+export const MARKER = "CLITIC-VERB-OK";
 
 // EXEMPTIONS. Meng ruled on 2026-09-13 that rare exceptions may keep the verb
 // "especially if they are terms of art from the upstream source". The marker
@@ -82,7 +88,7 @@ const MARKER = "CLITIC-VERB-OK";
 // verb (Reg CF's is bare: "if the issuer:"), so the limb carries it and matching
 // the source means carrying it too. Fidelity to the source is the ruling's own
 // stated rationale, so it is also the ruling's own limit.
-const EXEMPT = new Map([
+export const EXEMPT = new Map([
   [
     "has given such security as is lawfully required to be furnished",
     "Probate and Administration Act limb, quoted; contains its own `is`",
@@ -113,7 +119,7 @@ const EXEMPT = new Map([
 // first word is `is` or `has`. The name must continue past the verb -- a field
 // actually called `` `is` `` is not this bug -- and the closing backtick is not
 // required on the line, because a long name may wrap in a comment.
-const CLITIC = /['’]s\s+`(is|has)(\s+[^`]*)?`?/g;
+export const CLITIC = /['’]s\s+`(is|has)(\s+[^`]*)?`?/g;
 
 // RULE 2 -- the DECLARATION. Meng ruled on 2026-09-13 that a field named `is …`
 // or `has …` is wrong wherever it is declared, whether or not anything
@@ -142,7 +148,7 @@ const CLITIC = /['’]s\s+`(is|has)(\s+[^`]*)?`?/g;
 //        the FIRST field of a record shares the `HAS` line, so the optional
 //        `HAS` below is not cosmetic -- without it the first field of every
 //        DECLARE is invisible, which is the gap this file's own selftest caught.
-const DECL =
+export const DECL =
   /^\s+(HAS\s+)?`(is|has)\s+[^`]+`\s+IS\s+(A|AN|THE)\s+(?!FUNCTION\b)/;
 
 // A marker covers its own line AND the block it introduces -- the contiguous
@@ -152,7 +158,7 @@ const DECL =
 // every one of those lines would clutter the very lesson it protects. Ending at
 // a blank line keeps the scope small and visible: you can see what a marker
 // covers without counting.
-function scanText(text, label, sink) {
+export function scanText(text, label, sink) {
   const findings = [];
   let armed = false;
   text.split("\n").forEach((raw, i) => {
@@ -172,6 +178,7 @@ function scanText(text, label, sink) {
         file: label,
         line: i + 1,
         col: m.index + 1,
+        name: (m[1] + m[2]).trim(),
         text: raw.trim(),
       });
     }
@@ -186,6 +193,7 @@ function scanText(text, label, sink) {
         file: label,
         line: i + 1,
         col: d[0].indexOf("`") + 1,
+        name: dn ? dn[1] : null,
         text: raw.trim(),
       });
 
@@ -202,7 +210,7 @@ function scanText(text, label, sink) {
 // claimed 57 files when the answer was 51. Counting a file twice is the harmless
 // half; the dangerous half is that a repair applied under one path reads as
 // outstanding under the other, forever.
-function walk(dir) {
+export function walk(dir) {
   const out = [];
   for (const e of readdirSync(dir)) {
     if (SKIP_DIRS.has(e)) continue;
@@ -414,57 +422,84 @@ function selftest() {
 }
 
 // ---------------------------------------------------------------------------
-const argv = process.argv.slice(2);
-if (argv.length === 0) {
-  console.error(
-    "usage: check-clitic-verbs.mjs [--selftest | --dir <dir>... | <file>...]",
-  );
-  process.exit(2);
+// The CLI runs only when this file is EXECUTED. `etc/apply-clitic-sweep.mjs`
+// imports the regexes, the EXEMPT list and `scanText` from here so that the
+// detector and the applier cannot drift apart -- one definition of what a
+// clitic-verb name IS, shared, rather than two that agree today. Without this
+// guard, importing the module would run the CLI and exit 2 on the importer's
+// own argv.
+// REALPATH BOTH SIDES. Node resolves the main entry to its realpath, while
+// `argv[1]` keeps whatever spelling was typed, so invoking this file THROUGH A
+// SYMLINK made the two differ and the CLI simply did not run: no output, exit 0.
+// A checker that prints nothing and returns success is the worst failure mode
+// available -- it reads as "clean" -- and this repo ships tooling behind a
+// symlink (`.claude/skills/writing-l4-rules`). Introduced by the main-module
+// guard; the byte-identity measurement that accompanied it covered --selftest,
+// three --dir shapes and the usage path, and not this one.
+function isMainModule() {
+  try {
+    return (
+      import.meta.url ===
+      pathToFileURL(realpathSync(process.argv[1] ?? "")).href
+    );
+  } catch {
+    return false;
+  }
 }
-if (argv[0] === "--selftest") process.exit(selftest());
 
-let files;
-if (argv[0] === "--dir") {
-  const dirs = argv.slice(1);
-  if (dirs.length === 0) {
-    console.error("--dir needs at least one directory");
+if (isMainModule()) {
+  const argv = process.argv.slice(2);
+  if (argv.length === 0) {
+    console.error(
+      "usage: check-clitic-verbs.mjs [--selftest | --dir <dir>... | <file>...]",
+    );
     process.exit(2);
   }
-  files = dirs.flatMap((d) => walk(d));
-} else {
-  files = argv;
+  if (argv[0] === "--selftest") process.exit(selftest());
+
+  let files;
+  if (argv[0] === "--dir") {
+    const dirs = argv.slice(1);
+    if (dirs.length === 0) {
+      console.error("--dir needs at least one directory");
+      process.exit(2);
+    }
+    files = dirs.flatMap((d) => walk(d));
+  } else {
+    files = argv;
+  }
+
+  const suppressed = [];
+  const findings = files.flatMap((f) =>
+    scanText(readFileSync(f, "utf8"), f, suppressed),
+  );
+
+  if (suppressed.length) {
+    console.log(`${MARKER} honoured on ${suppressed.length} line(s):`);
+    for (const s of suppressed) console.log(`  ${s}`);
+    console.log("");
+  }
+
+  if (findings.length === 0) {
+    console.log(`check-clitic-verbs: clean over ${files.length} file(s)`);
+    process.exit(0);
+  }
+
+  const byFile = new Map();
+  for (const f of findings) byFile.set(f.file, (byFile.get(f.file) ?? 0) + 1);
+
+  const nDecl = findings.filter((f) => f.kind === "decl").length;
+  const nDeref = findings.length - nDecl;
+  console.error(
+    `check-clitic-verbs: ${findings.length} finding(s) in ${byFile.size} file(s) ` +
+      `(${nDecl} declaration, ${nDeref} dereference).\n` +
+      `The clitic 's already supplies "is" and "has" -- start the field name at the\n` +
+      `complement: person's \`bankrupt\`, not person's \`is bankrupt\`. A field named\n` +
+      `for the verb is wrong where it is DECLARED too, whether or not anything reads\n` +
+      `it yet, because every L4 file is ultimately a training example.\n` +
+      `See doc/concepts/language-design/linguistic-syntax.md, "The Saxon Genitive".\n`,
+  );
+  for (const f of findings)
+    console.error(`  ${f.file}:${f.line}:${f.col}  [${f.kind}]  ${f.text}`);
+  process.exit(1);
 }
-
-const suppressed = [];
-const findings = files.flatMap((f) =>
-  scanText(readFileSync(f, "utf8"), f, suppressed),
-);
-
-if (suppressed.length) {
-  console.log(`${MARKER} honoured on ${suppressed.length} line(s):`);
-  for (const s of suppressed) console.log(`  ${s}`);
-  console.log("");
-}
-
-if (findings.length === 0) {
-  console.log(`check-clitic-verbs: clean over ${files.length} file(s)`);
-  process.exit(0);
-}
-
-const byFile = new Map();
-for (const f of findings) byFile.set(f.file, (byFile.get(f.file) ?? 0) + 1);
-
-const nDecl = findings.filter((f) => f.kind === "decl").length;
-const nDeref = findings.length - nDecl;
-console.error(
-  `check-clitic-verbs: ${findings.length} finding(s) in ${byFile.size} file(s) ` +
-    `(${nDecl} declaration, ${nDeref} dereference).\n` +
-    `The clitic 's already supplies "is" and "has" -- start the field name at the\n` +
-    `complement: person's \`bankrupt\`, not person's \`is bankrupt\`. A field named\n` +
-    `for the verb is wrong where it is DECLARED too, whether or not anything reads\n` +
-    `it yet, because every L4 file is ultimately a training example.\n` +
-    `See doc/concepts/language-design/linguistic-syntax.md, "The Saxon Genitive".\n`,
-);
-for (const f of findings)
-  console.error(`  ${f.file}:${f.line}:${f.col}  [${f.kind}]  ${f.text}`);
-process.exit(1);
