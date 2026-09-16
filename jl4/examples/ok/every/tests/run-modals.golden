@@ -54,6 +54,13 @@ run-modals.l4:119:1-123:29:
       MUST Sublet e
     before their deadline, which was at
       7
+run-modals.l4:139:44-52:
+  I found a problem while checking the definition of `each approval is published`:
+    In this action, `theChair` refers to
+    
+      theChair (at run-modals.l4:19:1-9)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-modals.l4:141:1-142:45:
   FULFILLED
 run-modals.l4:144:1-146:46:
@@ -67,6 +74,6 @@ run-modals.l4:144:1-146:46:
     surpassed the deadline of party
       Chair OF "Ms Ng"
     who had to do obligatory action
-      MUST Publish (EXACTLY theChair)
+      MUST Publish theChair
     before their deadline, which was at
       8

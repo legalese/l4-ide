@@ -134,9 +134,9 @@ GIVETH A DEONTIC Actor Action
 --    routing, jl4/examples/bpmn/modals.l4 `each approval is published`.)
 GIVETH A DEONTIC Actor Action
 `each approval is published` MEANS
-    EVERY Director d IN board MAY Approve (EXACTLY d) WITHIN 30
+    EVERY Director d IN board MAY Approve d WITHIN 30
         UPON EACH
-        HENCE (PARTY theChair MUST Publish (EXACTLY theChair) WITHIN 5)
+        HENCE (PARTY theChair MUST Publish theChair WITHIN 5)
 
 #TRACE `each approval is published` AT 0 WITH
   PARTY theChair DOES Publish theChair AT 40
