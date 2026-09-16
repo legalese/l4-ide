@@ -1,6 +1,13 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+run-stack.l4:64:47-58:
+  I found a problem while checking the definition of `staggered`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-stack.l4:34:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-stack.l4:66:1-70:20:
   FULFILLED
 run-stack.l4:72:1-76:20:
@@ -14,7 +21,7 @@ run-stack.l4:72:1-76:20:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Refund (EXACTLY theLandlord)
+      MUST Refund theLandlord
     before their deadline, which was at
       10
 run-stack.l4:82:1-86:20:
@@ -30,7 +37,7 @@ run-stack.l4:88:1-92:20:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Refund (EXACTLY theLandlord)
+      MUST Refund theLandlord
     before their deadline, which was at
       10
 run-stack.l4:106:1-109:50:
@@ -44,7 +51,7 @@ run-stack.l4:106:1-109:50:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Refund (EXACTLY theLandlord)
+      MUST Refund theLandlord
     before their deadline, which was at
       10
 run-stack.l4:111:1-114:50:
@@ -58,9 +65,16 @@ run-stack.l4:111:1-114:50:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Refund (EXACTLY theLandlord)
+      MUST Refund theLandlord
     before their deadline, which was at
       10
+run-stack.l4:138:47-58:
+  I found a problem while checking the definition of `may approve`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-stack.l4:34:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-stack.l4:140:1-144:20:
   FULFILLED
 run-stack.l4:146:1-150:20:
@@ -74,7 +88,7 @@ run-stack.l4:146:1-150:20:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Refund (EXACTLY theLandlord)
+      MUST Refund theLandlord
     before their deadline, which was at
       10
 run-stack.l4:152:1-156:20:
@@ -88,7 +102,7 @@ run-stack.l4:152:1-156:20:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Refund (EXACTLY theLandlord)
+      MUST Refund theLandlord
     before their deadline, which was at
       10
 run-stack.l4:158:1-161:50:
@@ -102,7 +116,7 @@ run-stack.l4:158:1-161:50:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Refund (EXACTLY theLandlord)
+      MUST Refund theLandlord
     before their deadline, which was at
       10
 run-stack.l4:163:1-166:50:
@@ -116,11 +130,18 @@ run-stack.l4:163:1-166:50:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Refund (EXACTLY theLandlord)
+      MUST Refund theLandlord
     before their deadline, which was at
       10
 run-stack.l4:168:1-171:38:
   FULFILLED
+run-stack.l4:189:47-58:
+  I found a problem while checking the definition of `do staggered`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-stack.l4:34:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-stack.l4:191:1-195:20:
   FULFILLED
 run-stack.l4:197:1-201:20:
@@ -134,7 +155,7 @@ run-stack.l4:197:1-201:20:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Refund (EXACTLY theLandlord)
+      MUST Refund theLandlord
     before their deadline, which was at
       10
 run-stack.l4:203:1-207:20:
@@ -148,9 +169,16 @@ run-stack.l4:203:1-207:20:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Refund (EXACTLY theLandlord)
+      MUST Refund theLandlord
     before their deadline, which was at
       10
+run-stack.l4:226:47-58:
+  I found a problem while checking the definition of `no smoking`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-stack.l4:34:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-stack.l4:228:1-232:20:
   FULFILLED
 run-stack.l4:234:1-238:20:
@@ -164,7 +192,7 @@ run-stack.l4:234:1-238:20:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Refund (EXACTLY theLandlord)
+      MUST Refund theLandlord
     before their deadline, which was at
       10
 run-stack.l4:240:1-244:20:
@@ -178,7 +206,7 @@ run-stack.l4:240:1-244:20:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Refund (EXACTLY theLandlord)
+      MUST Refund theLandlord
     before their deadline, which was at
       10
 run-stack.l4:260:1-264:20:
@@ -198,7 +226,7 @@ run-stack.l4:283:1-286:50:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Refund (EXACTLY theLandlord)
+      MUST Refund theLandlord
     before their deadline, which was at
       19
 run-stack.l4:288:1-291:50:
@@ -212,9 +240,30 @@ run-stack.l4:288:1-291:50:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Refund (EXACTLY theLandlord)
+      MUST Refund theLandlord
     before their deadline, which was at
       19
+run-stack.l4:304:27-32:
+  I found a problem while checking the definition of `both anchored`:
+    In this action, `alice` refers to
+    
+      alice (at run-stack.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-stack.l4:305:44-55:
+  I found a problem while checking the definition of `both anchored`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-stack.l4:34:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-stack.l4:306:38-41:
+  I found a problem while checking the definition of `both anchored`:
+    In this action, `bob` refers to
+    
+      bob (at run-stack.l4:36:1-4)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-stack.l4:309:1-311:20:
   DEONTIC BREACHED:
     party
@@ -226,17 +275,17 @@ run-stack.l4:309:1-311:20:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Deliver (EXACTLY theLandlord)
+      MUST Deliver theLandlord
     before their deadline, which was at
       15
     and the breach names, in order
       Landlord OF "Ms Ng"
         who had to do obligatory action
-          MUST Deliver (EXACTLY theLandlord)
+          MUST Deliver theLandlord
         before their deadline, which was at
           15
       Tenant OF "Bob"
         who had to do obligatory action
-          MUST Sign (EXACTLY bob)
+          MUST Sign bob
         before their deadline, which was at
           7

@@ -41,7 +41,7 @@ tenants     MEANS LIST alice, bob, carol
 GIVETH A DEONTIC Actor Action
 `all sign` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -55,7 +55,7 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `all sign, reversed` MEANS
     EVERY Tenant t IN `tenants, reversed`
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -77,11 +77,11 @@ GIVETH A NUMBER
 GIVETH A DEONTIC Actor Action
 `staggered signing` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN `days allowed to` t
         ONCE   ALL HAVE
         HENCE  FULFILLED
-        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 3)
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 3)
 
 #TRACE `staggered signing` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
@@ -96,7 +96,7 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `staggered signing, no reparation` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN `days allowed to` t
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -111,9 +111,9 @@ GIVETH A DEONTIC Actor Action
 --    (here a tie, revealed by the same event, so the left one).
 GIVETH A DEONTIC Actor Action
 `both sign` MEANS
-    (PARTY alice MUST Sign (EXACTLY alice) WITHIN 14)
+    (PARTY alice MUST Sign alice WITHIN 14)
     RAND
-    (PARTY bob   MUST Sign (EXACTLY bob)   WITHIN 14)
+    (PARTY bob   MUST Sign bob   WITHIN 14)
 
 #TRACE `both sign` AT 0 WITH
   (`WAIT UNTIL` 20)
@@ -124,9 +124,9 @@ GIVETH A DEONTIC Actor Action
 -- the pooch two different ways'".)
 GIVETH A DEONTIC Actor Action
 `alice twice` MEANS
-    (PARTY alice MUST Sign (EXACTLY alice) WITHIN 14)
+    (PARTY alice MUST Sign alice WITHIN 14)
     RAND
-    (PARTY alice MUST Refund (EXACTLY alice) WITHIN 14)
+    (PARTY alice MUST Refund alice WITHIN 14)
 
 #TRACE `alice twice` AT 0 WITH
   (`WAIT UNTIL` 20)
@@ -137,7 +137,7 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `joint and several` MEANS
     PARTY theLandlord
-        MUST   Refund (EXACTLY theLandlord)
+        MUST   Refund theLandlord
         WITHIN 3
         LEST   BREACH BY LIST alice, bob, alice BECAUSE "the tenants carry it"
 
@@ -154,7 +154,7 @@ nobody t MEANS FALSE
 GIVETH A DEONTIC Actor Action
 `blame nobody` MEANS
     PARTY theLandlord
-        MUST   Refund (EXACTLY theLandlord)
+        MUST   Refund theLandlord
         WITHIN 3
         LEST   BREACH BY filter nobody tenants
 
@@ -166,7 +166,7 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `one misses` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED

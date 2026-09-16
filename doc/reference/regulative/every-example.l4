@@ -60,10 +60,10 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `cure from the deadline` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
-        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 5 OF THE DEADLINE)
+        HENCE  (PARTY theLandlord MUST Deliver theLandlord what WITHIN 5 OF THE DEADLINE)
         LEST   BREACH
 
 -- a join line's WITHIN anchored to an instant: everyone has signed by 105,
@@ -71,7 +71,7 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `everyone by instant 105` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         ONCE   ALL HAVE WITHIN 5 OF 100
         HENCE  FULFILLED
         LEST   BREACH

@@ -11,8 +11,8 @@ theLandlord MEANS Landlord OF "Ms Ng"
 GIVETH A DEONTIC Actor Action
 contract MEANS
     EVERY Tenant t
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14 OF THE ARMING
         ONCE   ALL HAVE WITHIN 30 OF closingDate
-        HENCE  (PARTY theLandlord MUST Sign (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        HENCE  (PARTY theLandlord MUST Sign theLandlord WITHIN 5 OF THE DEADLINE)
         LEST   BREACH

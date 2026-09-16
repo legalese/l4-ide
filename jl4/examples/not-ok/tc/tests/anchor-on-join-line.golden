@@ -3,7 +3,7 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: anchor-on-join-line.l4
   Hidden: no
-  Range: 16:66-16:77
+  Range: 16:56-16:67
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -18,7 +18,7 @@ File: anchor-on-join-line.l4
 
 File: anchor-on-join-line.l4
   Hidden: no
-  Range: 20:62-20:77
+  Range: 20:52-20:67
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>

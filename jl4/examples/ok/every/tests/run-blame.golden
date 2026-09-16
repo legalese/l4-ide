@@ -12,18 +12,18 @@ run-blame.l4:49:1-51:20:
     surpassed the deadline of party
       Tenant OF "Bob"
     who had to do obligatory action
-      MUST Sign (EXACTLY t)
+      MUST Sign t
     before their deadline, which was at
       14
     and the breach names, in order
       Tenant OF "Bob"
         who had to do obligatory action
-          MUST Sign (EXACTLY t)
+          MUST Sign t
         before their deadline, which was at
           14
       Tenant OF "Carol"
         who had to do obligatory action
-          MUST Sign (EXACTLY t)
+          MUST Sign t
         before their deadline, which was at
           14
 run-blame.l4:63:1-65:20:
@@ -37,20 +37,27 @@ run-blame.l4:63:1-65:20:
     surpassed the deadline of party
       Tenant OF "Carol"
     who had to do obligatory action
-      MUST Sign (EXACTLY t)
+      MUST Sign t
     before their deadline, which was at
       14
     and the breach names, in order
       Tenant OF "Carol"
         who had to do obligatory action
-          MUST Sign (EXACTLY t)
+          MUST Sign t
         before their deadline, which was at
           14
       Tenant OF "Bob"
         who had to do obligatory action
-          MUST Sign (EXACTLY t)
+          MUST Sign t
         before their deadline, which was at
           14
+run-blame.l4:84:47-58:
+  I found a problem while checking the definition of `staggered signing`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-blame.l4:30:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-blame.l4:86:1-90:20:
   DEONTIC BREACHED:
     party
@@ -62,7 +69,7 @@ run-blame.l4:86:1-90:20:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Refund (EXACTLY theLandlord)
+      MUST Refund theLandlord
     before their deadline, which was at
       11
 run-blame.l4:104:1-107:20:
@@ -76,20 +83,34 @@ run-blame.l4:104:1-107:20:
     surpassed the deadline of party
       Tenant OF "Carol"
     who had to do obligatory action
-      MUST Sign (EXACTLY t)
+      MUST Sign t
     before their deadline, which was at
       5
     and the breach names, in order
       Tenant OF "Bob"
         who had to do obligatory action
-          MUST Sign (EXACTLY t)
+          MUST Sign t
         before their deadline, which was at
           14
       Tenant OF "Carol"
         who had to do obligatory action
-          MUST Sign (EXACTLY t)
+          MUST Sign t
         before their deadline, which was at
           5
+run-blame.l4:114:28-33:
+  I found a problem while checking the definition of `both sign`:
+    In this action, `alice` refers to
+    
+      alice (at run-blame.l4:31:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-blame.l4:116:28-31:
+  I found a problem while checking the definition of `both sign`:
+    In this action, `bob` refers to
+    
+      bob (at run-blame.l4:32:1-4)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-blame.l4:118:1-119:20:
   DEONTIC BREACHED:
     party
@@ -101,20 +122,34 @@ run-blame.l4:118:1-119:20:
     surpassed the deadline of party
       Tenant OF "Alice"
     who had to do obligatory action
-      MUST Sign (EXACTLY alice)
+      MUST Sign alice
     before their deadline, which was at
       14
     and the breach names, in order
       Tenant OF "Alice"
         who had to do obligatory action
-          MUST Sign (EXACTLY alice)
+          MUST Sign alice
         before their deadline, which was at
           14
       Tenant OF "Bob"
         who had to do obligatory action
-          MUST Sign (EXACTLY bob)
+          MUST Sign bob
         before their deadline, which was at
           14
+run-blame.l4:127:28-33:
+  I found a problem while checking the definition of `alice twice`:
+    In this action, `alice` refers to
+    
+      alice (at run-blame.l4:31:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-blame.l4:129:30-35:
+  I found a problem while checking the definition of `alice twice`:
+    In this action, `alice` refers to
+    
+      alice (at run-blame.l4:31:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-blame.l4:131:1-132:20:
   DEONTIC BREACHED:
     party
@@ -126,26 +161,40 @@ run-blame.l4:131:1-132:20:
     surpassed the deadline of party
       Tenant OF "Alice"
     who had to do obligatory action
-      MUST Sign (EXACTLY alice)
+      MUST Sign alice
     before their deadline, which was at
       14
     and the breach names, in order
       Tenant OF "Alice"
         who had to do obligatory action
-          MUST Sign (EXACTLY alice)
+          MUST Sign alice
         before their deadline, which was at
           14
       Tenant OF "Alice"
         who had to do obligatory action
-          MUST Refund (EXACTLY alice)
+          MUST Refund alice
         before their deadline, which was at
           14
+run-blame.l4:140:23-34:
+  I found a problem while checking the definition of `joint and several`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-blame.l4:30:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-blame.l4:144:1-145:20:
   DEONTIC BREACHED:
     BREACH
     BY Tenant OF "Alice" BECAUSE "the tenants carry it"
     BY Tenant OF "Bob" BECAUSE "the tenants carry it"
     BY Tenant OF "Alice" BECAUSE "the tenants carry it"
+run-blame.l4:157:23-34:
+  I found a problem while checking the definition of `blame nobody`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-blame.l4:30:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-blame.l4:161:1-162:20:
   BREACH BY names an empty list, at run-blame.l4:159:16-47. A breach blames at least one party: give BY a party, or a LIST with someone in it, or leave BY out to blame nobody. (EVERY-EACH-QUANTIFIER-SPEC section 6.1, R-T3.)
 run-blame.l4:174:1-177:20:
@@ -159,7 +208,7 @@ run-blame.l4:174:1-177:20:
     surpassed the deadline of party
       Tenant OF "Carol"
     who had to do obligatory action
-      MUST Sign (EXACTLY t)
+      MUST Sign t
     before their deadline, which was at
       14
 run-blame.l4:191:1-192:20:

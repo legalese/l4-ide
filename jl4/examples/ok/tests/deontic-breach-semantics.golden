@@ -6,12 +6,12 @@ deontic-breach-semantics.l4:41:1-42:22:
     BREACH
     BY Alice BECAUSE "missed first"
     BY Bob BECAUSE "missed second"
-deontic-breach-semantics.l4:49:1-50:22:
+deontic-breach-semantics.l4:51:1-52:22:
   DEONTIC BREACHED:
     BREACH
     BY Alice BECAUSE "missed first"
     BY Bob BECAUSE "missed second"
-deontic-breach-semantics.l4:65:1-66:22:
+deontic-breach-semantics.l4:67:1-68:22:
   DEONTIC BREACHED:
     party
       NEVERMATCHESPARTY
@@ -32,7 +32,7 @@ deontic-breach-semantics.l4:65:1-66:22:
           MUST deliver
         before their deadline, which was at
           10
-deontic-breach-semantics.l4:68:1-69:22:
+deontic-breach-semantics.l4:70:1-71:22:
   DEONTIC BREACHED:
     BREACH
     BY Bob
@@ -41,7 +41,7 @@ deontic-breach-semantics.l4:68:1-69:22:
       before their deadline, which was at
         10
     BY Alice BECAUSE "missed payment"
-deontic-breach-semantics.l4:79:1-80:21:
+deontic-breach-semantics.l4:81:1-82:21:
   DEONTIC BREACHED:
     BREACH
     BY Alice

@@ -335,7 +335,7 @@ Note that the same words mean different instants on the two lines of a **nested*
 GIVETH A DEONTIC Actor Action
 `everyone by instant 105` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         ONCE   ALL HAVE WITHIN 5 OF 100
         HENCE  FULFILLED
         LEST   BREACH
@@ -352,10 +352,10 @@ So the cure period in the example below runs from day 14, when every tenant's si
 GIVETH A DEONTIC Actor Action
 `cure from the deadline` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
-        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 5 OF THE DEADLINE)
+        HENCE  (PARTY theLandlord MUST Deliver theLandlord what WITHIN 5 OF THE DEADLINE)
         LEST   BREACH
 ```
 
@@ -443,7 +443,7 @@ Verified 2026-09-08 against the compiler at the head of this branch; the blame s
 
 - Parsing of every form above, including `ONCE ALL HAVE`, `UPON EACH`, the `WITHIN` on either join line — anchored or not — and `WHO`.
 - Name checking: the variable is bound in the condition, the action, the act's `WITHIN`, `HENCE` and `LEST`; a name nothing binds is reported. (Being bound in a barrier's `HENCE`/`LEST` is a rough edge, not a capability — see below.)
-- Type checking: the variable has the party type; the cast must be a constructor of that type; the condition must be a `BOOLEAN`; both durations must be `NUMBER`s and an `OF` expression a `NUMBER` or a `DATE`; a lifecycle anchor is refused where the position it names does not exist (`THE JOIN`/`THE DEADLINE` on a join line, at the top level, or — for `THE JOIN` — under `LEST`); a `HENCE` or `LEST` under `EVERY` without a join line is rejected, naming the two spellings; a join line under `PARTY` is rejected; an action that rebinds the variable is rejected.
+- Type checking: the variable has the party type; the cast must be a constructor of that type; the condition must be a `BOOLEAN`; both durations must be `NUMBER`s and an `OF` expression a `NUMBER` or a `DATE`; a lifecycle anchor is refused where the position it names does not exist (`THE JOIN`/`THE DEADLINE` on a join line, at the top level, or — for `THE JOIN` — under `LEST`); a `HENCE` or `LEST` under `EVERY` without a join line is rejected, naming the two spellings; a join line under `PARTY` is rejected. (Until 2026-09-16 an action that spelled the variable again — `MUST Sign t` — was rejected as a rebinding; #407 retired that error the same day, and that spelling is now the reference to the member.)
 - Printing: `l4 format` reproduces the source; the layout printer used by `l4 batch` re-emits a parseable, re-checkable rule, anchors included.
 - **Running**, as described above: the roll call, the barrier, the fork, the plain distributive form with no join line, all four modals, the deadline on the act and the deadline on the join line, both of them anchored (`OF THE JOIN`, `OF THE DEADLINE`, `OF THE ARMING`, `OF` an instant) as the section above describes, and nesting one quantified rule inside another's `HENCE`.
 - **A failed barrier's breach names everyone who failed.** With no `LEST` on the join, the answer is one breach naming every member who did not act, in roll order, each with the action and deadline they missed. It is anchored at the member whose deadline was missed first, and dated at the event that revealed that miss (the `at` line below is the `WAIT UNTIL 20` that revealed it, not the deadline of 14 — see "The clock on a failed barrier" further down). That member prints first, in the same words a single failure uses; the full list follows. Two of three tenants never sign:
@@ -459,18 +459,18 @@ Verified 2026-09-08 against the compiler at the head of this branch; the blame s
     surpassed the deadline of party
       Tenant OF "Bob"
     who had to do obligatory action
-      MUST Sign (EXACTLY t)
+      MUST Sign t
     before their deadline, which was at
       14
     and the breach names, in order
       Tenant OF "Bob"
         who had to do obligatory action
-          MUST Sign (EXACTLY t)
+          MUST Sign t
         before their deadline, which was at
           14
       Tenant OF "Carol"
         who had to do obligatory action
-          MUST Sign (EXACTLY t)
+          MUST Sign t
         before their deadline, which was at
           14
   ```

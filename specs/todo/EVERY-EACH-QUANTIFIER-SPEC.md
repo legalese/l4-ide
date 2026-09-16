@@ -3554,6 +3554,40 @@ section, the later blocks' source ranges renumbered; run 2 = 3182 examples, 0 fa
 `etc/verify-branch.sh --quick` EXIT 0; `doc/test-docs.sh` with the worktree `l4` on `PATH`:
 1479 links, 102 L4 files, 0 orphans.
 
+#### `EXACTLY` retired by #407 (2026-09-16) — the wave's files swept, PR-A
+
+PR #407 (`lang/action-binder-reference`, merged to `unstable` as `cb07560d`, 2026-09-16;
+`specs/todo/PATTERN-REFERENCE-RULE-SPEC.md`) made a bare name in a deontic action refer to what it
+names — a lexical local (a `GIVEN`, a lambda, a `WHERE`/`LET`, an outer action binder, a `CONSIDER`
+or `EVERY` variable) or a top-level value — and a fresh wildcard only when it names nothing. So
+`EVERY Tenant t IN tenants MUST Sign t` is now the spelling: `t` refers to the member. Its R4
+retired the rebind error (`QuantifierVariableRebound`, which refused exactly that spelling and
+told the author to write `Sign (EXACTLY t)`); its fixture moved from
+`not-ok/tc/every-rebinds-variable.l4` to `ok/every/every-rebinds-variable.l4`, where the same
+spelling is now a positive witness, and the four `not-ok/tc` goldens were deleted (`1b0b5bfef`,
+`559004560`, `2a54689ae`); `EXACTLY` in a regulative action is
+deprecated, with a `DeprecatedExactly` warning carrying the replacement, until the sunset recorded
+by #409 (2026-10-01). Snippets in this document written before 2026-09-16 keep the `EXACTLY`
+spelling as a record of what was built and measured at the time; they are not rewritten.
+
+The wave's own files were swept in the commit that carries this note (PR-A, `every/anchors-on-blame`,
+rebased onto `unstable` `e966996f`): every `DeprecatedExactly` warning the rebased tip's own `l4
+check` printed was applied as the compiler advised — all `DropTheKeyword` of a bare name, none of
+the two "cannot simply be dropped" kinds — and the parentheses that had held the keyword were
+dropped. Counts, `EXACTLY` before → after: `jl4/examples/ok/every/run-anchors.l4` 71 → 0,
+`run-blame.l4` 12 → 0, `run-stack.l4` 11 → 0, `doc/reference/regulative/every-example.l4` 3 → 0,
+`jl4/examples/not-ok/tc/anchor-on-join-line.l4` 2 → 0, `jl4/examples/lsp/semantic-tokens/anchors.l4`
+2 → 0, and the six lines the wave had added to `doc/reference/regulative/EVERY.md` (three in
+fenced L4, three in a pasted breach print, which now reads `MUST Sign t` as the run prints it).
+The verdict-preserving differential — the same snapshot binary running the pre-sweep copy and the
+swept file, `Result:` blocks only, the pre-sweep side's own `(EXACTLY x)` normalised to `x` —
+was SAME for all 85 directives (`run-anchors` 50, `run-blame` 11, `run-stack` 24; the other three
+files carry no directive), with the same exit code on both sides. The files commits 10–19 add or
+re-introduce the keyword into (`run-lest.l4`, `run-after.l4`, `ok/contracts.l4`,
+`legal/promissory-note.l4`, `lsp/semantic-tokens/after.l4`, `not-ok/tc/before-on-join-line.l4`,
+`AFTER.md`, `what-follows.md`, …) are NOT swept here: PR-B (`every/after-before`) owes its own
+sweep commit at its tip, which had not been made when this note was written.
+
 ### 11.0.2 The roll, said outright: `EVERY Cast v IN xs` — RULED 2026-09-08 (Meng), BUILT
 
 **The ruling.** Meng, 2026-09-08, in session: _build `EVERY X x IN xs` syntax, and revise the

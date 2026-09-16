@@ -43,8 +43,8 @@ tenants     MEANS LIST alice, bob
 -- deadline 8 + 5 = 13.
 GIVETH A DEONTIC Actor Action
 `of the join` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 30
-    HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE JOIN)
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE JOIN)
     LEST  BREACH
 
 #TRACE `of the join` AT 0 WITH
@@ -63,8 +63,8 @@ GIVETH A DEONTIC Actor Action
 -- the breach at 36 reports 30 + 5 = 35.
 GIVETH A DEONTIC Actor Action
 `of the deadline` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 30
-    HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE DEADLINE)
     LEST  BREACH
 
 #TRACE `of the deadline` AT 0 WITH
@@ -86,9 +86,9 @@ GIVETH A DEONTIC Actor Action
 -- 16 does not, and the breach reports 15.
 GIVETH A DEONTIC Actor Action
 `cure from the deadline` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    PARTY alice MUST Sign alice WITHIN 10
     HENCE FULFILLED
-    LEST  (PARTY alice MUST Sign (EXACTLY alice) WITHIN 5 OF THE DEADLINE)
+    LEST  (PARTY alice MUST Sign alice WITHIN 5 OF THE DEADLINE)
 
 #TRACE `cure from the deadline` AT 0 WITH
   PARTY alice DOES Sign alice AT 14
@@ -108,9 +108,9 @@ GIVETH A DEONTIC Actor Action
 -- names.
 GIVETH A DEONTIC Actor Action
 `of the arming` MEANS
-    PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 10
-    HENCE (PARTY bob MUST Sign (EXACTLY bob) WITHIN 30
-           HENCE (PARTY alice MUST Sign (EXACTLY alice) WITHIN 40 OF THE ARMING))
+    PARTY theLandlord MUST Deliver theLandlord WITHIN 10
+    HENCE (PARTY bob MUST Sign bob WITHIN 30
+           HENCE (PARTY alice MUST Sign alice WITHIN 40 OF THE ARMING))
     LEST  BREACH
 
 #TRACE `of the arming` AT 0 WITH
@@ -128,7 +128,7 @@ GIVETH A DEONTIC Actor Action
 -- due 3 + 7 = 10.
 GIVETH A DEONTIC Actor Action
 `own arming` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 7 OF THE ARMING
+    PARTY alice MUST Sign alice WITHIN 7 OF THE ARMING
 
 #TRACE `own arming` AT 3 WITH
   PARTY alice DOES Sign alice AT 11
@@ -142,7 +142,7 @@ closingDate MEANS 20
 -- clock read when it was entered: armed at 3, due 20 + 5 = 25.
 GIVETH A DEONTIC Actor Action
 `of a number` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 5 OF closingDate
+    PARTY alice MUST Sign alice WITHIN 5 OF closingDate
 
 #TRACE `of a number` AT 3 WITH
   PARTY alice DOES Sign alice AT 26
@@ -153,7 +153,7 @@ GIVETH A DEONTIC Actor Action
 -- 30 June 2026.
 GIVETH A DEONTIC Actor Action
 `by thirty june` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 0 OF (YMD 2026 6 30)
+    PARTY alice MUST Sign alice WITHIN 0 OF (YMD 2026 6 30)
 
 #TRACE `by thirty june` AT (DATE_SERIAL (YMD 2026 6 1)) WITH
   PARTY alice DOES Sign alice AT (DATE_SERIAL (YMD 2026 6 30))
@@ -166,7 +166,7 @@ GIVETH A DEONTIC Actor Action
 -- the expiry, and the breach reports the deadline that had already passed.
 GIVETH A DEONTIC Actor Action
 `already expired` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 5 OF (YMD 2026 6 20)
+    PARTY alice MUST Sign alice WITHIN 5 OF (YMD 2026 6 20)
 
 #TRACE `already expired` AT (DATE_SERIAL (YMD 2026 7 1)) WITH
   PARTY alice DOES Sign alice AT (DATE_SERIAL (YMD 2026 7 2))
@@ -178,7 +178,7 @@ GIVEN n IS A NUMBER GIVETH A NUMBER DECIDE twice n IS n TIMES 2
 
 GIVETH A DEONTIC Actor Action
 `applied duration` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN (twice OF 3) OF THE ARMING
+    PARTY alice MUST Sign alice WITHIN (twice OF 3) OF THE ARMING
 
 #TRACE `applied duration` AT 0 WITH
   PARTY alice DOES Sign alice AT 7
@@ -199,11 +199,11 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `the tenancy` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
-        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
-        LEST   (PARTY theLandlord MUST Refund  (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        HENCE  (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE DEADLINE)
+        LEST   (PARTY theLandlord MUST Refund  theLandlord WITHIN 5 OF THE DEADLINE)
 
 #TRACE `the tenancy` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
@@ -224,10 +224,10 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `the tenancy, bounded as a whole` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE WITHIN 30
-        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        HENCE  (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE DEADLINE)
         LEST   BREACH
 
 #TRACE `the tenancy, bounded as a whole` AT 0 WITH
@@ -242,11 +242,11 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `the tenancy, a member late` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE WITHIN 30
         HENCE  FULFILLED
-        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
 
 #TRACE `the tenancy, a member late` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
@@ -259,11 +259,11 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `the tenancy, the group late` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 40
         ONCE   ALL HAVE WITHIN 30
         HENCE  FULFILLED
-        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
 
 #TRACE `the tenancy, the group late` AT 0 WITH
   PARTY alice DOES Sign alice AT 1
@@ -287,10 +287,10 @@ GIVEN roll IS A LIST OF Actor
 GIVETH A DEONTIC Actor Action
 `per member` roll MEANS
     EVERY Tenant t IN roll
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN grace t
         ONCE   ALL HAVE
-        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        HENCE  (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE DEADLINE)
         LEST   BREACH
 
 #TRACE `per member` (LIST alice, bob) AT 0 WITH
@@ -317,9 +317,9 @@ nobody MEANS LIST
 GIVETH A DEONTIC Actor Action
 `nobody, bounded as a whole` MEANS
     EVERY Tenant t IN nobody
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         ONCE   ALL HAVE WITHIN 30
-        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        HENCE  (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE DEADLINE)
         LEST   BREACH
 
 #TRACE `nobody, bounded as a whole` AT 0 WITH
@@ -331,12 +331,12 @@ GIVETH A DEONTIC Actor Action
 -- NOT borrowed (the landlord's 10 here plays no part).
 GIVETH A DEONTIC Actor Action
 `nobody, act deadline only` MEANS
-    PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 10
+    PARTY theLandlord MUST Deliver theLandlord WITHIN 10
     HENCE (EVERY Tenant t IN nobody
-              MUST   Sign (EXACTLY t)
+              MUST   Sign t
               WITHIN 3
               ONCE   ALL HAVE
-              HENCE  (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+              HENCE  (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
               LEST   BREACH)
     LEST  BREACH
 
@@ -351,9 +351,9 @@ GIVETH A DEONTIC Actor Action
 -- and its members are due 5 + 14 = 19: Bob's signature at 20 breaches.
 GIVETH A DEONTIC Actor Action
 `after delivery` MEANS
-    PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 10
+    PARTY theLandlord MUST Deliver theLandlord WITHIN 10
     HENCE (EVERY Tenant t IN tenants
-              MUST   Sign (EXACTLY t)
+              MUST   Sign t
               ONCE   ALL HAVE WITHIN 14 OF THE ARMING
               HENCE  FULFILLED
               LEST   BREACH)
@@ -376,10 +376,10 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `by instant 105` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         ONCE   ALL HAVE WITHIN 5 OF 100
         HENCE  FULFILLED
-        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 1 OF THE DEADLINE)
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 1 OF THE DEADLINE)
 
 #TRACE `by instant 105` AT 3 WITH
   PARTY alice DOES Sign alice AT 4
@@ -401,10 +401,10 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `receipts` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         UPON   EACH
-        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 2 OF THE DEADLINE)
+        HENCE  (PARTY theLandlord MUST Deliver theLandlord WITHIN 2 OF THE DEADLINE)
         LEST   BREACH BY t
 
 #TRACE `receipts` AT 0 WITH
@@ -430,14 +430,14 @@ GIVETH A DEONTIC Actor Action
 GIVEN k IS A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 after k MEANS
-    PARTY bob MUST Sign (EXACTLY bob) WITHIN 100
+    PARTY bob MUST Sign bob WITHIN 100
     HENCE k
     LEST  BREACH
 
 GIVETH A DEONTIC Actor Action
 `handed on, the join` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
-    HENCE (after (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE JOIN))
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE (after (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE JOIN))
     LEST  BREACH
 
 #TRACE `handed on, the join` AT 0 WITH
@@ -452,8 +452,8 @@ GIVETH A DEONTIC Actor Action
 
 GIVETH A DEONTIC Actor Action
 `handed on, the deadline` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
-    HENCE (after (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE))
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE (after (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE DEADLINE))
     LEST  BREACH
 
 #TRACE `handed on, the deadline` AT 0 WITH
@@ -476,14 +476,14 @@ GIVETH A DEONTIC Actor Action
 GIVEN k IS A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 afterBoth k MEANS
-    PARTY bob MUST Sign (EXACTLY bob) WITHIN 100
-    HENCE (k RAND (PARTY bob MUST Refund (EXACTLY bob) WITHIN 100))
+    PARTY bob MUST Sign bob WITHIN 100
+    HENCE (k RAND (PARTY bob MUST Refund bob WITHIN 100))
     LEST  BREACH
 
 GIVETH A DEONTIC Actor Action
 `handed on, in a compound, the join` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
-    HENCE (afterBoth (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE JOIN))
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE (afterBoth (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE JOIN))
     LEST  BREACH
 
 #TRACE `handed on, in a compound, the join` AT 0 WITH
@@ -500,8 +500,8 @@ GIVETH A DEONTIC Actor Action
 
 GIVETH A DEONTIC Actor Action
 `handed on, in a compound, the deadline` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
-    HENCE (afterBoth (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE))
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE (afterBoth (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE DEADLINE))
     LEST  BREACH
 
 #TRACE `handed on, in a compound, the deadline` AT 0 WITH
@@ -520,14 +520,14 @@ GIVETH A DEONTIC Actor Action
 GIVEN k IS A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 afterEither k MEANS
-    PARTY bob MUST Sign (EXACTLY bob) WITHIN 100
-    HENCE (k ROR (PARTY bob MUST Refund (EXACTLY bob) WITHIN 100))
+    PARTY bob MUST Sign bob WITHIN 100
+    HENCE (k ROR (PARTY bob MUST Refund bob WITHIN 100))
     LEST  BREACH
 
 GIVETH A DEONTIC Actor Action
 `handed on, either way` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
-    HENCE (afterEither (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE JOIN))
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE (afterEither (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE JOIN))
     LEST  BREACH
 
 #TRACE `handed on, either way` AT 0 WITH
@@ -543,11 +543,11 @@ GIVETH A DEONTIC Actor Action
 -- does putting the local inside a compound.
 GIVETH A DEONTIC Actor Action
 `factored out` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    PARTY alice MUST Sign alice WITHIN 10
     HENCE cure
     LEST  BREACH
     WHERE
-      cure MEANS PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE ARMING
+      cure MEANS PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE ARMING
 
 #TRACE `factored out` AT 0 WITH
   PARTY alice DOES Sign alice AT 3
@@ -555,11 +555,11 @@ GIVETH A DEONTIC Actor Action
 
 GIVETH A DEONTIC Actor Action
 `factored out, in a compound` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
-    HENCE (cure RAND (PARTY bob MUST Sign (EXACTLY bob) WITHIN 100))
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE (cure RAND (PARTY bob MUST Sign bob WITHIN 100))
     LEST  BREACH
     WHERE
-      cure MEANS PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE ARMING
+      cure MEANS PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE ARMING
 
 #TRACE `factored out, in a compound` AT 0 WITH
   PARTY alice DOES Sign alice AT 3
@@ -575,27 +575,27 @@ GIVETH A DEONTIC Actor Action
 GIVEN k IS A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 unless k MEANS
-    PARTY bob MUST Sign (EXACTLY bob) WITHIN 10
+    PARTY bob MUST Sign bob WITHIN 10
     HENCE FULFILLED
     LEST  k
 
 GIVEN k IS A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 unlessBoth k MEANS
-    PARTY bob MUST Sign (EXACTLY bob) WITHIN 10
+    PARTY bob MUST Sign bob WITHIN 10
     HENCE FULFILLED
-    LEST  (k RAND (PARTY bob MUST Refund (EXACTLY bob) WITHIN 100))
+    LEST  (k RAND (PARTY bob MUST Refund bob WITHIN 100))
 
 GIVEN k IS A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `after, open-ended` k MEANS
-    PARTY bob MUST Sign (EXACTLY bob)
+    PARTY bob MUST Sign bob
     HENCE k
 
 GIVETH A DEONTIC Actor Action
 `handed under a LEST` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
-    HENCE (unless (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE JOIN))
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE (unless (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE JOIN))
     LEST  BREACH
 
 #TRACE `handed under a LEST` AT 0 WITH
@@ -605,8 +605,8 @@ GIVETH A DEONTIC Actor Action
 
 GIVETH A DEONTIC Actor Action
 `handed under a LEST, in a compound` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
-    HENCE (unlessBoth (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE JOIN))
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE (unlessBoth (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE JOIN))
     LEST  BREACH
 
 #TRACE `handed under a LEST, in a compound` AT 0 WITH
@@ -617,8 +617,8 @@ GIVETH A DEONTIC Actor Action
 
 GIVETH A DEONTIC Actor Action
 `handed to no WITHIN` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
-    HENCE (`after, open-ended` (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE))
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE (`after, open-ended` (PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE DEADLINE))
     LEST  BREACH
 
 #TRACE `handed to no WITHIN` AT 0 WITH
@@ -640,8 +640,8 @@ GIVETH A DEONTIC Actor Action
 -- late, reporting 13.
 GIVETH A DEONTIC Actor Action
 `kept, the join` MEANS
-    PARTY alice SHANT Smoke (EXACTLY alice) WITHIN 10
-    HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 3 OF THE JOIN)
+    PARTY alice SHANT Smoke alice WITHIN 10
+    HENCE (PARTY theLandlord MUST Deliver theLandlord WITHIN 3 OF THE JOIN)
     LEST  BREACH
 
 #TRACE `kept, the join` AT 0 WITH
@@ -650,8 +650,8 @@ GIVETH A DEONTIC Actor Action
 
 GIVETH A DEONTIC Actor Action
 `kept, the deadline` MEANS
-    PARTY alice SHANT Smoke (EXACTLY alice) WITHIN 10
-    HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 3 OF THE DEADLINE)
+    PARTY alice SHANT Smoke alice WITHIN 10
+    HENCE (PARTY theLandlord MUST Deliver theLandlord WITHIN 3 OF THE DEADLINE)
     LEST  BREACH
 
 #TRACE `kept, the deadline` AT 0 WITH
@@ -676,4 +676,4 @@ GIVETH A DEONTIC Actor Action
 
 -- An inline rule, so the natural-language linearisation of an anchor
 -- ("within 7 of the arming") is in this file's .nlg golden too.
-#EVAL PARTY alice MUST Sign (EXACTLY alice) WITHIN 7 OF THE ARMING
+#EVAL PARTY alice MUST Sign alice WITHIN 7 OF THE ARMING

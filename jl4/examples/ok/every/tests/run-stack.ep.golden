@@ -57,11 +57,11 @@ GIVEN roll IS A LIST OF Actor
 GIVETH A DEONTIC Actor Action
 `staggered` roll MEANS
     EVERY Tenant t IN roll
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN `days allowed to` t
         ONCE   ALL HAVE
         HENCE  FULFILLED
-        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
 
 #TRACE `staggered` tenants AT 0 WITH
   PARTY alice DOES Sign alice AT 1
@@ -131,11 +131,11 @@ GIVEN roll IS A LIST OF Actor
 GIVETH A DEONTIC Actor Action
 `may approve` roll MEANS
     EVERY Tenant t IN roll
-        MAY    Approve (EXACTLY t)
+        MAY    Approve t
         WITHIN `days allowed to` t
         ONCE   ALL HAVE
         HENCE  FULFILLED
-        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
 
 #TRACE `may approve` tenants AT 0 WITH
   PARTY alice DOES Approve alice AT 1
@@ -182,11 +182,11 @@ GIVEN roll IS A LIST OF Actor
 GIVETH A DEONTIC Actor Action
 `do staggered` roll MEANS
     EVERY Tenant t IN roll
-        DO     Sign (EXACTLY t)
+        DO     Sign t
         WITHIN `days allowed to` t
         ONCE   ALL HAVE
         HENCE  FULFILLED
-        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
 
 #TRACE `do staggered` tenants AT 0 WITH
   PARTY alice DOES Sign alice AT 1
@@ -219,11 +219,11 @@ GIVEN roll IS A LIST OF Actor
 GIVETH A DEONTIC Actor Action
 `no smoking` roll MEANS
     EVERY Tenant t IN roll
-        SHANT  Smoke (EXACTLY t)
+        SHANT  Smoke t
         WITHIN `days allowed to` t
         ONCE   ALL HAVE
         HENCE  FULFILLED
-        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
 
 #TRACE `no smoking` tenants AT 0 WITH
   PARTY carol DOES Smoke carol AT 3
@@ -301,9 +301,9 @@ GIVETH A DEONTIC Actor Action
 -- produced: the landlord's 15, then Bob's 7.
 GIVETH A DEONTIC Actor Action
 `both anchored` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
-    HENCE ((PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
-           RAND (PARTY bob MUST Sign (EXACTLY bob) WITHIN 3 OF THE JOIN))
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE ((PARTY theLandlord MUST Deliver theLandlord WITHIN 5 OF THE DEADLINE)
+           RAND (PARTY bob MUST Sign bob WITHIN 3 OF THE JOIN))
     LEST  BREACH
 
 #TRACE `both anchored` AT 0 WITH
