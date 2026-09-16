@@ -14,18 +14,39 @@
 --   hand-rolled @serializeBreachReason@ in jl4-service (Backend.Jl4), so the
 --   two wire surfaces stay convergent: @eventParty@ / @eventAction@ /
 --   @timestamp@ / @obligationAction@ / @deadline@, plus @obligatedParty@
---   (which jl4-service currently drops on its own wire).
+--   (which jl4-service dropped on its own wire until 2026-09-15).
 --
 -- * For a violated prohibition (SHANT/MUST NOT with no LEST), the machine
 --   reuses the violating event's timestamp as the deadline sentinel, so
 --   @deadline == timestamp@ on the wire; see the Contract10 'DMustNot'
 --   branch in "L4.EvaluateLazy.Machine".
+--
+-- * The blame set (R-T3, EVERY-EACH-QUANTIFIER-SPEC §6.1, built 2026-09-15;
+--   per-entry detail and no dedup RULED the same day): a breach names every
+--   obligation that failed. The wire stays additive over the one-party form:
+--
+--     - the scalars @obligatedParty@ \/ @obligationAction@ \/ @deadline@ (and
+--       @party@ \/ @reason@ for an explicit breach) describe the ANCHOR — the
+--       failure the breach's time comes from — so they are one coherent
+--       obligation, and for a single obligation's breach exactly what the
+--       old wire carried. (The brief said "the head"; the head is the
+--       anchor only for a left-anchored compound, and a head party beside
+--       the anchor's action and deadline named an obligation nobody had —
+--       measured on the first build, spec §6.1.1.)
+--     - @obligatedParties@ \/ @parties@: every party named, in operand \/
+--       roll order, WITH duplicates; an entry naming nobody adds nothing.
+--     - @failures@: one object per failed obligation, in the same order —
+--       @{"type":"deadline_missed","party","action","deadline"}@ or
+--       @{"type":"explicit_breach","party","reason"}@ (@null@ where absent).
+--     - @anchor@: the index into @failures@ of the anchoring failure.
 module L4.Evaluate.ValueLazyJSON () where
 
 import Base
 import Data.Aeson (ToJSON(..), object, (.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
+import qualified Data.Aeson.Types as Aeson.Types
+import qualified Data.List.NonEmpty as NE
 import Data.Ratio (numerator, denominator)
 import qualified Data.Vector as Vector
 
@@ -84,23 +105,64 @@ instance ToJSON a => ToJSON (Value a) where
   toJSON (ValEnvironment{})       = toJSON ("<environment>" :: Text)
   toJSON (ValBreached reason)     = object ["breached" .= toJSON reason]
 
-instance ToJSON a => ToJSON (ReasonForBreach a) where
-  -- Field labels follow the constructor:
-  --   DeadlineMissed <event party> <event action> <event timestamp>
-  --                  <obligated party> <obligation action> <deadline>
-  -- (the first three describe the event that *revealed* the deadline expiry;
-  -- the last three describe the obligation that was missed).
-  toJSON (DeadlineMissed evParty evAction stamp party action deadline) = object
+instance ToJSON a => ToJSON (Failure a) where
+  toJSON (MissedDeadline party action deadline) = object
     [ "type" .= ("deadline_missed" :: Text)
-    , "eventParty" .= evParty
-    , "eventAction" .= evAction
-    , "timestamp" .= (fromRational stamp :: Double)
-    , "obligatedParty" .= party
-    , "obligationAction" .= prettyLayout action
+    , "party" .= party
+    , "action" .= prettyLayout action
     , "deadline" .= (fromRational deadline :: Double)
     ]
-  toJSON (ExplicitBreach mParty mReason) = object
+  toJSON (DeclaredBreach mParty mReason) = object
     [ "type" .= ("explicit_breach" :: Text)
     , "party" .= mParty
     , "reason" .= mReason
     ]
+
+instance ToJSON a => ToJSON (ReasonForBreach a) where
+  -- Field labels follow the constructor:
+  --   DeadlineMissed <event party> <event action> <event timestamp> <blame>
+  -- (the first three describe the event that *revealed* the anchoring
+  -- deadline expiry; the scalars below describe the anchoring obligation;
+  -- the arrays describe every failure — see the module header).
+  toJSON (DeadlineMissed evParty evAction stamp blame) = object $
+    [ "type" .= ("deadline_missed" :: Text)
+    , "eventParty" .= evParty
+    , "eventAction" .= evAction
+    , "timestamp" .= (fromRational stamp :: Double)
+    ]
+    <> case blame.anchor of
+      MissedDeadline party action deadline ->
+        [ "obligatedParty" .= party
+        , "obligationAction" .= prettyLayout action
+        , "deadline" .= (fromRational deadline :: Double)
+        ]
+      -- unreachable by construction (a DeadlineMissed is anchored at a
+      -- missed deadline); still a well-formed object rather than a crash
+      DeclaredBreach mParty mReason ->
+        [ "obligatedParty" .= mParty
+        , "reason" .= mReason
+        ]
+    <> blameFields "obligatedParties" blame
+  toJSON (ExplicitBreach blame) = object $
+    [ "type" .= ("explicit_breach" :: Text) ]
+    <> case blame.anchor of
+      DeclaredBreach mParty mReason ->
+        [ "party" .= mParty
+        , "reason" .= mReason
+        ]
+      -- unreachable by construction, as above
+      MissedDeadline party action deadline ->
+        [ "party" .= party
+        , "obligationAction" .= prettyLayout action
+        , "deadline" .= (fromRational deadline :: Double)
+        ]
+    <> blameFields "parties" blame
+
+-- | The array fields every breach carries: the parties (under the given
+-- key), the failures, and the anchor's index.
+blameFields :: ToJSON a => Key.Key -> Blame a -> [Aeson.Types.Pair]
+blameFields partiesKey blame =
+  [ partiesKey .= blameParties blame
+  , "failures" .= NE.toList (blameList blame)
+  , "anchor" .= anchorIndex blame
+  ]

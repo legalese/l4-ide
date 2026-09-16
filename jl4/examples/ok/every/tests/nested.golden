@@ -1,2 +1,16 @@
 Parsing successful
 Typechecking successful
+nested.l4:37:26-31:
+  I found a problem while checking the definition of `after the chair gives notice`:
+    In this action, `chair` refers to
+    
+      chair (at nested.l4:17:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+nested.l4:41:36-41:
+  I found a problem while checking the definition of `after the chair gives notice`:
+    In this action, `chair` refers to
+    
+      chair (at nested.l4:17:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.

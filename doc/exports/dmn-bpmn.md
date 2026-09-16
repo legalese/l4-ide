@@ -36,9 +36,9 @@ This is the export for handing your rules to an organisation rather than an indi
   layer genuinely _is_ a transition system, so drawing it as one asserts nothing the source did
   not. (Predicates are a different matter and deliberately stay out of the diagram; see
   [logic, not flowcharts](../concepts/language-design/logic-not-flowcharts.md).)
-- **Deadlines and breach become first-class.** A `WITHIN` becomes a timer boundary event and a
-  `LEST` becomes the path taken when it fires — which is exactly how a process modeller would have
-  drawn it by hand.
+- **Deadlines and breach become first-class.** A plain `WITHIN` becomes a timer boundary event and
+  a `LEST` becomes the path taken when it fires — which is exactly how a process modeller would
+  have drawn it by hand. (An anchored `WITHIN` is carried as a condition instead; see below.)
 
 ## The command
 
@@ -91,6 +91,13 @@ means the export ran, not that everything made it across.
 The recurring case for BPMN is the unitless deadline: L4 permits a `WITHIN` with no unit, and BPMN
 timers require one. `--deadline-unit days` assumes days and records a note saying it did; `refuse`
 emits no timer and records that instead. Neither silently invents a unit.
+
+The other deadline the export declines is the anchored one — `WITHIN 5 OF THE JOIN`,
+`OF THE DEADLINE`, `OF THE ARMING`, `OF closingDate` (see
+[WITHIN](../reference/regulative/README.md#within-temporal-deadline)). A BPMN timer runs from the
+moment its activity starts, and the exporter does not work out whether the anchor is that moment,
+so it draws no timer: the boundary event is a _conditional_ event carrying the text verbatim, and
+the report says so with a blocking `P-DEADLINE` that names the anchor.
 
 A rule written for a group — [`EVERY`](../reference/regulative/EVERY.md) — becomes **one task
 marked multi-instance** (the three parallel bars, in most modelers), not one task per member: who

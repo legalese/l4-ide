@@ -723,7 +723,7 @@ GIVETH A NUMBER
 `the number of sureties a bond ordinarily requires` MEANS 2
 ```
 
-— `jl4/examples/legal/sg-succession/sg-paa.l4:913-914`
+— `jl4/examples/canon/sg/succession/sg-paa.l4:913-914`
 
 Where the count is a fact about the world, it takes one, and records the convention it is relying
 on:

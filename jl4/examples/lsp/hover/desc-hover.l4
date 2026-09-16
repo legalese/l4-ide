@@ -20,3 +20,10 @@ DECLARE Person
 -- Test 3: Reference to Person field (should use DECLARE's @desc as fallback)
 GIVEN employee IS A Person
 DECIDE employeeName IS employee's name
+
+-- Test 4: a BARE opened field (R5, IMPLICIT-PROPS-DESIGN §11.7). It is
+-- elaborated to `employee's name`, whose operand now carries the bare read's
+-- source range so that diagnostics anchor there. Hover must still answer with
+-- the FIELD's type (STRING), not with the record the operand names.
+GIVEN employee IS A Person
+DECIDE employeeName2 IS name

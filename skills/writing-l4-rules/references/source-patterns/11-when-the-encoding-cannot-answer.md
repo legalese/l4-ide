@@ -325,7 +325,7 @@ A refusal is an expression at **any** type, so it needs no sentinel constructor 
 
 **Where no rule reaches the boundary, a comment is still the right thing** — it documents a gap that
 cannot be hit. State which way the omission errs, as the corpus does
-(`jl4/examples/legal/sg-succession/sg-wills.l4:278-280`):
+(`jl4/examples/canon/sg/succession/sg-wills.l4:278-280`):
 
 ```text
 -- WHICH WAY THE OMISSION ERRS. s 5 only ever ADDS ways of being properly

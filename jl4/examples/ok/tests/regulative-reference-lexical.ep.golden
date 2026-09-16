@@ -1,0 +1,86 @@
+-- R1 of specs/todo/PATTERN-REFERENCE-RULE-SPEC.md, one rule per kind of
+-- lexical local: a name written in an action ARGUMENT refers to the thing it
+-- names, and is therefore discharged only by an event carrying that value.
+--
+-- Before R1 each of these was a fresh pattern binder matching ANY value, so a
+-- payment of 1 discharged an obligation to pay `price`. The file checked
+-- clean and the only observable was a wrong verdict (spec §2; upstream
+-- smucclaw/l4-ide#955). Every trace below therefore comes in pairs: the
+-- MISMATCHING event first, which must leave the obligation pending, then the
+-- matching one, which must FULFIL it.
+--
+-- None of these draw the R5 notice: a lexical local is the unambiguous
+-- reading, and the corpus is unanimous that it is what the drafter meant.
+
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+
+DECLARE Action IS ONE OF
+    pay HAS amount IS A NUMBER
+    ship HAS count IS A NUMBER
+
+-- (1) a GIVEN parameter
+GIVEN price IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`given reference` MEANS
+    PARTY Buyer MUST pay price WITHIN 30 HENCE FULFILLED LEST BREACH
+
+#TRACE `given reference` 500 AT 0 WITH
+    PARTY Buyer DOES pay 1 AT 10
+#TRACE `given reference` 500 AT 0 WITH
+    PARTY Buyer DOES pay 500 AT 10
+
+-- (2) a WHERE local
+GIVEN base IS A NUMBER
+GIVETH A DEONTIC Actor Action
+`where reference` MEANS
+    PARTY Buyer MUST pay withTax WITHIN 30 HENCE FULFILLED LEST BREACH
+  WHERE
+    withTax MEANS base TIMES 2
+
+#TRACE `where reference` 100 AT 0 WITH
+    PARTY Buyer DOES pay 100 AT 10
+#TRACE `where reference` 100 AT 0 WITH
+    PARTY Buyer DOES pay 200 AT 10
+
+-- (3) an outer action's own binder, read in the HENCE continuation
+GIVETH A DEONTIC Actor Action
+`outer binder reference` MEANS
+    PARTY Seller
+    MUST ship n
+    WITHIN 14
+    HENCE (PARTY Buyer MUST pay n WITHIN 30 HENCE FULFILLED LEST BREACH)
+    LEST BREACH
+
+#TRACE `outer binder reference` AT 0 WITH
+    PARTY Seller DOES ship 7 AT 1
+    PARTY Buyer DOES pay 9 AT 20
+#TRACE `outer binder reference` AT 0 WITH
+    PARTY Seller DOES ship 7 AT 1
+    PARTY Buyer DOES pay 7 AT 20
+
+-- (4) a CONSIDER branch variable
+GIVEN owed IS A LIST OF NUMBER
+GIVETH A DEONTIC Actor Action
+`consider reference` MEANS
+    CONSIDER owed
+      WHEN EMPTY THEN PARTY Buyer MUST pay 0 WITHIN 1 HENCE FULFILLED LEST BREACH
+      WHEN d FOLLOWED BY rest THEN
+          PARTY Buyer MUST pay d WITHIN 30 HENCE FULFILLED LEST BREACH
+
+#TRACE `consider reference` (LIST 42) AT 0 WITH
+    PARTY Buyer DOES pay 1 AT 10
+#TRACE `consider reference` (LIST 42) AT 0 WITH
+    PARTY Buyer DOES pay 42 AT 10
+
+-- (5) a lambda parameter
+GIVETH A FUNCTION FROM NUMBER TO DEONTIC Actor Action
+`lambda reference` MEANS
+    GIVEN due YIELD
+        PARTY Buyer MUST pay due WITHIN 30 HENCE FULFILLED LEST BREACH
+
+#TRACE (`lambda reference` 77) AT 0 WITH
+    PARTY Buyer DOES pay 1 AT 10
+#TRACE (`lambda reference` 77) AT 0 WITH
+    PARTY Buyer DOES pay 77 AT 10

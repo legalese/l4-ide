@@ -4385,8 +4385,11 @@ lowerModule opts modul@(MkModule _ uri _) =
         , dcnLogic        = LogicContext (storedEntries <> computedEntries)
         -- ★ The source instance is NOT the only edge, and treating it as the
         -- only one was a defect: a computed field's @MEANS@ body may reference
-        -- anything in scope at the DECLARE, and 'Desugar.rewriteFieldRefs'
-        -- rewrites only the names that are the record's OWN fields. So
+        -- anything in scope at the DECLARE, and 'Desugar.openFields'
+        -- rewrites only the names that are the record's OWN fields (a
+        -- computed field's synthetic DECIDE is walked with no enclosing
+        -- frames, 'Desugar.isComputedFieldDecide', so a section GIVEN's
+        -- fields are NOT in scope in a MEANS body). So
         -- @`b` IS A NUMBER MEANS `a` TIMES `vat rate`@ renders `a * vat_rate`
         -- inside the context, and without an edge to `decision_vat_rate` that
         -- name is not in the hydrator's evaluation scope: KIE 8.44 answers

@@ -147,7 +147,7 @@ shape of the negated input.
 
 > `-- ... administration expenses and debts still come off the top (s 5: "after payment thereout"). They are borne rateably by the part this Act governs, in the absence of any direction otherwise`
 >
-> — `jl4/examples/legal/sg-succession/sg-isa.l4:125-128`.
+> — `jl4/examples/canon/sg/succession/sg-isa.l4:125-128`.
 
 **It is doing** stating a **fallback value**. There is a value the parties (or the will, or the
 contract) may set; where they have not, the instrument supplies one. The two are the same quantity,
@@ -296,7 +296,7 @@ words are the whole content.
 
 > `-- "No will shall be revoked by any presumption of an intention on the ground of an alteration in circumstances."`
 >
-> — `jl4/examples/legal/sg-succession/sg-wills.l4:489-490`, Wills Act 1838 s 14. The note beside it:
+> — `jl4/examples/canon/sg/succession/sg-wills.l4:489-490`, Wills Act 1838 s 14. The note beside it:
 > "Constant FALSE, and it earns its place. s 14 abolishes a doctrine, and the only way to encode an
 > abolition is to carry the abolished ground as a disjunct that can never fire."
 
@@ -341,7 +341,7 @@ stub", for the neighbouring case where the whole provision is gone, and entry
 
 > `-- "8. The following provisions shall also apply: (a) the order of application may be varied by the will of the deceased; and (b) this Schedule does not affect the liability of land ..."`
 >
-> — `jl4/examples/legal/sg-succession/sg-paa.l4:1566-1569`, Probate and Administration Act 1934
+> — `jl4/examples/canon/sg/succession/sg-paa.l4:1566-1569`, Probate and Administration Act 1934
 > Second Schedule item 8. The note: "Item 8 is not a class of assets. It is a rider on the seven that
 > precede it ... 8(a) is the provision that lets a well-drafted will move everything above it."
 

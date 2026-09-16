@@ -11,7 +11,7 @@ One area of the phrasebook. The index, the preamble and the other ten areas are 
 
 > `-- "8.--(1) Probate may be granted to any executor appointed by a will."`
 >
-> — `jl4/examples/legal/sg-succession/sg-paa.l4:432`, encoded at `:450` as
+> — `jl4/examples/canon/sg/succession/sg-paa.l4:432`, encoded at `:450` as
 > `` `probate may be granted to` p MEANS … ``, a `GIVETH A BOOLEAN`.
 
 **It is doing** stating an **eligibility test**, not conferring a permission. Read who holds the
@@ -409,7 +409,8 @@ GIVETH A NUMBER
 without it and the file does not check: `I could not find a definition for the identifier` /
 `` `five business days` ``, once per `WITHIN`, exit 1 (measured 2026-09-05, probe
 `v-fbd-undefined.l4`). Entry [4.3](04-dates-and-periods.md#e4-3) has the bare-number form and the
-reason neither `WITHIN 5 days` nor `WITHIN 5 days OF …` parses.
+reason `WITHIN 5 days` — and, since the `OF` anchor was built on 2026-09-15, `WITHIN 5 days OF …`
+too — checks only once `days` is defined.
 
 The snippet is the corpus chain with one rung dropped for length — the corpus interposes a duty to
 notify the investor of the cancellation before the refund duty, and guards the reconfirmation with
@@ -458,13 +459,13 @@ that shape, three rungs deep: pay, then pay with penalty, then pay everything ou
 >
 > — Probate and Administration Act 1934 s 42, at
 > `jl4/examples/legal/sg-succession/cleanroom-2026-08/source/PAA1934.txt:842-853`, whose running
-> header between `:845` and `:849` the quotation elides. **No offence in `jl4/examples/legal/` is
-> encoded**. The word "offence" appears there in exactly three `.l4` files, and in each it
+> header between `:845` and `:849` the quotation elides. **No offence in `jl4/examples/legal/` and `jl4/examples/canon/`
+> is encoded**. The word "offence" appears there in exactly three `.l4` files, and in each it
 > is a scope-out: that module lists "the s 42 offence" among the provisions it deliberately leaves
 > out (`probate-administration-act.l4:2883-2884`), as does its earlier draft (`sg-paa.l4:1082`), and
 > the Jersey charities module puts "offences" out of scope in its opening note
 > (`jl4/examples/legal/charities-cleanroom/charity-test.l4:21-23`). The count is of
-> `jl4/examples/legal/` only. `jl4/experiments/`, which entry [5.10](#e5-10) draws on for the
+> `jl4/examples/legal/` and `jl4/examples/canon/` only. `jl4/experiments/`, which entry [5.10](#e5-10) draws on for the
 > housing grounds, holds offence vocabulary of its own — `macma2.l4` declares an `Offence` type and
 > predicates over it — but no offence-creating rule: not one of its files that mentions an offence
 > carries a `SHANT` or a `MUST NOT`. The pattern below is therefore written from the source, not
@@ -501,7 +502,7 @@ _(Probe `d06-offence.l4`, exit 0, three assertions satisfied. The full probe add
 a `` `s 42 — the fine is within the maximum` `` predicate that tests a sentence against the ceiling,
 satisfied at 500 and refuted at 1,500.)_
 
-**Not** a duty to pay the maximum. Written as ``MUST `pay a fine` EXACTLY 1_000``, an offender
+**Not** a duty to pay the maximum. Written as ``MUST `pay a fine` 1_000``, an offender
 fined $500 by the court — a sentence s 42 plainly permits — who pays it in full produces
 
 ```
@@ -599,7 +600,7 @@ flattened form returns `DEONTIC BREACHED: BREACH` and the nested one `FULFILLED`
 directives are in one file, probe `d07b-notice-flat.l4`, exit 0. `RAND` is for duties that genuinely
 run in parallel; a period measured from an event is not one of them.
 
-**See** [regulative.md](../regulative.md), "`PROVIDED` and `EXACTLY` — action matching", and
+**See** [regulative.md](../regulative.md), "PROVIDED and action patterns — reference and wildcard matching", and
 "Composition: `RAND` and `ROR`"; entry [4.3](04-dates-and-periods.md#e4-3) for the unit that `WITHIN
 5` does not record — "five business days" and "five days" are the same `5` here, and only your
 comment says which — and entry [5.6](#e5-6) for the `` `five business days` `` definition the block

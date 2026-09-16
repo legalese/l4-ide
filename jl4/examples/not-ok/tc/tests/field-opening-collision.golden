@@ -1,0 +1,192 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: field-opening-collision.l4
+  Hidden: no
+  Range: 14:7-14:13
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This input has a field name that an earlier input of the rule also has:
+
+      seller IS A Seller
+
+    has a field named `name`, and so does buyer (a Buyer, declared at field-opening-collision.l4:13:7-12).
+    Neither one can be read by its bare name in this rule. Write
+
+      buyer's name
+      seller's name
+
+    wherever the body means one of them. (The bare read is at field-opening-collision.l4:16:19-23.)
+
+File: field-opening-collision.l4
+  Hidden: no
+  Range: 16:19-16:23
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Two inputs of this rule have a field named
+
+      `name`
+
+    so on its own the name could belong to either:
+
+      buyer's name      (buyer IS A Buyer, declared at field-opening-collision.l4:13:7-12)
+      seller's name     (seller IS A Seller, declared at field-opening-collision.l4:14:7-13)
+
+    Write the one you mean with its input in front, as shown.
+
+File: field-opening-collision.l4
+  Hidden: no
+  Range: 35:7-35:12
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This input has field names that an earlier input of the rule also has:
+
+      agent IS AN Agent
+
+    has fields named `name` and `pays`, and so does buyer (a Buyer, declared at field-opening-collision.l4:34:7-12).
+    Neither one can be read by these bare names in this rule. Write
+
+      buyer's name
+      agent's name
+      buyer's pays
+      agent's pays
+
+    wherever the body means one of them. (The bare read is at field-opening-collision.l4:37:14-18.)
+
+File: field-opening-collision.l4
+  Hidden: no
+  Range: 37:14-37:18
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Two inputs of this rule have a field named
+
+      `name`
+
+    so on its own the name could belong to either:
+
+      buyer's name     (buyer IS A Buyer, declared at field-opening-collision.l4:34:7-12)
+      agent's name     (agent IS AN Agent, declared at field-opening-collision.l4:35:7-12)
+
+    Write the one you mean with its input in front, as shown.
+
+File: field-opening-collision.l4
+  Hidden: no
+  Range: 37:34-37:38
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Two inputs of this rule have a field named
+
+      `pays`
+
+    so on its own the name could belong to either:
+
+      buyer's pays     (buyer IS A Buyer, declared at field-opening-collision.l4:34:7-12)
+      agent's pays     (agent IS AN Agent, declared at field-opening-collision.l4:35:7-12)
+
+    Write the one you mean with its input in front, as shown.
+
+File: field-opening-collision.l4
+  Hidden: no
+  Range: 44:7-44:8
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This input has a field name that an earlier input of the rule also has:
+
+      b IS A Vector
+
+    has a field named `x`, and so does a (a Vector, declared at field-opening-collision.l4:43:7-8).
+    None of them can be read by its bare name in this rule. Write
+
+      a's x
+      b's x
+      c's x
+
+    wherever the body means one of them. (The bare read is at field-opening-collision.l4:47:13-14.)
+
+File: field-opening-collision.l4
+  Hidden: no
+  Range: 45:7-45:8
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This input has a field name that an earlier input of the rule also has:
+
+      c IS A Vector
+
+    has a field named `x`, and so do a (a Vector, declared at field-opening-collision.l4:43:7-8) and b (a Vector, declared at field-opening-collision.l4:44:7-8).
+    None of them can be read by its bare name in this rule. Write
+
+      a's x
+      b's x
+      c's x
+
+    wherever the body means one of them. (The bare read is at field-opening-collision.l4:47:13-14.)
+
+File: field-opening-collision.l4
+  Hidden: no
+  Range: 47:13-47:14
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Several inputs of this rule have a field named
+
+      `x`
+
+    so on its own the name could belong to any of them:
+
+      a's x     (a IS A Vector, declared at field-opening-collision.l4:43:7-8)
+      b's x     (b IS A Vector, declared at field-opening-collision.l4:44:7-8)
+      c's x     (c IS A Vector, declared at field-opening-collision.l4:45:7-8)
+
+    Write the one you mean with its input in front, as shown.
+
+File: field-opening-collision.l4
+  Hidden: no
+  Range: 59:11-59:17
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This input has a field name that an earlier input of the section also has:
+
+      animal IS A Pet
+
+    has a field named `age`, and so does owner (a Person, declared at field-opening-collision.l4:56:11-16).
+    Neither one can be read by its bare name in this section. Write
+
+      owner's age
+      animal's age
+
+    wherever the body means one of them. (The bare read is at field-opening-collision.l4:62:19-22.)
+
+File: field-opening-collision.l4
+  Hidden: no
+  Range: 62:19-62:22
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Two inputs of this section have a field named
+
+      `age`
+
+    so on its own the name could belong to either:
+
+      owner's age      (owner IS A Person, declared at field-opening-collision.l4:56:11-16)
+      animal's age     (animal IS A Pet, declared at field-opening-collision.l4:59:11-17)
+
+    Write the one you mean with its input in front, as shown.

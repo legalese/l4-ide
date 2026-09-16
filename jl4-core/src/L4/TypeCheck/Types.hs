@@ -16,7 +16,7 @@ import L4.Syntax
 import L4.TypeCheck.With
 import qualified L4.Utils.IntervalMap as IV
 import L4.Mixfix (MixfixInfo(..))
-import L4.Names (SectionBinderDecl)
+import L4.Names (OpenedBinderDecl (..), OpenedFieldCollision (..), OpenedFieldShadow (..), SectionBinderDecl)
 import qualified Base.Set as Set
 
 import Control.Applicative
@@ -202,22 +202,69 @@ data CheckError =
     -- as a module-level ASSUME it (or a helper it reaches) reads. Both
     -- would be one JSON property, so a request could not supply them
     -- separately. Arguments: exported-function name, the clashing GIVEN.
-  | QuantifierVariableRebound Resolved Resolved
-    -- ^ The action pattern of an @EVERY v …@ binds a fresh pattern variable
-    -- spelled like the quantifier's own variable (@EVERY Tenant t MUST Sign t@).
-    -- An action is a pattern, so that @t@ would be a NEW binder matching any
-    -- signer — silently discharging tenant @t@'s duty by a stranger's act.
-    -- Arguments: the pattern's binder, the quantifier's binder.
+  | ActionPatternReference Name Name
+    -- ^ R5 of @specs\/todo\/PATTERN-REFERENCE-RULE-SPEC.md@: a bare name in an
+    -- ARGUMENT slot of a regulative action was read as a reference (R1) to
+    -- something that is not a lexical local — a same-module top-level, a
+    -- section-level binder, an @ASSUME@d term, or an imported name. It is a
+    -- notice and asks the drafter for nothing: severity 'SInfo'.
+    --
+    -- Its job is the one thing a marker-free design cannot otherwise make
+    -- loud — a top-level name added LATER capturing what used to be a
+    -- wildcard. Lexical locals do not draw it (that reading is unambiguous),
+    -- nor do constructors, nor the action HEAD ('AtActionHead').
+    --
+    -- Arguments: the name as written in the pattern, and the referent's
+    -- defining name (whose range is the definition site).
+  | ActionPatternNotComparable (Expr Name) (Type' Resolved)
+    -- ^ An argument slot of a regulative action pins a value of a __function__
+    -- type — @MUST apply g@ under @GIVEN g IS A FUNCTION FROM NUMBER TO
+    -- NUMBER@, or the same thing written @EXACTLY g@. Matching an event
+    -- against a pinned value is an equality test, and two functions cannot be
+    -- compared, so no event could ever match: the run dies with \"trying to
+    -- check equality on types that do not support it\" at the first @#TRACE@.
+    --
+    -- Refused at check time rather than at the first trace (review of
+    -- 2026-09-16, spec §4 R7): the reading cannot be what the drafter meant,
+    -- and the two corrections — pin something comparable, or spell the
+    -- placeholder as a name nothing else uses — are the same two R7 already
+    -- offers for a reference that does not fit its slot.
+    --
+    -- Arguments: the pinned expression as written, and its type.
   | JoinWithoutEvery (Join Name)
     -- ^ An @ONCE …@ join line under a @PARTY@ subject. The join says when a
     -- cast's continuation fires, and a single party is not a cast. Carries
     -- the join for its source range. (EVERY-EACH-QUANTIFIER-SPEC R-Q1.)
+  | EmptyBreachBy (Expr Name)
+    -- ^ @BREACH BY@ given a list literal with nobody in it (@EMPTY@, or
+    -- @LIST@ with no elements). A breach blames at least one party, and a
+    -- literal is decidable here; a COMPUTED list that turns out empty is
+    -- refused when the rule runs instead (R-T3, EVERY-EACH-QUANTIFIER-SPEC
+    -- §6.1). Carries the expression for its source range.
+  | BreachByListNeedsPartyType (Expr Name)
+    -- ^ @BREACH BY@ given a LIST while the rule's party type is still an
+    -- inference variable — a top-level @MEANS@ with no @GIVETH@, or the left
+    -- operand of a @RAND@\/@ROR@ that has none. Whether the list names several
+    -- parties or one list-valued party is decided by the party type
+    -- ('checkBreachParty'), so it cannot be decided here; guessing the
+    -- element reading pinned the party type and failed at the use site
+    -- (EVERY-EACH-QUANTIFIER-SPEC §6.1.1, adversarial pass round 2,
+    -- R2-TC-1). Carries the expression for its source range.
   | ContinuationWithoutJoin (Expr Name)
     -- ^ A @HENCE@ or @LEST@ directly under an @EVERY@ with no @ONCE@ line.
     -- The join is mandatory there (R-Q1, RULED 2026-09-07): a default would
     -- silently decide barrier-or-fork, and the barrier reading reverses what a
     -- single-party @MAY … HENCE@ means today. Carries the first continuation
     -- present, for its source range.
+  | AnchorUnavailable (Anchor Name) AnchorRefusal
+    -- ^ A lifecycle anchor (@WITHIN d OF THE JOIN@ \/ @THE DEADLINE@ \/
+    -- @THE ARMING@, EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7B) written where
+    -- the position it names does not exist. Carries the anchor for its
+    -- source range and the reason (see 'AnchorRefusal').
+  | AnchorNotAnInstant (Expr Name) (Type' Resolved)
+    -- ^ The expression after @OF@ in a @WITHIN@ (R-Q7C) is neither a NUMBER
+    -- (an instant on the trace's own clock) nor a DATE. Carries the
+    -- expression, for its range, and the type it was found to have.
   | RegulativeActorMismatch Resolved Resolved Resolved
     -- ^ A regulative @PARTY p MUST a@ (or a @PARTY p DOES a@ event) binds a
     -- party to an action belonging to a different actor. In a value-actor
@@ -259,6 +306,19 @@ data CheckError =
     -- on the @NOT@'s own line: @NOT a AND b@, or @NOT (a) AND b@. Both read
     -- as @NOT (a AND b)@, which is silently not what most readers take them
     -- to say (SET-OPERATORS-SPEC §18.1, R-NOT-1). See 'L4.Lint.NotReach'.
+  | OpenedFieldCollisionAtRead OpenedFieldCollision
+    -- ^ R5 (IMPLICIT-PROPS-DESIGN §11.7): a bare read of a field name that
+    -- two or more record-typed binders of the same signature open. Anchored
+    -- at the read; names every binder. See 'L4.Desugar.openFields'.
+  | OpenedFieldCollisionAtOpening OpenedFieldCollision OpenedBinderDecl [Name]
+    -- ^ The same collision, anchored at a binder after the first that opens
+    -- the name: the "declaration that opens the second" of the ruling. The
+    -- second argument is that binder; it is one of the collision's binders.
+    -- The third is every field name these same binders collide on, so that
+    -- two shared fields draw ONE error at the declaration rather than two
+    -- stacked on the identical range.
+    -- Emitted only alongside an 'OpenedFieldCollisionAtRead' — two binders
+    -- that merely share a field name and read it as @r's f@ are fine.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -276,6 +336,13 @@ data CheckWarning
     -- ^ A fixity annotation was attached to a definition that is not a plain
     -- binary infix operator (pattern @_ op _@); the annotation is ignored.
     -- Carries the definition's name and the annotation's source range.
+  | OpenedFieldShadowsDefinition OpenedFieldShadow
+    -- ^ R5 (IMPLICIT-PROPS-DESIGN §11.7): a bare read that an opened field
+    -- won over a 0-ary constructor or top-level definition of the same name.
+    -- The rank puts both below every opened field, and the ruling names
+    -- neither, so this is the one place the rank decides an author's meaning
+    -- silently. A warning, never an error: nothing that checked before this
+    -- stops checking, and @r's f@ or a rename both silence it.
   | DeprecatedAssume DeprecatedAssumeInfo
     -- ^ An author-written @ASSUME@. The keyword is deprecated
     -- (IMPLICIT-PROPS-DESIGN.md §11.1), and this is the warning that says so
@@ -284,6 +351,59 @@ data CheckWarning
     -- the elaborations 'L4.Desugar.desugarSectionGivens' prepends for a
     -- section @GIVEN@ reach the same code and never draw it
     -- ('L4.Names.isSectionBinderElaboration').
+  | DeprecatedExactly DeprecatedExactlyInfo
+    -- ^ An @EXACTLY@ written in a regulative action pattern. Since R1 of
+    -- @specs\/todo\/PATTERN-REFERENCE-RULE-SPEC.md@ a bare name there already
+    -- refers to what it names and a parenthesised expression already reads as
+    -- an expression, so the keyword is redundant. Deprecated, not removed: it
+    -- still parses and still means exactly what it meant.
+    --
+    -- Only fires inside a deontic action. R6 was decided DEONTIC-ONLY, so
+    -- @EXACTLY@ remains the /only/ way to pin a value in a
+    -- @CONSIDER … WHEN@ and is not deprecated there.
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | Everything 'DeprecatedExactly' needs to phrase its advice.
+data DeprecatedExactlyInfo = MkDeprecatedExactlyInfo
+  { range :: Maybe SrcRange
+    -- ^ The range of the @EXACTLY@ keyword itself — the warning's anchor, so
+    -- the squiggle sits under the word being retired rather than under the
+    -- whole pattern.
+  , advice :: ExactlyAdvice
+    -- ^ Whether the keyword can be dropped here, and what to write if it can.
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | What the 'DeprecatedExactly' warning can honestly advise, which depends on
+-- how R1 would read the operand once the keyword is gone.
+--
+-- R3 as first drafted claimed the drop was always meaning-preserving, on the
+-- reasoning that an operand resolving to nothing is already an error today. It
+-- is — but that error is \"could not find a definition\", and under R1 the
+-- bare name becomes a silently-matching placeholder instead, which is the very
+-- defect (smucclaw\/l4-ide#955) the rule exists to remove. So the advice is
+-- conditional, and there are __two__ ways for it to be withheld, not one.
+data ExactlyAdvice
+  = DropTheKeyword Text
+    -- ^ The pasteable text that replaces @EXACTLY \<operand\>@: the bare name
+    -- for a name operand, the parenthesised expression otherwise. Safe: a
+    -- literal is already a literal in pattern position, a constructor is
+    -- already a constructor pattern, and a reference is what @EXACTLY@ meant.
+  | KeepItUnresolved
+    -- ^ A bare-name operand that names nothing in scope, or only a field
+    -- selector: R1 would read it as a fresh placeholder matching anything.
+    -- Phase A measured one such site in the corpus,
+    -- @jl4\/examples\/not-ok\/tc\/every-unbound-variable.l4:11@, and it is a
+    -- fixture whose whole purpose is that error.
+  | KeepItShadowedByConstructor Name
+    -- ^ A bare-name operand that names __both__ a data constructor and a
+    -- value. @EXACTLY n@ evaluates @n@ as an expression, which is the value;
+    -- the bare name takes R1's first row, which is the constructor. Both
+    -- readings type-check and they mean different things, so the drop would
+    -- silently change the rule (the review of 2026-09-16 found the warning
+    -- recommending exactly that edit). Carries the operand as written.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -372,6 +492,14 @@ data ExpectationContext =
   | ExpectDecideSignatureContext (Maybe SrcRange) -- actual result type range from the signature, if it exists
   | ExpectRegulativePartyContext -- party clause of obligation
   | ExpectRegulativeActionContext -- action clause of obligation
+  | ExpectActionPatternReferenceContext Name
+    -- ^ R7: a bare name in a regulative action pattern that R1 read as a
+    -- REFERENCE, being checked against the slot it fills. It gets its own
+    -- context because its type mismatch is the one diagnostic the R1
+    -- principle deliberately does not correct: the checker cannot tell a
+    -- wrongly-typed reference from a wildcard that wants a different
+    -- spelling, so the message names BOTH corrections. Carries the name as
+    -- written.
   | ExpectRegulativeDeadlineContext -- within clause of obligation
   | ExpectRegulativeTimestampContext -- timestamp of a regulative event
   | ExpectRegulativeFollowupContext -- hence clause of regulative rule
@@ -387,12 +515,62 @@ data ExpectationContext =
   | ExpectAsStringArgumentContext -- argument of AS STRING
   | ExpectTypicallyValueContext Name -- TYPICALLY value must match the declared type
   | ExpectBreachReasonContext -- reason argument of BREACH
+  | ExpectBreachPartyContext -- the BY argument of BREACH: a party, or a LIST of parties
   | ExpectRefuseMessageContext -- message argument of REFUSE
   | ExpectRecordCellContext -- cell (path) argument of RECORD/COMMIT/ATTEST
   | ExpectQuantifierCastContext -- the constructor after EVERY must build values of the party type
   | ExpectQuantifierFilterContext -- the WHO clause of an EVERY is a predicate on the bound variable
   | ExpectQuantifierRollContext -- the IN clause of an EVERY is the LIST the cast is drawn from
   | ExpectJoinDeadlineContext -- a join line's WITHIN bounds the joined state
+  | ExpectAnchoredDurationContext -- the duration of an anchored WITHIN: everything before OF, where OF is not application
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | Why a lifecycle anchor was refused ('AnchorUnavailable'). Each names a
+-- position in the life of the ENCLOSING obligation — the one whose @HENCE@
+-- or @LEST@ the anchored obligation is the continuation of — and each reason
+-- is a way for that position not to exist. Build decisions of 2026-09-15,
+-- recorded in spec §5.1.1 and open to review there.
+data AnchorRefusal
+  = NoEnclosingObligation
+    -- ^ @THE JOIN@ or @THE DEADLINE@ on an obligation that is not inside any
+    -- @HENCE@ or @LEST@: there is nothing whose join or deadline it could be.
+    -- (@THE ARMING@ is allowed there: it is the obligation's own arming,
+    -- which is the default.)
+  | OnJoinLine
+    -- ^ @THE JOIN@ or @THE DEADLINE@ on a join line's own @WITHIN@: that
+    -- @WITHIN@ IS the group's deadline, and its join has not fired when it
+    -- is read. Only @THE ARMING@ (the EVERY's own arming) and an expression
+    -- make sense there.
+  | JoinUnderLest
+    -- ^ @THE JOIN@ under @LEST@: the join did not fire, so there is no
+    -- instant to count from. The conservative reading of §5.1.1's open
+    -- question; a build decision, not a ruling.
+  | EnclosingHasNoDeadline
+    -- ^ @THE DEADLINE@ where the enclosing obligation has no @WITHIN@ at
+    -- all, on its act or on its join line.
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | Which continuation slot of an obligation a deonton sits in, for the
+-- anchored @WITHIN@ (R-Q7B): a lifecycle anchor names a position in the
+-- life of the ENCLOSING obligation, and two of them exist only in one slot.
+data ContinuationSlot = InHence | InLest
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | What the checker knows about the obligation enclosing the one it is
+-- checking: the slot it is in, and whether the enclosing obligation has a
+-- deadline to name (an act @WITHIN@ or a join-line @WITHIN@). @Nothing@ in
+-- 'CheckEnv' means the top level. Set with 'local' around a @HENCE@ or
+-- @LEST@ body ('L4.TypeCheck.checkDeontonBody'), so a nested obligation —
+-- however deep inside a @LET@, @IF@ or @AND@ — sees its nearest enclosing
+-- one, which is also what the machine binds at run time.
+data EnclosingObligation =
+  MkEnclosingObligation
+    { slot        :: !ContinuationSlot
+    , hasDeadline :: !Bool
+    }
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -430,6 +608,7 @@ severity (MkCheckErrorWithContext e _) =
     CheckInfo {}               -> SInfo
     CheckWarning {}            -> SWarn
     SuspiciousBinderPattern {} -> SInfo
+    ActionPatternReference {}  -> SInfo
     _                          -> SError
 
 -- | Does this diagnostic refuse an @\@export@ for a reason that belongs to the
@@ -496,8 +675,13 @@ instance HasSrcRange CheckError where
   rangeOf (CheckInfo _ mr)                  = mr
   rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
   rangeOf (JoinWithoutEvery j)              = rangeOf j
+  rangeOf (EmptyBreachBy e)                 = rangeOf e
+  rangeOf (BreachByListNeedsPartyType e)    = rangeOf e
   rangeOf (ContinuationWithoutJoin e)       = rangeOf e
-  rangeOf (QuantifierVariableRebound b _)   = rangeOf b
+  rangeOf (ActionPatternReference n _)      = rangeOf n
+  rangeOf (ActionPatternNotComparable e _)  = rangeOf e
+  rangeOf (AnchorUnavailable a _)           = rangeOf a
+  rangeOf (AnchorNotAnInstant e _)          = rangeOf e
   rangeOf (FixityAnnotationMalformed mr _)  = mr
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
@@ -505,6 +689,8 @@ instance HasSrcRange CheckError where
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _)) = Just r
   rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
+  rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
+  rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
@@ -514,6 +700,8 @@ instance HasSrcRange CheckError where
   rangeOf (ImplicitCrossesImport r _)       = rangeOf r
   rangeOf (RestatedSectionBinder n)         = rangeOf n
   rangeOf (NotReachesConnective site)       = Just site.range
+  rangeOf (OpenedFieldCollisionAtRead c)    = rangeOf c.fieldRead
+  rangeOf (OpenedFieldCollisionAtOpening _ b _) = rangeOf b.binderName
   rangeOf _                                 = Nothing
 
 -- | A token in a mixfix pattern, representing either a keyword (part of the function name)
@@ -722,6 +910,11 @@ data CheckEnv =
     -- @\@nonexhaustive@ (deliberately not defined for all inputs)? If so, the
     -- non-exhaustive-CONSIDER warning is suppressed; redundancy warnings
     -- stay active. Set via 'local' in @inferDecide@.
+    , enclosingObligation  :: !(Maybe EnclosingObligation)
+    -- ^ The obligation whose @HENCE@ or @LEST@ we are inside, if any — what
+    -- the lifecycle anchors of an anchored @WITHIN@ refer to (R-Q7B). Set
+    -- via 'local' in 'L4.TypeCheck.checkDeontonBody'; @Nothing@ at the top
+    -- level and, like 'inNonexhaustiveDecide', never carried across imports.
     , errorContext         :: !CheckErrorContext
     , sectionStack         :: ![NonEmpty Text]
     , localBindings        :: !(Set Unique)
@@ -734,7 +927,39 @@ data CheckEnv =
     -- (lexical shadowing), so we must track them explicitly: they are absent
     -- from 'sectionPaths', which otherwise conflates them with top-level and
     -- imported bindings.
+    , actionPatternPos     :: !ActionPatternPos
+    -- ^ Where in a /regulative action pattern/ the checker currently is, if
+    -- anywhere. This is the flag that switches on R1 of
+    -- @specs\/todo\/PATTERN-REFERENCE-RULE-SPEC.md@: a bare name inside a
+    -- deontic action refers to what it names, while the very same production
+    -- inside a @CONSIDER … WHEN@ still binds a fresh name (R6 was decided
+    -- DEONTIC-ONLY). Nothing in the pattern itself distinguishes the two
+    -- sites, so the distinction has to be carried down from the caller.
+    --
+    -- Set by 'L4.TypeCheck.checkActionPattern' and stepped inward by
+    -- 'L4.TypeCheck.descendActionPattern'; cleared by
+    -- 'L4.TypeCheck.leaveActionPattern' whenever the checker descends from a
+    -- pattern into an /expression/, because an expression may contain a
+    -- @CONSIDER@ of its own whose branch patterns are not action patterns.
     }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
+-- | Where the checker is with respect to a regulative action pattern.
+-- See 'CheckEnv.actionPatternPos'.
+data ActionPatternPos
+  = NotInActionPattern
+    -- ^ An ordinary pattern: a @CONSIDER … WHEN@ branch, or a multi-clause
+    -- @DECIDE@ head. A bare name binds (the pre-existing behaviour).
+  | AtActionHead
+    -- ^ The outermost pattern of a @MUST@\/@MAY@\/@SHANT@\/@DO@ action. R1
+    -- applies, but the R5 notice does not: a bare action name denoting a
+    -- module-level action IS the idiom here, and the head has a declared
+    -- expected type to catch an accidental capture (this is the behaviour
+    -- @34a7c1c5@ already shipped).
+  | InActionArgument
+    -- ^ An argument slot inside an action pattern, at any depth. R1 applies
+    -- and so does the R5 notice: this is the position that had no net.
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
 
@@ -784,9 +1009,11 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
     , importedImplicitReaders =
         Set.union accEnv.importedImplicitReaders depImplicitReaders
     , inNonexhaustiveDecide = False
+    , enclosingObligation = Nothing
     , errorContext = None
     , sectionStack = []
     , localBindings = Set.empty
+    , actionPatternPos = NotInActionPattern
     }
 
 newtype SectionNames =
@@ -2024,8 +2251,10 @@ extendEnv cis env =
     , sectionBinderDecls = e.sectionBinderDecls
     , importedImplicitReaders = e.importedImplicitReaders
     , inNonexhaustiveDecide = e.inNonexhaustiveDecide
+    , enclosingObligation = e.enclosingObligation
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings
+    , actionPatternPos = e.actionPatternPos
     }
     where
       u :: Unique

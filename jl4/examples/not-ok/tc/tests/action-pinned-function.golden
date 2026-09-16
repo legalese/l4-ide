@@ -1,0 +1,63 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: action-pinned-function.l4
+  Hidden: no
+  Range: 26:28-26:29
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This pins a value that cannot be compared.
+
+      g
+
+    is of type
+
+      FUNCTION FROM NUMBER TO NUMBER
+
+    An action written with a value in it accepts only events carrying that
+    same value, which means comparing the two. Two functions cannot be
+    compared, so no event could ever match this one.
+
+    Pin something that can be compared, or -- if you meant a name that stands
+    for anything here -- give it a spelling nothing else is using.
+
+File: action-pinned-function.l4
+  Hidden: no
+  Range: 31:29-31:36
+  Source: check
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    EXACTLY is no longer needed here, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+
+    A name written in an action already refers to the thing it names, and a
+    parenthesised expression is already read as an expression. Write
+
+      g
+
+    in place of the EXACTLY and this rule means exactly what it means now.
+
+File: action-pinned-function.l4
+  Hidden: no
+  Range: 31:37-31:38
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    This pins a value that cannot be compared.
+
+      g
+
+    is of type
+
+      FUNCTION FROM NUMBER TO NUMBER
+
+    An action written with a value in it accepts only events carrying that
+    same value, which means comparing the two. Two functions cannot be
+    compared, so no event could ever match this one.
+
+    Pin something that can be compared, or -- if you meant a name that stands
+    for anything here -- give it a spelling nothing else is using.

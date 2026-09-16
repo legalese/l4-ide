@@ -1,0 +1,24 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: action-reference-type-mismatch.l4
+  Hidden: no
+  Range: 26:38-26:44
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    In this action, `amount` names something already in scope, so it
+    refers to that thing rather than introducing a new name. Read that way it
+    does not fit the slot it is in, which is expected to be of type
+
+      Thing
+
+    but is here of type
+
+      NUMBER
+
+    There are two ways to fix this, and which one is right depends on what
+    you meant. If you meant the thing `amount` names, then this action's
+    type is wrong here. If you meant a name that stands for anything, give
+    it a spelling nothing else is using.

@@ -1,0 +1,43 @@
+-- Field opening: inside a rule whose GIVEN is a record, the record's fields
+-- can be read by their bare names.
+
+IMPORT prelude
+
+DECLARE Person HAS
+    `the age`   IS A NUMBER
+    `bankrupt`  IS A BOOLEAN
+
+-- Before: every read names the input.
+GIVEN person IS A Person
+GIVETH A BOOLEAN
+DECIDE `is eligible (spelled out)` IF
+        person's `the age` >= 21
+    AND NOT person's `bankrupt`
+
+-- After: the fields of `person` are in scope by name. Same rule, same answers.
+GIVEN person IS A Person
+GIVETH A BOOLEAN
+DECIDE `is eligible` IF
+        `the age` >= 21
+    AND NOT `bankrupt`
+
+-- A section GIVEN opens the same way, for every rule under the heading.
+§ `Applicant checks`
+    GIVEN applicant IS A Person
+
+GIVETH A BOOLEAN
+DECIDE `applicant is solvent` IF NOT `bankrupt`
+
+-- A rule never sees the fields of its CALLER's inputs. `over 18` has to
+-- declare its own Person; it cannot read `is eligible`'s.
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `over 18` IF `the age` > 18
+
+alice MEANS Person WITH `the age` IS 30, `bankrupt` IS FALSE
+carol MEANS Person WITH `the age` IS 17, `bankrupt` IS FALSE
+
+#EVAL `is eligible` alice
+#EVAL `is eligible` carol
+#EVAL `applicant is solvent` WITH applicant IS alice
+#EVAL `over 18` carol

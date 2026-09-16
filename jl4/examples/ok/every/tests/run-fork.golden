@@ -1,10 +1,24 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+run-fork.l4:28:22-33:
+  I found a problem while checking the definition of `receipts`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-fork.l4:17:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-fork.l4:32:36-47:
+  I found a problem while checking the definition of `receipts`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-fork.l4:17:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-fork.l4:38:1-42:58:
   FULFILLED
 run-fork.l4:46:1-49:58:
-  PARTY Landlord OF "Ms Ng" MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) WITHIN 2 HENCE FULFILLED AND FULFILLED
+  PARTY Landlord OF "Ms Ng" MUST Receipt theLandlord t amount WITHIN 2 HENCE FULFILLED AND FULFILLED
 run-fork.l4:52:1-55:59:
   DEONTIC BREACHED:
     BREACH

@@ -1,0 +1,256 @@
+{
+  "_readme": [
+    "The queue of decisions waiting on a named human, rendered by etc/status-board.mjs as its first pane.",
+    "This is a QUEUE, not a record: a decision is recorded in its owning document (CLAUDE.md §4), and each entry here points at that document by file + anchor string.",
+    "The generator re-reads every anchor at generation time and flags the entry STALE if the anchor is gone, so an entry cannot outlive the sentence it points at without being noticed.",
+    "`verify` is an optional shell command; while its output matches `pendingWhen` the entry is live, otherwise the generator reports it RESOLVED and it should be deleted in the next edit. EMPTY output (command failed, gh not authenticated, grep -c exiting 1 on zero) means UNVERIFIED and the entry stays live — a check must never retire an entry by failing.",
+    "`ref` (optional) reads the anchor at a git ref instead of the working tree — for decisions posed on a branch that has not landed.",
+    "Retire an entry by deleting it in the same PR that records the ruling. Do not leave answered entries here to rot."
+  ],
+  "decisions": [
+    {
+      "id": "R1",
+      "owner": "Thomas (serrynaimo) or wabisabiyo",
+      "kind": "admin action",
+      "quick": true,
+      "raised": "2026-09-13",
+      "ask": "Add `Corpus Goldens Present` and `Repo-Wide Invariants` to ruleset 18543507's required status checks (Settings → Rules → Rulesets → \"Merge queue for unstable\" → Require status checks). Marked ACCEPT by Meng on the housekeeping bench 2026-09-13; both check names are exactly as GitHub reports them on every PR. Verified 2026-09-15: `mengwong` is an org MEMBER (permissions: push, not admin) — a PUT to the ruleset via `gh api` returned 404 — and the only admins on legalese/l4-ide are the two org owners, serrynaimo and wabisabiyo. So the click is Thomas's, not Meng's; Meng said \"do it\" on 2026-09-15 and the ask is now relayed.",
+      "unblocks": "R2 (drop the TypeScript job's duplicate format:check) — the xpile-docassemble session is idle on it",
+      "source": {
+        "file": ".github/workflows/pr-checks.yml",
+        "anchor": "name: Repo-Wide Invariants"
+      },
+      "verify": {
+        "cmd": "gh api repos/legalese/l4-ide/rulesets/18543507 --jq '.rules[]|select(.type==\"required_status_checks\")|.parameters.required_status_checks[].context' | grep -c 'Repo-Wide Invariants' || true",
+        "pendingWhen": "^0$"
+      }
+    },
+    {
+      "id": "WHOSE",
+      "owner": "Meng",
+      "kind": "go / no-go",
+      "quick": true,
+      "raised": "2026-09-14",
+      "ask": "lang/whose-opening: 30 commits, self-verified only (etc/verify-branch.sh green before the rebase; the final adversarial round was killed twice by session limits). REBASED by GM 2026-09-15 onto unstable e578654c — 68b1ae35 → 74d4e7fb, clean, 0 behind, NOT rebuilt after the rebase. Options: (a) GM runs a refuter panel, then PRs — recommended; (b) park; (c) PR as-is. The narrowing rule Meng cut on 2026-09-13 is already reflected (a later DECIDE clause is refused outright). WHOSE itself is unbuilt; the branch is S2/S3 section-binder work. UPDATE 2026-09-16: R5 field opening has LANDED (#403), so the sequencing constraint on WHOSE (EVERY-EACH §13.6 'sequenced after R5') is discharged; the go/no-go is the only thing left.",
+      "unblocks": "the EVERY-EACH §13.6 direction Meng endorsed 2026-09-08",
+      "source": {
+        "file": "specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md",
+        "anchor": "### 13.6 `WHOSE`, and the R-Q4 problem it does not escape — OPEN, raised by Meng 2026-09-08"
+      }
+    },
+    {
+      "id": "Ground 8",
+      "owner": "Meng",
+      "kind": "interpretation",
+      "quick": true,
+      "raised": "2026-08",
+      "ask": "housing-act-ground-8.l4 bundles `weekly or fortnightly` as one RentPeriod variant and applies 13× the per-period rent uniformly, so a fortnightly tenant is tested at ~26 weeks — under-stating a mandatory-eviction risk. Options in the spec: split the enum (weekly / fortnightly, 6.5× threshold); normalise fortnightly → weekly-equivalent; or constrain the demo to weekly/monthly. The interpretation note at ~lines 92–102 of the .l4 is where the answer belongs.",
+      "unblocks": "the Lawmaker demo inviting real tenancies rather than the four scripted fixtures",
+      "source": {
+        "file": "specs/todo/housing-act-citizen-wizard-demo.md",
+        "anchor": "left for Meng to decide"
+      }
+    },
+    {
+      "id": "TS shape",
+      "owner": "Meng",
+      "kind": "design ruling",
+      "quick": false,
+      "raised": "2026-09-11",
+      "ask": "Which of the three TypeScript backend shapes ships first: a source emitter from the constitutive-core IR, an interpreter over the DMN XML we already export, or a new IR target via zen-engine JDM. Also gated by Q9 (the open/commercial line). The spec (§1.3.3) records the fork and no recommendation; nothing is built and nobody is waiting, so this is a ruling to take when the exporter is scheduled, not before.",
+      "unblocks": "step 1 of the GP-language backend roadmap (PR #371, merged)",
+      "source": {
+        "file": "specs/roadmap/general-purpose-language-backends.md",
+        "anchor": "which of\nthe three TypeScript shapes ships first is a design decision for Meng"
+      }
+    },
+    {
+      "id": "Drafts",
+      "owner": "Meng",
+      "kind": "triage",
+      "quick": true,
+      "raised": "2026-09-15",
+      "ask": "Three draft PRs against unstable with no motion: #216 (DMN differential handoff, 2026-08-04, marked 'not for merge' by its own author), #309 (call-graph materiality spec+paper, 2026-08-27, TypeScript check failing since), #326 (YC SAFE product-line spec, 2026-09-03). Close, finish, or leave as parked? A draft that is never going to merge should be closed so the in-flight pane means something.",
+      "unblocks": "an in-flight pane that only lists things in flight",
+      "source": {
+        "file": "etc/status-board.mjs",
+        "anchor": "Everything actually moving"
+      },
+      "verify": {
+        "cmd": "gh pr list --repo legalese/l4-ide --state open --base unstable --json number,isDraft --jq '[.[]|select(.isDraft)]|length'",
+        "pendingWhen": "^[1-9]"
+      }
+    },
+    {
+      "id": "Branches",
+      "owner": "Meng",
+      "kind": "triage — mostly done",
+      "quick": false,
+      "raised": "2026-09-15",
+      "ask": "Rebase pass 2026-09-15 (Meng's suggestion), pre-rebase SHAs kept as local tags pre-rebase/*. PUSHED clean, 0 behind: lang/whose-opening (30), docs/prerelease-status-correction (1), ci/unstable-prerelease-main (1). DELETED on Meng's word (2026-09-15 evening): the two sg-child-support twins (subject lives in canon since 08-26), the five that collapsed to zero on rebase (r4-readsets, r2-vocab, r9-milestone, go-cost-accounting, backend-portfolio), and corpus-style (superseded by #386). STILL HELD on conflicts: applies-corpus-survey (GM takes it with A1–A5 — unstable gained its own §11 from #318, so the branch's §11 becomes §12), ci/skills-layout (GM's; waits on Thomas's Q1), ladder-false-vs-unknown (Aug 2, +1, goldens conflict; #191 merged from a different branch — needs a look). SKIPPED on purpose: backup/refuse-pre-drop (a backup), webchat-mobile-ui and `origin` (Thomas's), claude/computational-law-intro-k2n1zu (a live cloud session's), claude/unstable-branch-reorganization-6cle91 (release-train tooling, deferred). OPEN QUESTION it surfaced, not a copy job: how does the go pipeline address a canon-hosted subject — every etc/go/subjects/* registration points at jl4/examples/legal paths.",
+      "unblocks": "a 'committed, not PR'd' pane short enough to read",
+      "source": {
+        "file": "etc/status-board.mjs",
+        "anchor": "Committed, not PR"
+      }
+    },
+    {
+      "id": "Wave 3",
+      "owner": "Meng",
+      "kind": "scope",
+      "quick": false,
+      "raised": "2026-09-06",
+      "deferred": "2026-09-15 — Meng: \"don't worry about unstable→main; we work off unstable\"",
+      "ask": "Wave 3 of the unstable→main topic slices needs Meng's go on how the tree is sliced. Deferred by Meng on 2026-09-15; recorded in RELEASE-MODEL-SPEC.md's header in the same PR as this entry. Listed so nobody re-raises it.",
+      "unblocks": "nothing anyone is waiting on",
+      "source": {
+        "file": "specs/todo/RELEASE-MODEL-SPEC.md",
+        "anchor": "needs Meng's go on scope"
+      }
+    },
+    {
+      "id": "EVERY residue",
+      "owner": "Meng",
+      "kind": "scope",
+      "quick": false,
+      "raised": "2026-09-08",
+      "ask": "CORRECTED 2026-09-15 — an earlier version of this card said the EVERY/EACH arc was ruled-not-built; that was a stale memory note and was false of the tree. BUILT AND MERGED: the front end (#360, 2026-09-07), evaluation (#370, 2026-09-08) and `EVERY Cast v IN xs` (#374, 2026-09-08) — EVERY + WHO filter, ONCE ALL HAVE barrier, UPON EACH fork, the distributive form, all four modals, the join deadline, nesting; 14 witnesses under jl4/examples/ok/every/ with goldens. NOT BUILT, each verified against Lexer.hs/Parser.hs on unstable e578654c: (1) R-T3 blame set §6.1 — a failed barrier names ONE non-completer, roll order, because ReasonForBreach carries one party; (2) §5.2 deadline anchor — LEST anchored at the revealing event, not the missed deadline, deliberately matching the single-party path so it is one change in one place; (3) §11.1 BarrierRuntime — an unfinished barrier's residual lacks the join line (only a resuming service cares); (4) per-member performer/actor check; (5) §13.2 partial-completion visibility and §2.2.7.4 count/measure joins (RT4 `Aggregate OF`, RT5 `SOME m OF` — TKSome is lexed, zero parser uses); (6) R-Q7A–C anchors `OF THE JOIN/DEADLINE/ARMING` + date expression §5.1.1 — zero parser mentions; (7) R-X5 AFTER/BEFORE edges, R-X6 early-act nullity, T1 origin §5.1.2 — AFTER/BEFORE not lexed; (8) §5.1.3 anchor as trace expression — direction only; (9) WHOSE §13.6 — endorsed as a direction, not ruled, not lexed (lang/whose-opening is S2/S3 section work, not this). Also owed: doc/reference/regulative/README.md:86,96 still teach `WITHIN 5 days OF notice`, a parse error (§2.5). Separate arc, also not built: R5 field opening for rule bodies (IMPLICIT-PROPS-DESIGN.md §11.7, :2193). The question for Meng is sequencing: which of (1)–(9) first.",
+      "unblocks": "the next EVERY build session starting from the true residue rather than re-deriving it",
+      "source": {
+        "file": "specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md",
+        "anchor": "### 11.0.1 What phase 2 built, and what it did not"
+      }
+    },
+    {
+      "id": "Plugin Q1",
+      "owner": "Thomas",
+      "kind": "design ruling",
+      "quick": true,
+      "raised": "2026-09-09",
+      "ask": "ci/skills-layout (+6, pushed 2026-09-11, no PR) moves skills/writing-l4-rules to .claude/skills/, deletes the symlink, and adds etc/build-plugin-bundle.mjs. Right only if Q1 = 'the plugin moves to its own repo' — and legalese/l4-plugin now exists, so Q1 is easier to answer yes than when posed. Thomas chose skills/ in 4c4c5ed4 for Agent Plugins 1.0; it is his call. Meng may want to nudge.",
+      "unblocks": "the plugin bundle being regenerable by anyone, not one machine",
+      "source": {
+        "file": "specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md",
+        "anchor": "Q1",
+        "ref": "origin/ci/skills-layout"
+      }
+    },
+    {
+      "id": "HITL debt",
+      "owner": "Meng",
+      "kind": "standing",
+      "quick": false,
+      "raised": "2026-09-13",
+      "ask": "Meng's own note on the housekeeping bench: \"there is generally a HITL debt — Meng needs to read and tweak encoded l4, and the rest of the system needs to adapt its encoding style guidance to track.\" No mechanism exists for that loop yet. Not a ruling; a standing obligation the board should keep visible until a mechanism is proposed.",
+      "unblocks": "encoding-style guidance that tracks what Meng actually changes",
+      "source": {
+        "file": "skills/writing-l4-rules/references/drafting-patterns.md",
+        "anchor": "Ruling (Meng, 2026-09-13)"
+      }
+    },
+    {
+      "id": "APPLIES I1",
+      "owner": "UNASSIGNED — a build session (ultracode)",
+      "kind": "queued build",
+      "quick": false,
+      "raised": "2026-09-16",
+      "ask": "Unblocked by A1–A5 (PR #400, MERGED e0f7dc91). Brief: /Users/Shared/claude-collab-legalese-gm/inbox/2026-09-16T0130Z-BRIEF-applies-i1.md. Phase 0 measures the two things §12.3.3 A4 says are owed (can a § heading's name double as a function name; spellings for the four conjunct projections — proposed, Meng rules) and where each conjunct comes from in the AST today; Phase 1 derives the read `` `<label>` p `` for every §-labelled node as names in scope after typechecking, MAYBE BOOLEAN, inForce TRUE when unpinned; the pilots (Wills Act s 5(9)/s 27, Jersey Art 10(4)/27(1)) diff generated against hand-rolled. Claim it in the outbox before starting.",
+      "unblocks": "the APPLIES read side moving from spec to compiler; §9.6's stratification check gets something to attach to",
+      "source": {
+        "file": "specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md",
+        "anchor": "#### 12.3.4 Proposed sequencing, for whoever picks this up"
+      }
+    },
+    {
+      "id": "R5 rulings",
+      "owner": "Meng",
+      "kind": "design ruling",
+      "quick": true,
+      "raised": "2026-09-16",
+      "ask": "R5 field opening MERGED as #403 (unstable 7161f864, 2026-09-16). Three rulings the build left open, each a coarser answer today rather than a wrong one: (1) the TIER of constructors and top-level definitions relative to opened fields — today an opened field wins and OpenedFieldShadowsDefinition WARNS (§11.7 ranks 'selectors' last and names neither); (2) whether opening extends INTO regulative, EVENT and inert bodies — today nothing there opens (kept so nothing that resolved before R5 resolves differently; probate-administration-act.l4:2744's `the grantee` still names the constructor), and until it does the EXACTLY-rule interaction has no live case; (3) record SYNONYMS and UNTYPED binders (`GIVEN x`, head-only params) — today they do not open, ~10 sites read `p's f` unchanged. Mark accept/modify per item; the owning section is IMPLICIT-PROPS-DESIGN §11.7.1.",
+      "unblocks": "rule bodies reading `bankrupt` bare inside PARTY … MUST …; a rank with no silent rung",
+      "source": {
+        "file": "specs/todo/IMPLICIT-PROPS-DESIGN.md",
+        "anchor": "#### 11.7.1 What the build built, and what it did not"
+      }
+    },
+    {
+      "id": "state-graphs",
+      "owner": "GM",
+      "kind": "small PR, gated",
+      "quick": true,
+      "raised": "2026-09-16",
+      "ask": "jl4/examples/state-graphs/*.dot (37 files) are drifted against the exporter on unstable — pre-existing, found by #399's consistency pass. One `regenerate.sh` run and one commit, AFTER #395 (the join line) and #399 merge so the regenerated set is stable; read the diff — it should be the join-line change plus whatever moved since. Handed to GM by lts-diagrams-2.",
+      "unblocks": "a checked-in state-graph set that matches the exporter",
+      "source": {
+        "file": "jl4/examples/state-graphs/regenerate.sh",
+        "anchor": "regenerate"
+      }
+    },
+    {
+      "id": "Dominators §7",
+      "owner": "GM (papers bench)",
+      "kind": "doc correction, gated",
+      "quick": true,
+      "raised": "2026-09-16",
+      "ask": "paper/bounded-deontics/draft/bd-sections-7-9.tex:83 says 'the dominator query and the verification backends are' not implemented (and paper/formal-methods-in-law/FORMAL-PAPER.md:296 lists the dominator query under 'Designed, not yet built'). That becomes false the moment #399 merges (L4.StateGraph.Dominators, `l4 state-graph --dominators`, doc/reference/regulative/STATE-GRAPH.md). Edit AFTER #399 lands, not before — the anti-drift rule cuts both ways. Handed to GM by lts-diagrams-2.",
+      "unblocks": "the paper agreeing with the tree",
+      "source": {
+        "file": "paper/bounded-deontics/draft/bd-sections-7-9.tex",
+        "anchor": "the dominator query and the verification backends are"
+      }
+    },
+    {
+      "id": "Prune glob",
+      "owner": "Meng (homelab launchd on nye)",
+      "kind": "ops decision",
+      "quick": true,
+      "raised": "2026-09-16",
+      "ask": "The weekly worktree prune never reaches /Volumes/transcend/src/l4wt, and 41 trees live there tonight after lts-diagrams-2 moved 14 idle ones to free the native disk (98% → 23% used). GM's recommendation: add the second glob, but (1) `git worktree lock --reason 'removable volume'` every transcend tree so `git worktree prune` cannot drop their admin entries while the volume is unmounted, and (2) have the job skip the transcend glob when the mount is absent. Also: trees created under the `legalese` login fail with 'dubious ownership' once moved (git checks the owner of .git/worktrees/<name>); mengwong has `safe.directory '/Volumes/transcend/src/l4wt/*'` now, the legalese login would need its own entry. The change lives in the homelab repo — session homelab-fc is idle if you want it done there.",
+      "unblocks": "the prune job covering the trees that actually accumulate",
+      "source": {
+        "file": "etc/verify-branch.sh",
+        "anchor": "worktree"
+      }
+    },
+    {
+      "id": "§7.3 reader",
+      "owner": "Meng (scheduling)",
+      "kind": "human experiment",
+      "quick": false,
+      "raised": "2026-09-16",
+      "ask": "If the §7.3 gate's human reader experiment is to run (as opposed to the LLM proxy in etc/lts-reader-proxy/ on #401), a person has to be scheduled against the three artefacts the proxy already prepared — list / DOT / BPMN per contract, plus the question sheet in the manifest. A GM scheduling item, not an agent one; Meng names the reader.",
+      "unblocks": "the LTS visualiser's human-readability claim resting on a human",
+      "source": {
+        "file": "specs/todo/lexipedia-superset/LTS-VISUALISER.md",
+        "anchor": "7.3"
+      }
+    },
+    {
+      "id": "EXACTLY retirement",
+      "owner": "Meng (confirm PROVIDED) · GM (removal PR by 2026-10-01)",
+      "kind": "merged; sunset scheduled",
+      "quick": false,
+      "raised": "2026-09-16",
+      "ask": "MERGED as #407 (unstable cb07560d, 2026-09-16 07:19Z); smucclaw#955 closed. RULED 2026-09-16 (Meng): sunset 2026-10-01 — EXACTLY removed EVERYWHERE, CONSIDER included; a pinned name in a WHEN is spelled as a guard (two corpus sites to rewrite, both degenerate); R5 notice stays Info with Meng's wording (\"If you wanted a placeholder variable that matches any value, choose a name not already taken.\"); no notice at the action head. Remaining after #407: 10 code-line EXACTLYs (8 warning fixtures, 2 CONSIDER), canon 0. ONE THING FOR MENG: confirm the guard spelling — GM recommends `WHEN <pattern> PROVIDED <cond>` (mirrors the action guard; falls through; non-covering for exhaustiveness); CONSIDER has no guard production today, so this is a small language change to land before the sunset. Then: the removal PR (lexer/parser/printer/warning out, 2 sites, 8 fixtures, docs).",
+      "unblocks": "the 2026-10-01 removal PR; a marker-free pattern language",
+      "source": {
+        "file": "specs/todo/PATTERN-REFERENCE-RULE-SPEC.md",
+        "anchor": "RULED 2026-09-16 (Meng), superseding the deontic-only outcome"
+      }
+    },
+    {
+      "id": "CLAUDE.md §1.0",
+      "owner": "Meng",
+      "kind": "doc correction",
+      "quick": true,
+      "raised": "2026-09-16",
+      "ask": "CLAUDE.md §1.0 says the writing-l4-rules skill and its l4-plugin copy are byte-identical. FALSE today, GM-verified 2026-09-16 against l4-plugin@0c7a23d (2026-09-10): 7 of the skill's files differ (SKILL.md, drafting-patterns.md, gotchas.md, source-patterns 01/05/06/11) and the shipped bundle carries 6 occurrences of the retired term `binder` where this repo has 0 — the term CI sweeps skills/ for. Nobody can regenerate the bundle: etc/build-plugin-bundle.mjs lives only on the unpushed local branch ci/skills-layout. Raised by a peer session and NOT edited on its word (a CLAUDE.md edit needs Meng). ASK: say yes and GM corrects the sentence in the next PR that touches the skill — the EXACTLY sweep (wf_8a91a677-de7) — and re-ports the skill by hand, marked as superseded by the next regeneration.",
+      "unblocks": "a true §1.0; a bundle that does not ship a retired word",
+      "source": {
+        "file": "CLAUDE.md",
+        "anchor": "the copies are **byte-identical**"
+      }
+    }
+  ]
+}

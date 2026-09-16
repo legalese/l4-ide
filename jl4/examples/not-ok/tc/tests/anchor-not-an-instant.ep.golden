@@ -1,0 +1,14 @@
+-- The expression after OF in a WITHIN is an instant: a NUMBER on the trace's
+-- own clock, or a DATE (EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7C). A STRING
+-- is neither, and the refusal names both types it would accept.
+
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+
+DECLARE Action IS ONE OF
+    Pay
+    Deliver
+
+GIVETH A DEONTIC Actor Action
+bad MEANS PARTY Buyer MUST Pay WITHIN 5 OF "next Tuesday"

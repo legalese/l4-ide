@@ -1,0 +1,18 @@
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Sign HAS signer IS AN Actor
+
+closingDate MEANS 20
+theLandlord MEANS Landlord OF "Ms Ng"
+
+GIVETH A DEONTIC Actor Action
+contract MEANS
+    EVERY Tenant t
+        MUST   Sign t
+        WITHIN 14 OF THE ARMING
+        ONCE   ALL HAVE WITHIN 30 OF closingDate
+        HENCE  (PARTY theLandlord MUST Sign theLandlord WITHIN 5 OF THE DEADLINE)
+        LEST   BREACH

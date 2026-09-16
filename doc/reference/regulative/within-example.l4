@@ -1,0 +1,64 @@
+IMPORT prelude
+IMPORT daydate
+-- WITHIN, anchored and not: the examples from README.md's WITHIN section,
+-- with a trace each so the deadline the anchor produces is visible.
+
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF pay HAS amount IS A NUMBER
+                         deliver
+closingDate MEANS 20
+
+-- Simple deadline: 30 units from when the obligation is entered
+GIVETH A DEONTIC Person Action
+simple MEANS PARTY Buyer MUST pay 100 WITHIN 30
+
+-- The cure period runs from when payment fell due, not from the day the
+-- buyer finally paid: due 30 + 5 = 35
+GIVETH A DEONTIC Person Action
+cure MEANS
+  PARTY Buyer MUST pay 100 WITHIN 30
+  HENCE (PARTY Seller MUST deliver WITHIN 5 OF THE DEADLINE)
+  LEST  BREACH
+
+-- "Within 10 days of this agreement": counts from when the outer obligation
+-- was entered, however long the buyer took to pay: due 0 + 10 = 10
+GIVETH A DEONTIC Person Action
+`of this agreement` MEANS
+  PARTY Buyer MUST pay 100 WITHIN 30
+  HENCE (PARTY Seller MUST deliver WITHIN 10 OF THE ARMING)
+  LEST  BREACH
+
+-- An absolute deadline on the trace's own clock: due at 20 + 5 = 25
+GIVETH A DEONTIC Person Action
+absolute MEANS PARTY Seller MUST deliver WITHIN 5 OF closingDate
+
+-- A unit word is ordinary L4: define it and it checks
+GIVEN n IS A NUMBER GIVETH A NUMBER DECIDE n days IS n
+
+GIVETH A DEONTIC Person Action
+`with a unit word` MEANS
+  PARTY Buyer MUST pay 100 WITHIN 30
+  HENCE (PARTY Seller MUST deliver WITHIN 5 days OF THE DEADLINE)
+  LEST  BREACH
+
+-- A DATE anchor on a date-serial trace: by 30 June 2026
+GIVETH A DEONTIC Person Action
+`by thirty june` MEANS PARTY Seller MUST deliver WITHIN 0 OF (YMD 2026 6 30)
+
+#TRACE cure AT 0 WITH
+  PARTY Buyer DOES pay 100 AT 8
+  PARTY Seller DOES deliver AT 36
+
+#TRACE `of this agreement` AT 0 WITH
+  PARTY Buyer DOES pay 100 AT 8
+  PARTY Seller DOES deliver AT 11
+
+#TRACE absolute AT 3 WITH
+  PARTY Seller DOES deliver AT 26
+
+#TRACE `with a unit word` AT 0 WITH
+  PARTY Buyer DOES pay 100 AT 8
+  PARTY Seller DOES deliver AT 35
+
+#TRACE `by thirty june` AT (DATE_SERIAL (YMD 2026 6 1)) WITH
+  PARTY Seller DOES deliver AT (DATE_SERIAL (YMD 2026 7 1))

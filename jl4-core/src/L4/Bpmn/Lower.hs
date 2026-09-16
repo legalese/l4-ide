@@ -1607,9 +1607,24 @@ raceArms _ task bnd = (task, bnd)
 -- the node is inert instead.
 boundaryDoc :: Maybe DeonticModal -> Maybe Text -> Text
 boundaryDoc (Just DMustNot) (Just d) =
-  "the deadline passes ("
-    <> d
-    <> ") with the prohibited act not performed: the prohibition is respected, so this is the HENCE arm"
+  "the deadline passes "
+    <> parenthesised d
+    <> " with the prohibited act not performed: the prohibition is respected, so this is the HENCE arm"
+ where
+  -- an applied duration arrives already bracketed ('L4.StateGraph.edgeText'),
+  -- and "(( … ))" is not what a reader should see
+  parenthesised x
+    | oneGroup x = x
+    | otherwise = "(" <> x <> ")"
+  oneGroup x = case Text.unpack x of
+    '(' : rest -> closesAtEnd (1 :: Int) rest
+    _ -> False
+  closesAtEnd 0 cs = null cs
+  closesAtEnd _ [] = False
+  closesAtEnd n (c : cs) = case c of
+    '(' -> closesAtEnd (n + 1) cs
+    ')' -> closesAtEnd (n - 1) cs
+    _ -> closesAtEnd n cs
 boundaryDoc (Just DMustNot) Nothing =
   "the prohibition is respected once its deadline passes with the act not \
   \performed, so this is the HENCE arm — but the rule sets no WITHIN, so \
@@ -1677,22 +1692,41 @@ boundaryTrigger opts modal elemId lestLabel = \case
             \duration needs editing"
         ]
       )
-    Unparsed ->
-      ( WhenCondition raw
-      , [ note
-            "P-DEADLINE"
-            Blocking
-            ( "Deadline "
-                <> quoted raw
-                <> " is not an ISO 8601 duration and no unit could be read from \
-                   \it, so the boundary event carries the text verbatim as a \
-                   \condition rather than a timer carrying a duration we \
-                   \invented."
-            )
-            "the deadline as a machine-checkable timer"
-        ]
-      )
+    Unparsed -> (WhenCondition raw, [unparsedNote raw])
  where
+  -- The shapes 'parseDuration' cannot read, each said as what it is
+  -- (adversarial pass of 2026-09-16, R1-2: an anchored deadline used to be
+  -- reported as a missing unit, which is not what is wrong with it).
+  unparsedNote raw
+    -- An anchored WITHIN (R-Q7, §5.1.1): the unit may well be readable; what
+    -- this exporter cannot do is resolve the anchor.
+    | Just anchor <- deadlineAnchor raw =
+        note
+          "P-DEADLINE"
+          Blocking
+          ( "Deadline "
+              <> quoted raw
+              <> " is anchored: the duration counts from "
+              <> anchor
+              <> ", and this exporter does not resolve anchors \8212 not even \
+                 \where the anchor is the instant this activity starts \8212 so \
+                 \the boundary event carries the text verbatim as a condition \
+                 \rather than a timer."
+          )
+          "the deadline as a machine-checkable timer; the anchor survives only \
+          \in the condition's text"
+    | otherwise =
+        note
+          "P-DEADLINE"
+          Blocking
+          ( "Deadline "
+              <> quoted raw
+              <> " is not an ISO 8601 duration and no unit could be read from \
+                 \it, so the boundary event carries the text verbatim as a \
+                 \condition rather than a timer carrying a duration we \
+                 \invented."
+          )
+          "the deadline as a machine-checkable timer"
   note c sev msg what =
     MkFidelityNote
       { code = c
@@ -1735,7 +1769,9 @@ data DurationResult
 -- L4's @WITHIN@ takes an expression, and 'L4.StateGraph.labelDeadline' is that
 -- expression pretty-printed — usually a bare number, sometimes a whole
 -- expression like @terms's defaultAfterDays@ that no amount of parsing will
--- turn into a duration.
+-- turn into a duration, and sometimes an anchored form, @5 OF THE JOIN@,
+-- whose anchor nothing here resolves ('deadlineAnchor' tells that case
+-- apart, so the note can say which it met).
 parseDuration :: DeadlineUnitPolicy -> Text -> DurationResult
 parseDuration policy raw
   | Text.null t = Unparsed
@@ -1750,6 +1786,45 @@ parseDuration policy raw
 
 isNat :: Text -> Bool
 isNat t = not (Text.null t) && Text.all isDigit t
+
+-- | The anchor of an anchored closing edge — @WITHIN d OF anchor@ (R-Q7,
+-- EVERY-EACH-QUANTIFIER-SPEC §5.1.1) — read off the label text: the words
+-- after the first @OF@ that stands outside every bracket and outside every
+-- backticked name.
+--
+-- The label is the source form ('L4.StateGraph.edgeText'), which brackets an
+-- applied duration — @(f OF x) OF THE JOIN@, @(2 TIMES 7) OF THE ARMING@ —
+-- so an @OF@ at bracket depth zero is the anchor and only the anchor; the
+-- @OF@ of an unanchored application, @(f OF x)@, sits inside its brackets.
+-- A backticked name is one word whatever it contains ('L4.Lexer' reads
+-- @`days OF grace`@ as one identifier): its @OF@ is no anchor and its
+-- brackets count for nothing ('labelWords'). Without that, @WITHIN `days OF
+-- grace`@ was reported as anchored at @grace`@ (adversarial pass of
+-- 2026-09-16, round 2, R2-SEM-2).
+deadlineAnchor :: Text -> Maybe Text
+deadlineAnchor raw = go (0 :: Int) (labelWords (Text.strip raw))
+ where
+  go _ [] = Nothing
+  go 0 ("OF" : rest@(_ : _)) = Just (Text.unwords rest)
+  go d (w : rest) = go (d + bracketDepth w) rest
+
+-- | 'Text.words', except that a backtick-quoted identifier is one word,
+-- backticks included — @(`period OF` OF 3) OF THE ARMING@ splits as @(@,
+-- @`period OF`@, @OF@, @3)@, @OF@, @THE@, @ARMING@. An unpaired backtick
+-- quotes to the end of the text; none reaches a label, because the lexer
+-- refuses a quoted identifier with no closing backtick ('L4.Lexer').
+labelWords :: Text -> [Text]
+labelWords = concat . zipWith segment (cycle [False, True]) . Text.splitOn "`"
+ where
+  segment quoted s
+    | quoted = ["`" <> s <> "`"]
+    | otherwise = Text.words s
+
+-- | How many brackets a label word opens, net; none for a backticked name.
+bracketDepth :: Text -> Int
+bracketDepth w
+  | "`" `Text.isPrefixOf` w = 0
+  | otherwise = Text.count "(" w - Text.count ")" w
 
 -- | Already a duration: @P30D@, @PT2H@, @P1M@ …
 --

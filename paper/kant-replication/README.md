@@ -403,8 +403,8 @@ relative-time convention removes the type safety producing one of those wins.
 | `artifacts/A3*.txt`         | the paper's own prompts, transcribed from Appendix A.3                                                                                   |
 
 **`artifacts/encodings/` is an experimental record and is deliberately frozen.** `ref-inert.l4` is
-the ancestor of the maintained corpus module at `jl4/examples/legal/chubb/chubb.l4`, and
-`ref-guarded.l4` of `jl4/examples/legal/chubb/denovo/chubb-denovo.l4`. **Those corpus copies are
+the ancestor of the maintained corpus module at `jl4/examples/canon/us/chubb-hospital-cash/blind-inert/chubb.l4`, and
+`ref-guarded.l4` of `jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4`. **Those corpus copies are
 canonical and are the ones `jl4-test` defends**; these are kept unchanged because a blind artifact
 that gets maintained is no longer a blind artifact. `ref-record.l4` has no corpus copy — the
 third-ranked arm was not deposited.

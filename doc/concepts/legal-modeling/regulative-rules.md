@@ -528,22 +528,22 @@ When a deadline failure has a remedy ("pay within 30 or pay extra within 60"), e
 
 ## Summary
 
-| Concept   | Purpose                                 | Syntax                                              |
-| --------- | --------------------------------------- | --------------------------------------------------- |
-| MUST      | Obligation                              | `PARTY x MUST action`                               |
-| MAY       | Permission                              | `PARTY x MAY action`                                |
-| SHANT     | Prohibition (polarity flips!)           | `PARTY x SHANT action`                              |
-| DO        | Bare form; behaves as MUST              | `PARTY x DO action`                                 |
-| WITHIN    | Relative deadline                       | `WITHIN duration`                                   |
-| HENCE     | Desirable-outcome branch                | `HENCE nextRule`                                    |
-| LEST      | Undesirable-outcome branch              | `LEST consequence` (terminal or another obligation) |
-| PROVIDED  | Guard on action matching                | `MUST action PROVIDED condition`                    |
-| EXACTLY   | Equality match instead of pattern match | `MUST EXACTLY expr`                                 |
-| BREACH    | Terminal failure state                  | `LEST BREACH BY party BECAUSE reason`               |
-| FULFILLED | Terminal success state                  | `HENCE FULFILLED`                                   |
-| RAND      | Parallel: all must fulfil               | `rule1 RAND rule2`                                  |
-| ROR       | Parallel: any one suffices              | `rule1 ROR rule2`                                   |
-| #TRACE    | Simulate against a timeline             | `#TRACE rule AT t WITH events…`                     |
+| Concept     | Purpose                                                                                     | Syntax                                              |
+| ----------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| MUST        | Obligation                                                                                  | `PARTY x MUST action`                               |
+| MAY         | Permission                                                                                  | `PARTY x MAY action`                                |
+| SHANT       | Prohibition (polarity flips!)                                                               | `PARTY x SHANT action`                              |
+| DO          | Bare form; behaves as MUST                                                                  | `PARTY x DO action`                                 |
+| WITHIN      | Relative deadline                                                                           | `WITHIN duration`                                   |
+| HENCE       | Desirable-outcome branch                                                                    | `HENCE nextRule`                                    |
+| LEST        | Undesirable-outcome branch                                                                  | `LEST consequence` (terminal or another obligation) |
+| PROVIDED    | Guard on action matching                                                                    | `MUST action PROVIDED condition`                    |
+| _(default)_ | A name in an action requires the value it names; a name that names nothing is a placeholder | `MUST action name`                                  |
+| BREACH      | Terminal failure state                                                                      | `LEST BREACH BY party BECAUSE reason`               |
+| FULFILLED   | Terminal success state                                                                      | `HENCE FULFILLED`                                   |
+| RAND        | Parallel: all must fulfil                                                                   | `rule1 RAND rule2`                                  |
+| ROR         | Parallel: any one suffices                                                                  | `rule1 ROR rule2`                                   |
+| #TRACE      | Simulate against a timeline                                                                 | `#TRACE rule AT t WITH events…`                     |
 
 Key conceptual takeaways:
 

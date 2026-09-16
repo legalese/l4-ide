@@ -231,7 +231,7 @@ When the source text says "must", "may", "shall not", or mentions a deadline, us
 ```
 PARTY   actor
 MUST    action                 -- or MAY / SHANT / DO
-WITHIN  deadline               -- NUMBER (often derived from a DATE/TIME/DATETIME)
+WITHIN  deadline [OF anchor]   -- NUMBER (often derived from a DATE/TIME/DATETIME); anchor: THE JOIN | THE DEADLINE | THE ARMING | a NUMBER/DATE instant
 HENCE   nextState              -- optional; consequence on success
 LEST    penaltyState           -- optional; consequence on failure
 ```
@@ -272,13 +272,13 @@ Both type names may be backticked multi-word names, as in `` GIVETH A DEONTIC `A
 
 Actions with fields are **enum constructors** — apply them to arguments like any function (`` `pay invoice` amt recipient ``). Don't use `WITH` inside a `MUST`/`MAY` action; `WITH` is for record construction, not enum constructors.
 
-**Write `BECAUSE "reason"` on every `LEST BREACH`.** The language accepts the bare `LEST BREACH` and `LEST BREACH BY <party>` too — that is why you will see all three spellings — but the reason string is what a trace prints back, and it is what a legal reviewer or a downstream system reads. A breach with no reason reports the failure without saying which clause failed.
+**Write `BECAUSE "reason"` on every `LEST BREACH`.** The language accepts the bare `LEST BREACH`, `LEST BREACH BY <party>` and `LEST BREACH BY LIST <party>, <party>` too — that is why you will see the other spellings — but the reason string is what a trace prints back, and it is what a legal reviewer or a downstream system reads. A breach with no reason reports the failure without saying which clause failed. (A list literal with nobody in it, `BY EMPTY`, is a check-time error.)
 
 **When the duty falls on a group, not one named party, use `EVERY`.** `PARTY` names one actor; `EVERY` binds the same obligation to every member of a list and gives you one place to hang the follow-on:
 
 ```l4
 EVERY Tenant t IN tenants          -- one obligation per tenant, all live at once
-    MUST   Sign (EXACTLY t)
+    MUST   Sign t
     WITHIN 14
     ONCE   ALL HAVE                -- the join line: fires once, at the last signature
     HENCE  `the tenancy begins`
@@ -289,11 +289,11 @@ Three things about it are non-obvious enough that a general-purpose model gets t
 
 1. **The group must be a list, given after `IN`.** Without it the rule parses and type-checks and then **refuses at run time** — so `l4 check` passing is not evidence it will run.
 2. **The join line is mandatory whenever there is a `HENCE` or `LEST`**, and picks the meaning: `ONCE ALL HAVE` fires once when the last member acts (a **barrier**); `UPON EACH` fires once per member as each acts (a **fork**). There is no default.
-3. **Write `EXACTLY t` in the action.** A bare `t` there is a fresh pattern name matching _anyone_, so a stranger's act would discharge the member's duty.
+3. **`t` in the action already refers to the member.** A bare name in an action pattern refers to whatever it names, if it names anything in scope — `t` is the quantifier's own variable, so `MUST Sign t` means the member signs. Only a name that names _nothing_ in scope (or only a field selector of the action's own record type) is a fresh wildcard. `EXACTLY t` still parses but is the deprecated spelling of the same reference; write plain `t`.
 
 Do **not** write `EVERY Tenant t WHO elem t tenants`: that is the pre-2026-09-08 spelling of the roll, deprecated, and it still runs with no warning of any kind. `WHO elem t xs` becomes `IN xs`; `WHO elem t xs AND p` becomes `IN xs WHO p`.
 
-Full treatment — `RAND`/`ROR` composition, `PROVIDED` guards, `EXACTLY` matching, `EVERY` and its join lines, recursive obligations, and `#TRACE` simulation — is in [references/regulative.md](references/regulative.md).
+Full treatment — `RAND`/`ROR` composition, `PROVIDED` guards, action-pattern reference and wildcard matching, `EVERY` and its join lines, recursive obligations, and `#TRACE` simulation — is in [references/regulative.md](references/regulative.md).
 
 ### 6. Validate with the `l4` CLI
 

@@ -17,10 +17,10 @@ EVERY Cast v WHO condition     -- only those for which the condition holds
 
 EVERY Cast v [IN list] [WHO condition]
     MUST/MAY/SHANT/DO action
-    [WITHIN deadline]              -- bounds each act
-    [ONCE ALL HAVE [WITHIN deadline]]   -- the barrier: once, when ALL of them have acted
-     -- or --                           -- (pick one; this WITHIN bounds the whole)
-    [UPON EACH     [WITHIN deadline]]   -- the fork: once PER member who acts
+    [WITHIN deadline [OF anchor]]  -- bounds each act
+    [ONCE ALL HAVE [WITHIN deadline [OF anchor]]]   -- the barrier: once, when ALL of them have acted
+     -- or --                                       -- (pick one; this WITHIN bounds the whole)
+    [UPON EACH     [WITHIN deadline [OF anchor]]]   -- the fork: once PER member who acts
     [HENCE consequent]
     [LEST alternative]
 ```
@@ -58,7 +58,7 @@ theLandlord MEANS Landlord OF "Ms Ng"
 
 GIVETH A DEONTIC Actor Action
 `the tenancy begins` MEANS
-    PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 5
+    PARTY theLandlord MUST Deliver theLandlord what WITHIN 5
 ```
 
 With those declarations:
@@ -85,7 +85,7 @@ GIVETH A DEONTIC Actor Action
 `the tenants who are not Carol sign` MEANS
     EVERY Tenant t IN tenants
         WHO    NOT (t EQUALS (Tenant OF "Carol"))
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
 ```
 
@@ -98,7 +98,7 @@ The condition names the variable itself — `t` is in scope inside `WHO`, which 
 ```l4
 GIVETH A DEONTIC Actor Action
 `sign by the due date` MEANS
-    EVERY Tenant t MUST Sign (EXACTLY t) WITHIN due
+    EVERY Tenant t MUST Sign t WITHIN due
     WHERE
         due MEANS 14
 ```
@@ -121,7 +121,7 @@ tenants MEANS LIST (Tenant OF "Alice"), (Tenant OF "Bob"), (Tenant OF "Carol")
 GIVETH A DEONTIC Actor Action
 `all tenants sign` MEANS
     EVERY Tenant t IN tenants      -- the roll: these three, and nobody else
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -136,7 +136,7 @@ Read it aloud and it says what it does: _every tenant t in tenants must sign, wi
 EVERY Tenant t
     IN     tenants
     WHO    NOT (t EQUALS (Tenant OF "Carol"))
-    MUST   Sign (EXACTLY t)
+    MUST   Sign t
     WITHIN 14
 ```
 
@@ -162,7 +162,7 @@ This is the same habit the language has elsewhere: where two readings are possib
 Four details worth knowing:
 
 - **The roll is read once**, when the rule meets its event stream, and the group is fixed from then on. Somebody who joins the list later does not join a group that is already running, and somebody who leaves it is still counted and still blamed. That is deliberate: a group that quietly changed size would quietly change what the rule means. (The design calls this "the cast is evaluated once at arming"; changing a running group is meant to need an explicit act, which is not built.)
-- **An empty roll means an empty group**, and an empty group has nothing outstanding. A barrier over nobody is achieved immediately and its `HENCE` fires at once, because "all of them have acted" is true when there are none of them. If that is not what you want, guard the rule with an `IF`. One trap follows from it: an empty group whose `HENCE` leads back to the same rule never consumes an event, so it goes round forever and the run ends with a recursion-depth message rather than an answer.
+- **An empty roll means an empty group**, and an empty group has nothing outstanding. A barrier over nobody is achieved immediately — "all of them have acted" is true when there are none of them — and its `HENCE` fires at once, with one exception: the `ONCE` line's `WITHIN` still applies to the empty group as to any join, so if that `WITHIN` is anchored to an instant already past when the rule is entered (`ONCE ALL HAVE WITHIN 5 OF 0`, entered at 10), the deadline has been missed by nobody in particular and the `LEST` fires instead. If either is not what you want, guard the rule with an `IF`. One trap follows from it: an empty group whose `HENCE` leads back to the same rule never consumes an event, so it goes round forever and the run ends with a recursion-depth message rather than an answer.
 - **The roll cannot mention the member.** `EVERY Tenant t IN (peersOf t)` asks the list to know its own answer: the list is read once, before there is anybody to be a member, so there is no `t` for it to mean yet. The checker rejects it, and — because the member's name is simply not in scope there — the message you get is the general one, _"I could not find a definition for the identifier t"_. That wording is poorer than the mistake deserves and we know it; the same is true of a join line's `WITHIN`, for the same reason, and the two are meant to get a better message together. To narrow the group by something about each member, put that in the `WHO` condition, where the member **is** in scope: `EVERY Tenant t IN tenants WHO isAdult t`.
 
   **One sharp edge in that, worth knowing.** What the checker actually rejects is a name it cannot find. If your file happens to define something _else_ called `t` at the top level, then the `t` inside `IN` quietly means **that** one, and nothing is reported — so the same letter would mean the top-level thing in the roll and the member everywhere else. This is the ordinary rule that an inner name only hides an outer one where the inner name is in scope, and the join line's deadline has the same edge. The way to stay clear of it is the way you would anyway: give the member a name nothing else in the file uses.
@@ -217,18 +217,37 @@ EVERY Tenant t IN tenants
 
 draws the three from `tenants`, then keeps the two the condition allows. Nothing is ambiguous and nothing is silently dropped — and note that this is **not** the deprecated spelling, because the roll is written outright. An `elem` condition beside an `IN` roll is an ordinary condition, and there is nothing wrong with it. Worked examples of both spellings side by side are in `jl4/examples/ok/every/run-in.l4`.
 
-## The action: write EXACTLY to mean the member
+## The action: the member's own name means the member
 
-The action after `MUST` is a **pattern**, exactly as it is after `PARTY` (see [EXACTLY](README.md#exactly-exact-action-matching)). A bare name in a pattern is a _new_ name that matches anything. So `MUST Sign t` would not mean "t signs": it would introduce a second `t` that matches any signer at all, and a stranger's signature would discharge the tenant's duty.
-
-The checker refuses that spelling and says what to write instead:
+The action after `MUST` is a **pattern**, exactly as it is after `PARTY` (see
+[Action Patterns: Reference or Wildcard](README.md#action-patterns-reference-or-wildcard)).
+`t` is the quantifier's own variable, so it is a name already in scope — and a
+name in an action that is already in scope requires that value:
 
 ```l4
-EVERY Tenant t MUST Sign t WITHIN 14            -- ERROR: rebinds t; write EXACTLY t
-EVERY Tenant t MUST Sign (EXACTLY t) WITHIN 14  -- the member signs
+EVERY Tenant t MUST Sign t WITHIN 14  -- t is the quantifier's own variable: the member signs
 ```
 
-Other arguments of the action may still be patterns. `MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount` pins the payer and the payee and binds `amount` to whatever was paid; `amount` is then in scope in `PROVIDED`, in `HENCE` and in `LEST`, as it is for a `PARTY` rule.
+`MUST Sign someoneElse`, with a name that is not the quantifier's variable and
+names nothing else either, is a different case: it introduces a fresh
+placeholder that matches any signer, and a stranger's signature would
+discharge the tenant's duty. The rule is the same one that holds everywhere
+else in an action: a name that refers to something requires it, and a name
+that refers to nothing is a wildcard. (Before this rule shipped, `t` had to be
+written `EXACTLY t` to make this reference explicit, and writing the bare
+`t` was refused outright, naming `EXACTLY t` as the fix. `EXACTLY` still
+parses and still works; it just is not needed here any more.)
+
+The same lookup applies at any nesting depth: an inner `EVERY`'s action
+referring to an **outer** quantifier's variable resolves to that outer
+member, not to a fresh name of its own, so a nested rule may refer to an
+enclosing member's variable the same way a flat one refers to its own.
+
+Other arguments of the action are read the same way. `MUST Pay t theLandlord amount`
+requires the payer to be the member and the payee to be `theLandlord` (a
+top-level name), and binds `amount` — which names nothing here — to whatever
+was paid; `amount` is then in scope in `PROVIDED`, in `HENCE` and in `LEST`,
+as it is for a `PARTY` rule.
 
 ## The join line: once, or once per member
 
@@ -241,7 +260,7 @@ Under an `EVERY`, a `HENCE` or a `LEST` needs a line saying **when it fires**, a
 GIVETH A DEONTIC Actor Action
 `all tenants sign` MEANS
     EVERY Tenant t
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  `the tenancy begins`
@@ -254,11 +273,11 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `each payment gets a receipt` MEANS
     EVERY Tenant t
-        MUST   Pay (EXACTLY t) (EXACTLY theLandlord) amount
+        MUST   Pay t theLandlord amount
         WITHIN 7
         UPON   EACH
         HENCE  (PARTY theLandlord
-                    MUST   Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)
+                    MUST   Receipt theLandlord t amount
                     WITHIN 5)
         LEST   BREACH BY t
 ```
@@ -295,16 +314,58 @@ When it is the **only** deadline in the rule it also becomes each member's, beca
 GIVETH A DEONTIC Actor Action
 `sign, and be done by day 30` MEANS
     EVERY Tenant t
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE WITHIN 30
         HENCE  FULFILLED
         LEST   BREACH
 ```
 
+### Anchored deadlines under a join
+
+Either `WITHIN` may be anchored with `OF`, as described under [WITHIN](README.md#within-temporal-deadline): the deadline is then the anchor's instant plus the duration, whatever the clock read when the obligation arose.
+
+**On the act's `WITHIN`**, the three lifecycle anchors name positions in the life of the obligation the `EVERY` is nested under — `THE JOIN` its completion, `THE DEADLINE` its deadline, `THE ARMING` when it was entered — exactly as they would on a `PARTY` rule in the same place. An `EVERY` at the top level has no enclosing obligation, so `THE JOIN` and `THE DEADLINE` are refused there and `THE ARMING` is the `EVERY`'s own arming, which is the default.
+
+**On a join line's `WITHIN`**, only two anchors make sense, and only two are accepted: `THE ARMING` — the `EVERY`'s own arming, which is also what it counts from unanchored — and an instant, `OF closingDate` or `OF (YMD 2026 6 30)`. `THE JOIN` and `THE DEADLINE` are refused, because the join line's `WITHIN` _is_ the group's deadline and its join has not fired when it is read.
+
+Note that the same words mean different instants on the two lines of a **nested** `EVERY`. On the act line, `WITHIN 14 OF THE ARMING` counts from the arming of the obligation the `EVERY` sits under, which is _earlier_ than the `EVERY`'s own arming — so naming the anchor there moves the deadline earlier than leaving it off; on the join line, `ONCE ALL HAVE WITHIN 14 OF THE ARMING` counts from the `EVERY`'s own arming, exactly as it would unanchored. Leave the act line unanchored if the `EVERY`'s arming is what you mean. A join line's `OF expression` is read when the join fires, after the last member has acted, not when the `EVERY` is armed; when the join line's `WITHIN` also serves as each member's deadline (no act `WITHIN`), each member reads it again at that member's first event.
+
+```l4
+GIVETH A DEONTIC Actor Action
+`everyone by instant 105` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign t
+        ONCE   ALL HAVE WITHIN 5 OF 100
+        HENCE  FULFILLED
+        LEST   BREACH
+```
+
+**Inside the continuation**, `THE DEADLINE` and the others name the `EVERY`'s own lifecycle, and which deadline that is depends on the join:
+
+- under a **barrier**, `THE JOIN` is the last completion and `THE ARMING` is the `EVERY`'s. `THE DEADLINE` depends on the slot. Under `HENCE` it is the `ONCE` line's `WITHIN` when one is written (the deadline on the whole), and otherwise the _latest_ of the members' act deadlines — the instant by which all performance had fallen due, which does not depend on who acted last or on the order the roll names them. Under `LEST` it is the deadline that was actually missed: when members expired, the act deadline of the member whose failure the `LEST` is anchored at — the **earliest** failure, wherever that member stands on the roll; when two failures land at the same stamp, the one the stream reached first (two `SHANT` violations at one stamp are two events, and the `LEST` sees what followed the first of them); and when two misses come to light at the same event, the one with the earlier deadline — or the `ONCE` line's when everyone acted but the last act landed after it. A barrier over an empty group is joined at its arming and then goes through the `ONCE` line's `WITHIN` like any other join: its `HENCE` fires, and `THE DEADLINE` there is the `ONCE` line's `WITHIN` when written — unless that `WITHIN` is anchored to an instant so early that the deadline lies before the arming, in which case the `LEST` fires and `THE DEADLINE` there is that missed state deadline. With only an act `WITHIN` there is no deadline at all — nobody had one — so the run refuses and says so;
+- under a **fork**, each member's continuation is its own, so all three name that member's: its completion, its deadline, the `EVERY`'s arming.
+
+So the cure period in the example below runs from day 14, when every tenant's signature fell due, and not from the day the last of them finally signed:
+
+```l4
+GIVETH A DEONTIC Actor Action
+`cure from the deadline` MEANS
+    EVERY Tenant t IN tenants
+        MUST   Sign t
+        WITHIN 14
+        ONCE   ALL HAVE
+        HENCE  (PARTY theLandlord MUST Deliver theLandlord what WITHIN 5 OF THE DEADLINE)
+        LEST   BREACH
+```
+
+Both rules are in [every-example.l4](every-example.l4), and every case in this section has a worked trace in `jl4/examples/ok/every/run-anchors.l4` — except the barrier-`LEST` tie cases (the earliest failure wherever it stands on the roll, two failures at one stamp, two misses one event revealed), whose traces are in `jl4/examples/ok/every/run-stack.l4`.
+
 **A barrier's `HENCE` and `LEST` cannot name the member.** They belong to the join, which fires once after everybody has acted, so there is nobody for the variable to stand for — the design writes them "shared". Under a fork they can and routinely do, because each member has a copy of its own. Writing `EVERY Tenant t … ONCE ALL HAVE … LEST BREACH BY t` is accepted by the type checker and refused when the rule is run, with a message that says to drop the name or to use the fork. (The type checker keeping the variable in scope there is a rough edge, not a design: see the limits below.)
 
-**`LEST`** fires when the group's obligation fails: under a barrier, when the group can no longer all be done in time; under a fork, when the member it belongs to fails. Under the design the blame falls on exactly the members who did not act; what a run actually names today is one of them. See [What runs today](#what-runs-today-and-what-does-not).
+**`LEST`** fires when the group's obligation fails: under a barrier, when the group can no longer all be done in time; under a fork, when the member it belongs to fails. A barrier's `LEST` runs once, and it is anchored at the **earliest** failure — for `MUST`, `DO` and `MAY` the member whose deadline was missed first, for `SHANT` the member whose violation came first, wherever that member stood on the roll; two failures at the same stamp are ordered by the stream, then by the deadline missed, and the roll decides only when nothing else does — so a reparation's own `WITHIN` counts from there, the `LEST` sees the events that followed that failure, and `WITHIN d OF THE DEADLINE` inside it counts from that member's deadline (`jl4/examples/ok/every/run-stack.l4` pins all of it, on both rolls: `MUST` in §1–3, `MAY` in §3b, `DO` in §3c, `SHANT` in §4–4b).
+
+**Who is blamed.** A barrier with **no** `LEST` answers with one breach that names **every** member who did not act, in the order the roll named them, each with the deadline they missed. A barrier's own `LEST BREACH` names whom you name: a party, or several with `BREACH BY LIST a, b`, or nobody if you write no `BY` — it cannot name the members who failed, because it belongs to the join and not to any member. See [What runs today](#what-runs-today-and-what-does-not) for the shape of the answer.
 
 ## Combining with RAND and ROR, and nesting
 
@@ -313,9 +374,9 @@ An `EVERY` may appear wherever a `PARTY` rule may: as an operand of `RAND` or `R
 ```l4
 GIVETH A DEONTIC Actor Action
 `sign and deliver` MEANS
-    (EVERY Tenant t MUST Sign (EXACTLY t) WITHIN 14 ONCE ALL HAVE HENCE FULFILLED LEST BREACH)
+    (EVERY Tenant t MUST Sign t WITHIN 14 ONCE ALL HAVE HENCE FULFILLED LEST BREACH)
     RAND
-    (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) what WITHIN 14 HENCE FULFILLED LEST BREACH)
+    (PARTY theLandlord MUST Deliver theLandlord what WITHIN 14 HENCE FULFILLED LEST BREACH)
 ```
 
 `RAND` asks for both sides: every tenant signs, and the landlord delivers. `ROR` asks for either. The `EVERY` on one side is a single operand, whatever its cast turns out to hold.
@@ -333,12 +394,12 @@ DECLARE Action IS ONE OF
 GIVETH A DEONTIC Actor Action
 `mutual termination` MEANS
     EVERY Partner x
-        MAY    Terminate (EXACTLY x)
+        MAY    Terminate x
         WITHIN 365
         UPON   EACH
         HENCE  EVERY Partner y
                    WHO    NOT (y EQUALS x)
-                   MUST   Settle (EXACTLY y) (EXACTLY x)
+                   MUST   Settle y x
                    WITHIN 30
                    ONCE   ALL HAVE
                    HENCE  FULFILLED
@@ -359,7 +420,7 @@ A rule with `EVERY` is run the same way a `PARTY` rule is: `#TRACE` it against a
 
 **Under a barrier**, the `HENCE` fires once, when the last member has acted — here at day 9 — and two consequences follow that a drafter has to have in mind:
 
-- **The clock starts at the join.** If the `HENCE` is itself an obligation with a `WITHIN 5`, the five days run from day 9, not from day 0. So the landlord's delivery is due on day 14.
+- **The clock starts at the join.** If the `HENCE` is itself an obligation with a `WITHIN 5`, the five days run from day 9, not from day 0. So the landlord's delivery is due on day 14. To count from somewhere else, anchor it: `WITHIN 5 OF THE DEADLINE` runs from day 14, when the signatures fell due, and `WITHIN 5 OF THE ARMING` from day 0 — see [Anchored deadlines under a join](#anchored-deadlines-under-a-join).
 - **The `HENCE` only sees what happened after the join.** A delivery on day 3 does not discharge an obligation that only arose on day 9. This is the same rule as for a `PARTY` rule's `HENCE`, and it is what stops a rule from being satisfied by an act that came too early to count.
 
 **Under a fork**, the `HENCE` fires once per member as that member acts, and the member's variable is bound to that member inside it — so three payments produce three receipt obligations, each with its own clock and each naming its own tenant. A `LEST` under a fork blames the member it belongs to, so `LEST BREACH BY t` names exactly the tenant who did not pay.
@@ -376,15 +437,48 @@ Worked traces for all of this are in the corpus: `jl4/examples/ok/every/run-in.l
 
 ## What runs today, and what does not
 
-Verified 2026-09-08 against the compiler at the head of this branch.
+Verified 2026-09-08 against the compiler at the head of this branch; the blame set re-verified 2026-09-15 (`jl4/examples/ok/every/run-blame.l4`); the anchored `WITHIN` added 2026-09-15.
 
 **Runs:**
 
-- Parsing of every form above, including `ONCE ALL HAVE`, `UPON EACH`, the `WITHIN` on either join line, and `WHO`.
+- Parsing of every form above, including `ONCE ALL HAVE`, `UPON EACH`, the `WITHIN` on either join line — anchored or not — and `WHO`.
 - Name checking: the variable is bound in the condition, the action, the act's `WITHIN`, `HENCE` and `LEST`; a name nothing binds is reported. (Being bound in a barrier's `HENCE`/`LEST` is a rough edge, not a capability — see below.)
-- Type checking: the variable has the party type; the cast must be a constructor of that type; the condition must be a `BOOLEAN`; both deadlines must be `NUMBER`s; a `HENCE` or `LEST` under `EVERY` without a join line is rejected, naming the two spellings; a join line under `PARTY` is rejected; an action that rebinds the variable is rejected.
-- Printing: `l4 format` reproduces the source; the layout printer used by `l4 batch` re-emits a parseable, re-checkable rule.
-- **Running**, as described above: the roll call, the barrier, the fork, the plain distributive form with no join line, all four modals, the deadline on the act and the deadline on the join line, and nesting one quantified rule inside another's `HENCE`.
+- Type checking: the variable has the party type; the cast must be a constructor of that type; the condition must be a `BOOLEAN`; both durations must be `NUMBER`s and an `OF` expression a `NUMBER` or a `DATE`; a lifecycle anchor is refused where the position it names does not exist (`THE JOIN`/`THE DEADLINE` on a join line, at the top level, or — for `THE JOIN` — under `LEST`); a `HENCE` or `LEST` under `EVERY` without a join line is rejected, naming the two spellings; a join line under `PARTY` is rejected. (Until 2026-09-16 an action that spelled the variable again — `MUST Sign t` — was rejected as a rebinding; #407 retired that error the same day, and that spelling is now the reference to the member.)
+- Printing: `l4 format` reproduces the source; the layout printer used by `l4 batch` re-emits a parseable, re-checkable rule, anchors included.
+- **Running**, as described above: the roll call, the barrier, the fork, the plain distributive form with no join line, all four modals, the deadline on the act and the deadline on the join line, both of them anchored (`OF THE JOIN`, `OF THE DEADLINE`, `OF THE ARMING`, `OF` an instant) as the section above describes, and nesting one quantified rule inside another's `HENCE`.
+- **A failed barrier's breach names everyone who failed.** With no `LEST` on the join, the answer is one breach naming every member who did not act, in roll order, each with the action and deadline they missed. It is anchored at the member whose deadline was missed first, and dated at the event that revealed that miss (the `at` line below is the `WAIT UNTIL 20` that revealed it, not the deadline of 14 — see "The clock on a failed barrier" further down). That member prints first, in the same words a single failure uses; the full list follows. Two of three tenants never sign:
+
+  ```
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      20
+    surpassed the deadline of party
+      Tenant OF "Bob"
+    who had to do obligatory action
+      MUST Sign t
+    before their deadline, which was at
+      14
+    and the breach names, in order
+      Tenant OF "Bob"
+        who had to do obligatory action
+          MUST Sign t
+        before their deadline, which was at
+          14
+      Tenant OF "Carol"
+        who had to do obligatory action
+          MUST Sign t
+        before their deadline, which was at
+          14
+  ```
+
+  One failure prints as it always did — `party`, singular, and one name — and a compound's first nine lines are exactly that: the event that revealed the anchoring miss, and the anchor. The list under `and the breach names, in order` is the whole answer, the anchor included, so it reads in roll order; it says nothing about _when_ each entry was revealed, because a later member's miss is revealed by a later event. The same goes for `RAND`: when both sides are lost, both sides' failures are named, left first, each with its own deadline or its own `BECAUSE`. Nothing is collapsed: a member listed twice on the roll who never acts is named twice, and `PARTY alice MUST x RAND PARTY alice MUST y` with both missed names Alice twice, once per way. And `BREACH BY` takes a list: `LEST BREACH BY LIST alice, bob BECAUSE "…"` prints one `BY … BECAUSE …` line per name, in order; a list literal with nobody in it is refused when the file is checked, and a computed one that turns out empty is refused at run time, by name. With a `LEST` on the join, the `LEST` runs once, anchored at the **earliest** failure — a member late on the roll who fails first is the one whose failure sets the clock, and whose deadline `THE DEADLINE` names inside the `LEST`; two failures at one stamp are ordered by the stream, then by the deadline — and it names whom you wrote in it, as the next section says. (Built 2026-09-15; the design calls this the set-valued breach, R-T3.)
+
+  Because the answer lists everyone, **every member is run** before the barrier decides, even after an earlier member on the roll has already failed. Before 2026-09-15 the first failure ended the scan and the later members were never evaluated; now they are, so a later member whose `WITHIN` (or anything its run reaches) raises an error makes that error the barrier's answer, where it used to be hidden behind the earlier failure.
+
 - The state graph shows the quantified obligation as **one** transition labelled with the quantifier, with the join line written under it (`ONCE ALL HAVE`, `UPON EACH`, and the join line's own `WITHIN` if any). The BPMN lowered from it draws **one task marked multi-instance**, with three notes of its own: `P-CAST` (the cardinality is a run-time fact; the note names the roll an engine would need), `P-FORK` and `P-FORK-CANCEL` (a fork's once-per-member continuation is drawn once, after all of them, and the timer cancels every member at once), `P-PROHIBITION-FIRST` (a `SHANT`'s activity completes on the first act, because one act is the breach), and `P-JOIN-DEADLINE` (the join line's own `WITHIN` beside the act's is not drawn — lossy under a barrier, advisory under a fork, where the runtime does not enforce it either). A quantified `MAY`'s lapse, under either join, goes to fulfilled, not into what follows. Neither draws one element per member. See [DMN and BPMN](../../exports/dmn-bpmn.md). _(Before 2026-09-15 the join line reached neither; the bullet under "Runs, but not yet as the design says" records what that looked like.)_
 
 **Does not run, and says so:**
@@ -396,15 +490,16 @@ Verified 2026-09-08 against the compiler at the head of this branch.
 
 **Runs, but not yet as the design says.** These are the places where a run gives an answer and the answer is coarser than the design calls for. Most are a detail of the verdict rather than the verdict itself; the one exception is the same-instant case, marked below, which can make an act count twice.
 
-- **A failed barrier's breach does not say who failed — it names nobody at all.** The design says the blame should be exactly the set of members who did not act; the design calls that the set-valued breach, R-T3, and it is not built. What you get instead, measured 2026-09-09 and visible in the corpus's own committed output for `run-barrier.l4`, is a bare `BREACH` with **no party**. The reason is structural rather than an oversight: a barrier's `LEST` belongs to the join and not to any member, so it may not name the member at all — `LEST BREACH BY t` is refused at check time, with a message that says so and points at the fork. You may still write a **constant** — `LEST BREACH BY theLandlord BECAUSE "not all signed"` — and that constant is carried through, but it is a party you chose, not the party who failed. **Where the information does exist is the residual**: run the barrier without enough events and what comes back lists the outstanding members by name. If you need to know who missed, read the residual, or use the fork, whose `LEST` does bind the member.
-  (An earlier version of this bullet said the breach named "the first non-actor in the order the roll named them", and that two failures would name one of them. That was wrong in the direction that matters — a reader would look for a name that is never there — and it is corrected here rather than quietly deleted.)
-- **The clock on a failed barrier is today's, not the design's.** When a `LEST` is itself an obligation, its deadline is counted from the event that revealed the miss, not from the deadline that was missed. That is what a `PARTY` rule does today, and `EVERY` was made to match rather than to diverge; the design (§5.2) changes both together, and that change is not built.
+- **A barrier's own `LEST BREACH` does not say who failed.** A barrier with no `LEST` names every member who did not act (above); but once you write a `LEST` on the join, what runs is the `LEST` you wrote, and a bare `LEST BREACH` is a bare `BREACH` with **no party** — the corpus's committed output for `run-barrier.l4` shows it. The reason is structural: a barrier's `LEST` belongs to the join and not to any member, so it may not name the member — `LEST BREACH BY t` is refused when the rule is run, with a message that says so and points at the fork. You may write a **constant**, one party or several — `LEST BREACH BY LIST theLandlord, theAgent BECAUSE "not all signed"` — and that is carried through, but it is a party you chose, not the party who failed. A `BY` that names the failing members from inside a barrier's `LEST` is not designed yet. **Where the information does exist is the residual**: run the barrier without enough events and what comes back lists the outstanding members by name. If you need the breach itself to name who missed, leave the `LEST` off, or use the fork, whose `LEST` does bind the member.
+  (An earlier version of this bullet said the breach named "the first non-actor in the order the roll named them", and that two failures would name one of them. That was wrong in the direction that matters — a reader would look for a name that is never there — and it is corrected here rather than quietly deleted. Before 2026-09-15 a barrier with no `LEST` named only the first non-actor on the roll; it now names all of them.)
+- **The clock on a failed barrier is today's, not the design's.** When a `LEST` is itself an obligation and its `WITHIN` is unanchored, its deadline is counted from the event that revealed the miss, not from the deadline that was missed. That is what a `PARTY` rule does today, and `EVERY` was made to match rather than to diverge; the design (§5.2) changes both together, and that change is not built. (Which miss sets the clock is the design's — the earliest — since 2026-09-15; what the clock reads at that miss is still the revealing event's stamp.) Until it is, write `WITHIN d OF THE DEADLINE` on the `LEST`, which is the same clock said explicitly: `THE DEADLINE` there is the deadline of that same earliest-failing member.
 - **A residual barrier loses its join.** If the events run out mid-way, what comes back is the outstanding members' obligations, with their deadlines correctly counted down. Their `HENCE` and `LEST` print as `` `the join` `` and `` `the join fails` `` — the machine's own markers for "report back to the group", not anything you wrote. What the residual does not carry is the join line, so feeding it more events would run the members and not the join. Run the whole stream at once.
 - **A join line's `WITHIN` bounds each act; only a barrier also checks it on the whole.** Written alone, on either kind of join line, it is each member's deadline — otherwise nothing would ever expire. Written alongside an act `WITHIN`, the act's is each member's deadline, and a barrier additionally fails if the last act lands after the join's; a fork has no join to check, so there the act's is the only one enforced. Write the tighter of the two on the act.
-- **When two members act at the very same instant, the continuation can see one of their acts.** The join's time is right either way, but the stream handed to the continuation is the one belonging to whichever of the two the roll named first, so an event stamped exactly at the join may still reach it. It only bites if the continuation's action could be matched by a member's own act at that instant. A prohibition (`SHANT`) barrier ties by construction and is not affected, because every member finishes on the same event.
+- **A `LEST` fired by the join line's `WITHIN` sees the whole stream.** When everyone acted but the last act landed after the `ONCE … WITHIN` deadline, the `LEST` is anchored at that deadline and `THE DEADLINE` names it — but the events it is applied to are the barrier's whole stream from its arming, so a reparation performed _before_ the deadline was missed, even before anyone had acted, discharges it. The member-failure path does not do this: there the `LEST` is handed the stream from the revealing event on. The stream this path should get — from the first event after the state deadline — is not computed today. (Measured 2026-09-16; a pre-existing corner of the blame set, not of the anchored `WITHIN`.)
+- **When two members act at the very same instant, the continuation can see one of their acts.** The join's time is right either way, and so is `THE DEADLINE` (the latest of the members' deadlines, whichever of them acted last), but the stream handed to the continuation is the one belonging to whichever of the two the roll named first, so an event stamped exactly at the join may still reach it. It only bites if the continuation's action could be matched by a member's own act at that instant. A prohibition (`SHANT`) barrier ties by construction and is not affected, because every member finishes on the same event.
 - **The type checker is looser than the run time in two places**, and both refuse rather than answer: a barrier continuation that names the member, and a roll — in the older, deprecated `WHO elem` spelling only — that names the member. Both are described above. An `IN` roll that names the member is caught earlier, at check time, which is one of the reasons the older spelling is the deprecated one.
 
-- **Nothing checks that the action names the member.** `MUST Sign (EXACTLY t)` ties the act to the member; `MUST Sign someoneElse` does not, and is accepted. What the run does check is that the **event's** party is the member. Write `EXACTLY t`.
+- **Writing the member's own variable is what ties the act to the member — an unrelated name never does, automatically.** `MUST Sign t` ties the act to the member because `t` is the quantifier's variable; `MUST Sign someoneElse`, with a name that is not `t` and names nothing else, is a placeholder and is accepted. What the run checks is that the **event's** party equals whatever the action names — the member, if you wrote the member's name.
 - **The count and measure joins are not built at all** — `ONCE SOME 2 OF … HAVE`, `ONCE sum OF amount AT LEAST rent`. Only `ONCE ALL HAVE` and `UPON EACH` parse.
 - The WASM export refuses a rule containing `EVERY` rather than compile it wrongly.
 - **FIXED 2026-09-15 — the BPMN export used to draw a barrier and a fork identically, and its fidelity report did not say so.**
@@ -421,7 +516,6 @@ Verified 2026-09-08 against the compiler at the head of this branch.
 - **Naming the member in a join line's `WITHIN`** is rejected, correctly, but the message is the generic `could not find a definition for the identifier t` — and it then prints the type it inferred for `t`, which reads as a contradiction. What it means is that a deadline on the whole group may not depend on one member. True of both `ONCE ALL HAVE` and `UPON EACH`.
 - **Using the party _type_ as the cast** — `EVERY Actor a` where `Actor` is the type — gives `could not find a definition for the identifier Actor ... of type: Actor`, the same self-contradictory shape. The cast must be a constructor. Write `EVERY a` for the unfiltered case.
 - **A join line with no `HENCE` and no `LEST` is accepted**, and since 2026-09-08 its `WITHIN` is not idle: a deadline written only on the join line bounds each act, because otherwise nothing would ever expire and the rule could never fail. What is still true is that there is no continuation for it to fire, so what you get at the deadline is a breach rather than anything you wrote.
-- **The check that an action may not rebind the quantifier's variable only looks at the innermost `EVERY`.** In a nested rule, an inner action writing a bare `x` where `x` is the _outer_ quantifier's variable is accepted, and binds a fresh name matching anyone. Write `EXACTLY x` for every quantifier variable you mean to refer to, at every depth.
 - **Clause order decides which `WITHIN` you wrote, silently.** A `WITHIN` before the join line bounds each act; the same `WITHIN` after it bounds the whole group. Both orders parse, both check, and `l4 format` prints either back unchanged, so nothing tells you which one you got. Write the act's `WITHIN` first, as every example here does.
 - **A misplaced join line does not say "indentation".** If its head keyword (`ONCE` or `UPON`) is too far left, the join simply does not match, and the leftover keyword is reported against the expression that precedes it — a long `expecting %, &&, *, …` list. Only a misplaced _second_ word (`ALL`, `HAVE`, `EACH`) produces the `incorrect indentation` message. If you get operator soup after a rule that looks right, check the join line's column first.
 - **A join line under a `PARTY` rule can report two errors** — that the join line needs an `EVERY`, and separately anything wrong inside the line itself, such as a non-`NUMBER` deadline. A plain `ONCE ALL HAVE` under a `PARTY` reports just the one. Where the second appears it is noise: fixing it does not help, because the line has to go.
@@ -438,6 +532,6 @@ Verified 2026-09-08 against the compiler at the head of this branch.
 
 ## See Also
 
-- **[Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md)** - why `Tenant` is a constructor, and what `EXACTLY` does
+- **[Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md)** - why `Tenant` is a constructor, and what a name in an action means
 - **[Regulative Rules](../../concepts/legal-modeling/regulative-rules.md)** - the five slots of a rule
 - `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md` - the design, its rulings, and the parts still open

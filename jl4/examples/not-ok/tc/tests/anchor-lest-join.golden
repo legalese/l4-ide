@@ -1,0 +1,16 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: anchor-lest-join.l4
+  Hidden: no
+  Range: 19:47-19:58
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    OF THE JOIN cannot anchor a WITHIN under LEST.
+
+    LEST runs because the obligation was NOT completed — its join did not
+    fire — so there is no join to count from. Under LEST, anchor to
+    OF THE DEADLINE (the deadline that was missed), to OF THE ARMING, or to
+    an instant; or leave the WITHIN unanchored.

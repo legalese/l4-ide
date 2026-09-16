@@ -1,0 +1,23 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+regulative-reference-lexical.l4:29:1-30:33:
+  PARTY Buyer MUST pay price WITHIN 20 HENCE FULFILLED LEST BREACH
+regulative-reference-lexical.l4:31:1-32:35:
+  FULFILLED
+regulative-reference-lexical.l4:42:1-43:35:
+  PARTY Buyer MUST pay withTax WITHIN 20 HENCE FULFILLED LEST BREACH
+regulative-reference-lexical.l4:44:1-45:35:
+  FULFILLED
+regulative-reference-lexical.l4:56:1-58:33:
+  PARTY Buyer MUST pay n WITHIN 11 HENCE FULFILLED LEST BREACH
+regulative-reference-lexical.l4:59:1-61:33:
+  FULFILLED
+regulative-reference-lexical.l4:72:1-73:33:
+  PARTY Buyer MUST pay d WITHIN 20 HENCE FULFILLED LEST BREACH
+regulative-reference-lexical.l4:74:1-75:34:
+  FULFILLED
+regulative-reference-lexical.l4:83:1-84:33:
+  PARTY Buyer MUST pay due WITHIN 20 HENCE FULFILLED LEST BREACH
+regulative-reference-lexical.l4:85:1-86:34:
+  FULFILLED

@@ -1,0 +1,14 @@
+DECLARE Person HAS
+    age IS A NUMBER
+
+-- The bare `age` is elaborated to `p's age` before the checker runs (R5,
+-- IMPLICIT-PROPS-DESIGN §11.7). The Check phase must still emit a token at
+-- it: with one AnnoHole on the synthetic projection the label was never
+-- reached and the editor left the read unhighlighted.
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE adult IF age >= 18
+
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `adult spelled out` IF p's age >= 18

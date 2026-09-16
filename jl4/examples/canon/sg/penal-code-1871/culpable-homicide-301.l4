@@ -1,0 +1,264 @@
+-- Singapore Penal Code 1871, s 301 — transferred malice
+-- "Culpable homicide by causing the death of a person other than the person
+--  whose death was intended"
+-- As substituted by the Criminal Law Reform Act 2019 (Act 15 of 2019),
+-- w.e.f. 1 January 2020.
+--
+-- An ISOMORPHIC encoding in INERT STYLE: the verbatim statutory prose rides
+-- along as inert string literals (identity for their boolean context — TRUE
+-- under AND, FALSE under OR), and only the operative atoms are lifted into
+-- named leaves. Read a rule top to bottom and you read the section.
+--
+-- ---------------------------------------------------------------------------
+-- The text
+-- ---------------------------------------------------------------------------
+--
+-- 301.—(1) If a person, by doing anything which he intends or knows to be
+--          likely to cause death, commits culpable homicide by causing the
+--          death of any person whose death he neither intends nor knows himself
+--          to be likely to cause, the culpable homicide committed by the
+--          offender is of the description of which it would have been if he had
+--          caused the death of the person whose death he intended or knew
+--          himself to be likely to cause.
+--                                                     [Act 15 of 2019 wef 01/01/2020]
+--
+--      (2) To avoid doubt, in the circumstances mentioned in subsection (1),
+--          the accused person may rely on any defence or exception in law as
+--          though the accused person had caused the death of the person whose
+--          death he intended or knew himself to be likely to cause.
+--                                                     [Act 15 of 2019 wef 01/01/2020]
+--
+-- ---------------------------------------------------------------------------
+-- The shape of the section
+-- ---------------------------------------------------------------------------
+--
+-- Two people are in play throughout, and the section names them only by
+-- relative clause. Both subsections do the same thing on two different
+-- channels, so the encoding keeps the pairing visible:
+--
+--   INTENDED  "the person whose death he intended or knew himself to be likely
+--             to cause"
+--   ACTUAL    "any person whose death he neither intends nor knows himself to
+--             be likely to cause" — i.e. the person he in fact killed
+--
+--   (1) DESCRIPTION channel — the description borne as against ACTUAL is
+--       replaced by the description it WOULD have borne as against INTENDED.
+--   (2) DEFENCE channel     — the defences available as against ACTUAL are
+--       augmented by those that WOULD have been available as against INTENDED.
+--
+-- Both are counterfactual substitutions, which is why each channel needs two
+-- fields on the record: what the law says apart from this section, and what it
+-- would have said in the counterfactual this section points at.
+--
+-- s 26G (general transferred fault, also inserted by Act 15 of 2019) is
+-- expressly disapplied where s 301(1) applies — see s 26G(1). s 301 is the
+-- death-specific carve-out, and s 26G(5) is the model for s 301(2).
+
+§ `Penal Code 1871`
+
+§§ `Descriptions of culpable homicide`
+
+-- s 301 does not define the descriptions; it only says WHICH ONE attaches.
+-- They come from ss 299–300, and are reproduced here as an ontology only.
+@ref Penal Code 1871 ss 299, 300 — s 301 supplies no descriptions of its own
+DECLARE `Description of culpable homicide` IS ONE OF
+    `murder within the meaning of section 300(a)`
+    `murder within the meaning of section 300(b)`
+    `murder within the meaning of section 300(c)`
+    `murder within the meaning of section 300(d)`
+    `culpable homicide not amounting to murder`
+
+§§ `The facts of one killing`
+
+@ref Penal Code 1871 s 301 — the operative atoms of subsections (1) and (2)
+DECLARE Killing HAS
+    -- "by doing anything which he intends or knows to be likely to cause death"
+    `intends to cause death`                                                                     IS A BOOLEAN
+    `knows to be likely to cause death`                                                          IS A BOOLEAN
+
+    -- "commits culpable homicide by causing the death of any person"
+    `culpable homicide by causing the death of any person`                                       IS A BOOLEAN
+
+    -- "whose death he neither intends nor knows himself to be likely to cause"
+    `intends the death of the person whose death he in fact causes`                              IS A BOOLEAN
+    `knows himself to be likely to cause the death of the person whose death he in fact causes`  IS A BOOLEAN
+
+    -- the description channel of subsection (1)
+    `the description apart from this section`
+        IS A MAYBE `Description of culpable homicide`
+    `the description it would have been if he had caused the death of the person whose death he intended or knew himself to be likely to cause`
+        IS A `Description of culpable homicide`
+
+    -- the defence channel of subsection (2)
+    `defence or exception in law apart from this section`
+        IS A BOOLEAN
+    `defence or exception in law as though he had caused the death of the person whose death he intended or knew himself to be likely to cause`
+        IS A BOOLEAN
+
+§§ `301(1) — the circumstances`
+
+-- The antecedent of subsection (1), verbatim. The `...` are the sentence's own
+-- commas (asyndetic AND); the `..` inside the first group is its "or"; and the
+-- NOT wrapped around the second group IS the "neither … nor".
+@ref Penal Code 1871 s 301(1) — the "If …" antecedent
+GIVEN k IS A Killing
+GIVETH A BOOLEAN
+DECIDE `the circumstances mentioned in subsection (1)` k IF
+        "If a person, by doing anything which he"
+   ...  (    k's `intends to cause death`
+         ..  k's `knows to be likely to cause death` )
+   ...  ", commits"
+   ...  k's `culpable homicide by causing the death of any person`
+   ...  "whose death he neither … nor"
+   ...  NOT (    k's `intends the death of the person whose death he in fact causes`
+             ..  k's `knows himself to be likely to cause the death of the person whose death he in fact causes` )
+
+§§ `301(1) — the description transfers`
+
+-- The consequent: "the culpable homicide committed by the offender is of the
+-- description of which it would have been if he had caused the death of the
+-- person whose death he intended or knew himself to be likely to cause."
+--
+-- Apart from this section the answer is a MAYBE, and deliberately so: whether
+-- ss 299–300 describe the killing of ACTUAL at all — when every fault element
+-- was directed at INTENDED — is precisely the question s 301 exists to close.
+@ref Penal Code 1871 s 301(1) — the deeming consequent
+GIVEN k IS A Killing
+GIVETH A MAYBE `Description of culpable homicide`
+DECIDE `the description of the culpable homicide committed by the offender` k IS
+    IF   `the circumstances mentioned in subsection (1)` k
+    THEN JUST (k's `the description it would have been if he had caused the death of the person whose death he intended or knew himself to be likely to cause`)
+    ELSE      k's `the description apart from this section`
+
+§§ `301(2) — the defences transfer`
+
+-- Subsection (2) verbatim. It is a conditional grant, not a substitution: it
+-- says what the accused MAY rely on once the subsection (1) circumstances are
+-- made out, and says nothing about what he could rely on anyway.
+@ref Penal Code 1871 s 301(2) — cf. s 26G(5), the general form of the same rule
+GIVEN k IS A Killing
+GIVETH A BOOLEAN
+DECIDE `the accused person may rely on a defence under subsection (2)` k IF
+        "To avoid doubt, in"
+   ...  `the circumstances mentioned in subsection (1)` k
+   ...  "the accused person may rely on any"
+   ...  k's `defence or exception in law as though he had caused the death of the person whose death he intended or knew himself to be likely to cause`
+
+-- NOT part of s 301. "May rely on" is additive, so the defences actually open
+-- to the accused are those he had apart from the section, together with those
+-- subsection (2) hands him.
+GIVEN k IS A Killing
+GIVETH A BOOLEAN
+DECIDE `a defence or exception in law is available to the accused person` k IF
+        k's `defence or exception in law apart from this section`
+    OR  `the accused person may rely on a defence under subsection (2)` k
+
+§§ `Illustrations`
+
+-- (a) A fires at B intending to cause B's death. The shot misses B and kills C,
+--     a bystander whose death A neither intends nor knows himself to be likely
+--     to cause. Had B died, the killing of B would have been murder within the
+--     meaning of s 300(a). By s 301(1) the killing of C bears that description.
+`A shoots at B and kills C` MEANS Killing WITH
+    `intends to cause death`                                                                    IS TRUE
+    `knows to be likely to cause death`                                                         IS FALSE
+    `culpable homicide by causing the death of any person`                                      IS TRUE
+    `intends the death of the person whose death he in fact causes`                             IS FALSE
+    `knows himself to be likely to cause the death of the person whose death he in fact causes` IS FALSE
+    `the description apart from this section`                                                   IS NOTHING
+    `the description it would have been if he had caused the death of the person whose death he intended or knew himself to be likely to cause`
+        IS `murder within the meaning of section 300(a)`
+    `defence or exception in law apart from this section`                                       IS FALSE
+    `defence or exception in law as though he had caused the death of the person whose death he intended or knew himself to be likely to cause`
+        IS FALSE
+
+-- (b) The same facts, save that A fired at B in the exercise of A's right of
+--     private defence against B. The defence would have availed A had B died,
+--     so by s 301(2) A may rely on it on the charge in respect of C — even
+--     though A had no right of private defence against C.
+`A shoots at B in private defence and kills C` MEANS Killing WITH
+    `intends to cause death`                                                                    IS TRUE
+    `knows to be likely to cause death`                                                         IS FALSE
+    `culpable homicide by causing the death of any person`                                      IS TRUE
+    `intends the death of the person whose death he in fact causes`                             IS FALSE
+    `knows himself to be likely to cause the death of the person whose death he in fact causes` IS FALSE
+    `the description apart from this section`                                                   IS NOTHING
+    `the description it would have been if he had caused the death of the person whose death he intended or knew himself to be likely to cause`
+        IS `murder within the meaning of section 300(a)`
+    `defence or exception in law apart from this section`                                       IS FALSE
+    `defence or exception in law as though he had caused the death of the person whose death he intended or knew himself to be likely to cause`
+        IS TRUE
+
+-- (c) A throws a stone into a crowd knowing himself to be likely to cause the
+--     death of any of them, and kills C. The "neither … nor" limb fails: A did
+--     know himself likely to cause C's death. s 301 has no work to do, and the
+--     ordinary law describes the killing of C directly — here, murder within
+--     the meaning of s 300(d).
+`A stones a crowd and kills C` MEANS Killing WITH
+    `intends to cause death`                                                                    IS FALSE
+    `knows to be likely to cause death`                                                         IS TRUE
+    `culpable homicide by causing the death of any person`                                      IS TRUE
+    `intends the death of the person whose death he in fact causes`                             IS FALSE
+    `knows himself to be likely to cause the death of the person whose death he in fact causes` IS TRUE
+    `the description apart from this section`
+        IS JUST `murder within the meaning of section 300(d)`
+    `the description it would have been if he had caused the death of the person whose death he intended or knew himself to be likely to cause`
+        IS `culpable homicide not amounting to murder`
+    `defence or exception in law apart from this section`                                       IS FALSE
+    `defence or exception in law as though he had caused the death of the person whose death he intended or knew himself to be likely to cause`
+        IS FALSE
+
+-- (d) The same facts as (b), save that A fired into a group knowing himself to
+--     be likely to cause C's death as well as B's. The "neither … nor" limb
+--     fails, so subsection (1) is not engaged and subsection (2) hands A
+--     nothing: A's right of private defence against B does not reach the charge
+--     in respect of C through this section.
+`A shoots at B in private defence knowing C is at risk` MEANS Killing WITH
+    `intends to cause death`                                                                    IS TRUE
+    `knows to be likely to cause death`                                                         IS FALSE
+    `culpable homicide by causing the death of any person`                                      IS TRUE
+    `intends the death of the person whose death he in fact causes`                             IS FALSE
+    `knows himself to be likely to cause the death of the person whose death he in fact causes` IS TRUE
+    `the description apart from this section`
+        IS JUST `murder within the meaning of section 300(d)`
+    `the description it would have been if he had caused the death of the person whose death he intended or knew himself to be likely to cause`
+        IS `murder within the meaning of section 300(a)`
+    `defence or exception in law apart from this section`                                       IS FALSE
+    `defence or exception in law as though he had caused the death of the person whose death he intended or knew himself to be likely to cause`
+        IS TRUE
+
+§§ `Directives`
+
+#EVAL `the circumstances mentioned in subsection (1)` `A shoots at B and kills C`
+#EVAL `the description of the culpable homicide committed by the offender` `A shoots at B and kills C`
+#EVAL `a defence or exception in law is available to the accused person` `A shoots at B and kills C`
+
+#EVAL `the accused person may rely on a defence under subsection (2)` `A shoots at B in private defence and kills C`
+#EVAL `a defence or exception in law is available to the accused person` `A shoots at B in private defence and kills C`
+
+#EVAL `the circumstances mentioned in subsection (1)` `A shoots at B in private defence knowing C is at risk`
+#EVAL `a defence or exception in law is available to the accused person` `A shoots at B in private defence knowing C is at risk`
+
+#EVAL `the circumstances mentioned in subsection (1)` `A stones a crowd and kills C`
+#EVAL `the description of the culpable homicide committed by the offender` `A stones a crowd and kills C`
+
+-- (a) the transfer bites: C's killing takes B's description
+#ASSERT `the circumstances mentioned in subsection (1)` `A shoots at B and kills C`
+#ASSERT `the description of the culpable homicide committed by the offender` `A shoots at B and kills C` EQUALS JUST `murder within the meaning of section 300(a)`
+
+-- (a) but the section transfers no defence that was never there
+#ASSERT NOT (`a defence or exception in law is available to the accused person` `A shoots at B and kills C`)
+
+-- (b) s 301(2): the counterfactual defence is available on the actual charge
+#ASSERT `a defence or exception in law is available to the accused person` `A shoots at B in private defence and kills C`
+
+-- (c) the "neither … nor" limb fails, so s 301 does not engage and the
+--     description apart from the section stands
+#ASSERT NOT (`the circumstances mentioned in subsection (1)` `A stones a crowd and kills C`)
+#ASSERT `the description of the culpable homicide committed by the offender` `A stones a crowd and kills C` EQUALS JUST `murder within the meaning of section 300(d)`
+
+-- (d) the gate does the work: without the subsection (1) circumstances,
+--     subsection (2) transfers nothing, even though the same defence would
+--     have availed as against the person whose death A intended
+#ASSERT NOT (`the circumstances mentioned in subsection (1)` `A shoots at B in private defence knowing C is at risk`)
+#ASSERT NOT (`a defence or exception in law is available to the accused person` `A shoots at B in private defence knowing C is at risk`)

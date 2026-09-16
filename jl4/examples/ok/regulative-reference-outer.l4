@@ -1,0 +1,43 @@
+IMPORT `regulative-reference-outer-lib`
+
+-- R1 row 3 plus R5 of specs/todo/PATTERN-REFERENCE-RULE-SPEC.md: an action
+-- argument that names a SAME-MODULE TOP-LEVEL definition, or an IMPORTED one,
+-- also refers to it. The rule is uniform — a pattern name never silently
+-- shadows anything in scope — and the alternative would reintroduce the §2
+-- defect for exactly one class of name.
+--
+-- Unlike a lexical local, these two draw the R5 notice: an SInfo diagnostic
+-- naming what was referred to and where it is defined. It asks the drafter for
+-- nothing. Its job is the one thing a marker-free design cannot otherwise make
+-- loud — a top-level name added LATER capturing what used to be a wildcard.
+-- Both notices are in this file's golden; that is the point of the fixture.
+
+DECLARE Actor IS ONE OF
+    Buyer
+    Seller
+
+DECLARE Action IS ONE OF
+    pay HAS amount IS A NUMBER
+
+-- a same-module top-level MEANS
+`the agreed price` MEANS 500
+
+GIVETH A DEONTIC Actor Action
+`top level reference` MEANS
+    PARTY Buyer MUST pay `the agreed price` WITHIN 30 HENCE FULFILLED LEST BREACH
+
+#TRACE `top level reference` AT 0 WITH
+    PARTY Buyer DOES pay 1 AT 10
+#TRACE `top level reference` AT 0 WITH
+    PARTY Buyer DOES pay 500 AT 10
+
+-- an IMPORTED name. The memo measured zero corpus sites of this shape, so this
+-- fixture is the only place the import row of R1's table is exercised.
+GIVETH A DEONTIC Actor Action
+`imported reference` MEANS
+    PARTY Buyer MUST pay `the imported fee` WITHIN 30 HENCE FULFILLED LEST BREACH
+
+#TRACE `imported reference` AT 0 WITH
+    PARTY Buyer DOES pay 1 AT 10
+#TRACE `imported reference` AT 0 WITH
+    PARTY Buyer DOES pay 250 AT 10

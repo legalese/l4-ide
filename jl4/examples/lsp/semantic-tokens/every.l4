@@ -8,7 +8,7 @@ GIVETH A DEONTIC Actor Action
 contract MEANS
     EVERY Tenant t
         WHO    NOT (t EQUALS Tenant OF "Carol")
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         UPON   EACH WITHIN 30
         HENCE  FULFILLED
@@ -20,7 +20,7 @@ GIVETH A DEONTIC Actor Action
 `with a roll` MEANS
     EVERY Tenant t IN tenants
         WHO    NOT (t EQUALS Tenant OF "Carol")
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         UPON   EACH WITHIN 30
         HENCE  FULFILLED

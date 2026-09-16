@@ -31,7 +31,7 @@ DECLARE Action IS ONE OF
 GIVETH A DEONTIC Actor Action
 `the rent is due` MEANS
     PARTY  Alice
-    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    MUST   (Pay Alice `Ms Ng` 1500)
     WITHIN 7
     HENCE  FULFILLED
     LEST   BREACH BY Alice BECAUSE "the rent was not paid by the seventh day"
@@ -54,15 +54,15 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `rent, receipt, guarantee` MEANS
     PARTY  Alice
-    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    MUST   (Pay Alice `Ms Ng` 1500)
     WITHIN 7
     HENCE  PARTY  `Ms Ng`
-           MUST   EXACTLY (Receipt `Ms Ng` Alice 1500)
+           MUST   (Receipt `Ms Ng` Alice 1500)
            WITHIN 5
            HENCE  FULFILLED
            LEST   BREACH BY `Ms Ng` BECAUSE "no receipt was issued"
     LEST   PARTY  `Mr Lim`
-           MUST   EXACTLY (Pay `Mr Lim` `Ms Ng` 1500)
+           MUST   (Pay `Mr Lim` `Ms Ng` 1500)
            WITHIN 14
            HENCE  FULFILLED
            LEST   BREACH BY `Mr Lim` BECAUSE "the guarantor did not pay the rent"
@@ -76,9 +76,9 @@ GIVETH A DEONTIC Actor Action
 -- At once: two flatmates each owe a share (all of these) ...
 GIVETH A DEONTIC Actor Action
 `two shares` MEANS
-    (PARTY Alice MUST EXACTLY (Pay Alice `Ms Ng` 750) WITHIN 7 HENCE FULFILLED LEST BREACH BY Alice)
+    (PARTY Alice MUST (Pay Alice `Ms Ng` 750) WITHIN 7 HENCE FULFILLED LEST BREACH BY Alice)
     RAND
-    (PARTY Bob   MUST EXACTLY (Pay Bob   `Ms Ng` 750) WITHIN 7 HENCE FULFILLED LEST BREACH BY Bob)
+    (PARTY Bob   MUST (Pay Bob   `Ms Ng` 750) WITHIN 7 HENCE FULFILLED LEST BREACH BY Bob)
 
 #TRACE `two shares` AT 0 WITH
     PARTY Alice DOES Pay Alice `Ms Ng` 750 AT 2
@@ -86,9 +86,9 @@ GIVETH A DEONTIC Actor Action
 -- ... or either of them may pay the whole (any of these).
 GIVETH A DEONTIC Actor Action
 `either pays the whole` MEANS
-    (PARTY Alice MUST EXACTLY (Pay Alice `Ms Ng` 1500) WITHIN 7 HENCE FULFILLED LEST BREACH BY Alice)
+    (PARTY Alice MUST (Pay Alice `Ms Ng` 1500) WITHIN 7 HENCE FULFILLED LEST BREACH BY Alice)
     ROR
-    (PARTY Bob   MUST EXACTLY (Pay Bob   `Ms Ng` 1500) WITHIN 7 HENCE FULFILLED LEST BREACH BY Bob)
+    (PARTY Bob   MUST (Pay Bob   `Ms Ng` 1500) WITHIN 7 HENCE FULFILLED LEST BREACH BY Bob)
 
 #TRACE `either pays the whole` AT 0 WITH
     PARTY Bob DOES Pay Bob `Ms Ng` 1500 AT 2
@@ -106,7 +106,7 @@ GIVEN who    IS AN Actor
 GIVETH A DEONTIC Actor Action
 `a receipt to` who amount MEANS
     PARTY  `Ms Ng`
-    MUST   EXACTLY (Receipt `Ms Ng` who amount)
+    MUST   (Receipt `Ms Ng` who amount)
     WITHIN 5
     HENCE  FULFILLED
     LEST   BREACH BY `Ms Ng` BECAUSE "no receipt was issued"
@@ -125,7 +125,8 @@ GIVETH A DEONTIC Actor Action
 
 
 -- ====================================================================
--- Question 4. An act with the doer left open, used with EXACTLY.
+-- Question 4. An act with the doer left open, applied by a rule rather than
+-- matched as a shape.
 -- ====================================================================
 
 GIVEN who    IS AN Actor
@@ -136,7 +137,7 @@ GIVETH AN Action
 GIVETH A DEONTIC Actor Action
 `rent, by whoever is named` MEANS
     PARTY  Alice
-    MUST   EXACTLY (`payment by` Alice 1500)
+    MUST   (`payment by` Alice 1500)
     WITHIN 7
     HENCE  FULFILLED
     LEST   BREACH BY Alice

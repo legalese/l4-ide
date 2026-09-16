@@ -388,7 +388,10 @@ EFFECTIVE AT`, and the ambiguity register closely enough that the memo calls it 
   reproduction deletes §2 BENEFITS), bench/ (bench.mjs, per-arm scripts, keys.json vs
   keys-restored.json, PREREGISTRATION-restored.md run, PREREGISTRATION-go.md specified not run).
   Encodings at jl4/examples/legal/chubb/; a copy deposited in legalese/canon at
-  subjects/us/chubb-hospital-cash/. **Two warnings:** bench/PREREGISTRATION-go.md is
+  subjects/us/chubb-hospital-cash/. [Updated 2026-09-16: that is where they were on
+  2026-09-14. The encodings now live at jl4/examples/canon/us/chubb-hospital-cash/, and the
+  direction is the other way round — canon holds them and l4-ide vendors a pinned mirror;
+  jl4/examples/legal/chubb/ keeps only the source deposit.] **Two warnings:** bench/PREREGISTRATION-go.md is
   result-adjacent and forbidden to encoder sandboxes — a blog reviser does not open it either; and
   the memory system is a contamination channel (FOUNDATION.md T9) — the MEMORY.md index lines for
   kant-chubb-replication and kant-guided-encoding stay finding-free; do not edit them. One finding

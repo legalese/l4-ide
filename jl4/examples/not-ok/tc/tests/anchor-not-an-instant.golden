@@ -1,0 +1,14 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: anchor-not-an-instant.l4
+  Hidden: no
+  Range: 14:44-14:58
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The anchor after OF in a WITHIN is expected to be an instant — a NUMBER on
+    the trace's own clock, or a DATE — but is here of type
+
+      STRING

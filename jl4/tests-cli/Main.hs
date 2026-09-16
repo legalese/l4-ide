@@ -1550,8 +1550,14 @@ spec bin = do
             , "\"eventAction\":\"ping\""
             , "\"timestamp\":15"
             , "\"obligatedParty\":\"Alice\""
+            -- the blame set (R-T3): the scalars describe the anchoring
+            -- failure, the arrays every failure; a single obligation's breach
+            -- names one party once, and it is the anchor
+            , "\"obligatedParties\":[\"Alice\"]"
             , "\"obligationAction\":\"MUST pay 100\""
             , "\"deadline\":10"
+            , "\"anchor\":0"
+            , "\"failures\":[{"
             ]
       for_ expectedFragments \frag ->
         unless (frag `isInfixOf` sout) $

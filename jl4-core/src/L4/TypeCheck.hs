@@ -117,7 +117,7 @@ import qualified Base.Set as Set
 import Data.Function (on)
 import Control.Exception (assert)
 import Text.Read (readMaybe)
-import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames)
+import L4.Desugar (collectSectionBinderDecls, collectSectionBinderNames, desugarComputedFields, desugarSectionGivens, detectComputedFieldCycles, detectMisattachedSectionGivens, detectRestatedSectionBinders, detectTypeSynonymCycles, extractComputedFieldNames, openFields, recordFieldTable, shadowCandidates)
 import L4.Lint.NotReach (NotReachSite (..), detectSameLineNotReach)
 
 mkInitialCheckState :: Substitution -> CheckState
@@ -151,9 +151,11 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , sectionBinderDecls = Map.empty
     , importedImplicitReaders = Set.empty
     , inNonexhaustiveDecide = False
+    , enclosingObligation = Nothing
     , moduleUri
     , sectionStack = []
     , localBindings = Set.empty
+    , actionPatternPos = NotInActionPattern
     }
 
 -- | Main entry point for scope- and type-checking.
@@ -210,18 +212,55 @@ doCheckProgramWithDependencies checkState checkEnv program =
         [ MkCheckErrorWithContext (NotReachesConnective site) None
         | site <- detectSameLineNotReach program
         ]
+        ++
+        -- R5 (IMPLICIT-PROPS-DESIGN §11.7): a field name two binders of one
+        -- signature both open, read bare. Once at the read, naming every
+        -- binder; and once at each binder after the first, so that the
+        -- declaration that made the name ambiguous is marked too. The
+        -- opening-site errors are deduplicated per (field, binders): a body
+        -- that reads the name three times gets three read errors and one
+        -- per later binder.
+        [ MkCheckErrorWithContext (OpenedFieldCollisionAtRead c) None
+        | c <- fieldCollisions
+        ]
+        ++
+        [ MkCheckErrorWithContext (OpenedFieldCollisionAtOpening c b (fieldsOf c)) None
+        | c <- nubBy (\ x y -> x.binders == y.binders) fieldCollisions
+        , b <- drop 1 c.binders
+        ]
+        ++
+        -- R5, the one silent rung of the rank: an opened field that outranks
+        -- a 0-ary constructor or top-level definition of the same name. A
+        -- warning, so nothing that checked before stops checking.
+        [ MkCheckErrorWithContext (CheckWarning (OpenedFieldShadowsDefinition s)) None
+        | s <- nubBy (\ x y -> rangeOf x.fieldRead == rangeOf y.fieldRead) fieldShadows
+        ]
+      -- Every field name one pair of binders collides on, in the order the
+      -- reads were found, deduplicated by spelling.
+      fieldsOf c =
+        nubBy (\ a b -> rawName a == rawName b)
+          [ c'.fieldRead | c' <- fieldCollisions, c'.binders == c.binders ]
       synonymCycles = detectTypeSynonymCycles program
+      -- Section binders are elaborated LAST, so that the ASSUME each one becomes
+      -- sits at the very head of its section's declaration list. Computed-field
+      -- desugaring only ever inserts DECIDEs after a DECLARE, so the two passes
+      -- do not interfere. Field opening runs over the result of both: it needs
+      -- the computed-field DECIDEs to exist (their @_self@ binder opens like
+      -- any other) and it reads the section GIVENs off the 'Section' node,
+      -- which the elaboration leaves in place. Its record table is read off
+      -- the ORIGINAL module and the import environment, so computed fields —
+      -- which the first pass strips from their DECLARE — are still in it.
+      (desugaredProgram, fieldCollisions, fieldShadows) =
+        openFields (recordFieldTable checkEnv.entityInfo program)
+          (shadowCandidates checkEnv.entityInfo program)
+          (desugarSectionGivens (desugarComputedFields program))
       checkEnv' = checkEnv
         { computedFields = extractComputedFieldNames program
         , cyclicSynonyms = Set.fromList (rawName <$> concat synonymCycles)
         , sectionBinderNames = collectSectionBinderNames program
         , sectionBinderDecls = collectSectionBinderDecls program
         }
-  in -- Section binders are elaborated LAST, so that the ASSUME each one becomes
-     -- sits at the very head of its section's declaration list. Computed-field
-     -- desugaring only ever inserts DECIDEs after a DECLARE, so the two passes
-     -- do not interfere.
-     case runCheckUnique (checkProgram (desugarSectionGivens (desugarComputedFields program))) checkEnv' checkState of
+  in case runCheckUnique (checkProgram desugaredProgram) checkEnv' checkState of
     (w, s) ->
       let
         (errs, (rprog, topEnv, localMixfixRegistry)) = runWith w
@@ -379,8 +418,8 @@ withExtraMixfix mixfixAdds =
     -- positional match: 'mixfixRegistry' is a duplicated field name, so a
     -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb sd ir ne h i lb) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb sd ir ne h i lb
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf cs sb sd ir ne eo h i lb apos) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf cs sb sd ir ne eo h i lb apos
 
 dedupCheckInfos :: [CheckInfo] -> [CheckInfo]
 dedupCheckInfos = go Set.empty []
@@ -583,6 +622,45 @@ checkBinOp t1 t2 tr opname op ann e1 e2 = do
   e2' <- checkExpr (ExpectBinOpArgContext opname 2) e2 t2
   pure (op ann e1' e2', tr)
 
+-- | A regulative @RAND@\/@ROR@ whose @DEONTIC party action@ type is given:
+-- both operands are checked against it, left first, with the inert context
+-- set for each. Shared by the two paths — 'inferExpr' gives a fresh contract
+-- type, 'checkRegulativeBinOp' the expected one after unifying with it.
+regulativeBinOpAt ::
+     Type' Resolved
+  -> Text
+  -> (Anno -> Expr Resolved -> Expr Resolved -> Expr Resolved)
+  -> InertContext
+  -> Anno
+  -> Expr Name
+  -> Expr Name
+  -> Check (Expr Resolved, Type' Resolved)
+regulativeBinOpAt contractT opname op ctx ann e1 e2 =
+  checkBinOp contractT contractT contractT opname op ann
+    (setInertContext ctx e1) (setInertContext ctx e2)
+
+-- | A regulative @RAND@\/@ROR@ checked against an expected type: unify the
+-- expected type with a @DEONTIC party action@ FIRST, then check both operands
+-- at it, so a @BREACH BY <list>@ in either operand is read against the
+-- rule's party type (see the 'checkExpr' clauses that call this, and
+-- 'checkBreachParty').
+checkRegulativeBinOp ::
+     ExpectationContext
+  -> Text
+  -> (Anno -> Expr Resolved -> Expr Resolved -> Expr Resolved)
+  -> InertContext
+  -> Anno
+  -> Expr Name
+  -> Expr Name
+  -> Type' Resolved
+  -> Check (Expr Resolved)
+checkRegulativeBinOp ec opname op ctx ann e1 e2 t = do
+  partyT <- fresh (NormalName "party")
+  actT <- fresh (NormalName "action")
+  let contractT = contract partyT actT
+  expect ec t contractT
+  fst <$> regulativeBinOpAt contractT opname op ctx ann e1 e2
+
 -- Phase 4.
 inferDeclare :: Declare Name -> Check (Declare Resolved, [CheckInfo])
 inferDeclare (MkDeclare ann _tysig appForm _t) =
@@ -688,6 +766,65 @@ warnDeprecatedAssume origin ann n role mReplacement aliases =
     , aliases
     , annotated = isJust ann.extra.desc || isJust ann.extra.ref
     }
+
+-- | R3: the deprecation warning for an @EXACTLY@ written in a regulative
+-- action pattern. Fires only inside an action ('CheckEnv.actionPatternPos'),
+-- because R6 was decided DEONTIC-ONLY and @EXACTLY@ is still the only way to
+-- pin a value in a @CONSIDER … WHEN@.
+--
+-- The keyword is read back off the concrete syntax rather than off the AST:
+-- R2 admits a bare parenthesised expression in pattern position, and that
+-- produces the very same 'PatExpr'. 'L4.Parser.patExpr' is the only production
+-- that puts a 'TKExact' into a pattern's own annotation.
+warnDeprecatedExactly :: Anno -> Expr Name -> Check ()
+warnDeprecatedExactly ann expr = do
+  inAction <- inActionPattern
+  forM_ (guard inAction *> exactlyKeywordRange ann) \ kwRange -> do
+    advice <- exactlyReplacement expr
+    addWarning $ DeprecatedExactly MkDeprecatedExactlyInfo
+      { range = Just kwRange
+      , advice
+      }
+
+-- | What to write instead of @EXACTLY \<operand\>@. A bare name loses the
+-- keyword and nothing else (R1 makes the name refer); anything else keeps its
+-- parentheses (R2 admits a parenthesised expression in pattern position).
+--
+-- Two operand classes cannot take the advice, and both are bare names, because
+-- a bare name is the only operand whose reading R1 changes:
+--
+--   * one that resolves to nothing in scope, or only to a field selector,
+--     would become a fresh WILDCARD rather than a reference
+--     ('KeepItUnresolved');
+--   * one that names a data constructor /as well as/ a value would become the
+--     CONSTRUCTOR pattern, while @EXACTLY@ evaluates it as the value
+--     ('KeepItShadowedByConstructor').
+--
+-- Everything else is safe: a literal is already a literal in pattern position,
+-- a constructor alone is already a constructor pattern, and a reference is what
+-- @EXACTLY@ meant in the first place. A compound operand keeps its parentheses
+-- and stays an expression: 'prettyLayout' prints an application in its @OF@
+-- form (@Money OF amt@), which the pattern production cannot read, so the
+-- pasted text cannot fall back into a constructor pattern with fresh names.
+--
+-- R3 as drafted claimed the drop was unconditionally safe, on the reasoning
+-- that an operand resolving to nothing is already an error today. It is, but
+-- the error is the one R1 would REPLACE with a silent wildcard, which is the
+-- defect the whole rule exists to remove. Phase A measured one corpus site,
+-- @jl4/examples/not-ok/tc/every-unbound-variable.l4:11@. The constructor case
+-- came out of the 2026-09-16 review, which found the warning advising an edit
+-- that flipped which colour discharged an obligation.
+exactlyReplacement :: Expr Name -> Check ExactlyAdvice
+exactlyReplacement = \ case
+  Var _ n    -> nameReplacement n
+  App _ n [] -> nameReplacement n
+  Lit _ l    -> pure (DropTheKeyword (prettyLayout l))
+  e          -> pure (DropTheKeyword ("(" <> prettyLayout e <> ")"))
+  where
+    nameReplacement n = actionNameReading n >>= \ case
+      ReadsAsBinder                   -> pure KeepItUnresolved
+      ReadsAsConstructorShadowingTerm -> pure (KeepItShadowedByConstructor n)
+      _                               -> pure (DropTheKeyword (prettyLayout n))
 
 -- | The names an @AKA@ on the head gave the declaration.
 assumeAliases :: AppForm Resolved -> [Name]
@@ -1867,11 +2004,124 @@ checkExpr ec (LetIn ann ds e) t = softprune $ do
       re <- checkExpr ec e t
       nlgExpr re
   setAnnResolvedType t Nothing (LetIn ann rds re)
+-- A BREACH checked against a KNOWN deontic type unifies with it FIRST, so
+-- that its BY expression is read against the rule's party type (see
+-- 'checkBreachParty'): inferring it with a fresh party type and unifying
+-- afterwards would decide the list-versus-party reading before the party type
+-- was known. A LEST/HENCE, the operand of a RAND/ROR under a GIVETH (via the
+-- two clauses below), and a top-level @x MEANS BREACH BY …@ under a GIVETH
+-- all arrive here.
+checkExpr ec e@(Breach ann mParty mReason) t = softprune $ errorContext (WhileCheckingExpression e) do
+  partyT <- fresh (NormalName "party")
+  actionT <- fresh (NormalName "action")
+  expect ec t (contract partyT actionT)
+  mParty' <- traverse (checkBreachParty partyT) mParty
+  mReason' <- traverse (\r -> checkExpr ExpectBreachReasonContext r string) mReason
+  setAnnResolvedType t Nothing (Breach ann mParty' mReason')
+-- A RAND\/ROR checked against a KNOWN deontic type likewise unifies with it
+-- FIRST and then checks both operands against it, so that a @BREACH BY <list>@
+-- in EITHER operand sees the rule's party type. Inferring the compound (as
+-- 'inferExpr' must, when nothing says its type) checks the left operand
+-- under a fresh party type, which the left operand's own shape then fixes for
+-- the right — and a @BREACH BY <list>@ on the LEFT cannot fix it
+-- ('checkBreachParty' refuses it there). Without these two clauses a
+-- @GIVETH A DEONTIC …@ never reached the operands, and the refusal's advice
+-- ("give the definition a signature") was false for a rule that had one
+-- (adversarial pass of 2026-09-15, round 2, R2-TC-1).
+checkExpr ec e@(RAnd ann e1 e2) t = softprune $ errorContext (WhileCheckingExpression e) do
+  re <- checkRegulativeBinOp ec "AND" RAnd InertCtxAnd ann e1 e2 t
+  setAnnResolvedType t Nothing re
+checkExpr ec e@(ROr ann e1 e2) t = softprune $ errorContext (WhileCheckingExpression e) do
+  re <- checkRegulativeBinOp ec "OR" ROr InertCtxOr ann e1 e2 t
+  setAnnResolvedType t Nothing re
 checkExpr ec e t = softprune $ errorContext (WhileCheckingExpression e) do
   (re, rt) <- inferExpr e
   expect ec t rt
   -- Store the expected type in the annotation so it's available during evaluation
   setAnnResolvedType t Nothing re
+
+-- | @BREACH BY e@ takes a party or a LIST of parties (R-T3,
+-- EVERY-EACH-QUANTIFIER-SPEC §6.1, built 2026-09-15). The expression is
+-- inferred first and its type read back: a @LIST OF t@ unifies its ELEMENT
+-- type with the breach's party type, anything else is the party itself. This
+-- is deliberately not a nondeterministic 'choose' between the two readings:
+-- a party whose type is still an inference variable would then leave both
+-- branches viable and report an ambiguity where there was none.
+--
+-- The machine cannot see which reading was taken — no mark is left on the
+-- syntax — and reads a LIST value as several parties. So the one case where
+-- the two readings collide is settled HERE, by rewriting: when the party type
+-- is ITSELF the list type @e@ has (both fully known, so this is a structural
+-- comparison, not a unification), the drafter named ONE party whose value is
+-- a list — @DEONTIC (LIST OF Person) Action@ with @BREACH BY ps@ — and @e@ is
+-- wrapped as the one-element list @LIST e@, which the machine walks into
+-- exactly that one party. The wrap is idempotent under re-check (the printed
+-- @LIST (LIST …)@ takes the element reading, whose element type is the
+-- party type) and invisible to exactprint, which prints the parsed tree.
+-- Restored 2026-09-15 by the adversarial pass; the first build gave this
+-- case up.
+--
+-- That decision needs the party type, and a @BREACH@ reached by INFERENCE —
+-- a top-level @x MEANS BREACH BY …@ with no @GIVETH@, or the LEFT operand of
+-- a @RAND@\/@ROR@ that has none (with one, 'checkRegulativeBinOp' pushes the
+-- @GIVETH@'s type into both operands first) — arrives with a fresh one. Reading the list
+-- as several parties there would PIN the party type to the element type and
+-- fail later, at the use site, with a @HENCE@ or @AND@ mismatch that names
+-- the wrong place (and the same rule would pass with its operands swapped:
+-- measured by the adversarial pass of 2026-09-15, round 2, R2-TC-1). So a
+-- LIST after @BY@ under a party type that is not yet known is REFUSED here,
+-- at the @BREACH@, with the two ways to fix it ('BreachByListNeedsPartyType');
+-- the party type is left for the use site to fix, so that one cause is one
+-- error. Deferring the decision to the end of the module instead (record the
+-- breach, decide once the substitution is final, rewrite the tree) would
+-- accept those shapes; it needs a post-check rewrite pass the checker does
+-- not have, and is recorded in the spec (§6.1.1) as the fuller fix, not built.
+--
+-- A list LITERAL with nobody in it (@EMPTY@, or @LIST@ with no elements) is
+-- refused here, loudly: a breach blames at least one party, and the literal
+-- is decidable at check time. A computed list that turns out empty is
+-- refused when the rule runs ('emptyBreachByRefusal' in the machine).
+--
+-- A mismatch under the element reading is reported with the LIST's own type
+-- as the given type, because the range the error carries is the whole list
+-- expression (R2-TC-2): the message's prefix says that a list's elements
+-- must be the party type.
+checkBreachParty :: Type' Resolved -> Expr Name -> Check (Expr Resolved)
+checkBreachParty partyT p = errorContext (WhileCheckingExpression p) do
+  partyT' <- applySubst partyT
+  (rp, pt) <- inferExpr p
+  let emptyLiteral = isEmptyListLiteral rp
+  when emptyLiteral $ addError (EmptyBreachBy p)
+  pt' <- applySubst pt
+  let ground t = not (hasInfVarKey (typeKey t))
+  case pt' of
+    TyApp _ n [elemT] | getUnique n == getUnique listRef ->
+      if ground partyT' && ground pt' && typeKey partyT' == typeKey pt'
+        then do
+          -- the party type IS this list type: one party, wrapped (see above)
+          rp' <- setAnnResolvedType pt' Nothing rp
+          pure (List emptyAnno [rp'])
+        else if not (ground partyT') && not emptyLiteral
+          then do
+            -- the reading cannot be decided yet: refuse at the BREACH (see
+            -- above) and leave the party type for the use site to fix
+            addError (BreachByListNeedsPartyType p)
+            setAnnResolvedType pt' Nothing rp
+          else do
+            -- several parties, one per element
+            b <- unify partyT elemT
+            unless b $ addError (TypeMismatch ExpectBreachPartyContext partyT pt')
+            setAnnResolvedType pt' Nothing rp
+    _ -> do
+      expect ExpectBreachPartyContext partyT pt'
+      setAnnResolvedType pt' Nothing rp
+  where
+    -- @LIST@ with no elements, or the builtin @EMPTY@ (a nullary constructor)
+    isEmptyListLiteral = \ case
+      List _ []  -> True
+      Var _ r    -> getUnique r == emptyUnique
+      App _ r [] -> getUnique r == emptyUnique
+      _          -> False
 
 checkIfThenElse :: ExpectationContext -> Anno -> Expr Name -> Expr Name -> Expr Name -> Type' Resolved -> Check (Expr Resolved)
 checkIfThenElse ec ann e1 e2 e3 t = do
@@ -1891,7 +2141,7 @@ checkMultiWayIf ann es e t = do
 
 checkDeonton
   :: Anno -> Subject Name -> RAction Name
-  -> Maybe (Expr Name) -> Maybe (Join Name) -> Maybe (Expr Name) -> Maybe (Expr Name)
+  -> Maybe (Deadline Name) -> Maybe (Join Name) -> Maybe (Expr Name) -> Maybe (Expr Name)
   -> Type' Resolved -> Type' Resolved -> Check (Deonton Resolved)
 checkDeonton ann subject action due mjoin hence lest partyT actionT =
   case subject of
@@ -1901,7 +2151,7 @@ checkDeonton ann subject action due mjoin hence lest partyT actionT =
       forM_ mjoin (addError . JoinWithoutEvery)
       joinR <- traverse checkJoin mjoin
       (actionR, dueR, henceR, lestR) <-
-        checkDeontonBody (Just partyR) partyT actionT action due hence lest
+        checkDeontonBody (Just partyR) partyT actionT action due (hasJoinDeadline mjoin) hence lest
       pure (MkDeonton ann (Party sann partyR) actionR dueR joinR henceR lestR)
     Every sann mCast v mRoll mFilter -> do
       -- EVERY-EACH-QUANTIFIER-SPEC §2.1/§2.4: the bound variable has the
@@ -1963,16 +2213,17 @@ checkDeonton ann subject action due mjoin hence lest partyT actionT =
         -- the machine checks that the EVENT's party is the member
         -- ('Contract8'), which is a different question from whether the
         -- ACTION's own actor field names the performer. Writing
-        -- @MUST Sign (EXACTLY t)@ is what ties the two together, and nothing
-        -- enforces it — stated on doc/reference/regulative/EVERY.md.
+        -- @MUST Sign t@ is what ties the two together, and nothing enforces
+        -- it — stated on doc/reference/regulative/EVERY.md.
+        --
+        -- The quantifier's variable @v@ is a lexical local, so under R1
+        -- ('checkActionPattern') @MUST Sign t@ /is/ the reference to the
+        -- member: the name resolves, so it cannot be a fresh binder. That is
+        -- why 'QuantifierVariableRebound' — which used to refuse this very
+        -- spelling and tell the author to write @Sign (EXACTLY t)@ — is
+        -- retired (R4). Its message would now be false.
         (actionR, dueR, henceR, lestR) <-
-          checkDeontonBody Nothing partyT actionT action due hence lest
-        -- An action is a pattern, so @MUST Sign t@ would bind a NEW @t@ over
-        -- any signer rather than refer to the member. Refuse the silent
-        -- shadowing and say how to spell the reference (@Sign (EXACTLY t)@).
-        forM_ (patternBinders actionR.action) \ b ->
-          when (rawName (getName b) == rawName v) $
-            addError (QuantifierVariableRebound b rv')
+          checkDeontonBody Nothing partyT actionT action due (hasJoinDeadline mjoin) hence lest
         pure (MkDeonton ann (Every sann mCastR rv' mRollR filterR) actionR dueR joinR henceR lestR)
 
 -- | The @ONCE@ line: its threshold carries no expression in phase 1; its
@@ -1985,34 +2236,117 @@ checkJoin = \ case
   JoinUpon jann ue mdue ->
     JoinUpon jann ue <$> checkJoinDeadline mdue
   where
-    checkJoinDeadline =
-      traverse (\e -> checkExpr ExpectJoinDeadlineContext e number)
+    checkJoinDeadline = traverse (checkDeadline JoinLineDeadline)
+
+-- | Does the join line carry a @WITHIN@? Under a barrier that is the group's
+-- deadline, and it is what @THE DEADLINE@ in the barrier's continuation
+-- names when it is written (see 'checkAnchor').
+hasJoinDeadline :: Maybe (Join Name) -> Bool
+hasJoinDeadline = \ case
+  Just (JoinOnce _ _ (Just _)) -> True
+  Just (JoinUpon _ _ (Just _)) -> True
+  _                            -> False
+
+-- | The two positions a @WITHIN@ can sit in. The duration's type mismatch is
+-- worded per position ('ExpectRegulativeDeadlineContext',
+-- 'ExpectJoinDeadlineContext'), and the lifecycle anchors mean different
+-- things in the two (see 'checkAnchor').
+data DeadlinePosition = ActDeadline | JoinLineDeadline
+
+-- | @WITHIN d [OF anchor]@ (EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7A\/B\/C;
+-- built 2026-09-15). The duration is a NUMBER in either position; the anchor,
+-- when written, is one of the three lifecycle positions or an expression.
+checkDeadline :: DeadlinePosition -> Deadline Name -> Check (Deadline Resolved)
+checkDeadline pos (MkDeadline dann d ma) = do
+  dR <- checkExpr ctx d number
+  maR <- traverse (checkAnchor pos) ma
+  pure (MkDeadline dann dR maR)
+  where
+    -- An anchored deadline's duration is everything before OF, and inside
+    -- an unbracketed duration OF is never application ('L4.Parser.deadline',
+    -- @ofIsAnchor@). The commonest way to get a non-NUMBER there is to have
+    -- meant @f OF x@ as a call, so a mismatch next to an anchor says so; the
+    -- unanchored wording is kept for the unanchored form (its goldens hold).
+    ctx = case (pos, ma) of
+      (_, Just _)              -> ExpectAnchoredDurationContext
+      (ActDeadline, Nothing)      -> ExpectRegulativeDeadlineContext
+      (JoinLineDeadline, Nothing) -> ExpectJoinDeadlineContext
+
+-- | The anchor after @OF@.
+--
+-- The three lifecycle anchors name positions in the life of the ENCLOSING
+-- obligation, which 'enclosingObligation' describes; each is refused where
+-- the position it names does not exist ('AnchorRefusal'):
+--
+--   * on a join line, @THE JOIN@ and @THE DEADLINE@ are refused outright —
+--     that @WITHIN@ IS the group's deadline, and its join has not fired when
+--     it is read; @THE ARMING@ there is the EVERY's own arming;
+--   * on an act with no enclosing obligation, @THE JOIN@ and @THE DEADLINE@
+--     are refused; @THE ARMING@ is the obligation's own arming, i.e. the
+--     default, allowed and pointless;
+--   * @THE JOIN@ under @LEST@ is refused (the join did not fire) — the
+--     conservative reading of the question §5.1.1 leaves open;
+--   * @THE DEADLINE@ is refused when the enclosing obligation has no
+--     @WITHIN@ on its act or its join line.
+--
+-- The expression form is a NUMBER — an instant on the trace's own clock —
+-- or a DATE, which the machine lowers with @DATE_SERIAL@; anything else is
+-- refused naming both. The choice is biased: an expression of a
+-- not-yet-known type is taken as a NUMBER.
+checkAnchor :: DeadlinePosition -> Anchor Name -> Check (Anchor Resolved)
+checkAnchor pos a = case a of
+  AnchorJoin aann     -> AnchorJoin aann     <$ lifecycle (\ enc -> case enc.slot of
+                                                             InLest  -> Just JoinUnderLest
+                                                             InHence -> Nothing)
+  AnchorDeadline aann -> AnchorDeadline aann <$ lifecycle (\ enc ->
+                                                             if enc.hasDeadline then Nothing else Just EnclosingHasNoDeadline)
+  AnchorArming aann   -> pure (AnchorArming aann)
+  AnchorAt aann e     -> AnchorAt aann <$> checkAnchorAt e
+  where
+    -- refuse per position, then per what the enclosing obligation has
+    lifecycle :: (EnclosingObligation -> Maybe AnchorRefusal) -> Check ()
+    lifecycle refuseWithin = case pos of
+      JoinLineDeadline -> addError (AnchorUnavailable a OnJoinLine)
+      ActDeadline -> do
+        menc <- asks (.enclosingObligation)
+        case menc of
+          Nothing  -> addError (AnchorUnavailable a NoEnclosingObligation)
+          Just enc -> forM_ (refuseWithin enc) (addError . AnchorUnavailable a)
+
+    checkAnchorAt :: Expr Name -> Check (Expr Resolved)
+    checkAnchorAt e = softprune $ errorContext (WhileCheckingExpression e) do
+      (re, rt) <- inferExpr e
+      t <- accept number rt `orElse` accept date rt `orElse` (number <$ addError (AnchorNotAnInstant e rt))
+      setAnnResolvedType t Nothing re
+
+    accept :: Type' Resolved -> Type' Resolved -> Check (Type' Resolved)
+    accept t rt = do
+      ok <- unify t rt
+      if ok then pure t else empty
 
 -- | The part of a deonton after its subject: the action (with its PROVIDED
 -- guard), the deadline, and the two continuations. Shared by both subjects.
+--
+-- The continuations are checked with 'enclosingObligation' set to THIS
+-- deonton, so that a nested obligation's anchored @WITHIN@ can be checked
+-- against what this one has ('checkAnchor'). The nearest enclosing
+-- obligation wins, which is also what the machine binds at run time.
 checkDeontonBody
   :: Maybe (Expr Resolved) -> Type' Resolved -> Type' Resolved
-  -> RAction Name -> Maybe (Expr Name) -> Maybe (Expr Name) -> Maybe (Expr Name)
-  -> Check (RAction Resolved, Maybe (Expr Resolved), Maybe (Expr Resolved), Maybe (Expr Resolved))
-checkDeontonBody mPartyR partyT actionT action due hence lest = do
+  -> RAction Name -> Maybe (Deadline Name) -> Bool -> Maybe (Expr Name) -> Maybe (Expr Name)
+  -> Check (RAction Resolved, Maybe (Deadline Resolved), Maybe (Expr Resolved), Maybe (Expr Resolved))
+checkDeontonBody mPartyR partyT actionT action due joinHasDeadline hence lest = do
   (actionR, boundByPattern) <- checkAction action actionT
   checkPartyActionAgreement partyT actionT
   forM_ mPartyR \partyR ->
     checkRegulativeActorAgreement partyT partyR (actionExprOfPattern actionR.action)
   let rTy = contract partyT actionT
-  dueR <- traverse (\e -> checkExpr ExpectRegulativeDeadlineContext e number) due
-  henceR <- traverse (\e -> extendKnownMany boundByPattern $ checkExpr ExpectRegulativeFollowupContext e rTy) hence
-  lestR <- traverse (\e -> checkExpr ExpectRegulativeFollowupContext e rTy) lest
+      hasDeadline = isJust due || joinHasDeadline
+      inSlot slot = local \ env -> env { enclosingObligation = Just (MkEnclosingObligation slot hasDeadline) }
+  dueR <- traverse (checkDeadline ActDeadline) due
+  henceR <- traverse (\e -> extendKnownMany boundByPattern $ inSlot InHence $ checkExpr ExpectRegulativeFollowupContext e rTy) hence
+  lestR <- traverse (\e -> inSlot InLest $ checkExpr ExpectRegulativeFollowupContext e rTy) lest
   pure (actionR, dueR, henceR, lestR)
-
--- | The variables an action pattern binds (its 'PatVar's), in source order.
-patternBinders :: Pattern Resolved -> [Resolved]
-patternBinders = \ case
-  PatVar _ b       -> [b]
-  PatApp _ _ ps    -> concatMap patternBinders ps
-  PatCons _ p1 p2  -> patternBinders p1 <> patternBinders p2
-  PatExpr _ _      -> []
-  PatLit _ _       -> []
 
 -- | The cast of an @EVERY Cast v@: a data constructor whose result type is the
 -- party type. A constructor with a payload (@Tenant HAS name IS A STRING@) has
@@ -2166,60 +2500,205 @@ sameTypeHead :: Type' Resolved -> Type' Resolved -> Bool
 sameTypeHead (TyApp _ r1 _) (TyApp _ r2 _) = getUnique r1 == getUnique r2
 sameTypeHead _              _              = False
 
--- | Check the action of a regulative @MUST@/@MAY@ clause against the action
--- type declared in the contract's @DEONTIC <Party> <Action>@ signature.
+-- | Check the action of a regulative @MUST@\/@MAY@\/@SHANT@\/@DO@ clause
+-- against the action type declared in the contract's
+-- @DEONTIC \<Party\> \<Action\>@ signature.
 --
 -- This is 'checkPattern' specialised to 'ExpectRegulativeActionContext', with
--- one wrinkle that matters once actions carry a type argument.
+-- one difference that is the whole point of
+-- @specs\/todo\/PATTERN-REFERENCE-RULE-SPEC.md@: inside this call, and nowhere
+-- else, __a bare name in a pattern refers to the thing it names__ (R1). The
+-- switch is 'CheckEnv.actionPatternPos', which 'inferPattern' reads.
 --
--- A bare action name is parsed as a nullary 'PatApp'. The generic pattern
--- checker resolves it as a data constructor if it can, and otherwise treats it
--- as a /fresh binder/ whose type is an unconstrained inference variable — which
--- then unifies with whatever action type the contract declares. That is
--- harmless for plain-enum actions (their names /are/ constructors, so they go
--- through full unification), but it means a name that refers to an existing
--- action /value/ — e.g. a parametric @Action Court@ introduced by a @MEANS@
--- clause — is silently accepted in a contract pinned to @Action Landlord@,
--- dropping exactly the index we want the deontic layer to enforce.
+-- __Why a name has to refer here.__ An action is parsed as an ordinary
+-- pattern, the same production @CONSIDER … WHEN@ uses, so a bare name became a
+-- /fresh binder/ matching anything. At the head that was fixed in @34a7c1c5@
+-- (the head has a declared expected type, so an accidental capture surfaces as
+-- a type mismatch). An argument slot had no such net: given
 --
--- So when a bare name resolves to an in-scope non-constructor term, we treat it
--- as a reference to that value — precisely as the explicit @EXACTLY@ form
--- ('PatExpr') already does — and check its type against the contract's declared
--- action type. The decision rule (see 'namesNonConstructorTerm'):
+-- > GIVEN price IS A NUMBER
+-- > PARTY Buyer MUST `pay invoice` price WITHIN 30
 --
---   * any constructor candidate  -> constructor-pattern semantics (unchanged);
---     this keeps plain-enum actions, and overloaded names that /also/ name a
---     constructor, on their existing path;
---   * else any term candidate (a @MEANS@/global @Computable@, a @GIVEN@
---     parameter, an @ASSUME@'d term, a record selector, ...) -> reference;
---   * no term candidate at all -> a genuine fresh binder (e.g. a wildcard
---     action whose value a @HENCE@ clause inspects).
+-- the @price@ in the action was a NEW name matching /any/ amount, the @GIVEN@
+-- was silently shadowed, the file checked clean, and the only observable was a
+-- wrong verdict — a payment of 1 fulfilled an obligation to pay @price@
+-- (§2 of the spec; upstream smucclaw\/l4-ide#955).
 --
--- The reference branch is intentionally broader than just @MEANS@-defined
--- actions: a bare action name that refers to /anything/ in scope denotes that
--- value, and silently re-binding it as a fresh same-named pattern variable was
--- exactly the footgun behind this bug. A consequence is that a name which
--- merely collides with an unrelated in-scope term now surfaces as a type
--- mismatch instead of quietly shadowing it — the intended trade-off.
+-- The resolution order is 'actionNameReading'. Head and argument share it, so
+-- the two positions cannot drift apart again; the only thing the head does
+-- differently is not draw the R5 notice (see 'AtActionHead').
+--
+-- What still binds a fresh name: a name that resolves to nothing at all, and —
+-- __in an argument slot only__ — a name that resolves only to a record
+-- /selector/, as in @Pay Alice \`Ms Ng\` amount@ where @amount@ is the action's
+-- own field name. That spelling is the established "name the slot you are
+-- filling" idiom and every corpus site of it is a deliberate wildcard (spec
+-- Appendix A.4); a selector is a function and can never be the intended value
+-- in an action slot. At the HEAD a selector-spelled name stays a reference and
+-- fails the head's declared type, which is what base did and what the
+-- 2026-09-16 review restored: see 'actionNameReading'.
 checkActionPattern :: Pattern Name -> Type' Resolved -> Check (Pattern Resolved, [CheckInfo])
-checkActionPattern action actionT = case action of
-  PatApp ann n [] -> do
-    refersToValue <- namesNonConstructorTerm n
-    if refersToValue
-      then checkPattern ExpectRegulativeActionContext (PatExpr ann (Var ann n)) actionT
-      else checkPattern ExpectRegulativeActionContext action actionT
-  _ -> checkPattern ExpectRegulativeActionContext action actionT
+checkActionPattern action actionT =
+  enterActionPattern (checkPattern ExpectRegulativeActionContext action actionT)
 
--- | Does this name resolve to at least one in-scope term, none of which is a
--- data constructor? Used to decide whether a bare action name denotes a
--- reference to an existing value rather than a fresh pattern binder. Any
--- constructor candidate keeps constructor-pattern semantics (returns 'False');
--- a name with no term candidate at all is a binder (also 'False').
-namesNonConstructorTerm :: Name -> Check Bool
-namesNonConstructorTerm n = do
+-- | How a bare name written in a regulative action pattern reads (R1).
+data ActionNameReading
+  = ReadsAsConstructor
+    -- ^ A data constructor candidate and nothing else: constructor-pattern
+    -- semantics, unchanged. This keeps plain-enum actions on their existing
+    -- path.
+  | ReadsAsConstructorShadowingTerm
+    -- ^ A data constructor candidate /and/ a value of the same name. The
+    -- pattern reading is still the constructor, exactly as before — but the
+    -- two readings of the name now differ, because @EXACTLY n@ evaluates @n@
+    -- as an expression and gets the value. Told apart from 'ReadsAsConstructor'
+    -- for one purpose: 'exactlyReplacement' must not advise dropping a keyword
+    -- whose removal would swap one reading for the other.
+  | ReadsAsLexicalReference
+    -- ^ A lexical local — a @GIVEN@, a lambda parameter, a @WHERE@\/@LET@
+    -- local, an outer action's binder, a @CONSIDER@ or @EVERY@ variable.
+    -- Unambiguously a reference; draws no notice.
+  | ReadsAsOuterReference Name
+    -- ^ Some other in-scope term that is not a selector: a same-module
+    -- top-level, a section-level binder, an @ASSUME@d term, an imported name.
+    -- Also a reference — the rule is uniform, @a pattern name never silently
+    -- shadows anything in scope@ — but it draws the R5 notice in argument
+    -- position. Carries the referent's defining name.
+  | ReadsAsBinder
+    -- ^ Nothing in scope, or only selectors: a genuine fresh wildcard.
+
+-- | R1's resolution table, for a nullary @PatApp@ in a regulative action.
+--
+-- 'TermKind' alone is __not__ the lexical\/global discriminator: a @WHERE@
+-- local and a top-level @MEANS@ are both 'Computable'. 'CheckEnv.localBindings'
+-- is, because 'extendKnownMany' marks its bindings there and
+-- 'extendKnownGlobalMany' does not. 'TermKind' is used only for the two
+-- carve-outs: 'Constructor' (row 1) and 'Selector'\/'ComputedSelector'
+-- (row 4).
+--
+-- __The selector carve-out is an ARGUMENT-position rule.__ It has to be, and
+-- the review of 2026-09-16 found out why: at the HEAD, base's rule
+-- ('namesNonConstructorTerm', @34a7c1c5@) counted a selector as a term, so
+-- @PARTY Buyer MUST amount@ — where @amount@ is a field of the action's own
+-- record — was a reference and failed the head's declared type. Carving
+-- selectors out there instead made it a fresh name at the head, which matches
+-- EVERY action: an obligation discharged by an unrelated act, silently. So the
+-- carve-out applies where its evidence was gathered (26 argument-position
+-- wildcards, spec Appendix A.4) and nowhere else.
+actionNameReading :: Name -> Check ActionNameReading
+actionNameReading n = do
+  pos     <- asks (.actionPatternPos)
   options <- lookupRawNameInEnvironment (rawName n)
-  let termKinds = [ tk | (_, _, KnownTerm _ tk) <- options ]
-  pure (not (null termKinds) && all (/= Constructor) termKinds)
+  locals  <- asks (.localBindings)
+  let terms = [ (u, o, tk) | (u, o, KnownTerm _ tk) <- options ]
+      isSelector tk = tk == Selector || tk == ComputedSelector
+      carvedOut tk = tk == Constructor || (pos == InActionArgument && isSelector tk)
+      values = [ (u, o) | (u, o, tk) <- terms, not (carvedOut tk) ]
+  pure $
+    if any (\ (_, _, tk) -> tk == Constructor) terms
+      then if null values then ReadsAsConstructor else ReadsAsConstructorShadowingTerm
+      else case values of
+        []            -> ReadsAsBinder
+        ((_, o) : _)
+          | any (\ (u, _) -> Set.member u locals) values -> ReadsAsLexicalReference
+          | otherwise                                    -> ReadsAsOuterReference o
+
+-- | Read a pattern as the expression it is spelled like, for R1's applied
+-- form. Total except for @FOLLOWED BY@, which has no bare expression spelling
+-- (the list-cons operator is not part of the pattern language's surface here),
+-- and which no reference-headed action can want anyway.
+patternAsExpr :: Pattern Name -> Maybe (Expr Name)
+patternAsExpr = \ case
+  PatVar ann v      -> Just (Var ann v)
+  PatLit ann l      -> Just (Lit ann l)
+  PatExpr _ e       -> Just e
+  PatApp ann v []   -> Just (Var (soleHoleAnno ann) v)
+  PatApp ann v ps   -> App ann v <$> traverse patternAsExpr ps
+  PatCons{}         -> Nothing
+
+{- Note [Hole arity of a synthesised reference]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'flattenConcreteNodes' walks a node's annotation and fills each 'AnnoHole' from
+that node's children, one child per hole in order. A hole with no child left to
+fill it is an error ('InsufficientHoleFit'). So an annotation may only be moved
+onto a constructor with the SAME number of annotated fields as the one it came
+from.
+
+R1 moves annotations across exactly that boundary: it rewrites @PatApp ann n []@
+into a 'PatExpr' holding a reference, and the constructors do not agree.
+'L4.Parser.nameAsPatApp' builds TWO holes — one for the name, one for the
+(always empty) argument list — while 'PatExpr' and 'Var' have one field each.
+Reusing @ann@ verbatim on either leaves the second hole unfilled.
+
+__It fails silently, which is the reason for the note.__ Nothing in @l4 check@,
+@l4 run@, the evaluator or exactprint walks the /checked/ AST's annotations, so
+a broken annotation costs nothing on any path with an exit code. The one
+consumer is the LSP's type-checked semantic tokens, and its rule turns the error
+into 'Nothing' — which means no tokens for the WHOLE file, no diagnostic, and
+an editor that silently falls back to parser-level highlighting
+('LSP.L4.Rules.TypeCheckedSemanticTokens'). The corpus witness is
+@jl4/examples/lsp/semantic-tokens/every.l4@, whose golden is the only one that
+covers a regulative rule at this phase.
+
+The two helpers below are the fix, and they split the tokens so that each one
+is emitted exactly once: the wrapper contributes nothing and delegates, the
+inner node keeps every concrete token it had. -}
+
+-- | The annotation for a synthesised /wrapper/: one hole and no concrete
+-- tokens of its own, keeping the range and extra of the node it replaces. Its
+-- single child carries the tokens. See Note [Hole arity of a synthesised
+-- reference].
+wrapperAnno :: Anno -> Anno
+wrapperAnno ann =
+  fixAnnoSrcRange
+    Anno
+      { extra   = ann.extra
+      , range   = ann.range
+      , payload = [mkHoleWithSrcRangeHint ann.range]
+      }
+
+-- | Keep every concrete token and the FIRST hole, dropping later holes. Only
+-- for moving a @PatApp n []@ annotation onto a one-field node: the hole that
+-- goes is the empty argument list, which has no tokens to lose. See
+-- Note [Hole arity of a synthesised reference].
+soleHoleAnno :: Anno -> Anno
+soleHoleAnno ann =
+  fixAnnoSrcRange
+    Anno
+      { extra   = ann.extra
+      , range   = ann.range
+      , payload = go ann.payload
+      }
+  where
+    go [] = []
+    go (e@(AnnoHole _) : rest) = e : filter (not . isHole) rest
+    go (e : rest)              = e : go rest
+
+    isHole (AnnoHole _) = True
+    isHole _            = False
+
+-- | Run a check as the __head__ of a regulative action pattern (R1 on, R5 off).
+enterActionPattern :: Check a -> Check a
+enterActionPattern = local (\ env -> env { actionPatternPos = AtActionHead })
+
+-- | Step one level inward in a pattern: the head's arguments, and everything
+-- below them, are argument positions (R1 on, R5 on). A no-op outside an
+-- action pattern, which is what keeps @CONSIDER@ on its old behaviour (R6).
+descendActionPattern :: Check a -> Check a
+descendActionPattern = local $ \ env -> case env.actionPatternPos of
+  NotInActionPattern -> env
+  _                  -> env { actionPatternPos = InActionArgument }
+
+-- | Leave the action pattern. Used wherever the checker descends from a
+-- pattern into an /expression/: an expression may contain a @CONSIDER@ of its
+-- own, and that @CONSIDER@'s branch patterns are ordinary patterns, not action
+-- patterns.
+leaveActionPattern :: Check a -> Check a
+leaveActionPattern = local (\ env -> env { actionPatternPos = NotInActionPattern })
+
+-- | Is the checker inside a regulative action pattern at all?
+inActionPattern :: Check Bool
+inActionPattern = (/= NotInActionPattern) <$> asks (.actionPatternPos)
 
 -- | Build the exhaustiveness oracle: a map from a type's 'Unique' to the list
 -- of its data constructors.
@@ -3007,21 +3486,15 @@ inferExpr' g =
       dsFun <- desugarBinOpToFunction (rawName orName) (Or ann e1' e2') ann e1' e2'
       inferExpr' dsFun
     RAnd ann e1 e2 -> do
-      -- Set inert context to AND for subexpressions
-      let e1' = setInertContext InertCtxAnd e1
-          e2' = setInertContext InertCtxAnd e2
+      -- nothing says the compound's type: a fresh DEONTIC, which the LEFT
+      -- operand then fixes for the right (see 'checkRegulativeBinOp')
       partyT <- fresh (NormalName "party")
       actT <- fresh (NormalName "action")
-      let contractT = contract partyT actT
-      checkBinOp contractT contractT contractT "AND" RAnd ann e1' e2'
+      regulativeBinOpAt (contract partyT actT) "AND" RAnd InertCtxAnd ann e1 e2
     ROr ann e1 e2 -> do
-      -- Set inert context to OR for subexpressions
-      let e1' = setInertContext InertCtxOr e1
-          e2' = setInertContext InertCtxOr e2
       partyT <- fresh (NormalName "party")
       actT <- fresh (NormalName "action")
-      let contractT = contract partyT actT
-      checkBinOp contractT contractT contractT "OR" ROr ann e1' e2'
+      regulativeBinOpAt (contract partyT actT) "OR" ROr InertCtxOr ann e1 e2
     Implies ann e1 e2 -> do
       dsFun <- desugarBinOpToFunction (rawName impliesName) g ann e1 e2
       inferExpr' dsFun
@@ -3340,7 +3813,7 @@ inferExpr' g =
       -- Breach is a terminal clause that represents a contract breach
       partyT <- fresh (NormalName "party")
       actionT <- fresh (NormalName "action")
-      mParty' <- traverse (\p -> checkExpr ExpectRegulativePartyContext p partyT) mParty
+      mParty' <- traverse (checkBreachParty partyT) mParty
       mReason' <- traverse (\r -> checkExpr ExpectBreachReasonContext r string) mReason
       pure (Breach ann mParty' mReason', contract partyT actionT)
     Refuse ann msg -> do
@@ -3619,7 +4092,18 @@ checkBranch ec _scrutinee _tscrutinee tresult (MkBranch ann' (Otherwise ann) e) 
 checkPattern :: ExpectationContext -> Pattern Name -> Type' Resolved -> Check (Pattern Resolved, [CheckInfo])
 checkPattern ec p t = errorContext (WhileCheckingPattern p) do
   (rp, rt, extend) <- inferPattern p
-  expect ec t rt
+  -- R7: when R1 turned a bare name into a reference, the slot's own
+  -- expectation context ("the 2nd input of function Pay is expected to be
+  -- ...") is the wrong sentence: the reader needs to be told that the name
+  -- was READ AS A REFERENCE, and that there are two ways to fix it. A
+  -- rewritten @PatApp n []@ is the only pattern that comes back as a
+  -- 'PatExpr' it did not go in as, so the test is local and cheap.
+  ec' <- case (p, rp) of
+    (PatApp _ n [], PatExpr _ _) -> do
+      inAction <- inActionPattern
+      pure (if inAction then ExpectActionPatternReferenceContext n else ec)
+    _ -> pure ec
+  expect ec' t rt
   pure (rp, extend)
 
 -- Note: PatVar doesn't really get produced by the parser. We replace
@@ -3629,20 +4113,93 @@ inferPattern :: Pattern Name -> Check (Pattern Resolved, Type' Resolved, [CheckI
 inferPattern g@(PatVar _ann n)      = errorContext (WhileCheckingPattern g) do
   inferPatternVar n
 inferPattern g@(PatApp ann n [])   = errorContext (WhileCheckingPattern g) do
-  inferPatternApp ann n [] `orElse` inferPatternVar n
+  -- R1 lives here. Outside a regulative action this is the old behaviour
+  -- verbatim: try the constructor reading, else bind a fresh name. Inside
+  -- one, 'actionNameReading' decides, and a name that resolves to something
+  -- becomes a reference instead of silently shadowing it.
+  pos <- asks (.actionPatternPos)
+  case pos of
+    NotInActionPattern -> asBinder
+    _ -> actionNameReading n >>= \ case
+      ReadsAsConstructor              -> asBinder
+      ReadsAsConstructorShadowingTerm -> asBinder
+      ReadsAsBinder           -> asBinder
+      ReadsAsLexicalReference -> asReference
+      ReadsAsOuterReference o -> do
+        -- R5: a notice, never a request. Argument position only — a bare
+        -- action NAME denoting a module-level action is the ordinary idiom
+        -- at the head, and the head's declared type already catches a
+        -- mis-capture.
+        when (pos == InActionArgument) $ addError (ActionPatternReference n o)
+        asReference
+  where
+    -- A reference reads exactly as the explicit @EXACTLY@ form always did.
+    -- The two annotations are deliberately different: see
+    -- Note [Hole arity of a synthesised reference].
+    asReference = inferPattern (PatExpr (wrapperAnno ann) (Var (soleHoleAnno ann) n))
+    asBinder    = inferPatternApp ann n [] `orElse` inferPatternVar n
 inferPattern g@(PatApp ann n ps)   = errorContext (WhileCheckingPattern g) do
-  inferPatternApp ann n ps
+  -- R1, applied form. @MUST `pay invoice` (`fee for` tier)@ — a head that
+  -- names something in scope which is NOT a data constructor cannot be a
+  -- pattern at all ('resolveConstructor' would refuse it); read the whole
+  -- thing as the application it looks like.
+  --
+  -- Without this the expression reading is unreachable for a parenthesised
+  -- application: R2 has the parser try the pattern reading first, and
+  -- @(`payment by` Alice 1500)@ IS a well-formed pattern syntactically, so
+  -- the parser commits to it and the checker then rejects a head that is not
+  -- a constructor. Measured on this corpus: four sites, all of which the
+  -- sweep would otherwise break
+  -- (doc/concepts/legal-modeling/regulative-layer-whole-example.l4:139 and
+  -- jl4/examples/legal/ceo-performance-award.l4:360,364,415).
+  --
+  -- This turns an error into a meaning, never one meaning into another: the
+  -- same text is refused outright today.
+  pos <- asks (.actionPatternPos)
+  reading <- if pos == NotInActionPattern then pure ReadsAsConstructor else actionNameReading n
+  -- The 'PatExpr' wrapper gets an annotation of its own; @e@ keeps @ann@,
+  -- whose holes match 'App' field for field. Note [Hole arity of a
+  -- synthesised reference].
+  -- No R5 notice on this path, and the reason is the notice's own text. It
+  -- says the name "refers to X rather than introducing a new name of its own",
+  -- and offers a placeholder as the alternative — both of which are false of an
+  -- APPLIED head, which could never have introduced a name or matched anything
+  -- (base refused the same text outright, "I could not find a definition").
+  -- Reported by the 2026-09-16 review: 3 of the 26 notices in the goldens were
+  -- this class, notices with no hazard behind them.
+  case (reading, patternAsExpr (PatApp ann n ps)) of
+    (ReadsAsLexicalReference, Just e)  -> inferPattern (PatExpr (wrapperAnno ann) e)
+    (ReadsAsOuterReference _, Just e)  -> inferPattern (PatExpr (wrapperAnno ann) e)
+    _                                  -> inferPatternApp ann n ps
 inferPattern g@(PatCons ann p1 p2) = errorContext (WhileCheckingPattern g) do
-  (rp1, rt1, extend1) <- inferPattern p1
+  (rp1, rt1, extend1) <- descendActionPattern (inferPattern p1)
   let listType = list rt1
-  (rp2, extend2) <- checkPattern ExpectConsArgument2Context p2 listType
+  (rp2, extend2) <- descendActionPattern (checkPattern ExpectConsArgument2Context p2 listType)
 
   -- Allows us to hover over the 'FOLLOWED BY',
   -- giving us a type signature.
   patCons <- setAnnResolvedType listType Nothing (PatCons ann rp1 rp2)
   pure (patCons, listType, extend1 <> extend2)
 inferPattern g@(PatExpr ann expr) = errorContext (WhileCheckingPattern g) do
-  (rexpr, ty) <- inferExpr expr
+  -- R3: an @EXACTLY@ written inside a deontic action is now redundant, and
+  -- says so. The keyword is read back off the concrete syntax because R2's
+  -- bare parenthesised expression produces the very same 'PatExpr'.
+  warnDeprecatedExactly ann expr
+  pos <- asks (.actionPatternPos)
+  -- 'leaveActionPattern': below this point we are in an EXPRESSION, which may
+  -- contain a @CONSIDER@ whose branch patterns are ordinary patterns (R6).
+  (rexpr, ty) <- leaveActionPattern (inferExpr expr)
+  -- R7, extended by the 2026-09-16 review: a pinned value is matched by
+  -- EQUALITY, and a function has none. Both spellings land here — the
+  -- reference R1 synthesised and the @EXACTLY@ an author wrote — so refusing
+  -- it once here covers both, and covers it at @l4 check@ rather than at the
+  -- first @#TRACE@, where it arrived as "trying to check equality on types
+  -- that do not support it" with nothing to say which name was at fault.
+  -- Argument position only: at the head a function-typed action already fails
+  -- the rule's declared @DEONTIC OF …@ type, and that message is the better
+  -- one.
+  when (pos == InActionArgument && isFunctionType ty) $
+    addError (ActionPatternNotComparable expr ty)
   resPatExpr <- setAnnResolvedType ty Nothing (PatExpr ann rexpr)
   pure (resPatExpr, ty, [])
 inferPattern g@(PatLit ann lit) = errorContext (WhileCheckingPattern g) do
@@ -4166,7 +4723,7 @@ matchPatFunTy  r t args =
           let tf = fun_ argts rt
           assign #substitution (Map.insert i tf subst)
 
-          (rargs, extends) <- unzip <$> traverse (\ (j, e, t') -> checkPattern (ExpectAppArgContext False r j) e t') (zip3 [1 ..] args argts)
+          (rargs, extends) <- unzip <$> traverse (\ (j, e, t') -> descendActionPattern (checkPattern (ExpectAppArgContext False r j) e t')) (zip3 [1 ..] args argts)
           pure (rargs, rt, concat extends)
 
         Just t' -> matchPatFunTy r t' args
@@ -4176,12 +4733,12 @@ matchPatFunTy  r t args =
       -- and then check the arguments against their expected result
       -- types.
       | nonts == nargs -> do
-        (rargs, extends) <- unzip <$> traverse (\ (j, e, t') -> checkPattern (ExpectAppArgContext False r j) e t') (zip3 [1 ..] args (optionallyNamedTypeType <$> onts))
+        (rargs, extends) <- unzip <$> traverse (\ (j, e, t') -> descendActionPattern (checkPattern (ExpectAppArgContext False r j) e t')) (zip3 [1 ..] args (optionallyNamedTypeType <$> onts))
         pure (rargs, rt, concat extends)
 
       | otherwise -> do
         addError (IncorrectArgsNumberApp r nonts nargs)
-        (rargs, _, extends) <- unzip3 <$> traverse inferPattern args
+        (rargs, _, extends) <- unzip3 <$> traverse (descendActionPattern . inferPattern) args
         pure (rargs, rt, concat extends)
       where
         nonts = length onts
@@ -4189,7 +4746,7 @@ matchPatFunTy  r t args =
     _ -> do
       -- We are trying to apply a non-function.
       addError (IllegalApp r t (length args))
-      (rargs, _, extends) <- unzip3 <$> traverse inferPattern args
+      (rargs, _, extends) <- unzip3 <$> traverse (descendActionPattern . inferPattern) args
       pure (rargs, t, concat extends)
 
 -- ----------------------------------------------------------------------------
@@ -5507,10 +6064,14 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
     goNamed ctx' (MkNamedExpr ann n e) = MkNamedExpr ann n (go False ctx' e)
     goGuarded ctx' (MkGuardedExpr ann c f) = MkGuardedExpr ann (go True ctx' c) (go False ctx' f)
     goObl ctx' (MkDeonton ann subj action due mjoin hence lest) =
-      MkDeonton ann (goSubject ctx' subj) (goRAction ctx' action) (fmap (go False ctx') due) (fmap (goJoin ctx') mjoin) (fmap (go False ctx') hence) (fmap (go False ctx') lest)
+      MkDeonton ann (goSubject ctx' subj) (goRAction ctx' action) (fmap (goDeadline ctx') due) (fmap (goJoin ctx') mjoin) (fmap (go False ctx') hence) (fmap (go False ctx') lest)
     goJoin ctx' = \ case
-      JoinOnce ann th due -> JoinOnce ann th (fmap (go False ctx') due)
-      JoinUpon ann ue due -> JoinUpon ann ue (fmap (go False ctx') due)
+      JoinOnce ann th due -> JoinOnce ann th (fmap (goDeadline ctx') due)
+      JoinUpon ann ue due -> JoinUpon ann ue (fmap (goDeadline ctx') due)
+    goDeadline ctx' (MkDeadline ann d ma) = MkDeadline ann (go False ctx' d) (fmap (goAnchor ctx') ma)
+    goAnchor ctx' = \ case
+      AnchorAt ann e -> AnchorAt ann (go False ctx' e)
+      a              -> a
     goSubject ctx' = \ case
       Party ann party -> Party ann (go False ctx' party)
       -- The filter is a BOOLEAN context ('go True'); the roll is a LIST, so it
@@ -5653,6 +6214,15 @@ prettyCheckErrorContext (WhileCheckingType _t ctx)       e = prettyCheckErrorCon
 forkWordsText :: Text
 forkWordsText = Text.strip (prettyLayout (MkUponEach emptyAnno))
 
+-- | The lifecycle anchor's words as a drafter wrote them, for diagnostics
+-- ('L4.Print' is the printer's copy).
+anchorWords :: Anchor n -> Text
+anchorWords = \ case
+  AnchorJoin{}     -> "THE JOIN"
+  AnchorDeadline{} -> "THE DEADLINE"
+  AnchorArming{}   -> "THE ARMING"
+  AnchorAt{}       -> "…"
+
 prettyCheckError :: CheckError -> [Text]
 prettyCheckError (SuspiciousBinderPattern binder ctor)     =
   [ "This CONSIDER branch introduces a new name"
@@ -5793,6 +6363,52 @@ prettyCheckError (NotReachesConnective site)               =
   , "or move the " <> site.connective <> " to a line of its own, starting in the same"
   , "column as the NOT or further left."
   ]
+prettyCheckError (OpenedFieldCollisionAtRead c)              =
+  [ headline <> " of this " <> siteWord c.site <> " have a field named"
+  , ""
+  , "  " <> quotedName c.fieldRead
+  , ""
+  , "so on its own the name could belong to " <> either' <> ":"
+  , ""
+  ] ++ map row c.binders ++
+  [ ""
+  , "Write the one you mean with its input in front, as shown."
+  ]
+  where
+    two = length c.binders == 2
+    headline = if two then "Two inputs" else "Several inputs"
+    either' = if two then "either" else "any of them"
+    projections = [ openedProjection c.fieldRead b | b <- c.binders ]
+    width = maximum (0 : map Text.length projections)
+    row b =
+      let proj = openedProjection c.fieldRead b
+      in "  " <> proj <> Text.replicate (width - Text.length proj + 5) " "
+           <> "(" <> openedBinderDecl b <> ", declared at " <> openedBinderAt b <> ")"
+prettyCheckError (OpenedFieldCollisionAtOpening c b fields)  =
+  [ "This input has " <> (if oneField then "a field name" else "field names")
+      <> " that an earlier input of the " <> siteWord c.site <> " also has:"
+  , ""
+  , "  " <> openedBinderDecl b
+  , ""
+  , "has " <> (if oneField then "a field named " else "fields named ")
+      <> oxford (map quotedName fields) <> ", and so " <> does <> " "
+      <> oxford (map earlier earliers) <> "."
+  , neither <> " can be read by " <> (if oneField then "its bare name" else "these bare names")
+      <> " in this " <> siteWord c.site <> ". Write"
+  , ""
+  ] ++ [ "  " <> openedProjection f b' | f <- fields, b' <- c.binders ] ++
+  [ ""
+  , "wherever the body means one of them. (The bare read is at "
+      <> prettySrcRangeM (rangeOf c.fieldRead) <> ".)"
+  ]
+  where
+    oneField = length fields == 1
+    earliers = takeWhile (/= b) c.binders
+    does = if length earliers == 1 then "does" else "do"
+    neither = if length c.binders == 2 then "Neither one" else "None of them"
+    earlier b' =
+      prettyLayout b'.binderName <> " (" <> typeArticle b'.declaredType <> " "
+        <> prettyLayout b'.declaredType <> ", declared at " <> openedBinderAt b' <> ")"
 prettyCheckError (OutOfScopeError n t)                     =
   [ "I could not find a definition for the identifier"
   , ""
@@ -6030,18 +6646,50 @@ prettyCheckError (ExportAssumeNameClash fnName paramName) =
   , "Both would be one input field, so a request could not supply them separately."
   , "Rename the input or the ASSUME."
   ]
-prettyCheckError (QuantifierVariableRebound b q) =
-  [ "The action of this EVERY binds a new name"
+prettyCheckError (ActionPatternReference n referent) =
+  -- Wording ruled by Meng 2026-09-16 (PATTERN-REFERENCE-RULE-SPEC §4 R5): the fact,
+  -- the referent, and the one thing to do if a placeholder was meant. Nothing else.
+  [ "In this action, " <> quotedName n <> " refers to"
   , ""
-  , "  " <> quotedName (getName b)
+  , "  " <> prettyNameWithRange referent
   , ""
-  , "which is spelled like the quantifier's own variable " <> quotedName (getName q) <> "."
-  , "An action is a pattern, so this would be a fresh name matching anyone,"
-  , "not a reference to the member. To mean the member, write"
+  , "If you wanted a placeholder variable that matches any value, choose a name not already taken."
+  ]
+prettyCheckError (ActionPatternNotComparable e t) =
+  [ "This pins a value that cannot be compared."
   , ""
-  , "  EXACTLY " <> quotedName (getName q)
+  , "  " <> prettyLayout e
   , ""
-  , "in that position; to mean a fresh name, choose a different spelling."
+  , "is of type"
+  , ""
+  , "  " <> prettyLayout t
+  , ""
+  , "An action written with a value in it accepts only events carrying that"
+  , "same value, which means comparing the two. Two functions cannot be"
+  , "compared, so no event could ever match this one."
+  , ""
+  , "Pin something that can be compared, or -- if you meant a name that stands"
+  , "for anything here -- give it a spelling nothing else is using."
+  ]
+prettyCheckError (EmptyBreachBy _) =
+  [ "BREACH BY names an empty list."
+  , ""
+  , "A breach blames at least one party: give BY a party, or a LIST with"
+  , "someone in it, or leave BY out to blame nobody. (A list that is computed"
+  , "and turns out empty is refused when the rule runs.)"
+  ]
+prettyCheckError (BreachByListNeedsPartyType _) =
+  [ "BREACH BY names a list, but the rule's party type is not known here."
+  , ""
+  , "A LIST after BY names several parties, one per element — unless the"
+  , "party type is itself that kind of list, in which case it names one party"
+  , "whose value is a list. Which of the two is meant is decided by the party"
+  , "type, and nothing has fixed it at this point: this BREACH is checked"
+  , "before anything says what the rule's party type is. Either"
+  , ""
+  , "  - give the definition a signature, GIVETH A DEONTIC <party> <action>, or"
+  , "  - if this BREACH is the first operand of a RAND or ROR, write the PARTY"
+  , "    operand first."
   ]
 prettyCheckError (JoinWithoutEvery _) =
   [ "A join line needs an EVERY."
@@ -6062,6 +6710,59 @@ prettyCheckError (ContinuationWithoutJoin _) =
   , "on its own line between the act's WITHIN and the HENCE or LEST, indented"
   , "past the EVERY. There is no default: the two readings differ, and guessing"
   , "one would silently change the rule."
+  ]
+prettyCheckError (AnchorUnavailable a reason) =
+  case reason of
+    NoEnclosingObligation ->
+      [ "OF " <> word <> " names a position in the life of the obligation this one"
+      , "is the continuation of — but this obligation is not WRITTEN inside any"
+      , "HENCE or LEST: it is at the top level, or defined in a WHERE, and the"
+      , "checker cannot see which obligation (if any) it will be attached to."
+      , ""
+      , "Write the anchored obligation inline, under the HENCE or LEST whose " <> noun
+      , "it means, or anchor it to an instant instead: WITHIN d OF <a NUMBER or"
+      , "DATE expression>. (OF THE ARMING is allowed here: it is the arming of"
+      , "whatever obligation this one is attached to when it runs, or its own"
+      , "when there is none, which is where an unanchored WITHIN already counts"
+      , "from.)"
+      ]
+    OnJoinLine ->
+      [ "OF " <> word <> " cannot anchor the WITHIN on a join line."
+      , ""
+      , "A join line's WITHIN is the deadline on the whole group, so it is what"
+      , "OF THE DEADLINE would name, and the group's join has not fired when it is"
+      , "read. Write the join line's WITHIN as a plain duration (it counts from"
+      , "the EVERY's arming), as WITHIN d OF THE ARMING, or as WITHIN d OF an"
+      , "instant, a NUMBER or DATE expression."
+      ]
+    JoinUnderLest ->
+      [ "OF THE JOIN cannot anchor a WITHIN under LEST."
+      , ""
+      , "LEST runs because the obligation was NOT completed — its join did not"
+      , "fire — so there is no join to count from. Under LEST, anchor to"
+      , "OF THE DEADLINE (the deadline that was missed), to OF THE ARMING, or to"
+      , "an instant; or leave the WITHIN unanchored."
+      ]
+    EnclosingHasNoDeadline ->
+      [ "OF THE DEADLINE names the deadline of the obligation this one is the"
+      , "continuation of, but that obligation has no WITHIN — not on its act, and"
+      , "not on its join line — so it has no deadline to count from."
+      , ""
+      , "Give the enclosing obligation a WITHIN, or anchor this one elsewhere:"
+      , "OF THE JOIN (under HENCE), OF THE ARMING, or an instant."
+      ]
+  where
+    word = anchorWords a
+    noun = case a of
+      AnchorJoin{}     -> "join"
+      AnchorDeadline{} -> "deadline"
+      AnchorArming{}   -> "arming"
+      AnchorAt{}       -> "anchor"
+prettyCheckError (AnchorNotAnInstant _ given) =
+  [ "The anchor after OF in a WITHIN is expected to be an instant — a NUMBER on"
+  , "the trace's own clock, or a DATE — but is here of type"
+  , ""
+  , "  " <> prettyTypeForDisplay given
   ]
 prettyCheckError (RegulativeActorMismatch party performer actionName) =
   [ "An actor may only perform its own actions."
@@ -6136,6 +6837,57 @@ prettyCheckWarning = \ case
     , ""
     , "where a and b are the GIVEN inputs."
     ]
+  DeprecatedExactly info -> case info.advice of
+    DropTheKeyword line ->
+      [ "EXACTLY is no longer needed here, and it is being retired."
+      , "Nothing is broken: the file still checks, runs and exports as before."
+      , ""
+      , "A name written in an action already refers to the thing it names, and a"
+      , "parenthesised expression is already read as an expression. Write"
+      , ""
+      , "  " <> line
+      , ""
+      , "in place of the EXACTLY and this rule means exactly what it means now."
+      ]
+    KeepItUnresolved ->
+      [ "EXACTLY is being retired, but here it cannot simply be dropped."
+      , ""
+      , "What follows it does not name anything in scope. Written without the"
+      , "keyword it would not be a reference at all: it would be a brand new"
+      , "name, and a new name in an action matches anything. So removing the"
+      , "keyword would change what this rule requires."
+      , ""
+      , "Say what the name should refer to, or -- if a placeholder really is"
+      , "what you want -- give it a spelling that says so."
+      ]
+    KeepItShadowedByConstructor n ->
+      [ "EXACTLY is being retired, but here it cannot simply be dropped."
+      , ""
+      , quotedName n <> " names two things here: a value, and a constructor."
+      , "With the keyword this is the value. Without it, a name that is also a"
+      , "constructor is read as the constructor -- so removing the keyword"
+      , "would quietly change which events this rule accepts."
+      , ""
+      , "Rename one of the two, so the name means only one thing where you"
+      , "write it, and then the keyword can go."
+      ]
+  OpenedFieldShadowsDefinition s ->
+    [ "This name is read as a field of " <> prettyLayout s.binder.binderName
+        <> ", not as the " <> what <> " of the same name:"
+    , ""
+    , "  " <> quotedName s.fieldRead
+    , ""
+    , "A field of a record input outranks a " <> what <> " it shares a name"
+    , "with, so the input decides what the body says. Write"
+    , ""
+    , "  " <> openedProjection s.fieldRead s.binder
+    , ""
+    , "if that is what you meant, and rename one of the two if it is not."
+    ]
+    where
+      what = case s.shadowed of
+        ShadowedConstructor -> "constructor"
+        ShadowedDefinition  -> "definition"
   DeprecatedAssume info ->
     [ "ASSUME is an older way of introducing a name, and it is being retired."
     , "Nothing is broken: the file still checks, runs and exports as before."
@@ -6399,6 +7151,19 @@ prettyTypeMismatch ExpectRegulativePartyContext expected given =
   standardTypeMismatch [ "The PARTY clause of a regulative rule is expected to be of type" ] expected given
 prettyTypeMismatch ExpectRegulativeActionContext expected given =
   standardTypeMismatch [ "The DO clause of a regulative rule is expected to be of type" ] expected given
+prettyTypeMismatch (ExpectActionPatternReferenceContext n) expected given =
+  standardTypeMismatch
+    [ "In this action, " <> quotedName n <> " names something already in scope, so it"
+    , "refers to that thing rather than introducing a new name. Read that way it"
+    , "does not fit the slot it is in, which is expected to be of type"
+    ]
+    expected given
+    <> [ ""
+       , "There are two ways to fix this, and which one is right depends on what"
+       , "you meant. If you meant the thing " <> quotedName n <> " names, then this action's"
+       , "type is wrong here. If you meant a name that stands for anything, give"
+       , "it a spelling nothing else is using."
+       ]
 prettyTypeMismatch ExpectRegulativeDeadlineContext expected given =
   standardTypeMismatch [ "The WITHIN clause of a regulative rule is expected to be of type" ] expected given
 prettyTypeMismatch ExpectRegulativeFollowupContext expected given =
@@ -6418,6 +7183,12 @@ prettyTypeMismatch ExpectPartyActionAgreementContext expected given =
     ] expected given
 prettyTypeMismatch ExpectAssertContext expected given =
   standardTypeMismatch [ "An ASSERT directive is expected to be of type" ] expected given
+prettyTypeMismatch ExpectBreachPartyContext expected given =
+  standardTypeMismatch
+    [ "The party named by BREACH BY is expected to be of the rule's party type."
+    , "A LIST there names several parties, each of that type (or, when the party"
+    , "type is itself a LIST, the one party). The party type here is"
+    ] expected given
 prettyTypeMismatch ExpectBreachReasonContext expected given =
   standardTypeMismatch [ "The BECAUSE clause of a BREACH is expected to be of type" ] expected given
 prettyTypeMismatch ExpectRefuseMessageContext expected given =
@@ -6438,6 +7209,14 @@ prettyTypeMismatch ExpectQuantifierRollContext expected given =
     ] expected given
 prettyTypeMismatch ExpectJoinDeadlineContext expected given =
   standardTypeMismatch [ "The WITHIN on a join line (the deadline on the whole) is expected to be of type" ] expected given
+prettyTypeMismatch ExpectAnchoredDurationContext expected given =
+  standardTypeMismatch
+    [ "In WITHIN d OF anchor, everything before OF is the duration d, and inside"
+    , "it OF is never a function call: WITHIN f OF x means f anchored at x. To"
+    , "apply a function in the duration, bracket it (WITHIN (f OF x) OF ...) or"
+    , "juxtapose its arguments (WITHIN f x OF ...). The duration is expected to"
+    , "be of type"
+    ] expected given
 
 -- | Best effort, only small numbers will occur"
 prettyOrdinal :: Int -> Text
@@ -6505,6 +7284,40 @@ prettyOptionallyNamedType (MkOptionallyNamedType _ Nothing  t) =
   "an unnamed input of type " <> prettyLayout t <> " (this is most likely an internal error)"
 prettyOptionallyNamedType (MkOptionallyNamedType _ (Just r) t) =
   prettyLayout r <> " of type " <> prettyLayout t
+
+-- | @r's f@, as the R5 collision diagnostics ask the author to write it.
+openedProjection :: Name -> OpenedBinderDecl -> Text
+openedProjection field b = prettyLayout b.binderName <> "'s " <> prettyLayout field
+
+-- | @buyer IS A Buyer@ — the binder as its GIVEN line declared it.
+openedBinderDecl :: OpenedBinderDecl -> Text
+openedBinderDecl b =
+  prettyLayout b.binderName <> " IS " <> Text.toUpper (typeArticle b.declaredType)
+    <> " " <> prettyLayout b.declaredType
+
+-- | @a@ or @an@, by the type's spelling, as the surface syntax spells it.
+typeArticle :: Type' Name -> Text
+typeArticle ty =
+  case Text.uncons (Text.dropWhile (== '`') (prettyLayout ty)) of
+    Just (ch, _) | Text.toLower (Text.singleton ch) `elem` ["a", "e", "i", "o", "u"] -> "an"
+    _ -> "a"
+
+-- | Where the binder was declared. Read off the GIVEN-line occurrence, which
+-- carries a range even for the @GIVEN x IS A T@ + @DECIDE f IS ...@ form whose
+-- 'Resolved' does not ('L4.Names.OpenedBinderDecl').
+openedBinderAt :: OpenedBinderDecl -> Text
+openedBinderAt b = prettySrcRangeM (rangeOf b.binderName)
+
+siteWord :: OpeningSite -> Text
+siteWord DeclarationOpening = "rule"
+siteWord SectionOpening     = "section"
+
+-- | @a@, @a and b@, @a, b and c@ — a list joined the way a sentence joins it.
+oxford :: [Text] -> Text
+oxford = \ case
+  []  -> ""
+  [x] -> x
+  xs  -> Text.intercalate ", " (init xs) <> " and " <> last xs
 
 -- | Show the name with its original / definition source range.
 prettyResolvedWithRange :: Resolved -> Text

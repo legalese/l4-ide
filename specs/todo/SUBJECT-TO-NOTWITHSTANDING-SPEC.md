@@ -11,6 +11,10 @@
 >   is that the **first build is a derivation lint over the existing call graph, not syntax**; five
 >   of §6.1's eight constructs are declined on measurement; and §10.8 S3 is narrowed by §12.2. The
 >   lint is **ruled and not built**.
+> - §12.3 (posed 2026-09-11 as a §11 on a branch, landed here after `unstable` grew its own §11 and §12)
+>   records rulings **A1–A5**, the five the corpus survey forces. **All five ANSWERED** — A1–A4 on
+>   2026-09-15, A5 on 2026-09-16 — on the APPLIES bench and in chat; the marks are in §12.3.3.
+>   Nothing under §12.3 is implemented.
 
 > **Prior art from the backend portfolio (added 2026-08-16):** two independently-implemented,
 > battle-tested target-side defeasibility mechanisms — and one ratified interchange standard —
@@ -42,6 +46,7 @@
 **Revised:** 2026-06-17 — added §2.8–2.9 (override as aspect-oriented _advice_; amendment as homoiconic source rewrite + the modular-verification boundary), §5.5–5.6 (AOP; PROLEG / negation-as-failure), §6.5–6.6 (advice as the organizing principle; relationship to `TYPICALLY`).
 **Revised:** 2026-08-16 — added §9 (`APPLIES`: the read side of override — the four-conjunct applicability decomposition, post-weaving semantics, closed-world elaboration and its cliff into homoiconicity, the _-plies_ philology) plus §9 references.
 **Revised:** 2026-08-19 — §9.4 corpus quotes upgraded from schematic/paraphrase to verbatim: Companies Act 2006 s 724 replaces the invented two-step example, HRA 1998 s 10(1)(a)/(4) now quoted rather than paraphrased; both verified against legislation.gov.uk (in-browser — direct fetches are bot-walled).
+**Revised:** 2026-09-16 — §12.3 records the five rulings the survey forces (A1–A5) as ANSWERED (posed 2026-09-11 as a §11 on a branch; renumbered on landing), each with its downstream forecast and its cost of being wrong, plus a proposed sequencing. §11.1 records that §10.2's lexer-hazard claim was withdrawn on checking the lexer, which weakened the main argument against a keyword; §11.2 adds the option §10.8 omitted — a verdict vocabulary in `jl4-core/libraries` rather than in the language. A1 (does `applies` include the in-force conjunct?) is flagged as the one ruling that does not defer. No ruling is decided; owner is Meng.
 **Revised:** 2026-08-28 — added §10, the corpus survey (559 sites across `legalese/canon` and `legalese/l4-ide`): `appl*` is four verbs of which only half are applicability; encoders already hand-roll §9.5's projections; a Boolean `applies` was measured insufficient (a six-member verdict, arrived at by adversarial review); four Acts encode "cannot be applied on this evidence" four incompatible ways; all three R10 escapes have witnesses. Discharges "Next Steps" item 1 for the read side, answers §7.1 and §9.9.1 (which had cited a §8.1 that never existed), and re-verifies the drifted `Lexer.hs` line references.
 **Branch:** mengwong/applies-corpus-survey (§10); docs/residual-sidebar (§11, PR #318); mengwong/spec-notwithstanding (original)
 **Revised:** 2026-08-28 — added §11 (defeasance by recorded act: the discretionary override — Hohfeldian power/immunity typing, the three strengths of fiat, the ledger as defeater store, the control-effect / intuitionistic reading) plus §11 references. Same-day companions: `doc/concepts/legal-modeling/residual.md` (the residual bridge) and `paper/hohfeld-higher-order/DESIGN.md` (2026-08-28 addendum).
@@ -907,10 +912,31 @@ the drafting connective ("_subject to_ section 6"), and the two are not lexicall
 predicate sense frequently cites a section too ("subject to a disqualification as specified in
 section 227.503(a)").
 
-This is the survey's first finding and it is about syntax, not semantics: **`APPLIES` and
-`SUBJECT TO` are homonyms of high-frequency corpus vocabulary**, and both senses already appear
-inside identifier text that the parser sees. Compare the known mixfix/identifier collision traps
-(smucclaw/l4-ide#944, #948). Any keyword design under §8 item 2 has to survive this.
+This is the survey's first finding: **`APPLIES` and `SUBJECT TO` are homonyms of high-frequency
+corpus vocabulary.** Be precise about what that does and does not threaten.
+
+It is **not** a lexer hazard. Every one of the 130 identifiers is backtick-quoted, and `quoted`
+(`jl4-core/src/L4/Lexer.hs:496-499`) consumes everything between backticks as a single `TQuoted`
+token — "printable char except backticks" — so a reserved `APPLIES` would not collide with
+`` `the guardian may apply to the court under section 7(4)` `` any more than the existing `IF` and
+`AND` collide with `` `is adult` ``. A sweep for unquoted `appl*` in both corpora finds it only
+inside string literals, `@desc`/`@export` prose and comments, which are equally opaque. (An
+earlier draft of this section asserted that "both senses appear inside identifier text that the
+parser sees"; that inferred a hazard from a frequency count without reading the lexer, and it is
+withdrawn.)
+
+What the homonymy does threaten is narrower, and worth naming exactly:
+
+- **Unquoted mixfix patterns.** A user-defined mixfix that wants the bare word — the corpus does
+  not currently have one, but nothing prevents it — would collide, in the manner of
+  smucclaw/l4-ide#944 and #948.
+- **The prose round-trip.** NLG emits sentences containing "applies" in all four senses; a keyword
+  spelled the same way widens the gap between generated prose and source, which the
+  legislative-prose work is trying to close.
+- **Human ambiguity, which the count does measure.** A reader meeting `APPLIES` in a file where
+  47% of nearby `appl*` vocabulary means "petition the court" or "appropriate the funds" has to
+  disambiguate every time. That is a readability cost, not a parsing one — but readability is the
+  whole point of an isomorphic surface syntax.
 
 ### 10.3 Encoders already hand-roll the projections of §9.5
 
@@ -1067,14 +1093,17 @@ Settled by measurement, and recorded here as the answer to §8 item 1 for the re
 
 **Not settled, and deliberately left to the concrete-syntax decision (§8 item 2):**
 
-- **Q1.** The return type of a top-level applicability read: Boolean, the defeasible Boolean of
+- **Q1.** _ANSWERED 2026-09-15, see §12.3.3 A2 and A3._ The return type of a top-level applicability read: Boolean, the defeasible Boolean of
   §6.4, a three-valued answer, or a verdict-with-reason. §10.4 shows the corpus needed the last of
   these; whether the _language primitive_ should be that rich, or should be Boolean with the
   richness built above it, is a design call.
-- **Q2.** How to spell it, given §10.2's homonymy — a keyword, an annotation on the cited label, or
+- **Q2.** _ANSWERED 2026-09-15, see §12.3.3 A4._ How to spell it, given §10.2's homonymy — a keyword, an annotation on the cited label, or
   a derived name in a reserved namespace.
-- **Q3.** Whether selector reads (§10.7) are the same construct returning a provision, or a
+- **Q3.** _ANSWERED 2026-09-16, see §12.3.3 A5._ Whether selector reads (§10.7) are the same construct returning a provision, or a
   different one.
+
+§12.3 restates Q1–Q3 as numbered rulings with their consequences forecast, adds two the survey
+exposed that this list did not have, and — since 2026-09-16 — records all five as answered.
 
 ## 11. Defeasance by Recorded Act: the Discretionary Override
 
@@ -1582,7 +1611,7 @@ it.
 **What review changed.** The prior analysis recommended the annotation. This ruling declines it, on
 the probe above and on `modeBClauses`'s actual scope, and replaces "design the syntax" with "derive
 the edge, then rule the syntax on what you find". The five declined constructs were already the
-prior analysis's recommendation and are unchanged. `§10.8` Q1 and Q3 **stay OPEN**; §10.9 records
+prior analysis's recommendation and are unchanged. `§10.8` Q1 and Q3 **stay OPEN** _(true when written; both answered since — §12.3.3)_; §10.9 records
 the one correction to §10.8's settled findings.
 
 **Owed, and not done by the author of this change, which has no GitHub write authority:** cross-post
@@ -1618,7 +1647,190 @@ so the decision answered `TRUE` of a sole-executor will — "a subsection report
 where its own opening words do not reach". An `@ref` promising an override over a body that calls
 nothing is exactly that bug, and it is machine-detectable.
 
-**Unchanged:** S1, S2, S4, S5 and the open questions Q1, Q2 and Q3 of §10.8.
+**Unchanged:** S1, S2, S4, S5 and the open questions Q1, Q2 and Q3 of §10.8 _(the three questions have since been answered in §12.3.3; S1–S5 are unchanged)_.
+
+### 12.3 The rulings the survey forces, and what each one cost — ANSWERED 2026-09-15/16
+
+> **Status:** posed 2026-09-11 (as `## 11` on branch `mengwong/applies-corpus-survey`, never PR'd; by
+> the time it landed `unstable` had its own §11 and §12, so it lives here as §12.3). **All five rulings
+> ANSWERED** — A1–A4 marked by Meng on 2026-09-15, A5 on 2026-09-16 — on the APPLIES bench
+> (<https://claude.ai/artifact/UTykRduqWbvkR7tqaK7X69>, store `applies-rulings/A1..A5`) and in chat, and
+> recorded in §12.3.3 with his words. The recommendations he marked were the GM's, one opinion, no
+> adversarial pass — said so on the bench. **Nothing here is implemented**; §12.3.4's sequencing is
+> still the proposal for whoever builds it.
+
+#### 12.3.1 What review changed before any ruling was taken
+
+Recorded because it moved the answer, not just the wording. The first draft of §10.2 argued that
+the `appl*` homonymy was a **parsing** hazard, citing the mixfix collision traps. That inferred a
+hazard from a frequency count without reading the lexer, and it was wrong: backtick-quoted names
+are a single opaque token (`Lexer.hs:496-499`), so a reserved word cannot collide with them. The
+claim is withdrawn in §10.2 and the three risks that survive checking are named there.
+
+**Consequence for the rulings below:** the homonymy count was the main argument against spelling the
+read as a keyword, and it no longer carries that weight. A1-A5 are posed with the corrected version.
+
+#### 12.3.2 A question that was missing: where does the verdict live?
+
+§10.8's Q1 offered a binary — Boolean primitive, or verdict primitive. That framing omitted the
+option with the most precedent in this repo. Three places can own an applicability verdict:
+
+| Home             | Mechanism                                                   | Precedent                                                                                        |
+| ---------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **userland**     | each encoding declares its own enum                         | the status quo — and §10.5 measures its cost: four Acts, four incompatible conventions, one week |
+| **a library**    | one `DECLARE … IS ONE OF` in `jl4-core/libraries`, imported | `hierarchy.l4`, `jurisdiction.l4`, `legal-persons.l4`, the actus vocabulary family               |
+| **the language** | a primitive the typechecker and evaluator know about        | none for a domain vocabulary of this kind                                                        |
+
+The library option is absent from §10.8 and should not have been. It buys one shared vocabulary
+across subjects — which is what §10.5's finding actually asks for — while leaving the vocabulary
+revisable by a version bump rather than a language change.
+
+Second omission: **three-valued applicability needs no new construct.** `MAYBE BOOLEAN` is in the
+language, and the Guardianship of Infants encoding already used `NOTHING` for exactly this case
+(§10.5). Whatever else is decided, the uncertainty case is expressible today.
+
+#### 12.3.3 The rulings
+
+Stable identifiers, for answering in place. Each says what it decides, what it forecloses, and how
+expensive it is to get wrong.
+
+---
+
+**A1. Does the derived `applies` include conjunct 1 (`inForce`)?**
+**RULED 2026-09-15 (Meng, `accept`): yes — include `inForce`.** Meng: _"A1: I take your
+recommendation."_ The recommendation, with its two conditions, now binding: **(1)** where no pin is
+active and a provision carries no commencement data, `inForce` is `TRUE` — written into the derivation,
+not left to the evaluator; **(2)** the within-version read (conjuncts 2–4) stays available as its own
+named projection. The asymmetry that decided it: an `applies` written as within-version silently
+changes meaning the day someone pins a date on that module; one written to include `inForce` never
+changes meaning. The word means what a lawyer means by it.
+_Subsumes nothing; this ruling was not previously posed._
+
+The only ruling here that does not defer, because it is the one place the read side touches
+machinery that has already shipped. The four `EVAL` pins are live
+(`TEMPORAL_EVAL_SPEC.md`; `Environment.hs`), and purely-temporal applicability is being hand-written
+into the corpus now — Wills Act s 5(9) is nothing but a commencement boundary, and CA 2006
+s 724(5)(a) (§9.4) reads `applies` as of a past purchase.
+
+- If **yes**, every read composes with the ambient temporal context for free, and a read under
+  `EVAL … UNDER RULES EFFECTIVE AT` means what a lawyer would expect.
+- If **no**, `applies` is a within-version predicate and the corpus needs a second, temporal
+  predicate beside it permanently.
+
+**Cost of getting it wrong:** every subject encoded before this is settled picks an answer by
+accident, and the two answers are not interconvertible after the fact. This is the ruling to take
+first even if the rest wait.
+
+---
+
+**A2. Where does the verdict vocabulary live?** _Subsumes §10.8 Q1._
+**RULED 2026-09-15 (Meng, `modify`): a canon common-types library — and, sharper, under the
+subject.** Meng: _"A2, yes, go ahead with modify; surely any types that belong to a subject should show
+up under that subject, not in global libs?"_ So the table below is read with a fourth row the survey
+did not pose: **(0)** a type that belongs to one subject lives under that subject in canon; **(1)** only
+genuinely cross-subject vocabulary goes in a canon common-types library; **(2)** `jl4-core/libraries`
+is the home only for types the compiler computes over — and under A3, applicability is not one of
+them. What moved the recommendation off `jl4-core/libraries`, measured 2026-09-15: the requirement
+§10.5 states is _one shared vocabulary_, not _shipped with the compiler_; canon is public; a
+`jl4-core` library change reaches a user only through a release (main was 1680 commits behind
+`unstable` that day) while a canon commit is live at once; and the six members were measured in one
+subject. Costs to pay, all measured: canon has no shared-library convention yet
+(`docs/directory-conventions.md` shares only `source/` within a subject); the subject that measured
+the six members lives in l4-ide (`legal/sg-succession`, now vendored from canon — see
+`CANON-REGRESSION-CORPUS-SPEC.md`); a resolution path for a canon-wide library in every rig.
+Options and their forecast, per §12.3.2:
+
+| Choice                     | canon growth                                    | the six export backends                                           | verifier / ROBDD                         | NLG                                                      | reversibility       |
+| -------------------------- | ----------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------- | -------------------------------------------------------- | ------------------- |
+| Boolean, userland verdicts | re-invented per subject; measured cost in §10.5 | cleanest — every target is Boolean-native                         | cleanest                                 | neutral                                                  | high                |
+| Library verdict            | one vocabulary, imported                        | fine — an enum; DMN itemDefinitions already carry enums (PR #175) | unaffected: verify the Boolean conjuncts | gift — corpus verdict members are already full sentences | high (version bump) |
+| Language primitive         | one vocabulary, enforced                        | every backend must track vocabulary changes                       | typechecker coupling                     | same                                                     | low                 |
+
+**The honest uncertainty, which argues against the third column.** The six members of §10.4 were
+measured in **one subject, succession law**. Two of them — renvoi and empty-domain — may be
+conflict-of-laws artefacts rather than general structure. Freezing six members observed once into a
+language primitive would repeat, at much greater cost, exactly the over-generalisation §12.3.1
+withdrew.
+
+---
+
+**A3. How is applicability-under-uncertainty represented?** _Part of §10.8 Q1._
+**RULED 2026-09-15 (Meng, `accept`): `MAYBE BOOLEAN`, no new primitive.** Meng: _"A3: I take your
+recommendation."_ Every derived projection is `MAYBE BOOLEAN`; if A2's library carries an
+"undetermined on this evidence" member, the library states the mapping `NOTHING ↔ that member` in one
+place. _Rebuttable_ (§6.4's defeasance) and _unknown_ stay distinct; the corpus conflates them today.
+Nothing is foreclosed — a later primitive could desugar to `MAYBE`; what is fixed is §10.5's
+four-spellings problem.
+`MAYBE BOOLEAN` (available today, already used for this in the corpus), a three-valued primitive, or
+a member of A2's verdict. §10.5 is the evidence that _something_ must be chosen: four Acts in one
+corpus chose four different things, each deliberately. Note the tie to the ladder's
+FALSE-vs-UNKNOWN axis (PR #191) and to §6.4's defeasible Boolean — a read that can be rebutted and a
+read that is unknown are different things, and the corpus conflates them today.
+
+---
+
+**A4. How is the read spelled?** _Subsumes §10.8 Q2. Recommended: defer._
+**RULED 2026-09-15 (Meng, `modify`): the label _is_ the read — `` `s 27` p ``. No keyword, no
+reification.** Meng: _"I've always preferred the short names like just `s 27`. I thought we might go
+higher order but that seems risky."_ Offered two readings — (i) the label supplies the verb, as the
+clitic supplies _is_, so the derived projection is named by the node's label alone; (ii) a short label
+plus a keyword, `` `s 27` APPLIES TO p `` — he took (i): _"A4, i'd prefer i."_ Both reject the
+higher-order forms (`` `s 27`'s `applies` ``, or `applies` taking the provision as a value); R10 stays
+the escape hatch. This overrides the deferral recommended below: the spelling is decided, the keyword
+is not coming. **Two things owed before it is built:** the four conjunct projections need spellings of
+their own (the label alone names the whole read); and a measurement — whether a section heading's
+name can double as a function name in the same module without colliding in name resolution.
+The GM's position, recorded because Meng asked: neutral-to-supportive.
+Keyword (`` `s 27` APPLIES TO p ``), derived projection names (`` `s 27 applies` p ``), a selector on
+the label (`` `s 27`'s `applies` p ``), or a stdlib mixfix. §12.3.1 removes the parsing objection to the
+first; the residual objections are the NLG round-trip and reader ambiguity.
+
+**Why defer:** the strongest argument for a keyword is readability under isomorphic drafting, and
+that argument is best settled by seeing what encoders write once the projections exist. Deriving
+names first (§12.3.4) costs nothing that a later keyword would have to undo — the keyword becomes
+sugar over names that already work.
+
+---
+
+**A5. Are selector reads the same construct?** _Subsumes §10.8 Q3._
+**RULED 2026-09-16 (Meng, `accept`): separate, for now.** Meng: _"I will take your recommendation
+for separate for now."_ Selectors are stdlib functions over the per-node Boolean projections, not a
+generated family; the two wizard selectors stay hand-written; revisit after the next wizard. The
+basis, shown against the five §10.7 sites: two (both wizards — `` `which part of Rule 501(a)(4) applies
+to` ``, `` `which limb applies` ``) would gain from a generated `` `which of <parent> applies to` ``;
+three would not (`` `the schedule that applies in` `` already returns a field of a richer record; `` `the
+law that applies` `` and `` `the provision applied` `` are answer-record fields, the last not even a
+label); none would get its prose generated; and the family reading forces an overlap semantic
+(`LIST` vs first-match) that the corpus decides per site today, plus a generated enum per parent node
+— a mild form of the reification A4 rejected. Nothing forecloses the family reading later: its
+selectors are definable over these projections.
+§10.7 found five reads that return _which_ provision governs rather than whether one does, two of
+them returning explanation prose rather than a label. Either applicability is a family of which the
+Boolean read is one member, or selectors are a separate construct that happens to share a verb. The
+second reading is cheaper; the first is the one that would let `` `which part of Rule 501(a)(4)
+applies to` `` and `` `the schedule that applies in` `` be generated rather than hand-written.
+
+#### 12.3.4 Proposed sequencing, for whoever picks this up
+
+This is a proposal, not a ruling, and deliberately front-loads the reversible work.
+
+1. **Derive the four conjunct projections per labelled node (I1).** Needs no ruling: §10.3 measures
+   that encoders already hand-write exactly these, at every structural level (§10.7). Reversible,
+   and it gives §9.6's stratification check something to attach to. The pilot named in §8 item 6 —
+   Contracts (Rights of Third Parties) Act 2001 — still stands, and the survey adds two better ones:
+   Wills Act s 5(9)/s 27 and Charities (Jersey) Art 10(4)/27(1), which already have the hand-rolled
+   predicates to diff against.
+2. **Take A1**, because the corpus is accumulating reads that assume an answer.
+3. ~~**A2 into `jl4-core/libraries`** if the library option is chosen, so subjects converge without the
+   language committing.~~ _Overruled by A2's mark (2026-09-15): the verdict vocabulary goes in canon, and
+   a type that belongs to one subject lives under that subject. The six-member verdict was measured in
+   one subject (succession), so under that rule it lives under `subjects/sg/succession/` until a second
+   subject needs it — there is nothing to put in a common library yet, and nothing in `jl4-core`._
+4. **A4 and A5 after two more subjects** have used the projections.
+
+The write side (`SUBJECT TO` et al.) is not in this sequence and remains the larger prize: §10.3
+measures that weaving currently lives in comments, and three shipped export backends have
+defeasibility constructs with nothing in L4 to lower into them.
 
 ---
 
@@ -1735,7 +1947,9 @@ nothing is exactly that bug, and it is machine-detectable.
 Measured 2026-08-28. Counts in §10 are reproducible at these commits with the `grep` in §10.1.
 
 - `legalese/canon` @ `2589fdd` (`mengwong/drafts`) — `subjects/sg/{succession,pdpa-2012,penal-code-1871,child-support}`. Chief witnesses: `cleanroom-2026-08/family-cases.l4` (the six-member verdict, §10.4; the four-Act evidence comparison, §10.5), `cleanroom-2026-08/guardianship-of-infants-act.l4` ("carried, not dropped", §10.3; s 5A(1)'s two-step), `cleanroom-2026-08/wills-act.l4` (hand-rolled projections, §10.3).
-- `legalese/l4-ide` @ `81f0f752` (`origin/unstable`) — `jl4/examples/legal/**`, `paper/case-studies/**`. Chief witnesses: `charities-jersey-2014/part-3-charity-test.l4` (Art 5(3) runtime disapplication, §10.6), `part-5-governors.l4` (Art 18(3) open quantification and non-static priority, §10.6), `gco-jersey-covid/MHO-as-at-20210115.l4` ("as applied by Article 14", §10.6), `regcf/regcf-wizard.l4` (selector reads, §10.7), `sg-succession/sg-isa.l4` (hand-woven `SUBJECT TO`, §10.3).
+- `legalese/l4-ide` @ `81f0f752` (`origin/unstable`) — `jl4/examples/legal/**`, `paper/case-studies/**`. Chief witnesses: `charities-jersey-2014/part-3-charity-test.l4` (Art 5(3) runtime disapplication, §10.6), `part-5-governors.l4` (Art 18(3) open quantification and non-static priority, §10.6), `gco-jersey-covid/MHO-as-at-20210115.l4` ("as applied by Article 14", §10.6), `regcf/regcf-wizard.l4` (selector reads, §10.7), `sg-succession/sg-isa.l4` (hand-woven `SUBJECT TO`, §10.3) — **since the canon migration that file
+  is `jl4/examples/canon/sg/succession/sg-isa.l4`; the `@ 81f0f752` coordinates above are the state
+  when this was measured and are left as the dated record they are**.
 
 ---
 

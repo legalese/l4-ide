@@ -1,0 +1,25 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+regulative-reference-outer.l4:27:26-44:
+  I found a problem while checking the definition of `top level reference`:
+    In this action, `the agreed price` refers to
+    
+      `the agreed price` (at regulative-reference-outer.l4:23:1-19)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+regulative-reference-outer.l4:29:1-30:33:
+  PARTY Buyer MUST pay `the agreed price` WITHIN 20 HENCE FULFILLED LEST BREACH
+regulative-reference-outer.l4:31:1-32:35:
+  FULFILLED
+regulative-reference-outer.l4:38:26-44:
+  I found a problem while checking the definition of `imported reference`:
+    In this action, `the imported fee` refers to
+    
+      `the imported fee` (at regulative-reference-outer-lib.l4:3:1-19)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+regulative-reference-outer.l4:40:1-41:33:
+  PARTY Buyer MUST pay `the imported fee` WITHIN 20 HENCE FULFILLED LEST BREACH
+regulative-reference-outer.l4:42:1-43:35:
+  FULFILLED

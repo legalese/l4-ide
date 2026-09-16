@@ -1,2 +1,9 @@
 Parsing successful
 Typechecking successful
+rand.l4:20:37-48:
+  I found a problem while checking the definition of `sign and deliver`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at rand.l4:14:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.

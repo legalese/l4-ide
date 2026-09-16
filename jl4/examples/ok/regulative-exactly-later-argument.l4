@@ -20,6 +20,16 @@ IMPORT prelude
 -- example the spec itself writes — `Receipt (EXACTLY theLandlord) (EXACTLY t)
 -- (EXACTLY amount)` — is exactly this shape. Nothing about it is quantifier-
 -- specific: every rule below binds one PARTY.
+--
+-- THIS FILE KEEPS THE KEYWORD ON PURPOSE. Since R3 of
+-- specs/todo/PATTERN-REFERENCE-RULE-SPEC.md, EXACTLY is deprecated and the
+-- corpus was swept of it — but deprecated is not removed: it still parses and
+-- still means what it meant, and this is the file that says so. It is the only
+-- place where the keyword is exercised in a WORKING deontic action, so it is
+-- also where the deprecation warning's pasteable advice ("write `alice` in
+-- place of the EXACTLY") is pinned by a golden. The bare twins at the foot
+-- show the same rules in the spelling that replaces it, with the same traces
+-- and the same answers.
 
 DECLARE Actor IS ONE OF
     Landlord HAS name IS A STRING
@@ -75,3 +85,24 @@ GIVETH A DEONTIC Actor Action
 -- pinning it: the landlord is not Alice's payee here.
 #TRACE `alice pays the landlord` AT 0 WITH
   PARTY alice DOES Pay alice alice AT 1
+
+-- THE SAME RULES WITHOUT THE KEYWORD (R1/R3). A bare name in an argument slot
+-- already refers to what it names, so these say what the ones above say, and
+-- the traces below agree with the traces above answer for answer.
+GIVETH A DEONTIC Actor Action
+`pays the landlord, bare` MEANS PARTY alice MUST Pay payer theLandlord WITHIN 7
+
+#TRACE `pays the landlord, bare` AT 0 WITH
+  PARTY alice DOES Pay alice theLandlord AT 1
+
+GIVETH A DEONTIC Actor Action
+`notes the landlord, bare` MEANS
+    PARTY alice MUST Note alice theLandlord what WITHIN 7
+
+#TRACE `notes the landlord, bare` AT 0 WITH
+  PARTY alice DOES Note alice theLandlord "hello" AT 1
+
+-- and a mismatching one: the second argument refers to theLandlord, so an
+-- otherwise well-formed note to somebody else does NOT discharge it.
+#TRACE `notes the landlord, bare` AT 0 WITH
+  PARTY alice DOES Note alice alice "hello" AT 1

@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+regulative-reference-selector-wildcard.l4:26:1-27:47:
+  FULFILLED
+regulative-reference-selector-wildcard.l4:37:1-38:47:
+  PARTY Alice MUST Pay Alice `Ms Ng` amount PROVIDED (amount AT LEAST 1000) WITHIN 20 HENCE FULFILLED LEST BREACH
+regulative-reference-selector-wildcard.l4:39:1-40:50:
+  FULFILLED
