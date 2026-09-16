@@ -49,8 +49,8 @@ tenants     MEANS LIST alice, bob
 -- MUST so that a late act BREACHES and reports the deadline it missed.
 GIVETH A DEONTIC Actor Action
 `cooling off` MEANS
-    PARTY shop MUST Deliver (EXACTLY shop) WITHIN 30
-    HENCE (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 WITHIN 30
+    PARTY shop MUST Deliver shop WITHIN 30
+    HENCE (PARTY buyer MUST Order buyer AFTER 3 WITHIN 30
            HENCE FULFILLED)
     LEST BREACH
 
@@ -91,8 +91,8 @@ GIVETH A DEONTIC Actor Action
 -- not a breach here; it is a permission that expired unused.
 GIVETH A DEONTIC Actor Action
 `cooling off, may` MEANS
-    PARTY shop MUST Deliver (EXACTLY shop) WITHIN 30
-    HENCE (PARTY buyer MAY Order (EXACTLY buyer) AFTER 3 WITHIN 30
+    PARTY shop MUST Deliver shop WITHIN 30
+    HENCE (PARTY buyer MAY Order buyer AFTER 3 WITHIN 30
            HENCE FULFILLED)
     LEST BREACH
 
@@ -110,8 +110,8 @@ GIVETH A DEONTIC Actor Action
 -- Both edges from the delivery: [13, 40]. 40 is in time, 41 is late.
 GIVETH A DEONTIC Actor Action
 `two offset` MEANS
-    PARTY shop MUST Deliver (EXACTLY shop) WITHIN 30
-    HENCE (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 WITHIN 30 OF THE JOIN
+    PARTY shop MUST Deliver shop WITHIN 30
+    HENCE (PARTY buyer MUST Order buyer AFTER 3 WITHIN 30 OF THE JOIN
            HENCE FULFILLED)
     LEST BREACH
 
@@ -128,8 +128,8 @@ GIVETH A DEONTIC Actor Action
 -- WITHIN 30 is [13, 43] — 43 in time, 44 late.
 GIVETH A DEONTIC Actor Action
 `after anchored` MEANS
-    PARTY shop MUST Deliver (EXACTLY shop) WITHIN 30
-    HENCE (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 OF THE JOIN WITHIN 30
+    PARTY shop MUST Deliver shop WITHIN 30
+    HENCE (PARTY buyer MUST Order buyer AFTER 3 OF THE JOIN WITHIN 30
            HENCE FULFILLED)
     LEST BREACH
 
@@ -144,8 +144,8 @@ GIVETH A DEONTIC Actor Action
 -- Both anchored to the join: [13, 40], the two-offset window again.
 GIVETH A DEONTIC Actor Action
 `both anchored` MEANS
-    PARTY shop MUST Deliver (EXACTLY shop) WITHIN 30
-    HENCE (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 OF THE JOIN WITHIN 30 OF THE JOIN
+    PARTY shop MUST Deliver shop WITHIN 30
+    HENCE (PARTY buyer MUST Order buyer AFTER 3 OF THE JOIN WITHIN 30 OF THE JOIN
            HENCE FULFILLED)
     LEST BREACH
 
@@ -157,8 +157,8 @@ GIVETH A DEONTIC Actor Action
 -- join (10) — [3, 40]. 12 is in time.
 GIVETH A DEONTIC Actor Action
 `two origins` MEANS
-    PARTY shop MUST Deliver (EXACTLY shop) WITHIN 30
-    HENCE (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 OF THE ARMING WITHIN 30 OF THE JOIN
+    PARTY shop MUST Deliver shop WITHIN 30
+    HENCE (PARTY buyer MUST Order buyer AFTER 3 OF THE ARMING WITHIN 30 OF THE JOIN
            HENCE FULFILLED)
     LEST BREACH
 
@@ -176,8 +176,8 @@ GIVETH A DEONTIC Actor Action
 -- empty; adversarial pass of 2026-09-16, F1/R1-1.)
 GIVETH A DEONTIC Actor Action
 `bare after, deadline within` MEANS
-    PARTY shop MUST Deliver (EXACTLY shop) WITHIN 30
-    HENCE (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 WITHIN 2 OF THE DEADLINE
+    PARTY shop MUST Deliver shop WITHIN 30
+    HENCE (PARTY buyer MUST Order buyer AFTER 3 WITHIN 2 OF THE DEADLINE
            HENCE FULFILLED)
     LEST BREACH
 
@@ -201,7 +201,7 @@ closingDate MEANS 200
 
 GIVETH A DEONTIC Actor Action
 `bare after, instant within` MEANS
-    PARTY buyer MUST Order (EXACTLY buyer) AFTER 30 WITHIN 5 OF closingDate
+    PARTY buyer MUST Order buyer AFTER 30 WITHIN 5 OF closingDate
     HENCE FULFILLED
     LEST BREACH
 
@@ -221,9 +221,9 @@ GIVETH A DEONTIC Actor Action
 -- spellings coincide.
 GIVETH A DEONTIC Actor Action
 `cure from the deadline` MEANS
-    PARTY shop MUST Deliver (EXACTLY shop) WITHIN 30
+    PARTY shop MUST Deliver shop WITHIN 30
     HENCE FULFILLED
-    LEST (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 OF THE DEADLINE WITHIN 30
+    LEST (PARTY buyer MUST Order buyer AFTER 3 OF THE DEADLINE WITHIN 30
           HENCE FULFILLED)
 
 #TRACE `cure from the deadline` AT 0 WITH
@@ -234,9 +234,9 @@ GIVETH A DEONTIC Actor Action
 
 GIVETH A DEONTIC Actor Action
 `cure, bare` MEANS
-    PARTY shop MUST Deliver (EXACTLY shop) WITHIN 30
+    PARTY shop MUST Deliver shop WITHIN 30
     HENCE FULFILLED
-    LEST (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 WITHIN 30
+    LEST (PARTY buyer MUST Order buyer AFTER 3 WITHIN 30
           HENCE FULFILLED)
 
 #TRACE `cure, bare` AT 0 WITH
@@ -254,9 +254,9 @@ GIVETH A DEONTIC Actor Action
 -- pass of 2026-09-16, F2.)
 GIVETH A DEONTIC Actor Action
 `cure after violation, bare` MEANS
-    PARTY buyer SHANT Smoke (EXACTLY buyer) WITHIN 30
+    PARTY buyer SHANT Smoke buyer WITHIN 30
     HENCE FULFILLED
-    LEST (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 WITHIN 30
+    LEST (PARTY buyer MUST Order buyer AFTER 3 WITHIN 30
           HENCE FULFILLED)
 
 #TRACE `cure after violation, bare` AT 0 WITH
@@ -273,9 +273,9 @@ GIVETH A DEONTIC Actor Action
 
 GIVETH A DEONTIC Actor Action
 `cure after violation, from the deadline` MEANS
-    PARTY buyer SHANT Smoke (EXACTLY buyer) WITHIN 30
+    PARTY buyer SHANT Smoke buyer WITHIN 30
     HENCE FULFILLED
-    LEST (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 OF THE DEADLINE WITHIN 30
+    LEST (PARTY buyer MUST Order buyer AFTER 3 OF THE DEADLINE WITHIN 30
           HENCE FULFILLED)
 
 #TRACE `cure after violation, from the deadline` AT 0 WITH
@@ -292,9 +292,9 @@ GIVETH A DEONTIC Actor Action
 -- are refused in not-ok/tc/after-empty-window-lest.l4.
 GIVETH A DEONTIC Actor Action
 `cure after violation, deadline within` MEANS
-    PARTY buyer SHANT Smoke (EXACTLY buyer) WITHIN 30
+    PARTY buyer SHANT Smoke buyer WITHIN 30
     HENCE FULFILLED
-    LEST (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 WITHIN 2 OF THE DEADLINE
+    LEST (PARTY buyer MUST Order buyer AFTER 3 WITHIN 2 OF THE DEADLINE
           HENCE FULFILLED)
 
 #TRACE `cure after violation, deadline within` AT 0 WITH
@@ -317,22 +317,22 @@ GIVETH A DEONTIC Actor Action
 GIVEN k IS A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `under a prohibition` k MEANS
-    PARTY buyer SHANT Smoke (EXACTLY buyer) WITHIN 30
+    PARTY buyer SHANT Smoke buyer WITHIN 30
     HENCE FULFILLED
     LEST k
 
 GIVEN k IS A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `under an obligation` k MEANS
-    PARTY buyer MUST Sign (EXACTLY buyer) WITHIN 30
+    PARTY buyer MUST Sign buyer WITHIN 30
     HENCE FULFILLED
     LEST k
 
 GIVETH A DEONTIC Actor Action
 `cure handed on, prohibition` MEANS
-    PARTY shop MUST Deliver (EXACTLY shop) WITHIN 10
+    PARTY shop MUST Deliver shop WITHIN 10
     HENCE FULFILLED
-    LEST (`under a prohibition` (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 WITHIN 2 OF THE DEADLINE
+    LEST (`under a prohibition` (PARTY buyer MUST Order buyer AFTER 3 WITHIN 2 OF THE DEADLINE
                                  HENCE FULFILLED
                                  LEST BREACH))
 
@@ -355,9 +355,9 @@ GIVETH A DEONTIC Actor Action
 
 GIVETH A DEONTIC Actor Action
 `cure handed on, obligation` MEANS
-    PARTY shop MUST Deliver (EXACTLY shop) WITHIN 10
+    PARTY shop MUST Deliver shop WITHIN 10
     HENCE FULFILLED
-    LEST (`under an obligation` (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 WITHIN 2 OF THE DEADLINE
+    LEST (`under an obligation` (PARTY buyer MUST Order buyer AFTER 3 WITHIN 2 OF THE DEADLINE
                                  HENCE FULFILLED
                                  LEST BREACH))
 
@@ -380,8 +380,8 @@ GIVETH A DEONTIC Actor Action
 -- residual prints as written.
 GIVETH A DEONTIC Actor Action
 `vests` MEANS
-    PARTY shop MUST Deliver (EXACTLY shop) WITHIN 30
-    HENCE (PARTY buyer MAY Order (EXACTLY buyer) AFTER 3
+    PARTY shop MUST Deliver shop WITHIN 30
+    HENCE (PARTY buyer MAY Order buyer AFTER 3
            HENCE FULFILLED)
     LEST BREACH
 
@@ -406,7 +406,7 @@ GIVETH A DEONTIC Actor Action
 -- anchored WITHIN's does.
 GIVETH A DEONTIC Actor Action
 `by june` MEANS
-    PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 BEFORE (YMD 2026 6 30)
+    PARTY buyer MUST Order buyer AFTER 3 BEFORE (YMD 2026 6 30)
     HENCE FULFILLED
     LEST BREACH
 
@@ -425,7 +425,7 @@ GIVETH A DEONTIC Actor Action
 -- AFTER a date: the window opens on 10 June and runs 5 days from there.
 GIVETH A DEONTIC Actor Action
 `from june` MEANS
-    PARTY buyer MUST Order (EXACTLY buyer) AFTER (YMD 2026 6 10) WITHIN 5
+    PARTY buyer MUST Order buyer AFTER (YMD 2026 6 10) WITHIN 5
     HENCE FULFILLED
     LEST BREACH
 
@@ -454,7 +454,7 @@ GIVETH A DEONTIC Actor Action
 -- before 2026-09-16 — and still runs on a date-serial one.
 GIVETH A DEONTIC Actor Action
 `anchored to june` MEANS
-    PARTY buyer MUST Order (EXACTLY buyer) WITHIN 0 OF (YMD 2026 6 30)
+    PARTY buyer MUST Order buyer WITHIN 0 OF (YMD 2026 6 30)
     HENCE FULFILLED
     LEST BREACH
 
@@ -471,9 +471,9 @@ GIVETH A DEONTIC Actor Action
 -- [11, 41]. 10 is early, 41 in time, 42 late.
 GIVETH A DEONTIC Actor Action
 `barrier then window` MEANS
-    EVERY Tenant t IN tenants MUST Sign (EXACTLY t) WITHIN 30
+    EVERY Tenant t IN tenants MUST Sign t WITHIN 30
       ONCE ALL HAVE
-    HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) AFTER 3 WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver theLandlord AFTER 3 WITHIN 30
            HENCE FULFILLED)
     LEST BREACH
 
@@ -497,7 +497,7 @@ GIVETH A DEONTIC Actor Action
 -- Bob's at 4 is in time; Alice's residual at 4 has 29 to run.
 GIVETH A DEONTIC Actor Action
 `barrier window` MEANS
-    EVERY Tenant t IN tenants MUST Sign (EXACTLY t) AFTER 3 WITHIN 30
+    EVERY Tenant t IN tenants MUST Sign t AFTER 3 WITHIN 30
       ONCE ALL HAVE
     HENCE FULFILLED
     LEST BREACH
@@ -518,7 +518,7 @@ GIVETH A DEONTIC Actor Action
 -- nullity; her second at 4 counts; Bob's at 33 is timely.
 GIVETH A DEONTIC Actor Action
 `fork window` MEANS
-    EVERY Tenant t IN tenants MUST Sign (EXACTLY t) AFTER 3 WITHIN 30
+    EVERY Tenant t IN tenants MUST Sign t AFTER 3 WITHIN 30
       UPON EACH
     HENCE FULFILLED
     LEST BREACH
@@ -543,7 +543,7 @@ GIVETH A DEONTIC Actor Action
 -- timely, Alice at 31 is late.
 GIVETH A DEONTIC Actor Action
 `fork bounded as a whole` MEANS
-    EVERY Tenant t IN tenants MUST Sign (EXACTLY t) AFTER 3
+    EVERY Tenant t IN tenants MUST Sign t AFTER 3
       UPON EACH WITHIN 30
     HENCE FULFILLED
     LEST BREACH
@@ -566,7 +566,7 @@ GIVETH A DEONTIC Actor Action
 -- 40, after the window closed, is a kept prohibition: FULFILLED.
 GIVETH A DEONTIC Actor Action
 `no smoking later` MEANS
-    PARTY buyer SHANT Smoke (EXACTLY buyer) AFTER 3 WITHIN 30
+    PARTY buyer SHANT Smoke buyer AFTER 3 WITHIN 30
     HENCE FULFILLED
     LEST BREACH
 
@@ -592,8 +592,8 @@ GIVEN d1 IS A NUMBER
       d2 IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `window of` d1 d2 MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 30
-    HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) AFTER d1 WITHIN d2 OF THE JOIN
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver theLandlord AFTER d1 WITHIN d2 OF THE JOIN
            HENCE FULFILLED)
     LEST BREACH
 
@@ -610,8 +610,8 @@ GIVEN d1 IS A NUMBER
       d2 IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `window of, bare` d1 d2 MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 30
-    HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) AFTER d1 WITHIN d2
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver theLandlord AFTER d1 WITHIN d2
            HENCE FULFILLED)
     LEST BREACH
 
@@ -628,8 +628,8 @@ GIVEN d1 IS A NUMBER
       d2 IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `window of, arming` d1 d2 MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 30
-    HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) AFTER d1 WITHIN d2 OF THE ARMING
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver theLandlord AFTER d1 WITHIN d2 OF THE ARMING
            HENCE FULFILLED)
     LEST BREACH
 
@@ -642,8 +642,8 @@ GIVEN d1 IS A NUMBER
       d2 IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `window of, two anchors` d1 d2 MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 30
-    HENCE (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) AFTER d1 OF THE JOIN WITHIN d2 OF THE ARMING
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY theLandlord MUST Deliver theLandlord AFTER d1 OF THE JOIN WITHIN d2 OF THE ARMING
            HENCE FULFILLED)
     LEST BREACH
 
@@ -656,7 +656,7 @@ GIVETH A DEONTIC Actor Action
 GIVEN d IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `window before` d MEANS
-    PARTY buyer MUST Order (EXACTLY buyer) AFTER d BEFORE (YMD 2026 6 10)
+    PARTY buyer MUST Order buyer AFTER d BEFORE (YMD 2026 6 10)
     HENCE FULFILLED
     LEST BREACH
 
@@ -670,7 +670,7 @@ GIVETH A DEONTIC Actor Action
 -- which a date does not (adversarial pass of 2026-09-16, round 2, R2-3).
 GIVETH A DEONTIC Actor Action
 `window from june` MEANS
-    PARTY buyer MUST Order (EXACTLY buyer) AFTER (YMD 2026 6 10) WITHIN 5 OF THE ARMING
+    PARTY buyer MUST Order buyer AFTER (YMD 2026 6 10) WITHIN 5 OF THE ARMING
     HENCE FULFILLED
     LEST BREACH
 
@@ -684,8 +684,8 @@ GIVEN d1 IS A NUMBER
       d2 IS A NUMBER
 GIVETH A DEONTIC Actor Action
 `window of, shant` d1 d2 MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 30
-    HENCE (PARTY theLandlord SHANT Smoke (EXACTLY theLandlord) AFTER d1 WITHIN d2 OF THE JOIN
+    PARTY alice MUST Sign alice WITHIN 30
+    HENCE (PARTY theLandlord SHANT Smoke theLandlord AFTER d1 WITHIN d2 OF THE JOIN
            HENCE FULFILLED)
     LEST BREACH
 
@@ -702,7 +702,7 @@ GIVETH A DEONTIC Actor Action
 -- each early act is its own note, naming its party and stamp.
 GIVETH A DEONTIC Actor Action
 `fork bounded, empty` MEANS
-    EVERY Tenant t IN tenants MUST Sign (EXACTLY t) AFTER 40
+    EVERY Tenant t IN tenants MUST Sign t AFTER 40
       UPON EACH WITHIN 30
     HENCE FULFILLED
     LEST BREACH
@@ -718,13 +718,13 @@ GIVETH A DEONTIC Actor Action
 GIVEN d IS A NUMBER
 GIVETH A DEONTIC Actor Action
 retry d MEANS
-    PARTY buyer MUST Order (EXACTLY buyer) AFTER d WITHIN 0 OF 2
+    PARTY buyer MUST Order buyer AFTER d WITHIN 0 OF 2
     HENCE FULFILLED
     LEST (retry d)
 
 GIVETH A DEONTIC Actor Action
 `stalled window` MEANS
-    PARTY buyer MUST Order (EXACTLY buyer) WITHIN 2
+    PARTY buyer MUST Order buyer WITHIN 2
     HENCE FULFILLED
     LEST (retry 3)
 
@@ -737,7 +737,7 @@ GIVETH A DEONTIC Actor Action
 -- An obligation evaluated without a trace prints back in its source form,
 -- keyword by keyword, and the natural-language annotation reads the window
 -- aloud: bare, a WITHIN beside an AFTER is "within 30 of that".
-#EVAL PARTY buyer MAY Order (EXACTLY buyer) AFTER 3 WITHIN 30
-#EVAL PARTY buyer MAY Order (EXACTLY buyer) AFTER 3 OF THE ARMING WITHIN 30 OF THE ARMING
-#EVAL PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 BEFORE (YMD 2026 6 30)
-#EVAL PARTY buyer MAY Order (EXACTLY buyer) AFTER (YMD 2026 6 10)
+#EVAL PARTY buyer MAY Order buyer AFTER 3 WITHIN 30
+#EVAL PARTY buyer MAY Order buyer AFTER 3 OF THE ARMING WITHIN 30 OF THE ARMING
+#EVAL PARTY buyer MUST Order buyer AFTER 3 BEFORE (YMD 2026 6 30)
+#EVAL PARTY buyer MAY Order buyer AFTER (YMD 2026 6 10)

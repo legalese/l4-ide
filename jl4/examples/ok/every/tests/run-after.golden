@@ -1,9 +1,23 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+run-after.l4:52:29-33:
+  I found a problem while checking the definition of `cooling off`:
+    In this action, `shop` refers to
+    
+      shop (at run-after.l4:36:1-5)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:53:35-40:
+  I found a problem while checking the definition of `cooling off`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:59:1-61:37:
-  PARTY Customer OF "Alice" MUST Order (EXACTLY buyer) AFTER 1 WITHIN 30 HENCE FULFILLED
-  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 12, before the window opened at 13: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 43), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  PARTY Customer OF "Alice" MUST Order buyer AFTER 1 WITHIN 30 HENCE FULFILLED
+  NOTE: PARTY Customer OF "Alice" did Order buyer at 12, before the window opened at 13: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 43), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:64:1-66:37:
   FULFILLED
 run-after.l4:69:1-71:37:
@@ -21,17 +35,45 @@ run-after.l4:79:1-81:37:
     surpassed the deadline of party
       Customer OF "Alice"
     who had to do obligatory action
-      MUST Order (EXACTLY buyer)
+      MUST Order buyer
     before their deadline, which was at
       43
 run-after.l4:84:1-87:37:
   FULFILLED
-  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 12, before the window opened at 13: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 43), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  NOTE: PARTY Customer OF "Alice" did Order buyer at 12, before the window opened at 13: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 43), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:94:29-33:
+  I found a problem while checking the definition of `cooling off, may`:
+    In this action, `shop` refers to
+    
+      shop (at run-after.l4:36:1-5)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:95:34-39:
+  I found a problem while checking the definition of `cooling off, may`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:99:1-101:37:
-  PARTY Customer OF "Alice" MAY Order (EXACTLY buyer) AFTER 1 WITHIN 30 HENCE FULFILLED
-  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 12, before the window opened at 13: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 43), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  PARTY Customer OF "Alice" MAY Order buyer AFTER 1 WITHIN 30 HENCE FULFILLED
+  NOTE: PARTY Customer OF "Alice" did Order buyer at 12, before the window opened at 13: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 43), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:103:1-105:37:
   FULFILLED
+run-after.l4:113:29-33:
+  I found a problem while checking the definition of `two offset`:
+    In this action, `shop` refers to
+    
+      shop (at run-after.l4:36:1-5)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:114:35-40:
+  I found a problem while checking the definition of `two offset`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:118:1-120:37:
   FULFILLED
 run-after.l4:122:1-124:37:
@@ -45,9 +87,23 @@ run-after.l4:122:1-124:37:
     surpassed the deadline of party
       Customer OF "Alice"
     who had to do obligatory action
-      MUST Order (EXACTLY buyer)
+      MUST Order buyer
     before their deadline, which was at
       40
+run-after.l4:131:29-33:
+  I found a problem while checking the definition of `after anchored`:
+    In this action, `shop` refers to
+    
+      shop (at run-after.l4:36:1-5)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:132:35-40:
+  I found a problem while checking the definition of `after anchored`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:136:1-138:37:
   FULFILLED
 run-after.l4:140:1-142:37:
@@ -61,9 +117,23 @@ run-after.l4:140:1-142:37:
     surpassed the deadline of party
       Customer OF "Alice"
     who had to do obligatory action
-      MUST Order (EXACTLY buyer)
+      MUST Order buyer
     before their deadline, which was at
       43
+run-after.l4:147:29-33:
+  I found a problem while checking the definition of `both anchored`:
+    In this action, `shop` refers to
+    
+      shop (at run-after.l4:36:1-5)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:148:35-40:
+  I found a problem while checking the definition of `both anchored`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:152:1-154:37:
   DEONTIC BREACHED:
     party
@@ -75,11 +145,39 @@ run-after.l4:152:1-154:37:
     surpassed the deadline of party
       Customer OF "Alice"
     who had to do obligatory action
-      MUST Order (EXACTLY buyer)
+      MUST Order buyer
     before their deadline, which was at
       40
+run-after.l4:160:29-33:
+  I found a problem while checking the definition of `two origins`:
+    In this action, `shop` refers to
+    
+      shop (at run-after.l4:36:1-5)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:161:35-40:
+  I found a problem while checking the definition of `two origins`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:165:1-167:37:
   FULFILLED
+run-after.l4:179:29-33:
+  I found a problem while checking the definition of `bare after, deadline within`:
+    In this action, `shop` refers to
+    
+      shop (at run-after.l4:36:1-5)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:180:35-40:
+  I found a problem while checking the definition of `bare after, deadline within`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:184:1-186:37:
   FULFILLED
 run-after.l4:188:1-190:37:
@@ -95,19 +193,54 @@ run-after.l4:192:1-194:37:
     surpassed the deadline of party
       Customer OF "Alice"
     who had to do obligatory action
-      MUST Order (EXACTLY buyer)
+      MUST Order buyer
     before their deadline, which was at
       32
+run-after.l4:204:28-33:
+  I found a problem while checking the definition of `bare after, instant within`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:208:1-209:38:
   FULFILLED
 run-after.l4:211:1-212:38:
   DEONTIC BREACHED:
     BREACH
+run-after.l4:224:29-33:
+  I found a problem while checking the definition of `cure from the deadline`:
+    In this action, `shop` refers to
+    
+      shop (at run-after.l4:36:1-5)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:226:34-39:
+  I found a problem while checking the definition of `cure from the deadline`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:229:1-230:37:
-  PARTY Customer OF "Alice" MUST Order (EXACTLY buyer) AFTER 1 WITHIN 30 HENCE FULFILLED
-  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 32, before the window opened at 33: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 63), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  PARTY Customer OF "Alice" MUST Order buyer AFTER 1 WITHIN 30 HENCE FULFILLED
+  NOTE: PARTY Customer OF "Alice" did Order buyer at 32, before the window opened at 33: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 63), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:232:1-233:37:
   FULFILLED
+run-after.l4:237:29-33:
+  I found a problem while checking the definition of `cure, bare`:
+    In this action, `shop` refers to
+    
+      shop (at run-after.l4:36:1-5)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:239:34-39:
+  I found a problem while checking the definition of `cure, bare`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:242:1-243:37:
   FULFILLED
 run-after.l4:245:1-246:37:
@@ -121,12 +254,26 @@ run-after.l4:245:1-246:37:
     surpassed the deadline of party
       Customer OF "Alice"
     who had to do obligatory action
-      MUST Order (EXACTLY buyer)
+      MUST Order buyer
     before their deadline, which was at
       63
+run-after.l4:257:29-34:
+  I found a problem while checking the definition of `cure after violation, bare`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:259:34-39:
+  I found a problem while checking the definition of `cure after violation, bare`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:262:1-264:36:
-  PARTY Customer OF "Alice" MUST Order (EXACTLY buyer) AFTER 1 WITHIN 30 HENCE FULFILLED
-  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 7, before the window opened at 8: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 38), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  PARTY Customer OF "Alice" MUST Order buyer AFTER 1 WITHIN 30 HENCE FULFILLED
+  NOTE: PARTY Customer OF "Alice" did Order buyer at 7, before the window opened at 8: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 38), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:266:1-268:37:
   FULFILLED
 run-after.l4:270:1-272:37:
@@ -140,19 +287,75 @@ run-after.l4:270:1-272:37:
     surpassed the deadline of party
       Customer OF "Alice"
     who had to do obligatory action
-      MUST Order (EXACTLY buyer)
+      MUST Order buyer
     before their deadline, which was at
       38
+run-after.l4:276:29-34:
+  I found a problem while checking the definition of `cure after violation, from the deadline`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:278:34-39:
+  I found a problem while checking the definition of `cure after violation, from the deadline`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:281:1-283:37:
-  PARTY Customer OF "Alice" MUST Order (EXACTLY buyer) AFTER 13 WITHIN 30 HENCE FULFILLED
-  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 20, before the window opened at 33: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 63), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  PARTY Customer OF "Alice" MUST Order buyer AFTER 13 WITHIN 30 HENCE FULFILLED
+  NOTE: PARTY Customer OF "Alice" did Order buyer at 20, before the window opened at 33: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 63), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:285:1-287:37:
   FULFILLED
+run-after.l4:295:29-34:
+  I found a problem while checking the definition of `cure after violation, deadline within`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:297:34-39:
+  I found a problem while checking the definition of `cure after violation, deadline within`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:300:1-302:37:
   FULFILLED
+run-after.l4:320:29-34:
+  I found a problem while checking the definition of `under a prohibition`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:327:27-32:
+  I found a problem while checking the definition of `under an obligation`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:333:29-33:
+  I found a problem while checking the definition of `cure handed on, prohibition`:
+    In this action, `shop` refers to
+    
+      shop (at run-after.l4:36:1-5)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:335:57-62:
+  I found a problem while checking the definition of `cure handed on, prohibition`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:340:1-342:37:
-  PARTY Customer OF "Alice" MUST Order (EXACTLY buyer) AFTER 1 WITHIN 28 HENCE FULFILLED LEST BREACH
-  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 13, before the window opened at 14: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 42), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  PARTY Customer OF "Alice" MUST Order buyer AFTER 1 WITHIN 28 HENCE FULFILLED LEST BREACH
+  NOTE: PARTY Customer OF "Alice" did Order buyer at 13, before the window opened at 14: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 42), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:344:1-346:37:
   FULFILLED
 run-after.l4:348:1-350:37:
@@ -160,24 +363,59 @@ run-after.l4:348:1-350:37:
 run-after.l4:352:1-354:37:
   DEONTIC BREACHED:
     BREACH
+run-after.l4:358:29-33:
+  I found a problem while checking the definition of `cure handed on, obligation`:
+    In this action, `shop` refers to
+    
+      shop (at run-after.l4:36:1-5)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:360:57-62:
+  I found a problem while checking the definition of `cure handed on, obligation`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:368:1-369:37:
-  PARTY Customer OF "Alice" MUST Order (EXACTLY buyer) AFTER 2 WITHIN -1 HENCE FULFILLED LEST BREACH
+  PARTY Customer OF "Alice" MUST Order buyer AFTER 2 WITHIN -1 HENCE FULFILLED LEST BREACH
   NOTE: This window closes at 42, before it opens at 43: both edges count from THE DEADLINE (the obligation's own clock here) and the opening offset is the larger. Drop the anchor from the WITHIN to count it from the instant the window opens, or make the closing offset at least the opening one — so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
-  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 41, before the window opened at 43: the act does not count as performance. The obligation stays live, but its window closes at 42, before it opens, so no act can be in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  NOTE: PARTY Customer OF "Alice" did Order buyer at 41, before the window opened at 43: the act does not count as performance. The obligation stays live, but its window closes at 42, before it opens, so no act can be in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:371:1-372:37:
   DEONTIC BREACHED:
     BREACH
   NOTE: This window closes at 42, before it opens at 43: both edges count from THE DEADLINE (the obligation's own clock here) and the opening offset is the larger. Drop the anchor from the WITHIN to count it from the instant the window opens, or make the closing offset at least the opening one — so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
+run-after.l4:383:29-33:
+  I found a problem while checking the definition of `vests`:
+    In this action, `shop` refers to
+    
+      shop (at run-after.l4:36:1-5)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:384:34-39:
+  I found a problem while checking the definition of `vests`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:388:1-390:39:
   FULFILLED
 run-after.l4:392:1-394:37:
-  PARTY Customer OF "Alice" MAY Order (EXACTLY buyer) AFTER 1 HENCE FULFILLED
-  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 12, before the window opened at 13: the act does not count as performance. The obligation stays live, with no closing edge, and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  PARTY Customer OF "Alice" MAY Order buyer AFTER 1 HENCE FULFILLED
+  NOTE: PARTY Customer OF "Alice" did Order buyer at 12, before the window opened at 13: the act does not count as performance. The obligation stays live, with no closing edge, and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:396:1-397:37:
-  PARTY buyer MAY Order (EXACTLY buyer) AFTER 3 HENCE FULFILLED
+  PARTY buyer MAY Order buyer AFTER 3 HENCE FULFILLED
+run-after.l4:409:28-33:
+  I found a problem while checking the definition of `by june`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:413:1-414:63:
-  PARTY Customer OF "Alice" MUST Order (EXACTLY buyer) AFTER 1 WITHIN 26 HENCE FULFILLED LEST BREACH
-  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 740134, before the window opened at 740135: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 740161), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  PARTY Customer OF "Alice" MUST Order buyer AFTER 1 WITHIN 26 HENCE FULFILLED LEST BREACH
+  NOTE: PARTY Customer OF "Alice" did Order buyer at 740134, before the window opened at 740135: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 740161), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:416:1-417:63:
   FULFILLED
 run-after.l4:419:1-420:64:
@@ -185,9 +423,16 @@ run-after.l4:419:1-420:64:
 run-after.l4:422:1-423:63:
   DEONTIC BREACHED:
     BREACH
+run-after.l4:428:28-33:
+  I found a problem while checking the definition of `from june`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:432:1-433:63:
-  PARTY Customer OF "Alice" MUST Order (EXACTLY buyer) AFTER 1 WITHIN 5 HENCE FULFILLED LEST BREACH
-  NOTE: PARTY Customer OF "Alice" did Order (EXACTLY buyer) at 740140, before the window opened at 740141: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 740146), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  PARTY Customer OF "Alice" MUST Order buyer AFTER 1 WITHIN 5 HENCE FULFILLED LEST BREACH
+  NOTE: PARTY Customer OF "Alice" did Order buyer at 740140, before the window opened at 740141: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 740146), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:435:1-436:64:
   FULFILLED
 run-after.l4:438:1-439:64:
@@ -197,13 +442,27 @@ run-after.l4:446:1-447:36:
   BEFORE names the date 2026-06-30, but this obligation's clock read 0 when it was entered, which is not a date serial (DATE_SERIAL (YMD 1 1 1) is 365): the trace counts in floating units from an origin such as 0, and a date has no place on that scale. Start the trace at a date serial — #TRACE … AT (DATE_SERIAL (YMD …)) with the events stamped the same way — or write the edge as a duration. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.1.)
 run-after.l4:449:1-450:36:
   AFTER names the date 2026-06-10, but this obligation's clock read 0 when it was entered, which is not a date serial (DATE_SERIAL (YMD 1 1 1) is 365): the trace counts in floating units from an origin such as 0, and a date has no place on that scale. Start the trace at a date serial — #TRACE … AT (DATE_SERIAL (YMD …)) with the events stamped the same way — or write the edge as a duration. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.1.)
+run-after.l4:457:28-33:
+  I found a problem while checking the definition of `anchored to june`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:461:1-462:36:
   The anchor of the WITHIN names the date 2026-06-30, but this obligation's clock read 0 when it was entered, which is not a date serial (DATE_SERIAL (YMD 1 1 1) is 365): the trace counts in floating units from an origin such as 0, and a date has no place on that scale. Start the trace at a date serial — #TRACE … AT (DATE_SERIAL (YMD …)) with the events stamped the same way — or write the edge as a duration. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.1.)
 run-after.l4:464:1-465:63:
   FULFILLED
+run-after.l4:476:43-54:
+  I found a problem while checking the definition of `barrier then window`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-after.l4:37:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:480:1-483:51:
-  PARTY Landlord OF "Ms Ng" MUST Deliver (EXACTLY theLandlord) AFTER 1 WITHIN 30 HENCE FULFILLED
-  NOTE: PARTY Landlord OF "Ms Ng" did Deliver (EXACTLY theLandlord) at 10, before the window opened at 11: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 41), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  PARTY Landlord OF "Ms Ng" MUST Deliver theLandlord AFTER 1 WITHIN 30 HENCE FULFILLED
+  NOTE: PARTY Landlord OF "Ms Ng" did Deliver theLandlord at 10, before the window opened at 11: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 41), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:485:1-488:51:
   FULFILLED
 run-after.l4:490:1-493:51:
@@ -217,37 +476,58 @@ run-after.l4:490:1-493:51:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Deliver (EXACTLY theLandlord)
+      MUST Deliver theLandlord
     before their deadline, which was at
       41
 run-after.l4:505:1-507:31:
-  PARTY Tenant OF "Alice" MUST Sign (EXACTLY t) WITHIN 29 HENCE `the join` LEST `the join fails`
-  NOTE: PARTY Tenant OF "Alice" did Sign (EXACTLY t) at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 33), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  PARTY Tenant OF "Alice" MUST Sign t WITHIN 29 HENCE `the join` LEST `the join fails`
+  NOTE: PARTY Tenant OF "Alice" did Sign t at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 33), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:509:1-512:35:
   FULFILLED
-  NOTE: PARTY Tenant OF "Alice" did Sign (EXACTLY t) at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 33), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  NOTE: PARTY Tenant OF "Alice" did Sign t at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 33), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:526:1-529:32:
   FULFILLED
-  NOTE: PARTY Tenant OF "Alice" did Sign (EXACTLY t) at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 33), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  NOTE: PARTY Tenant OF "Alice" did Sign t at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 33), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:533:1-535:32:
-  PARTY Tenant OF "Alice" MUST Sign (EXACTLY t) WITHIN 0 HENCE FULFILLED LEST BREACH AND FULFILLED
-  NOTE: PARTY Tenant OF "Alice" did Sign (EXACTLY t) at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 33), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  PARTY Tenant OF "Alice" MUST Sign t WITHIN 0 HENCE FULFILLED LEST BREACH AND FULFILLED
+  NOTE: PARTY Tenant OF "Alice" did Sign t at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 33), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:551:1-553:32:
-  PARTY Tenant OF "Alice" MUST Sign (EXACTLY t) WITHIN 0 HENCE FULFILLED LEST BREACH AND FULFILLED
-  NOTE: PARTY Tenant OF "Alice" did Sign (EXACTLY t) at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 30), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  PARTY Tenant OF "Alice" MUST Sign t WITHIN 0 HENCE FULFILLED LEST BREACH AND FULFILLED
+  NOTE: PARTY Tenant OF "Alice" did Sign t at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 30), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
 run-after.l4:555:1-558:36:
   DEONTIC BREACHED:
     BREACH
-  NOTE: PARTY Tenant OF "Alice" did Sign (EXACTLY t) at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 30), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  NOTE: PARTY Tenant OF "Alice" did Sign t at 2, before the window opened at 3: the act does not count as performance. The obligation stays live, with its deadline untouched (the window closes at 30), and may be performed once the window is open. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:569:29-34:
+  I found a problem while checking the definition of `no smoking later`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:573:1-574:36:
-  PARTY Customer OF "Alice" MUST NOT Smoke (EXACTLY buyer) AFTER 1 WITHIN 30 HENCE FULFILLED LEST BREACH
-  NOTE: PARTY Customer OF "Alice" did Smoke (EXACTLY buyer) at 2, before the window opened at 3: the prohibition had not started, so this is not a violation. It stays in force (the window closes at 33).
+  PARTY Customer OF "Alice" MUST NOT Smoke buyer AFTER 1 WITHIN 30 HENCE FULFILLED LEST BREACH
+  NOTE: PARTY Customer OF "Alice" did Smoke buyer at 2, before the window opened at 3: the prohibition had not started, so this is not a violation. It stays in force (the window closes at 33).
 run-after.l4:576:1-577:36:
   DEONTIC BREACHED:
     BREACH
 run-after.l4:579:1-581:37:
   FULFILLED
-  NOTE: PARTY Customer OF "Alice" did Smoke (EXACTLY buyer) at 2, before the window opened at 3: the prohibition had not started, so this is not a violation. It stays in force (the window closes at 33).
+  NOTE: PARTY Customer OF "Alice" did Smoke buyer at 2, before the window opened at 3: the prohibition had not started, so this is not a violation. It stays in force (the window closes at 33).
+run-after.l4:595:27-32:
+  I found a problem while checking the definition of `window of`:
+    In this action, `alice` refers to
+    
+      alice (at run-after.l4:38:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:596:43-54:
+  I found a problem while checking the definition of `window of`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-after.l4:37:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:600:1-602:51:
   DEONTIC BREACHED:
     party
@@ -259,16 +539,44 @@ run-after.l4:600:1-602:51:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Deliver (EXACTLY theLandlord)
+      MUST Deliver theLandlord
     before their deadline, which was at
       13
   NOTE: This window closes at 13, before it opens at 38: both edges count from THE JOIN (the obligation's own clock here) and the opening offset is the larger. Drop the anchor from the WITHIN to count it from the instant the window opens, or make the closing offset at least the opening one — so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
 run-after.l4:604:1-606:51:
-  PARTY Landlord OF "Ms Ng" MUST Deliver (EXACTLY theLandlord) AFTER 28 WITHIN -25 HENCE FULFILLED
+  PARTY Landlord OF "Ms Ng" MUST Deliver theLandlord AFTER 28 WITHIN -25 HENCE FULFILLED
   NOTE: This window closes at 13, before it opens at 38: both edges count from THE JOIN (the obligation's own clock here) and the opening offset is the larger. Drop the anchor from the WITHIN to count it from the instant the window opens, or make the closing offset at least the opening one — so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
-  NOTE: PARTY Landlord OF "Ms Ng" did Deliver (EXACTLY theLandlord) at 10, before the window opened at 38: the act does not count as performance. The obligation stays live, but its window closes at 13, before it opens, so no act can be in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  NOTE: PARTY Landlord OF "Ms Ng" did Deliver theLandlord at 10, before the window opened at 38: the act does not count as performance. The obligation stays live, but its window closes at 13, before it opens, so no act can be in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:613:27-32:
+  I found a problem while checking the definition of `window of, bare`:
+    In this action, `alice` refers to
+    
+      alice (at run-after.l4:38:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:614:43-54:
+  I found a problem while checking the definition of `window of, bare`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-after.l4:37:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:618:1-620:51:
   FULFILLED
+run-after.l4:631:27-32:
+  I found a problem while checking the definition of `window of, arming`:
+    In this action, `alice` refers to
+    
+      alice (at run-after.l4:38:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:632:43-54:
+  I found a problem while checking the definition of `window of, arming`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-after.l4:37:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:636:1-638:51:
   DEONTIC BREACHED:
     party
@@ -280,10 +588,24 @@ run-after.l4:636:1-638:51:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Deliver (EXACTLY theLandlord)
+      MUST Deliver theLandlord
     before their deadline, which was at
       5
   NOTE: This window closes at 5, before it opens at 38: the WITHIN counts from THE ARMING and the AFTER from the obligation's own clock, so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
+run-after.l4:645:27-32:
+  I found a problem while checking the definition of `window of, two anchors`:
+    In this action, `alice` refers to
+    
+      alice (at run-after.l4:38:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:646:43-54:
+  I found a problem while checking the definition of `window of, two anchors`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-after.l4:37:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:650:1-652:51:
   DEONTIC BREACHED:
     party
@@ -295,36 +617,102 @@ run-after.l4:650:1-652:51:
     surpassed the deadline of party
       Landlord OF "Ms Ng"
     who had to do obligatory action
-      MUST Deliver (EXACTLY theLandlord)
+      MUST Deliver theLandlord
     before their deadline, which was at
       5
   NOTE: This window closes at 5, before it opens at 38: the AFTER counts from THE JOIN and the WITHIN from THE ARMING, so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
+run-after.l4:659:28-33:
+  I found a problem while checking the definition of `window before`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:663:1-664:64:
   DEONTIC BREACHED:
     BREACH
   NOTE: This window closes at 740141, before it opens at 740172: the BEFORE date is earlier than the instant the AFTER opens the window, so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
+run-after.l4:673:28-33:
+  I found a problem while checking the definition of `window from june`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:677:1-678:64:
   DEONTIC BREACHED:
     BREACH
   NOTE: This window closes at 740137, before it opens at 740141: the AFTER date is later than the instant the WITHIN, counted from THE ARMING, closes the window, so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
+run-after.l4:687:27-32:
+  I found a problem while checking the definition of `window of, shant`:
+    In this action, `alice` refers to
+    
+      alice (at run-after.l4:38:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:688:42-53:
+  I found a problem while checking the definition of `window of, shant`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-after.l4:37:1-12)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:692:1-694:49:
-  PARTY Landlord OF "Ms Ng" MUST NOT Smoke (EXACTLY theLandlord) AFTER 28 WITHIN -25 HENCE FULFILLED
+  PARTY Landlord OF "Ms Ng" MUST NOT Smoke theLandlord AFTER 28 WITHIN -25 HENCE FULFILLED
   NOTE: This window closes at 13, before it opens at 38: both edges count from THE JOIN (the obligation's own clock here) and the opening offset is the larger. Drop the anchor from the WITHIN to count it from the instant the window opens, or make the closing offset at least the opening one — so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
-  NOTE: PARTY Landlord OF "Ms Ng" did Smoke (EXACTLY theLandlord) at 10, before the window opened at 38: the prohibition had not started, so this is not a violation. It stays in force until 13, before the window opens, so nothing can violate it.
+  NOTE: PARTY Landlord OF "Ms Ng" did Smoke theLandlord at 10, before the window opened at 38: the prohibition had not started, so this is not a violation. It stays in force until 13, before the window opens, so nothing can violate it.
 run-after.l4:710:1-712:31:
-  PARTY Tenant OF "Alice" MUST Sign (EXACTLY t) AFTER 36 WITHIN -10 HENCE FULFILLED LEST BREACH AND PARTY Tenant OF "Bob" MUST Sign (EXACTLY t) AFTER 36 WITHIN -10 HENCE FULFILLED LEST BREACH
+  PARTY Tenant OF "Alice" MUST Sign t AFTER 36 WITHIN -10 HENCE FULFILLED LEST BREACH AND PARTY Tenant OF "Bob" MUST Sign t AFTER 36 WITHIN -10 HENCE FULFILLED LEST BREACH
   NOTE: This window closes at 30, before it opens at 40: the join line's WITHIN bounds each member from the arming, and the member's AFTER opens later than that, so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
-  NOTE: PARTY Tenant OF "Alice" did Sign (EXACTLY t) at 2, before the window opened at 40: the act does not count as performance. The obligation stays live, but its window closes at 30, before it opens, so no act can be in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
-  NOTE: PARTY Tenant OF "Bob" did Sign (EXACTLY t) at 4, before the window opened at 40: the act does not count as performance. The obligation stays live, but its window closes at 30, before it opens, so no act can be in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  NOTE: PARTY Tenant OF "Alice" did Sign t at 2, before the window opened at 40: the act does not count as performance. The obligation stays live, but its window closes at 30, before it opens, so no act can be in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+  NOTE: PARTY Tenant OF "Bob" did Sign t at 4, before the window opened at 40: the act does not count as performance. The obligation stays live, but its window closes at 30, before it opens, so no act can be in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2, R-X6.)
+run-after.l4:721:28-33:
+  I found a problem while checking the definition of `retry`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:727:28-33:
+  I found a problem while checking the definition of `stalled window`:
+    In this action, `buyer` refers to
+    
+      buyer (at run-after.l4:35:1-6)
+    
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-after.l4:731:1-732:38:
   A chain of HENCE or LEST continuations has stalled: the event at 100 has been handed on 1000 times in a row to continuations whose deadlines never advanced past 2, a deadline it had already revealed the expiry of, so no continuation this chain reaches can ever be open to it. A continuation that names itself and is already past its deadline when it is entered - a negative WITHIN, a LEST's WITHIN 0, or an anchored deadline no later than the one just missed - is such a chain. Give it a positive WITHIN, anchor it later than the missed deadline, or end the chain with BREACH. (EVERY-EACH-QUANTIFIER-SPEC section 5.2.1.)
   
   NOTE: This window closes at 2, before it opens at 5: both edges count from 2 (the obligation's own clock here) and the opening offset is the larger. Drop the anchor from the WITHIN to count it from the instant the window opens, or make the closing offset at least the opening one — so no act can be performed in time. (EVERY-EACH-QUANTIFIER-SPEC section 5.1.2.2.)
-run-after.l4:740:1-62:
-  PARTY buyer MAY Order (EXACTLY buyer) AFTER 3 WITHIN 30 HENCE FULFILLED
-run-after.l4:741:1-90:
-  PARTY buyer MAY Order (EXACTLY buyer) AFTER 3 OF THE ARMING WITHIN 30 OF THE ARMING HENCE FULFILLED
-run-after.l4:742:1-76:
-  PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 BEFORE (YMD OF 2026, 6, 30) HENCE FULFILLED
-run-after.l4:743:1-66:
-  PARTY buyer MAY Order (EXACTLY buyer) AFTER (YMD OF 2026, 6, 10) HENCE FULFILLED
+run-after.l4:740:1-52:
+  PARTY buyer MAY Order buyer AFTER 3 WITHIN 30 HENCE FULFILLED
+run-after.l4:740:29-34:
+  In this action, `buyer` refers to
+  
+    buyer (at run-after.l4:35:1-6)
+  
+  If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:741:1-80:
+  PARTY buyer MAY Order buyer AFTER 3 OF THE ARMING WITHIN 30 OF THE ARMING HENCE FULFILLED
+run-after.l4:741:29-34:
+  In this action, `buyer` refers to
+  
+    buyer (at run-after.l4:35:1-6)
+  
+  If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:742:1-66:
+  PARTY buyer MUST Order buyer AFTER 3 BEFORE (YMD OF 2026, 6, 30) HENCE FULFILLED
+run-after.l4:742:30-35:
+  In this action, `buyer` refers to
+  
+    buyer (at run-after.l4:35:1-6)
+  
+  If you wanted a placeholder variable that matches any value, choose a name not already taken.
+run-after.l4:743:1-56:
+  PARTY buyer MAY Order buyer AFTER (YMD OF 2026, 6, 10) HENCE FULFILLED
+run-after.l4:743:29-34:
+  In this action, `buyer` refers to
+  
+    buyer (at run-after.l4:35:1-6)
+  
+  If you wanted a placeholder variable that matches any value, choose a name not already taken.

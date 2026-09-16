@@ -66,9 +66,9 @@ GIVETH A NUMBER
 -- was due at 19, and the refund at 18 was FULFILLED.)
 GIVETH A DEONTIC Actor Action
 `sign or refund` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    PARTY alice MUST Sign alice WITHIN 10
     HENCE FULFILLED
-    LEST  (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5)
+    LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
 
 #TRACE `sign or refund` AT 0 WITH
   (`WAIT UNTIL` 14)
@@ -85,9 +85,9 @@ GIVETH A DEONTIC Actor Action
 -- unanchored form now counts from. Same residual, same breach.
 GIVETH A DEONTIC Actor Action
 `sign or refund, anchored` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    PARTY alice MUST Sign alice WITHIN 10
     HENCE FULFILLED
-    LEST  (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+    LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
 
 #TRACE `sign or refund, anchored` AT 0 WITH
   (`WAIT UNTIL` 14)
@@ -132,11 +132,11 @@ GIVEN roll IS A LIST OF Actor
 GIVETH A DEONTIC Actor Action
 `staggered` roll MEANS
     EVERY Tenant t IN roll
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN `days allowed to` t
         ONCE   ALL HAVE
         HENCE  FULFILLED
-        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5)
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
 
 #TRACE `staggered` tenants AT 0 WITH
   PARTY alice DOES Sign alice AT 1
@@ -176,11 +176,11 @@ GIVEN roll IS A LIST OF Actor
 GIVETH A DEONTIC Actor Action
 `staggered, anchored` roll MEANS
     EVERY Tenant t IN roll
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN `days allowed to` t
         ONCE   ALL HAVE
         HENCE  FULFILLED
-        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
 
 #TRACE `staggered, anchored` tenants AT 0 WITH
   PARTY alice DOES Sign alice AT 1
@@ -199,11 +199,11 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `each signs or refund` MEANS
     EVERY Tenant t IN LIST bob, carol
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN `days allowed to` t
         UPON   EACH
         HENCE  FULFILLED
-        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5)
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
 
 #TRACE `each signs or refund` AT 0 WITH
   (`WAIT UNTIL` 8)
@@ -226,9 +226,9 @@ GIVETH A DEONTIC Actor Action
 -- and a refund at 9 is timely there.
 GIVETH A DEONTIC Actor Action
 `no smoking` MEANS
-    PARTY alice SHANT Smoke (EXACTLY alice) WITHIN 14
+    PARTY alice SHANT Smoke alice WITHIN 14
     HENCE FULFILLED
-    LEST  (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5)
+    LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
 
 #TRACE `no smoking` AT 0 WITH
   PARTY alice DOES Smoke alice AT 3
@@ -240,9 +240,9 @@ GIVETH A DEONTIC Actor Action
 
 GIVETH A DEONTIC Actor Action
 `no smoking, anchored` MEANS
-    PARTY alice SHANT Smoke (EXACTLY alice) WITHIN 14
+    PARTY alice SHANT Smoke alice WITHIN 14
     HENCE FULFILLED
-    LEST  (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+    LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
 
 #TRACE `no smoking, anchored` AT 0 WITH
   PARTY alice DOES Smoke alice AT 3
@@ -262,11 +262,11 @@ GIVEN roll IS A LIST OF Actor
 GIVETH A DEONTIC Actor Action
 `bounded` roll MEANS
     EVERY Tenant t IN roll
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE WITHIN 10
         HENCE  FULFILLED
-        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5)
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
 
 #TRACE `bounded` tenants AT 0 WITH
   PARTY theLandlord DOES Refund theLandlord AT 1
@@ -304,11 +304,11 @@ GIVEN roll IS A LIST OF Actor
 GIVETH A DEONTIC Actor Action
 `bounded, anchored` roll MEANS
     EVERY Tenant t IN roll
-        MUST   Sign (EXACTLY t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE WITHIN 10
         HENCE  FULFILLED
-        LEST   (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5 OF THE DEADLINE)
+        LEST   (PARTY theLandlord MUST Refund theLandlord WITHIN 5 OF THE DEADLINE)
 
 #TRACE `bounded, anchored` tenants AT 0 WITH
   PARTY theLandlord DOES Refund theLandlord AT 1
@@ -325,9 +325,9 @@ GIVETH A DEONTIC Actor Action
 -- at 10 it is timely; at 11 the breach reports 10.
 GIVETH A DEONTIC Actor Action
 `may approve or refund` MEANS
-    PARTY alice MAY Approve (EXACTLY alice) WITHIN 5
+    PARTY alice MAY Approve alice WITHIN 5
     HENCE FULFILLED
-    LEST  (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5)
+    LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
 
 #TRACE `may approve or refund` AT 0 WITH
   (`WAIT UNTIL` 8)
@@ -343,9 +343,9 @@ GIVETH A DEONTIC Actor Action
 -- DO is the bare form and behaves as MUST: at 14 one day remains.
 GIVETH A DEONTIC Actor Action
 `do sign or refund` MEANS
-    PARTY alice DO Sign (EXACTLY alice) WITHIN 10
+    PARTY alice DO Sign alice WITHIN 10
     HENCE FULFILLED
-    LEST  (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5)
+    LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5)
 
 #TRACE `do sign or refund` AT 0 WITH
   (`WAIT UNTIL` 14)
@@ -359,9 +359,9 @@ GIVETH A DEONTIC Actor Action
 -- inner LEST BREACH is the answer.
 GIVETH A DEONTIC Actor Action
 `sign, with a second chance` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 7
+    PARTY alice MUST Sign alice WITHIN 7
     HENCE FULFILLED
-    LEST  (PARTY alice MUST Sign (EXACTLY alice) WITHIN 14
+    LEST  (PARTY alice MUST Sign alice WITHIN 14
            HENCE FULFILLED
            LEST BREACH BY alice BECAUSE "the second chance was missed too")
 
@@ -394,7 +394,7 @@ GIVETH A DEONTIC Actor Action
 -- at 101 — timely for the incarnation live at 101 — was dropped.)
 GIVETH A DEONTIC Actor Action
 `sign, or try again` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 3
+    PARTY alice MUST Sign alice WITHIN 3
     HENCE FULFILLED
     LEST  `sign, or try again`
 
@@ -411,11 +411,11 @@ GIVETH A DEONTIC Actor Action
 -- makes no difference to the verdict.
 GIVETH A DEONTIC Actor Action
 `third chance` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 3
+    PARTY alice MUST Sign alice WITHIN 3
     HENCE FULFILLED
-    LEST  (PARTY alice MUST Sign (EXACTLY alice) WITHIN 3
+    LEST  (PARTY alice MUST Sign alice WITHIN 3
            HENCE FULFILLED
-           LEST  (PARTY alice MUST Sign (EXACTLY alice) WITHIN 100
+           LEST  (PARTY alice MUST Sign alice WITHIN 100
                   HENCE FULFILLED
                   LEST  BREACH BY alice BECAUSE "all three chances missed"))
 
@@ -430,11 +430,11 @@ GIVETH A DEONTIC Actor Action
 -- at 100, or two, is the same breach.
 GIVETH A DEONTIC Actor Action
 `three chances` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 3
+    PARTY alice MUST Sign alice WITHIN 3
     HENCE FULFILLED
-    LEST  (PARTY alice MUST Sign (EXACTLY alice) WITHIN 3
+    LEST  (PARTY alice MUST Sign alice WITHIN 3
            HENCE FULFILLED
-           LEST  (PARTY alice MUST Sign (EXACTLY alice) WITHIN 3
+           LEST  (PARTY alice MUST Sign alice WITHIN 3
                   HENCE FULFILLED
                   LEST  BREACH BY alice BECAUSE "all three chances missed"))
 
@@ -456,10 +456,10 @@ GIVETH A DEONTIC Actor Action
 -- WAIT at 16 then reveals that Bob's window closed at 13.
 GIVETH A DEONTIC Actor Action
 `arming under lest` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    PARTY alice MUST Sign alice WITHIN 10
     HENCE FULFILLED
-    LEST  (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 20
-           HENCE (PARTY bob MUST Approve (EXACTLY bob) WITHIN 3 OF THE ARMING))
+    LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 20
+           HENCE (PARTY bob MUST Approve bob WITHIN 3 OF THE ARMING))
 
 #TRACE `arming under lest` AT 0 WITH
   (`WAIT UNTIL` 14)
@@ -470,9 +470,9 @@ GIVETH A DEONTIC Actor Action
 -- THE ARMING read two levels down under a HENCE is that act's stamp.
 GIVETH A DEONTIC Actor Action
 `arming under hence` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
-    HENCE (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 20
-           HENCE (PARTY bob MUST Approve (EXACTLY bob) WITHIN 3 OF THE ARMING))
+    PARTY alice MUST Sign alice WITHIN 10
+    HENCE (PARTY theLandlord MUST Refund theLandlord WITHIN 20
+           HENCE (PARTY bob MUST Approve bob WITHIN 3 OF THE ARMING))
 
 #TRACE `arming under hence` AT 0 WITH
   PARTY alice DOES Sign alice AT 4
@@ -498,11 +498,11 @@ GIVETH A DEONTIC Actor Action
 -- gave FULFILLED and the breach — one instant, two verdicts.)
 GIVETH A DEONTIC Actor Action
 `stuck in the middle` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    PARTY alice MUST Sign alice WITHIN 10
     HENCE FULFILLED
-    LEST  (PARTY alice MUST Sign (EXACTLY alice) WITHIN 5 OF THE ARMING
+    LEST  (PARTY alice MUST Sign alice WITHIN 5 OF THE ARMING
            HENCE FULFILLED
-           LEST  (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 10))
+           LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 10))
 
 #TRACE `stuck in the middle` AT 0 WITH
   PARTY theLandlord DOES Refund theLandlord AT 12
@@ -523,11 +523,11 @@ GIVETH A DEONTIC Actor Action
 -- reaches the third layer, with or without the WAIT; at 20 it is late.
 GIVETH A DEONTIC Actor Action
 `forthwith` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 10
+    PARTY alice MUST Sign alice WITHIN 10
     HENCE FULFILLED
-    LEST  (PARTY alice MUST Sign (EXACTLY alice) WITHIN 0
+    LEST  (PARTY alice MUST Sign alice WITHIN 0
            HENCE FULFILLED
-           LEST  (PARTY theLandlord MUST Refund (EXACTLY theLandlord) WITHIN 5))
+           LEST  (PARTY theLandlord MUST Refund theLandlord WITHIN 5))
 
 #TRACE `forthwith` AT 0 WITH
   PARTY theLandlord DOES Refund theLandlord AT 12
@@ -551,7 +551,7 @@ GIVETH A DEONTIC Actor Action
 -- (deontic-breach-semantics.l4 (f) pins the negative-WITHIN form.)
 GIVETH A DEONTIC Actor Action
 `forthwith, forever` MEANS
-    PARTY alice MUST Sign (EXACTLY alice) WITHIN 0
+    PARTY alice MUST Sign alice WITHIN 0
     HENCE FULFILLED
     LEST  `forthwith, forever`
 

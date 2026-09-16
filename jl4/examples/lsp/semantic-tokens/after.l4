@@ -15,7 +15,7 @@ shop  MEANS Shop OF "Acme"
 GIVETH A DEONTIC Actor Action
 contract MEANS
     PARTY  shop
-    MUST   Deliver (EXACTLY shop)
+    MUST   Deliver shop
     WITHIN 30
-    HENCE  (PARTY buyer MAY Order (EXACTLY buyer) AFTER 3 OF THE JOIN WITHIN 30 HENCE FULFILLED)
-    LEST   (PARTY buyer MUST Order (EXACTLY buyer) AFTER 3 BEFORE (YMD 2026 6 30))
+    HENCE  (PARTY buyer MAY Order buyer AFTER 3 OF THE JOIN WITHIN 30 HENCE FULFILLED)
+    LEST   (PARTY buyer MUST Order buyer AFTER 3 BEFORE (YMD 2026 6 30))
