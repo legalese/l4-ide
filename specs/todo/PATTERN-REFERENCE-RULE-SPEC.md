@@ -172,9 +172,29 @@ needed and what it costs.
 `CheckWarning (DeprecatedExactly …)` — the `DeprecatedAssume` shape (`TypeCheck/Types.hs:279`,
 severity `SWarn`, LSP `Deprecated` tag) — whose text gives the exact replacement: for a name
 operand, drop the keyword; for an expression operand, drop the keyword and keep the parentheses.
-Dropping the keyword is always meaning-preserving under R1/R2: an operand that resolves to nothing
+~~Dropping the keyword is always meaning-preserving under R1/R2: an operand that resolves to nothing
 is already an error today (`not-ok/tc/every-unbound-variable.l4`), and one that resolves only to a
-selector is already a type error, so no surviving `EXACTLY` operand can become a wildcard.
+selector is already a type error, so no surviving `EXACTLY` operand can become a wildcard.~~
+
+**CORRECTED 2026-09-16 (Phase A2 measurement, Phase B build).** That sentence is false for one
+class of operand, and it is false in the direction that matters. An operand resolving to nothing
+_is_ an error today — but the error is `could not find a definition`, and under R1 dropping the
+keyword replaces that error with a **fresh wildcard that matches anything**, which is the §2 defect
+itself. The reasoning confused "already an error" with "still an error afterwards".
+
+So the warning is conditional, and `DeprecatedExactlyInfo.replacement` is a `Maybe Text`
+(`jl4-core/src/L4/TypeCheck/Types.hs:314`, computed by `exactlyReplacement`,
+`jl4-core/src/L4/TypeCheck.hs`). For a bare-name operand whose R1 reading is `ReadsAsBinder` — it
+names nothing in scope, or only a field selector — the warning still says the keyword is being
+retired but **does not offer the drop**, and says instead that dropping it would change what the
+rule requires. Every other operand class is safe and gets its pasteable line: a literal is already
+a literal in pattern position, a constructor is already a constructor pattern, and a reference is
+what `EXACTLY` meant.
+
+Phase A2 measured the corpus: **one** site is in the unsafe class,
+`jl4/examples/not-ok/tc/every-unbound-variable.l4:11`, which is the fixture for that very error and
+which §5.1 already keeps. So the sweep is unaffected; what changes is that the checker can no
+longer mislead a future author into the defect.
 
 The prerelease shelf ships `unstable` to outside users (CLAUDE.md §1), so removal of the keyword is
 a **separate ruling** for Meng, after at least one shelf cut with the warning live (§10).
@@ -212,6 +232,47 @@ reference, and none is a deliberate shadowing wildcard. If the count is zero or 
 holds, the build applies R1–R3 to `CONSIDER` in the same PR and records the numbers here. If any
 site is a deliberate wildcard, the rule stays deontic-only, `EXACTLY` stays undeprecated in
 `CONSIDER`, and the site list goes to §10 for Meng.
+
+**DECIDED 2026-09-16T04:10Z (run stamp), by the criterion above: DEONTIC-ONLY.** R1, R2 and R3 are
+**not** applied to `CONSIDER`; `EXACTLY` stays undeprecated there and remains the only way to pin a
+value in a `WHEN`.
+
+Phase A1 measured, at base `11b7534b`, with the same scope model as the deontic survey: 993
+`CONSIDER` nodes, 2303 branches, 1094 branch bare-name binders, **57** colliding with an in-scope
+term — 35 selector-only, **22 local-or-module** (18 `GIVEN`, 4 `import`; none from a desugared
+multi-clause `DECIDE`). The numbers are in Appendix A.5.
+
+The criterion asked whether every colliding binder is, on reading the file, intended as a
+reference. It is not — **all 22 are deliberate wildcards**, and several would break outright:
+
+- **The `Maybe`-unwrap idiom, 8 sites** (`jl4-core/libraries/prelude.l4:481, 493, 504, 533` and
+  their `thailand-cosmetics/prelude.l4` copies at `405, 417, 427, 454`). `fromMaybe default x`
+  is written `CONSIDER x WHEN NOTHING THEN default WHEN JUST x THEN x`: the inner `x` rebinds to
+  the **unwrapped payload**, and the arm body needs that payload, not the outer `MAYBE a`. Under
+  R1 the inner `x` would refer to the scrutinee, making the arm an equality test `x == JUST x` —
+  a self-referential type error that breaks `fromMaybe`, `maybe`, `orElse` and `maybeToList`, i.e.
+  the standard library.
+- **The mnemonic payload name, 7 sites** (`prelude.l4:691, 692`; `ok/datatypes.l4:68, 69, 78`;
+  `ok/nlg_decide3.l4:15, 17`, plus `thailand-cosmetics/prelude.l4:600, 601`). `either left right x`
+  writes `WHEN LEFT a THEN left a` where the outer `a` is a **type variable**. An equality reading
+  is not even meaningful — you cannot compare a value to a type — so the collision is with
+  something that could never have been the intended referent.
+- **`Restart at`, 2 sites** (`jl4-core/libraries/hierarchy.l4:257, 267`). The binder `at` shadows
+  both prelude's list-indexing `at` and the module's own `Restart.at` selector, and the arm
+  computes `at PLUS 1` on the constructor's own NUMBER payload.
+- **`count`, 2 sites** (`jl4/experiments/safe-post.l4:173, 451`), same shape.
+- The remaining site (`jl4/experiments/base-money.l4:23`) is the same unwrap idiom.
+
+The asymmetry is worth stating because it is the reason the two positions get different rules. A
+`CONSIDER` pattern **destructures**: rebinding a name to a payload of a different type is the
+idiom, and the scrutinee is right there on the same line, so the reader can see what is being taken
+apart. A deontic action pattern does not destructure anything the reader can see — there is no
+scrutinee in the text, only a future event — so a name there has nothing to be "the payload of",
+and a silent rebind has no local evidence at all. The same syntax is doing two different jobs.
+
+Per R6 this is not fallout for §10: the criterion was applied and it decided. What is left open is
+whether `CONSIDER` should ever get a **different** treatment (for instance, a notice when a branch
+binder shadows a same-typed lexical local), which is a separate question this spec does not open.
 
 ### R7. What remains an error, and why the principle does not reach it
 
@@ -389,7 +450,23 @@ Every one read is a deliberate wildcard named after the slot, usually refined by
 (`doc/reference/regulative/every-example.l4:23,40,63`), `ok/every/\*.l4`, `maintain eligible
 service status Service Status PROVIDED …`, `Convert SAFE issue PROVIDED issue EQUALS …`.
 
-### A.5 `CONSIDER` binders — NOT YET MEASURED (Phase A)
+### A.5 `CONSIDER` binders (Phase A1, base `11b7534b`, run stamp 2026-09-16T04:10Z)
+
+Tool: `etc/survey-pattern-binders.py`, `--mode consider`, over all 1066 tracked `.l4` files
+(53 rejected by `l4 ast` itself, as in A.1).
+
+| measure                                                      |                  count |
+| ------------------------------------------------------------ | ---------------------: |
+| `CONSIDER` nodes (literal + desugared multi-clause `DECIDE`) |                    993 |
+| branches (`WHEN` + `OTHERWISE`)                              |                   2303 |
+| branch bare-name binders                                     |                   1094 |
+| binders colliding with an in-scope term                      |                     57 |
+| — selector-only                                              |                     35 |
+| — local-or-module (the candidates for R1)                    |                     22 |
+| — of those, from a desugared multi-clause `DECIDE`           |                      0 |
+| by innermost non-selector collision bucket                   | `GIVEN` 18, `import` 4 |
+
+All 22 are deliberate wildcards; see §4 R6 for the reading of each and the decision.
 
 ### A.6 Literals and expressions in pattern position
 

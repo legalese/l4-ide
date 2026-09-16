@@ -202,12 +202,20 @@ data CheckError =
     -- as a module-level ASSUME it (or a helper it reaches) reads. Both
     -- would be one JSON property, so a request could not supply them
     -- separately. Arguments: exported-function name, the clashing GIVEN.
-  | QuantifierVariableRebound Resolved Resolved
-    -- ^ The action pattern of an @EVERY v …@ binds a fresh pattern variable
-    -- spelled like the quantifier's own variable (@EVERY Tenant t MUST Sign t@).
-    -- An action is a pattern, so that @t@ would be a NEW binder matching any
-    -- signer — silently discharging tenant @t@'s duty by a stranger's act.
-    -- Arguments: the pattern's binder, the quantifier's binder.
+  | ActionPatternReference Name Name
+    -- ^ R5 of @specs\/todo\/PATTERN-REFERENCE-RULE-SPEC.md@: a bare name in an
+    -- ARGUMENT slot of a regulative action was read as a reference (R1) to
+    -- something that is not a lexical local — a same-module top-level, a
+    -- section-level binder, an @ASSUME@d term, or an imported name. It is a
+    -- notice and asks the drafter for nothing: severity 'SInfo'.
+    --
+    -- Its job is the one thing a marker-free design cannot otherwise make
+    -- loud — a top-level name added LATER capturing what used to be a
+    -- wildcard. Lexical locals do not draw it (that reading is unambiguous),
+    -- nor do constructors, nor the action HEAD ('AtActionHead').
+    --
+    -- Arguments: the name as written in the pattern, and the referent's
+    -- defining name (whose range is the definition site).
   | JoinWithoutEvery (Join Name)
     -- ^ An @ONCE …@ join line under a @PARTY@ subject. The join says when a
     -- cast's continuation fires, and a single party is not a cast. Carries
@@ -284,6 +292,43 @@ data CheckWarning
     -- the elaborations 'L4.Desugar.desugarSectionGivens' prepends for a
     -- section @GIVEN@ reach the same code and never draw it
     -- ('L4.Names.isSectionBinderElaboration').
+  | DeprecatedExactly DeprecatedExactlyInfo
+    -- ^ An @EXACTLY@ written in a regulative action pattern. Since R1 of
+    -- @specs\/todo\/PATTERN-REFERENCE-RULE-SPEC.md@ a bare name there already
+    -- refers to what it names and a parenthesised expression already reads as
+    -- an expression, so the keyword is redundant. Deprecated, not removed: it
+    -- still parses and still means exactly what it meant.
+    --
+    -- Only fires inside a deontic action. R6 was decided DEONTIC-ONLY, so
+    -- @EXACTLY@ remains the /only/ way to pin a value in a
+    -- @CONSIDER … WHEN@ and is not deprecated there.
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | Everything 'DeprecatedExactly' needs to phrase its advice.
+data DeprecatedExactlyInfo = MkDeprecatedExactlyInfo
+  { range :: Maybe SrcRange
+    -- ^ The range of the @EXACTLY@ keyword itself — the warning's anchor, so
+    -- the squiggle sits under the word being retired rather than under the
+    -- whole pattern.
+  , replacement :: Maybe Text
+    -- ^ The pasteable text that replaces @EXACTLY \<operand\>@: the bare name
+    -- for a name operand, the parenthesised expression otherwise.
+    --
+    -- 'Nothing' where dropping the keyword would NOT be meaning-preserving,
+    -- which is exactly one case: a bare-name operand that resolves to nothing
+    -- in scope (or only to a field selector), because R1 would then read the
+    -- bare name as a fresh wildcard rather than as a reference.
+    --
+    -- R3 as first drafted claimed the drop was always safe, on the reasoning
+    -- that such an operand is already an error today. It is -- but the error
+    -- is \"could not find a definition\", and under R1 it would become a
+    -- silently-matching placeholder instead, which is the very defect
+    -- (smucclaw\/l4-ide#955) this rule exists to remove. Phase A measured one
+    -- such site in the corpus,
+    -- @jl4\/examples\/not-ok\/tc\/every-unbound-variable.l4:11@, and it is a
+    -- fixture whose whole purpose is that error.
+  }
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -372,6 +417,14 @@ data ExpectationContext =
   | ExpectDecideSignatureContext (Maybe SrcRange) -- actual result type range from the signature, if it exists
   | ExpectRegulativePartyContext -- party clause of obligation
   | ExpectRegulativeActionContext -- action clause of obligation
+  | ExpectActionPatternReferenceContext Name
+    -- ^ R7: a bare name in a regulative action pattern that R1 read as a
+    -- REFERENCE, being checked against the slot it fills. It gets its own
+    -- context because its type mismatch is the one diagnostic the R1
+    -- principle deliberately does not correct: the checker cannot tell a
+    -- wrongly-typed reference from a wildcard that wants a different
+    -- spelling, so the message names BOTH corrections. Carries the name as
+    -- written.
   | ExpectRegulativeDeadlineContext -- within clause of obligation
   | ExpectRegulativeTimestampContext -- timestamp of a regulative event
   | ExpectRegulativeFollowupContext -- hence clause of regulative rule
@@ -430,6 +483,7 @@ severity (MkCheckErrorWithContext e _) =
     CheckInfo {}               -> SInfo
     CheckWarning {}            -> SWarn
     SuspiciousBinderPattern {} -> SInfo
+    ActionPatternReference {}  -> SInfo
     _                          -> SError
 
 -- | Does this diagnostic refuse an @\@export@ for a reason that belongs to the
@@ -497,7 +551,7 @@ instance HasSrcRange CheckError where
   rangeOf (RegulativeActorMismatch p _ _)   = rangeOf p
   rangeOf (JoinWithoutEvery j)              = rangeOf j
   rangeOf (ContinuationWithoutJoin e)       = rangeOf e
-  rangeOf (QuantifierVariableRebound b _)   = rangeOf b
+  rangeOf (ActionPatternReference n _)      = rangeOf n
   rangeOf (FixityAnnotationMalformed mr _)  = mr
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
@@ -505,6 +559,7 @@ instance HasSrcRange CheckError where
   -- WhileCheckingDecide context range via @rangeOf e <|> rangeOf ctx@ above.
   rangeOf (CheckWarning (PatternClausesMissing r _ _)) = Just r
   rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
+  rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (MisattachedSectionGiven n _)     = rangeOf n
   rangeOf (UnreadImplicitSupply _ b)        = rangeOf b
@@ -734,7 +789,39 @@ data CheckEnv =
     -- (lexical shadowing), so we must track them explicitly: they are absent
     -- from 'sectionPaths', which otherwise conflates them with top-level and
     -- imported bindings.
+    , actionPatternPos     :: !ActionPatternPos
+    -- ^ Where in a /regulative action pattern/ the checker currently is, if
+    -- anywhere. This is the flag that switches on R1 of
+    -- @specs\/todo\/PATTERN-REFERENCE-RULE-SPEC.md@: a bare name inside a
+    -- deontic action refers to what it names, while the very same production
+    -- inside a @CONSIDER … WHEN@ still binds a fresh name (R6 was decided
+    -- DEONTIC-ONLY). Nothing in the pattern itself distinguishes the two
+    -- sites, so the distinction has to be carried down from the caller.
+    --
+    -- Set by 'L4.TypeCheck.checkActionPattern' and stepped inward by
+    -- 'L4.TypeCheck.descendActionPattern'; cleared by
+    -- 'L4.TypeCheck.leaveActionPattern' whenever the checker descends from a
+    -- pattern into an /expression/, because an expression may contain a
+    -- @CONSIDER@ of its own whose branch patterns are not action patterns.
     }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
+-- | Where the checker is with respect to a regulative action pattern.
+-- See 'CheckEnv.actionPatternPos'.
+data ActionPatternPos
+  = NotInActionPattern
+    -- ^ An ordinary pattern: a @CONSIDER … WHEN@ branch, or a multi-clause
+    -- @DECIDE@ head. A bare name binds (the pre-existing behaviour).
+  | AtActionHead
+    -- ^ The outermost pattern of a @MUST@\/@MAY@\/@SHANT@\/@DO@ action. R1
+    -- applies, but the R5 notice does not: a bare action name denoting a
+    -- module-level action IS the idiom here, and the head has a declared
+    -- expected type to catch an accidental capture (this is the behaviour
+    -- @34a7c1c5@ already shipped).
+  | InActionArgument
+    -- ^ An argument slot inside an action pattern, at any depth. R1 applies
+    -- and so does the R5 notice: this is the position that had no net.
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
 
@@ -787,6 +874,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
     , errorContext = None
     , sectionStack = []
     , localBindings = Set.empty
+    , actionPatternPos = NotInActionPattern
     }
 
 newtype SectionNames =
@@ -2026,6 +2114,7 @@ extendEnv cis env =
     , inNonexhaustiveDecide = e.inNonexhaustiveDecide
     , sectionStack = e.sectionStack
     , localBindings = e.localBindings
+    , actionPatternPos = e.actionPatternPos
     }
     where
       u :: Unique

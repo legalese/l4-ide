@@ -986,9 +986,56 @@ mprint kw = foldMap \x -> [kw <+> parensIfNeeded x]
 
 instance LayoutPrinterWithName n => LayoutPrinter (RAction n) where
   printWithLayout MkAction {modal, action, provided} = hsep $
-    [ printDeonticModal modal, printWithLayout action
+    [ printDeonticModal modal, printActionPattern action
     ]
     <> mprint "PROVIDED" provided
+
+-- | Print a regulative ACTION pattern (§6 of
+-- @specs\/todo\/PATTERN-REFERENCE-RULE-SPEC.md@).
+--
+-- The one thing this does differently from the generic 'Pattern' printer is
+-- 'PatExpr': in an action, a pinned value is written without @EXACTLY@ (a bare
+-- name refers, R1; a parenthesised expression is an expression, R2), and the
+-- keyword is deprecated, so printing it would re-emit a form the checker warns
+-- about.
+--
+-- __Why this is not simply the 'Pattern' instance.__ R6 was decided
+-- DEONTIC-ONLY: in a @CONSIDER … WHEN@ a bare name still BINDS, so printing a
+-- @CONSIDER@'s @PatExpr (Var n)@ as a bare @n@ would silently turn an equality
+-- test into a wildcard — a printer that changes meaning, which is precisely
+-- the class of bug the round-trip and evaluation-differential checks exist to
+-- catch. So the deontic call site gets its own printer and the generic
+-- instance keeps @EXACTLY@.
+--
+-- Re-parsing what this prints yields the same resolved pattern because the
+-- scope is the same module: a name that resolved to something still resolves
+-- to it. The one spelling that would not round-trip — @EXACTLY x@ where @x@
+-- names only a record selector, or nothing — cannot occur in a module that
+-- type-checks, because such an operand is already an error today (R3).
+printActionPattern :: LayoutPrinterWithName a => Pattern a -> Doc ann
+printActionPattern = \ case
+  PatExpr _ e            -> printPinnedExpr e
+  PatApp _ n pats@(_:_)  -> printWithLayout n <> space <> hsep (fmap actionArgParens pats)
+  PatCons _ h t          -> actionArgParens h <+> "FOLLOWED BY" <+> actionArgParens t
+  p                      -> printWithLayout p
+  where
+    actionArgParens p = case p of
+      PatVar{}         -> printActionPattern p
+      PatLit{}         -> printActionPattern p
+      PatApp _ _ []    -> printActionPattern p
+      PatExpr _ e      -> pinnedNeedsParens e
+      _                -> surround (printActionPattern p) "(" ")"
+
+    -- A pinned name or literal is an atom and needs no brackets; anything
+    -- else is a parenthesised expression whether it stands alone or fills an
+    -- argument slot.
+    pinnedNeedsParens e = case e of
+      Var _ n    -> printWithLayout n
+      App _ n [] -> printWithLayout n
+      Lit _ l    -> printWithLayout l
+      _          -> surround (printWithLayout e) "(" ")"
+
+    printPinnedExpr = pinnedNeedsParens
 
 -- | Print deontic modal keyword
 printDeonticModal :: DeonticModal -> Doc ann
