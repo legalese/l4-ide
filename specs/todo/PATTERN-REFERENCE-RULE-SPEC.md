@@ -149,6 +149,25 @@ Overloading: a name with both a constructor and a term candidate keeps construct
 (unchanged from `namesNonConstructorTerm`, `TypeCheck.hs:2218`). A lexical local whose type does
 not fit the slot is a type error, not a fallback to a wildcard (§4 R7).
 
+**CORRECTED 2026-09-16 (Phase E review, Phase F build): the selector carve-out is an ARGUMENT
+rule, and the parenthetical above — "and, unchanged, at the head" — was false of the build as first
+written.** Base's head rule (`namesNonConstructorTerm`, `34a7c1c5`) counted a selector as a term,
+so `PARTY Buyer MUST amount`, where `amount` is a field of the action's own record, was a reference
+and failed the head's declared type. Applying row 4 at the head as well turned that compile error
+into a fresh name at the head — and a fresh name at the head matches **every** action, so
+`PARTY Buyer MUST amount` was discharged by `ship 3`, silently, with `Check succeeded`. The
+carve-out now applies only where its evidence was gathered (the 26 argument-position wildcards of
+Appendix A.4); at the head a selector-spelled name stays a reference. Fixture:
+`jl4/examples/not-ok/tc/action-head-selector.l4`.
+
+**ADDED 2026-09-16 (Phase E review, Phase F build): `ASSUME`d referents are ruled IN, deliberately,
+and the run-time failure is accepted.** R1's third row lists `ASSUME`d terms as references, and
+under it `ASSUME price IS A NUMBER` + `MUST pay price` fails at the first `#TRACE` with "trying to
+check equality on types that do not support it" where base answered `FULFILLED`. That is the right
+trade and it is not a defect: base's answer was a silent wrong verdict (the wildcard of §2), and an
+uninterpreted term does not evaluate anywhere else either (CLAUDE.md §5). A loud failure replaces a
+quiet wrong one. Function-typed referents are the case that _is_ refused, at check time — see R7.
+
 ### R2. Expressions are admitted in pattern position without a keyword
 
 Anything in pattern position that is **not** a name, a literal, a constructor application, a cons
@@ -182,8 +201,8 @@ _is_ an error today — but the error is `could not find a definition`, and unde
 keyword replaces that error with a **fresh wildcard that matches anything**, which is the §2 defect
 itself. The reasoning confused "already an error" with "still an error afterwards".
 
-So the warning is conditional, and `DeprecatedExactlyInfo.replacement` is a `Maybe Text`
-(`jl4-core/src/L4/TypeCheck/Types.hs:314`, computed by `exactlyReplacement`,
+So the warning is conditional, and `DeprecatedExactlyInfo.advice` is an `ExactlyAdvice`
+(`jl4-core/src/L4/TypeCheck/Types.hs`, computed by `exactlyReplacement`,
 `jl4-core/src/L4/TypeCheck.hs`). For a bare-name operand whose R1 reading is `ReadsAsBinder` — it
 names nothing in scope, or only a field selector — the warning still says the keyword is being
 retired but **does not offer the drop**, and says instead that dropping it would change what the
@@ -195,6 +214,23 @@ Phase A2 measured the corpus: **one** site is in the unsafe class,
 `jl4/examples/not-ok/tc/every-unbound-variable.l4:11`, which is the fixture for that very error and
 which §5.1 already keeps. So the sweep is unaffected; what changes is that the checker can no
 longer mislead a future author into the defect.
+
+**CORRECTED AGAIN 2026-09-16 (Phase E review, Phase F build): there are TWO unsafe classes, not
+one, and the second one type-checks either way.** A bare-name operand that names a data constructor
+**as well as** a value reads differently with the keyword and without it: `EXACTLY n` evaluates `n`
+as an expression and finds the value, while the bare name takes R1's first row and is the
+constructor pattern. Measured on `jl4/examples/ok/regulative-exactly-constructor-overload.l4`, with
+the `GIVEN red` supplied as `green`: `MUST paint (EXACTLY red)` is discharged by `paint green` and
+`MUST paint red` is not. The warning was recommending that exact edit, on a file `l4 check` called
+clean before and after — the §2 defect shape, introduced by the migration advice itself. So
+`ExactlyAdvice` has a third case, `KeepItShadowedByConstructor`, whose message names the collision
+and asks for a rename. `actionNameReading` tells the two constructor readings apart
+(`ReadsAsConstructor` / `ReadsAsConstructorShadowingTerm`); the pattern semantics of both are
+unchanged, the distinction exists only so the advice can be honest.
+
+Compound operands were checked and are safe as they stand: `prettyLayout` prints an application in
+its `OF` form (`Money OF amt`), which the pattern production cannot read, so a pasted replacement
+cannot fall back into a constructor pattern with fresh names.
 
 The prerelease shelf ships `unstable` to outside users (CLAUDE.md §1), so removal of the keyword is
 a **separate ruling** for Meng, after at least one shelf cut with the warning live (§10).
@@ -218,6 +254,18 @@ later that captures what used to be a wildcard. It does not fire for lexical loc
 is unambiguous and the corpus is unanimous) and not for constructors. The build reports how many
 fire over the swept corpus; if the count is noisy, the severity is Meng's to lower, not the
 build's.
+
+**NARROWED 2026-09-16 (Phase E review, Phase F build): arity-0 only.** R1's applied form — a head
+that names something in scope and takes arguments, `(`Forfeiture Reason` `award state`) — was also
+drawing the notice, whose text ("refers to … rather than introducing a new name of its own", "a
+placeholder that matches anything") is false of an applied head: it could never have introduced a
+name, and base refused the same text outright with "I could not find a definition". Three of the 26
+notices in the goldens were that class, all in `legal/ceo-performance-award.l4`(:360, :364, :415),
+and they are gone. Measured after the fix —`grep -rc "rather than introducing a new name of its own" --include=\*.golden .`— **19** notices
+remain over the whole corpus, every one of them a name that really could have been a placeholder.
+(Two of the difference are not this narrowing: restoring`ok/regulative-exactly-later-argument.l4`
+to the keyword turns two of its notices into deprecation warnings.) That is the count for Meng's
+severity question in §10.2.
 
 ### R6. `CONSIDER` is measured first and extended only if its numbers look like the deontic ones
 
@@ -282,6 +330,23 @@ that wants a different spelling, or an action whose type is wrong), and the chec
 This is the same trade `checkActionPattern`'s comment already records for the head position.
 The message should say both corrections.
 
+**EXTENDED 2026-09-16 (Phase E review, Phase F build): a pinned value that cannot be COMPARED is
+the second error, for the same reason.** An action holding a value accepts only events carrying
+that same value, which is an equality test, and a **function** has no equality. So
+`GIVEN g IS A FUNCTION FROM NUMBER TO NUMBER` with `MUST apply g` can never match anything: base
+made it a wildcard and answered `FULFILLED`, and R1 as first built type-checked clean and then died
+at the first `#TRACE` with "trying to check equality on types that do not support it", naming
+neither `g` nor the slot. It is now `ActionPatternNotComparable`, raised at check time, in argument
+position only — at the head a function-typed action already fails the rule's declared
+`DEONTIC OF …` type, and that message is the better one. Both spellings are refused, because
+`EXACTLY g` and the reference R1 synthesises are the same pinned pattern. The two corrections it
+names are R7's two. Fixture: `jl4/examples/not-ok/tc/action-pinned-function.l4`.
+
+Note what is **not** carved out. Extending R1 row 4 to every function-typed referent would have
+kept those files running, by making the name a silent wildcard — which is the trade §2 exists to
+refuse. The selector carve-out survives on evidence (26 corpus sites, all deliberate wildcards),
+not on the fact that a selector is a function.
+
 ---
 
 ## 5. The corpus sweep
@@ -300,6 +365,21 @@ pages outside `specs/` mention the keyword.
    the **new** binary, must be identical apart from the deprecation warning. One exception is
    kept: `not-ok/tc/every-unbound-variable.l4` keeps its `EXACTLY` because its purpose is the
    unbound-operand error; its golden gains the deprecation warning.
+
+   **CORRECTED 2026-09-16 (Phase E review, Phase F build), twice.** (a) Three more files keep the
+   keyword, because a deprecated construct still needs fixtures: `ok/regulative-exactly-later-argument.l4`
+   was swept and thereby lost its own subject (it is the `PatApp1` later-argument scope regression),
+   so it is restored to the keyword and gains bare twins at its foot; it is now also where the
+   warning's _pasteable_ branch is pinned, which nothing covered. `ok/regulative-exactly-constructor-overload.l4`
+   and `not-ok/tc/action-pinned-function.l4` are new and keep it deliberately. (b) The sweep dropped
+   the keyword but left the parentheses that had bracketed it, so 94 argument slots across 26 files
+   read `Sign (t)` where R3 asks for `Sign t` — cosmetic in the corpus, not cosmetic in the pages
+   that quote it (`doc/reference/regulative/EVERY.md` showed `Sign t` against an `every-example.l4`
+   that said `Sign (t)`) and not cosmetic in the goldens, where the parens were the diagnostic's
+   anchor (`every-cast-not-party` pointed at `(s)`, columns 28-31, while quoting `s`). Stripped, with
+   a per-file `l4 run` differential over all 26 showing the Result blocks unchanged and only
+   diagnostic ranges moving.
+
 2. **The 34 hazard sites** (Appendix A.3) change meaning without changing text — that is the fix.
    Where a trace exists, add one mismatching event so the golden witnesses the narrowing:
    at minimum `doc/reference/regulative/deontic-example.l4` (§2's example) and the moved `EVERY`
@@ -337,6 +417,30 @@ the same resolved pattern because scope is the same module. The round-trip prope
 `jl4/tests/Main.hs` (parse → print → parse → type-check) covers the first two; **the evaluation
 differential of CLAUDE.md §3.2.1 is owed by hand** because `L4/Print.hs` is in the diff, with the
 binary snapshotted first. `Rules.ExactPrint` is untouched (tokens).
+
+**CORRECTED 2026-09-16 (Phase E review, Phase F build): "a `PatExpr (Var n)` prints as `n`" is
+unsound for one name, and the sentence about round-tripping above was the confident version of the
+same mistake.** Where `n` names a data constructor as well as a value, the printed bare name
+re-parses under R1 row 1 as the **constructor pattern**, which is not what the pinned expression
+meant — measured on `ok/regulative-exactly-constructor-overload.l4`, where `paint (EXACTLY red)`
+printed as `paint red` and the residual changed which colour discharged the obligation. The printer
+has no scope and cannot test for the overload, so it uses provenance instead: a pinned pattern
+whose **source wrote the keyword** prints the keyword back (`exactlyKeywordRange`, moved to
+`L4.Syntax` so the printer and the checker read it the same way), and one the checker **synthesised
+for a bare name** prints bare — which is sound by construction, because R1 only synthesises for a
+name it has already resolved to a non-constructor. After the sweep the second kind is almost all of
+them, so residuals still print in the new spelling, which is what this section wanted.
+
+**The differential was run twice, and the first run was measuring a stale instrument** — the
+familiar §3.2.1 shape in a new place. `cabal build all` does **not** build test suites, so
+`cabal list-bin jl4-test` handed back the phase-D binary and the printed modules came from the old
+printer; `cmp` against the earlier snapshot showed the two byte-identical. Rebuild with
+`--enable-tests` before snapshotting. Second run, 393 modules printed, 235 comparable: **230
+identical, 5 differing**, all five accounted for and none of them this branch's — `ok/excel-date/serials.l4`
+and `ok/ledger/bitemporal-recall.l4` stamp wall-clock time (§3.2.1 names both), `ok/mixfix-garden-path.l4`
+is the loud failure §3.2.2 documents, and `legal/sg-succession/sg-wills.l4` with its
+`canon/` mirror differ by a recursion-depth overflow in the printed module that **reproduces at
+base**, on `l4-base` with a base-printed module.
 
 ---
 
