@@ -6,21 +6,11 @@ nested.l4:37:26-31:
     
       chair (at nested.l4:17:1-6)
     
-    rather than introducing a new name of its own.
-    
-    That is what a name in an action does: it names the thing it names. A
-    placeholder that matches anything has to be a name nothing else is using.
-    This note only appears when the thing named is defined outside the rule,
-    because a name added there later can quietly capture a placeholder here.
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 nested.l4:41:36-41:
   I found a problem while checking the definition of `after the chair gives notice`:
     In this action, `chair` refers to
     
       chair (at nested.l4:17:1-6)
     
-    rather than introducing a new name of its own.
-    
-    That is what a name in an action does: it names the thing it names. A
-    placeholder that matches anything has to be a name nothing else is using.
-    This note only appears when the thing named is defined outside the rule,
-    because a name added there later can quietly capture a placeholder here.
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.

@@ -7,12 +7,7 @@ run-barrier.l4:37:48-59:
     
       theLandlord (at run-barrier.l4:25:1-12)
     
-    rather than introducing a new name of its own.
-    
-    That is what a name in an action does: it names the thing it names. A
-    placeholder that matches anything has to be a name nothing else is using.
-    This note only appears when the thing named is defined outside the rule,
-    because a name added there later can quietly capture a placeholder here.
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 run-barrier.l4:42:1-46:51:
   FULFILLED
 run-barrier.l4:51:1-55:51:

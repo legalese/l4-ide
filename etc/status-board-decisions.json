@@ -163,11 +163,11 @@
     },
     {
       "id": "R5 opening",
-      "owner": "Meng (enqueue #403; three rulings)",
-      "kind": "PR open",
+      "owner": "merge-manager (enqueue #403)",
+      "kind": "in queue",
       "quick": false,
       "raised": "2026-09-16",
-      "ask": "BUILT 2026-09-16 by workflow wf_686ecb24-22e (10 agents): PR #403 (lang/r5-field-opening @ eac99b19, mergeable, gate 8/8, jl4-test 3147/0, docs checked with the branch binary). A record-typed GIVEN on a function or section opens its fields by bare name, elaborated before type checking to the same Proj a hand-written `r's f` produces; the computed-field rewrite generalised into the one pass; rank as ruled as a frame stack, every enclosing section one frame; two-site collision error. Review round fixed 1 BLOCKER (a computed field's body opened an unrelated section GIVEN's fields — silent, 14→200) + 6 defects; the rank's silent rung now WARNS (OpenedFieldShadowsDefinition). NOT built (each a coarser answer): untyped binders, record synonyms, lambda params, anything inside a regulative/EVENT/inert body, directive bodies. MENG: (1) say enqueue; (2) rule the tier of constructors and top-level names vs opened fields (warning today); (3) rule whether opening extends into regulatives — until it does, the EXACTLY-retirement interaction (an opened field spelled like an action slot) has no live case.",
+      "ask": "Meng said enqueue (2026-09-16). #403 conflicted with #407 in three files; GM rebased it across #407 on a temp branch (both sides kept), gate 8/8 there (jl4-test 3288/0), docs L4 leg green, then moved the two commits onto the merged unstable: lang/r5-field-opening @ df724009, 0 behind. merge-manager enqueues when CLEAN. RULINGS STILL OWED (PR body): constructor/top-level tier vs opened fields (warning today); opening inside regulatives; synonyms/untyped binders.",
       "unblocks": "rule bodies reading `bankrupt` instead of p's `bankrupt`; WHOSE (EVERY spec §13.6) is sequenced behind it",
       "source": {
         "file": "specs/todo/IMPLICIT-PROPS-DESIGN.md",
@@ -232,20 +232,15 @@
     },
     {
       "id": "EXACTLY retirement",
-      "owner": "Meng (enqueue #407; rulings 1–4)",
-      "kind": "PR open",
+      "owner": "Meng (confirm PROVIDED) · GM (removal PR by 2026-10-01)",
+      "kind": "merged; sunset scheduled",
       "quick": false,
       "raised": "2026-09-16",
-      "ask": "BUILT 2026-09-16 by workflow wf_8a91a677-de7 (15 agents): PR #407 (lang/action-binder-reference @ 29819243, 14 commits, gate 8/8 at 41809c4d, evaluation differential over 392 files clean of branch-caused differences). A bare name in a deontic action argument refers to what it names (lexical local silently; other in-scope non-selector term with an Info notice); wildcard only when it names nothing or only a selector; parenthesised expressions admitted in pattern position; EXACTLY deprecated with a warning that says drop / keep-unbound / keep-constructor-shadowed; EVERY rebind error retired. CONSIDER kept as-is BY MEASUREMENT: 22 collisions, all 22 deliberate wildcards (prelude's `WHEN JUST x` idiom would become `x == JUST x`). 302 tokens dropped, 1 kept; 54 goldens re-blessed and read; one real regression (semantic tokens silently lost) caught by a golden and fixed; 21 review findings → 8 fixed + docs, 2 declined with reasons in the spec. MENG: (1) enqueue #407; (2) keyword REMOVAL date (after one prerelease cut with the warning live); (3) R5 notice severity — 59 notices over the corpus, listed in the spec; (4) whether the action HEAD should also notice (11 sites, all top-level DECIDE references); (5) an ASSUME'd term referenced from a pattern now fails loudly at run time where the base silently fulfilled — accept as recorded, or change. After merge: close smucclaw#955; hand-port the skill to l4-plugin (needs the CLAUDE.md §1.0 yes).",
-      "unblocks": "smucclaw#955; the 33 silent wildcard sites; a simpler EVERY page; the marker-free reading Meng asked for",
+      "ask": "MERGED as #407 (unstable cb07560d, 2026-09-16 07:19Z); smucclaw#955 closed. RULED 2026-09-16 (Meng): sunset 2026-10-01 — EXACTLY removed EVERYWHERE, CONSIDER included; a pinned name in a WHEN is spelled as a guard (two corpus sites to rewrite, both degenerate); R5 notice stays Info with Meng's wording (\"If you wanted a placeholder variable that matches any value, choose a name not already taken.\"); no notice at the action head. Remaining after #407: 10 code-line EXACTLYs (8 warning fixtures, 2 CONSIDER), canon 0. ONE THING FOR MENG: confirm the guard spelling — GM recommends `WHEN <pattern> PROVIDED <cond>` (mirrors the action guard; falls through; non-covering for exhaustiveness); CONSIDER has no guard production today, so this is a small language change to land before the sunset. Then: the removal PR (lexer/parser/printer/warning out, 2 sites, 8 fixtures, docs).",
+      "unblocks": "the 2026-10-01 removal PR; a marker-free pattern language",
       "source": {
         "file": "specs/todo/PATTERN-REFERENCE-RULE-SPEC.md",
-        "anchor": "## 1. The ruling",
-        "ref": "origin/lang/action-binder-reference"
-      },
-      "verify": {
-        "cmd": "gh pr view 407 --repo legalese/l4-ide --json state --jq .state || true",
-        "pendingWhen": "^OPEN$"
+        "anchor": "RULED 2026-09-16 (Meng), superseding the deontic-only outcome"
       }
     },
     {

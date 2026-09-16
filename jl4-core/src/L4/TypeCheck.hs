@@ -6395,16 +6395,13 @@ prettyCheckError (ExportAssumeNameClash fnName paramName) =
   , "Rename the input or the ASSUME."
   ]
 prettyCheckError (ActionPatternReference n referent) =
+  -- Wording ruled by Meng 2026-09-16 (PATTERN-REFERENCE-RULE-SPEC §4 R5): the fact,
+  -- the referent, and the one thing to do if a placeholder was meant. Nothing else.
   [ "In this action, " <> quotedName n <> " refers to"
   , ""
   , "  " <> prettyNameWithRange referent
   , ""
-  , "rather than introducing a new name of its own."
-  , ""
-  , "That is what a name in an action does: it names the thing it names. A"
-  , "placeholder that matches anything has to be a name nothing else is using."
-  , "This note only appears when the thing named is defined outside the rule,"
-  , "because a name added there later can quietly capture a placeholder here."
+  , "If you wanted a placeholder variable that matches any value, choose a name not already taken."
   ]
 prettyCheckError (ActionPatternNotComparable e t) =
   [ "This pins a value that cannot be compared."

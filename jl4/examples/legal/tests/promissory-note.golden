@@ -7,36 +7,21 @@ promissory-note.l4:91:27-39:
     
       `Promissory Note`.Parties.`The Lender` (at promissory-note.l4:46:1-13)
     
-    rather than introducing a new name of its own.
-    
-    That is what a name in an action does: it names the thing it names. A
-    placeholder that matches anything has to be a name nothing else is using.
-    This note only appears when the thing named is defined outside the rule,
-    because a name added there later can quietly capture a placeholder here.
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 promissory-note.l4:104:35-47:
   I found a problem while checking the definition of `Payment Obligations`:
     In this action, `The Lender` refers to
     
       `Promissory Note`.Parties.`The Lender` (at promissory-note.l4:46:1-13)
     
-    rather than introducing a new name of its own.
-    
-    That is what a name in an action does: it names the thing it names. A
-    placeholder that matches anything has to be a name nothing else is using.
-    This note only appears when the thing named is defined outside the rule,
-    because a name added there later can quietly capture a placeholder here.
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 promissory-note.l4:112:43-55:
   I found a problem while checking the definition of `Payment Obligations`:
     In this action, `The Lender` refers to
     
       `Promissory Note`.Parties.`The Lender` (at promissory-note.l4:46:1-13)
     
-    rather than introducing a new name of its own.
-    
-    That is what a name in an action does: it names the thing it names. A
-    placeholder that matches anything has to be a name nothing else is using.
-    This note only appears when the thing named is defined outside the rule,
-    because a name added there later can quietly capture a placeholder here.
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 promissory-note.l4:165:1-30:
   Money OF "USD", 2077.49370354708
 promissory-note.l4:167:1-31:

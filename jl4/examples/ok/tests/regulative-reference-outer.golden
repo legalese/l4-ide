@@ -7,12 +7,7 @@ regulative-reference-outer.l4:27:26-44:
     
       `the agreed price` (at regulative-reference-outer.l4:23:1-19)
     
-    rather than introducing a new name of its own.
-    
-    That is what a name in an action does: it names the thing it names. A
-    placeholder that matches anything has to be a name nothing else is using.
-    This note only appears when the thing named is defined outside the rule,
-    because a name added there later can quietly capture a placeholder here.
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 regulative-reference-outer.l4:29:1-30:33:
   PARTY Buyer MUST pay `the agreed price` WITHIN 20 HENCE FULFILLED LEST BREACH
 regulative-reference-outer.l4:31:1-32:35:
@@ -23,12 +18,7 @@ regulative-reference-outer.l4:38:26-44:
     
       `the imported fee` (at regulative-reference-outer-lib.l4:3:1-19)
     
-    rather than introducing a new name of its own.
-    
-    That is what a name in an action does: it names the thing it names. A
-    placeholder that matches anything has to be a name nothing else is using.
-    This note only appears when the thing named is defined outside the rule,
-    because a name added there later can quietly capture a placeholder here.
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 regulative-reference-outer.l4:40:1-41:33:
   PARTY Buyer MUST pay `the imported fee` WITHIN 20 HENCE FULFILLED LEST BREACH
 regulative-reference-outer.l4:42:1-43:35:

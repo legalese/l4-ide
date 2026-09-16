@@ -7,11 +7,6 @@ barrier.l4:26:36-47:
     
       theLandlord (at barrier.l4:22:1-12)
     
-    rather than introducing a new name of its own.
-    
-    That is what a name in an action does: it names the thing it names. A
-    placeholder that matches anything has to be a name nothing else is using.
-    This note only appears when the thing named is defined outside the rule,
-    because a name added there later can quietly capture a placeholder here.
+    If you wanted a placeholder variable that matches any value, choose a name not already taken.
 barrier.l4:44:1-25:
   EVERY Tenant t MUST Sign t WITHIN 14 ONCE ALL HAVE HENCE `the tenancy begins` LEST BREACH
