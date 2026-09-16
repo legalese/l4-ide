@@ -59,8 +59,8 @@ import {
   symlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, extname } from "node:path";
-import { pathToFileURL } from "node:url";
+import { join, extname, resolve, dirname, sep } from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
 import {
   EXEMPT,
   EXTS,
@@ -91,9 +91,19 @@ const WRITE_EXTS = new Set([
 // applied HERE makes the mirror disagree with its pin; `etc/sync-canon.mjs
 // --check` then fails, and the edit has to be thrown away and redone upstream.
 // Refusing is better than being caught: the fix is to sweep in canon and bump
-// the pin. `--allow-mirror` exists for the one caller who is doing exactly that
-// and knows it.
-const MIRROR = join("jl4", "examples", "canon");
+// the pin. `--allow-mirror` exists for the caller doing exactly that.
+//
+// RESOLVED, NOT SPELLED, AND CHECKED PER FILE. The first version of this guard
+// compared the ARGUMENT string against "jl4/examples/canon", and every one of
+// these walked straight past it: "./jl4/examples/canon", an absolute path, and
+// "jl4/examples/legal/../canon". Worse, and the reason it was a real bug rather
+// than a tidiness point: a PARENT directory -- "jl4/examples", or "." -- contains
+// the mirror without being it, so the most natural way to invoke the tool swept
+// the mirror with no refusal at all. A guard on the input's spelling is not a
+// guard on the operation. This resolves real paths, and the check runs at the
+// moment of writing each file.
+const REPO = dirname(dirname(fileURLToPath(import.meta.url)));
+const MIRROR = resolve(REPO, "jl4", "examples", "canon");
 
 // The mechanical rename: drop the leading clitic verb, keep the complement.
 // Anything cleverer would be inventing a name in somebody else's corpus.
@@ -337,11 +347,26 @@ function selftest() {
       `an uncontested rename must be safe, got ${h2.held.length} held`,
     );
 
-  // The mirror refusal.
-  if (!isMirror(join("jl4", "examples", "canon", "sg", "succession")))
-    fail("isMirror", "must refuse a path inside the vendored mirror");
-  if (isMirror(join("jl4", "examples", "legal", "sg-succession")))
-    fail("isMirror", "must not refuse a path outside the mirror");
+  // The mirror refusal, in every spelling that once bypassed it. The
+  // parent-directory rows are the ones that made this a bug and not a nicety:
+  // `.` and `jl4/examples` contain the mirror without being it, and they are
+  // how a person actually invokes the tool.
+  for (const q of [
+    join("jl4", "examples", "canon"),
+    join(".", "jl4", "examples", "canon"),
+    resolve(REPO, "jl4", "examples", "canon"),
+    join("jl4", "examples", "legal", "..", "canon"),
+    join("jl4", "examples", "canon", "sg", "succession", "sg-paa.l4"),
+  ])
+    if (!isMirror(q)) fail("isMirror", `must refuse ${q}`);
+  for (const q of [
+    join("jl4", "examples", "legal", "sg-succession"),
+    join("jl4", "examples"),
+    ".",
+    join("jl4", "examples", "canon-ish"),
+  ])
+    if (isMirror(q))
+      fail("isMirror", `must not refuse ${q} (it is not inside the mirror)`);
 
   // The detector's vocabulary is IMPORTED, not restated. If these ever stop
   // being the same objects, the two files have drifted and this test says so.
@@ -406,15 +431,14 @@ function selftest() {
     return 1;
   }
   console.log(
-    `apply-clitic-sweep selftest: ${SELFTEST.length} text cases + 14 structural checks pass`,
+    `apply-clitic-sweep selftest: ${SELFTEST.length} text cases + 22 structural checks pass`,
   );
   return 0;
 }
 
 export function isMirror(p) {
-  return (
-    p === MIRROR || p.startsWith(MIRROR + "/") || p.startsWith(MIRROR + "\\")
-  );
+  const a = resolve(p);
+  return a === MIRROR || a.startsWith(MIRROR + sep);
 }
 
 // ---------------------------------------------------------------------------
@@ -459,11 +483,17 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
 
   let edits = 0;
   const touched = [];
+  const refused = [];
   for (const dir of dirs)
     for (const f of writeWalk(dir)) {
       const before = readFileSync(f, "utf8");
       const { text, edits: n } = sweepText(before, safe);
       if (!n) continue;
+      // THE guard. Reading and reporting is always fine; writing is not.
+      if (mode === "apply" && isMirror(f) && !allowMirror) {
+        refused.push(f);
+        continue;
+      }
       edits += n;
       touched.push(`${mode === "apply" ? "edited" : "would edit"} ${f} (${n})`);
       if (mode === "apply") writeFileSync(f, text);
@@ -474,6 +504,19 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     `\n${mode === "apply" ? "" : "PENDING — "}${edits} replacement(s) in ${touched.length} file(s)`,
   );
   for (const [from, to] of safe) console.log(`  \`${from}\` -> \`${to}\``);
+
+  if (refused.length) {
+    console.error(
+      `\napply-clitic-sweep: REFUSED to write ${refused.length} file(s) inside the vendored mirror:`,
+    );
+    for (const f of refused) console.error(`  ${f}`);
+    console.error(
+      `\n${MIRROR} is a copy of legalese/canon at the SHA in etc/canon-pin.json.\n` +
+        `Sweeping it here makes the mirror disagree with its pin, which\n` +
+        `\`node etc/sync-canon.mjs --check\` then fails on. Sweep in canon and bump\n` +
+        `the pin. --allow-mirror overrides, for the caller doing exactly that.`,
+    );
+  }
 
   if (held.length) {
     console.log(`\nHELD BACK (listed, never forced):`);
@@ -489,6 +532,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   // work is a non-zero exit. A held-back rename is also non-zero: it needs a
   // human decision and must not read as clean.
   if (mode === "check" && (edits || held.length)) process.exit(1);
-  if (held.length) process.exit(1);
+  if (held.length || refused.length) process.exit(1);
   process.exit(0);
 }
