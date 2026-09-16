@@ -35,7 +35,7 @@ DECLARE Action IS ONE OF
 GIVETH A DEONTIC Actor Action
 `the rent is due` MEANS
     PARTY  Alice
-    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    MUST   (Pay Alice `Ms Ng` 1500)
     WITHIN 7
     HENCE  FULFILLED
     LEST   BREACH BY Alice BECAUSE "the rent was not paid by the seventh day"

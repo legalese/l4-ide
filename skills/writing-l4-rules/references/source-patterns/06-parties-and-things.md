@@ -13,7 +13,7 @@ a wrong answer, that is said, because a shape that type-checks is the more dange
 
 **If the source says**
 
-> `` PARTY   `The Borrower` ``, `` MUST    `pay monthly installment to` ``, `` EXACTLY `The Lender` ``
+> `` PARTY   `The Borrower` ``, `` MUST    `pay monthly installment to` ``, `` `The Lender` ``
 >
 > — `jl4/examples/legal/promissory-note.l4:90-92`, the borrower's payment obligation. The comment
 > beside it: "This function/action is defined in the prelude and expects an object of type Lender

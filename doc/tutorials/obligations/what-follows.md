@@ -29,10 +29,10 @@ Here is the rent clause with the receipt written into its `HENCE`:
 GIVETH A DEONTIC Actor Action
 `rent, then receipt` MEANS
     PARTY  Alice
-    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    MUST   (Pay Alice `Ms Ng` 1500)
     WITHIN 7
     HENCE  PARTY  `Ms Ng`
-           MUST   EXACTLY (Receipt `Ms Ng` Alice 1500)
+           MUST   (Receipt `Ms Ng` Alice 1500)
            WITHIN 5
            HENCE  FULFILLED
            LEST   BREACH BY `Ms Ng` BECAUSE "no receipt was issued"
@@ -83,7 +83,7 @@ Now stop the story after Alice's payment:
 
 ```
 Result:
-  PARTY `Ms Ng` MUST EXACTLY Receipt OF `Ms Ng`, Alice, 1500 WITHIN 5 HENCE FULFILLED LEST (BREACH BY `Ms Ng` BECAUSE "no receipt was issued")
+  PARTY `Ms Ng` MUST Receipt `Ms Ng` Alice 1500 WITHIN 5 HENCE FULFILLED LEST (BREACH BY `Ms Ng` BECAUSE "no receipt was issued")
 ```
 
 The "still owed" line no longer mentions Alice at all. What is still owed is the receipt, and it is owed by Ms Ng. A chain, played forward, shows you only the link you have reached.
@@ -113,11 +113,11 @@ Result:
 GIVETH A DEONTIC Actor Action
 `rent, with a late fee` MEANS
     PARTY  Alice
-    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    MUST   (Pay Alice `Ms Ng` 1500)
     WITHIN 7
     HENCE  FULFILLED
     LEST   PARTY  Alice
-           MUST   EXACTLY (Pay Alice `Ms Ng` 1550)
+           MUST   (Pay Alice `Ms Ng` 1550)
            WITHIN 14
            HENCE  FULFILLED
            LEST   BREACH BY Alice BECAUSE "the rent and the late fee were not paid"
@@ -147,7 +147,7 @@ Look at what is owed on day 8, when the miss has just come to light:
 
 ```
 Result:
-  PARTY Alice MUST EXACTLY Pay OF Alice, `Ms Ng`, 1550 WITHIN 14 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent and the late fee were not paid")
+  PARTY Alice MUST Pay Alice `Ms Ng` 1550 WITHIN 14 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent and the late fee were not paid")
 ```
 
 The original obligation is gone; the second chance is what stands, with fourteen days on its clock. **Where does the second clock start?** At day 8 — the first event after the deadline, the moment the miss came to light — and not at day 7, the deadline itself. Fourteen days from day 8 is day 22. That difference is not fixed at one day. L4 learns that a deadline has passed only when the next event arrives, and the next obligation begins then — so a late payment that is itself the next event is on time by its own clock. That is why every miss on this page is recorded as ``(`WAIT UNTIL` 8)`` before anything else: it pins the second clock to the day after the deadline. Even so, the window ends on day 22, one day later than a lease saying "fourteen more days from the seventh" would have it; to end it on day 21, write `WITHIN 13`, and say why in a comment.
@@ -162,7 +162,7 @@ Alice pays the plain rent on day 15, forgetting the fee:
 
 ```
 Result:
-  PARTY Alice MUST EXACTLY Pay OF Alice, `Ms Ng`, 1550 WITHIN 7 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent and the late fee were not paid")
+  PARTY Alice MUST Pay Alice `Ms Ng` 1550 WITHIN 7 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent and the late fee were not paid")
 ```
 
 Not the payment the second chance asks for, so it is passed over, and she has seven days left to make the right one. And if nobody does anything for a month, both chances are gone and the sentence on the screen is the inner one:
@@ -187,7 +187,7 @@ So the two "then what" lines are symmetrical. `HENCE` names what the good outcom
 
 ## Step 3: Paying Any Amount, and Handing It On
 
-Every payment so far has been written with `EXACTLY`: this payment and no other. Sometimes the clause is looser. Alice may pay the rent together with something towards the deposit, and the receipt should be for whatever she paid. So the act has to accept _any_ amount, then decide whether it was enough, then carry the amount forward into the receipt.
+Every payment so far has required an exact figure: this payment and no other. Sometimes the clause is looser. Alice may pay the rent together with something towards the deposit, and the receipt should be for whatever she paid. So the act has to accept _any_ amount, then decide whether it was enough, then carry the amount forward into the receipt.
 
 Leave the amount as a blank, and test it with `PROVIDED`:
 
@@ -203,7 +203,7 @@ GIVETH A DEONTIC Actor Action
 
 Three new things on the `MUST` line, and one on the `HENCE` line.
 
-There is no `EXACTLY`. Without it, the act is a shape to be matched rather than a value to be equalled: a payment from Alice to Ms Ng of _some_ amount. The word `amount` — any word would do — is not a value you have defined anywhere; it is a blank, and the event that matches the shape fills it in. Then `PROVIDED amount AT LEAST 1500` is the test: a payment counts only if the blank, once filled, passes it. A payment that fails the test is passed over as if it had not fitted at all.
+`amount` here is a shape to be matched rather than a value to be equalled: a payment from Alice to Ms Ng of _some_ amount. The word `amount` — any word would do, so long as it is not already defined — names nothing you have defined anywhere; it is a blank, and the event that matches the shape fills it in. Then `PROVIDED amount AT LEAST 1500` is the test: a payment counts only if the blank, once filled, passes it. A payment that fails the test is passed over as if it had not fitted at all.
 
 On the `HENCE` line, the blank is handed on. `` `a receipt to` Alice amount `` is a rule being used with two inputs, the way [One Obligation](one-obligation.md) used `Pay` with three — and the rule is one that gives an obligation:
 
@@ -213,7 +213,7 @@ GIVEN who    IS AN Actor
 GIVETH A DEONTIC Actor Action
 `a receipt to` who amount MEANS
     PARTY  `Ms Ng`
-    MUST   EXACTLY (Receipt `Ms Ng` who amount)
+    MUST   (Receipt `Ms Ng` who amount)
     WITHIN 5
     HENCE  FULFILLED
     LEST   BREACH BY `Ms Ng` BECAUSE "no receipt was issued"
@@ -243,7 +243,7 @@ Stop the story after the payment:
 
 ```
 Result:
-  PARTY `Ms Ng` MUST EXACTLY Receipt OF `Ms Ng`, who, amount WITHIN 5 HENCE FULFILLED LEST (BREACH BY `Ms Ng` BECAUSE "no receipt was issued")
+  PARTY `Ms Ng` MUST Receipt `Ms Ng` who amount WITHIN 5 HENCE FULFILLED LEST (BREACH BY `Ms Ng` BECAUSE "no receipt was issued")
 ```
 
 The receipt is owed — but the screen writes it with the rule's own input names, `who` and `amount`, rather than Alice and 1600. The figure has been carried in (the next example proves it, by offering a receipt for the wrong amount); the screen does not print it in a "still owed" line.
@@ -277,20 +277,11 @@ Result:
   PARTY Alice MUST Pay Alice `Ms Ng` amount PROVIDED (amount AT LEAST 1500) WITHIN 4 HENCE (`a receipt to` OF Alice, amount) LEST (BREACH BY Alice BECAUSE "the rent was not paid by the seventh day")
 ```
 
-The "still owed" line writes the act as you wrote it — there is no `EXACTLY` to turn it into the `Pay OF …` form — with the blank still unfilled, the test still to be passed, and the receipt rule still waiting for its inputs.
+The "still owed" line writes the act as you wrote it, as a pattern rather than a value already equalled — with the blank still unfilled, the test still to be passed, and the receipt rule still waiting for its inputs.
 
-**Why the receipt is a rule of its own.** It need not be. The receipt obligation can be written directly under `HENCE`, with ``EXACTLY (Receipt `Ms Ng` Alice amount)`` inside it, as Step 1 did with a fixed figure, and the blank is carried in just the same. The house rule prefers a rule for the reason a lease defines a term once: in a real lease the same receipt is owed after several different payments, and a rule can be used from as many places as need it, where an obligation written out under one `HENCE` serves that one place. The next page uses the same device to hand a shrinking balance back to the same rule.
+**Why the receipt is a rule of its own.** It need not be. The receipt obligation can be written directly under `HENCE`, with ``(Receipt `Ms Ng` Alice amount)`` inside it, as Step 1 did with a fixed figure, and the blank is carried in just the same. The house rule prefers a rule for the reason a lease defines a term once: in a real lease the same receipt is owed after several different payments, and a rule can be used from as many places as need it, where an obligation written out under one `HENCE` serves that one place. The next page uses the same device to hand a shrinking balance back to the same rule.
 
-One more thing about `EXACTLY` while it is in view. There are two places to write it: around the whole act, ``EXACTLY (Pay Alice `Ms Ng` 1500)``, as every example on this page does, or around one figure, ``Pay Alice `Ms Ng` (EXACTLY 1500)``. The second works only when the figure is written out as a number. Give it a name instead — a defined rent, a rule's input, or a blank such as `amount` — and the run stops when the event arrives:
-
-```
-Internal error:
-  amount
-is not in scope.
-Please report this as a bug.
-```
-
-The whole-act spelling has no such limit, and it is the one to reach for.
+One more thing worth noticing while a fixed figure and a blank are both in view: they are written the *same* way. Step 1's ``Pay Alice `Ms Ng` 1500`` requires that figure; this page's blank `amount` requires nothing, because it names nothing yet. There is no special spelling for "this value, exactly" any more, whether it sits on the whole act or on one figure inside it — a defined rent, a rule's input, and a blank all read the same: a name that refers to something requires it, and a name that refers to nothing is filled in from the event.
 
 ---
 
@@ -302,11 +293,11 @@ Alice is a student. Her father, Mr Lim, signs the lease as guarantor: if Alice d
 GIVETH A DEONTIC Actor Action
 `rent, guaranteed by Mr Lim` MEANS
     PARTY  Alice
-    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    MUST   (Pay Alice `Ms Ng` 1500)
     WITHIN 7
     HENCE  FULFILLED
     LEST   PARTY  `Mr Lim`
-           MUST   EXACTLY (Pay `Mr Lim` `Ms Ng` 1500)
+           MUST   (Pay `Mr Lim` `Ms Ng` 1500)
            WITHIN 14
            HENCE  FULFILLED
            LEST   BREACH BY `Mr Lim` BECAUSE "the guarantor did not pay the rent"
@@ -346,7 +337,7 @@ Now the case that shows what kind of guarantee this is. Mr Lim, being careful, p
 
 ```
 Result:
-  PARTY Alice MUST EXACTLY Pay OF Alice, `Ms Ng`, 1500 WITHIN 4 HENCE FULFILLED LEST (PARTY `Mr Lim` MUST EXACTLY Pay OF `Mr Lim`, `Ms Ng`, 1500 WITHIN 14 HENCE FULFILLED LEST (BREACH BY `Mr Lim` BECAUSE "the guarantor did not pay the rent"))
+  PARTY Alice MUST Pay Alice `Ms Ng` 1500 WITHIN 4 HENCE FULFILLED LEST (PARTY `Mr Lim` MUST Pay `Mr Lim` `Ms Ng` 1500 WITHIN 14 HENCE FULFILLED LEST (BREACH BY `Mr Lim` BECAUSE "the guarantor did not pay the rent"))
 ```
 
 It did nothing. On day 3 the only obligation standing is Alice's, and Mr Lim's payment is not Alice paying, so it is passed over like the inspection was in [One Obligation](one-obligation.md). His obligation does not exist until hers has failed. That is the guarantee the civil codes call _simple_, and it comes with a right the lawyers call the benefit of discussion: go to the debtor first.
@@ -393,13 +384,13 @@ In L4, that is a choice between two obligations that are both live at once, join
 GIVETH A DEONTIC Actor Action
 `rent, Alice or Mr Lim` MEANS
     (PARTY  Alice
-     MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+     MUST   (Pay Alice `Ms Ng` 1500)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY Alice BECAUSE "the rent was not paid by the seventh day")
     ROR
     (PARTY  `Mr Lim`
-     MUST   EXACTLY (Pay `Mr Lim` `Ms Ng` 1500)
+     MUST   (Pay `Mr Lim` `Ms Ng` 1500)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY `Mr Lim` BECAUSE "the guarantor did not pay the rent")
@@ -428,7 +419,7 @@ Alice paying on day 5 settles it just the same. With nothing paid yet, both obli
 
 ```
 Result:
-  PARTY Alice MUST EXACTLY Pay OF Alice, `Ms Ng`, 1500 WITHIN 4 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent was not paid by the seventh day") OR PARTY `Mr Lim` MUST EXACTLY Pay OF `Mr Lim`, `Ms Ng`, 1500 WITHIN 4 HENCE FULFILLED LEST (BREACH BY `Mr Lim` BECAUSE "the guarantor did not pay the rent")
+  PARTY Alice MUST Pay Alice `Ms Ng` 1500 WITHIN 4 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent was not paid by the seventh day") OR PARTY `Mr Lim` MUST Pay `Mr Lim` `Ms Ng` 1500 WITHIN 4 HENCE FULFILLED LEST (BREACH BY `Mr Lim` BECAUSE "the guarantor did not pay the rent")
 ```
 
 (The screen writes `ROR` as `OR` in a "still owed" line. It is the same choice.)
@@ -469,7 +460,7 @@ The three things the screen can say are the same as for one obligation, but they
 - **`HENCE` and `LEST` can each name another obligation.** A lease is a chain of them, and every chain ends at a `FULFILLED` or a `BREACH`.
 - **The next clock starts at the event that reached it**: for `HENCE`, the act that discharged the previous link; for `LEST`, the first event after the deadline — the moment the default came to light — which is not the deadline itself.
 - **An act can accept any amount**: leave the amount as a blank, test it with `PROVIDED`, and hand it on to a rule that gives the next obligation, so that the same obligation can be used from more than one place.
-- **`EXACTLY` around the whole act** is the spelling that works with a named figure; `EXACTLY` around one figure works only when the figure is written out.
+- **A named figure and a literal figure are required the same way.** A name in an act requires the value it names, whether that name sits on the whole act or on one figure inside it; there is no special keyword for it any more.
 - **Two guarantees, one word apart.** A guarantor who pays only after the tenant's default is a `LEST`. A guarantor the landlord may go to first is a `ROR`. Which one the source text says is a question of law, and the encoding has to answer it.
 - **A choice is broken only when every side is lost**, and the screen then names one side, not all of them.
 

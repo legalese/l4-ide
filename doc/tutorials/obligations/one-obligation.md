@@ -69,7 +69,7 @@ Here is the rent clause, all five parts:
 GIVETH A DEONTIC Actor Action
 `the rent is due` MEANS
     PARTY  Alice
-    MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+    MUST   (Pay Alice `Ms Ng` 1500)
     WITHIN 7
     HENCE  FULFILLED
     LEST   BREACH BY Alice BECAUSE "the rent was not paid by the seventh day"
@@ -82,7 +82,7 @@ Line by line:
 | `GIVETH A DEONTIC Actor Action`           | this rule gives an obligation, between the people in `Actor`, about the acts in `Action`                                                                                                                                                                                                                |
 | `` `the rent is due` MEANS ``             | and this is its name                                                                                                                                                                                                                                                                                    |
 | `PARTY Alice`                             | the person bound is Alice                                                                                                                                                                                                                                                                               |
-| ``MUST EXACTLY (Pay Alice `Ms Ng` 1500)`` | what she must do: make this payment — $1,500, from Alice, to Ms Ng. The brackets only group the act. `EXACTLY` says to take the act as written: $1,000 is not this payment (Step 5 shows that). [What Follows](what-follows.md) shows the other way to write an act, as a shape that accepts any amount |
+| ``MUST (Pay Alice `Ms Ng` 1500)`` | what she must do: make this payment — $1,500, from Alice, to Ms Ng. The brackets only group the act; writing the figures out takes the act as written: $1,000 is not this payment (Step 5 shows that). [What Follows](what-follows.md) shows the other way to write an act, as a shape that accepts any amount |
 | `WITHIN 7`                                | she has seven days, counting from when the obligation begins                                                                                                                                                                                                                                            |
 | `HENCE FULFILLED`                         | if she does it in time, the obligation is over and nothing further is owed                                                                                                                                                                                                                              |
 | `LEST BREACH BY Alice BECAUSE "…"`        | if she does not, she is in breach, and this is the sentence that says why. Write that sentence for the person who will read it — a clerk, a lawyer, Alice herself. It is what the screen prints (Step 4)                                                                                                |
@@ -140,10 +140,10 @@ And the third thing that can happen — nothing has happened yet. Write the inst
 
 ```
 Result:
-  PARTY Alice MUST EXACTLY Pay OF Alice, `Ms Ng`, 1500 WITHIN 7 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent was not paid by the seventh day")
+  PARTY Alice MUST Pay Alice `Ms Ng` 1500 WITHIN 7 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent was not paid by the seventh day")
 ```
 
-That is neither a success nor a breach. It is the obligation itself, written back out on one line, exactly as it stands: still open, still seven days on the clock. The screen spells the payment ``Pay OF Alice, `Ms Ng`, 1500``, which is the tool's own way of writing what you wrote as ``Pay Alice `Ms Ng` 1500``; the two are the same payment. Read this line as **what is still owed**, and read its `WITHIN` as how long is left.
+That is neither a success nor a breach. It is the obligation itself, written back out on one line, exactly as it stands: still open, still seven days on the clock. Read this line as **what is still owed**, and read its `WITHIN` as how long is left.
 
 So an obligation, played forward, comes out as one of three things:
 
@@ -197,7 +197,7 @@ Result:
 
 ```
 Result:
-  PARTY Alice MUST EXACTLY Pay OF Alice, `Ms Ng`, 1500 WITHIN 5 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent was not paid by the seventh day")
+  PARTY Alice MUST Pay Alice `Ms Ng` 1500 WITHIN 5 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent was not paid by the seventh day")
 ```
 
 The same obligation, with five days left instead of seven. Every event in the list is looked at in order; one that does not fit the obligation is passed over, and the clock keeps moving.
@@ -223,7 +223,7 @@ And one experiment about the act rather than the clock. Alice pays $1,000 on day
 
 ```
 Result:
-  PARTY Alice MUST EXACTLY Pay OF Alice, `Ms Ng`, 1500 WITHIN 2 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent was not paid by the seventh day")
+  PARTY Alice MUST Pay Alice `Ms Ng` 1500 WITHIN 2 HENCE FULFILLED LEST (BREACH BY Alice BECAUSE "the rent was not paid by the seventh day")
 ```
 
 Not the payment the clause asked for, so it is passed over like the inspection was, and Alice has two days left to make the right one. That is what writing the figure into the act bought you. [What Follows](what-follows.md) shows the other way to write an act — as a shape that accepts any amount and then decides whether it was enough.

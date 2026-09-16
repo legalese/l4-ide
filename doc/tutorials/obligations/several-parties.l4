@@ -38,19 +38,19 @@ DECLARE Action IS ONE OF
 GIVETH A DEONTIC Actor Action
 `each pays a share` MEANS
     (PARTY  Alice
-     MUST   EXACTLY (Pay Alice `Ms Ng` 500)
+     MUST   (Pay Alice `Ms Ng` 500)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY Alice BECAUSE "Alice's share was not paid")
     RAND
     (PARTY  Bob
-     MUST   EXACTLY (Pay Bob `Ms Ng` 500)
+     MUST   (Pay Bob `Ms Ng` 500)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY Bob BECAUSE "Bob's share was not paid")
     RAND
     (PARTY  Carol
-     MUST   EXACTLY (Pay Carol `Ms Ng` 500)
+     MUST   (Pay Carol `Ms Ng` 500)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY Carol BECAUSE "Carol's share was not paid")
@@ -111,19 +111,19 @@ rent MEANS 1500
 GIVETH A DEONTIC Actor Action
 `any one pays the rent` MEANS
     (PARTY  Alice
-     MUST   EXACTLY (Pay Alice `Ms Ng` rent)
+     MUST   (Pay Alice `Ms Ng` rent)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY Alice BECAUSE "the rent was not paid")
     ROR
     (PARTY  Bob
-     MUST   EXACTLY (Pay Bob `Ms Ng` rent)
+     MUST   (Pay Bob `Ms Ng` rent)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY Bob BECAUSE "the rent was not paid")
     ROR
     (PARTY  Carol
-     MUST   EXACTLY (Pay Carol `Ms Ng` rent)
+     MUST   (Pay Carol `Ms Ng` rent)
      WITHIN 7
      HENCE  FULFILLED
      LEST   BREACH BY Carol BECAUSE "the rent was not paid")
@@ -149,20 +149,20 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `one pays, the other repays` MEANS
     (PARTY  Alice
-     MUST   EXACTLY (Pay Alice `Ms Ng` 1500)
+     MUST   (Pay Alice `Ms Ng` 1500)
      WITHIN 7
      HENCE  PARTY  Bob
-            MUST   EXACTLY (Reimburse Bob Alice 750)
+            MUST   (Reimburse Bob Alice 750)
             WITHIN 30
             HENCE  FULFILLED
             LEST   BREACH BY Bob BECAUSE "Bob did not repay his half"
      LEST   BREACH BY Alice BECAUSE "the rent was not paid")
     ROR
     (PARTY  Bob
-     MUST   EXACTLY (Pay Bob `Ms Ng` 1500)
+     MUST   (Pay Bob `Ms Ng` 1500)
      WITHIN 7
      HENCE  PARTY  Alice
-            MUST   EXACTLY (Reimburse Alice Bob 750)
+            MUST   (Reimburse Alice Bob 750)
             WITHIN 30
             HENCE  FULFILLED
             LEST   BREACH BY Alice BECAUSE "Alice did not repay her half"
