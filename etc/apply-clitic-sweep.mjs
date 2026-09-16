@@ -233,10 +233,28 @@ export function bindingRe(name) {
 //   So the corpus you pass IS the collision domain, and you are asserting it by
 //   passing it. The run prints how many files it searched so that assertion is
 //   visible rather than implied.
+//
+// WITH ONE ADDITION, AND IT IS THE PRINCIPLED ONE: `jl4-core/libraries` is
+// always in the domain. The rule above is about IMPORT REACHABILITY -- a binding
+// nothing can import is not a collision -- and the libraries are the modules
+// that nearly everything DOES import, prelude first. A rename target that
+// collides with a library binding is a real collision the run would otherwise be
+// unable to see.
+//
+// MEASURED 2026-09-16, before adding it: over `jl4/examples/canon`,
+// `jl4/examples/legal` and `jl4/examples`, adding the libraries to the domain
+// changed NO hold -- the held sets are identical in all three. So this costs
+// nothing today; it closes a class for tomorrow. The measurement is not vacuous:
+// the libraries contribute 23 files and 438 distinct backticked bindings, and a
+// positive control -- a synthetic rename whose target IS one of those bindings --
+// goes from 0 held to 1 held when they enter the domain. The instrument was
+// shown to be live before its negative answer was believed.
+const LIBRARIES = resolve(REPO, "jl4-core", "libraries");
+
 export function hazardCorpus(dirs = []) {
   const seen = new Set();
   const out = [];
-  for (const r of dirs) {
+  for (const r of [...dirs, LIBRARIES]) {
     let files;
     try {
       files = writeWalk(r);
@@ -375,9 +393,8 @@ export function plan(dirs) {
 
 // ---------------------------------------------------------------------------
 // Selftest. Every case is a bug this file HAD -- each number below is a defect a
-// refuter found in an earlier version of this file, not a hypothetical. Each has
-// been SEEN TO FAIL, measured 2026-09-16 by mutating a scratch copy one rule at
-// a time:
+// refuter found in an earlier version, not a hypothetical. Each has been SEEN TO
+// FAIL, measured 2026-09-16 by mutating a copy one rule at a time:
 //
 //   sweep BARE TEXT (undelimited)             5 cases redden
 //   drop the keyword-led binding form         5
@@ -387,22 +404,24 @@ export function plan(dirs) {
 //   allow the quoted form in .l4/.md          2
 //   apply renames in sequence, not one pass   2
 //   drop the declaration requirement          2
+//   drop jl4-core/libraries from the domain   2
 //   hazard corpus back to .l4/.md only        1
 //   revert realpath in the CLI guard          1
 //   drop the `tests/` exclusion               1
 //   follow symlinks                           1
 //
 // NO ROW IS ZERO, and that is the property being maintained rather than a happy
-// accident. A zero says a guard is justified by a comment and exercised by
-// nothing -- which is how `IF` and `GIVETH` were found sitting in BINDS_BEFORE,
+// result. A zero says a guard is justified by a comment and exercised by nothing
+// -- which is how `IF` and `GIVETH` were found sitting in the binding pattern,
 // matching no corpus form and protected by no case. They were removed.
 //
-// A MEASUREMENT NOTE, because the harness lies if you skip it. The mutant must
-// run where `REPO` still resolves to this repository: `REPO` comes from
-// `import.meta.url`, so a copy executed out of /tmp reports 4 phantom isMirror
-// failures that have nothing to do with the mutation. The numbers above are
-// differences against an UNMUTATED copy run from the same place, not raw counts.
-// An instrument that reports 6 where the answer is 2 reads as thoroughness.
+// RUN THE MUTANT FROM INSIDE THE REPOSITORY. `REPO` and `LIBRARIES` derive from
+// `import.meta.url`, so a copy executed out of /tmp cannot find the libraries and
+// reports phantom failures that have nothing to do with the mutation -- six of
+// them, at the time of writing. That baseline then MASKS real effects by
+// subtraction: measured from /tmp, dropping the libraries from the domain scored
+// 0 and looked like an unexercised guard; measured from `etc/`, it scores 2.
+// A harness with a non-zero baseline is not a harness, it is a filter.
 // ---------------------------------------------------------------------------
 const R = [["is a Singapore citizen", "a Singapore citizen"]];
 
@@ -600,6 +619,40 @@ function selftest() {
   if (mention.held.length !== 0)
     fail("bindingRe", "a mere mention is not a binding and must not hold");
 
+  // The libraries are always in the collision domain, and this check derives its
+  // own victim from them rather than hard-coding a name, so it keeps working when
+  // the libraries change. It is the positive control that made the "adding the
+  // libraries changes no hold" measurement believable: without it, a zero could
+  // equally have meant the instrument was looking at nothing.
+  {
+    const libs = hazardCorpus([]);
+    if (!libs.length)
+      fail("hazardCorpus", "jl4-core/libraries must always be in the domain");
+    let victim = null;
+    for (const { text } of libs) {
+      const mm = /(?:^|\n)[ \t]*`([^`]+)`\s*(?:MEANS|IS\s+(?:A|AN|THE))/.exec(
+        text,
+      );
+      if (mm) {
+        victim = mm[1];
+        break;
+      }
+    }
+    if (!victim)
+      fail(
+        "hazardCorpus",
+        "expected at least one binding in jl4-core/libraries",
+      );
+    else {
+      const r = hazards([[`is ${victim}`, victim]], libs);
+      if (r.held.length !== 1)
+        fail(
+          "hazardCorpus",
+          `a rename colliding with the library binding \`${victim}\` must be held`,
+        );
+    }
+  }
+
   // V1: the CLI guard must survive being invoked through a SYMLINK. Node
   // resolves the main entry to its realpath while argv[1] keeps the spelling, so
   // comparing them naively made the tool print nothing and exit 0 -- which reads
@@ -740,7 +793,7 @@ function selftest() {
     return 1;
   }
   console.log(
-    `apply-clitic-sweep selftest: ${SELFTEST.length} text + ${ORDER_CASES.length} order cases + 34 structural checks pass`,
+    `apply-clitic-sweep selftest: ${SELFTEST.length} text + ${ORDER_CASES.length} order cases + 37 structural checks pass`,
   );
   return 0;
 }
@@ -833,8 +886,9 @@ if (isMainModule()) {
   );
   for (const [from, to] of safe) console.log(`  \`${from}\` -> \`${to}\``);
   console.log(
-    `\ncollision domain: ${domain} file(s) under ${dirs.join(", ")} — a name bound\n` +
-      `outside that is not searched for, because L4 names are scoped per module.`,
+    `\ncollision domain: ${domain} file(s) — ${dirs.join(", ")} plus jl4-core/libraries,\n` +
+      `which nearly every module imports. A name bound outside that is not searched\n` +
+      `for, because L4 names are scoped per module and reached through imports.`,
   );
 
   if (refused.length) {

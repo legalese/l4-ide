@@ -621,7 +621,9 @@ refusal resolves real paths and is checked per file, so passing a parent directo
 past it.
 
 A rename whose target name is **already bound** is listed and held back, never forced — the checker
-reports it as outstanding until a human decides. That is not a limitation but the interesting case:
+reports it as outstanding until a human decides. The collision domain is the directories you pass
+**plus `jl4-core/libraries`**, which nearly every module imports; a binding in a corpus nothing
+imports is not a collision, so it is deliberately not searched for. The run prints the domain size. That is not a limitation but the interesting case:
 in canon, `is the natural father` wanted a name already taken by a test fixture, and the resolution
 was to rename the fixture first.
 
