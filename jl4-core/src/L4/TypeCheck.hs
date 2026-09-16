@@ -97,7 +97,7 @@ import L4.TypeCheck.Types as X
 import L4.TypeCheck.Unify
 import L4.TypeCheck.With as X
 import qualified L4.Utils.IntervalMap as IV
-import L4.Lexer (FixityDirection (..), TKeywords (..), TokenType (..), fixityHerald)
+import L4.Lexer (FixityDirection (..), fixityHerald)
 import qualified L4.Lexer as Lexer
 import L4.Mixfix (MixfixInfo(..), MixfixPatternToken(..), extractMixfixInfo, canonicalMixfixName, firstKeyword, isBinaryInfixPattern, buildCanonicalNameFromKeywords)
 import qualified L4.Discharge as Discharge
@@ -703,50 +703,51 @@ warnDeprecatedExactly :: Anno -> Expr Name -> Check ()
 warnDeprecatedExactly ann expr = do
   inAction <- inActionPattern
   forM_ (guard inAction *> exactlyKeywordRange ann) \ kwRange -> do
-    replacement <- exactlyReplacement expr
+    advice <- exactlyReplacement expr
     addWarning $ DeprecatedExactly MkDeprecatedExactlyInfo
       { range = Just kwRange
-      , replacement
+      , advice
       }
-
--- | The range of the @EXACTLY@ keyword in a pattern's own annotation, if it
--- was written with one.
-exactlyKeywordRange :: Anno -> Maybe SrcRange
-exactlyKeywordRange ann =
-  listToMaybe
-    [ t.range
-    | AnnoCsn _ cluster <- ann.payload
-    , t <- allClusterTokens cluster
-    , t.payload == TKeywords TKExact
-    ]
 
 -- | What to write instead of @EXACTLY \<operand\>@. A bare name loses the
 -- keyword and nothing else (R1 makes the name refer); anything else keeps its
 -- parentheses (R2 admits a parenthesised expression in pattern position).
 --
--- 'Nothing' when the drop would NOT preserve meaning. A bare name that
--- resolves to nothing in scope, or only to a field selector, would become a
--- fresh WILDCARD under R1 rather than a reference -- so for that one class the
--- keyword cannot simply be dropped, and the warning must not say it can.
+-- Two operand classes cannot take the advice, and both are bare names, because
+-- a bare name is the only operand whose reading R1 changes:
+--
+--   * one that resolves to nothing in scope, or only to a field selector,
+--     would become a fresh WILDCARD rather than a reference
+--     ('KeepItUnresolved');
+--   * one that names a data constructor /as well as/ a value would become the
+--     CONSTRUCTOR pattern, while @EXACTLY@ evaluates it as the value
+--     ('KeepItShadowedByConstructor').
+--
 -- Everything else is safe: a literal is already a literal in pattern position,
--- a constructor is already a constructor pattern, and a reference is what
--- @EXACTLY@ meant in the first place.
+-- a constructor alone is already a constructor pattern, and a reference is what
+-- @EXACTLY@ meant in the first place. A compound operand keeps its parentheses
+-- and stays an expression: 'prettyLayout' prints an application in its @OF@
+-- form (@Money OF amt@), which the pattern production cannot read, so the
+-- pasted text cannot fall back into a constructor pattern with fresh names.
 --
 -- R3 as drafted claimed the drop was unconditionally safe, on the reasoning
 -- that an operand resolving to nothing is already an error today. It is, but
 -- the error is the one R1 would REPLACE with a silent wildcard, which is the
 -- defect the whole rule exists to remove. Phase A measured one corpus site,
--- @jl4/examples/not-ok/tc/every-unbound-variable.l4:11@.
-exactlyReplacement :: Expr Name -> Check (Maybe Text)
+-- @jl4/examples/not-ok/tc/every-unbound-variable.l4:11@. The constructor case
+-- came out of the 2026-09-16 review, which found the warning advising an edit
+-- that flipped which colour discharged an obligation.
+exactlyReplacement :: Expr Name -> Check ExactlyAdvice
 exactlyReplacement = \ case
   Var _ n    -> nameReplacement n
   App _ n [] -> nameReplacement n
-  Lit _ l    -> pure (Just (prettyLayout l))
-  e          -> pure (Just ("(" <> prettyLayout e <> ")"))
+  Lit _ l    -> pure (DropTheKeyword (prettyLayout l))
+  e          -> pure (DropTheKeyword ("(" <> prettyLayout e <> ")"))
   where
     nameReplacement n = actionNameReading n >>= \ case
-      ReadsAsBinder -> pure Nothing
-      _             -> pure (Just (prettyLayout n))
+      ReadsAsBinder                   -> pure KeepItUnresolved
+      ReadsAsConstructorShadowingTerm -> pure (KeepItShadowedByConstructor n)
+      _                               -> pure (DropTheKeyword (prettyLayout n))
 
 -- | The names an @AKA@ on the head gave the declaration.
 assumeAliases :: AppForm Resolved -> [Name]
@@ -2245,12 +2246,15 @@ sameTypeHead _              _              = False
 -- the two positions cannot drift apart again; the only thing the head does
 -- differently is not draw the R5 notice (see 'AtActionHead').
 --
--- What still binds a fresh name: a name that resolves to nothing at all, and a
--- name that resolves only to a record /selector/ — @Pay Alice \`Ms Ng\` amount@,
--- where @amount@ is the action's own field name. That spelling is the
--- established "name the slot you are filling" idiom and every corpus site of
--- it is a deliberate wildcard (spec Appendix A.4); a selector is a function
--- and can never be the intended value in an action slot.
+-- What still binds a fresh name: a name that resolves to nothing at all, and —
+-- __in an argument slot only__ — a name that resolves only to a record
+-- /selector/, as in @Pay Alice \`Ms Ng\` amount@ where @amount@ is the action's
+-- own field name. That spelling is the established "name the slot you are
+-- filling" idiom and every corpus site of it is a deliberate wildcard (spec
+-- Appendix A.4); a selector is a function and can never be the intended value
+-- in an action slot. At the HEAD a selector-spelled name stays a reference and
+-- fails the head's declared type, which is what base did and what the
+-- 2026-09-16 review restored: see 'actionNameReading'.
 checkActionPattern :: Pattern Name -> Type' Resolved -> Check (Pattern Resolved, [CheckInfo])
 checkActionPattern action actionT =
   enterActionPattern (checkPattern ExpectRegulativeActionContext action actionT)
@@ -2258,9 +2262,16 @@ checkActionPattern action actionT =
 -- | How a bare name written in a regulative action pattern reads (R1).
 data ActionNameReading
   = ReadsAsConstructor
-    -- ^ At least one data constructor candidate: constructor-pattern
-    -- semantics, unchanged. This keeps plain-enum actions, and names that
-    -- /also/ name a constructor, on their existing path.
+    -- ^ A data constructor candidate and nothing else: constructor-pattern
+    -- semantics, unchanged. This keeps plain-enum actions on their existing
+    -- path.
+  | ReadsAsConstructorShadowingTerm
+    -- ^ A data constructor candidate /and/ a value of the same name. The
+    -- pattern reading is still the constructor, exactly as before — but the
+    -- two readings of the name now differ, because @EXACTLY n@ evaluates @n@
+    -- as an expression and gets the value. Told apart from 'ReadsAsConstructor'
+    -- for one purpose: 'exactlyReplacement' must not advise dropping a keyword
+    -- whose removal would swap one reading for the other.
   | ReadsAsLexicalReference
     -- ^ A lexical local — a @GIVEN@, a lambda parameter, a @WHERE@\/@LET@
     -- local, an outer action's binder, a @CONSIDER@ or @EVERY@ variable.
@@ -2282,16 +2293,28 @@ data ActionNameReading
 -- 'extendKnownGlobalMany' does not. 'TermKind' is used only for the two
 -- carve-outs: 'Constructor' (row 1) and 'Selector'\/'ComputedSelector'
 -- (row 4).
+--
+-- __The selector carve-out is an ARGUMENT-position rule.__ It has to be, and
+-- the review of 2026-09-16 found out why: at the HEAD, base's rule
+-- ('namesNonConstructorTerm', @34a7c1c5@) counted a selector as a term, so
+-- @PARTY Buyer MUST amount@ — where @amount@ is a field of the action's own
+-- record — was a reference and failed the head's declared type. Carving
+-- selectors out there instead made it a fresh name at the head, which matches
+-- EVERY action: an obligation discharged by an unrelated act, silently. So the
+-- carve-out applies where its evidence was gathered (26 argument-position
+-- wildcards, spec Appendix A.4) and nowhere else.
 actionNameReading :: Name -> Check ActionNameReading
 actionNameReading n = do
+  pos     <- asks (.actionPatternPos)
   options <- lookupRawNameInEnvironment (rawName n)
   locals  <- asks (.localBindings)
   let terms = [ (u, o, tk) | (u, o, KnownTerm _ tk) <- options ]
       isSelector tk = tk == Selector || tk == ComputedSelector
-      values = [ (u, o) | (u, o, tk) <- terms, not (isSelector tk) ]
+      carvedOut tk = tk == Constructor || (pos == InActionArgument && isSelector tk)
+      values = [ (u, o) | (u, o, tk) <- terms, not (carvedOut tk) ]
   pure $
     if any (\ (_, _, tk) -> tk == Constructor) terms
-      then ReadsAsConstructor
+      then if null values then ReadsAsConstructor else ReadsAsConstructorShadowingTerm
       else case values of
         []            -> ReadsAsBinder
         ((_, o) : _)
@@ -3822,7 +3845,8 @@ inferPattern g@(PatApp ann n [])   = errorContext (WhileCheckingPattern g) do
   case pos of
     NotInActionPattern -> asBinder
     _ -> actionNameReading n >>= \ case
-      ReadsAsConstructor      -> asBinder
+      ReadsAsConstructor              -> asBinder
+      ReadsAsConstructorShadowingTerm -> asBinder
       ReadsAsBinder           -> asBinder
       ReadsAsLexicalReference -> asReference
       ReadsAsOuterReference o -> do
@@ -3860,11 +3884,16 @@ inferPattern g@(PatApp ann n ps)   = errorContext (WhileCheckingPattern g) do
   -- The 'PatExpr' wrapper gets an annotation of its own; @e@ keeps @ann@,
   -- whose holes match 'App' field for field. Note [Hole arity of a
   -- synthesised reference].
+  -- No R5 notice on this path, and the reason is the notice's own text. It
+  -- says the name "refers to X rather than introducing a new name of its own",
+  -- and offers a placeholder as the alternative — both of which are false of an
+  -- APPLIED head, which could never have introduced a name or matched anything
+  -- (base refused the same text outright, "I could not find a definition").
+  -- Reported by the 2026-09-16 review: 3 of the 26 notices in the goldens were
+  -- this class, notices with no hazard behind them.
   case (reading, patternAsExpr (PatApp ann n ps)) of
     (ReadsAsLexicalReference, Just e)  -> inferPattern (PatExpr (wrapperAnno ann) e)
-    (ReadsAsOuterReference o, Just e)  -> do
-      when (pos == InActionArgument) $ addError (ActionPatternReference n o)
-      inferPattern (PatExpr (wrapperAnno ann) e)
+    (ReadsAsOuterReference _, Just e)  -> inferPattern (PatExpr (wrapperAnno ann) e)
     _                                  -> inferPatternApp ann n ps
 inferPattern g@(PatCons ann p1 p2) = errorContext (WhileCheckingPattern g) do
   (rp1, rt1, extend1) <- descendActionPattern (inferPattern p1)
@@ -3880,9 +3909,21 @@ inferPattern g@(PatExpr ann expr) = errorContext (WhileCheckingPattern g) do
   -- says so. The keyword is read back off the concrete syntax because R2's
   -- bare parenthesised expression produces the very same 'PatExpr'.
   warnDeprecatedExactly ann expr
+  pos <- asks (.actionPatternPos)
   -- 'leaveActionPattern': below this point we are in an EXPRESSION, which may
   -- contain a @CONSIDER@ whose branch patterns are ordinary patterns (R6).
   (rexpr, ty) <- leaveActionPattern (inferExpr expr)
+  -- R7, extended by the 2026-09-16 review: a pinned value is matched by
+  -- EQUALITY, and a function has none. Both spellings land here — the
+  -- reference R1 synthesised and the @EXACTLY@ an author wrote — so refusing
+  -- it once here covers both, and covers it at @l4 check@ rather than at the
+  -- first @#TRACE@, where it arrived as "trying to check equality on types
+  -- that do not support it" with nothing to say which name was at fault.
+  -- Argument position only: at the head a function-typed action already fails
+  -- the rule's declared @DEONTIC OF …@ type, and that message is the better
+  -- one.
+  when (pos == InActionArgument && isFunctionType ty) $
+    addError (ActionPatternNotComparable expr ty)
   resPatExpr <- setAnnResolvedType ty Nothing (PatExpr ann rexpr)
   pure (resPatExpr, ty, [])
 inferPattern g@(PatLit ann lit) = errorContext (WhileCheckingPattern g) do
@@ -6282,6 +6323,22 @@ prettyCheckError (ActionPatternReference n referent) =
   , "This note only appears when the thing named is defined outside the rule,"
   , "because a name added there later can quietly capture a placeholder here."
   ]
+prettyCheckError (ActionPatternNotComparable e t) =
+  [ "This pins a value that cannot be compared."
+  , ""
+  , "  " <> prettyLayout e
+  , ""
+  , "is of type"
+  , ""
+  , "  " <> prettyLayout t
+  , ""
+  , "An action written with a value in it accepts only events carrying that"
+  , "same value, which means comparing the two. Two functions cannot be"
+  , "compared, so no event could ever match this one."
+  , ""
+  , "Pin something that can be compared, or -- if you meant a name that stands"
+  , "for anything here -- give it a spelling nothing else is using."
+  ]
 prettyCheckError (JoinWithoutEvery _) =
   [ "A join line needs an EVERY."
   , ""
@@ -6375,8 +6432,8 @@ prettyCheckWarning = \ case
     , ""
     , "where a and b are the GIVEN inputs."
     ]
-  DeprecatedExactly info -> case info.replacement of
-    Just line ->
+  DeprecatedExactly info -> case info.advice of
+    DropTheKeyword line ->
       [ "EXACTLY is no longer needed here, and it is being retired."
       , "Nothing is broken: the file still checks, runs and exports as before."
       , ""
@@ -6387,7 +6444,7 @@ prettyCheckWarning = \ case
       , ""
       , "in place of the EXACTLY and this rule means exactly what it means now."
       ]
-    Nothing ->
+    KeepItUnresolved ->
       [ "EXACTLY is being retired, but here it cannot simply be dropped."
       , ""
       , "What follows it does not name anything in scope. Written without the"
@@ -6397,6 +6454,17 @@ prettyCheckWarning = \ case
       , ""
       , "Say what the name should refer to, or -- if a placeholder really is"
       , "what you want -- give it a spelling that says so."
+      ]
+    KeepItShadowedByConstructor n ->
+      [ "EXACTLY is being retired, but here it cannot simply be dropped."
+      , ""
+      , quotedName n <> " names two things here: a value, and a constructor."
+      , "With the keyword this is the value. Without it, a name that is also a"
+      , "constructor is read as the constructor -- so removing the keyword"
+      , "would quietly change which events this rule accepts."
+      , ""
+      , "Rename one of the two, so the name means only one thing where you"
+      , "write it, and then the keyword can go."
       ]
   DeprecatedAssume info ->
     [ "ASSUME is an older way of introducing a name, and it is being retired."

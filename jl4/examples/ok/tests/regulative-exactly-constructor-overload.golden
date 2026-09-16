@@ -1,0 +1,22 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+regulative-exactly-constructor-overload.l4:38:29-36:
+  I found a problem while checking the definition of `the colour supplied`:
+    EXACTLY is being retired, but here it cannot simply be dropped.
+    
+    `red` names two things here: a value, and a constructor.
+    With the keyword this is the value. Without it, a name that is also a
+    constructor is read as the constructor -- so removing the keyword
+    would quietly change which events this rule accepts.
+    
+    Rename one of the two, so the name means only one thing where you
+    write it, and then the keyword can go.
+regulative-exactly-constructor-overload.l4:47:1-48:38:
+  FULFILLED
+regulative-exactly-constructor-overload.l4:49:1-50:38:
+  PARTY Buyer MUST paint red WITHIN 29 HENCE FULFILLED LEST BREACH
+regulative-exactly-constructor-overload.l4:53:1-54:36:
+  PARTY Buyer MUST paint (EXACTLY red) WITHIN 29 HENCE FULFILLED LEST BREACH
+regulative-exactly-constructor-overload.l4:55:1-56:36:
+  FULFILLED

@@ -1007,14 +1007,30 @@ instance LayoutPrinterWithName n => LayoutPrinter (RAction n) where
 -- catch. So the deontic call site gets its own printer and the generic
 -- instance keeps @EXACTLY@.
 --
--- Re-parsing what this prints yields the same resolved pattern because the
--- scope is the same module: a name that resolved to something still resolves
--- to it. The one spelling that would not round-trip — @EXACTLY x@ where @x@
--- names only a record selector, or nothing — cannot occur in a module that
--- type-checks, because such an operand is already an error today (R3).
+-- __What it may NOT drop.__ Dropping the keyword is only meaning-preserving
+-- where R1 would read the bare text back as the same thing, and for a bare
+-- NAME that depends on scope the printer cannot see: a name that also names a
+-- data constructor reads back as the constructor pattern, while the pinned
+-- expression was the value (the 2026-09-16 review measured a module where
+-- @paint (EXACTLY red)@ printed as @paint red@ and changed which colour
+-- discharged the obligation). So the printer keeps @EXACTLY@ for exactly those
+-- pinned patterns whose source WROTE it, read back off the concrete syntax
+-- with 'exactlyKeywordRange'.
+--
+-- That test is the right one rather than a conservative guess, because the two
+-- kinds of 'PatExpr' have different provenance and different guarantees:
+--
+--   * one the CHECKER synthesised for a bare name (R1) carries no keyword, and
+--     the name it holds is one R1 already resolved to a non-constructor — so
+--     printing it bare reads back as that same reference;
+--   * one an AUTHOR wrote carries the keyword, and printing the keyword back
+--     preserves the text they wrote and the meaning it had.
+--
+-- After the corpus sweep the second kind is rare (the keyword is deprecated),
+-- so residuals print in the new spelling, which is what §6 asked for.
 printActionPattern :: LayoutPrinterWithName a => Pattern a -> Doc ann
 printActionPattern = \ case
-  PatExpr _ e            -> printPinnedExpr e
+  PatExpr ann e          -> printPinned ann e
   PatApp _ n pats@(_:_)  -> printWithLayout n <> space <> hsep (fmap actionArgParens pats)
   PatCons _ h t          -> actionArgParens h <+> "FOLLOWED BY" <+> actionArgParens t
   p                      -> printWithLayout p
@@ -1023,19 +1039,21 @@ printActionPattern = \ case
       PatVar{}         -> printActionPattern p
       PatLit{}         -> printActionPattern p
       PatApp _ _ []    -> printActionPattern p
-      PatExpr _ e      -> pinnedNeedsParens e
+      PatExpr ann e    -> printPinned ann e
       _                -> surround (printActionPattern p) "(" ")"
 
     -- A pinned name or literal is an atom and needs no brackets; anything
     -- else is a parenthesised expression whether it stands alone or fills an
-    -- argument slot.
+    -- argument slot. A pattern whose source said EXACTLY keeps saying it.
+    printPinned ann e
+      | isJust (exactlyKeywordRange ann) = surround ("EXACTLY" <+> pinnedNeedsParens e) "(" ")"
+      | otherwise                        = pinnedNeedsParens e
+
     pinnedNeedsParens e = case e of
       Var _ n    -> printWithLayout n
       App _ n [] -> printWithLayout n
       Lit _ l    -> printWithLayout l
       _          -> surround (printWithLayout e) "(" ")"
-
-    printPinnedExpr = pinnedNeedsParens
 
 -- | Print deontic modal keyword
 printDeonticModal :: DeonticModal -> Doc ann

@@ -216,6 +216,21 @@ data CheckError =
     --
     -- Arguments: the name as written in the pattern, and the referent's
     -- defining name (whose range is the definition site).
+  | ActionPatternNotComparable (Expr Name) (Type' Resolved)
+    -- ^ An argument slot of a regulative action pins a value of a __function__
+    -- type — @MUST apply g@ under @GIVEN g IS A FUNCTION FROM NUMBER TO
+    -- NUMBER@, or the same thing written @EXACTLY g@. Matching an event
+    -- against a pinned value is an equality test, and two functions cannot be
+    -- compared, so no event could ever match: the run dies with \"trying to
+    -- check equality on types that do not support it\" at the first @#TRACE@.
+    --
+    -- Refused at check time rather than at the first trace (review of
+    -- 2026-09-16, spec §4 R7): the reading cannot be what the drafter meant,
+    -- and the two corrections — pin something comparable, or spell the
+    -- placeholder as a name nothing else uses — are the same two R7 already
+    -- offers for a reference that does not fit its slot.
+    --
+    -- Arguments: the pinned expression as written, and its type.
   | JoinWithoutEvery (Join Name)
     -- ^ An @ONCE …@ join line under a @PARTY@ subject. The join says when a
     -- cast's continuation fires, and a single party is not a cast. Carries
@@ -311,24 +326,40 @@ data DeprecatedExactlyInfo = MkDeprecatedExactlyInfo
     -- ^ The range of the @EXACTLY@ keyword itself — the warning's anchor, so
     -- the squiggle sits under the word being retired rather than under the
     -- whole pattern.
-  , replacement :: Maybe Text
+  , advice :: ExactlyAdvice
+    -- ^ Whether the keyword can be dropped here, and what to write if it can.
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | What the 'DeprecatedExactly' warning can honestly advise, which depends on
+-- how R1 would read the operand once the keyword is gone.
+--
+-- R3 as first drafted claimed the drop was always meaning-preserving, on the
+-- reasoning that an operand resolving to nothing is already an error today. It
+-- is — but that error is \"could not find a definition\", and under R1 the
+-- bare name becomes a silently-matching placeholder instead, which is the very
+-- defect (smucclaw\/l4-ide#955) the rule exists to remove. So the advice is
+-- conditional, and there are __two__ ways for it to be withheld, not one.
+data ExactlyAdvice
+  = DropTheKeyword Text
     -- ^ The pasteable text that replaces @EXACTLY \<operand\>@: the bare name
-    -- for a name operand, the parenthesised expression otherwise.
-    --
-    -- 'Nothing' where dropping the keyword would NOT be meaning-preserving,
-    -- which is exactly one case: a bare-name operand that resolves to nothing
-    -- in scope (or only to a field selector), because R1 would then read the
-    -- bare name as a fresh wildcard rather than as a reference.
-    --
-    -- R3 as first drafted claimed the drop was always safe, on the reasoning
-    -- that such an operand is already an error today. It is -- but the error
-    -- is \"could not find a definition\", and under R1 it would become a
-    -- silently-matching placeholder instead, which is the very defect
-    -- (smucclaw\/l4-ide#955) this rule exists to remove. Phase A measured one
-    -- such site in the corpus,
+    -- for a name operand, the parenthesised expression otherwise. Safe: a
+    -- literal is already a literal in pattern position, a constructor is
+    -- already a constructor pattern, and a reference is what @EXACTLY@ meant.
+  | KeepItUnresolved
+    -- ^ A bare-name operand that names nothing in scope, or only a field
+    -- selector: R1 would read it as a fresh placeholder matching anything.
+    -- Phase A measured one such site in the corpus,
     -- @jl4\/examples\/not-ok\/tc\/every-unbound-variable.l4:11@, and it is a
     -- fixture whose whole purpose is that error.
-  }
+  | KeepItShadowedByConstructor Name
+    -- ^ A bare-name operand that names __both__ a data constructor and a
+    -- value. @EXACTLY n@ evaluates @n@ as an expression, which is the value;
+    -- the bare name takes R1's first row, which is the constructor. Both
+    -- readings type-check and they mean different things, so the drop would
+    -- silently change the rule (the review of 2026-09-16 found the warning
+    -- recommending exactly that edit). Carries the operand as written.
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -552,6 +583,7 @@ instance HasSrcRange CheckError where
   rangeOf (JoinWithoutEvery j)              = rangeOf j
   rangeOf (ContinuationWithoutJoin e)       = rangeOf e
   rangeOf (ActionPatternReference n _)      = rangeOf n
+  rangeOf (ActionPatternNotComparable e _)  = rangeOf e
   rangeOf (FixityAnnotationMalformed mr _)  = mr
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr

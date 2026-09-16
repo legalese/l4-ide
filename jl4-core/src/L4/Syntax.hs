@@ -8,7 +8,7 @@ module L4.Syntax where
 
 import Base
 import L4.Annotation
-import L4.Lexer (PosToken, FixityDirection)
+import L4.Lexer (PosToken (..), FixityDirection, TokenType (TKeywords), TKeywords (TKExact))
 import L4.Parser.SrcSpan (SrcRange)
 
 #if defined(SERIALISE_ENABLED)
@@ -805,6 +805,26 @@ data TermKind =
 type Anno = Anno_ PosToken Extension
 type AnnoElement = AnnoElement_ PosToken
 type CsnCluster = CsnCluster_ PosToken
+
+-- | The range of the @EXACTLY@ keyword in a pattern's own annotation, if the
+-- pattern was written with one.
+--
+-- A 'PatExpr' does not record whether it came from @EXACTLY e@ or from R2's
+-- bare parenthesised @(e)@ — both produce the same node — so the keyword is
+-- read back off the concrete syntax. 'L4.Parser.patExpr' is the only production
+-- that puts a 'TKExact' into a pattern's own annotation.
+--
+-- Two callers, for two different jobs: 'L4.TypeCheck.warnDeprecatedExactly'
+-- anchors its deprecation warning here, and 'L4.Print.printActionPattern' uses
+-- it to decide whether it may print a pinned value WITHOUT the keyword.
+exactlyKeywordRange :: Anno -> Maybe SrcRange
+exactlyKeywordRange ann =
+  listToMaybe
+    [ t.range
+    | AnnoCsn _ cluster <- ann.payload
+    , t <- allClusterTokens cluster
+    , t.payload == TKeywords TKExact
+    ]
 
 newtype L4Syntax a = MkL4Syntax a
 

@@ -1,0 +1,17 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: action-head-selector.l4
+  Hidden: no
+  Range: 26:5-26:66
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The type of this definition must match its type signature at action-head-selector.l4:24:8-30, namely
+
+      DEONTIC OF Actor, Action
+
+    but is here of type
+
+      DEONTIC OF Actor, (FUNCTION FROM Action TO NUMBER)
