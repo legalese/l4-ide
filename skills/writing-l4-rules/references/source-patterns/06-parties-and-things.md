@@ -236,7 +236,7 @@ fills.
 
 > `-- "13.--(1) Where -- (a) no executor is appointed by a will; (b) the executor or all the executors appointed by will are legally incapable of acting as such, or have renounced the right to act as such; ..."`
 >
-> — `jl4/examples/legal/sg-succession/sg-paa.l4:472-474`, Probate and Administration Act 1934
+> — `jl4/examples/canon/sg/succession/sg-paa.l4:472-474`, Probate and Administration Act 1934
 > s 13(1). Limb (b) is encoded at `:498` as
 > ``all (GIVEN p YIELD p's `legally incapable of acting as such` OR p's `renounced the right to such grant`) executors``.
 
@@ -298,7 +298,7 @@ rather than a list.
 
 > ``OR any (GIVEN q YIELD `a survivor stands in the line of` q) (p's `issue`)``
 >
-> — `jl4/examples/legal/sg-succession/sg-isa.l4:149`, the recursive test for whether any descendant
+> — `jl4/examples/canon/sg/succession/sg-isa.l4:149`, the recursive test for whether any descendant
 > of a person survived the intestate.
 
 **It is doing** the existential half of the same job: the rule fires if the property holds of at
@@ -392,7 +392,7 @@ structurally even when the sets are extensionally equal.
 
 > `-- "(2) A prior right to a grant under subsection (1) shall belong to the following persons in the following order: (a) a universal or residuary legatee; ... (e) a creditor of the deceased."`
 >
-> — `jl4/examples/legal/sg-succession/sg-paa.l4:541-547`, Probate and Administration Act 1934
+> — `jl4/examples/canon/sg/succession/sg-paa.l4:541-547`, Probate and Administration Act 1934
 > s 13(2), encoded at `:557` as `` `the section 13(2) rank of` p `` and at `:573` as
 > `` `those with a prior right under section 13(2) in` a ``.
 

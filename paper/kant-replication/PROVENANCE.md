@@ -89,6 +89,16 @@ Toolchain: `l4` is on PATH. Run checks with `JL4_LIBRARY_PATH=<repo>/jl4-core/li
 IMPORTANT L4 GOTCHAS: a file cannot `IMPORT` a library sharing its own basename. Each `#EVAL` line must carry a bare token `q1`..`q9` so the scorer can find it; name any extra probes `Q4b` or `S4` so they do not collide.
 ```
 
+> **Note, 2026-09-16 — the carve-out above names a directory that no longer holds an
+> encoding.** The chubb modules moved to
+> `jl4/examples/canon/us/chubb-hospital-cash/`; `jl4/examples/legal/chubb/` now holds only
+> the source deposit. **The quoted bytes are not edited** — they are what encoders were
+> actually given, and §2 is this file's record of that. Nothing leaks: the permitted set is
+> the skill, `doc/reference/` and `.l4` under `jl4-core/libraries/`, none of which reaches
+> `jl4/examples/`, and the "but NOT" clause was always a reminder rather than the fence.
+> A re-run under this protocol should carry the canon path in the clause, as
+> `bench/PREREGISTRATION-go.md` §6 now does.
+
 with rules 3–5 requiring `policy.l4` + `apply.l4`, permitting typecheck only ("You may NOT run
 the nine evaluations"), and requiring `NOTES.md`. `l4-guided` = `l4-unguided` minus the schema
 prohibition, plus the same "Use ALL OF, and ONLY, the `Claim` fields" sentence as
@@ -108,7 +118,16 @@ also name `bench/schema-restored-{prolog,l4}.md`. Guided sandboxes staged the re
 under the same in-sandbox name `schema.md`, so the cell prompts stayed byte-identical across
 arms (see `bench/setup-restored.sh`).
 
-## 3. The corpus-side oracle encoding: `jl4/examples/legal/chubb/chubb.l4`
+## 3. The corpus-side oracle encoding: `jl4/examples/canon/us/chubb-hospital-cash/blind-inert/chubb.l4`
+
+> **Moved 2026-09-16.** This module was deposited at `jl4/examples/legal/chubb/chubb.l4` for the
+> whole of this study, and every trial and score in this repository was produced against it at
+> that path. It now lives at the path in the heading, having been vendored into the
+> `legalese/canon` mirror; the bytes are unchanged (verified identical across the move). The old
+> path is kept here because §2's wrapper prompts quote it verbatim and are not editable.
+>
+> The four `denovo/…` deposits named in §4 did NOT move — they are spelled absolutely there for
+> that reason.
 
 Produced **2026-08-31**, before any benchmark trial, as one of **three independent blind
 encodings** (inert, guarded-rows, and record house styles), each written by a separate agent
@@ -122,15 +141,19 @@ the producing session's transcript, not in this repository** — the protocol th
 (inputs shown, blindness rules, style mandates) is described in `FOUNDATION.md`, but the exact
 prompt bytes were not preserved as artifacts. Disclosed gap; see §6.
 
-## 4. The de novo oracle encoding: `jl4/examples/legal/chubb/denovo/chubb-denovo.l4`
+## 4. The de novo oracle encoding: `jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4`
+
+> **Moved 2026-09-16**, as §3 — deposited and measured at
+> `jl4/examples/legal/chubb/denovo/chubb-denovo.l4`, bytes unchanged. The source deposit it
+> cites below stayed at that old path and is spelled in full.
 
 Produced **2026-08-31** under the go-pipeline cleanroom discipline for subject `chubb`
 (`etc/go/subjects/chubb/`): the encoder was given the hash-pinned source deposit —
-`denovo/source-policy.txt`, whose assembly from the arXiv PDF is specified byte-for-byte in
-`denovo/source-bundle.json` (PDF sha256, extraction rule, whitespace-normalised diff check) —
-and **not** `chubb.l4`. Its interpretive choices are recorded in `denovo/fork-register.json`
+`jl4/examples/legal/chubb/denovo/source-policy.txt`, whose assembly from the arXiv PDF is specified byte-for-byte in
+`jl4/examples/legal/chubb/denovo/source-bundle.json` (PDF sha256, extraction rule, whitespace-normalised diff check) —
+and **not** `chubb.l4`. Its interpretive choices are recorded in `jl4/examples/legal/chubb/denovo/fork-register.json`
 (28 entries, each with both readings and the one taken) and its input pins in
-`denovo/surface-map.json`. The phase _instructions_ are split: the pipeline contract is
+`jl4/examples/legal/chubb/denovo/surface-map.json`. The phase _instructions_ are split: the pipeline contract is
 committed (`etc/go/go.sh`, `subject.json`), but the phase-executing agents' session prompts are,
 again, transcript material. The independence claim a reviewer can check without any transcript:
 the fork register documents readings the corpus encoding did not take, and the §8 oracle's 107

@@ -57,7 +57,7 @@ for `UNLESS`.
 
 > `s 27(1) opens "Notwithstanding anything in this Act", so it is asked FIRST: a soldier in actual military service or a mariner at sea may make a will with no writing, no signature, no witnesses and no majority`
 >
-> — the encoding's note at `jl4/examples/legal/sg-succession/sg-wills.l4:712-715`, on Wills Act
+> — the encoding's note at `jl4/examples/canon/sg/succession/sg-wills.l4:712-715`, on Wills Act
 > 1838 s 27(1)
 
 **It is doing** declaring an express priority between two provisions.
@@ -210,7 +210,7 @@ a condition.
 
 > `"No will shall be valid unless it is in writing and executed in the manner mentioned in subsection (2)."`
 >
-> — quoted in the encoding at `jl4/examples/legal/sg-succession/sg-wills.l4:110-111`, on Wills Act
+> — quoted in the encoding at `jl4/examples/canon/sg/succession/sg-wills.l4:110-111`, on Wills Act
 > 1838 s 6(1)
 
 **It is doing** stating a **necessary condition**, in the negative-plus-exception form legal drafting
@@ -589,7 +589,7 @@ names the absent case", for the same move applied to outcomes;
 
 > `"In effecting such distribution, the following rules shall be observed."`
 >
-> — `jl4/examples/legal/sg-succession/sg-isa.l4:303`, quoting Intestate Succession Act 1967 s 7
+> — `jl4/examples/canon/sg/succession/sg-isa.l4:303`, quoting Intestate Succession Act 1967 s 7
 
 **It is doing** setting out a list of rules meant to be worked through in order, each with its own
 antecedent. Mutual exclusivity is usually implicit: the corpus notes that the nine distribution

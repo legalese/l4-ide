@@ -17,37 +17,37 @@ TIMEZONE IS "Asia/Singapore"
 
 `Aisha` MEANS Child WITH          -- born after commencement: the full Package
     `name` IS "Aisha", `date of birth` IS YMD 2027 6 15
-    `is a Singapore citizen` IS TRUE, `birth order` IS 1
+    `a Singapore citizen` IS TRUE, `birth order` IS 1
     `parents lawfully married` IS TRUE
 
 `Bala` MEANS Child WITH           -- 1 Jan 2026 - 31 Mar 2027 band, third child
     `name` IS "Bala", `date of birth` IS YMD 2026 1 1
-    `is a Singapore citizen` IS TRUE, `birth order` IS 3
+    `a Singapore citizen` IS TRUE, `birth order` IS 3
     `parents lawfully married` IS TRUE
 
 `Chloe` MEANS Child WITH          -- the first day of the enhanced Cash Gift
     `name` IS "Chloe", `date of birth` IS YMD 2023 2 14
-    `is a Singapore citizen` IS TRUE, `birth order` IS 1
+    `a Singapore citizen` IS TRUE, `birth order` IS 1
     `parents lawfully married` IS TRUE
 
 `Devi` MEANS Child WITH           -- ONE DAY EARLIER: the last pre-enhancement day
     `name` IS "Devi", `date of birth` IS YMD 2023 2 13
-    `is a Singapore citizen` IS TRUE, `birth order` IS 1
+    `a Singapore citizen` IS TRUE, `birth order` IS 1
     `parents lawfully married` IS TRUE
 
 `Elias` MEANS Child WITH          -- 1 Jan 2010 - 31 Dec 2014 band: Credits and PSEA only
     `name` IS "Elias", `date of birth` IS YMD 2010 5 20
-    `is a Singapore citizen` IS TRUE, `birth order` IS 1
+    `a Singapore citizen` IS TRUE, `birth order` IS 1
     `parents lawfully married` IS TRUE
 
 `Farah` MEANS Child WITH          -- the 2009 band: the PSEA top-up and nothing else
     `name` IS "Farah", `date of birth` IS YMD 2009 3 10
-    `is a Singapore citizen` IS TRUE, `birth order` IS 1
+    `a Singapore citizen` IS TRUE, `birth order` IS 1
     `parents lawfully married` IS TRUE
 
 `Gopal` MEANS Child WITH          -- a fifth child: the biggest co-matching cap in the outgoing scheme
     `name` IS "Gopal", `date of birth` IS YMD 2025 3 1
-    `is a Singapore citizen` IS TRUE, `birth order` IS 5
+    `a Singapore citizen` IS TRUE, `birth order` IS 5
     `parents lawfully married` IS TRUE
 
 -- The steady state: after 1 October 2027 every co-matching cap has
@@ -204,7 +204,7 @@ GIVETH A Parent
 `a parent of` kids `serving` months `months at` rate MEANS
     Parent WITH
         `name` IS "the employee"
-        `is the natural father` IS FALSE
+        `the natural father` IS FALSE
         `months served this period` IS months
         `gross daily rate` IS rate
         `children` IS kids
@@ -289,14 +289,14 @@ GIVETH A DATE
 
 §§ `Section 12B(1B) — the bar on the natural father, which nobody announced away`
 
-`the natural father` MEANS
+`the male employee` MEANS
     Parent WITH
         `name` IS "the natural father"
-        `is the natural father` IS TRUE
+        `the natural father` IS TRUE
         `months served this period` IS 12
         `gross daily rate` IS 400
         `children` IS `one toddler`
 
-#ASSERT `is barred from leave for the child` `the natural father` TRUE FALSE
-#ASSERT NOT (`is barred from leave for the child` `the natural father` TRUE TRUE)
+#ASSERT `is barred from leave for the child` `the male employee` TRUE FALSE
+#ASSERT NOT (`is barred from leave for the child` `the male employee` TRUE TRUE)
 #ASSERT NOT (`is barred from leave for the child` `the parent of one` TRUE FALSE)

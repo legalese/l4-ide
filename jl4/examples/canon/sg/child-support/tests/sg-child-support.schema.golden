@@ -2,6 +2,9 @@
     "$defs": {
         "ChildFacts": {
             "properties": {
+                "a Singapore citizen": {
+                    "type": "boolean"
+                },
                 "birth order": {
                     "type": "number"
                 },
@@ -11,14 +14,11 @@
                 "date of birth": {
                     "format": "date",
                     "type": "string"
-                },
-                "is a Singapore citizen": {
-                    "type": "boolean"
                 }
             },
             "required": [
                 "date of birth",
-                "is a Singapore citizen",
+                "a Singapore citizen",
                 "birth order",
                 "co-matching already received"
             ],

@@ -1,10 +1,12 @@
 # The regression corpus spans two repos: `jl4/examples/legal` and canon's blessed dirs
 
-**Status:** RULED 2026-09-15 (Meng). §3B **BUILT 2026-09-15** — see the Built / Not built lists at
-§3B; §4's migration is **not** built and nothing is deleted yet. ~~Nothing below changes a workflow,
-a test harness or a file under `jl4/examples/` yet.~~ That sentence was true when written and is
-now false: §3B added a CI job, a golden glob and 85 files under `jl4/examples/canon/`. The measurements are from `unstable` `388f8605` and canon
-`mengwong/drafts` `299dd490`, taken the evening of 2026-09-15.
+**Status:** RULED 2026-09-15 (Meng). §3B **BUILT 2026-09-15**; §4's migration **BUILT 2026-09-16**
+— see the Built / Not built lists at §3B, and §4's own record of what was actually done.
+~~§4's migration is **not** built and nothing is deleted yet.~~ ~~Nothing below changes a workflow,
+a test harness or a file under `jl4/examples/` yet.~~ Both sentences were true when written and are
+now false: §3B added a CI job, a golden glob and 85 files under `jl4/examples/canon/`; the pin bump
+carried the mirror to 90; and §4 deleted 45 files from `jl4/examples/legal/`. The measurements are
+from `unstable` `388f8605` and canon `mengwong/drafts` `299dd490`, taken the evening of 2026-09-15.
 
 ## 1. The ruling, verbatim
 
@@ -150,9 +152,13 @@ what was implemented, with the two departures named under _What review changed_.
   because making it fatal would reintroduce exactly the cross-repo blessing deadlock §5 says
   vendoring was chosen to avoid. §6's open question — whether canon or l4-ide owns the goldens —
   is therefore still open, and this implementation assumes canon owns them.
-- **The migration (§4).** Nothing is deleted: `legal/chubb` and `legal/sg-succession` still exist
-  and are still globbed, so those two subjects are duplicated _within this repository_ until §4
-  runs. That is deliberate — ship the mechanism, see it green, then move.
+- **The migration (§4).** ~~Nothing is deleted: `legal/chubb` and `legal/sg-succession` still
+  exist and are still globbed, so those two subjects are duplicated _within this repository_ until
+  §4 runs. That is deliberate — ship the mechanism, see it green, then move.~~ **Superseded
+  2026-09-16 — §4 ran.** 45 files were deleted and the duplication is gone. Both directories do
+  still exist, but hold only what the mirror does not carry: chubb's source deposit, and
+  sg-succession's deposits, `app/` and `cleanroom-2026-08/`. `legal/chubb` now contains no `.l4`
+  at all, so the `legal/**` glob yields nothing from it.
 - **The merge-queue requirement.** `Canon Mirror` is not a required check in the ruleset.
 - **The pin is on a canon BRANCH, not on `main`**, which §3A.4/§3B.6 require. It is
   `gm/rebless-2026-09-15`, cut from `mengwong/drafts`, created because the first run needed a
@@ -240,7 +246,64 @@ what was implemented, with the two departures named under _What review changed_.
    Info-level ASSUME-retirement diagnostic that canon's golden predates. The harness is the
    definition of green, because the harness is what CI runs.
 
-## 4. The migration, once §3B is green in CI
+## 4. The migration — DONE 2026-09-16
+
+**Built**, on `mengwong/canon-migrate`, after §3B merged as #398. The plan below is
+kept for the record; three of its steps turned out to rest on a false premise, and
+what was actually done differs. Read this block first.
+
+**The premise that failed: "the mirror carries every file." It does not**, in two
+independent ways, both measured before anything was deleted:
+
+1. **`legal/sg-succession/cleanroom-2026-08/`** — 6 `.l4`, 24 goldens — is the
+   encoding the pin deliberately does **not** bless, so **the mirror carries none
+   of it**. Deleting the parent directory would have dropped six corpus files and
+   their goldens from the regression suite with nothing to replace them. That is
+   the whole reason it stayed, and it stands on its own.
+
+   ~~**l4-ide's copy is the healthy one.**~~ **Retracted 2026-09-16 — that was
+   unsupported, and it was the load-bearing sentence.** Measured against
+   `canon@5f248326`: the two copies' goldens are byte-identical except for one
+   column count in `intestate-succession-act.golden` (162 → 158, an identifier
+   shortened by the clitic sweep), so l4-ide's copy carries exactly the same
+   claim-of-success canon's does. §2 records that the diagnostic which makes
+   `family-cases.l4` and `probate-administration-act.l4` exit non-zero is
+   **Info-level and sits at `daydate.l4:104`** — a library neither copy owns — and
+   that both sets of goldens were blessed by an older binary. The only real
+   difference is the sweep: this copy is partly swept, canon's is not, and
+   `check-clitic-verbs` still finds six identifiers here. Less dirty is not
+   healthy. Re-blessing remains a canon-side job.
+
+2. **The mirror carries no deposit data.** The allowlist takes `.l4`,
+   `tests/*.golden`, `encoding.json`, `SOURCE-LICENSE.md` — not `registers/`. Both
+   go sidecars name four deposit JSONs each that have nowhere to go.
+
+**What was done instead (ruled by GM, 2026-09-16): delete only what the mirror
+carries.**
+
+- `legal/chubb/{chubb.l4, tests/}` and `denovo/{chubb-denovo.l4, tests/}` deleted;
+  `denovo/*.json`, `denovo/source/` kept.
+- `legal/sg-succession/`'s 7 top-level `.l4` and `tests/` (28 goldens) deleted;
+  `cleanroom-2026-08/`, `app/`, `denovo/`, `source/` kept.
+- **45 files deleted, none lost** — every one is in the mirror.
+- `etc/go/subjects/{chubb,sg-succession}` had **only their corpus-module paths**
+  retargeted (5 files: both `subject.json`, both `pins.json`, one
+  `known-defects.json`). Deposit paths untouched. All three subjects resolve;
+  `etc/go/selftest.mjs` passes — run explicitly, because `verify-branch.sh` does
+  not cover it and says so in its own footer.
+- Three spec citations retargeted with **line numbers re-verified in the mirror,
+  not carried over** (`SET-OPERATORS` §, `SUBJECT-TO-NOTWITHSTANDING`,
+  `NLG-TNR-ROUNDTRIP`). The `cleanroom-2026-08` citations in the first two were
+  left alone — that directory did not move.
+- `jl4/examples/legal/README.md` states the split, including why the two things
+  that stayed, stayed.
+
+**Still open, boarded rather than decided here:** whether `registers/*.json` join
+the mirror allowlist — which is really the question of how `etc/go` addresses a
+canon-hosted subject — and re-blessing canon's `cleanroom-2026-08` from l4-ide's
+healthy copy, which is "moved, not lost" running in the other direction.
+
+### 4.1 The plan as written before any of it was measured
 
 - `legal/chubb` → deleted; its mirror is ~~`canon/us/chubb-hospital-cash/blind-inert-2026-08/`~~
   **`jl4/examples/canon/us/chubb-hospital-cash/blind-inert/`**. `etc/go/subjects/chubb` → that path.

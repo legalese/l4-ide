@@ -36,9 +36,9 @@ DECLARE Person
     HAS `birth year`                            IS A NUMBER
         `born on or after the Package commences` IS A BOOLEAN
         `born on or after the Cash Gift enhancement` IS A BOOLEAN
-        `has a Child Development Account`       IS A BOOLEAN
+        `a Child Development Account`       IS A BOOLEAN
         `birth order`                           IS A NUMBER
-        `is a Singapore citizen`                IS A BOOLEAN
+        `a Singapore citizen`                IS A BOOLEAN
 
 DECLARE Period HAS year IS A NUMBER
 
@@ -47,7 +47,7 @@ GIVEN p      IS A Person @desc The child, with birth year, birth order and citiz
       period IS A Period @desc The simulation period.
 GIVETH A NUMBER
 `child credits` p period MEANS
-    BRANCH IF NOT p's `is a Singapore citizen` THEN 0
+    BRANCH IF NOT p's `a Singapore citizen` THEN 0
            IF p's `birth year` PLUS 16 LESS THAN 2026 THEN 0
            IF p's `birth year` PLUS 1 AT LEAST 2026 THEN 32000
            OTHERWISE 2000 TIMES (p's `birth year` PLUS 16 MINUS 2025)
@@ -57,7 +57,7 @@ GIVEN p      IS A Person @desc The child, with birth year and citizenship.
       period IS A Period @desc The simulation period.
 GIVETH A NUMBER
 `psea top up` p period MEANS
-    IF       p's `is a Singapore citizen`
+    IF       p's `a Singapore citizen`
          AND p's `birth year` PLUS 17 AT LEAST 2026
     THEN 10000
     ELSE 0
@@ -67,7 +67,7 @@ GIVEN p      IS A Person @desc The child. Set the two commencement booleans from
       period IS A Period @desc The simulation period.
 GIVETH A NUMBER
 `baby gift` p period MEANS
-    BRANCH IF NOT p's `is a Singapore citizen` THEN 0
+    BRANCH IF NOT p's `a Singapore citizen` THEN 0
            IF p's `born on or after the Package commences` THEN 10000
            IF p's `born on or after the Cash Gift enhancement` THEN 10000
            OTHERWISE 0
@@ -77,18 +77,18 @@ GIVEN p      IS A Person @desc The child.
       period IS A Period @desc The simulation period.
 GIVETH A NUMBER
 `cda first step grant` p period MEANS
-    IF       p's `is a Singapore citizen`
+    IF       p's `a Singapore citizen`
          AND p's `born on or after the Package commences`
     THEN 5000
     ELSE 0
 
 @export The Child Development Account co-matching CAP from 1 October 2027, when every cap becomes $5,000. A cap, not a payment: the Government matches only what the family saves, so an agency pricing this line must apply its own take-up assumption.
-GIVEN p      IS A Person @desc The child. `has a Child Development Account` is false for a child born before 1 January 2015, whose account has closed.
+GIVEN p      IS A Person @desc The child. `a Child Development Account` is false for a child born before 1 January 2015, whose account has closed.
       period IS A Period @desc The simulation period.
 GIVETH A NUMBER
 `cda co matching cap` p period MEANS
-    IF       p's `is a Singapore citizen`
-         AND p's `has a Child Development Account`
+    IF       p's `a Singapore citizen`
+         AND p's `a Child Development Account`
     THEN 5000
     ELSE 0
 
@@ -121,9 +121,9 @@ GIVETH A Person
         `birth year` IS `birth year`
         `born on or after the Package commences` IS `after commencement`
         `born on or after the Cash Gift enhancement` IS `after enhancement`
-        `has a Child Development Account` IS `has CDA`
+        `a Child Development Account` IS `has CDA`
         `birth order` IS `birth order`
-        `is a Singapore citizen` IS TRUE
+        `a Singapore citizen` IS TRUE
 
 GIVEN `birth year` IS A NUMBER, `birth order` IS A NUMBER
 GIVETH A Child
@@ -131,7 +131,7 @@ GIVETH A Child
     Child WITH
         `name` IS "cross-check"
         `date of birth` IS YMD `birth year` 6 15
-        `is a Singapore citizen` IS TRUE
+        `a Singapore citizen` IS TRUE
         `birth order` IS `birth order`
         `parents lawfully married` IS TRUE
 
@@ -163,8 +163,8 @@ GIVETH A NUMBER
         `birth year` IS 2028
         `born on or after the Package commences` IS TRUE
         `born on or after the Cash Gift enhancement` IS TRUE
-        `has a Child Development Account` IS TRUE
+        `a Child Development Account` IS TRUE
         `birth order` IS 1
-        `is a Singapore citizen` IS FALSE
+        `a Singapore citizen` IS FALSE
 
 #ASSERT (`package total` OF `a non-citizen child`, `any year`) EQUALS 0

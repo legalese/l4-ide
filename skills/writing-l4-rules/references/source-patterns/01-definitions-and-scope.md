@@ -149,8 +149,8 @@ subtree, and a rule that reaches two at once is an error naming both.
 
 ## 1.3 "a person ('P')", "(the 'Purchaser')" — the parenthetical label
 
-**If the source says** — this device does **not** occur in the encoded corpus. Checked across all 26
-files under `jl4/examples/legal/`: no `("P")`, no `(the "Purchaser")`, no `(hereinafter …)`, in
+**If the source says** — this device does **not** occur in the encoded corpus. Checked across all 35
+files under `jl4/examples/legal/` and `jl4/examples/canon/` (measured 2026-09-16): no `("P")`, no `(the "Purchaser")`, no `(hereinafter …)`, in
 quoted text or in comments. Modern United Kingdom drafting uses it constantly, and the encoded slice
 of the British Nationality Act 1981 does not reach one. The nearest corpus analogue is the role
 parameter `GIVEN person IS A PersonProfile` (`jl4/examples/legal/bna/bna.l4:257`, and 28 more
@@ -866,7 +866,7 @@ GIVETH A BOOLEAN
 _(Checked on the release binary, exit 0, no errors;
 `` #ASSERT `s 36(1)(a) — …` `a claim in tort` `` and the `#ASSERT NOT` for an unscheduled proceeding
 are both satisfied. `Schedule item 2` is elided above for length.)_ The corpus does this at
-`jl4/examples/legal/sg-succession/sg-paa.l4:1582-1591`, where the Probate and Administration Act's
+`jl4/examples/canon/sg/succession/sg-paa.l4:1582-1591`, where the Probate and Administration Act's
 Second Schedule is eight named items gathered into one `LIST`, each carrying its `paragraph` and its
 `text` — kept at its own number, in the file's words, "because the app shows the Schedule as the
 Schedule reads" (`:1572-1573`).

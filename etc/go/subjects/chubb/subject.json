@@ -37,8 +37,8 @@
     "style, never a position in a sequence. Note the resolver's constraint: an",
     "additional encoding may NOT name a committed module, because a diff of a",
     "thing against itself reports agreement and measures nothing. It holds here --",
-    "jl4/examples/legal/chubb/denovo/chubb-denovo.l4 and",
-    "jl4/examples/legal/chubb/chubb.l4 are two different files, written by two",
+    "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4 and",
+    "jl4/examples/canon/us/chubb-hospital-cash/blind-inert/chubb.l4 are two different files, written by two",
     "agents who did not read each other's work.",
     "",
     "FLOORS ARE MEASURED, NOT ASPIRATIONAL, and each travels with the encoding it",
@@ -77,7 +77,7 @@
     "rather than a permanent red.",
     "",
     "  p7-tnr    declared. The NLG golden exists at",
-    "            jl4/examples/legal/chubb/tests/chubb.nlg.golden and `l4 nlg`",
+    "            jl4/examples/canon/us/chubb-hospital-cash/blind-inert/tests/chubb.nlg.golden and `l4 nlg`",
     "            regenerates it, so the leg is a real differential oracle.",
     "  p7-akn    declared. `l4 render --format akn` works on any module that",
     "            typechecks; its oracle is well-formedness only, and the leg",
@@ -104,7 +104,7 @@
   "citation": "Appendix A.1, \"Simplified Chubb Hospital Cash Benefit Policy\", in Kant, Nabi, Kant, Scharrer, Ma & Nabi, \"Towards Robust Legal Reasoning: Harnessing Logical LLMs in Law\", arXiv:2502.17638v1 [cs.CY], 24 February 2025. A synthetic specimen printed in a research paper — abridged and anonymised by its authors, never issued to anyone, and not an instrument in force.",
   "source_url": "https://arxiv.org/abs/2502.17638",
   "encoding": {
-    "main": "jl4/examples/legal/chubb/chubb.l4"
+    "main": "jl4/examples/canon/us/chubb-hospital-cash/blind-inert/chubb.l4"
   },
   "checks": {
     "min_dated_arms": 0,
@@ -120,7 +120,9 @@
   },
   "encodings": {
     "guarded-2026-08": {
-      "modules": ["jl4/examples/legal/chubb/denovo/chubb-denovo.l4"],
+      "modules": [
+        "jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4"
+      ],
       "checks": {
         "min_dated_arms": 0,
         "min_assertions": 0
@@ -130,7 +132,7 @@
   "legs": {
     "p7-mcp": {},
     "p7-tnr": {
-      "golden": "jl4/examples/legal/chubb/tests/chubb.nlg.golden"
+      "golden": "jl4/examples/canon/us/chubb-hospital-cash/blind-inert/tests/chubb.nlg.golden"
     },
     "p7-akn": {}
   }

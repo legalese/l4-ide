@@ -26,7 +26,7 @@ IMPORT `sg-child-support-domain`
 GIVEN parent IS A Parent, `conceived while either was married to another` IS A BOOLEAN, `have since married each other` IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE `is barred from leave for the child` IF
-        parent's `is the natural father`
+        parent's `the natural father`
     AND `conceived while either was married to another`
     AND NOT `have since married each other`
 
@@ -63,7 +63,7 @@ GIVETH A NUMBER
 GIVEN parent IS A Parent, day IS A DATE
 GIVETH A NUMBER
 `children below seven` parent day MEANS
-    `how many` (filter (GIVEN c YIELD     c's `is a Singapore citizen`
+    `how many` (filter (GIVEN c YIELD     c's `a Singapore citizen`
                                       AND `the age` c `has on` day LESS THAN 7)
                        (parent's `children`))
 
@@ -71,7 +71,7 @@ GIVETH A NUMBER
 GIVEN parent IS A Parent, day IS A DATE
 GIVETH A NUMBER
 `children from seven to twelve` parent day MEANS
-    `how many` (filter (GIVEN c YIELD     c's `is a Singapore citizen`
+    `how many` (filter (GIVEN c YIELD     c's `a Singapore citizen`
                                       AND `the age` c `has on` day AT LEAST 7
                                       AND `the age` c `has on` day LESS THAN 13)
                        (parent's `children`))

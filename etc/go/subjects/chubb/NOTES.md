@@ -61,10 +61,10 @@ Its consolidated report is `runs/FOUNDATION.md` (69 KB). Section references belo
 
 The two arms this subject deposits:
 
-| file                                              | style   | role                                 | foundation ranking                            |
-| ------------------------------------------------- | ------- | ------------------------------------ | --------------------------------------------- |
-| `jl4/examples/legal/chubb/chubb.l4`               | inert   | committed encoding (`encoding.main`) | reference — best on both axes (§4.1)          |
-| `jl4/examples/legal/chubb/denovo/chubb-denovo.l4` | guarded | `encodings.guarded-2026-08`          | acceptable; two confirmed logic errors (§4.1) |
+| file                                                                      | style   | role                                 | foundation ranking                            |
+| ------------------------------------------------------------------------- | ------- | ------------------------------------ | --------------------------------------------- |
+| `jl4/examples/canon/us/chubb-hospital-cash/blind-inert/chubb.l4`          | inert   | committed encoding (`encoding.main`) | reference — best on both axes (§4.1)          |
+| `jl4/examples/canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4` | guarded | `encodings.guarded-2026-08`          | acceptable; two confirmed logic errors (§4.1) |
 
 They are two different files by two different authors, which is what makes the §8 acceptance diff a
 real comparison rather than an identity. The third arm (record style) was not deposited.
@@ -286,7 +286,7 @@ phase catalogued, **29 are invisible to the nine questions entirely.**
 ### Legs
 
 Declared: **p7-tnr** (real differential oracle — `l4 nlg` regenerates
-`jl4/examples/legal/chubb/tests/chubb.nlg.golden` and the leg diffs it), **p7-akn** (an EXTRA leg;
+`jl4/examples/canon/us/chubb-hospital-cash/blind-inert/tests/chubb.nlg.golden` and the leg diffs it), **p7-akn** (an EXTRA leg;
 well-formedness is its only oracle, so it cannot raise the run verdict), **p7-mcp** (each module
 carries exactly one `@export`, so there is a deployable surface; with no `JL4_GO_SERVICE_URL` the leg
 SKIPs and still records the zip).

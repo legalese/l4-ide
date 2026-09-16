@@ -1947,7 +1947,9 @@ defeasibility constructs with nothing in L4 to lower into them.
 Measured 2026-08-28. Counts in §10 are reproducible at these commits with the `grep` in §10.1.
 
 - `legalese/canon` @ `2589fdd` (`mengwong/drafts`) — `subjects/sg/{succession,pdpa-2012,penal-code-1871,child-support}`. Chief witnesses: `cleanroom-2026-08/family-cases.l4` (the six-member verdict, §10.4; the four-Act evidence comparison, §10.5), `cleanroom-2026-08/guardianship-of-infants-act.l4` ("carried, not dropped", §10.3; s 5A(1)'s two-step), `cleanroom-2026-08/wills-act.l4` (hand-rolled projections, §10.3).
-- `legalese/l4-ide` @ `81f0f752` (`origin/unstable`) — `jl4/examples/legal/**`, `paper/case-studies/**`. Chief witnesses: `charities-jersey-2014/part-3-charity-test.l4` (Art 5(3) runtime disapplication, §10.6), `part-5-governors.l4` (Art 18(3) open quantification and non-static priority, §10.6), `gco-jersey-covid/MHO-as-at-20210115.l4` ("as applied by Article 14", §10.6), `regcf/regcf-wizard.l4` (selector reads, §10.7), `sg-succession/sg-isa.l4` (hand-woven `SUBJECT TO`, §10.3).
+- `legalese/l4-ide` @ `81f0f752` (`origin/unstable`) — `jl4/examples/legal/**`, `paper/case-studies/**`. Chief witnesses: `charities-jersey-2014/part-3-charity-test.l4` (Art 5(3) runtime disapplication, §10.6), `part-5-governors.l4` (Art 18(3) open quantification and non-static priority, §10.6), `gco-jersey-covid/MHO-as-at-20210115.l4` ("as applied by Article 14", §10.6), `regcf/regcf-wizard.l4` (selector reads, §10.7), `sg-succession/sg-isa.l4` (hand-woven `SUBJECT TO`, §10.3) — **since the canon migration that file
+  is `jl4/examples/canon/sg/succession/sg-isa.l4`; the `@ 81f0f752` coordinates above are the state
+  when this was measured and are left as the dated record they are**.
 
 ---
 
