@@ -3,7 +3,7 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: every-cast-not-party.l4
   Hidden: no
-  Range: 12:5-12:41
+  Range: 12:5-12:39
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -18,7 +18,7 @@ File: every-cast-not-party.l4
 
 File: every-cast-not-party.l4
   Hidden: no
-  Range: 12:28-12:31
+  Range: 12:28-12:29
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>

@@ -22,7 +22,7 @@ DECLARE Action IS ONE OF
 GIVETH A DEONTIC Actor Action
 `sign, and note each signature` MEANS
     EVERY Tenant t
-        MUST   Sign (t)
+        MUST   Sign t
         WITHIN 14
         UPON   EACH
         HENCE  FULFILLED

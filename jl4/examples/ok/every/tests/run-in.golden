@@ -15,7 +15,7 @@ run-in.l4:123:1-124:35:
   FULFILLED
 run-in.l4:138:1-140:35:
   FULFILLED
-run-in.l4:164:37-48:
+run-in.l4:164:36-47:
   I found a problem while checking the definition of `fork in`:
     In this action, `theLandlord` refers to
     
@@ -33,5 +33,5 @@ run-in.l4:191:1-193:35:
   FULFILLED
 run-in.l4:206:1-207:35:
   FULFILLED
-run-in.l4:215:1-83:
+run-in.l4:215:1-81:
   EVERY Tenant t IN tenants WHO (NOT t EQUALS carol) MUST Sign t WITHIN 14

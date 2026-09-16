@@ -1,6 +1,6 @@
 Parsing successful
 Typechecking successful
-fork.l4:30:25-36:
+fork.l4:30:22-33:
   I found a problem while checking the definition of `each payment gets a receipt`:
     In this action, `theLandlord` refers to
     
@@ -12,7 +12,7 @@ fork.l4:30:25-36:
     placeholder that matches anything has to be a name nothing else is using.
     This note only appears when the thing named is defined outside the rule,
     because a name added there later can quietly capture a placeholder here.
-fork.l4:34:37-48:
+fork.l4:34:36-47:
   I found a problem while checking the definition of `each payment gets a receipt`:
     In this action, `theLandlord` refers to
     

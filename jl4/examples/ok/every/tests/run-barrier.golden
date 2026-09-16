@@ -1,7 +1,7 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-run-barrier.l4:37:49-60:
+run-barrier.l4:37:48-59:
   I found a problem while checking the definition of `the tenancy`:
     In this action, `theLandlord` refers to
     

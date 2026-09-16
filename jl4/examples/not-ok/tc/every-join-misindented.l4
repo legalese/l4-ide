@@ -25,10 +25,10 @@ DECLARE Action IS ONE OF
 GIVETH A DEONTIC Actor Action
 `bad` MEANS
     EVERY Tenant x
-        MUST   Sign (x)
+        MUST   Sign x
         WITHIN 1
         ONCE   ALL HAVE
         HENCE  EVERY Tenant y
-                   MUST   Sign (y)
+                   MUST   Sign y
                    WITHIN 2
         UPON   EACH

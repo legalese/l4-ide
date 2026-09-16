@@ -19,12 +19,12 @@ chair MEANS Partner OF "Chair"
 GIVETH A DEONTIC Actor Action
 `mutual termination` MEANS
     EVERY Partner x
-        MAY    Terminate (x)
+        MAY    Terminate x
         WITHIN 365
         UPON   EACH
         HENCE  EVERY Partner y
                    WHO    NOT (y EQUALS x)
-                   MUST   Settle (y) (x)
+                   MUST   Settle y x
                    WITHIN 30
                    ONCE   ALL HAVE
                    HENCE  FULFILLED
@@ -34,9 +34,9 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `after the chair gives notice` MEANS
     PARTY chair
-        MUST   Terminate (chair)
+        MUST   Terminate chair
         WITHIN 10
         HENCE  EVERY Partner p
                    WHO    NOT (p EQUALS chair)
-                   MUST   Settle (p) (chair)
+                   MUST   Settle p chair
                    WITHIN 30

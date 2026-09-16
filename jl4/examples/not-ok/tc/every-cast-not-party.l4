@@ -9,4 +9,4 @@ DECLARE Action IS ONE OF
 
 GIVETH A DEONTIC Actor Action
 bad MEANS
-    EVERY Sign s MUST Sign (s) WITHIN 14
+    EVERY Sign s MUST Sign s WITHIN 14

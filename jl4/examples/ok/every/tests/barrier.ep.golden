@@ -23,7 +23,7 @@ theLandlord MEANS Landlord OF "Ms Ng"
 
 GIVETH A DEONTIC Actor Action
 `the tenancy begins` MEANS
-    PARTY theLandlord MUST Deliver (theLandlord) what WITHIN 5
+    PARTY theLandlord MUST Deliver theLandlord what WITHIN 5
 
 -- `EVERY Tenant t`: the pattern form (RULED 2026-09-07). `Tenant` is a
 -- constructor of `Actor`, not a type; it selects the cast. `t` is bound to
@@ -35,7 +35,7 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `all tenants sign` MEANS
     EVERY Tenant t
-        MUST   Sign (t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  `the tenancy begins`

@@ -3,7 +3,7 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: every-join-under-party.l4
   Hidden: no
-  Range: 14:28-14:33
+  Range: 14:27-14:32
   Source: check
   Severity: DiagnosticSeverity_Information
   Code: <none>
@@ -21,7 +21,7 @@ File: every-join-under-party.l4
 
 File: every-join-under-party.l4
   Hidden: no
-  Range: 14:45-14:58
+  Range: 14:43-14:56
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>

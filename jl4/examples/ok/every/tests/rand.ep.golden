@@ -15,12 +15,12 @@ theLandlord MEANS Landlord OF "Ms Ng"
 
 GIVETH A DEONTIC Actor Action
 `sign and deliver` MEANS
-    (EVERY Tenant t MUST Sign (t) WITHIN 14 ONCE ALL HAVE HENCE FULFILLED LEST BREACH)
+    (EVERY Tenant t MUST Sign t WITHIN 14 ONCE ALL HAVE HENCE FULFILLED LEST BREACH)
     RAND
-    (PARTY theLandlord MUST Deliver (theLandlord) what WITHIN 14 HENCE FULFILLED LEST BREACH)
+    (PARTY theLandlord MUST Deliver theLandlord what WITHIN 14 HENCE FULFILLED LEST BREACH)
 
 GIVETH A DEONTIC Actor Action
 `either way` MEANS
-    (EVERY Tenant t MUST Sign (t) WITHIN 14)
+    (EVERY Tenant t MUST Sign t WITHIN 14)
     ROR
-    (EVERY Tenant t WHO t EQUALS Tenant OF "Alice" MUST Sign (t) WITHIN 7)
+    (EVERY Tenant t WHO t EQUALS Tenant OF "Alice" MUST Sign t WITHIN 7)

@@ -31,10 +31,10 @@ tenants     MEANS LIST alice, bob, carol
 GIVETH A DEONTIC Actor Action
 `the tenancy` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
-        HENCE  (PARTY theLandlord MUST Deliver (theLandlord) WITHIN 5)
+        HENCE  (PARTY theLandlord MUST Deliver theLandlord WITHIN 5)
         LEST   BREACH
 
 -- All three sign; the third signature at day 9 is the join. The landlord's
@@ -91,7 +91,7 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `whose tenancy` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED

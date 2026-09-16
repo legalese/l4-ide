@@ -1,6 +1,6 @@
 Parsing successful
 Typechecking successful
-nested.l4:37:27-32:
+nested.l4:37:26-31:
   I found a problem while checking the definition of `after the chair gives notice`:
     In this action, `chair` refers to
     
@@ -12,7 +12,7 @@ nested.l4:37:27-32:
     placeholder that matches anything has to be a name nothing else is using.
     This note only appears when the thing named is defined outside the rule,
     because a name added there later can quietly capture a placeholder here.
-nested.l4:41:39-44:
+nested.l4:41:36-41:
   I found a problem while checking the definition of `after the chair gives notice`:
     In this action, `chair` refers to
     

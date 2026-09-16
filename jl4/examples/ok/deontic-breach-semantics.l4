@@ -9,7 +9,9 @@
 --   (d) the deadline boundary is strict: arriving exactly AT the deadline is
 --       timely; a violated prohibition reuses the event stamp as its
 --       "deadline" sentinel.
---   (e) EXACTLY in per-argument position (the corrected README example).
+--   (e) a literal pinned in per-argument position (the corrected README
+--       example; it was written MUST pay EXACTLY 100 until R1 retired the
+--       keyword, and a literal in pattern position always meant this).
 --   (f) recursive LEST with a non-positive computed WITHIN terminates:
 --       the deadline-revealing event is re-offered AT MOST ONCE.
 --   MAY expiry routes to LEST (default FULFILLED) per the README
@@ -179,7 +181,7 @@ GIVETH A DEONTIC Person Action
   (`WAIT UNTIL` 31)
 
 -- ---------------------------------------------------------------------------
--- (e) EXACTLY in per-argument position (corrected README example)
+-- (e) a literal pinned in per-argument position (corrected README example)
 -- ---------------------------------------------------------------------------
 
 `pay exactly 100` MEANS

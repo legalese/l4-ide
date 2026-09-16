@@ -1,7 +1,7 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-run-fork.l4:28:25-36:
+run-fork.l4:28:22-33:
   I found a problem while checking the definition of `receipts`:
     In this action, `theLandlord` refers to
     
@@ -13,7 +13,7 @@ run-fork.l4:28:25-36:
     placeholder that matches anything has to be a name nothing else is using.
     This note only appears when the thing named is defined outside the rule,
     because a name added there later can quietly capture a placeholder here.
-run-fork.l4:32:37-48:
+run-fork.l4:32:36-47:
   I found a problem while checking the definition of `receipts`:
     In this action, `theLandlord` refers to
     

@@ -9,6 +9,6 @@ DECLARE Action IS ONE OF
 
 GIVETH A DEONTIC Actor Action
 `sign by the due date` MEANS
-    EVERY Tenant t MUST Sign (t) WITHIN due
+    EVERY Tenant t MUST Sign t WITHIN due
     WHERE
         due MEANS 14

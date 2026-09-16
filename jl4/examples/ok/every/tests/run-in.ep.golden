@@ -35,7 +35,7 @@ tenants     MEANS LIST alice, bob, carol
 GIVETH A DEONTIC Actor Action
 `in alone` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -52,7 +52,7 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `in incomplete` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -67,7 +67,7 @@ GIVETH A DEONTIC Actor Action
 `in and who` MEANS
     EVERY Tenant t IN tenants
         WHO    NOT (t EQUALS carol)
-        MUST   Sign (t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -82,7 +82,7 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `cast narrows the roll` MEANS
     EVERY Tenant t IN (LIST alice, theLandlord)
-        MUST   Sign (t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -96,7 +96,7 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `bare variable in` MEANS
     EVERY x IN (LIST alice, theLandlord)
-        MUST   Sign (x)
+        MUST   Sign x
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -114,7 +114,7 @@ GIVETH A DEONTIC Actor Action
 `in wins over elem` MEANS
     EVERY Tenant t IN (LIST alice)
         WHO    elem t tenants
-        MUST   Sign (t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -129,7 +129,7 @@ GIVETH A DEONTIC Actor Action
 `elem still narrows` MEANS
     EVERY Tenant t IN tenants
         WHO    elem t (LIST alice, bob)
-        MUST   Sign (t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -157,11 +157,11 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `fork in` MEANS
     EVERY Tenant t IN tenants
-        MUST   Sign (t)
+        MUST   Sign t
         WITHIN 14
         UPON   EACH
         HENCE  (PARTY theLandlord
-                    MUST   Receipt (theLandlord) (t)
+                    MUST   Receipt theLandlord t
                     WITHIN 5)
         LEST   BREACH BY t
 
@@ -182,7 +182,7 @@ GIVETH A LIST OF Actor
 GIVETH A DEONTIC Actor Action
 `computed roll` MEANS
     EVERY Tenant t IN (`without carol` tenants)
-        MUST   Sign (t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -197,7 +197,7 @@ GIVETH A DEONTIC Actor Action
 GIVETH A DEONTIC Actor Action
 `empty roll` MEANS
     EVERY Tenant t IN EMPTY
-        MUST   Sign (t)
+        MUST   Sign t
         WITHIN 14
         ONCE   ALL HAVE
         HENCE  FULFILLED
@@ -212,4 +212,4 @@ GIVETH A DEONTIC Actor Action
 --     what the natural-language rendering is built from. A quantified rule
 --     that is never handed a time and a list of events stays unarmed, and an
 --     unarmed rule's answer is itself.
-#EVAL (EVERY Tenant t IN tenants WHO NOT (t EQUALS carol) MUST Sign (t) WITHIN 14)
+#EVAL (EVERY Tenant t IN tenants WHO NOT (t EQUALS carol) MUST Sign t WITHIN 14)

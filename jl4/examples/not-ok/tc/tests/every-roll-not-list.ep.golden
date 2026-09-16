@@ -10,8 +10,8 @@ DECLARE Action IS ONE OF
 
 GIVETH A DEONTIC Actor Action
 `roll is a number` MEANS
-    EVERY Tenant t IN 42 MUST Sign (t) WITHIN 14
+    EVERY Tenant t IN 42 MUST Sign t WITHIN 14
 
 GIVETH A DEONTIC Actor Action
 `roll is a list of the wrong thing` MEANS
-    EVERY Tenant t IN (LIST "Alice") MUST Sign (t) WITHIN 14
+    EVERY Tenant t IN (LIST "Alice") MUST Sign t WITHIN 14

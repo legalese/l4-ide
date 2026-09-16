@@ -1,6 +1,6 @@
 Parsing successful
 Typechecking successful
-rand.l4:20:38-49:
+rand.l4:20:37-48:
   I found a problem while checking the definition of `sign and deliver`:
     In this action, `theLandlord` refers to
     

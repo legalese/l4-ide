@@ -11,9 +11,9 @@ DECLARE Action IS ONE OF
 GIVETH A DEONTIC Actor Action
 `everyone signs` MEANS
     EVERY a
-        MUST   Sign (a)
+        MUST   Sign a
         WITHIN 10
 
 -- no signature: the party type is inferred from the action's signer field
 `everyone signs, inferred` MEANS
-    EVERY a MUST Sign (a) WITHIN 10
+    EVERY a MUST Sign a WITHIN 10
