@@ -1914,6 +1914,13 @@ spec = do
       it "does not report cancellation on a prohibition's fork, where the timer is compliance" $ do
         findingsFor "P-FORK-CANCEL" shantFork `shouldBe` []
         length (findingsFor "P-FORK" shantFork) `shouldBe` 1
+      -- and the <documentation> must not send the reader to a note the report
+      -- does not contain (adversarial pass of 2026-09-16, R1-4; the MUST fork
+      -- keeps the citation because it keeps the note)
+      it "nor does its documentation cite the note it does not file" $ do
+        (task0 shantFork).nodeDoc `shouldSatisfy` maybe False (not . Text.isInfixOf "P-FORK-CANCEL")
+        (task0 shantFork).nodeDoc `shouldSatisfy` maybe False (Text.isInfixOf "compliance arm")
+        (theTask fork).nodeDoc `shouldSatisfy` maybe False (Text.isInfixOf "(P-FORK-CANCEL)")
 
     describe "a permission under EVERY" $ do
       let mayBarrier = exportOf defaultBpmnOptions "group" mayBarrierSrc

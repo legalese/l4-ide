@@ -1511,8 +1511,19 @@ quantifierDoc l = case l.labelQuantifier of
           " UPON EACH: in the source, what follows fires once per member as \
           \that member completes. A multi-instance activity fires its outgoing \
           \flow once, after the last instance, so what follows is drawn once \
-          \(P-FORK), and the timer on this activity cancels every instance \
-          \(P-FORK-CANCEL)."
+          \(P-FORK)"
+            <> case l.labelModal of
+              -- The note this clause cites is not filed for a prohibition —
+              -- there the timer is the compliance arm, and cancelling every
+              -- instance when it fires is right ('quantifierNotes') — so the
+              -- <documentation> must not send the reader to look for it
+              -- (adversarial pass of 2026-09-16, R1-4).
+              Just DMustNot ->
+                "; the timer on this activity is the compliance arm, and \
+                \cancelling every instance when it fires is right."
+              _ ->
+                ", and the timer on this activity cancels every instance \
+                \(P-FORK-CANCEL)."
 
 -- | How an @EVERY@'s activity completes. Keyed on the MODAL as well as on the
 -- quantifier: the positional pattern in 'L4.StateGraph.extractDeonton' guards
@@ -1899,6 +1910,12 @@ numberWithUnit t = do
 --------------------------------------------------------------------------------
 -- Findings raised while building nodes
 --------------------------------------------------------------------------------
+
+-- TODO (owed by the lts-diagrams session, on the blame set's merge;
+-- EVERY-EACH-QUANTIFIER-SPEC §6.1.1, LTS-VISUALISER.md §4.9): an F-class
+-- note that a barrier's error end event names NO party — every breach ends in
+-- the one shared Error_breach, <endEvent name="Breach"> (L4.Bpmn.Emit) — where
+-- the source now names the set of members who failed (R-T3).
 
 -- | What an @EVERY@ costs in BPMN, in notes that fire independently.
 --

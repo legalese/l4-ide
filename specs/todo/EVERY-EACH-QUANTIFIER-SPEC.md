@@ -4471,6 +4471,221 @@ section, the later blocks' source ranges renumbered; run 2 = 3182 examples, 0 fa
 `etc/verify-branch.sh --quick` EXIT 0; `doc/test-docs.sh` with the worktree `l4` on `PATH`:
 1479 links, 102 L4 files, 0 orphans.
 
+#### Rebased onto unstable 2a2432d6 (2026-09-16) — the whole wave, `every/wave-on-unstable`
+
+The eighteen commits of the four branches (`every/blame-set` 3, `every/anchors-on-blame` 9,
+`every/lest-anchor` 14, `every/after-before` 18, each the previous plus its own) were rebased as ONE
+chain from `0b640727` onto `origin/unstable` `2a2432d6`, which by then carried PR #395
+(`fix/join-on-state-graph`, merged `3abe4602`) — the state graph's join line, the multi-instance BPMN
+task and the two pin suites — plus #398, #400, #402, #404–#406 (#403 is an open PR, not on
+unstable). Every conflict was resolved inside the commit that raised it; no fix-up commit exists; the
+eighteen messages and both trailers are unchanged (but see the round-1 paragraph below: three
+messages later gained a closing paragraph); the four branch tips were re-pointed to the rebased
+commits 3, 9, 14 and — for `every/after-before` — this entry's own commit, the nineteenth, on top of 18. Three commits conflicted:
+
+- **Commit 1 (the blame set, was `4ba6abe9`).** `doc/reference/regulative/EVERY.md` "What runs
+  today": both sides replaced the same bullet — this branch's "a failed barrier's breach names everyone
+  who failed" bullet stands, followed by #395's state-graph/BPMN bullet (`P-CAST`, `P-FORK`,
+  `P-JOIN-DEADLINE`, the `MAY` lapse to fulfilled) in place of the 2026-09-08 "they do not draw the join
+  line" sentence, which was true when written and false on unstable.
+  `doc/tutorials/obligations/what-is-coming.md`: #395's run figure and its "the thing to see is the
+  clock" sentence, then this branch's "the third gap is half closed" text, in one paragraph as both
+  authors had it.
+- **Commit 4 (the anchored `WITHIN`, was `c8f2e2c6`).** §2.5 of this spec: #395's **FIXED 2026-09-15**
+  paragraph under the P2h bullet is kept whole (its retraction of "it moves P1's goldens" included),
+  and the `~~…~~ DISCHARGED` strike on the README bullet beneath it is this branch's.
+  `L4/StateGraph.hs` auto-merged (this commit adds a comment; #395's `prettyLayout <$> d` on the
+  join's deadline and `fmap prettyLayout due` on the act's typecheck unchanged against the
+  `Deadline` node, which is a `LayoutPrinter` whose `printWithLayout` is the unbracketed form).
+- **Commit 16 (`AFTER`/`BEFORE`, was `156ccbdf`).** `L4/StateGraph.hs`: #395's positional
+  `MkDeonton` pattern gains `opens` in its place between `action` and `due` — the pattern doing its
+  job, as #395's comment on it says; the `LEST` caption keeps #395's `memberDeadline label` and gains
+  `labelOpening = Nothing`; the `timeout` label and `jl4/tests/BpmnExport.hs`'s two positional
+  `TransitionLabel`s take the eighth field. The join line's deadline is rendered by this commit's
+  `closingText`, as the act's is — same slot type (`closingEdge` on both lines) — so a `MkBefore`
+  there would print with its keyword; unreachable through `l4 state-graph` and `l4 export`, which
+  extract only from a `SuccessfulTypeCheck`, and `BeforeOnJoinLine` refuses it. `L4/Bpmn/Lower.hs`:
+  `restateRule` keeps #395's `subjectWords` and `joinWords` beside this commit's `AFTER` clause and
+  `closingClause`, which is hoisted to top level so `joinWords` renders the join's deadline through
+  it too; `taskFindings` gained `openingFindings` beside #395's `quantifierFindings` by auto-merge.
+  Commits 17 and 18 (the `AFTER`/`BEFORE` adversarial rounds) auto-merged, `boundaryDoc`'s
+  `BEFORE` arm included.
+
+**#395's pins were not rewritten.** The brief for this rebase expected `jl4-core/test/StateGraphSpec.hs`
+("the join line of an EVERY") and `jl4/tests/BpmnExport.hs` ("a quantified obligation (EVERY)") to
+change shape with the `Deadline` node. Measured instead, at the rebased commit 4 with the tree built:
+13/13 and 15/15 green, `StateGraphSpec.hs` byte-identical to unstable and `BpmnExport.hs`'s #395
+cases untouched (rounds 1 and 2 later added cases of their own to this commit, so that file as a
+whole is no longer identical — its only removed lines are the two positional labels commit 16
+widens), because every pin is on the label's
+`Maybe Text` — `MkQuantifier "p" Nothing (Just (MkJoinLabel (Barrier "ALL HAVE") Nothing))`,
+`labelDeadline == Just "3"`, `joinDeadline == Just "30"` — and `lestArmWording` is polymorphic in
+the deadline. What they pin holds on every landing point: `memberDeadline` (the act's `WITHIN`, else
+the join's), `joinStateDue = Nothing` for `JoinUpon`, a quantified `MAY`'s lapse to Fulfilled under
+either join, `SHANT` completing on the first member's act. An anchored deadline reaches the label as
+its source text: probed on commit 4's binary, `ONCE ALL HAVE WITHIN 30 OF THE ARMING` on the join
+line and `[5 OF THE JOIN]` on the act (`probes/join-anchor.l4`, scratch).
+
+Gates, per landing point, each on a checkout of that commit in this worktree: commits 3 and 9 —
+`cabal build all` clean under `-Werror`, `jl4-core-test` 560/0, the two pin filters 13/0 and 15/0;
+commit 14 — the same plus `cabal test jl4-test` 3332 examples, 0 failures; commit 18 (then the tip;
+these are the original rebase's numbers, before rounds 1 and 2 amended it — the current tip's are
+at the end of this entry) — `etc/verify-branch.sh` (base `origin/unstable`) EXIT 0 (`cabal build all`, `jl4-test` 3375/0, `l4-cli-test` 369/0, `jl4-core-test` 560/0, `check-corpus-goldens` 483 files, `doc/test-docs.sh --no-l4` 1524 links / 0 orphans, prettier 3.4.2, trailers). No golden moved in the rebase: the
+only goldens the wave touches are its own, and #395's (`jl4/examples/bpmn/tenancy.l4`, `modals.l4`)
+held. `spec/r-x5-reanchor` (`380996f4`, docs only) is carried inside this chain as commit 15
+(`92d74c06` after round 2 — a re-rebase renews the sha of every commit after the earliest amended one, and
+every sha in this entry is the chain's as it stands after round 2; the patch-id `7c905cbd…` does not
+change and equals `85d4b1c2`'s — the rebased cherry-pick `85d4b1c2`: the same content, one header
+line re-wrapped); landing that branch separately would apply the same edit twice.
+The BPMN fidelity note the blame set owes (`quantifierNotes`: the error end event names **no**
+party — every breach ends in the one shared `Error_breach`, `L4.Bpmn.Emit` — where the source now
+names a set) is NOT written here — the lts-diagrams session has offered it; a `TODO` at the site
+names them.
+
+**Adversarial pass on the rebased chain, round 1 (2026-09-16) — nine findings, each confirmed by two
+independent checkers, none refuted, all nine applied INSIDE the commit each belongs to.** The chain
+was re-rebased from each amended commit forward (`git rebase --onto`, rerere off), so it is still
+nineteen commits and commits 1–3 are untouched (`every/blame-set` stays at `f85611d8`); the messages
+of commits 4, 16 and 18 gained a closing paragraph naming what was applied inside them, which is the
+one way "the eighteen messages are unchanged" above is no longer literally true. The scratch
+`FINDINGS-round1.md` has every finding with both verdicts; what changed, by commit:
+
+- **Into commit 4 (`615d5fb1`, the anchored `WITHIN`).** _R1-6 (minor):_ the state graph rendered an
+  applied duration unbracketed — `period OF 2 OF THE ARMING`, `2 TIMES 7 OF THE JOIN` — which is not
+  the source form (in the `WITHIN` slot the first `OF` is the anchor, so it re-parses as `period`
+  anchored at `2`), while the value printer bracketed it. The new `L4.StateGraph.edgeText`
+  (`docText . parensIfNeeded`) renders the act's and the join line's deadline; the label is
+  `[(period OF 2) OF THE ARMING]`, and the BPMN `<documentation>` that restates the rule re-parses
+  (measured: the refuter's `exprdue.l4` fed its own restatement back and ran identically). One golden moved, read:
+  `jl4/examples/bpmn/expected/regcf-resale.{bpmn,fidelity.txt}` — the one committed golden with an
+  applied duration — from ``WITHIN `days until the first anniversary of the issuance` OF transfer``
+  (the duration anchored at `transfer`, a type error) to the bracketed call; this is the golden the
+  anchors track kept still, and it moves because the old text was wrong. _R1-2 (major):_ the BPMN
+  `P-DEADLINE` note called an anchored deadline "not an ISO 8601 duration and no unit could be read
+  from it"; `L4.Bpmn.Lower.deadlineAnchor` (the first `OF` outside every bracket — unambiguous only
+  once R1-6 brackets the call) tells the anchored case apart and the note says "is anchored: the
+  duration counts from THE JOIN, and this exporter does not resolve anchors — not even where the
+  anchor is the instant this activity starts"; still blocking, still a condition. No user-facing page
+  said what the exports do with an anchor: `doc/reference/regulative/README.md` has a subsection
+  "What the exports do with an anchor" under `WITHIN`, and `doc/exports/dmn-bpmn.md` says a _plain_
+  `WITHIN` becomes a timer and has the anchored-deadline paragraph. The finding's third option —
+  resolve the three exact anchors to timers — is declined as a feature with two caveats the checkers
+  themselves supplied (`OF THE DEADLINE` under a `SHANT`'s `LEST`, `OF THE ARMING` below top level).
+  Tests: four cases under "an anchored deadline is reported as anchored, not as unitless".
+- **Into commit 16 (`856237eb`, `AFTER`/`BEFORE`).** R1-6 carried through `closingText`/`openingText`
+  (the conflict resolution of this commit, again); a `BEFORE` arm on the same `P-DEADLINE` note (a
+  date is "an absolute instant, and this exporter draws a timer only from a duration" — the same
+  misdiagnosis as R1-2's, met while fixing it; one test); _R1-5 (minor):_ LTS-VISUALISER.md §4.9's
+  seven-field quotation of the `extractDeonton` pattern is annotated — this commit grew it to eight
+  with `opens`; the README anchor paragraph links the `AFTER` page this commit adds.
+- **Into commit 18 (`a907e91c`, round 2 "the notes say what shape they met").** _R1-1 (major):_
+  `P-WINDOW-OPENING` told every `AFTER` that "the boundary timer, if one is drawn, is measured from
+  the wrong point too" and listed the measuring point as lost — true beside a bare act-level `WITHIN`
+  (re-anchor, §5.1.2.2) and false for the three other closing shapes, measured: a join-line `WITHIN`
+  demoted to the member (`AFTER 3 ONCE ALL HAVE WITHIN 30`: `l4 run` expires at 30 from the arming,
+  and the P30D timer on the multi-instance task starts there — the right point), a `BEFORE` date (an
+  instant with no measuring point) and an anchored `WITHIN` (counts from its anchor). `openingFindings`
+  keys its second sentence and its `lost` line on the closing edge's shape; six tests ("the window's
+  opening edge (AFTER) says what shape of closing edge it met"); `AFTER.md`'s export bullet and
+  `dmn-bpmn.md` say so. No golden carried the old sentence.
+- **Into this commit.** _Intent R1-1, R1-2:_ the two sentences above corrected (the tip is this
+  entry's own commit, on top of 18; unstable carried #398, #400, #402, #404–#406 — #403 is an open
+  PR). _Intent R1-4 and semantics R1-3:_ the `TODO` at `quantifierNotes` sits above the haddock, not
+  between the signature and the equation, and — as the sentence above now says — the error end event
+  names **no** party (one shared `Error_breach`; `L4.Bpmn.Emit`), not one; "one party" was a claim
+  borrowed from the brief and sharpened, contradicting §6.1.1. _Semantics R1-4 (minor, pre-existing
+  from #395, not the wave's):_ a `SHANT` fork's `<documentation>` cited `P-FORK-CANCEL`, a note
+  `quantifierNotes` deliberately does not file for a prohibition; `quantifierDoc` keys the clause on
+  the modal, `modals-shant-fork.bpmn` re-blessed (one line), one test. It is here because it belongs
+  to no wave commit; the GM may hand it to the lts-diagrams owner instead. _Intent R1-3_ (a stale
+  `TypeCheck.hs:2178` in the scratch BUILD-NOTES) was scratch-only.
+
+Gates after round 1, per landing point: commit 3 unchanged (its gate stands); commit 4 built, `bpmn
+export` 344/0, the two pin filters 13/0 and 15/0; commits 9 and 14 by the same gate as before
+(`cabal build all` clean, `jl4-core-test` 560/0, 13/0 and 15/0); commit 14 additionally `cabal test jl4-test` 3336 examples, 0 failures; the tip by
+`etc/verify-branch.sh` — numbers in the scratch BUILD-NOTES, which also carries the four re-pointed
+tips.
+
+**Adversarial pass on the rebased chain, round 2 (2026-09-16) — six findings, each confirmed by two
+independent checkers, none refuted, all six applied; three of them are about this record, one about
+the hand-off, one about the base, one about the code.** The chain was re-rebased from the amended
+commit 4 forward (`git rebase --onto`, rerere off), so commits 1–3 are still untouched and
+`every/blame-set` stays at `f85611d8`; the messages of commits 4 and 18 gained a second closing
+paragraph. The scratch `FINDINGS-round2.md` has every finding with both verdicts.
+
+- **Into commit 4 (`615d5fb1`).** _R2-SEM-2 (minor):_ `L4.Bpmn.Lower.deadlineAnchor` split the label
+  on `Text.words` and counted brackets only, so an uppercase `OF` inside a backtick-quoted name was
+  the anchor. With a `NUMBER` constant whose quoted name is `days OF grace`: a `WITHIN` of that name
+  alone was reported as "anchored: the duration counts from grace" (closing backtick and all) where
+  the unit-unreadable arm was right; the same name `OF THE ARMING` as counting from "grace OF THE
+  ARMING" rather than from `THE ARMING`; and, through the same helper at `openingFindings`,
+  `AFTER 1` beside that bare `WITHIN` as "anchored OF grace" where a bare `WITHIN` beside an
+  `AFTER` re-anchors (§5.1.2.2) and the "measured from the wrong point" warning was owed. The label
+  is now read through `labelWords`, which keeps a backtick-quoted identifier as one word (as
+  `L4.Lexer` does): its `OF` is no anchor and its brackets count for nothing. The drawn BPMN is
+  unchanged in every case (the `<condition>` is verbatim); only the note's reason was wrong. No
+  committed `.l4` under `jl4/examples` or `doc/` spells a backtick-quoted name with an uppercase
+  `OF` in a `WITHIN` slot, so no golden moves. Tests: two cases under "an anchored deadline is
+  reported as anchored" (unanchored: the unit-unreadable arm; anchored: "counts from THE ARMING,"
+  and not from the name). _R2-4 (minor):_ the haddock of `L4.StateGraph.edgeText` cited
+  `L4.Print.closingClause`, which commit 16 introduces — a dangling reference on
+  `every/anchors-on-blame`; at commit 4 it cites `parensIfNeeded` on the `Deadline` instance (what
+  `mprint "WITHIN"` applies), and commit 16's own rewrite of that haddock (re-resolved in the
+  re-rebase, together with the `BEFORE` guard of `deadlineAnchor`) says
+  `closingClause`/`openingClause` where they exist.
+- **Into commit 18 (`a907e91c`).** R2-SEM-2's other symptom, pinned: one case under "the window's
+  opening edge (AFTER) says what shape of closing edge it met" — a bare `WITHIN` spelled with a
+  backticked name that says `OF` is still bare.
+- **Into this commit.** _R2-1 (major):_ the sentence above cited commit 15 as `c94edc8a`, the sha
+  round 1's re-rebase had orphaned (on no branch; `git branch -a --contains` empty) — the content
+  claim held by patch-id, the sha did not; it now cites the current sha and says why the sha keeps
+  moving, and every sha in this entry is the chain's after round 2. _R2-3 (minor):_ "commit 18 (the
+  tip)" and "both files byte-identical" corrected above; the tip's own gate is at the end of this
+  entry. _R2-2 (major, the hand-off):_ the outbox result file named the pre-round-1 tips
+  (`7750e9d4`/`334ff41e`/`f10f40b5`), not ancestors of the branches — a GM pushing by sha would have
+  shipped the chain without round 1; a dated result file with the current tips supersedes it (the
+  outbox is not in this tree). _R2-SEM-1 (major, the base):_ the scratch BUILD-NOTES said the pending
+  rebase onto the moved `unstable` was three golden conflicts; measured, it is nine — recorded here
+  because it is what whoever lands the PRs meets first:
+
+**Base moved since (measured 2026-09-16, after round 2).** `origin/unstable` moved to `cb07560d` (PR
+#407, `lang/action-binder-reference`, the `EXACTLY` retirement) during round 1 and is `e966996f`
+(#403, #409 and #410 on top of it) as this is written; `git merge-tree --write-tree <either> <tip>`
+conflicts in the same nine paths with the same source hunks — `jl4-core/src/L4/TypeCheck.hs` (two hunks: the positional
+`updateMixfix … MkCheckEnv` where #407 appends `apos` and the wave inserts `eo`; and the `EVERY` arm,
+where #407 retired `QuantifierVariableRebound` (its R4, `MUST Sign t` now _is_ the reference) while
+the wave's arm still raises it and threads `opens` and `hasJoinDeadline mjoin` into
+`checkDeontonBody`), `TypeCheck/Types.hs` (`rangeOf`: #407's `ActionPatternReference` and
+`ActionPatternNotComparable` beside the wave's `QuantifierVariableRebound` line and six anchor/window
+constructors), four doc pages (`doc/concepts/legal-modeling/regulative-layer-whole.md`,
+`doc/reference/GLOSSARY.md`, `doc/reference/regulative/README.md`,
+`doc/tutorials/obligations/what-follows.md`) and three goldens (`ok/tests/contracts.golden`,
+`ok/tests/deontic-breach-semantics.golden`, `legal/tests/promissory-note.golden`). The same nine
+conflict against the pre-round-1 tip, so this is not the rounds' doing; against `5f132c8c` (#408)
+there was none. Per branch tip: `every/blame-set` 1 (the `deontic-breach-semantics` golden),
+`every/anchors-on-blame` 4 (+ `regulative/README.md`, the two `TypeCheck` sources),
+`every/lest-anchor` 8, `every/after-before` 9. That rebase is owed by whoever lands the four PRs and is not in this chain. It
+needs a source-level resolution (keep the wave's `checkDeontonBody … opens … (hasJoinDeadline
+mjoin)` call, drop the retired `QuantifierVariableRebound` loop and its `rangeOf` line, keep both
+new `CheckEnv` fields), then `cabal build all`, `jl4-core-test` and `jl4-test` — and a golden
+re-bless: #407's `DeprecatedExactly` is a _warning_, but the golden harness captures warnings
+verbatim (`ok/tests/regulative-exactly-later-argument.golden` on `cb07560d` carries the "EXACTLY is
+no longer needed here" block seven times), and the wave's own witnesses use `EXACTLY` under goldened
+globs — `ok/every/run-{anchors,after,lest,blame,stack}.l4` (71, 61, 44, 12, 11 uses) and
+`not-ok/tc/{anchor,before}-on-join-line.l4` — so those seven goldens will gain the block and must be
+re-blessed and read (inferred from the harness's behaviour on `cb07560d`, not observed on a merged
+tree; the two `lsp/semantic-tokens` witnesses carry tokens only). `doc/test-docs.sh` greps only
+`DiagnosticSeverity_Error`, so the doc `.l4` files warn without failing.
+
+Gates after round 2, per landing point: commit 3 unchanged (its gate stands); commit 4 built, `bpmn
+export` 346/0, the two pin filters 13/0 and 15/0; commit 16 built (while re-resolving), `bpmn export`
+347/0, join line 13/0; commit 18 built, `bpmn export` 354/0; commits 9 (`a1f31108`) and 14
+(`f66649f3`) by the same gate as before (`cabal build all` clean, `jl4-core-test` 560/0, 13/0 and
+15/0); commit 14 additionally `cabal test jl4-test` 3338 examples, 0 failures; the
+tip (this commit) by `etc/verify-branch.sh --base 2a2432d6`: EXIT 0 — `cabal build all`, `jl4-test` 3390/0 (3387 + the three tests round 2 added), `l4-cli-test` 369/0 (83 pending), `jl4-core-test` 560/0, `check-corpus-goldens` 483 files, `doc/test-docs.sh --no-l4` 1528 links / 0 orphans, prettier 3.4.2, trailers 19/19
+(measured on this commit's tree before this sentence was written into it; the amend that wrote it
+is spec-text-only and was re-gated with `--quick`).
+
 #### `EXACTLY` retired by #407 (2026-09-16) — the wave's files swept, PR-A
 
 PR #407 (`lang/action-binder-reference`, merged to `unstable` as `cb07560d`, 2026-09-16;
