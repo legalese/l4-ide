@@ -184,7 +184,7 @@ GIVETH A DEONTIC Person Action
 
 `pay exactly 100` MEANS
   PARTY Alice
-  MUST pay EXACTLY 100
+  MUST pay 100
   WITHIN 30
 
 #TRACE `pay exactly 100` AT 0 WITH

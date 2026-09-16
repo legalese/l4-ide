@@ -3,7 +3,7 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: every-cast-not-party.l4
   Hidden: no
-  Range: 12:5-12:49
+  Range: 12:5-12:41
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
@@ -18,19 +18,22 @@ File: every-cast-not-party.l4
 
 File: every-cast-not-party.l4
   Hidden: no
-  Range: 12:28-12:39
+  Range: 12:28-12:31
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first input of function 
-
-      Sign (defined at every-cast-not-party.l4:8:5-9)
-
-    is expected to be of type
+    In this action, `s` names something already in scope, so it
+    refers to that thing rather than introducing a new name. Read that way it
+    does not fit the slot it is in, which is expected to be of type
 
       Actor
 
     but is here of type
 
       Action
+
+    There are two ways to fix this, and which one is right depends on what
+    you meant. If you meant the thing `s` names, then this action's
+    type is wrong here. If you meant a name that stands for anything, give
+    it a spelling nothing else is using.

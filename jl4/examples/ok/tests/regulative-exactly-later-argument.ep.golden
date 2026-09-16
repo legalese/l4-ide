@@ -35,21 +35,21 @@ alice       MEANS Tenant OF "Alice"
 
 -- one argument
 GIVETH A DEONTIC Actor Action
-`waves` MEANS PARTY alice MUST Wave (EXACTLY alice) WITHIN 7
+`waves` MEANS PARTY alice MUST Wave (alice) WITHIN 7
 
 #TRACE `waves` AT 0 WITH
   PARTY alice DOES Wave alice AT 1
 
 -- two arguments, EXACTLY in the first
 GIVETH A DEONTIC Actor Action
-`pays someone` MEANS PARTY alice MUST Pay (EXACTLY alice) payee WITHIN 7
+`pays someone` MEANS PARTY alice MUST Pay (alice) payee WITHIN 7
 
 #TRACE `pays someone` AT 0 WITH
   PARTY alice DOES Pay alice theLandlord AT 1
 
 -- two arguments, EXACTLY in the SECOND: this is the case that failed
 GIVETH A DEONTIC Actor Action
-`pays the landlord` MEANS PARTY alice MUST Pay payer (EXACTLY theLandlord) WITHIN 7
+`pays the landlord` MEANS PARTY alice MUST Pay payer (theLandlord) WITHIN 7
 
 #TRACE `pays the landlord` AT 0 WITH
   PARTY alice DOES Pay alice theLandlord AT 1
@@ -57,7 +57,7 @@ GIVETH A DEONTIC Actor Action
 -- both pinned
 GIVETH A DEONTIC Actor Action
 `alice pays the landlord` MEANS
-    PARTY alice MUST Pay (EXACTLY alice) (EXACTLY theLandlord) WITHIN 7
+    PARTY alice MUST Pay (alice) (theLandlord) WITHIN 7
 
 #TRACE `alice pays the landlord` AT 0 WITH
   PARTY alice DOES Pay alice theLandlord AT 1
@@ -66,7 +66,7 @@ GIVETH A DEONTIC Actor Action
 -- a name bound by an earlier argument is still visible to a later EXACTLY.
 GIVETH A DEONTIC Actor Action
 `notes the landlord` MEANS
-    PARTY alice MUST Note (EXACTLY alice) (EXACTLY theLandlord) what WITHIN 7
+    PARTY alice MUST Note (alice) (theLandlord) what WITHIN 7
 
 #TRACE `notes the landlord` AT 0 WITH
   PARTY alice DOES Note alice theLandlord "hello" AT 1

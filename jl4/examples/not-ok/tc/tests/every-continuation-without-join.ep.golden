@@ -12,11 +12,11 @@ DECLARE Action IS ONE OF
 
 GIVETH A DEONTIC Actor Action
 `bare hence` MEANS
-    EVERY Tenant t MUST Sign (EXACTLY t) WITHIN 14 HENCE FULFILLED
+    EVERY Tenant t MUST Sign (t) WITHIN 14 HENCE FULFILLED
 
 GIVETH A DEONTIC Actor Action
 `bare lest` MEANS
     EVERY Tenant t
-        MUST   Sign (EXACTLY t)
+        MUST   Sign (t)
         WITHIN 14
         LEST   BREACH BY t

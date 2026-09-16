@@ -3,7 +3,25 @@ Typechecking successful
 Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
 File: every-join-under-party.l4
   Hidden: no
-  Range: 14:53-14:66
+  Range: 14:28-14:33
+  Source: check
+  Severity: DiagnosticSeverity_Information
+  Code: <none>
+  Message:
+    In this action, `alice` refers to
+
+      alice (at every-join-under-party.l4:10:1-6)
+
+    rather than introducing a new name of its own.
+
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
+
+File: every-join-under-party.l4
+  Hidden: no
+  Range: 14:45-14:58
   Source: check
   Severity: DiagnosticSeverity_Error
   Code: <none>

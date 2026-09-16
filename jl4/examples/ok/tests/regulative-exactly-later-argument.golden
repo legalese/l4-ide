@@ -1,15 +1,99 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+regulative-exactly-later-argument.l4:38:38-43:
+  I found a problem while checking the definition of `waves`:
+    In this action, `alice` refers to
+    
+      alice (at regulative-exactly-later-argument.l4:34:1-6)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
 regulative-exactly-later-argument.l4:40:1-41:35:
   FULFILLED
+regulative-exactly-later-argument.l4:45:44-49:
+  I found a problem while checking the definition of `pays someone`:
+    In this action, `alice` refers to
+    
+      alice (at regulative-exactly-later-argument.l4:34:1-6)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
 regulative-exactly-later-argument.l4:47:1-48:46:
   FULFILLED
+regulative-exactly-later-argument.l4:52:55-66:
+  I found a problem while checking the definition of `pays the landlord`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at regulative-exactly-later-argument.l4:33:1-12)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
 regulative-exactly-later-argument.l4:54:1-55:46:
   FULFILLED
+regulative-exactly-later-argument.l4:60:27-32:
+  I found a problem while checking the definition of `alice pays the landlord`:
+    In this action, `alice` refers to
+    
+      alice (at regulative-exactly-later-argument.l4:34:1-6)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
+regulative-exactly-later-argument.l4:60:35-46:
+  I found a problem while checking the definition of `alice pays the landlord`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at regulative-exactly-later-argument.l4:33:1-12)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
 regulative-exactly-later-argument.l4:62:1-63:46:
   FULFILLED
+regulative-exactly-later-argument.l4:69:28-33:
+  I found a problem while checking the definition of `notes the landlord`:
+    In this action, `alice` refers to
+    
+      alice (at regulative-exactly-later-argument.l4:34:1-6)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
+regulative-exactly-later-argument.l4:69:36-47:
+  I found a problem while checking the definition of `notes the landlord`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at regulative-exactly-later-argument.l4:33:1-12)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
 regulative-exactly-later-argument.l4:71:1-72:55:
   FULFILLED
 regulative-exactly-later-argument.l4:76:1-77:40:
-  PARTY Tenant OF "Alice" MUST Pay (EXACTLY alice) (EXACTLY theLandlord) WITHIN 6 HENCE FULFILLED
+  PARTY Tenant OF "Alice" MUST Pay alice theLandlord WITHIN 6 HENCE FULFILLED

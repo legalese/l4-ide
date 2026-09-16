@@ -8,4 +8,4 @@ DECLARE Action IS ONE OF
 
 GIVETH A DEONTIC Actor Action
 bad MEANS
-    EVERY Tenant t WHO 42 MUST Sign (EXACTLY t) WITHIN 14
+    EVERY Tenant t WHO 42 MUST Sign (t) WITHIN 14

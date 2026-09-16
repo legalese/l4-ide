@@ -1,6 +1,42 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+ceo-performance-award.l4:360:26-45:
+  I found a problem while checking the definition of `Eligible Service Requirement`:
+    In this action, `Forfeiture Reason` refers to
+    
+      `2025 CEO Performance Award - Complete Implementation`.`Helper Functions`.`Forfeiture Reason` (at ceo-performance-award.l4:528:1-20)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
+ceo-performance-award.l4:364:34-60:
+  I found a problem while checking the definition of `Eligible Service Requirement`:
+    In this action, `Immediate Vesting Reason` refers to
+    
+      `2025 CEO Performance Award - Complete Implementation`.`Helper Functions`.`Immediate Vesting Reason` (at ceo-performance-award.l4:543:1-27)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
+ceo-performance-award.l4:415:34-61:
+  I found a problem while checking the definition of `Vesting Requirement`:
+    In this action, `Offset Amount For Tranche` refers to
+    
+      `2025 CEO Performance Award - Complete Implementation`.`Offset Amount Calculations`.`Offset Amount For Tranche` (at ceo-performance-award.l4:334:1-28)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
 ceo-performance-award.l4:665:1-42:
   2000000000000
 ceo-performance-award.l4:666:1-42:

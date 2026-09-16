@@ -1,10 +1,34 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+run-fork.l4:28:25-36:
+  I found a problem while checking the definition of `receipts`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-fork.l4:17:1-12)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
+run-fork.l4:32:37-48:
+  I found a problem while checking the definition of `receipts`:
+    In this action, `theLandlord` refers to
+    
+      theLandlord (at run-fork.l4:17:1-12)
+    
+    rather than introducing a new name of its own.
+    
+    That is what a name in an action does: it names the thing it names. A
+    placeholder that matches anything has to be a name nothing else is using.
+    This note only appears when the thing named is defined outside the rule,
+    because a name added there later can quietly capture a placeholder here.
 run-fork.l4:38:1-42:58:
   FULFILLED
 run-fork.l4:46:1-49:58:
-  PARTY Landlord OF "Ms Ng" MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) WITHIN 2 HENCE FULFILLED AND FULFILLED
+  PARTY Landlord OF "Ms Ng" MUST Receipt theLandlord t amount WITHIN 2 HENCE FULFILLED AND FULFILLED
 run-fork.l4:52:1-55:59:
   DEONTIC BREACHED:
     BREACH

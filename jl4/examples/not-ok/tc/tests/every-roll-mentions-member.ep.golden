@@ -25,4 +25,4 @@ peersOf MEANS LIST p
 
 GIVETH A DEONTIC Actor Action
 `roll mentions the member` MEANS
-    EVERY Tenant t IN (peersOf t) MUST Sign (EXACTLY t) WITHIN 14
+    EVERY Tenant t IN (peersOf t) MUST Sign (t) WITHIN 14
