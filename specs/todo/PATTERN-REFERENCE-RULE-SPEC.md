@@ -1,6 +1,6 @@
 # Pattern names refer when they can — retiring `EXACTLY`
 
-**Status: BUILT `41809c4d`, 2026-09-16T04:10Z; not merged.** §1's ruling is Meng's and is unchanged
+**Status: BUILT `41809c4d` (2026-09-16T12:56:24+08:00); not merged.** §1's ruling is Meng's and is unchanged
 since he gave it on 2026-09-16. R1–R7, the corpus sweep, the printer change and the docs/skill
 rewrite (§4 onward) are built and committed on `lang/action-binder-reference`, verified green by
 `etc/verify-branch.sh` (full, not `--quick`) at this commit — nothing below describes a plan. Every
@@ -313,7 +313,7 @@ holds, the build applies R1–R3 to `CONSIDER` in the same PR and records the nu
 site is a deliberate wildcard, the rule stays deontic-only, `EXACTLY` stays undeprecated in
 `CONSIDER`, and the site list goes to §10 for Meng.
 
-**DECIDED 2026-09-16T04:10Z (run stamp), by the criterion above: DEONTIC-ONLY.** R1, R2 and R3 are
+**DECIDED 2026-09-16 (phase B, commit `b8f2dc3b`, 2026-09-16T09:20:31+08:00), by the criterion above: DEONTIC-ONLY.** R1, R2 and R3 are
 **not** applied to `CONSIDER`; `EXACTLY` stays undeprecated there and remains the only way to pin a
 value in a `WHEN`.
 
@@ -668,7 +668,7 @@ refined by `PROVIDED`: `Pay Alice \`Ms Ng\` amount` (`doc/tutorials/obligations/
 (`doc/reference/regulative/every-example.l4:23,40,63`), `ok/every/\*.l4`, `maintain eligible
 service status Service Status PROVIDED …`, `Convert SAFE issue PROVIDED issue EQUALS …`.
 
-### A.5 `CONSIDER` binders (Phase A1, base `11b7534b`, run stamp 2026-09-16T04:10Z)
+### A.5 `CONSIDER` binders (Phase A1, base `11b7534b`, measured 2026-09-16, tool committed as `1b0b5bfe` at 2026-09-16T09:20:03+08:00)
 
 Tool: `etc/survey-pattern-binders.py`, `--mode consider`, over the same 1066 tracked `.l4` files
 (the same 53 files fail to yield a record, for the same two reasons as A.1 — confirmed identical
