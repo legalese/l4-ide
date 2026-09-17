@@ -185,6 +185,389 @@ const specs = walk("specs").map((f) => {
   };
 });
 
+// -------------------------------------------------------------------- links
+// Meng, 2026-09-17: "the cards contain generous clickable links to the
+// references, because i tend to get a bit lost in the thicket of 'S3' and
+// 'R5' and '§13.6' -- i'm only human!" So every reference a card makes is a
+// link, and every link is VERIFIED against the tree when the page is
+// generated: "#403" only if that PR exists (hover shows its title and state);
+// a path only if the file or directory is in the tree at the link's ref;
+// "§13.6" only if the owning document -- or the document named just before
+// it, as in "EVERY-EACH §13.6" -- has a heading numbered 13.6; "R-X5" only if
+// a heading in the owning document rules it (the id at the head of the
+// heading, or in its "RULED <date> (R-X5)" parenthesis); a branch only if
+// origin has it; a commit only if a remote ref still reaches it. A reference
+// that cannot be verified stays plain text and is listed on stderr, so the
+// page never links confidently to nothing. An identifier ruled in a document
+// other than the card's own ("R5" on a card owned by the EVERY-EACH spec) is
+// declared per entry under `links` in the register.
+const LINK_REF = "unstable";
+const gitRef = (r) => (/^origin\//.test(r) ? r : `origin/${r}`);
+const urlRef = (r) => r.replace(/^origin\//, "");
+const gh = (p) => `https://github.com/${REPO}/${p}`;
+const memo = (f) => {
+  const m = new Map();
+  return (k) => (m.has(k) ? m.get(k) : (m.set(k, f(k)), m.get(k)));
+};
+const prIndex = new Map(
+  (
+    j(
+      `gh pr list --repo ${REPO} --state all --limit 1000 --json number,title,state,isDraft`,
+    ) ?? []
+  ).map((p) => [p.number, p]),
+);
+const treeOf = memo(
+  (ref) =>
+    new Set(
+      sh(`git ls-tree -r --name-only ${ref}`).split("\n").filter(Boolean),
+    ),
+);
+const dirsOf = memo((ref) => {
+  const d = new Set();
+  for (const f of treeOf(ref)) {
+    const parts = f.split("/");
+    for (let i = 1; i < parts.length; i++) d.add(parts.slice(0, i).join("/"));
+  }
+  return d;
+});
+const basenames = memo((ref) => {
+  const m = new Map();
+  for (const f of treeOf(ref)) {
+    const b = f.split("/").pop();
+    m.set(b, [...(m.get(b) ?? []), f]);
+  }
+  return m;
+});
+// Quoted: an unquoted %(...) is a subshell to the shell sh() runs, so the
+// listing came back empty and no branch linked (caught on the first look).
+const remoteBranches = new Set(
+  sh("git for-each-ref --format='%(refname:short)' refs/remotes/origin")
+    .split("\n")
+    .filter(Boolean)
+    .map((r) => r.replace(/^origin\//, "")),
+);
+const commitSubject = memo((sha) =>
+  sh(`git for-each-ref --contains ${sha} refs/remotes/origin | head -1`)
+    ? sh(`git log -1 --format=%s ${sha}`)
+    : "",
+);
+const repoExists = memo((r) => !!sh(`gh api repos/${r} --jq .full_name`));
+const repoCommit = memo((k) => {
+  const [r, sha] = k.split("@");
+  return sh(`gh api repos/${r}/commits/${sha} --jq .commit.message | head -1`);
+});
+// GitHub's heading anchor: drop inline-code and emphasis marks, lower-case,
+// keep only letters, digits, spaces, hyphens and underscores, spaces to
+// hyphens; a slug repeated within one file gets -1, -2, ... Checked against
+// GitHub's own renderer on four headings -- one with "—", backticks and "§"
+// -- on 2026-09-17. Lines inside a code fence are not headings.
+const headingsOf = memo((key) => {
+  const text = sh(`git show ${key}`);
+  const seen = new Map(),
+    out = [];
+  let fence = false;
+  text.split("\n").forEach((line, i) => {
+    if (/^\s*(```|~~~)/.test(line)) fence = !fence;
+    const m = fence ? null : /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
+    if (!m) return;
+    const raw = m[2]
+      .replace(/`([^`]*)`/g, "$1")
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/\*\*|~~|(?<!\w)\*|\*(?!\w)/g, "");
+    let slug = raw
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N} _-]/gu, "")
+      .replace(/ /g, "-");
+    const n = seen.get(slug) ?? 0;
+    seen.set(slug, n + 1);
+    if (n) slug += `-${n}`;
+    const tokens = raw
+      .split(/\s+/)
+      .map((t) => t.replace(/^[(\[]+|[.,:;)\]]+$/g, "").replace(/['’]s$/, ""));
+    out.push({
+      line: i + 1,
+      depth: m[1].length,
+      text: raw,
+      slug,
+      num: /^\d+(?:\.\d+)*$/.test(tokens[0]) ? tokens[0] : null,
+      tokens,
+    });
+  });
+  return out;
+});
+const fileUrl = (file, ref) => gh(`blob/${urlRef(ref)}/${file}`);
+// "§12.3.3" asked and only "12.3" headed: the nearest ancestor, and the link
+// says so in its title rather than pretending the section exists.
+function sectionHeading(file, ref, num) {
+  const hs = headingsOf(`${gitRef(ref)}:${file}`);
+  const want = num.split(".");
+  for (let k = want.length; k > 0; k--) {
+    const h = hs.find((x) => x.num === want.slice(0, k).join("."));
+    if (h) return { h, exact: k === want.length };
+  }
+  return null;
+}
+const expandRange = (t) => {
+  const m = /^(R-[A-Z]|[A-Z])(\d+)[–-](?:R-[A-Z]|[A-Z])?(\d+)$/.exec(t);
+  if (!m) return [t];
+  const out = [];
+  for (let i = +m[2]; i <= +m[3] && out.length < 50; i++)
+    out.push(`${m[1]}${i}`);
+  return out;
+};
+const rxEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function idHeading(file, ref, id) {
+  const hs = headingsOf(`${gitRef(ref)}:${file}`);
+  const head = hs.filter((h) =>
+    h.tokens.slice(0, 3).flatMap(expandRange).includes(id),
+  );
+  if (head.length) return head[0];
+  const inParens = new RegExp(
+    `\\((?:[^)]*[\\s(;,])?${rxEsc(id)}(?![\\w-])[^)]*\\)`,
+  );
+  const ruled = hs.filter((h) => inParens.test(h.text));
+  if (!ruled.length) return null;
+  const deepest = Math.max(...ruled.map((h) => h.depth));
+  return ruled.find((h) => h.depth === deepest);
+}
+// A document named in prose: "CLAUDE.md", "EVERY-EACH", "IMPLICIT-PROPS-DESIGN".
+function docByName(name, ctxFile, ref) {
+  const tree = treeOf(gitRef(ref));
+  if (/\.md$/i.test(name)) {
+    const hits = basenames(gitRef(ref)).get(name) ?? [];
+    return hits.length === 1 ? hits[0] : null;
+  }
+  const cands = [...tree].filter((f) => {
+    const b = f.split("/").pop().replace(/\.md$/, "");
+    return /\.md$/.test(f) && (b === name || b.startsWith(name + "-"));
+  });
+  if (cands.length === 1) return cands[0];
+  const exact = cands.find(
+    (f) =>
+      /\/(?:[^/]+)$/.test(f) &&
+      [`${name}.md`, `${name}-SPEC.md`].includes(f.split("/").pop()),
+  );
+  if (exact) return exact;
+  return cands.includes(ctxFile) ? ctxFile : null;
+}
+const attr = (s) => esc(s).replace(/"/g, "&quot;");
+const a = (href, text, title) =>
+  `<a href="${attr(href)}"${title ? ` title="${attr(title)}"` : ""} target="_blank" rel="noopener">${text}</a>`;
+// A text fragment (#:~:text=) for a cited sentence that is not a heading:
+// the first 120 characters, cut at a word boundary only when it was cut at
+// all; "-" and "," are the fragment syntax's own delimiters, so encoded.
+const textFragment = (s) => {
+  const clean = squash(s).replace(/\*\*|`/g, "");
+  const cut =
+    clean.length > 120 ? clean.slice(0, 120).replace(/\s+\S*$/, "") : clean;
+  return (
+    "#:~:text=" +
+    encodeURIComponent(cut).replace(/-/g, "%2D").replace(/,/g, "%2C")
+  );
+};
+const unlinked = [];
+const REPO_TOP =
+  /^(specs|etc|jl4|jl4-core|jl4-lsp|jl4-service|doc|skills|paper|blog|ts-apps|ts-shared|nix|\.github|\.claude)\//;
+// The one entry point: escape, then turn every verifiable reference into a
+// link. `ctx` is the card: its owning file and ref, its `links` map, its id.
+function linkify(s, ctx = {}) {
+  const t = esc(s);
+  const ref = ctx.ref ?? LINK_REF,
+    file = ctx.file,
+    map = ctx.links ?? {};
+  const miss = (kind, tok) => (
+    unlinked.push({ card: ctx.id ?? "-", kind, tok }), tok
+  );
+  const keys = Object.keys(map)
+    .sort((x, y) => y.length - x.length)
+    .map(rxEsc);
+  const re = new RegExp(
+    (keys.length ? `(?<![\\w-])(?<key>${keys.join("|")})(?![\\w-])|` : "") +
+      "\\b(?<issRepo>smucclaw|legalese)#(?<issN>\\d+)\\b" +
+      "|(?<![\\w/])#(?<prN>\\d{1,5})\\b" +
+      "|\\bruleset (?<rsN>\\d{5,})\\b" +
+      "|§\\s?(?<secN>\\d+(?:\\.\\d+)*)" +
+      "|(?<![\\w-])(?<id>R-[A-Z]\\d+[A-C]?|[A-KM-Z]\\d{1,2}(?:\\.\\d+)?)\\b" +
+      "|(?<![\\w/.-])(?<path>(?:[\\w.-]+/)+[\\w-]+(?:\\.[\\w-]+)*(?:/\\*?)?|[\\w-]+\\.(?:md|l4|mjs|sh|yml|yaml|json|ts|hs))(?::(?<pathLine>\\d+))?(?![\\w/-])" +
+      "|\\b(?<rsRepo>[\\w.-]+)@(?<rsSha>[0-9a-f]{7,40})\\b" +
+      "|\\b(?=[0-9a-f]*[a-f])(?<sha>[0-9a-f]{7,12})\\b" +
+      "|\\b(?<hb>[\\w.]+-[\\w.-]+)\\b",
+    "gu",
+  );
+  return t.replace(re, function (...args) {
+    const g = args.at(-1),
+      off = args.at(-3),
+      m = args[0];
+    if (g.key !== undefined)
+      return explicit(map[g.key], m, ctx, ref) ?? miss("links", m);
+    if (g.issN)
+      return a(
+        `https://github.com/${g.issRepo}/l4-ide/issues/${g.issN}`,
+        m,
+        `issue ${g.issRepo}/l4-ide#${g.issN}`,
+      );
+    if (g.prN) {
+      const p = prIndex.get(+g.prN);
+      return p
+        ? a(
+            gh(`pull/${g.prN}`),
+            m,
+            `#${g.prN} · ${p.isDraft ? "DRAFT " : ""}${p.state} · ${p.title}`,
+          )
+        : miss("pr", m);
+    }
+    if (g.rsN)
+      return a(
+        gh(`settings/rules/${g.rsN}`),
+        m,
+        `ruleset ${g.rsN} — Settings → Rules (admins only)`,
+      );
+    if (g.secN !== undefined) {
+      const before = t.slice(Math.max(0, off - 48), off);
+      const named =
+        /([A-Z][A-Z0-9-]{2,}(?:\.md)?|CLAUDE\.md)(?:['’]s)?\s?$/.exec(
+          before,
+        )?.[1];
+      const doc = named ? docByName(named, file, ref) : file;
+      if (!doc || !treeOf(gitRef(ref)).has(doc)) return miss("section", m);
+      const hit = sectionHeading(doc, ref, g.secN);
+      if (!hit) return miss("section", m);
+      return a(
+        `${fileUrl(doc, ref)}#${hit.h.slug}`,
+        m,
+        hit.exact
+          ? `${doc} — ${hit.h.text}`
+          : `${doc} — no heading ${g.secN}; nearest is ${hit.h.text}`,
+      );
+    }
+    if (g.id) {
+      if (!file || !treeOf(gitRef(ref)).has(file)) return miss("id", m);
+      const h = idHeading(file, ref, g.id);
+      return h
+        ? a(`${fileUrl(file, ref)}#${h.slug}`, m, `${file} — ${h.text}`)
+        : miss("id", m);
+    }
+    if (g.path !== undefined)
+      return (
+        resolvePath(g.path, g.pathLine, ref, ctx) ??
+        (ref !== LINK_REF
+          ? resolvePath(g.path, g.pathLine, LINK_REF, ctx)
+          : null) ??
+        (REPO_TOP.test(g.path) ? miss("path", m) : m)
+      );
+    if (g.rsSha) {
+      const r = `legalese/${g.rsRepo}`;
+      const subj = repoExists(r) ? repoCommit(`${r}@${g.rsSha}`) : "";
+      return subj
+        ? a(`https://github.com/${r}/commit/${g.rsSha}`, m, `${r} — ${subj}`)
+        : miss("commit", m);
+    }
+    if (g.sha) {
+      const subj = commitSubject(g.sha);
+      return subj ? a(gh(`commit/${g.sha}`), m, subj) : m;
+    }
+    if (g.hb)
+      return remoteBranches.has(g.hb)
+        ? a(gh(`tree/${g.hb}`), m, `branch ${g.hb}`)
+        : m;
+    return m;
+  });
+}
+function resolvePath(p0, line, ref, ctx) {
+  const p = p0.replace(/\/\*?$/, "");
+  const tree = treeOf(gitRef(ref));
+  if (tree.has(p))
+    return a(
+      `${fileUrl(p, ref)}${line ? `#L${line}` : ""}`,
+      `${p0}${line ? `:${line}` : ""}`,
+      `${p}${line ? ` line ${line}` : ""} @ ${urlRef(ref)}`,
+    );
+  if (dirsOf(gitRef(ref)).has(p))
+    return a(
+      gh(`tree/${urlRef(ref)}/${p}`),
+      p0,
+      `directory ${p} @ ${urlRef(ref)}`,
+    );
+  const b = p.replace(/^origin\//, "");
+  if (remoteBranches.has(b)) return a(gh(`tree/${b}`), p0, `branch ${b}`);
+  if (/^(legalese|smucclaw)\/[\w.-]+$/.test(p) && repoExists(p))
+    return a(`https://github.com/${p}`, p0, `repository ${p}`);
+  if (!p.includes("/")) {
+    const hits = basenames(gitRef(ref)).get(p) ?? [];
+    return hits.length === 1
+      ? a(
+          `${fileUrl(hits[0], ref)}${line ? `#L${line}` : ""}`,
+          `${p0}${line ? `:${line}` : ""}`,
+          `${hits[0]}${line ? ` line ${line}` : ""} @ ${urlRef(ref)}`,
+        )
+      : null;
+  }
+  // "S2/S3", "R-Q7A/B/C", "O1/O2": not a path at all -- link each side on its own.
+  if (/^[A-Z][\w-]*(?:\/[A-Z]?[\w-]*)+$/.test(p0) && !/[a-z]{3}/.test(p0))
+    return p0
+      .split("/")
+      .map((seg) => linkify(seg, ctx))
+      .join("/");
+  return null;
+}
+// A `links` value in the register: a URL; or a path, optionally followed by
+// ` §n.n` (heading by number), `:LINE`, `#slug`, or ` "text"` (a text
+// fragment, for a ruling that is a bold paragraph rather than a heading);
+// optionally ` @ <ref>` to read it on a branch that has not landed.
+function explicit(v, m, ctx, ref0) {
+  if (/^https?:\/\//.test(v)) return a(v, m, "declared in the register");
+  const p =
+    /^(\S+?)(?:\s+§(\S+)|:(\d+)|#(\S+)|\s+"([^"]+)")?(?:\s*@\s*(\S+))?$/.exec(
+      v.trim(),
+    );
+  if (!p) return null;
+  const [, path, sec, line, slug, text, at] = p;
+  const ref = at ?? ref0;
+  if (!treeOf(gitRef(ref)).has(path)) return null;
+  const base = fileUrl(path, ref);
+  if (sec) {
+    const h = /^\d/.test(sec)
+      ? sectionHeading(path, ref, sec)?.h
+      : idHeading(path, ref, sec);
+    return h ? a(`${base}#${h.slug}`, m, `${path} — ${h.text}`) : null;
+  }
+  if (line) return a(`${base}#L${line}`, m, `${path} line ${line}`);
+  if (slug) return a(`${base}#${slug}`, m, path);
+  if (text) return a(`${base}${textFragment(text)}`, m, `${path} — "${text}"`);
+  return a(base, m, path);
+}
+// The "owned by" line: the file, opened at the heading the entry cites when
+// the anchor is a heading, else at the cited sentence as a text fragment.
+function ownedBy(e) {
+  const file = e.source?.file;
+  if (!file) return "";
+  const ref = e.source?.ref ?? LINK_REF;
+  const label = `${esc(file)}${e.source?.ref ? ` @ ${esc(e.source.ref)}` : ""}`;
+  if (!treeOf(gitRef(ref)).has(file))
+    return `<span class="mono">${label}</span>`;
+  let href = fileUrl(file, ref),
+    title = `${file} @ ${urlRef(ref)}`;
+  const anchor = squash(e.source?.anchor ?? "")
+    .replace(/^#+\s*/, "")
+    .replace(/`/g, "");
+  if (anchor && e.anchored) {
+    const h = headingsOf(`${gitRef(ref)}:${file}`).find(
+      (x) =>
+        x.text === anchor ||
+        x.text.startsWith(anchor + " ") ||
+        anchor.startsWith(x.text + " "),
+    );
+    if (h) {
+      href += `#${h.slug}`;
+      title = `opens at the heading the entry cites: ${h.text}`;
+    } else {
+      href += textFragment(anchor);
+      title = `opens at the cited sentence (a text fragment: Chrome, Safari 16.1+, Firefox 131+)`;
+    }
+  }
+  return a(href, `<span class="mono">${label}</span>`, title);
+}
+
 // -------------------------------------------------------------------- shelf
 sh("git fetch origin unstable -q");
 const rels = (
@@ -244,6 +627,7 @@ const data = {
   mainBehind: Number(
     sh("git rev-list --count origin/main..origin/unstable") || 0,
   ),
+  unlinked,
 };
 
 if (process.argv.includes("--json")) {
@@ -251,6 +635,11 @@ if (process.argv.includes("--json")) {
   process.exit(0);
 }
 process.stdout.write(render(data));
+if (unlinked.length)
+  console.error(
+    `status-board: ${unlinked.length} reference${unlinked.length === 1 ? "" : "s"} left as plain text (not in the tree, or ruled in a document the card does not name -- declare it under \`links\`):\n` +
+      unlinked.map((u) => `  ${u.card}: ${u.kind} ${u.tok}`).join("\n"),
+  );
 
 // --------------------------------------------------------------------- view
 function esc(s) {
@@ -282,13 +671,19 @@ function render(d) {
   const live = d.decisions.filter((e) => !e.resolved && !e.deferred);
   const quick = live.filter((e) => e.quick);
   const stale = d.decisions.filter((e) => !e.anchored);
-  const decRow = (e) =>
-    `<div class="dec${e.resolved ? " done" : ""}${e.deferred ? " parked" : ""}" data-key="${slug(e.id)}" data-id="${esc(e.id).replace(/"/g, "&quot;")}">
-<div class="dec-h"><span class="dec-id">${esc(e.id)}</span><span class="pill ok rule-pill" hidden></span><span class="dec-kind">${esc(e.kind)}</span><span class="dec-owner">${esc(e.owner)}</span>${e.quick && !e.resolved && !e.deferred ? '<span class="pill ok">minutes</span>' : ""}${e.resolved ? '<span class="pill ok">resolved — delete this entry</span>' : ""}${e.deferred ? `<span class="pill warn">deferred ${esc(e.deferred)}</span>` : ""}${e.anchored ? "" : '<span class="pill bad">STALE — anchor not found</span>'}${e.unverified ? '<span class="pill warn">verify cmd failed</span>' : ""}<span class="dec-raised">raised ${esc(e.raised)}</span></div>
-<div class="dec-ask">${esc(e.ask)}</div>
-${e.bench ? `<div class="dec-meta"><b>bench:</b> ${esc(e.bench)}</div>` : ""}
-${e.next ? `<div class="dec-meta"><b>then:</b> ${esc(e.next)}</div>` : ""}
-<div class="dec-meta"><b>unblocks:</b> ${esc(e.unblocks)} · <b>owned by:</b> <span style="font-family:var(--mono)">${esc(e.source?.file)}${e.source?.ref ? ` @ ${esc(e.source.ref)}` : ""}</span></div>
+  const decRow = (e) => {
+    const ctx = {
+      id: e.id,
+      file: e.source?.file,
+      ref: e.source?.ref,
+      links: e.links,
+    };
+    return `<div class="dec${e.resolved ? " done" : ""}${e.deferred ? " parked" : ""}" data-key="${slug(e.id)}" data-id="${esc(e.id).replace(/"/g, "&quot;")}">
+<div class="dec-h"><span class="dec-id">${esc(e.id)}</span><span class="pill ok rule-pill" hidden></span><span class="dec-kind">${esc(e.kind)}</span><span class="dec-owner">${esc(e.owner)}</span>${e.quick && !e.resolved && !e.deferred ? '<span class="pill ok">minutes</span>' : ""}${e.resolved ? '<span class="pill ok">resolved — delete this entry</span>' : ""}${e.deferred ? `<span class="pill warn">deferred ${linkify(e.deferred, ctx)}</span>` : ""}${e.anchored ? "" : '<span class="pill bad">STALE — anchor not found</span>'}${e.unverified ? '<span class="pill warn">verify cmd failed</span>' : ""}<span class="dec-raised">raised ${esc(e.raised)}</span></div>
+<div class="dec-ask">${linkify(e.ask, ctx)}</div>
+${e.bench ? `<div class="dec-meta"><b>bench:</b> ${linkify(e.bench, ctx)}</div>` : ""}
+${e.next ? `<div class="dec-meta"><b>then:</b> ${linkify(e.next, ctx)}</div>` : ""}
+<div class="dec-meta"><b>unblocks:</b> ${linkify(e.unblocks, ctx)} · <b>owned by:</b> ${ownedBy(e)}</div>
 ${
   e.resolved
     ? ""
@@ -299,6 +694,7 @@ ${
 </div>`
 }
 </div>`;
+  };
   return `<title>L4 Programme Board</title>
 <style>
 :root{--bg:#faf9f7;--fg:#1c1a17;--dim:#6b6560;--line:#e0dcd5;--card:#fff;--accent:#8a5a2b;--red:#a33a2a;--amber:#9a7a1a;--green:#3f6b3a;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
@@ -325,7 +721,9 @@ td.n{text-align:right;font-variant-numeric:tabular-nums}
 .card .k{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;font-family:var(--mono)}
 .card .v{font-size:23px;font-variant-numeric:tabular-nums;margin-top:1px}
 .note{background:var(--card);border-left:3px solid var(--accent);padding:9px 13px;margin:12px 0;font-size:13.5px;border-radius:0 5px 5px 0}
-a{color:var(--accent)}
+a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:2px}
+.dec a{color:inherit;text-decoration-color:var(--accent)}.dec a:hover{color:var(--accent)}
+.mono{font-family:var(--mono)}
 .dec{background:var(--card);border:1px solid var(--line);border-radius:7px;padding:10px 14px;margin:8px 0}
 .dec.done{opacity:.55}.dec.parked{opacity:.7;border-style:dashed}
 .dec-h{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;font-family:var(--mono);font-size:12px;margin-bottom:5px}
@@ -346,19 +744,19 @@ a{color:var(--accent)}
 <div class="sub">generated ${esc(d.generatedAt)} · unstable ${esc(d.unstableHead)} · main ${esc(d.mainHead)} · regenerate with <b>node etc/status-board.mjs</b></div>
 
 <h2>Waiting on a human<span class="n">${live.length} live · ${quick.length} answerable in minutes · ${d.decisions.length - live.length} deferred or resolved</span></h2>
-<p class="lede">The queue, in the order to take it. Each entry names the document that owns the decision; the anchor it cites was re-read when this page was generated${stale.length ? ` — <b>${stale.length} could not be found and are marked STALE</b>` : ", and every one was found"}. A ruling entered on a card below is the <b>intake</b>: the GM reads it back and records it in the owning document in the same change (CLAUDE.md §4). Until that lands, the document — not this page — is the record.</p>
+<p class="lede">The queue, in the order to take it. Every reference on a card is a link, checked when the page was generated: a PR opens the PR (hover for its title), a § opens the heading in the owning document, a ruling id opens the heading that rules it, a path opens the file on unstable. What stays plain text could not be verified. Each entry names the document that owns the decision; the anchor it cites was re-read when this page was generated${stale.length ? ` — <b>${stale.length} could not be found and are marked STALE</b>` : ", and every one was found"}. A ruling entered on a card below is the <b>intake</b>: the GM reads it back and records it in the owning document in the same change (${linkify("CLAUDE.md §4", { id: "lede", file: "CLAUDE.md" })}). Until that lands, the document — not this page — is the record.</p>
 ${[...live.filter((e) => e.quick), ...live.filter((e) => !e.quick), ...d.decisions.filter((e) => e.deferred || e.resolved)].map(decRow).join("")}
 
 <h2>Committed, not PR'd<span class="n">${d.committed.length} branches · pushed, ahead of unstable, no PR, touched in 45 days</span></h2>
 <p class="lede">Work that exists on origin but is in nobody's queue. The tier between a worktree and a PR — this is where things go quiet.</p>
 <div class="scroll"><table><tr><th>branch</th><th>last commit</th><th>author</th><th class="n">ahead</th><th class="n">behind</th><th>head commit</th></tr>
-${d.committed.map((b) => `<tr><td>${esc(b.branch)}</td><td>${esc(b.last)}</td><td>${esc(b.author)}</td><td class="n">${b.ahead}</td><td class="n">${b.behind > 300 ? `<span class="pill bad">${b.behind}</span>` : b.behind > 60 ? `<span class="pill warn">${b.behind}</span>` : b.behind}</td><td>${esc(b.subject)}</td></tr>`).join("")}
+${d.committed.map((b) => `<tr><td>${a(gh(`tree/${b.branch}`), esc(b.branch), `branch ${b.branch}`)}</td><td>${esc(b.last)}</td><td>${esc(b.author)}</td><td class="n">${b.ahead}</td><td class="n">${b.behind > 300 ? `<span class="pill bad">${b.behind}</span>` : b.behind > 60 ? `<span class="pill warn">${b.behind}</span>` : b.behind}</td><td>${esc(b.subject)}</td></tr>`).join("")}
 </table></div>
 
 <h2>In flight<span class="n">PRs targeting unstable — ${d.inFlight.length}</span></h2>
 <p class="lede">Everything actually moving. Distinct from the release train at the bottom, which is a different queue.</p>
 <div class="scroll"><table><tr><th>PR</th><th>branch</th><th>checks</th><th>review</th><th>size</th><th>updated</th></tr>
-${d.inFlight.map((p) => `<tr><td><a href="https://github.com/${REPO}/pull/${p.number}">#${p.number}</a>${p.isDraft ? ' <span class="pill warn">draft</span>' : ""}</td><td>${esc(p.headRefName)}</td><td>${p.mergeStateStatus === "UNSTABLE" ? '<span class="pill bad">failing</span>' : p.mergeStateStatus === "CLEAN" ? '<span class="pill ok">clean</span>' : `<span class="pill warn">${esc(p.mergeStateStatus)}</span>`}</td><td>${p.reviewDecision ? esc(p.reviewDecision) : '<span class="pill warn">none</span>'}</td><td class="n">${p.changedFiles}f</td><td>${esc((p.updatedAt || "").slice(0, 10))}</td></tr>`).join("")}
+${d.inFlight.map((p) => `<tr><td>${a(gh(`pull/${p.number}`), `#${p.number}`, p.title)}${p.isDraft ? ' <span class="pill warn">draft</span>' : ""}</td><td>${esc(p.headRefName)}</td><td>${p.mergeStateStatus === "UNSTABLE" ? '<span class="pill bad">failing</span>' : p.mergeStateStatus === "CLEAN" ? '<span class="pill ok">clean</span>' : `<span class="pill warn">${esc(p.mergeStateStatus)}</span>`}</td><td>${p.reviewDecision ? esc(p.reviewDecision) : '<span class="pill warn">none</span>'}</td><td class="n">${p.changedFiles}f</td><td>${esc((p.updatedAt || "").slice(0, 10))}</td></tr>`).join("")}
 </table></div>
 
 <h2>Rulings<span class="n">${totDated} dated · ${totUndated} undated · ${d.specs.length} spec files</span></h2>
@@ -379,7 +777,7 @@ ${d.specs
   .slice(0, 22)
   .map(
     (s) =>
-      `<tr><td>${esc(s.file.replace("specs/", ""))}</td><td>${s.status ? esc(s.status) : '<span class="pill warn">none</span>'}</td><td class="n">${s.nDated || ""}</td><td class="n">${s.nUndated || ""}</td></tr>`,
+      `<tr><td>${a(fileUrl(s.file, LINK_REF), esc(s.file.replace("specs/", "")), s.file)}</td><td>${s.status ? esc(s.status) : '<span class="pill warn">none</span>'}</td><td class="n">${s.nDated || ""}</td><td class="n">${s.nUndated || ""}</td></tr>`,
   )
   .join("")}
 </table></div>
@@ -415,7 +813,7 @@ ${d.train
   .sort((a, b) => a.number - b.number)
   .map(
     (p) =>
-      `<tr><td><a href="https://github.com/${REPO}/pull/${p.number}">#${p.number}</a></td><td>${esc(p.headRefName.replace(/^claude\//, ""))}</td><td>${esc(p.baseRefName.replace(/^claude\//, ""))}</td><td>${p.mergeStateStatus === "UNSTABLE" ? '<span class="pill bad">failing</span>' : p.mergeStateStatus === "CLEAN" ? '<span class="pill ok">clean</span>' : `<span class="pill warn">${esc(p.mergeStateStatus)}</span>`}</td><td>${p.reviewDecision ? esc(p.reviewDecision) : '<span class="pill warn">none</span>'}</td><td class="n">${p.changedFiles}</td></tr>`,
+      `<tr><td>${a(gh(`pull/${p.number}`), `#${p.number}`, p.title)}</td><td>${esc(p.headRefName.replace(/^claude\//, ""))}</td><td>${esc(p.baseRefName.replace(/^claude\//, ""))}</td><td>${p.mergeStateStatus === "UNSTABLE" ? '<span class="pill bad">failing</span>' : p.mergeStateStatus === "CLEAN" ? '<span class="pill ok">clean</span>' : `<span class="pill warn">${esc(p.mergeStateStatus)}</span>`}</td><td>${p.reviewDecision ? esc(p.reviewDecision) : '<span class="pill warn">none</span>'}</td><td class="n">${p.changedFiles}</td></tr>`,
   )
   .join("")}
 </table></div>
