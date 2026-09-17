@@ -6,7 +6,8 @@
     "`verify` is an optional shell command; while its output matches `pendingWhen` the entry is live, otherwise the generator reports it RESOLVED and it should be deleted in the next edit. EMPTY output (command failed, gh not authenticated, grep -c exiting 1 on zero) means UNVERIFIED and the entry stays live — a check must never retire an entry by failing.",
     "`ref` (optional) reads the anchor at a git ref instead of the working tree — for decisions posed on a branch that has not landed.",
     "Retire an entry by deleting it in the same PR that records the ruling. Do not leave answered entries here to rot.",
-    "When the generated page is published as a Claude artifact with the `db` capability, every live entry carries a ruling widget (accept / modify / reject / defer / question + notes). Those marks are stored in the artifact's database, collection `board-rulings`, one document per entry keyed by the entry's slug (see `slug()` in etc/status-board.mjs) — an INTAKE, not the record: the GM reads them back (Artifact read_db) and writes each ruling into the owning document, in the marker's words, in the same change that acts on it."
+    "When the generated page is published as a Claude artifact with the `db` capability, every live entry carries a ruling widget (accept / modify / reject / defer / question + notes). Those marks are stored in the artifact's database, collection `board-rulings`, one document per entry keyed by the entry's slug (see `slug()` in etc/status-board.mjs) — an INTAKE, not the record: the GM reads them back (Artifact read_db) and writes each ruling into the owning document, in the marker's words, in the same change that acts on it.",
+    "Every reference in an entry's text is rendered as a link when it can be verified against the tree at generation time (PR numbers, paths, `§n.n` headings in the owning document or in a document named just before the §, ruling ids headed in the owning document, branches, commits). An identifier ruled in a DIFFERENT document is declared under `links`: `{\"R5\": \"specs/todo/IMPLICIT-PROPS-DESIGN.md §11.7\"}` — a path, optionally followed by ` §n.n`, `:LINE`, `#slug` or ` \"text\"` (a text fragment, for a ruling that is a bold paragraph rather than a heading), optionally ` @ <ref>`; or a full URL. What cannot be verified stays plain text and is listed on stderr."
   ],
   "decisions": [
     {
@@ -37,6 +38,9 @@
       "source": {
         "file": "specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md",
         "anchor": "### 13.6 `WHOSE`, and the R-Q4 problem it does not escape — OPEN, raised by Meng 2026-09-08"
+      },
+      "links": {
+        "R5": "specs/todo/IMPLICIT-PROPS-DESIGN.md §11.7"
       }
     },
     {
@@ -63,6 +67,9 @@
       "source": {
         "file": "specs/roadmap/general-purpose-language-backends.md",
         "anchor": "which of\nthe three TypeScript shapes ships first is a design decision for Meng"
+      },
+      "links": {
+        "Q9": "specs/roadmap/general-purpose-language-backends.md \"Q9 — Where exactly is the proof-of-concept/commercial line\""
       }
     },
     {
@@ -93,6 +100,10 @@
       "source": {
         "file": "etc/status-board.mjs",
         "anchor": "Committed, not PR"
+      },
+      "links": {
+        "A1–A5": "specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md §12.3.3",
+        "Q1": "specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md \"Q1. Does the plugin move to its own repository\" @ origin/ci/skills-layout"
       }
     },
     {
@@ -128,12 +139,15 @@
       "kind": "design ruling",
       "quick": true,
       "raised": "2026-09-09",
-      "ask": "ci/skills-layout (+6, pushed 2026-09-11, no PR) moves skills/writing-l4-rules to .claude/skills/, deletes the symlink, and adds etc/build-plugin-bundle.mjs. Right only if Q1 = 'the plugin moves to its own repo' — and legalese/l4-plugin now exists, so Q1 is easier to answer yes than when posed. Thomas chose skills/ in 4c4c5ed4 for Agent Plugins 1.0; it is his call. Meng may want to nudge.",
-      "unblocks": "the plugin bundle being regenerable by anyone, not one machine",
+      "ask": "ci/skills-layout (+6, pushed 2026-09-11, no PR) moves skills/writing-l4-rules to .claude/skills/, deletes the symlink, and carries five generator commits beyond the etc/build-plugin-bundle.mjs that #383 landed on unstable on 2026-09-11 (LICENSE, --l4-release, --project-layout, the second-stdlib fix, the git-history fix). Right only if Q1 = 'the plugin moves to its own repo' — and legalese/l4-plugin now exists, so Q1 is easier to answer yes than when posed. Thomas chose skills/ in 4c4c5ed4 for Agent Plugins 1.0; it is his call. Meng may want to nudge.",
+      "unblocks": "the five generator improvements landing, and the skill's home being settled",
       "source": {
         "file": "specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md",
         "anchor": "Q1",
         "ref": "origin/ci/skills-layout"
+      },
+      "links": {
+        "Q1": "specs/todo/PLUGIN-DISTRIBUTION-PROPOSAL.md \"Q1. Does the plugin move to its own repository\""
       }
     },
     {
@@ -160,6 +174,10 @@
       "source": {
         "file": "specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md",
         "anchor": "#### 12.3.4 Proposed sequencing, for whoever picks this up"
+      },
+      "links": {
+        "A1–A5": "specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md §12.3.3",
+        "A4": "specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md §12.3.3"
       }
     },
     {
@@ -173,6 +191,9 @@
       "source": {
         "file": "specs/todo/IMPLICIT-PROPS-DESIGN.md",
         "anchor": "#### 11.7.1 What the build built, and what it did not"
+      },
+      "links": {
+        "EXACTLY-rule": "specs/todo/PATTERN-REFERENCE-RULE-SPEC.md"
       }
     },
     {
@@ -220,8 +241,8 @@
       "kind": "doc correction",
       "quick": true,
       "raised": "2026-09-16",
-      "ask": "CLAUDE.md §1.0 says the writing-l4-rules skill and its l4-plugin copy are byte-identical. FALSE today, GM-verified 2026-09-16 against l4-plugin@0c7a23d (2026-09-10): 7 of the skill's files differ (SKILL.md, drafting-patterns.md, gotchas.md, source-patterns 01/05/06/11) and the shipped bundle carries 6 occurrences of the retired term `binder` where this repo has 0 — the term CI sweeps skills/ for. Nobody can regenerate the bundle: etc/build-plugin-bundle.mjs lives only on the unpushed local branch ci/skills-layout. Raised by a peer session and NOT edited on its word (a CLAUDE.md edit needs Meng). ASK: say yes and GM corrects the sentence in the next PR that touches the skill — the EXACTLY sweep (wf_8a91a677-de7) — and re-ports the skill by hand, marked as superseded by the next regeneration.",
-      "unblocks": "a true §1.0; a bundle that does not ship a retired word",
+      "ask": "CLAUDE.md §1.0 says the writing-l4-rules skill and its l4-plugin copy are byte-identical. FALSE today, GM-verified 2026-09-16 against l4-plugin@0c7a23d (2026-09-10): 7 of the skill's files differ (SKILL.md, drafting-patterns.md, gotchas.md, source-patterns 01/05/06/11) and the shipped bundle carries 6 occurrences of the retired term `binder` where this repo has 0 — the term CI sweeps skills/ for. A SECOND stale sentence in §1.0, caught 2026-09-17 by the board's own link check: it says etc/build-plugin-bundle.mjs \"is not on unstable\" and \"exists on one machine\" — the generator landed on unstable via #383 (3c92bbc4e, 2026-09-11, Meng's commit), so anyone can regenerate the bundle from unstable today; what ci/skills-layout still holds is five later generator commits (LICENSE, --l4-release, --project-layout, the second-stdlib fix, the git-history fix) and the skill move. Raised by a peer session and NOT edited on its word (a CLAUDE.md edit needs Meng). ASK: say yes and GM corrects both sentences in the next PR that touches the skill — the EXACTLY sweep (wf_8a91a677-de7) — and re-ports the skill by hand, marked as superseded by the next regeneration.",
+      "unblocks": "a true §1.0 (both sentences); a bundle that does not ship a retired word",
       "source": {
         "file": "CLAUDE.md",
         "anchor": "the copies are **byte-identical**"
