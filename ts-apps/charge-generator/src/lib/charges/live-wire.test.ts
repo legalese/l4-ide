@@ -23,7 +23,11 @@ describe('the live s 420 ladder', () => {
     expect(fn.body.$type).toBe('And')
     const leaves = boundLeaves(fn, 'f')
     expect(leaves[0].label).toBe('cheats OF f')
-    expect(leaves[0].binding).toEqual({ kind: 'call', fn: 'cheats' })
+    expect(leaves[0].binding).toEqual({
+      kind: 'call',
+      fn: 'cheats',
+      argPath: [],
+    })
     // and it is a UBoolVar with its own unique, not an App
     expect(leaves[0].unique).toBeTypeOf('number')
   })
@@ -53,8 +57,11 @@ describe('the live schema and the preload agree', () => {
   }
   it('the Lewis Christine facts are already complete — filling changes nothing', () => {
     const schema = factsSchema(
-      (schema420 as { parameters: Parameters<typeof factsSchema>[0] })
-        .parameters,
+      (
+        schema420 as unknown as {
+          parameters: Parameters<typeof factsSchema>[0]
+        }
+      ).parameters,
       'f'
     )
     const facts = LEWIS_CHRISTINE.result.charges[0].facts
@@ -63,8 +70,11 @@ describe('the live schema and the preload agree', () => {
   })
   it('the enum field is a string with three values', () => {
     const schema = factsSchema(
-      (schema420 as { parameters: Parameters<typeof factsSchema>[0] })
-        .parameters,
+      (
+        schema420 as unknown as {
+          parameters: Parameters<typeof factsSchema>[0]
+        }
+      ).parameters,
       'f'
     )
     const pronoun = stringFields(schema).find(

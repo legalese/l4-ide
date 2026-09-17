@@ -83,27 +83,130 @@
     await stream(t, p.reply)
   }
 
+  interface Pending {
+    readonly name: string
+    readonly type: string
+    readonly data?: string
+    readonly text?: string
+  }
+  let pending: Pending[] = []
+
+  async function readUpload(f: File): Promise<Pending> {
+    if (f.type === 'application/pdf' || f.type.startsWith('image/')) {
+      const buf = new Uint8Array(await f.arrayBuffer())
+      let bin = ''
+      for (let i = 0; i < buf.length; i += 0x8000)
+        bin += String.fromCharCode(...buf.subarray(i, i + 0x8000))
+      return { name: f.name, type: f.type, data: btoa(bin) }
+    }
+    return { name: f.name, type: f.type || 'text/plain', text: await f.text() }
+  }
+
+  /** The live route streams NDJSON; each line updates the transcript or the case. */
   async function live(text: string): Promise<void> {
     const t = casefile.say('assistant', '', true)
+    t.tools = []
+    const history = casefile.turns
+      .filter((x) => x.id !== t.id && x.text.trim())
+      .slice(0, -1)
+      .map((x) => ({ role: x.role, text: x.text }))
+    const result = {
+      charges: casefile.charges.map((c) => ({
+        section: c.offence.section,
+        facts: c.facts,
+      })),
+      evidence: casefile.evidence,
+      withdrawn: [],
+    }
     try {
       const res = await fetch('/api/interview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, snapshot: casefile.snapshot() }),
+        body: JSON.stringify({
+          text,
+          history,
+          uploads: pending,
+          pins: casefile.pins,
+          result,
+        }),
       })
-      const body = (await res.json().catch(() => ({}))) as {
-        error?: string
-        reply?: string
+      pending = []
+      if (!res.ok || !res.body) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string }
+        t.text =
+          body.error ?? `The interview route answered HTTP ${res.status}.`
+        return
       }
-      t.text =
-        body.reply ??
-        body.error ??
-        `The interview route answered HTTP ${res.status}.`
+      const reader = res.body.getReader()
+      const dec = new TextDecoder()
+      let buf = ''
+      for (;;) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buf += dec.decode(value, { stream: true })
+        let nl: number
+        while ((nl = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, nl).trim()
+          buf = buf.slice(nl + 1)
+          if (line) handle(t, JSON.parse(line) as Event)
+        }
+      }
     } catch (e) {
-      t.text = `Could not reach the interview route: ${e instanceof Error ? e.message : String(e)}`
+      t.text += `\n\nCould not reach the interview route: ${e instanceof Error ? e.message : String(e)}`
     } finally {
       t.streaming = false
       void scrollToEnd()
+    }
+  }
+
+  type Event =
+    | { t: 'text'; delta: string }
+    | { t: 'thinking'; delta: string }
+    | { t: 'tool'; name: string; args: unknown; result: unknown }
+    | {
+        t: 'case'
+        charges: { section: string; facts: Record<string, unknown> }[]
+        evidence: typeof casefile.evidence
+        withdrawn: string[]
+      }
+    | { t: 'done'; stop: string | null }
+    | { t: 'error'; message: string }
+
+  function handle(t: Turn, e: Event): void {
+    switch (e.t) {
+      case 'text':
+        t.text += e.delta
+        void scrollToEnd()
+        break
+      case 'thinking':
+        break
+      case 'tool':
+        t.tools = [
+          ...(t.tools ?? []),
+          { name: e.name, args: e.args, result: e.result },
+        ]
+        void scrollToEnd()
+        break
+      case 'case':
+        for (const s of e.withdrawn) casefile.withdraw(s)
+        for (const c of e.charges) {
+          const o = offenceBySection(c.section)
+          if (!o) continue
+          const pc = casefile.propose(o, c.facts)
+          scheduleRecital(pc)
+        }
+        casefile.evidence = e.evidence
+        if (
+          casefile.charges.length > 0 &&
+          casefile.selected >= casefile.charges.length
+        )
+          casefile.selected = 0
+        break
+      case 'error':
+        t.text += (t.text ? '\n\n' : '') + e.message
+        break
+      case 'done':
+        break
     }
   }
 
@@ -118,6 +221,7 @@
           ...casefile.uploads,
           { id: freshId('upload'), name: f.name, type: f.type, size: f.size },
         ]
+        pending = [...pending, await readUpload(f)]
       }
       files = null
     }

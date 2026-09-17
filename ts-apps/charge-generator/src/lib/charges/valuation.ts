@@ -81,12 +81,13 @@ export function valuationFor(
   fn: FunDecl,
   param: string,
   facts: Record<string, unknown>,
-  calls: ReadonlyMap<string, UBoolValue> = new Map()
+  calls: ReadonlyMap<string, UBoolValue> = new Map(),
+  prefix: FieldPath = []
 ): Map<NodeId, UBoolValue> {
   const out = new Map<NodeId, UBoolValue>()
   for (const l of boundLeaves(fn, param)) {
     if (l.binding.kind === 'projection') {
-      out.set(l.id, triOf(readAt(facts, l.binding.path)))
+      out.set(l.id, triOf(readAt(facts, [...prefix, ...l.binding.path])))
     } else if (l.binding.kind === 'call') {
       const v = calls.get(l.binding.fn)
       if (v) out.set(l.id, v)
@@ -95,10 +96,26 @@ export function valuationFor(
   return out
 }
 
-/** Node id → field path, for routing a click. */
-export function pathByNode(fn: FunDecl, param: string): Map<NodeId, FieldPath> {
+/** Node id → field path (under `prefix`), for routing a click. */
+export function pathByNode(
+  fn: FunDecl,
+  param: string,
+  prefix: FieldPath = []
+): Map<NodeId, FieldPath> {
   const out = new Map<NodeId, FieldPath>()
   for (const l of boundLeaves(fn, param))
-    if (l.binding.kind === 'projection') out.set(l.id, l.binding.path)
+    if (l.binding.kind === 'projection')
+      out.set(l.id, [...prefix, ...l.binding.path])
+  return out
+}
+
+/** Rule name → the record path it is called on, from every call leaf of a ladder. */
+export function callPrefixes(
+  fn: FunDecl,
+  param: string
+): Map<string, FieldPath> {
+  const out = new Map<string, FieldPath>()
+  for (const l of boundLeaves(fn, param))
+    if (l.binding.kind === 'call') out.set(l.binding.fn, l.binding.argPath)
   return out
 }

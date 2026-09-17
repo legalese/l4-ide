@@ -27,6 +27,12 @@ export interface CallLeaf {
   readonly kind: 'call'
   /** The called rule's name, backticks stripped: "cheats". */
   readonly fn: string
+  /**
+   * Where the callee's record lives inside the caller's: `cheats OF f` → [],
+   * `` `commits theft` OF f's theft `` → ["theft"]. The callee's own leaves are
+   * read and written UNDER this prefix.
+   */
+  readonly argPath: FieldPath
 }
 export interface OpaqueLeaf {
   readonly kind: 'opaque'
@@ -75,8 +81,16 @@ export function parseLeafLabel(label: string, param: string): LeafBinding {
   // printed with an explicit application keyword — `cheats OF f` — and arrives
   // as a UBoolVar with its own `unique`, not as an App. The rule name is the
   // leading backticked span or bare word before ` OF `.
-  const call = /^(`[^`]+`|[A-Za-z][\w-]*)\s+OF\s+/.exec(text)
-  if (call) return { kind: 'call', fn: strip(call[1]) }
+  const call = /^(`[^`]+`|[A-Za-z][\w-]*)\s+OF\s+(.*)$/.exec(text)
+  if (call) {
+    const arg = call[2].trim().replace(/^\(|\)$/g, '')
+    const inner = parseLeafLabel(arg, param)
+    return {
+      kind: 'call',
+      fn: strip(call[1]),
+      argPath: inner.kind === 'projection' ? inner.path : [],
+    }
+  }
   return { kind: 'opaque', label: text }
 }
 

@@ -32,10 +32,12 @@ describe('parseLeafLabel — the ladder→field join', () => {
     expect(parseLeafLabel('cheats OF f', 'f')).toEqual({
       kind: 'call',
       fn: 'cheats',
+      argPath: [],
     })
     expect(parseLeafLabel("`commits theft` OF f's theft", 'f')).toEqual({
       kind: 'call',
       fn: 'commits theft',
+      argPath: ['theft'],
     })
   })
   it('leaves anything else opaque', () => {

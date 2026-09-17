@@ -6,11 +6,17 @@
   import { casefile } from '$lib/case/casefile.svelte'
   import { ladderOf, schemaOf, scheduleRecital } from '$lib/charges/recital'
   import {
+    callPrefixes,
     elementPaths,
     pathByNode,
     valuationFor,
   } from '$lib/charges/valuation'
-  import { cycle, readAt, writeAt } from '$lib/charges/leaf-field'
+  import {
+    cycle,
+    readAt,
+    writeAt,
+    type FieldPath,
+  } from '$lib/charges/leaf-field'
   import {
     factsSchema,
     stringFields,
@@ -23,8 +29,8 @@
 
   /**
    * One slide of the carousel: the section as a ladder (with the defining
-   * section's ladder stacked beneath when the offence calls it), the charge as
-   * L4 recites it, the particulars the charge quotes, and the evidence the
+   * sections' ladders stacked beneath when the offence calls them), the charge
+   * as L4 recites it, the particulars the charge quotes, and the evidence the
    * elements rest on.
    *
    * The clicky-clicky loop lives here: click a leaf → its field flips in the
@@ -37,7 +43,9 @@
   interface Decoded {
     readonly fnName: string
     readonly fn: FunDecl
-    readonly paths: Map<NodeId, readonly string[]>
+    /** Where this rule's record sits inside the card's facts record (a nested call). */
+    readonly prefix: FieldPath
+    readonly paths: Map<NodeId, FieldPath>
   }
 
   let main = $state<Decoded | null>(null)
@@ -47,9 +55,9 @@
 
   const param = $derived(pc.offence.factsParam)
 
-  function decode(fnName: string, raw: unknown): Decoded {
+  function decode(fnName: string, raw: unknown, prefix: FieldPath): Decoded {
     const { fn } = fromVizFunDecl(raw as VizFunDecl)
-    return { fnName, fn, paths: pathByNode(fn, param) }
+    return { fnName, fn, prefix, paths: pathByNode(fn, param, prefix) }
   }
 
   onMount(async () => {
@@ -59,8 +67,21 @@
         schemaOf(pc.offence.chargeFn),
         ...pc.offence.definitionFns.map((f) => ladderOf(f)),
       ])
-      main = decode(pc.offence.offenceFn, mainRaw)
-      subs = pc.offence.definitionFns.map((f, i) => decode(f, subRaw[i]))
+      const m = decode(pc.offence.offenceFn, mainRaw, [])
+      // A callee's record may be nested (`commits theft OF (f's theft)`): its
+      // prefix is read off the call leaf of whoever calls it. definitionFns are
+      // listed outer to inner, so one pass resolves the chain.
+      const prefixes = new Map<string, FieldPath>(callPrefixes(m.fn, param))
+      const decoded: Decoded[] = []
+      pc.offence.definitionFns.forEach((f, i) => {
+        const prefix = prefixes.get(f) ?? []
+        const d = decode(f, subRaw[i], prefix)
+        for (const [callee, arg] of callPrefixes(d.fn, param))
+          if (!prefixes.has(callee)) prefixes.set(callee, [...prefix, ...arg])
+        decoded.push(d)
+      })
+      main = m
+      subs = decoded
       fields = stringFields(factsSchema(info.parameters, param))
       if (!pc.charge) scheduleRecital(pc)
     } catch (e) {
@@ -71,21 +92,30 @@
   const triOfVerdict = (v: string): UBoolValue =>
     v === 'Holds' ? 'TrueV' : v === 'Fails' ? 'FalseV' : 'UnknownV'
 
-  /** Sub-ladder valuations, then their verdicts feed the main ladder's call leaves. */
+  /**
+   * Sub-ladder valuations, innermost first, so a callee's verdict is known
+   * before the rule that calls it is valued; the verdicts then feed the call
+   * leaves of the main ladder.
+   */
+  const subState = $derived.by(() => {
+    const calls = new Map<string, UBoolValue>()
+    const vals = new Map<string, Map<NodeId, UBoolValue>>()
+    for (const d of [...subs].reverse()) {
+      const v = valuationFor(d.fn, param, pc.facts, calls, d.prefix)
+      vals.set(d.fnName, v)
+      calls.set(d.fnName, triOfVerdict(verdictFor(d.fn, v)))
+    }
+    return { calls, vals }
+  })
   const subValuations = $derived(
-    subs.map((s) => ({ d: s, v: valuationFor(s.fn, param, pc.facts) }))
-  )
-  const calls = $derived(
-    new Map(
-      subValuations.map(({ d, v }) => [
-        d.fnName,
-        triOfVerdict(verdictFor(d.fn, v)),
-      ])
-    )
+    subs.map((d) => ({
+      d,
+      v: subState.vals.get(d.fnName) ?? new Map<NodeId, UBoolValue>(),
+    }))
   )
   const mainValuation = $derived(
     main
-      ? valuationFor(main.fn, param, pc.facts, calls)
+      ? valuationFor(main.fn, param, pc.facts, subState.calls)
       : new Map<NodeId, UBoolValue>()
   )
   const localVerdict = $derived(
@@ -103,7 +133,7 @@
       [
         ...elements,
         ...subs.flatMap((s) =>
-          elementPaths(s.fn, param).map((p) => p.join('/'))
+          elementPaths(s.fn, param).map((p) => [...s.prefix, ...p].join('/'))
         ),
       ].filter((v, i, a) => a.indexOf(v) === i)
     )

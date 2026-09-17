@@ -52,7 +52,9 @@ form.append(
 // POST creates; PUT /deployments/{id} replaces an existing deployment in place
 // (ControlPlane.hs: `Verb 'PUT 202`). Probe first so re-seeding after an edit
 // to the corpus is one command.
-const exists = await fetch(`${BASE}/deployments/${ID}`).then((r) => r.ok).catch(() => false)
+const exists = await fetch(`${BASE}/deployments/${ID}`)
+  .then((r) => r.ok)
+  .catch(() => false)
 const res = exists
   ? await fetch(`${BASE}/deployments/${ID}`, { method: 'PUT', body: form })
   : await fetch(`${BASE}/deployments`, { method: 'POST', body: form })
@@ -61,7 +63,9 @@ if (!res.ok) {
   console.error(`deploy failed: HTTP ${res.status}\n${body}`)
   process.exit(1)
 }
-console.log(`${exists ? 'updated' : 'deployed'} ${files.length} files as ${ID}: ${body}`)
+console.log(
+  `${exists ? 'updated' : 'deployed'} ${files.length} files as ${ID}: ${body}`
+)
 
 // Poll the update job if the response names one.
 let job
