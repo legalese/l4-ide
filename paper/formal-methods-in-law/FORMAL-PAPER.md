@@ -292,8 +292,8 @@ Probably the best single case study: it lights up all three modes at once, and t
 
 A map of the ladder against what actually ships (mirroring the Bounded-Deontics §7 discipline of not overclaiming):
 
-- **Shipping / near-shipping (light end):** unambiguous grammar & CNL surface (§4.1); type/well-formedness & scope checks, incl. the linker (§4.3); object logic + partial `CONSIDER` exhaustiveness (§4.2); object-level LTS extraction (`StateGraph.hs`) served over REST.
-- **Designed, not yet built (heavy end):** SAT/equivalence backend (§4.2); model checking + the dominator/landmark query (§4.4); ATL / game solving (§4.5). A `verification-backend-lowering-spec` is in flight.
+- **Shipping / near-shipping (light end):** unambiguous grammar & CNL surface (§4.1); type/well-formedness & scope checks, incl. the linker (§4.3); object logic + partial `CONSIDER` exhaustiveness (§4.2); object-level LTS extraction (`StateGraph.hs`) served over REST; **the dominator/landmark query** (§4.4's landmark half: `l4 state-graph --dominators`, `L4.StateGraph.Dominators`, landed 2026-09-16 — an earlier version of this map listed it under "designed, not yet built").
+- **Designed, not yet built (heavy end):** SAT/equivalence backend (§4.2); model checking (§4.4, the CTL half); ATL / game solving (§4.5). A `verification-backend-lowering-spec` is in flight.
 
 The map is itself a contribution: it says _which_ legal-FM wins are reachable now (the light end pays off immediately and cheaply — the serial-comma checker and the exhaustiveness check ship first) and _which_ need the verification backend. The value doesn't wait for the heavy machinery.
 

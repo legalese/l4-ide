@@ -66,31 +66,36 @@ the object $T=(S,A,{\to},s_0)$ of Definition~\ref{def:dom} is not a modelling co
 impose from outside but a structure the tool already builds and hands back. The ``letter as
 a machine of states and admissible actions'' is a concrete, inspectable artefact.
 
-\paragraph{What does not yet ship, and why saying so is part of the contribution.} The
+\paragraph{What ships, what does not, and why saying so is part of the contribution.} The
 bounded \MUST{} of Section~\ref{sec:nec} is a \emph{query} over that extracted graph---the
-dominator set $\dom_s(J)$---and that query is, at the time of writing, \emph{not}
-implemented. We are candid about this because the boundary is the paper's subject: what we
-add over the shipping tool is exactly the derived-necessity reading, and realising it is a
-near-linear dominator computation \src{Lengauer \& Tarjan 1979} over a graph that already
-exists in memory, not new infrastructure. Two further layers are designed but unbuilt. The
+dominator set $\dom_s(J)$---and that query now ships: \texttt{l4 state-graph --dominators}
+answers it for every rule in a file, per terminal state or (with \texttt{--all-states}) per state, and
+\texttt{--dominators --dot} marks the answer on the drawing (module
+\texttt{L4.StateGraph.Dominators}; landed 2026-09-16, documented in the tool's reference page
+on state graphs). An earlier draft of this paragraph said the query was ``at the time of
+writing, not implemented'' and priced it as a near-linear dominator computation \src{Lengauer
+\& Tarjan 1979} over a graph that already existed in memory; it was built as the simpler
+iterative formulation of Cooper, Harvey \& Kennedy, which makes the same point: a query over
+existing infrastructure, not new infrastructure. Two further layers remain designed but
+unbuilt. The
 \emph{verification} of the faithful region (Section~\ref{sec:faithful})---closed goal
 family, acyclic ordering, closed facts---is to be discharged by transpiling the extracted
 automaton to an external model checker (UPPAAL, SPIN, or NuSMV) and posing the bounded
 modality as a temporal-logic property; this is specified in L4's roadmap but not yet
 wired. And the party-indexed ordering $\ppref$ of Section~\ref{sec:boundary}, together with
 the force-gap, are today \emph{parameters supplied to} the reading rather than quantities the
-tool computes. The honest summary is a single sentence: \emph{the object level and its state
-graph are implemented and in use; the dominator query and the verification backends are
-designed and not yet built.} The gap between those two clauses is, almost exactly, the gap
-this paper exists to map.
+tool computes. The honest summary is a single sentence: \emph{the object level, its state
+graph, and the dominator query are implemented; the verification backends and the computed
+ordering are designed and not yet built.} The gap between those two clauses is, almost exactly,
+the gap this paper exists to map.
 
-\paragraph{What it already buys.} Even short of the dominator query, the shipping layer is
+\paragraph{What it already buys.} Even short of the verification backends, the shipping layer is
 not idle with respect to the thesis. Because the letter executes and the state graph is
 inspectable, an obligation can be \emph{simulated} and its breach traced rather than merely
 asserted; because the evaluation is total and replayable, it can serve as the
 guard-railed, audit-grade ``left brain'' behind a neural-network front end---an LLM that
-proposes, and an L4 trace that certifies. The derived \MUST{} is the next increment on this
-substrate, not a separate system.
+proposes, and an L4 trace that certifies. The derived \MUST{} is now an increment on this
+substrate, not a separate system; the verification of the faithful region is the next.
 
 \section{A worked example: perfection under UCC Article~9}
 \label{sec:eval}

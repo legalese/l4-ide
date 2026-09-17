@@ -175,32 +175,6 @@
       }
     },
     {
-      "id": "state-graphs",
-      "owner": "GM",
-      "kind": "small PR, gated",
-      "quick": true,
-      "raised": "2026-09-16",
-      "ask": "jl4/examples/state-graphs/*.dot (37 files) are drifted against the exporter on unstable — pre-existing, found by #399's consistency pass. One `regenerate.sh` run and one commit, AFTER #395 (the join line) and #399 merge so the regenerated set is stable; read the diff — it should be the join-line change plus whatever moved since. Handed to GM by lts-diagrams-2.",
-      "unblocks": "a checked-in state-graph set that matches the exporter",
-      "source": {
-        "file": "jl4/examples/state-graphs/regenerate.sh",
-        "anchor": "regenerate"
-      }
-    },
-    {
-      "id": "Dominators §7",
-      "owner": "GM (papers bench)",
-      "kind": "doc correction, gated",
-      "quick": true,
-      "raised": "2026-09-16",
-      "ask": "paper/bounded-deontics/draft/bd-sections-7-9.tex:83 says 'the dominator query and the verification backends are' not implemented (and paper/formal-methods-in-law/FORMAL-PAPER.md:296 lists the dominator query under 'Designed, not yet built'). That becomes false the moment #399 merges (L4.StateGraph.Dominators, `l4 state-graph --dominators`, doc/reference/regulative/STATE-GRAPH.md). Edit AFTER #399 lands, not before — the anti-drift rule cuts both ways. Handed to GM by lts-diagrams-2.",
-      "unblocks": "the paper agreeing with the tree",
-      "source": {
-        "file": "paper/bounded-deontics/draft/bd-sections-7-9.tex",
-        "anchor": "the dominator query and the verification backends are"
-      }
-    },
-    {
       "id": "Prune glob",
       "owner": "Meng (homelab launchd on nye)",
       "kind": "ops decision",
