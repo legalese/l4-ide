@@ -11,8 +11,8 @@ Source files with regulative rules (MUST/MAY/SHANT):
 | `jl4/examples/ok/prohibition.l4` | noSmoking, noDrinking, mayDrink, mustDrink, limitedGambling, noSmokingWithConsequences, noSmokingExplicitBreach, noSmokingBreachByAlice, noSmokingBreachWithReason, noSmokingBreachReasonOnly, breachInHence |
 | `jl4/examples/ok/contracts.l4` | aContract, x, y, quux, z, a, goesOn |
 | `jl4/experiments/actors.l4` | SeriesAFinancing, SeriesAIssue |
-| `jl4/experiments/looping-with-recursion.l4` | InitialSale |
-| `jl4/experiments/patterns_and_idioms.l4` | simplePayment, serviceContract, paymentDue, loanAgreement |
+| `jl4/experiments/looping-with-recursion.l4` | InitialSale, PayUntilZero |
+| `jl4/experiments/patterns_and_idioms.l4` | simplePayment, serviceContract, paymentDue, loanAgreement, conditionalSale |
 | `jl4/experiments/safe-post.l4` | EquityFinancingConversion |
 | `jl4/experiments/wedding.l4` | weddingceremony, Spouse1lovesSpouse2, Spouse2lovesSpouse1, Spouse1holdsSpouse2, Spouse2holdsSpouse1, supportinallcircumstances, careinsicknessandhealth, deathreleasesvows, noabandonment, fidelity, marriagecontract |
 
@@ -32,10 +32,12 @@ hand-patched one looks regenerated without being it:
 jl4/examples/state-graphs/regenerate.sh
 ```
 
-`jl4/experiments/patterns_and_idioms.l4` does not currently typecheck, so its
-four diagrams (`simplePayment`, `serviceContract`, `paymentDue`,
-`loanAgreement`) cannot be regenerated and are stale; the script says so and
-leaves them alone.
+Every source in the script regenerates as of 2026-09-17 (unstable `e2f4a71f`).
+An earlier version of this note said `jl4/experiments/patterns_and_idioms.l4`
+did not typecheck and its four diagrams were stale; legalese/l4-ide#407 admitted
+the bare field-access patterns that had stopped it parsing, and the file now
+yields five graphs (`conditionalSale` is new). If the script prints a WARNING
+for a source, that source has regressed — do not hand-patch its diagrams.
 
 ## File Formats
 
