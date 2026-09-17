@@ -1,0 +1,417 @@
+@import 'tailwindcss';
+
+/*
+ * Charge generator theme — the Reg CF wizard's palette, so the two demos read as one family.
+ *
+ * Every outcome colour is applied ONLY through the static .outcome-* classes
+ * below — never via an inline style="" attribute — so the CSP `style-src` stays
+ * strict 'self' and the badge colour survives the BUILT app (the dev-server CSP
+ * and the built <meta> CSP behave differently; verify against `vite build`).
+ *
+ * The embedded ladder is safe under the same policy for a different reason:
+ * `sceneToSvg` emits no style attributes at all (only presentational SVG attrs)
+ * and `LadderController` writes every style through the CSSOM, which style-src
+ * does not govern.
+ *
+ * Every foreground-on-background pair passes >= 4.5:1 in BOTH the light and dark
+ * palettes. Colour is never the SOLE cue — every badge carries an icon, a word,
+ * a plain-English gloss and an aria-label.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Brand (Legalese crimson) */
+  --brand: #c8376a;
+  --brand-hover: #d94d7e;
+  --brand-dark: #6e1636;
+
+  /* Ink / surfaces */
+  --ink: #1f1f23;
+  --muted: #5f5f6a;
+  --surface: #ffffff;
+  --surface-sunk: #f7f7f9;
+  --hairline: #e4e4e7;
+  --focus: #c8376a;
+
+  /* Semantic outcome tokens — consumed only by the static outcome classes. */
+  --must-bg: #fbe9ef;
+  --must-fg: #6e1636;
+  --must-border: #e0a7bd;
+
+  --may-bg: #fdf3e0;
+  --may-fg: #7a4a00;
+  --may-border: #e6c785;
+
+  --clear-bg: #e6f5ec;
+  --clear-fg: #14663d;
+  --clear-border: #a6d6ba;
+
+  --chip-bg: #f0f0f2;
+  --chip-fg: #303036;
+  --cite-fg: #5a5a66;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --ink: #e6e6e9;
+    --muted: #a3a3ad;
+    --surface: #1b1b1f;
+    --surface-sunk: #222227;
+    --hairline: #2f2f35;
+    --focus: #d94d7e;
+    /* Lighter crimson so emphasis text (.bar-title, the intro <strong>must/may</strong>)
+       stays AA-legible on the dark surface — the #6e1636 light value is ~1.5:1 here. */
+    --brand-dark: #ff9dbe;
+
+    --must-bg: #44102560;
+    --must-fg: #ffd2e0;
+    --must-border: #7a2344;
+
+    --may-bg: #43320f60;
+    --may-fg: #ffe2b0;
+    --may-border: #6b551f;
+
+    --clear-bg: #103a2560;
+    --clear-fg: #bdeed1;
+    --clear-border: #1f6b46;
+
+    --chip-bg: #2c2c30;
+    --chip-fg: #e6e6e9;
+    --cite-fg: #9a9aa3;
+  }
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font:
+    17px/1.6 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  color: var(--ink);
+  background: var(--surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* SvelteKit body wrapper; transparent to layout so the app participates
+   directly in the body box. A class (not an inline style) keeps style-src
+   strict. */
+.app-shell {
+  display: contents;
+}
+
+:where(a, button, input, select, [tabindex]):focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* The ONLY place answer-card outcome colour is applied. Referenced via
+   class:outcome-must / class:outcome-may / class:outcome-clear. */
+.outcome-must {
+  background: var(--must-bg);
+  color: var(--must-fg);
+  border-color: var(--must-border);
+}
+.outcome-may {
+  background: var(--may-bg);
+  color: var(--may-fg);
+  border-color: var(--may-border);
+}
+.outcome-clear {
+  background: var(--clear-bg);
+  color: var(--clear-fg);
+  border-color: var(--clear-border);
+}
+
+.chip {
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+}
+.citation {
+  color: var(--cite-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* The ladder embed's host.
+ *
+ * STATIC (default): no height at all. `LadderController` with panZoom off keeps
+ * the pre-Step-4 sizing — max-width:100%; height:auto — so the figure is as tall
+ * as it needs to be and the page scrolls.
+ *
+ * INTERACTIVE: pan/zoom needs a DEFINITE height, because a viewBox only means
+ * something against a fixed viewport; without one `clientWidth`/`clientHeight`
+ * read 0, the controller skips the viewBox, and every gesture silently no-ops
+ * (the failure the controller's own manual checklist calls out). Hence the
+ * explicit height here rather than in the component.
+ */
+.ladder-host {
+  overflow: hidden;
+}
+.ladder-host.interactive {
+  height: 44vh;
+  min-height: 15rem;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 0.5rem;
+}
+.ladder-host.interactive:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.ladder-host svg {
+  display: block;
+}
+.ladder-host .lad-clickable {
+  cursor: pointer;
+}
+/* MEASURED 2026-09-17: the click act rides on the box <rect>, and the label
+   <text> is drawn ON TOP of it with no act of its own, so a click on the words
+   — which is where everyone clicks — routed nowhere. Let it fall through. */
+.ladder-host text {
+  pointer-events: none;
+}
+
+.submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand);
+  color: #ffffff;
+  border: 0;
+  border-radius: 10px;
+  padding: 0.7rem 1.2rem;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.submit:hover {
+  background: var(--brand-hover);
+}
+.submit:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+.submit.secondary {
+  background: var(--surface);
+  color: var(--brand-dark);
+  box-shadow: inset 0 0 0 2px var(--brand);
+}
+.linkish {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--brand);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------------
+   Two panes: the interview on the left, the carousel of charges on the right.
+   --------------------------------------------------------------------------- */
+.panes {
+  display: grid;
+  grid-template-columns: minmax(20rem, 2fr) minmax(24rem, 3fr);
+  gap: 1.2rem;
+  align-items: start;
+}
+@media (max-width: 64rem) {
+  .panes {
+    grid-template-columns: 1fr;
+  }
+}
+.pane {
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: var(--surface);
+  min-width: 0;
+}
+.pane-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--hairline);
+}
+.pane-head h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+.pane-body {
+  padding: 0.9rem 1rem;
+}
+
+/* The ladder inside a card: interactive, definite height (see the wizard's note). */
+.ladder-host.card {
+  height: 38vh;
+  min-height: 14rem;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 0.4rem;
+}
+.ladder-host.stacked {
+  height: 24vh;
+  min-height: 9rem;
+  border: 1px dashed var(--hairline);
+  border-radius: 12px;
+  padding: 0.4rem;
+}
+
+/* Verdict badges — class-based only (CSP style-src stays strict). */
+.badge {
+  display: inline-block;
+  border: 2px solid;
+  border-radius: 999px;
+  padding: 0.1rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.badge.made-out {
+  background: var(--clear-bg);
+  color: var(--clear-fg);
+  border-color: var(--clear-border);
+}
+.badge.refused {
+  background: var(--must-bg);
+  color: var(--must-fg);
+  border-color: var(--must-border);
+}
+.badge.pending {
+  background: var(--may-bg);
+  color: var(--may-fg);
+  border-color: var(--may-border);
+}
+
+/* The charge as read to the accused. */
+.recital {
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 1.08rem;
+  line-height: 1.55;
+  border: 1px solid var(--hairline);
+  border-left: 4px solid var(--brand);
+  border-radius: 8px;
+  padding: 0.9rem 1.1rem;
+  background: var(--surface-sunk);
+  white-space: pre-wrap;
+}
+.recital.refusal {
+  border-left-color: var(--must-border);
+  color: var(--must-fg);
+  font-family: system-ui, sans-serif;
+  font-size: 0.98rem;
+}
+
+/* Chat */
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  padding-right: 0.2rem;
+}
+.bubble {
+  border-radius: 12px;
+  padding: 0.6rem 0.85rem;
+  max-width: 92%;
+  line-height: 1.45;
+  font-size: 0.97rem;
+}
+.bubble.user {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--brand) 12%, var(--surface));
+}
+.bubble.assistant {
+  align-self: flex-start;
+  background: var(--surface-sunk);
+}
+.bubble :global(p) {
+  margin: 0 0 0.5rem;
+}
+.bubble :global(p:last-child) {
+  margin: 0;
+}
+.tool-row {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  color: var(--muted);
+  border-left: 3px solid var(--hairline);
+  padding-left: 0.6rem;
+  margin: 0.3rem 0;
+}
+.composer {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+.composer textarea {
+  width: 100%;
+  min-height: 5.5rem;
+  resize: vertical;
+  border: 2px solid var(--hairline);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  font-size: 0.97rem;
+  background: var(--surface);
+  color: var(--ink);
+  box-sizing: border-box;
+}
+.composer textarea:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+.composer-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* The fourth-wall spinner. */
+.moments {
+  text-align: center;
+  color: var(--muted);
+  font-style: italic;
+  padding: 0.6rem;
+  animation: moments-pulse 1.2s ease-in-out infinite;
+}
+@keyframes moments-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.chip {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.05rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}

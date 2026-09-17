@@ -1,0 +1,273 @@
+{
+  "description": "Frame a charge under section 420 of the Penal Code 1871 (cheating and dishonestly inducing a delivery of property), or say why none can be framed",
+  "isDeontic": false,
+  "name": "charge under s 420",
+  "parameters": {
+    "properties": {
+      "f": {
+        "description": "The deception, what it induced, and the particulars of the charge",
+        "properties": {
+          "body": { "description": "… in body?", "type": "boolean" },
+          "by remote communication": {
+            "description": "Was the cheating done by remote communication (s 420(2))?",
+            "type": "boolean",
+            "x-sanitized-name": "by-remote-communication"
+          },
+          "cause the delivery": {
+            "description": "Was the victim induced to cause property to be delivered to anyone?",
+            "type": "boolean",
+            "x-sanitized-name": "cause-the-delivery"
+          },
+          "causes": {
+            "description": "Did that act or omission cause damage or harm?",
+            "type": "boolean"
+          },
+          "consent that any person shall retain any property": {
+            "description": "Was the victim induced to consent to anyone keeping property?",
+            "type": "boolean",
+            "x-sanitized-name": "consent-that-any-person-shall-retain-any-property"
+          },
+          "damage": {
+            "description": "Damage to any person?",
+            "type": "boolean"
+          },
+          "deceived the victim": {
+            "description": "Did the accused deceive the victim? A dishonest concealment of facts is a deception (Explanation 1); a representation made through an agent counts (Explanation 3); a company can be deceived (Explanation 4).",
+            "type": "boolean",
+            "x-sanitized-name": "deceived-the-victim"
+          },
+          "deliver": {
+            "description": "Was the victim induced to deliver property to anyone?",
+            "type": "boolean"
+          },
+          "dishonestly": {
+            "description": "Did the accused act dishonestly — intending a wrongful gain or a wrongful loss, or in a way reasonable and honest people would call dishonest, knowing that (s 24)?",
+            "type": "boolean"
+          },
+          "do": {
+            "description": "Was the victim induced to do something they would not have done but for the deception?",
+            "type": "boolean"
+          },
+          "fraudulently": {
+            "description": "Did the accused act fraudulently — with intent to deceive, and by means of the deception, for an advantage to anyone or a detriment to anyone else (s 25)?",
+            "type": "boolean"
+          },
+          "harm": { "description": "Harm to any person?", "type": "boolean" },
+          "intentionally": {
+            "description": "Did the accused intend to induce the victim to act, or to refrain from acting, as they did?",
+            "type": "boolean"
+          },
+          "likely to cause": {
+            "description": "Was that act or omission likely to cause damage or harm?",
+            "type": "boolean",
+            "x-sanitized-name": "likely-to-cause"
+          },
+          "make, alter or destroy a valuable security": {
+            "description": "Was the victim induced to make, alter or destroy the whole or any part of a valuable security, or anything signed or sealed that could be converted into one?",
+            "type": "boolean",
+            "x-sanitized-name": "make-alter-or-destroy-a-valuable-security"
+          },
+          "mind": { "description": "… in mind?", "type": "boolean" },
+          "omit to do": {
+            "description": "Was the victim induced to leave undone something they would otherwise have done?",
+            "type": "boolean",
+            "x-sanitized-name": "omit-to-do"
+          },
+          "particulars": {
+            "description": "Who is charged, and when and where the offence was committed",
+            "properties": {
+              "accused": {
+                "description": "The accused person's full name, as it is to appear in the charge",
+                "type": "string"
+              },
+              "co-accused": {
+                "description": "Anyone charged jointly with the accused, as they are to be named in the charge; leave blank if none",
+                "type": "string"
+              },
+              "common intention": {
+                "description": "Was the act done in furtherance of a common intention shared with the co-accused, so that section 34 is read with the charge?",
+                "type": "boolean",
+                "x-sanitized-name": "common-intention"
+              },
+              "date": {
+                "description": "The date of the offence, as it is to read after \"on or about\" — for example \"the 24th day of April 2000\"",
+                "type": "string"
+              },
+              "place": {
+                "description": "Where the offence was committed, as it is to read after \"at\" — \"Singapore\" is added for you",
+                "type": "string"
+              },
+              "time": {
+                "description": "The time of day, as it is to read after \"at about\" — for example \"8.10 pm\"; leave blank if not known",
+                "type": "string"
+              }
+            },
+            "propertyOrder": [
+              "accused",
+              "date",
+              "time",
+              "place",
+              "co-accused",
+              "common intention"
+            ],
+            "required": [
+              "accused",
+              "date",
+              "time",
+              "place",
+              "co-accused",
+              "common intention"
+            ],
+            "type": "object",
+            "x-l4-type": "Particulars"
+          },
+          "property": { "description": "… in property?", "type": "boolean" },
+          "reputation": {
+            "description": "… in reputation?",
+            "type": "boolean"
+          },
+          "the act or omission": {
+            "description": "What the victim did or left undone, as it is to read after \"to\" — for example \"hand over the keys to the flat\"",
+            "type": "string",
+            "x-sanitized-name": "the-act-or-omission"
+          },
+          "the deception": {
+            "description": "What the victim was deceived into, as it is to read after \"by deceiving him/her\" — for example \"to believe that the price of a pencil casing is worth $5.25, when in actual fact, you knew that the price of the said item is worth $16.95\"",
+            "type": "string",
+            "x-sanitized-name": "the-deception"
+          },
+          "the property": {
+            "description": "What was delivered or retained, as it is to read after \"to deliver to you\" — for example \"the said item for only $5.25\"",
+            "type": "string",
+            "x-sanitized-name": "the-property"
+          },
+          "victim": {
+            "description": "The name of the person deceived, as it is to appear in the charge — for example \"Wong Fei Hsia\"",
+            "type": "string"
+          },
+          "victim described as": {
+            "description": "How the charge describes the person deceived, after the name — for example \"the cashier of Seiyu Departmental Store\"; leave blank if not needed",
+            "type": "string",
+            "x-sanitized-name": "victim-described-as"
+          },
+          "victim pronoun": {
+            "description": "The pronoun the charge uses for the person deceived",
+            "enum": ["he", "she", "they"],
+            "type": "string",
+            "x-l4-type": "Pronoun",
+            "x-sanitized-name": "victim-pronoun"
+          }
+        },
+        "propertyOrder": [
+          "particulars",
+          "victim",
+          "victim described as",
+          "victim pronoun",
+          "deceived the victim",
+          "the deception",
+          "fraudulently",
+          "dishonestly",
+          "deliver",
+          "cause the delivery",
+          "consent that any person shall retain any property",
+          "the property",
+          "intentionally",
+          "do",
+          "omit to do",
+          "the act or omission",
+          "causes",
+          "likely to cause",
+          "damage",
+          "harm",
+          "body",
+          "mind",
+          "reputation",
+          "property",
+          "make, alter or destroy a valuable security",
+          "by remote communication"
+        ],
+        "required": [
+          "particulars",
+          "victim",
+          "victim described as",
+          "victim pronoun",
+          "deceived the victim",
+          "the deception",
+          "fraudulently",
+          "dishonestly",
+          "deliver",
+          "cause the delivery",
+          "consent that any person shall retain any property",
+          "the property",
+          "intentionally",
+          "do",
+          "omit to do",
+          "the act or omission",
+          "causes",
+          "likely to cause",
+          "damage",
+          "harm",
+          "body",
+          "mind",
+          "reputation",
+          "property",
+          "make, alter or destroy a valuable security",
+          "by remote communication"
+        ],
+        "type": "object",
+        "x-l4-type": "Cheating Facts"
+      }
+    },
+    "required": ["f"],
+    "type": "object"
+  },
+  "returnSchema": {
+    "properties": {
+      "made out": {
+        "description": "Whether every legal condition of the offence is fulfilled on the facts given — a charge asserts that it is (CPC s 123(5))",
+        "type": "boolean",
+        "x-sanitized-name": "made-out"
+      },
+      "offence": {
+        "description": "The name the Code gives the offence",
+        "type": "string"
+      },
+      "punishment": {
+        "description": "The punishment the section prescribes, verbatim",
+        "type": "string"
+      },
+      "refusal": {
+        "description": "Why no charge can be framed on these facts, or blank",
+        "type": "string"
+      },
+      "section": {
+        "description": "The section of the Penal Code 1871 under which the charge is framed — the punishing section",
+        "type": "string"
+      },
+      "text": {
+        "description": "The charge as it is to be read to the accused, or blank if it cannot be framed on these facts",
+        "type": "string"
+      }
+    },
+    "propertyOrder": [
+      "section",
+      "offence",
+      "made out",
+      "text",
+      "refusal",
+      "punishment"
+    ],
+    "required": [
+      "section",
+      "offence",
+      "made out",
+      "text",
+      "refusal",
+      "punishment"
+    ],
+    "type": "object",
+    "x-l4-type": "Charge"
+  },
+  "returnType": "Charge",
+  "section": null
+}

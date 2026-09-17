@@ -1,0 +1,93 @@
+{
+  "funDecl": {
+    "$type": "FunDecl",
+    "body": {
+      "$type": "And",
+      "args": [
+        {
+          "$type": "InertE",
+          "context": "InertAnd",
+          "id": { "id": 3 },
+          "text": "(1) Whoever"
+        },
+        {
+          "$type": "UBoolVar",
+          "atomId": "749ac4fd-edc1-53b5-925d-2dae800c7d3c",
+          "canInline": false,
+          "id": { "id": 4 },
+          "name": { "label": "cheats OF f", "unique": 5 },
+          "typically": null,
+          "value": "UnknownV"
+        },
+        {
+          "$type": "InertE",
+          "context": "InertAnd",
+          "id": { "id": 6 },
+          "text": "and thereby"
+        },
+        {
+          "$type": "UBoolVar",
+          "atomId": "cda122a6-881a-5ae2-b410-a6c56a30b570",
+          "canInline": false,
+          "id": { "id": 7 },
+          "name": { "label": "f's dishonestly", "unique": 8 },
+          "typically": null,
+          "value": "UnknownV"
+        },
+        {
+          "$type": "InertE",
+          "context": "InertAnd",
+          "id": { "id": 9 },
+          "text": "induces the person deceived to"
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "c95a2c08-4ca2-5354-951e-d46634616949",
+              "canInline": false,
+              "id": { "id": 11 },
+              "name": { "label": "f's deliver", "unique": 12 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "4e19a7de-efa4-58cb-89f5-585d048725ad",
+              "canInline": false,
+              "id": { "id": 13 },
+              "name": { "label": "f's `cause the delivery`", "unique": 14 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertOr",
+              "id": { "id": 15 },
+              "text": "of any property to any person, or to"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "bdc03ef1-3de5-5433-a040-260c52b1f94e",
+              "canInline": false,
+              "id": { "id": 16 },
+              "name": {
+                "label": "f's `make, alter or destroy a valuable security`",
+                "unique": 17
+              },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 10 }
+        }
+      ],
+      "id": { "id": 2 }
+    },
+    "id": { "id": 1 },
+    "name": { "label": "`offence under s 420`", "unique": 32 },
+    "params": [{ "label": "f", "unique": 33 }]
+  },
+  "verDocId": { "uri": "file://offence%20under%20s%20420.l4", "version": 1 }
+}
