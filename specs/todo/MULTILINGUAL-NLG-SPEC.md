@@ -4,10 +4,10 @@ _Status: **proposed, not landed — with one exception.** §4 (the `%` and `]` e
 **implemented, gated and adversarially reviewed** on branch `fix/nlg-escapes` (`590bc3c56` +
 `53e9420d9`) and is **not merged**; everything else here is a proposal and no part of it is
 implemented. Every measurement in §2 was executed on 2026-09-17 against `unstable` @
-`cab6988d0` and canon `mengwong/drafts` @ `61a4755`. Six measurement errors in earlier drafts
+`cab6988d0` and canon `mengwong/drafts` @ `61a4755`. Seven measurement errors in earlier drafts
 of this file have been corrected in place, each re-measured rather than taken on report —
 §2.3's gap count, §2.4's annotation census and its bare-inline count, a line citation, three
-dangling cross-references, and §4's claim about where decoding happens; §2.4 and §4.1 carry
+dangling cross-references, `L4.Nlg`'s size, and §4's claim about where decoding happens; §2.4 and §4.1 carry
 the corrections rather than hiding them. Written on branch `spec/multilingual-nlg`; §4.1 and
 R-M7 by the `nlg-locale` session._
 
@@ -288,6 +288,34 @@ Requirements:
 3. **A module declares its own default language** so untagged annotations are not implicitly
    English. Proposal: a module-level `@lang he` annotation; R-M2.
 4. **Duplicate tags on one name are a check error**, not last-wins.
+5. **Whatever the spelling, it must work for the bare `[…]` form too** — and that is the
+   constraint that actually narrows R-M1. See below.
+
+**Measured 2026-09-17, and it rules out more than it looks.** The `@nlg:he` spelling in the
+block above only works on the LINE form. The inline form has no herald to hang a tag on:
+`toAnno`'s inline branch is `oh <> t <> ch`, i.e. `[` + text + `]`, with no free position. So
+a tagged inline annotation has to put the tag INSIDE the brackets — `[he: …]` — and that
+collides with prose, because a colon is an ordinary character in annotation text today:
+
+| written                       | renders as (`l4 render --format text`) |
+| ----------------------------- | -------------------------------------- |
+| `[he: a colon in prose, %c%]` | `he: a colon in prose, c`              |
+| `["the quoted form", %n%]`    | `"the quoted form", n`                 |
+
+Two consequences, and neither is obvious from the line form alone:
+
+- **`[he: …]` is ambiguous with existing prose** and cannot be adopted without a rule for
+  telling a tag from a sentence that happens to begin with a two-letter word and a colon.
+- **`@nlg he "…"` is worse than it looks**, because a double quote is ordinary text too. Two
+  annotations in the tree already open with one — `doc/reference/syntax/annotation-example.l4`
+  and `directive-example.l4`, both **user-facing documentation** — so that spelling changes
+  the meaning of text that ships as an example of how to write `@nlg`.
+
+The line form is the easy half and has no collision: 2 of the 140 `@nlg` lines contain a
+colon and both are `--` comments, so `@nlg:he` is free to take there. **R-M1 should be decided
+on the inline form, not the line form**, and the options worth costing are a distinct herald
+(`[he| …]`, `[@he …]`) or leaving the inline form untaggable and requiring the line form for
+any non-default language. This is evidence for the ruling, not the ruling: R-M1 stays OPEN.
 
 **Type changes.** `AnnoType` stays; the language rides on the NLG payload:
 
@@ -296,7 +324,7 @@ data TAnnotations = ... | TNlg !Text !AnnoType          -- today
                   | ... | TNlg !(Maybe LangTag) !Text !AnnoType   -- proposed
 ```
 
-`L4.Nlg` (486 lines) selects by requested locale with explicit fallback. **A miss must be
+`L4.Nlg` (509 lines at `cab6988d0`) selects by requested locale with explicit fallback. **A miss must be
 visible**: rendering an English page for a name that has only `@nlg:he` must emit the Hebrew
 _and record the fallback in the projection's fidelity report_, never silently substitute.
 
