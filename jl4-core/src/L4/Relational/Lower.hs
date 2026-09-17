@@ -588,6 +588,23 @@ linearNlg = \case
   -- very failure the escape was added to prevent, reintroduced one layer down.
   -- 'L4.Blawx.Lower.nlgChunks' decodes the literal chunks after the split.
   -- See the call-site table in 'L4.Nlg.unescapeNlgText'.
+  --
+  -- AUDITED 2026-09-17, so the next reader need not redo it. All four @*Nlg@
+  -- fields are fed from here and therefore all carry escapes undecoded:
+  -- 'tdNlg' (:668), 'adNlg' (:737), 'rfNlg' (:945), 'dsNlg' (:1342), plus
+  -- 'rpNlg', which they flow into (:1937, :2733, :2759, :2799). Outside this
+  -- module and 'L4.Relational.IR' they reach exactly two readers:
+  --
+  --   * 'L4.Blawx.Lower' — @attrNlg@ (:939, :946) and @relationship@ (:976).
+  --     All three go through 'L4.Blawx.Lower.nlgChunks', which decodes. Covered.
+  --   * 'L4.Relational.Debug' (:287), which dumps the IR and is the golden
+  --     contract for the relational middle-end. Verbatim is CORRECT there: a
+  --     dump that decoded would disagree with what the IR actually holds, and
+  --     would hide this invariant from the goldens that exist to expose it.
+  --
+  -- So there is no undecoded text reaching a reader through this path. If you
+  -- add a consumer, the question to ask is the one above: re-scanned, or
+  -- rendered? Rendered means decode at your site, never here.
   frag = \case
     MkNlgText _ t -> t
     MkNlgRef  _ r -> "%" <> rawNameToText (rawName (getActual r)) <> "%"
