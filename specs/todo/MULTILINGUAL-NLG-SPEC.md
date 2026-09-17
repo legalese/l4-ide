@@ -288,8 +288,10 @@ Requirements:
 3. **A module declares its own default language** so untagged annotations are not implicitly
    English. Proposal: a module-level `@lang he` annotation; R-M2.
 4. **Duplicate tags on one name are a check error**, not last-wins.
-5. **Whatever the spelling, it must work for the bare `[…]` form too** — and that is the
-   constraint that actually narrows R-M1. See below.
+5. **The bare `[…]` form is deliberately NOT taggable** (R-M1, ruled 2026-09-17). It carries
+   short parameter glosses — `[person]`, `[the foo]` — not sentences, which is the term-glossary
+   layer rather than the rendering layer. `[@he …]` is **pre-approved** as its spelling if and
+   when the need is actually encountered; it is not to be built speculatively.
 
 **Measured 2026-09-17, and it rules out more than it looks.** The `@nlg:he` spelling in the
 block above only works on the LINE form. The inline form has no herald to hang a tag on:
@@ -311,11 +313,18 @@ Two consequences, and neither is obvious from the line form alone:
   and `directive-example.l4`, both **user-facing documentation** — so that spelling changes
   the meaning of text that ships as an example of how to write `@nlg`.
 
-The line form is the easy half and has no collision: 2 of the 140 `@nlg` lines contain a
-colon and both are `--` comments, so `@nlg:he` is free to take there. **R-M1 should be decided
-on the inline form, not the line form**, and the options worth costing are a distinct herald
-(`[he| …]`, `[@he …]`) or leaving the inline form untaggable and requiring the line form for
-any non-default language. This is evidence for the ruling, not the ruling: R-M1 stays OPEN.
+The heralded form is the easy half and has no collision: 2 of the 140 `@nlg` lines contain a
+colon and both are `--` comments, so `@nlg:he` is free to take there.
+
+> **RULED 2026-09-17 (Meng).** `@nlg:he` on the heralded form. The bare `[…]` form **stays
+> untaggable**, because the two populations carry different things — 131 heralded annotations
+> carry sentences, ~50+ bare inline ones carry short glosses. **`[@he …]` is pre-approved** as
+> the bare form's spelling for when a real need appears, so that decision does not have to be
+> re-litigated then; it is explicitly not a licence to build it now.
+>
+> `@nlg he "…"` was **rejected on measurement**: a double quote is ordinary prose today, and two
+> annotations in `doc/reference/syntax/` already open with one — so that spelling would change
+> the meaning of text shipping as documentation about how to write `@nlg`.
 
 **Type changes.** `AnnoType` stays; the language rides on the NLG payload:
 
@@ -383,11 +392,20 @@ pointing at end-of-input rather than at the annotation. The repair splits the fu
 Because `]` is one character, the `notFollowedBy` machinery that kept `<<a > b>>` working is
 no longer needed and went with it.
 
-> **Ruling — a literal `>>` inside `<<…>>` stays unrepresentable.** It was unrepresentable
-> before this work and the escape does not extend to it. `refAnnotation` is outside what this
-> spec rules on, and widening a change to a second annotation family on a fix branch's own
-> initiative is not that branch's call. The mechanism would be cheap — the decode side would
-> need `>` added — but it wants its own ruling. Raised by the `hebrew` session, agreed here.
+> **Ruling — `\>` escapes a right angle bracket in `@ref`. RULED 2026-09-17 (Meng);
+> implementation owed.** A literal `>>` inside `<<…>>` was unrepresentable before this work and
+> the `\%`/`\]` escape deliberately did not extend to it — `refAnnotation` is a second
+> annotation family, and widening to it on a fix branch's own initiative was not that branch's
+> call. Raised by the `hebrew` session, deferred by this one, and then **ruled the other way**:
+> take the escape.
+>
+> **The reason the deferral was right is also the design constraint.** The escape could not
+> simply be re-shared into `inlineAnno`, because **nothing decodes `@ref` text** —
+> `unescapeNlgText` is reached only from the NLG linearizer. An escape the lexer consumes and
+> nothing decodes keeps the backslash for ever and makes the pre-escape text unwritable, which
+> is exactly the regression §4.1(a) records. So `\>` needs a decode site on the `@ref` path,
+> found by auditing what consumes ref text, before the lexer half is touched. Doing the lexer
+> half alone would reproduce the half-wired failure of §4.1(c) in a second family.
 
 **(b) The lexer and the decoder disagreed about what an escape is.** The lexer consumed `\`
 plus _any_ character; `unescapeNlgText` decodes only `\\`, `\%`, `\]`. A pair the lexer
@@ -454,16 +472,16 @@ carries `lang="en"`).
 
 ## 6. Rulings
 
-| #        | question                                                                                        | state                                                                                                                                                                                                                                                                           |
-| -------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **R-M1** | `@nlg:he` vs `@nlg he "…"` vs a separate `@lang` block — which surface syntax?                  | **OPEN**                                                                                                                                                                                                                                                                        |
-| **R-M2** | How does a module declare its default language for untagged `@nlg`?                             | **OPEN**                                                                                                                                                                                                                                                                        |
-| **R-M3** | Escape convention for a literal `%` and `]`?                                                    | **ANSWERED 2026-09-17**, §4: **backslash** (`\%`, `\]`, `\\`). Doubling does not generalise to `]`, and L4 string literals already use Haskell escapes. Measured 0 corpus uses of either convention, so both were free to take                                                  |
-| **R-M4** | One canonical encoding + `@nlg` (B), not parallel per-language encodings (A), for the Penal Law | **ANSWERED 2026-09-17**, §1. Driven by: 644 sections under active amendment; Amendment 155 reached Wikisource in 7 days; and the legal-status argument in §1, point 3                                                                                                           |
-| **R-M5** | Which language is canonical for `il/penal-law-1977`?                                            | **ANSWERED 2026-09-17**: **Hebrew.** It is the enacted and binding text, it is the only one on Wikisource, and it is the only one current to Amendment 155                                                                                                                      |
-| **R-M6** | Is the ICJ English text usable for `@nlg:en`?                                                   | **SPLIT 2026-09-17.** _Depositing_ it in canon stays **OPEN** — complete (592/592 match Hebrew, §2.3) but no stated translator, date or licence. _Consulting_ it is **ANSWERED: yes**, and is the better use — see §6.1                                                         |
-| **R-M7** | Confirm the Hebrew-binds / Arabic-special-status claim against primary sources                  | **ANSWERED 2026-09-17**, §1 point 3: Interpretation Law 5741-1981 §24 and Basic Law: Nation-State §4, both read in the primary text. The rule is language-of-enactment rather than "Hebrew always"; it reaches Hebrew here by application. Verified by the `nlg-locale` session |
-| **R-M8** | Where do Arabic renderings come from, given no Arabic statute text exists?                      | **OPEN.** Note the scope is a _term glossary_, not a 644-section translation — the encoding's vocabulary, not the statute                                                                                                                                                       |
+| #        | question                                                                                        | state                                                                                                                                                                                                                                                                                                                                                   |
+| -------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **R-M1** | `@nlg:he` vs `@nlg he "…"` vs a separate `@lang` block — which surface syntax?                  | **ANSWERED 2026-09-17 (Meng)**, §3: **`@nlg:he`** on the heralded form; the bare `[…]` form stays **untaggable**, its `[@he …]` spelling **pre-approved** for when a need appears. `@nlg he "…"` rejected on measurement — a `"` is ordinary prose and two `doc/reference/syntax/` annotations already open with one                                    |
+| **R-M2** | How does a module declare its default language for untagged `@nlg`?                             | **ANSWERED 2026-09-17 (Meng)**, §3: absent declaration means **`en`**, and a module-level `@lang` is **required** in any module that uses a tag. Backward-compatible for all 131 existing annotations, and forces explicitness exactly where ambiguity can arise                                                                                        |
+| **R-M3** | Escape convention for a literal `%` and `]`?                                                    | **ANSWERED 2026-09-17**, §4: **backslash** (`\%`, `\]`, `\\`). Doubling does not generalise to `]`, and L4 string literals already use Haskell escapes. Measured 0 corpus uses of either convention, so both were free to take                                                                                                                          |
+| **R-M4** | One canonical encoding + `@nlg` (B), not parallel per-language encodings (A), for the Penal Law | **ANSWERED 2026-09-17**, §1. Driven by: 644 sections under active amendment; Amendment 155 reached Wikisource in 7 days; and the legal-status argument in §1, point 3                                                                                                                                                                                   |
+| **R-M5** | Which language is canonical for `il/penal-law-1977`?                                            | **ANSWERED 2026-09-17**: **Hebrew.** It is the enacted and binding text, it is the only one on Wikisource, and it is the only one current to Amendment 155                                                                                                                                                                                              |
+| **R-M6** | Is the ICJ English text usable for `@nlg:en`?                                                   | **ANSWERED 2026-09-17 (Meng).** _Depositing_ it in canon: **NO.** Link to it and use it internally as a working alignment document; it does not enter `canon`. _Consulting_ it: **yes**, and it is the better use — see §6.1. Nothing in the pilot depends on the deposit, so declining costs nothing and removes the licence question                  |
+| **R-M7** | Confirm the Hebrew-binds / Arabic-special-status claim against primary sources                  | **ANSWERED 2026-09-17**, §1 point 3: Interpretation Law 5741-1981 §24 and Basic Law: Nation-State §4, both read in the primary text. The rule is language-of-enactment rather than "Hebrew always"; it reaches Hebrew here by application. Verified by the `nlg-locale` session                                                                         |
+| **R-M8** | Where do Arabic renderings come from, given no Arabic statute text exists?                      | **ANSWERED 2026-09-17 (Meng): drop the Arabic output.** Basic Law §4(b) makes Arabic a reader aid, so nothing operational depends on it, and there is no Arabic reviewer — note the Hebrew encoding has had no Hebrew-language review either, only mechanical verification. Pilot ships `he` canonical + `@nlg:en`; revisit `ar` when a reviewer exists |
 
 ### 6.1 The ICJ text as a Rosetta Stone, not a source
 
@@ -510,12 +528,20 @@ have no counterpart to consult, so their English is ours alone and should be mar
    annotation family, a second lexer and three renderers before it was finished; §4.1 is the
    account. Read that before step 2, because the language tag touches the same three places
    and the same green-gate-proves-nothing trap applies to it.
-2. **Language tag (R-M1, R-M2).** Lexer, `L4.Nlg` selection, check error on duplicates, goldens.
+2. **Fix smucclaw/l4-ide#962 (§2.6) — a precondition, not a parallel task.** Non-ASCII in a
+   `.schema.golden` is double-encoded and the corruption round-trips, so the suite stays green
+   while storing mojibake. A Hebrew-canonical encoding writes one schema golden per file, so
+   this lands on every one of them silently. **Ruled 2026-09-17 (Meng): fix it**, before any
+   Hebrew golden is blessed — otherwise the first thing the encoding proves is the wrong thing.
+3. **Language tag (R-M1, R-M2 — both now ruled, §3).** `@nlg:he` on the heralded form only;
+   absent `@lang` means `en`. Lexer, `L4.Nlg` selection, check error on duplicates, goldens.
    Untagged behaviour must be provably unchanged — assert against the existing 131 annotations.
-3. **Projection locale (§5).** Start with `l4 render` and the docs, which have no interactive
+   Do **not** build the bare form's `[@he …]` spelling: pre-approved, not commissioned.
+4. **Projection locale (§5).** Start with `l4 render` and the docs, which have no interactive
    surface; the wizard and ladder diagrams follow.
-4. **Penal Law pilot.** One chapter, Hebrew-canonical, with `@nlg:en` drawn from the ICJ text
-   _subject to R-M6_, to exercise the whole path before committing to 644 sections.
+5. **Penal Law pilot.** One chapter, Hebrew-canonical, with `@nlg:en` informed by the ICJ text
+   — **consulted, never deposited** (R-M6) — to exercise the whole path before committing to
+   644 sections. **No `@nlg:ar`** (R-M8).
 
 ## 9. Reproducing the measurements
 
@@ -525,7 +551,7 @@ All inputs are already deposited; nothing needs re-fetching.
 CANON=~/src/legalese/canon/subjects/il/penal-law-1977/source
 # 2.2 template inventory and tree well-formedness
 python3 - "$CANON/penal-law-1977.wikitext"     # see §2.2 for the regexes
-# 2.3 requires the ICJ PDF, which is NOT in canon (R-M6 unresolved):
+# 2.3 requires the ICJ PDF, which is deliberately NOT in canon (R-M6: consult, never deposit):
 curl -sfL -o /tmp/icj.pdf \
   https://www.icj.org/wp-content/uploads/2013/05/Israel-Penal-Law-5737-1977-eng.pdf
 pdftotext /tmp/icj.pdf /tmp/icj.txt
