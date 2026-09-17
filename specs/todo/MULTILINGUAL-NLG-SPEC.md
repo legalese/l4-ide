@@ -423,9 +423,20 @@ fragment-level assertion red. That last one matters most: the _existing_ escaped
 passes on the **pre-fix** lexer too, because #957's tightness rule already declines `% and %`
 — so the entire `nlgString` hunk could have been reverted with every test green.
 
-**Still owed.** The other consumers of the relational IR's `@nlg` fields
-(`tdNlg`/`adNlg`/`rfNlg`/`dsNlg`) have not been audited for the same leak; only the Blawx leg
-is fixed. And there is no corpus `.l4` case carrying a backslash inside `<<…>>`.
+**The consumer audit, now done — and it came up clean.** An earlier draft of this section
+listed the other consumers of the relational IR's `@nlg` fields
+(`tdNlg`/`adNlg`/`rfNlg`/`dsNlg`) as an unaudited leak. Measured 2026-09-17: all four are
+`linearNlg`-fed and so all carry escapes undecoded, as does `rpNlg`, which they flow into.
+Outside `Relational.Lower` and `Relational.IR` they reach **exactly two readers**:
+`Blawx.Lower`'s `attrNlg` (twice) and `relationship`, all three of which route through
+`nlgChunks` and are therefore already covered; and `Relational.Debug`, which dumps the IR and
+is the golden contract for the relational middle-end — where **verbatim is correct**, because
+a dump that decoded would disagree with what the IR holds and would hide this invariant from
+the goldens that exist to expose it. The audit is recorded at `linearNlg` with line numbers,
+not here, because that is where the next person to add a consumer will be reading.
+
+**Still owed.** One thing only: there is no corpus `.l4` case carrying a backslash inside
+`<<…>>`, so the `@ref` half of §4.1(a) is pinned by `RefAnnotationSpec` but not by the corpus.
 
 ## 5. Proposed: locale in the projections
 
