@@ -221,10 +221,10 @@
                 "any material information necessary to make the statements made not misleading": {
                     "type": "boolean"
                 },
-                "any matters that would have triggered disqualification under Â§ 227.503(a) but occurred before May 16, 2016": {
+                "any matters that would have triggered disqualification under § 227.503(a) but occurred before May 16, 2016": {
                     "type": "boolean"
                 },
-                "any written communication or broadcast script provided in accordance with Â§ 227.206 or Â§ 230.241": {
+                "any written communication or broadcast script provided in accordance with § 227.206 or § 230.241": {
                     "type": "boolean"
                 },
                 "the current number of employees of the issuer": {
@@ -257,7 +257,7 @@
                 "where on the issuer's Web site investors will be able to find the issuer's annual report, and by when": {
                     "type": "boolean"
                 },
-                "whether the issuer or any of its predecessors previously failed to comply with Â§ 227.202": {
+                "whether the issuer or any of its predecessors previously failed to comply with § 227.202": {
                     "type": "boolean"
                 },
                 "whether the issuer will accept investments in excess of the target offering amount and how oversubscriptions will be allocated": {
@@ -285,12 +285,12 @@
                 "a description of related-party transactions above the five percent threshold",
                 "a discussion of the issuer's financial condition",
                 "the financial statements and tax information required by paragraph (t)",
-                "any matters that would have triggered disqualification under Â§ 227.503(a) but occurred before May 16, 2016",
+                "any matters that would have triggered disqualification under § 227.503(a) but occurred before May 16, 2016",
                 "updates regarding the progress of the issuer in meeting the target offering amount",
                 "where on the issuer's Web site investors will be able to find the issuer's annual report, and by when",
-                "whether the issuer or any of its predecessors previously failed to comply with Â§ 227.202",
+                "whether the issuer or any of its predecessors previously failed to comply with § 227.202",
                 "any material information necessary to make the statements made not misleading",
-                "any written communication or broadcast script provided in accordance with Â§ 227.206 or Â§ 230.241"
+                "any written communication or broadcast script provided in accordance with § 227.206 or § 230.241"
             ],
             "type": "object"
         },
@@ -396,14 +396,14 @@
                 "total liabilities other than indebtedness secured by the primary residence": {
                     "type": "number"
                 },
-                "within a category of Â§ 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": {
+                "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be": {
                     "type": "boolean"
                 }
             },
             "required": [
                 "name",
                 "a natural person",
-                "within a category of Â§ 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be",
+                "within a category of § 230.501(a)(1)-(4) or (7)-(13) at the time of the sale, or reasonably believed to be",
                 "annual income for the calendar year",
                 "annual income for the investor's own fiscal year",
                 "revenue for the most recent fiscal year",
@@ -483,7 +483,7 @@
                 "liquidated or dissolved its business in accordance with state law": {
                     "type": "boolean"
                 },
-                "matters that would have triggered disqualification under Â§ 227.503(a) but occurred before May 16, 2016": {
+                "matters that would have triggered disqualification under § 227.503(a) but occurred before May 16, 2016": {
                     "type": "boolean"
                 },
                 "name": {
@@ -495,7 +495,7 @@
                 "organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia": {
                     "type": "boolean"
                 },
-                "previously failed to comply with the ongoing reporting requirements of Â§ 227.202": {
+                "previously failed to comply with the ongoing reporting requirements of § 227.202": {
                     "type": "boolean"
                 },
                 "previously sold securities in reliance on section 4(a)(6)": {
@@ -542,10 +542,10 @@
                 "total assets",
                 "all of the securities issued in reliance on section 4(a)(6) repurchased, including any payment in full of debt securities or any complete redemption of redeemable securities",
                 "liquidated or dissolved its business in accordance with state law",
-                "matters that would have triggered disqualification under Â§ 227.503(a) but occurred before May 16, 2016",
+                "matters that would have triggered disqualification under § 227.503(a) but occurred before May 16, 2016",
                 "those matters disclosed",
                 "did not know and, in the exercise of reasonable care, could not have known of the existence of the undisclosed matter",
-                "previously failed to comply with the ongoing reporting requirements of Â§ 227.202",
+                "previously failed to comply with the ongoing reporting requirements of § 227.202",
                 "date the offering statement was filed",
                 "end of the fiscal year covered by the report"
             ],
@@ -570,7 +570,7 @@
                     "format": "date",
                     "type": "string"
                 },
-                "date the Â§ 227.201 and Â§ 227.203(a) information was first made publicly available on the intermediary's platform": {
+                "date the § 227.201 and § 227.203(a) information was first made publicly available on the intermediary's platform": {
                     "format": "date",
                     "type": "string"
                 },
@@ -627,7 +627,7 @@
                 "the offering statement filed prior to the commencement of the offering": {
                     "type": "boolean"
                 },
-                "the only failure to comply is with Â§Â§ 227.202, 227.203(a)(3) and 227.203(b)": {
+                "the only failure to comply is with §§ 227.202, 227.203(a)(3) and 227.203(b)": {
                     "type": "boolean"
                 }
             },
@@ -636,7 +636,7 @@
                 "deadline identified in the issuer's offering materials",
                 "the issuer will accept investments in excess of the target offering amount",
                 "maximum amount the issuer will accept",
-                "date the Â§ 227.201 and Â§ 227.203(a) information was first made publicly available on the intermediary's platform",
+                "date the § 227.201 and § 227.203(a) information was first made publicly available on the intermediary's platform",
                 "sum of the investment commitments",
                 "the offering statement filed prior to the commencement of the offering",
                 "the disclosure provided",
@@ -645,7 +645,7 @@
                 "more than one intermediary used in this offering",
                 "more than one intermediary used by the issuer for this capital raise",
                 "the issuer complies with section 4A(b) of the Securities Act and the related requirements in this part",
-                "the only failure to comply is with Â§Â§ 227.202, 227.203(a)(3) and 227.203(b)",
+                "the only failure to comply is with §§ 227.202, 227.203(a)(3) and 227.203(b)",
                 "the issuer knows that the investor has exceeded, or would exceed, the investor limits",
                 "a material change to the terms of the offering or to the information provided by the issuer",
                 "date the material change notice was received by the investor",

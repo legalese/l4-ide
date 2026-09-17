@@ -6,6 +6,7 @@ import Control.Monad.Trans.Maybe
 import Data.Char (isAlphaNum)
 import qualified Data.Aeson.Encode.Pretty as AP
 import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified Data.Text.Encoding as TE
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified L4.Annotation as JL4
@@ -442,7 +443,21 @@ jl4JsonSchemaGolden evalConfig dir inputFile = do
                Just export ->
                  let ctx = buildSchemaContext checkResult.module'
                      schema = JsonSchema.generateJsonSchema ctx export
-                 in BL.unpack (AP.encodePretty schema) ++ "\n"
+                 -- NOT 'BL.unpack'. 'Data.ByteString.Lazy.Char8.unpack' maps
+                 -- each BYTE to a 'Char', and 'AP.encodePretty' returns UTF-8
+                 -- bytes — so every non-ASCII character arrived here as its
+                 -- individual bytes, and 'writeFile' then re-encoded each of
+                 -- those as UTF-8. Double encoding: source @ä@ (@c3 a4@) was
+                 -- stored as @c3 83 c2 a4@, i.e. @Ã¤@.
+                 --
+                 -- It survived because it ROUND-TRIPS. 'readFromFile' was
+                 -- 'readFile', which decodes UTF-8 and so undid the damage
+                 -- symmetrically; golden and actual agreed and the suite stayed
+                 -- green while the file on disk held mojibake. The @.ep.golden@
+                 -- beside it, written from 'Text', held the same source text
+                 -- correctly — which is the control that makes this visible.
+                 -- smucclaw/l4-ide#962.
+                 in Text.unpack (TE.decodeUtf8 (BL.toStrict (AP.encodePretty schema))) ++ "\n"
   pure
     Golden
       { output
