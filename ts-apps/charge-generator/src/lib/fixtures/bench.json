@@ -1,0 +1,1500 @@
+{
+  "Carl Elias Moses, as charged": {
+    "type": "CBT Facts",
+    "module": "cbt-405-406.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Carl Elias Moses",
+        "date": "23 October 1989",
+        "time": "",
+        "place": "the premises of Trans-Pacific Credit Pte Ltd",
+        "co-accused": "",
+        "common intention": false
+      },
+      "entrusted by": "",
+      "property": "2,000 Overseas Union Bank Warrant 1994",
+      "property, in short": "warrants",
+      "purpose of the entrustment": "for the purpose of delivering these warrants on behalf of Trans-Pacific Credit Pte Ltd (“the company”) to DBS Securities Pte Ltd pursuant to a sale (per contract number 414270/501) of the said warrants, and thereafter to pay the proceeds of the said sale to the company",
+      "entrusted with property": true,
+      "entrusted with dominion over property": false,
+      "dishonestly": true,
+      "misappropriates that property": false,
+      "converts that property to his own use": false,
+      "uses that property": false,
+      "disposes of that property": false,
+      "any direction of law prescribing the mode in which such trust is to be discharged": false,
+      "any legal contract, express or implied, which he has made touching the discharge of such trust": false,
+      "intentionally suffers any other person to do so": false
+    },
+    "charges": {
+      "406": {
+        "made out": false,
+        "offence": "criminal breach of trust",
+        "punishment": "imprisonment for a term which may extend to 7 years, or with fine, or with both",
+        "refusal": "A charge under section 406 would assert that the facts fulfil every legal condition of criminal breach of trust (CPC s 123(5)). On the facts given they do not: dishonestly misappropriates or converts to his own use THAT property, dishonestly uses or disposes of THAT property in violation of a direction of law or of a legal contract, or intentionally suffers any other person to do so — where “that property” is the property entrusted and nothing else; the elements of section 405 taken together.",
+        "section": "406",
+        "text": ""
+      }
+    }
+  },
+  "Carl Elias Moses, with the warrants misappropriated": {
+    "type": "CBT Facts",
+    "module": "cbt-405-406.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Carl Elias Moses",
+        "date": "23 October 1989",
+        "time": "",
+        "place": "the premises of Trans-Pacific Credit Pte Ltd",
+        "co-accused": "",
+        "common intention": false
+      },
+      "entrusted by": "",
+      "property": "2,000 Overseas Union Bank Warrant 1994",
+      "property, in short": "warrants",
+      "purpose of the entrustment": "for the purpose of delivering these warrants on behalf of Trans-Pacific Credit Pte Ltd (“the company”) to DBS Securities Pte Ltd pursuant to a sale (per contract number 414270/501) of the said warrants, and thereafter to pay the proceeds of the said sale to the company",
+      "entrusted with property": true,
+      "entrusted with dominion over property": false,
+      "dishonestly": true,
+      "misappropriates that property": true,
+      "converts that property to his own use": false,
+      "uses that property": false,
+      "disposes of that property": false,
+      "any direction of law prescribing the mode in which such trust is to be discharged": false,
+      "any legal contract, express or implied, which he has made touching the discharge of such trust": false,
+      "intentionally suffers any other person to do so": false
+    },
+    "charges": {
+      "406": {
+        "made out": true,
+        "offence": "criminal breach of trust",
+        "punishment": "imprisonment for a term which may extend to 7 years, or with fine, or with both",
+        "refusal": "",
+        "section": "406",
+        "text": "You, Carl Elias Moses, are charged that you, on or about 23 October 1989, at the premises of Trans-Pacific Credit Pte Ltd, Singapore, being entrusted with property, namely, 2,000 Overseas Union Bank Warrant 1994 for the purpose of delivering these warrants on behalf of Trans-Pacific Credit Pte Ltd (“the company”) to DBS Securities Pte Ltd pursuant to a sale (per contract number 414270/501) of the said warrants, and thereafter to pay the proceeds of the said sale to the company, did dishonestly misappropriate the said warrants, and you have thereby committed an offence punishable under section 406 of the Penal Code 1871."
+      }
+    }
+  },
+  "Carl Elias Moses, the charge amended": {
+    "type": "CBT Facts",
+    "module": "cbt-405-406.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Carl Elias Moses",
+        "date": "23 October 1989",
+        "time": "",
+        "place": "the premises of Trans-Pacific Credit Pte Ltd",
+        "co-accused": "",
+        "common intention": false
+      },
+      "entrusted by": "Trans-Pacific Credit Pte Ltd (“the company”)",
+      "property": "the proceeds of the sale of 2,000 Overseas Union Bank Warrant 1994",
+      "property, in short": "proceeds",
+      "purpose of the entrustment": "received by you from DBS Securities Pte Ltd pursuant to a sale (per contract number 414270/501) of the said warrants, for the purpose of paying the same to the company",
+      "entrusted with property": true,
+      "entrusted with dominion over property": false,
+      "dishonestly": true,
+      "misappropriates that property": true,
+      "converts that property to his own use": false,
+      "uses that property": false,
+      "disposes of that property": false,
+      "any direction of law prescribing the mode in which such trust is to be discharged": false,
+      "any legal contract, express or implied, which he has made touching the discharge of such trust": false,
+      "intentionally suffers any other person to do so": false
+    },
+    "charges": {
+      "406": {
+        "made out": true,
+        "offence": "criminal breach of trust",
+        "punishment": "imprisonment for a term which may extend to 7 years, or with fine, or with both",
+        "refusal": "",
+        "section": "406",
+        "text": "You, Carl Elias Moses, are charged that you, on or about 23 October 1989, at the premises of Trans-Pacific Credit Pte Ltd, Singapore, being entrusted by Trans-Pacific Credit Pte Ltd (“the company”) with property, namely, the proceeds of the sale of 2,000 Overseas Union Bank Warrant 1994 received by you from DBS Securities Pte Ltd pursuant to a sale (per contract number 414270/501) of the said warrants, for the purpose of paying the same to the company, did dishonestly misappropriate the said proceeds, and you have thereby committed an offence punishable under section 406 of the Penal Code 1871."
+      }
+    }
+  },
+  "the Penang agent, Illustration (c)": {
+    "type": "CBT Facts",
+    "module": "cbt-405-406.l4",
+    "facts": {
+      "particulars": {
+        "accused": "A",
+        "date": "a date unknown",
+        "time": "",
+        "place": "A's place of business",
+        "co-accused": "",
+        "common intention": false
+      },
+      "entrusted by": "one Z of Penang",
+      "property": "$5,000 remitted to you by the said Z",
+      "property, in short": "moneys",
+      "purpose of the entrustment": "with directions to you to invest the same in Government securities, pursuant to an express or implied contract between you and the said Z that all sums remitted by the said Z to you shall be invested by you according to his direction",
+      "entrusted with property": true,
+      "entrusted with dominion over property": false,
+      "dishonestly": true,
+      "misappropriates that property": false,
+      "converts that property to his own use": false,
+      "uses that property": true,
+      "disposes of that property": false,
+      "any direction of law prescribing the mode in which such trust is to be discharged": false,
+      "any legal contract, express or implied, which he has made touching the discharge of such trust": true,
+      "intentionally suffers any other person to do so": false
+    },
+    "charges": {
+      "406": {
+        "made out": true,
+        "offence": "criminal breach of trust",
+        "punishment": "imprisonment for a term which may extend to 7 years, or with fine, or with both",
+        "refusal": "",
+        "section": "406",
+        "text": "You, A, are charged that you, on or about a date unknown, at A's place of business, Singapore, being entrusted by one Z of Penang with property, namely, $5,000 remitted to you by the said Z with directions to you to invest the same in Government securities, pursuant to an express or implied contract between you and the said Z that all sums remitted by the said Z to you shall be invested by you according to his direction, did dishonestly use the said moneys in violation of a legal contract, express or implied, which you had made touching the discharge of the said trust, and you have thereby committed an offence punishable under section 406 of the Penal Code 1871."
+      }
+    }
+  },
+  "the Penang agent in good faith, Illustration (d)": {
+    "type": "CBT Facts",
+    "module": "cbt-405-406.l4",
+    "facts": {
+      "particulars": {
+        "accused": "A",
+        "date": "a date unknown",
+        "time": "",
+        "place": "A's place of business",
+        "co-accused": "",
+        "common intention": false
+      },
+      "entrusted by": "one Z of Penang",
+      "property": "$5,000 remitted to you by the said Z",
+      "property, in short": "moneys",
+      "purpose of the entrustment": "with directions to you to invest the same in Government securities, pursuant to an express or implied contract between you and the said Z that all sums remitted by the said Z to you shall be invested by you according to his direction",
+      "entrusted with property": true,
+      "entrusted with dominion over property": false,
+      "dishonestly": false,
+      "misappropriates that property": false,
+      "converts that property to his own use": false,
+      "uses that property": true,
+      "disposes of that property": false,
+      "any direction of law prescribing the mode in which such trust is to be discharged": false,
+      "any legal contract, express or implied, which he has made touching the discharge of such trust": true,
+      "intentionally suffers any other person to do so": false
+    },
+    "charges": {
+      "406": {
+        "made out": false,
+        "offence": "criminal breach of trust",
+        "punishment": "imprisonment for a term which may extend to 7 years, or with fine, or with both",
+        "refusal": "A charge under section 406 would assert that the facts fulfil every legal condition of criminal breach of trust (CPC s 123(5)). On the facts given they do not: dishonestly — which governs misappropriation, conversion, use and disposal — or intentionally, which governs suffering any other person to do so; dishonestly misappropriates or converts to his own use THAT property, dishonestly uses or disposes of THAT property in violation of a direction of law or of a legal contract, or intentionally suffers any other person to do so — where “that property” is the property entrusted and nothing else; the elements of section 405 taken together.",
+        "section": "406",
+        "text": ""
+      }
+    }
+  },
+  "Lewis Christine": {
+    "type": "Cheating Facts",
+    "module": "cheating-415-417-420.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Christine Lewis",
+        "date": "the 24th day of April 2000",
+        "time": "8.10 pm",
+        "place": "the Seiyu Departmental Store at Parkway Parade Shopping Centre",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "Wong Fei Hsia",
+      "victim described as": "the cashier of Seiyu Departmental Store",
+      "victim pronoun": "she",
+      "deceived the victim": true,
+      "the deception": "to believe that the price of a \"Pochacco\" pencil casing is worth $5.25, when in actual fact, you knew that the price of the said item is worth $16.95",
+      "fraudulently": false,
+      "dishonestly": true,
+      "deliver": true,
+      "cause the delivery": false,
+      "consent that any person shall retain any property": false,
+      "the property": "the said item for only $5.25",
+      "intentionally": false,
+      "do": false,
+      "omit to do": false,
+      "the act or omission": "",
+      "causes": false,
+      "likely to cause": false,
+      "damage": false,
+      "harm": false,
+      "body": false,
+      "mind": false,
+      "reputation": false,
+      "property": false,
+      "make, alter or destroy a valuable security": false,
+      "by remote communication": false
+    },
+    "charges": {
+      "420": {
+        "made out": true,
+        "offence": "cheating and dishonestly inducing a delivery of property",
+        "punishment": "imprisonment for a term which may extend to 10 years, and shall also be liable to fine or to caning or to both",
+        "refusal": "",
+        "section": "420",
+        "text": "You, Christine Lewis, are charged that you, on or about the 24th day of April 2000, at about 8.10 pm, at the Seiyu Departmental Store at Parkway Parade Shopping Centre, Singapore, did cheat one Wong Fei Hsia, the cashier of Seiyu Departmental Store by deceiving her to believe that the price of a \"Pochacco\" pencil casing is worth $5.25, when in actual fact, you knew that the price of the said item is worth $16.95, and by such manner of deception, you dishonestly induced the said Wong Fei Hsia to deliver to you the said item for only $5.25 which she would not have done, had she not been so deceived, and you have thereby committed an offence punishable under section 420 of the Penal Code 1871."
+      },
+      "417": {
+        "made out": true,
+        "offence": "cheating",
+        "punishment": "imprisonment for a term which may extend to 3 years, or with fine, or with both",
+        "refusal": "",
+        "section": "417",
+        "text": "You, Christine Lewis, are charged that you, on or about the 24th day of April 2000, at about 8.10 pm, at the Seiyu Departmental Store at Parkway Parade Shopping Centre, Singapore, did cheat one Wong Fei Hsia, the cashier of Seiyu Departmental Store by deceiving her to believe that the price of a \"Pochacco\" pencil casing is worth $5.25, when in actual fact, you knew that the price of the said item is worth $16.95, and by such manner of deception, you dishonestly induced the said Wong Fei Hsia to deliver to you the said item for only $5.25 which she would not have done, had she not been so deceived, and you have thereby committed an offence punishable under section 417 of the Penal Code 1871."
+      }
+    }
+  },
+  "Lewis Christine, fraudulently only": {
+    "type": "Cheating Facts",
+    "module": "cheating-415-417-420.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Christine Lewis",
+        "date": "the 24th day of April 2000",
+        "time": "8.10 pm",
+        "place": "the Seiyu Departmental Store at Parkway Parade Shopping Centre",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "Wong Fei Hsia",
+      "victim described as": "the cashier of Seiyu Departmental Store",
+      "victim pronoun": "she",
+      "deceived the victim": true,
+      "the deception": "to believe that the price of a \"Pochacco\" pencil casing is worth $5.25, when in actual fact, you knew that the price of the said item is worth $16.95",
+      "fraudulently": true,
+      "dishonestly": false,
+      "deliver": true,
+      "cause the delivery": false,
+      "consent that any person shall retain any property": false,
+      "the property": "the said item for only $5.25",
+      "intentionally": false,
+      "do": false,
+      "omit to do": false,
+      "the act or omission": "",
+      "causes": false,
+      "likely to cause": false,
+      "damage": false,
+      "harm": false,
+      "body": false,
+      "mind": false,
+      "reputation": false,
+      "property": false,
+      "make, alter or destroy a valuable security": false,
+      "by remote communication": false
+    },
+    "charges": {
+      "420": {
+        "made out": false,
+        "offence": "cheating and dishonestly inducing a delivery of property",
+        "punishment": "imprisonment for a term which may extend to 10 years, and shall also be liable to fine or to caning or to both",
+        "refusal": "A charge under section 420 would assert that the facts fulfil every legal condition of cheating and dishonestly inducing a delivery of property (CPC s 123(5)). On the facts given they do not: dishonestly (section 420 requires dishonesty; fraud alone is section 417).",
+        "section": "420",
+        "text": ""
+      },
+      "417": {
+        "made out": true,
+        "offence": "cheating",
+        "punishment": "imprisonment for a term which may extend to 3 years, or with fine, or with both",
+        "refusal": "",
+        "section": "417",
+        "text": "You, Christine Lewis, are charged that you, on or about the 24th day of April 2000, at about 8.10 pm, at the Seiyu Departmental Store at Parkway Parade Shopping Centre, Singapore, did cheat one Wong Fei Hsia, the cashier of Seiyu Departmental Store by deceiving her to believe that the price of a \"Pochacco\" pencil casing is worth $5.25, when in actual fact, you knew that the price of the said item is worth $16.95, and by such manner of deception, you fraudulently induced the said Wong Fei Hsia to deliver to you the said item for only $5.25 which she would not have done, had she not been so deceived, and you have thereby committed an offence punishable under section 417 of the Penal Code 1871."
+      }
+    }
+  },
+  "Lewis Christine, no deception": {
+    "type": "Cheating Facts",
+    "module": "cheating-415-417-420.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Christine Lewis",
+        "date": "the 24th day of April 2000",
+        "time": "8.10 pm",
+        "place": "the Seiyu Departmental Store at Parkway Parade Shopping Centre",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "Wong Fei Hsia",
+      "victim described as": "the cashier of Seiyu Departmental Store",
+      "victim pronoun": "she",
+      "deceived the victim": false,
+      "the deception": "",
+      "fraudulently": false,
+      "dishonestly": true,
+      "deliver": true,
+      "cause the delivery": false,
+      "consent that any person shall retain any property": false,
+      "the property": "the said item for only $5.25",
+      "intentionally": false,
+      "do": false,
+      "omit to do": false,
+      "the act or omission": "",
+      "causes": false,
+      "likely to cause": false,
+      "damage": false,
+      "harm": false,
+      "body": false,
+      "mind": false,
+      "reputation": false,
+      "property": false,
+      "make, alter or destroy a valuable security": false,
+      "by remote communication": false
+    },
+    "charges": {
+      "420": {
+        "made out": false,
+        "offence": "cheating and dishonestly inducing a delivery of property",
+        "punishment": "imprisonment for a term which may extend to 10 years, and shall also be liable to fine or to caning or to both",
+        "refusal": "A charge under section 420 would assert that the facts fulfil every legal condition of cheating and dishonestly inducing a delivery of property (CPC s 123(5)). On the facts given they do not: by deceiving any person; the elements of section 415 taken together.",
+        "section": "420",
+        "text": ""
+      },
+      "417": {
+        "made out": false,
+        "offence": "cheating",
+        "punishment": "imprisonment for a term which may extend to 3 years, or with fine, or with both",
+        "refusal": "A charge under section 417 would assert that the facts fulfil every legal condition of cheating (CPC s 123(5)). On the facts given they do not: by deceiving any person; the elements of section 415 taken together.",
+        "section": "417",
+        "text": ""
+      }
+    }
+  },
+  "Chan Yok Tuang, the facts as they were": {
+    "type": "Criminal Intimidation Facts",
+    "module": "criminal-intimidation-503-506.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Chan Yok Tuang",
+        "date": "16 May 2007",
+        "time": "",
+        "place": "the Central Police Division lockup",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "SSSgt Jessie Lim Geok Hwee",
+      "victim described as": "",
+      "victim pronoun": "she",
+      "threat words": "I will shoot her to death",
+      "language": "Hokkien",
+      "threatened the victim": true,
+      "person": true,
+      "reputation": false,
+      "property": false,
+      "person of one in whom interested": false,
+      "reputation of one in whom interested": false,
+      "cause alarm": false,
+      "do an act not legally bound to do": false,
+      "omit an act legally entitled to do": false,
+      "death": true,
+      "grievous hurt": false,
+      "the destruction of any property by fire": false,
+      "an offence punishable with death or with imprisonment for 7 years or more": false
+    },
+    "charges": {
+      "506": {
+        "made out": false,
+        "offence": "criminal intimidation",
+        "punishment": "imprisonment for a term which may extend to 10 years, or with fine, or with both",
+        "refusal": "A charge under section 506 would assert that the facts fulfil every legal condition of criminal intimidation (CPC s 123(5)). On the facts given they do not: with intent to cause alarm to that person, or to cause that person to do any act which he is not legally bound to do, or to omit to do any act which that person is legally entitled to do; the elements of section 503 taken together.",
+        "section": "506",
+        "text": ""
+      }
+    }
+  },
+  "Chan Yok Tuang, with intent to alarm": {
+    "type": "Criminal Intimidation Facts",
+    "module": "criminal-intimidation-503-506.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Chan Yok Tuang",
+        "date": "16 May 2007",
+        "time": "",
+        "place": "the Central Police Division lockup",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "SSSgt Jessie Lim Geok Hwee",
+      "victim described as": "",
+      "victim pronoun": "she",
+      "threat words": "I will shoot her to death",
+      "language": "Hokkien",
+      "threatened the victim": true,
+      "person": true,
+      "reputation": false,
+      "property": false,
+      "person of one in whom interested": false,
+      "reputation of one in whom interested": false,
+      "cause alarm": true,
+      "do an act not legally bound to do": false,
+      "omit an act legally entitled to do": false,
+      "death": true,
+      "grievous hurt": false,
+      "the destruction of any property by fire": false,
+      "an offence punishable with death or with imprisonment for 7 years or more": false
+    },
+    "charges": {
+      "506": {
+        "made out": true,
+        "offence": "criminal intimidation",
+        "punishment": "imprisonment for a term which may extend to 10 years, or with fine, or with both",
+        "refusal": "",
+        "section": "506",
+        "text": "You, Chan Yok Tuang, are charged that you, on or about 16 May 2007, at the Central Police Division lockup, Singapore, did commit criminal intimidation by threatening to cause injury to the person of SSSgt Jessie Lim Geok Hwee; to wit, by uttering “I will shoot her to death” in Hokkien at her, with intent to cause alarm to the said SSSgt Jessie Lim Geok Hwee, and you have thereby committed an offence punishable under section 506 of the Penal Code 1871."
+      }
+    }
+  },
+  "Chan Yok Tuang, threat not aggravated": {
+    "type": "Criminal Intimidation Facts",
+    "module": "criminal-intimidation-503-506.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Chan Yok Tuang",
+        "date": "16 May 2007",
+        "time": "",
+        "place": "the Central Police Division lockup",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "SSSgt Jessie Lim Geok Hwee",
+      "victim described as": "",
+      "victim pronoun": "she",
+      "threat words": "I will slap her",
+      "language": "Hokkien",
+      "threatened the victim": true,
+      "person": true,
+      "reputation": false,
+      "property": false,
+      "person of one in whom interested": false,
+      "reputation of one in whom interested": false,
+      "cause alarm": true,
+      "do an act not legally bound to do": false,
+      "omit an act legally entitled to do": false,
+      "death": false,
+      "grievous hurt": false,
+      "the destruction of any property by fire": false,
+      "an offence punishable with death or with imprisonment for 7 years or more": false
+    },
+    "charges": {
+      "506": {
+        "made out": true,
+        "offence": "criminal intimidation",
+        "punishment": "imprisonment for a term which may extend to 2 years, or with fine, or with both",
+        "refusal": "",
+        "section": "506",
+        "text": "You, Chan Yok Tuang, are charged that you, on or about 16 May 2007, at the Central Police Division lockup, Singapore, did commit criminal intimidation by threatening to cause injury to the person of SSSgt Jessie Lim Geok Hwee; to wit, by uttering “I will slap her” in Hokkien at her, with intent to cause alarm to the said SSSgt Jessie Lim Geok Hwee, and you have thereby committed an offence punishable under section 506 of the Penal Code 1871."
+      }
+    }
+  },
+  "the Illustration to s 503": {
+    "type": "Criminal Intimidation Facts",
+    "module": "criminal-intimidation-503-506.l4",
+    "facts": {
+      "particulars": {
+        "accused": "A",
+        "date": "1 January 2026",
+        "time": "",
+        "place": "the dwelling-house of the said B",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "B",
+      "victim described as": "the plaintiff in the said civil suit",
+      "victim pronoun": "he",
+      "threat words": "",
+      "language": "",
+      "threatened the victim": true,
+      "person": false,
+      "reputation": false,
+      "property": true,
+      "person of one in whom interested": false,
+      "reputation of one in whom interested": false,
+      "cause alarm": false,
+      "do an act not legally bound to do": false,
+      "omit an act legally entitled to do": true,
+      "death": false,
+      "grievous hurt": false,
+      "the destruction of any property by fire": true,
+      "an offence punishable with death or with imprisonment for 7 years or more": false
+    },
+    "charges": {
+      "506": {
+        "made out": true,
+        "offence": "criminal intimidation",
+        "punishment": "imprisonment for a term which may extend to 10 years, or with fine, or with both",
+        "refusal": "",
+        "section": "506",
+        "text": "You, A, are charged that you, on or about 1 January 2026, at the dwelling-house of the said B, Singapore, did commit criminal intimidation by threatening to cause injury to the property of B, the plaintiff in the said civil suit, with intent to cause the said B to omit to do an act which he is legally entitled to do, as the means of avoiding the execution of the said threat, and you have thereby committed an offence punishable under section 506 of the Penal Code 1871."
+      }
+    }
+  },
+  "Sarjit Singh Rapati": {
+    "type": "Extortion Facts",
+    "module": "extortion-383-384.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Sarjit Singh Rapati",
+        "date": "10 July 2003",
+        "time": "12.30 pm",
+        "place": "Newton Hawker Centre car-park",
+        "co-accused": "one Paramjit Singh s/o Buta Singh (M/43 yrs, NRIC No. S1436488-I)",
+        "common intention": true
+      },
+      "victim": "Mohammad Sharful Islam [“Sharful”]",
+      "victim described as": "M/27 yrs",
+      "victim pronoun": "he",
+      "the property extorted": "cash of $200/-",
+      "the fear": "that you would continue to keep his cousin, one Md Faruq Ahmed [“Faruq”], M/23 yrs, in wrongful confinement",
+      "intentionally": true,
+      "put the victim in fear": true,
+      "that person": false,
+      "any other person": true,
+      "body": true,
+      "mind": false,
+      "reputation": false,
+      "property": false,
+      "dishonestly": true,
+      "induced the person so put in fear": true,
+      "any property": true,
+      "valuable security": false,
+      "anything signed or sealed which may be converted into a valuable security": false
+    },
+    "charges": {
+      "384": {
+        "made out": true,
+        "offence": "extortion",
+        "punishment": "imprisonment for a term of not less than 2 years and not more than 7 years and with caning",
+        "refusal": "",
+        "section": "384",
+        "text": "You, Sarjit Singh Rapati, are charged that you, on or about 10 July 2003, at about 12.30 pm, at Newton Hawker Centre car-park, Singapore, together with one Paramjit Singh s/o Buta Singh (M/43 yrs, NRIC No. S1436488-I) and in furtherance of the common intention of you all, did extort cash of $200/- from one Mohammad Sharful Islam [“Sharful”], M/27 yrs by intentionally putting him in fear that you would continue to keep his cousin, one Md Faruq Ahmed [“Faruq”], M/23 yrs, in wrongful confinement, and you have thereby committed an offence punishable under section 384 read with section 34 of the Penal Code 1871."
+      }
+    }
+  },
+  "Sarjit Singh Rapati, no dishonest inducement": {
+    "type": "Extortion Facts",
+    "module": "extortion-383-384.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Sarjit Singh Rapati",
+        "date": "10 July 2003",
+        "time": "12.30 pm",
+        "place": "Newton Hawker Centre car-park",
+        "co-accused": "one Paramjit Singh s/o Buta Singh (M/43 yrs, NRIC No. S1436488-I)",
+        "common intention": true
+      },
+      "victim": "Mohammad Sharful Islam [“Sharful”]",
+      "victim described as": "M/27 yrs",
+      "victim pronoun": "he",
+      "the property extorted": "cash of $200/-",
+      "the fear": "that you would continue to keep his cousin, one Md Faruq Ahmed [“Faruq”], M/23 yrs, in wrongful confinement",
+      "intentionally": true,
+      "put the victim in fear": true,
+      "that person": false,
+      "any other person": true,
+      "body": true,
+      "mind": false,
+      "reputation": false,
+      "property": false,
+      "dishonestly": false,
+      "induced the person so put in fear": true,
+      "any property": true,
+      "valuable security": false,
+      "anything signed or sealed which may be converted into a valuable security": false
+    },
+    "charges": {
+      "384": {
+        "made out": false,
+        "offence": "extortion",
+        "punishment": "imprisonment for a term of not less than 2 years and not more than 7 years and with caning",
+        "refusal": "A charge under section 384 would assert that the facts fulfil every legal condition of extortion (CPC s 123(5)). On the facts given they do not: dishonestly (section 24).",
+        "section": "384",
+        "text": ""
+      }
+    }
+  },
+  "Sarjit Singh Rapati, nothing delivered": {
+    "type": "Extortion Facts",
+    "module": "extortion-383-384.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Sarjit Singh Rapati",
+        "date": "10 July 2003",
+        "time": "12.30 pm",
+        "place": "Newton Hawker Centre car-park",
+        "co-accused": "one Paramjit Singh s/o Buta Singh (M/43 yrs, NRIC No. S1436488-I)",
+        "common intention": true
+      },
+      "victim": "Mohammad Sharful Islam [“Sharful”]",
+      "victim described as": "M/27 yrs",
+      "victim pronoun": "he",
+      "the property extorted": "",
+      "the fear": "that you would continue to keep his cousin, one Md Faruq Ahmed [“Faruq”], M/23 yrs, in wrongful confinement",
+      "intentionally": true,
+      "put the victim in fear": true,
+      "that person": false,
+      "any other person": true,
+      "body": true,
+      "mind": false,
+      "reputation": false,
+      "property": false,
+      "dishonestly": true,
+      "induced the person so put in fear": false,
+      "any property": false,
+      "valuable security": false,
+      "anything signed or sealed which may be converted into a valuable security": false
+    },
+    "charges": {
+      "384": {
+        "made out": false,
+        "offence": "extortion",
+        "punishment": "imprisonment for a term of not less than 2 years and not more than 7 years and with caning",
+        "refusal": "A charge under section 384 would assert that the facts fulfil every legal condition of extortion (CPC s 123(5)). On the facts given they do not: thereby induces the person so put in fear; to deliver any property or valuable security, or anything signed or sealed which may be converted into a valuable security.",
+        "section": "384",
+        "text": ""
+      }
+    }
+  },
+  "Ang Boon Han": {
+    "type": "Hurt Facts",
+    "module": "hurt-321-323A.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Ang Boon Han",
+        "date": "15 May 2021",
+        "time": "10.30pm",
+        "place": "in the vicinity of bus stop no. 46229 along Woodlands Ave 2",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "Lam Mian Sern",
+      "victim described as": "",
+      "the manner": "by using both hands to push the chest of the said Lam Mian Sern once, causing him to fall backward and on his right hand, which was used to cushion his impact, resulting in the said Lam Mian Sern suffering fractures of both the distal radius and scaphoid at the right wrist",
+      "intention of causing hurt": true,
+      "knowledge of being likely to cause hurt": false,
+      "cause hurt": true,
+      "not grievous": true,
+      "grievous": true
+    },
+    "charges": {
+      "323A": {
+        "made out": true,
+        "offence": "voluntarily causing hurt which causes grievous hurt",
+        "punishment": "imprisonment for a term which may extend to 5 years, or with fine which may extend to $10,000, or with both",
+        "refusal": "",
+        "section": "323A",
+        "text": "You, Ang Boon Han, are charged that you, on or about 15 May 2021, at about 10.30pm, at in the vicinity of bus stop no. 46229 along Woodlands Ave 2, Singapore, did voluntarily cause hurt with the intention to cause hurt which is not grievous, but which actually caused grievous hurt to one Lam Mian Sern, to wit, by using both hands to push the chest of the said Lam Mian Sern once, causing him to fall backward and on his right hand, which was used to cushion his impact, resulting in the said Lam Mian Sern suffering fractures of both the distal radius and scaphoid at the right wrist, and you have thereby committed an offence punishable under section 323A of the Penal Code 1871."
+      }
+    }
+  },
+  "Ang Boon Han, the hurt intended was grievous": {
+    "type": "Hurt Facts",
+    "module": "hurt-321-323A.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Ang Boon Han",
+        "date": "15 May 2021",
+        "time": "10.30pm",
+        "place": "in the vicinity of bus stop no. 46229 along Woodlands Ave 2",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "Lam Mian Sern",
+      "victim described as": "",
+      "the manner": "by using both hands to push the chest of the said Lam Mian Sern once, causing him to fall backward and on his right hand, which was used to cushion his impact, resulting in the said Lam Mian Sern suffering fractures of both the distal radius and scaphoid at the right wrist",
+      "intention of causing hurt": true,
+      "knowledge of being likely to cause hurt": false,
+      "cause hurt": true,
+      "not grievous": false,
+      "grievous": true
+    },
+    "charges": {
+      "323A": {
+        "made out": false,
+        "offence": "voluntarily causing hurt which causes grievous hurt",
+        "punishment": "imprisonment for a term which may extend to 5 years, or with fine which may extend to $10,000, or with both",
+        "refusal": "A charge under section 323A would assert that the facts fulfil every legal condition of voluntarily causing hurt which causes grievous hurt (CPC s 123(5)). On the facts given they do not: the hurt which he intends to cause or knows himself to be likely to cause is not grievous (where the accused aimed at grievous hurt the offence is section 325, not this one).",
+        "section": "323A",
+        "text": ""
+      }
+    }
+  },
+  "Ang Boon Han, no hurt caused": {
+    "type": "Hurt Facts",
+    "module": "hurt-321-323A.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Ang Boon Han",
+        "date": "15 May 2021",
+        "time": "10.30pm",
+        "place": "in the vicinity of bus stop no. 46229 along Woodlands Ave 2",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "Lam Mian Sern",
+      "victim described as": "",
+      "the manner": "by using both hands to push the chest of the said Lam Mian Sern once, causing him to fall backward and on his right hand, which was used to cushion his impact, resulting in the said Lam Mian Sern suffering fractures of both the distal radius and scaphoid at the right wrist",
+      "intention of causing hurt": true,
+      "knowledge of being likely to cause hurt": false,
+      "cause hurt": false,
+      "not grievous": true,
+      "grievous": false
+    },
+    "charges": {
+      "323A": {
+        "made out": false,
+        "offence": "voluntarily causing hurt which causes grievous hurt",
+        "punishment": "imprisonment for a term which may extend to 5 years, or with fine which may extend to $10,000, or with both",
+        "refusal": "A charge under section 323A would assert that the facts fulfil every legal condition of voluntarily causing hurt which causes grievous hurt (CPC s 123(5)). On the facts given they do not: does thereby cause hurt to any person; the elements of section 321 taken together; the hurt which he actually causes is grievous.",
+        "section": "323A",
+        "text": ""
+      }
+    }
+  },
+  "Ang Boon Han, on the knowledge limb": {
+    "type": "Hurt Facts",
+    "module": "hurt-321-323A.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Ang Boon Han",
+        "date": "15 May 2021",
+        "time": "10.30pm",
+        "place": "in the vicinity of bus stop no. 46229 along Woodlands Ave 2",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "Lam Mian Sern",
+      "victim described as": "",
+      "the manner": "by using both hands to push the chest of the said Lam Mian Sern once, causing him to fall backward and on his right hand, which was used to cushion his impact, resulting in the said Lam Mian Sern suffering fractures of both the distal radius and scaphoid at the right wrist",
+      "intention of causing hurt": false,
+      "knowledge of being likely to cause hurt": true,
+      "cause hurt": true,
+      "not grievous": true,
+      "grievous": true
+    },
+    "charges": {
+      "323A": {
+        "made out": true,
+        "offence": "voluntarily causing hurt which causes grievous hurt",
+        "punishment": "imprisonment for a term which may extend to 5 years, or with fine which may extend to $10,000, or with both",
+        "refusal": "",
+        "section": "323A",
+        "text": "You, Ang Boon Han, are charged that you, on or about 15 May 2021, at about 10.30pm, at in the vicinity of bus stop no. 46229 along Woodlands Ave 2, Singapore, did voluntarily cause hurt with the knowledge that you were likely to cause hurt which is not grievous, but which actually caused grievous hurt to one Lam Mian Sern, to wit, by using both hands to push the chest of the said Lam Mian Sern once, causing him to fall backward and on his right hand, which was used to cushion his impact, resulting in the said Lam Mian Sern suffering fractures of both the distal radius and scaphoid at the right wrist, and you have thereby committed an offence punishable under section 323A of the Penal Code 1871."
+      }
+    }
+  },
+  "the Illustration to s 323A": {
+    "type": "Hurt Facts",
+    "module": "hurt-321-323A.l4",
+    "facts": {
+      "particulars": {
+        "accused": "A",
+        "date": "1 January 2026",
+        "time": "",
+        "place": "a club",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "Z",
+      "victim described as": "",
+      "the manner": "by punching the said Z in the face once, causing the said Z to lose his balance, to fall and to hit his head against a ledge, resulting in the said Z suffering severe brain injuries and being permanently paralysed",
+      "intention of causing hurt": true,
+      "knowledge of being likely to cause hurt": false,
+      "cause hurt": true,
+      "not grievous": true,
+      "grievous": true
+    },
+    "charges": {
+      "323A": {
+        "made out": true,
+        "offence": "voluntarily causing hurt which causes grievous hurt",
+        "punishment": "imprisonment for a term which may extend to 5 years, or with fine which may extend to $10,000, or with both",
+        "refusal": "",
+        "section": "323A",
+        "text": "You, A, are charged that you, on or about 1 January 2026, at a club, Singapore, did voluntarily cause hurt with the intention to cause hurt which is not grievous, but which actually caused grievous hurt to one Z, to wit, by punching the said Z in the face once, causing the said Z to lose his balance, to fall and to hit his head against a ledge, resulting in the said Z suffering severe brain injuries and being permanently paralysed, and you have thereby committed an offence punishable under section 323A of the Penal Code 1871."
+      }
+    }
+  },
+  "the handphone taken from Ng Juin Chye Joel": {
+    "type": "Theft Facts",
+    "module": "robbery-390-392.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Chen Weixiong Jerriek",
+        "date": "the 5th day of July 2002",
+        "time": "1.00pm",
+        "place": "void deck of Blk 121, Lor 1 Toa Payoh",
+        "co-accused": "Koh Bang Long and Chia Jia Ting Samuel",
+        "common intention": true
+      },
+      "victim": "Ng Juin Chye Joel",
+      "victim described as": "",
+      "victim pronoun": "he",
+      "the property": "a handphone valued at about $450/-",
+      "intending to take": true,
+      "dishonestly": true,
+      "movable property": true,
+      "out of the possession of any person": true,
+      "without that person's consent": true,
+      "moves that property": true,
+      "in order to such taking": true
+    },
+    "charges": {
+      "379": {
+        "made out": true,
+        "offence": "theft",
+        "punishment": "imprisonment for a term which may extend to 3 years, or with fine, or with both",
+        "refusal": "",
+        "section": "379",
+        "text": "You, Chen Weixiong Jerriek, are charged that you, on or about the 5th day of July 2002, at about 1.00pm, at void deck of Blk 121, Lor 1 Toa Payoh, Singapore, together with Koh Bang Long and Chia Jia Ting Samuel and in furtherance of the common intention of you all, did commit theft of a handphone valued at about $450/-, in the possession of one Ng Juin Chye Joel, and you have thereby committed an offence punishable under section 379 read with section 34 of the Penal Code 1871."
+      }
+    }
+  },
+  "no extortion": {
+    "type": "Extortion Facts",
+    "module": "robbery-390-392.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Chen Weixiong Jerriek",
+        "date": "the 5th day of July 2002",
+        "time": "1.00pm",
+        "place": "void deck of Blk 121, Lor 1 Toa Payoh",
+        "co-accused": "Koh Bang Long and Chia Jia Ting Samuel",
+        "common intention": true
+      },
+      "victim": "",
+      "victim described as": "",
+      "victim pronoun": "he",
+      "the property extorted": "",
+      "the fear": "",
+      "intentionally": false,
+      "put the victim in fear": false,
+      "that person": false,
+      "any other person": false,
+      "body": false,
+      "mind": false,
+      "reputation": false,
+      "property": false,
+      "dishonestly": false,
+      "induced the person so put in fear": false,
+      "any property": false,
+      "valuable security": false,
+      "anything signed or sealed which may be converted into a valuable security": false
+    },
+    "charges": {
+      "384": {
+        "made out": false,
+        "offence": "extortion",
+        "punishment": "imprisonment for a term of not less than 2 years and not more than 7 years and with caning",
+        "refusal": "A charge under section 384 would assert that the facts fulfil every legal condition of extortion (CPC s 123(5)). On the facts given they do not: intentionally; puts any person in fear; of any harm to that person or to any other person; in body, mind, reputation or property; dishonestly (section 24); thereby induces the person so put in fear; to deliver any property or valuable security, or anything signed or sealed which may be converted into a valuable security.",
+        "section": "384",
+        "text": ""
+      }
+    }
+  },
+  "Chen Weixiong Jerriek": {
+    "type": "Robbery Facts",
+    "module": "robbery-390-392.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Chen Weixiong Jerriek",
+        "date": "the 5th day of July 2002",
+        "time": "1.00pm",
+        "place": "void deck of Blk 121, Lor 1 Toa Payoh",
+        "co-accused": "Koh Bang Long and Chia Jia Ting Samuel",
+        "common intention": true
+      },
+      "theft": {
+        "particulars": {
+          "accused": "Chen Weixiong Jerriek",
+          "date": "the 5th day of July 2002",
+          "time": "1.00pm",
+          "place": "void deck of Blk 121, Lor 1 Toa Payoh",
+          "co-accused": "Koh Bang Long and Chia Jia Ting Samuel",
+          "common intention": true
+        },
+        "victim": "Ng Juin Chye Joel",
+        "victim described as": "",
+        "victim pronoun": "he",
+        "the property": "a handphone valued at about $450/-",
+        "intending to take": true,
+        "dishonestly": true,
+        "movable property": true,
+        "out of the possession of any person": true,
+        "without that person's consent": true,
+        "moves that property": true,
+        "in order to such taking": true
+      },
+      "extortion": {
+        "particulars": {
+          "accused": "Chen Weixiong Jerriek",
+          "date": "the 5th day of July 2002",
+          "time": "1.00pm",
+          "place": "void deck of Blk 121, Lor 1 Toa Payoh",
+          "co-accused": "Koh Bang Long and Chia Jia Ting Samuel",
+          "common intention": true
+        },
+        "victim": "",
+        "victim described as": "",
+        "victim pronoun": "he",
+        "the property extorted": "",
+        "the fear": "",
+        "intentionally": false,
+        "put the victim in fear": false,
+        "that person": false,
+        "any other person": false,
+        "body": false,
+        "mind": false,
+        "reputation": false,
+        "property": false,
+        "dishonestly": false,
+        "induced the person so put in fear": false,
+        "any property": false,
+        "valuable security": false,
+        "anything signed or sealed which may be converted into a valuable security": false
+      },
+      "the hurt": "slapping him and banging his head against the wall",
+      "in order to commit theft": false,
+      "in committing the theft": true,
+      "in carrying away or attempting to carry away property obtained by the theft": false,
+      "for that end": true,
+      "voluntarily causes": true,
+      "attempts to cause": false,
+      "death": false,
+      "hurt": true,
+      "wrongful restraint": true,
+      "fear of instant death": false,
+      "fear of instant hurt": true,
+      "fear of instant wrongful restraint": false,
+      "in the presence of the person put in fear": false,
+      "instant death": false,
+      "instant hurt": false,
+      "instant wrongful restraint": false,
+      "to that person": false,
+      "to some other person": false,
+      "then and there": false,
+      "committed after 7 p.m. and before 7 a.m.": false,
+      "attempting to commit robbery": false,
+      "voluntarily causes hurt": true,
+      "such person": true,
+      "any other person jointly concerned in committing or attempting to commit such robbery": true
+    },
+    "charges": {
+      "392": {
+        "made out": true,
+        "offence": "robbery",
+        "punishment": "imprisonment for a term of not less than 2 years and not more than 10 years and shall also be punished with caning with not less than 6 strokes",
+        "refusal": "",
+        "section": "392",
+        "text": "You, Chen Weixiong Jerriek, are charged that you, on or about the 5th day of July 2002, at about 1.00pm, at void deck of Blk 121, Lor 1 Toa Payoh, Singapore, together with Koh Bang Long and Chia Jia Ting Samuel and in furtherance of the common intention of you all, did rob one Ng Juin Chye Joel of a handphone valued at about $450/-, and you have thereby committed an offence punishable under section 392 read with section 34 of the Penal Code 1871."
+      },
+      "394": {
+        "made out": true,
+        "offence": "voluntarily causing hurt in committing robbery",
+        "punishment": "imprisonment for a term of not less than 5 years and not more than 20 years and shall also be punished with caning with not less than 12 strokes",
+        "refusal": "",
+        "section": "394",
+        "text": "You, Chen Weixiong Jerriek, are charged that you, on or about the 5th day of July 2002, at about 1.00pm, at void deck of Blk 121, Lor 1 Toa Payoh, Singapore, together with Koh Bang Long and Chia Jia Ting Samuel and in furtherance of the common intention of you all, were jointly concerned in committing robbery of a handphone valued at about $450/- from one Ng Juin Chye Joel and whilst committing the said robbery, voluntarily caused hurt to him, to wit, by slapping him and banging his head against the wall, and you have thereby committed an offence punishable under section 394 read with section 34 of the Penal Code 1871."
+      }
+    }
+  },
+  "Chen Weixiong Jerriek, after 7 p.m.": {
+    "type": "Robbery Facts",
+    "module": "robbery-390-392.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Chen Weixiong Jerriek",
+        "date": "the 5th day of July 2002",
+        "time": "1.00pm",
+        "place": "void deck of Blk 121, Lor 1 Toa Payoh",
+        "co-accused": "Koh Bang Long and Chia Jia Ting Samuel",
+        "common intention": true
+      },
+      "theft": {
+        "particulars": {
+          "accused": "Chen Weixiong Jerriek",
+          "date": "the 5th day of July 2002",
+          "time": "1.00pm",
+          "place": "void deck of Blk 121, Lor 1 Toa Payoh",
+          "co-accused": "Koh Bang Long and Chia Jia Ting Samuel",
+          "common intention": true
+        },
+        "victim": "Ng Juin Chye Joel",
+        "victim described as": "",
+        "victim pronoun": "he",
+        "the property": "a handphone valued at about $450/-",
+        "intending to take": true,
+        "dishonestly": true,
+        "movable property": true,
+        "out of the possession of any person": true,
+        "without that person's consent": true,
+        "moves that property": true,
+        "in order to such taking": true
+      },
+      "extortion": {
+        "particulars": {
+          "accused": "Chen Weixiong Jerriek",
+          "date": "the 5th day of July 2002",
+          "time": "1.00pm",
+          "place": "void deck of Blk 121, Lor 1 Toa Payoh",
+          "co-accused": "Koh Bang Long and Chia Jia Ting Samuel",
+          "common intention": true
+        },
+        "victim": "",
+        "victim described as": "",
+        "victim pronoun": "he",
+        "the property extorted": "",
+        "the fear": "",
+        "intentionally": false,
+        "put the victim in fear": false,
+        "that person": false,
+        "any other person": false,
+        "body": false,
+        "mind": false,
+        "reputation": false,
+        "property": false,
+        "dishonestly": false,
+        "induced the person so put in fear": false,
+        "any property": false,
+        "valuable security": false,
+        "anything signed or sealed which may be converted into a valuable security": false
+      },
+      "the hurt": "slapping him and banging his head against the wall",
+      "in order to commit theft": false,
+      "in committing the theft": true,
+      "in carrying away or attempting to carry away property obtained by the theft": false,
+      "for that end": true,
+      "voluntarily causes": true,
+      "attempts to cause": false,
+      "death": false,
+      "hurt": true,
+      "wrongful restraint": true,
+      "fear of instant death": false,
+      "fear of instant hurt": true,
+      "fear of instant wrongful restraint": false,
+      "in the presence of the person put in fear": false,
+      "instant death": false,
+      "instant hurt": false,
+      "instant wrongful restraint": false,
+      "to that person": false,
+      "to some other person": false,
+      "then and there": false,
+      "committed after 7 p.m. and before 7 a.m.": true,
+      "attempting to commit robbery": false,
+      "voluntarily causes hurt": true,
+      "such person": true,
+      "any other person jointly concerned in committing or attempting to commit such robbery": true
+    },
+    "charges": {
+      "392": {
+        "made out": true,
+        "offence": "robbery",
+        "punishment": "imprisonment for a term of not less than 3 years and not more than 14 years and shall also be punished with caning with not less than 12 strokes",
+        "refusal": "",
+        "section": "392",
+        "text": "You, Chen Weixiong Jerriek, are charged that you, on or about the 5th day of July 2002, at about 1.00pm, at void deck of Blk 121, Lor 1 Toa Payoh, Singapore, together with Koh Bang Long and Chia Jia Ting Samuel and in furtherance of the common intention of you all, did rob one Ng Juin Chye Joel of a handphone valued at about $450/-, and you have thereby committed an offence punishable under section 392 read with section 34 of the Penal Code 1871."
+      },
+      "394": {
+        "made out": true,
+        "offence": "voluntarily causing hurt in committing robbery",
+        "punishment": "imprisonment for a term of not less than 5 years and not more than 20 years and shall also be punished with caning with not less than 12 strokes",
+        "refusal": "",
+        "section": "394",
+        "text": "You, Chen Weixiong Jerriek, are charged that you, on or about the 5th day of July 2002, at about 1.00pm, at void deck of Blk 121, Lor 1 Toa Payoh, Singapore, together with Koh Bang Long and Chia Jia Ting Samuel and in furtherance of the common intention of you all, were jointly concerned in committing robbery of a handphone valued at about $450/- from one Ng Juin Chye Joel and whilst committing the said robbery, voluntarily caused hurt to him, to wit, by slapping him and banging his head against the wall, and you have thereby committed an offence punishable under section 394 read with section 34 of the Penal Code 1871."
+      }
+    }
+  },
+  "Chen Weixiong Jerriek, no aggravation": {
+    "type": "Robbery Facts",
+    "module": "robbery-390-392.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Chen Weixiong Jerriek",
+        "date": "the 5th day of July 2002",
+        "time": "1.00pm",
+        "place": "void deck of Blk 121, Lor 1 Toa Payoh",
+        "co-accused": "Koh Bang Long and Chia Jia Ting Samuel",
+        "common intention": true
+      },
+      "theft": {
+        "particulars": {
+          "accused": "Chen Weixiong Jerriek",
+          "date": "the 5th day of July 2002",
+          "time": "1.00pm",
+          "place": "void deck of Blk 121, Lor 1 Toa Payoh",
+          "co-accused": "Koh Bang Long and Chia Jia Ting Samuel",
+          "common intention": true
+        },
+        "victim": "Ng Juin Chye Joel",
+        "victim described as": "",
+        "victim pronoun": "he",
+        "the property": "a handphone valued at about $450/-",
+        "intending to take": true,
+        "dishonestly": true,
+        "movable property": true,
+        "out of the possession of any person": true,
+        "without that person's consent": true,
+        "moves that property": true,
+        "in order to such taking": true
+      },
+      "extortion": {
+        "particulars": {
+          "accused": "Chen Weixiong Jerriek",
+          "date": "the 5th day of July 2002",
+          "time": "1.00pm",
+          "place": "void deck of Blk 121, Lor 1 Toa Payoh",
+          "co-accused": "Koh Bang Long and Chia Jia Ting Samuel",
+          "common intention": true
+        },
+        "victim": "",
+        "victim described as": "",
+        "victim pronoun": "he",
+        "the property extorted": "",
+        "the fear": "",
+        "intentionally": false,
+        "put the victim in fear": false,
+        "that person": false,
+        "any other person": false,
+        "body": false,
+        "mind": false,
+        "reputation": false,
+        "property": false,
+        "dishonestly": false,
+        "induced the person so put in fear": false,
+        "any property": false,
+        "valuable security": false,
+        "anything signed or sealed which may be converted into a valuable security": false
+      },
+      "the hurt": "",
+      "in order to commit theft": false,
+      "in committing the theft": true,
+      "in carrying away or attempting to carry away property obtained by the theft": false,
+      "for that end": false,
+      "voluntarily causes": false,
+      "attempts to cause": false,
+      "death": false,
+      "hurt": false,
+      "wrongful restraint": false,
+      "fear of instant death": false,
+      "fear of instant hurt": false,
+      "fear of instant wrongful restraint": false,
+      "in the presence of the person put in fear": false,
+      "instant death": false,
+      "instant hurt": false,
+      "instant wrongful restraint": false,
+      "to that person": false,
+      "to some other person": false,
+      "then and there": false,
+      "committed after 7 p.m. and before 7 a.m.": false,
+      "attempting to commit robbery": false,
+      "voluntarily causes hurt": false,
+      "such person": false,
+      "any other person jointly concerned in committing or attempting to commit such robbery": false
+    },
+    "charges": {
+      "392": {
+        "made out": false,
+        "offence": "robbery",
+        "punishment": "imprisonment for a term of not less than 2 years and not more than 10 years and shall also be punished with caning with not less than 6 strokes",
+        "refusal": "A charge under section 392 would assert that the facts fulfil every legal condition of robbery (CPC s 123(5)). On the facts given they do not: neither the aggravation that makes a theft robbery (section 390(2)) nor the one that makes an extortion robbery (section 390(3)).",
+        "section": "392",
+        "text": ""
+      },
+      "394": {
+        "made out": false,
+        "offence": "voluntarily causing hurt in committing robbery",
+        "punishment": "imprisonment for a term of not less than 5 years and not more than 20 years and shall also be punished with caning with not less than 12 strokes",
+        "refusal": "A charge under section 394 would assert that the facts fulfil every legal condition of voluntarily causing hurt in committing robbery (CPC s 123(5)). On the facts given they do not: in committing or in attempting to commit robbery; voluntarily causes hurt; such person, or any other person jointly concerned in committing or attempting to commit such robbery.",
+        "section": "394",
+        "text": ""
+      }
+    }
+  },
+  "no theft": {
+    "type": "Theft Facts",
+    "module": "robbery-390-392.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Ravi s/o Muthu",
+        "date": "the 9th day of August 2004",
+        "time": "4.45 pm",
+        "place": "the footpath along Old Upper Thomson Road",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "",
+      "victim described as": "",
+      "victim pronoun": "he",
+      "the property": "",
+      "intending to take": false,
+      "dishonestly": false,
+      "movable property": false,
+      "out of the possession of any person": false,
+      "without that person's consent": false,
+      "moves that property": false,
+      "in order to such taking": false
+    },
+    "charges": {
+      "379": {
+        "made out": false,
+        "offence": "theft",
+        "punishment": "imprisonment for a term which may extend to 3 years, or with fine, or with both",
+        "refusal": "A charge under section 379 would assert that the facts fulfil every legal condition of theft (CPC s 123(5)). On the facts given they do not: intending to take; dishonestly (section 24); any movable property (section 22); out of the possession of any person; without that person's consent; moves that property; in order to such taking.",
+        "section": "379",
+        "text": ""
+      }
+    }
+  },
+  "the purse surrendered on the high road": {
+    "type": "Extortion Facts",
+    "module": "robbery-390-392.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Ravi s/o Muthu",
+        "date": "the 9th day of August 2004",
+        "time": "4.45 pm",
+        "place": "the footpath along Old Upper Thomson Road",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "Zulkifli bin Hassan",
+      "victim described as": "",
+      "victim pronoun": "he",
+      "the property extorted": "a purse",
+      "the fear": "that you would shoot him with the pistol you were showing him",
+      "intentionally": true,
+      "put the victim in fear": true,
+      "that person": true,
+      "any other person": false,
+      "body": true,
+      "mind": false,
+      "reputation": false,
+      "property": false,
+      "dishonestly": true,
+      "induced the person so put in fear": true,
+      "any property": true,
+      "valuable security": false,
+      "anything signed or sealed which may be converted into a valuable security": false
+    },
+    "charges": {
+      "384": {
+        "made out": true,
+        "offence": "extortion",
+        "punishment": "imprisonment for a term of not less than 2 years and not more than 7 years and with caning",
+        "refusal": "",
+        "section": "384",
+        "text": "You, Ravi s/o Muthu, are charged that you, on or about the 9th day of August 2004, at about 4.45 pm, at the footpath along Old Upper Thomson Road, Singapore, did extort a purse from one Zulkifli bin Hassan by intentionally putting him in fear that you would shoot him with the pistol you were showing him, and you have thereby committed an offence punishable under section 384 of the Penal Code 1871."
+      }
+    }
+  },
+  "Illustration (b) to section 390": {
+    "type": "Robbery Facts",
+    "module": "robbery-390-392.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Ravi s/o Muthu",
+        "date": "the 9th day of August 2004",
+        "time": "4.45 pm",
+        "place": "the footpath along Old Upper Thomson Road",
+        "co-accused": "",
+        "common intention": false
+      },
+      "theft": {
+        "particulars": {
+          "accused": "Ravi s/o Muthu",
+          "date": "the 9th day of August 2004",
+          "time": "4.45 pm",
+          "place": "the footpath along Old Upper Thomson Road",
+          "co-accused": "",
+          "common intention": false
+        },
+        "victim": "",
+        "victim described as": "",
+        "victim pronoun": "he",
+        "the property": "",
+        "intending to take": false,
+        "dishonestly": false,
+        "movable property": false,
+        "out of the possession of any person": false,
+        "without that person's consent": false,
+        "moves that property": false,
+        "in order to such taking": false
+      },
+      "extortion": {
+        "particulars": {
+          "accused": "Ravi s/o Muthu",
+          "date": "the 9th day of August 2004",
+          "time": "4.45 pm",
+          "place": "the footpath along Old Upper Thomson Road",
+          "co-accused": "",
+          "common intention": false
+        },
+        "victim": "Zulkifli bin Hassan",
+        "victim described as": "",
+        "victim pronoun": "he",
+        "the property extorted": "a purse",
+        "the fear": "that you would shoot him with the pistol you were showing him",
+        "intentionally": true,
+        "put the victim in fear": true,
+        "that person": true,
+        "any other person": false,
+        "body": true,
+        "mind": false,
+        "reputation": false,
+        "property": false,
+        "dishonestly": true,
+        "induced the person so put in fear": true,
+        "any property": true,
+        "valuable security": false,
+        "anything signed or sealed which may be converted into a valuable security": false
+      },
+      "the hurt": "",
+      "in order to commit theft": false,
+      "in committing the theft": false,
+      "in carrying away or attempting to carry away property obtained by the theft": false,
+      "for that end": false,
+      "voluntarily causes": false,
+      "attempts to cause": false,
+      "death": false,
+      "hurt": false,
+      "wrongful restraint": false,
+      "fear of instant death": false,
+      "fear of instant hurt": false,
+      "fear of instant wrongful restraint": false,
+      "in the presence of the person put in fear": true,
+      "instant death": false,
+      "instant hurt": true,
+      "instant wrongful restraint": false,
+      "to that person": true,
+      "to some other person": false,
+      "then and there": true,
+      "committed after 7 p.m. and before 7 a.m.": false,
+      "attempting to commit robbery": false,
+      "voluntarily causes hurt": false,
+      "such person": false,
+      "any other person jointly concerned in committing or attempting to commit such robbery": false
+    },
+    "charges": {
+      "392": {
+        "made out": true,
+        "offence": "robbery",
+        "punishment": "imprisonment for a term of not less than 2 years and not more than 10 years and shall also be punished with caning with not less than 6 strokes",
+        "refusal": "",
+        "section": "392",
+        "text": "You, Ravi s/o Muthu, are charged that you, on or about the 9th day of August 2004, at about 4.45 pm, at the footpath along Old Upper Thomson Road, Singapore, did rob one Zulkifli bin Hassan of a purse, and you have thereby committed an offence punishable under section 392 of the Penal Code 1871."
+      },
+      "394": {
+        "made out": false,
+        "offence": "voluntarily causing hurt in committing robbery",
+        "punishment": "imprisonment for a term of not less than 5 years and not more than 20 years and shall also be punished with caning with not less than 12 strokes",
+        "refusal": "A charge under section 394 would assert that the facts fulfil every legal condition of voluntarily causing hurt in committing robbery (CPC s 123(5)). On the facts given they do not: voluntarily causes hurt; such person, or any other person jointly concerned in committing or attempting to commit such robbery.",
+        "section": "394",
+        "text": ""
+      }
+    }
+  },
+  "Lim Wei Ming": {
+    "type": "Theft Facts",
+    "module": "theft-378-379.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Lim Wei Ming",
+        "date": "the 3rd day of March 2021",
+        "time": "11.15 pm",
+        "place": "Blk 123 Ang Mo Kio Avenue 3",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "Goh Siew Lan",
+      "victim described as": "",
+      "victim pronoun": "she",
+      "the property": "moneys amounting to $4,500/-",
+      "intending to take": true,
+      "dishonestly": true,
+      "movable property": true,
+      "out of the possession of any person": true,
+      "without that person's consent": true,
+      "moves that property": true,
+      "in order to such taking": true
+    },
+    "charges": {
+      "379": {
+        "made out": true,
+        "offence": "theft",
+        "punishment": "imprisonment for a term which may extend to 3 years, or with fine, or with both",
+        "refusal": "",
+        "section": "379",
+        "text": "You, Lim Wei Ming, are charged that you, on or about the 3rd day of March 2021, at about 11.15 pm, at Blk 123 Ang Mo Kio Avenue 3, Singapore, did commit theft of moneys amounting to $4,500/-, in the possession of one Goh Siew Lan, and you have thereby committed an offence punishable under section 379 of the Penal Code 1871."
+      }
+    }
+  },
+  "Lim Wei Ming, not dishonestly": {
+    "type": "Theft Facts",
+    "module": "theft-378-379.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Lim Wei Ming",
+        "date": "the 3rd day of March 2021",
+        "time": "11.15 pm",
+        "place": "Blk 123 Ang Mo Kio Avenue 3",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "Goh Siew Lan",
+      "victim described as": "",
+      "victim pronoun": "she",
+      "the property": "moneys amounting to $4,500/-",
+      "intending to take": true,
+      "dishonestly": false,
+      "movable property": true,
+      "out of the possession of any person": true,
+      "without that person's consent": true,
+      "moves that property": true,
+      "in order to such taking": true
+    },
+    "charges": {
+      "379": {
+        "made out": false,
+        "offence": "theft",
+        "punishment": "imprisonment for a term which may extend to 3 years, or with fine, or with both",
+        "refusal": "A charge under section 379 would assert that the facts fulfil every legal condition of theft (CPC s 123(5)). On the facts given they do not: dishonestly (section 24).",
+        "section": "379",
+        "text": ""
+      }
+    }
+  },
+  "Lim Wei Ming, not in anyone's possession": {
+    "type": "Theft Facts",
+    "module": "theft-378-379.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Lim Wei Ming",
+        "date": "the 3rd day of March 2021",
+        "time": "11.15 pm",
+        "place": "Blk 123 Ang Mo Kio Avenue 3",
+        "co-accused": "",
+        "common intention": false
+      },
+      "victim": "Goh Siew Lan",
+      "victim described as": "",
+      "victim pronoun": "she",
+      "the property": "moneys amounting to $4,500/-",
+      "intending to take": true,
+      "dishonestly": true,
+      "movable property": true,
+      "out of the possession of any person": false,
+      "without that person's consent": false,
+      "moves that property": true,
+      "in order to such taking": true
+    },
+    "charges": {
+      "379": {
+        "made out": false,
+        "offence": "theft",
+        "punishment": "imprisonment for a term which may extend to 3 years, or with fine, or with both",
+        "refusal": "A charge under section 379 would assert that the facts fulfil every legal condition of theft (CPC s 123(5)). On the facts given they do not: out of the possession of any person; without that person's consent.",
+        "section": "379",
+        "text": ""
+      }
+    }
+  }
+}
