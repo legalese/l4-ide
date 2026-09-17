@@ -1,17 +1,133 @@
 {
-  "date": "2026-09-15T20:25:02.409Z",
-  "browser": "chrome 152.0.7977.83",
+  "_note": "HAND-EXTENDED, and the generator does not write `perFixture` \u2014 the next `npm run run` will drop it. That is intended: it is an interim record for as long as out/ is a patchwork. The files here are NOT one run, because they cannot usefully be: `tokensOn`/`triggers` are written unsorted and the log carries a random per-run instance id, so re-running every fixture churns every file and hides the ones that actually changed (witness: consultation.json moved by 42 lines across a run that changed nothing). Until those are made diffable, provenance per fixture is the honest substitute for 'one run, all files from that run'. When the harness sorts and stubs, one full re-run becomes run 4, the first diffable baseline, and this field goes away.",
+  "latestRun": {
+    "runAt": "2026-09-17T01:33:07.342Z",
+    "browser": "chrome 153.0.8010.48",
+    "bpmnjs": "18.28.0",
+    "tokenSim": "0.40.0",
+    "harness": "5d4412ec8",
+    "note": "the top-level fields below describe THIS run"
+  },
+  "date": "2026-09-17T01:33:07.342Z",
+  "browser": "chrome 153.0.8010.48",
   "node": "v26.4.0",
   "npmLs": [
     "bpmn-token-sim@0.1.0 etc/bpmn-token-sim",
-    "├── bpmn-js-token-simulation@0.40.0",
-    "├── bpmn-js@18.28.0",
-    "├── esbuild@0.25.9",
-    "└── playwright@1.63.0"
+    "\u251c\u2500\u2500 bpmn-js-token-simulation@0.40.0",
+    "\u251c\u2500\u2500 bpmn-js@18.28.0",
+    "\u251c\u2500\u2500 esbuild@0.25.9",
+    "\u2514\u2500\u2500 playwright@1.63.0"
   ],
   "viewport": {
     "width": 1280,
     "height": 860
   },
-  "stepLimit": 12
+  "stepLimit": 12,
+  "perFixture": {
+    "consultation": {
+      "runAt": "2026-09-15T20:25:02.409Z",
+      "browser": "chrome 152.0.7977.83",
+      "bpmnjs": "18.28.0",
+      "tokenSim": "0.40.0",
+      "harness": "5d4412ec8"
+    },
+    "handover": {
+      "runAt": "2026-09-17T01:33:07.342Z",
+      "browser": "chrome 153.0.8010.48",
+      "bpmnjs": "18.28.0",
+      "tokenSim": "0.40.0",
+      "harness": "5d4412ec8"
+    },
+    "modals-may-barrier": {
+      "runAt": "2026-09-15T20:25:02.409Z",
+      "browser": "chrome 152.0.7977.83",
+      "bpmnjs": "18.28.0",
+      "tokenSim": "0.40.0",
+      "harness": "5d4412ec8"
+    },
+    "modals-may-fork": {
+      "runAt": "2026-09-15T20:25:02.409Z",
+      "browser": "chrome 152.0.7977.83",
+      "bpmnjs": "18.28.0",
+      "tokenSim": "0.40.0",
+      "harness": "5d4412ec8"
+    },
+    "modals-must-barrier-both-deadlines": {
+      "runAt": "2026-09-15T20:25:02.409Z",
+      "browser": "chrome 152.0.7977.83",
+      "bpmnjs": "18.28.0",
+      "tokenSim": "0.40.0",
+      "harness": "5d4412ec8"
+    },
+    "modals-must-fork-join-deadline": {
+      "runAt": "2026-09-15T20:25:02.409Z",
+      "browser": "chrome 152.0.7977.83",
+      "bpmnjs": "18.28.0",
+      "tokenSim": "0.40.0",
+      "harness": "5d4412ec8"
+    },
+    "modals-shant-barrier": {
+      "runAt": "2026-09-15T20:25:02.409Z",
+      "browser": "chrome 152.0.7977.83",
+      "bpmnjs": "18.28.0",
+      "tokenSim": "0.40.0",
+      "harness": "5d4412ec8"
+    },
+    "modals-shant-fork": {
+      "runAt": "2026-09-15T20:25:02.409Z",
+      "browser": "chrome 152.0.7977.83",
+      "bpmnjs": "18.28.0",
+      "tokenSim": "0.40.0",
+      "harness": "5d4412ec8"
+    },
+    "offering": {
+      "runAt": "2026-09-15T20:25:02.409Z",
+      "browser": "chrome 152.0.7977.83",
+      "bpmnjs": "18.28.0",
+      "tokenSim": "0.40.0",
+      "harness": "5d4412ec8"
+    },
+    "option": {
+      "runAt": "2026-09-17T01:33:07.342Z",
+      "browser": "chrome 153.0.8010.48",
+      "bpmnjs": "18.28.0",
+      "tokenSim": "0.40.0",
+      "harness": "5d4412ec8"
+    },
+    "regcf-advertising": {
+      "runAt": "2026-09-15T20:25:02.409Z",
+      "browser": "chrome 152.0.7977.83",
+      "bpmnjs": "18.28.0",
+      "tokenSim": "0.40.0",
+      "harness": "5d4412ec8"
+    },
+    "regcf-reporting": {
+      "runAt": "2026-09-15T20:25:02.409Z",
+      "browser": "chrome 152.0.7977.83",
+      "bpmnjs": "18.28.0",
+      "tokenSim": "0.40.0",
+      "harness": "5d4412ec8"
+    },
+    "regcf-resale": {
+      "runAt": "2026-09-15T20:25:02.409Z",
+      "browser": "chrome 152.0.7977.83",
+      "bpmnjs": "18.28.0",
+      "tokenSim": "0.40.0",
+      "harness": "5d4412ec8"
+    },
+    "tenancy-barrier": {
+      "runAt": "2026-09-15T20:25:02.409Z",
+      "browser": "chrome 152.0.7977.83",
+      "bpmnjs": "18.28.0",
+      "tokenSim": "0.40.0",
+      "harness": "5d4412ec8"
+    },
+    "tenancy-fork": {
+      "runAt": "2026-09-15T20:25:02.409Z",
+      "browser": "chrome 152.0.7977.83",
+      "bpmnjs": "18.28.0",
+      "tokenSim": "0.40.0",
+      "harness": "5d4412ec8"
+    }
+  }
 }
