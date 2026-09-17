@@ -36,3 +36,23 @@ GIVETH A NUMBER
 DECIDE doubled IS amount TIMES 2
 
 #EVAL doubled 21
+
+-- Tightness keys on WHITESPACE, so a percent pair with none still captures:
+-- `10%and%20` binds `and`. A backslash escapes what tightness cannot reach.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+@nlg a rate between 10\%and\%20 applied to %n%
+DECIDE `the levy on` IS n TIMES 0.1
+
+#EVAL `the levy on` 100
+
+-- The close bracket needs the same escape, for a different reason and with a
+-- different failure. `[...]` is an inline annotation, so a literal `]` ends it
+-- early and the remainder hits the enclosing parser as `unexpected ]`. That one
+-- is loud; the percent above is silent, which is why both are tested but only
+-- this one could ever have been caught by a golden.
+GIVEN m IS A NUMBER
+GIVETH A NUMBER
+`the duty on` m [rate \] per unit, see s.3 \% of value] MEANS m TIMES 0.2
+
+#EVAL `the duty on` 50

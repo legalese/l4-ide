@@ -2,6 +2,7 @@ module L4.Nlg (
   simpleLinearizer,
   Linearize (..),
   lin,
+  unescapeNlgText,
 ) where
 
 import Base
@@ -429,13 +430,34 @@ instance Linearize Nlg where
    where
     linParsedFragment :: NlgFragment Name -> LinTree
     linParsedFragment = \ case
-      MkNlgText _ t -> user t
+      MkNlgText _ t -> user (unescapeNlgText t)
       MkNlgRef  _ n -> linearize n
 
     linResolvedFragment :: NlgFragment Resolved -> LinTree
     linResolvedFragment = \ case
-      MkNlgText _ t -> user t
+      MkNlgText _ t -> user (unescapeNlgText t)
       MkNlgRef  _ n -> linearize n
+
+-- | Decode the backslash escapes an NLG annotation may carry, at the one point
+-- where annotation text becomes output.
+--
+-- The lexer deliberately keeps @\\%@ and @\\]@ verbatim (see 'L4.Lexer.nlgString'),
+-- because that same text is what exactprint re-emits — decoding earlier makes
+-- @l4 format@ strip the backslash and change the annotation's meaning. So this
+-- is the /only/ place the escape is removed.
+--
+-- @\\%@, @\\]@ and @\\\\@ decode. Any other @\\x@ is left as written, so a stray
+-- backslash keeps its previous meaning of "not special" and no existing
+-- annotation changes.
+unescapeNlgText :: Text -> Text
+unescapeNlgText t
+  | not (Text.any (== '\\') t) = t        -- the overwhelmingly common case
+  | otherwise = Text.pack (go (Text.unpack t))
+  where
+    go = \ case
+      '\\' : c : rest | c `elem` ("\\%]" :: String) -> c : go rest
+      c : rest -> c : go rest
+      [] -> []
 
 hcat :: [LinTree] -> LinTree
 hcat = mconcat . intersperse space

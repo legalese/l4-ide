@@ -470,10 +470,33 @@ fixityAnnotation =
 nonexhaustiveAnnotation :: Lexer Text
 nonexhaustiveAnnotation = fst <$> lineAnno "@nonexhaustive"
 
+-- | A run of literal text inside an NLG annotation.
+--
+-- This is the RENDER-side lexer: it runs over the text an annotation already
+-- captured, so it is the right place to DECODE escapes. The annotation token
+-- itself keeps the raw slice (see 'inlineAnno'), because 'toNlgAnno' re-emits
+-- that text verbatim for exactprint.
+--
+-- A backslash escape is consumed as a UNIT and kept VERBATIM — @\\%@ stays the
+-- two characters @\\@ and @%@. Two things follow, and both are the point:
+--
+--   * the @%@ inside @\\%@ never reaches 'nlgExprDelimiter', so it cannot open
+--     an interpolation. That is what makes @10\\%and\\%20@ mean what it says
+--     instead of silently rendering as @10\`and\`20@.
+--   * 'displayTokenType' re-emits this text for exactprint, so keeping the
+--     backslash is what makes @l4 format@ round-trip. DECODING HERE IS A BUG:
+--     it was written that way first, and the formatter duly stripped the
+--     backslash, turning a correct annotation into one that either fails to
+--     parse (@\\]@) or silently changes meaning (@\\%@).
+--
+-- Decoding happens once, at render time, in 'L4.Nlg.unescapeNlgText'.
 nlgString :: Lexer Text
 nlgString =
-  takeWhile1P (Just "character") (\c -> c `notElem` nlgSpecialChars && not (isSpace c))
+  Text.concat <$> some (escaped <|> plain)
   where
+    escaped = try (Text.cons <$> char '\\' <*> (Text.singleton <$> anySingle))
+    plain = takeWhile1P (Just "character") (\c -> not (isNlgSpecial c) && not (isSpace c))
+    isNlgSpecial c = c == '\\' || c `elem` nlgSpecialChars
     nlgSpecialChars =
       [ nlgInlineAnnotationCloseChar
       , nlgExprDelimiterSymbol
@@ -486,11 +509,38 @@ nlgExprDelimiter =
 nlgExprDelimiterSymbol :: Char
 nlgExprDelimiterSymbol = '%'
 
+-- | An annotation delimited by heralds, e.g. @[…]@.
+--
+-- A backslash escapes the closing herald, so @[a \\] b]@ is one annotation
+-- whose text is @a \\] b@ rather than truncating at the first @]@ and leaving
+-- @ b]@ to fail the enclosing parse with @unexpected ]@.
+--
+-- The backslash is KEPT in the returned text. This text is what 'toNlgAnno'
+-- re-emits for exactprint, so dropping it here would make the printer lose the
+-- escape and change the meaning on the next parse. Decoding happens on the
+-- render side, in 'nlgString'.
 inlineAnno :: Text -> Text -> Lexer (Text, AnnoType)
 inlineAnno openingHerald closingHerald = do
   _o <- string openingHerald
-  (anno, _c) <- manyTill_ anySingle (string closingHerald)
-  pure (Text.pack anno, InlineAnno)
+  anno <- Text.concat <$> many (escapedChar <|> plainChunk)
+  _c <- string closingHerald
+  pure (anno, InlineAnno)
+  where
+    escapedChar = try (Text.cons <$> char '\\' <*> (Text.singleton <$> anySingle))
+
+    -- A chunk of ordinary characters, then — separately — a single character
+    -- that merely STARTS the closing herald without completing it.
+    --
+    -- The second alternative is why this is not a one-liner, and it matters for
+    -- the OTHER caller: 'refAnnotation' uses @inlineAnno "<<" ">>"@, so a lone
+    -- @>@ inside @\<\<a > b\>\>@ must stay ordinary text. Testing only the first
+    -- character of the herald would end the annotation there and regress a form
+    -- that works today (verified against the unmodified lexer).
+    plainChunk =
+          takeWhile1P (Just "character") (\c -> c /= '\\' && not (startsCloser c))
+      <|> try (notFollowedBy (string closingHerald) *> (Text.singleton <$> satisfy startsCloser))
+
+    startsCloser c = maybe False ((c ==) . fst) (Text.uncons closingHerald)
 
 lineAnno :: Text -> Lexer (Text, AnnoType)
 lineAnno herald = do
