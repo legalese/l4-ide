@@ -15,3 +15,21 @@ DECIDE xor x y IS  @ref SG-c-2025-sghcf-14
      x AND NOT y <<SG-c-2025-sghcf-12>>
   OR (NOT x) AND y
 
+-- A literal `>>` inside an inline citation needs `\>`, because the annotation
+-- would otherwise terminate at the first `>>` and leave the remainder to fail
+-- the enclosing parse. The backslash is KEPT in the token, so exactprint
+-- re-emits the citation byte for byte (this file's `.ep.golden` pins that);
+-- it is decoded where the parser builds the `Ref`, which is the reader's copy.
+GIVEN a IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE cited IS
+  <<SG-c-2025-sghcf-12 \>> as amended>>
+  a
+
+-- A LONE `>` does not complete the herald and has always been ordinary text.
+-- It must stay that way: the escape is for the herald, not for the character.
+GIVEN b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE compared IS
+  <<see s.5 > s.3>>
+  b
