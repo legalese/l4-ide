@@ -21,7 +21,7 @@ export const LEWIS_CHRISTINE: Preload = {
     '- **by deceiving any person** — she deceived the cashier into believing the price was $5.25 (the swapped tag; Explanation 1 also covers concealment).\n' +
     '- **dishonestly** — she intended a wrongful gain to herself of $11.70 (s 24(a)); her cautioned statement says as much.\n' +
     '- **induced the person so deceived to deliver property** — the cashier handed over the casing for $5.25.\n\n' +
-    'I have framed the s 420 charge on the right and pinned each element to its evidence. The s 417 charge is also available if you prefer the simple form; the difference is only the punishing section. Two things to confirm before the charge is finalised: the exact time on the receipt, and whether the CCTV still shows the tag being swapped or only the purchase.',
+    'Both charges are on the right: **s 420** first, and **s 417** as the simple alternative on the same facts — the difference is only the punishing section. Click `dishonestly` off on either card and watch s 420 withdraw while s 417 stands, because s 415 accepts fraud or dishonesty but s 420 requires dishonesty. Each element is pinned to its evidence. Two things to confirm before the charge is finalised: the exact time on the receipt, and whether the CCTV still shows the tag being swapped or only the purchase.',
   tools: [
     {
       name: 'list_offences',
@@ -43,6 +43,12 @@ export const LEWIS_CHRISTINE: Preload = {
       result: { 'made out': true },
     },
     { name: 'propose_charge', args: { section: '420' } },
+    {
+      name: 'evaluate',
+      args: { section: '417', facts: '(the same record)' },
+      result: { 'made out': true },
+    },
+    { name: 'propose_charge', args: { section: '417' } },
   ],
   result: {
     turns: [],
@@ -65,6 +71,46 @@ export const LEWIS_CHRISTINE: Preload = {
     charges: [
       {
         section: '420',
+        facts: {
+          particulars: {
+            accused: 'Christine Lewis',
+            date: 'the 24th day of April 2000',
+            time: '8.10 pm',
+            place:
+              'the Seiyu Departmental Store at Parkway Parade Shopping Centre',
+            'co-accused': '',
+            'common intention': false,
+          },
+          victim: 'Wong Fei Hsia',
+          'victim described as': 'the cashier of Seiyu Departmental Store',
+          'victim pronoun': 'she',
+          'deceived the victim': true,
+          'the deception':
+            'to believe that the price of a "Pochacco" pencil casing is worth $5.25, when in actual fact, you knew that the price of the said item is worth $16.95',
+          fraudulently: false,
+          dishonestly: true,
+          deliver: true,
+          'cause the delivery': false,
+          'consent that any person shall retain any property': false,
+          'the property': 'the said item for only $5.25',
+          intentionally: false,
+          do: false,
+          'omit to do': false,
+          'the act or omission': '',
+          causes: false,
+          'likely to cause': false,
+          damage: false,
+          harm: false,
+          body: false,
+          mind: false,
+          reputation: false,
+          property: false,
+          'make, alter or destroy a valuable security': false,
+          'by remote communication': false,
+        },
+      },
+      {
+        section: '417',
         facts: {
           particulars: {
             accused: 'Christine Lewis',
@@ -163,6 +209,17 @@ export const LEWIS_CHRISTINE: Preload = {
           factIds: ['f-admit', 'f-price'],
         },
         { section: '420', field: 'deliver', factIds: ['f-paid'] },
+        {
+          section: '417',
+          field: 'deceived the victim',
+          factIds: ['f-tag', 'f-price'],
+        },
+        {
+          section: '417',
+          field: 'dishonestly',
+          factIds: ['f-admit', 'f-price'],
+        },
+        { section: '417', field: 'deliver', factIds: ['f-paid'] },
       ],
     },
   },
