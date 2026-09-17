@@ -5,7 +5,8 @@
     "The generator re-reads every anchor at generation time and flags the entry STALE if the anchor is gone, so an entry cannot outlive the sentence it points at without being noticed.",
     "`verify` is an optional shell command; while its output matches `pendingWhen` the entry is live, otherwise the generator reports it RESOLVED and it should be deleted in the next edit. EMPTY output (command failed, gh not authenticated, grep -c exiting 1 on zero) means UNVERIFIED and the entry stays live — a check must never retire an entry by failing.",
     "`ref` (optional) reads the anchor at a git ref instead of the working tree — for decisions posed on a branch that has not landed.",
-    "Retire an entry by deleting it in the same PR that records the ruling. Do not leave answered entries here to rot."
+    "Retire an entry by deleting it in the same PR that records the ruling. Do not leave answered entries here to rot.",
+    "When the generated page is published as a Claude artifact with the `db` capability, every live entry carries a ruling widget (accept / modify / reject / defer / question + notes). Those marks are stored in the artifact's database, collection `board-rulings`, one document per entry keyed by the entry's slug (see `slug()` in etc/status-board.mjs) — an INTAKE, not the record: the GM reads them back (Artifact read_db) and writes each ruling into the owning document, in the marker's words, in the same change that acts on it."
   ],
   "decisions": [
     {

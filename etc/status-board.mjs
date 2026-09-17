@@ -259,6 +259,16 @@ function esc(s) {
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c],
   );
 }
+// Document key for a card's ruling in the published page's database: the
+// register id, lowered, with anything outside the path grammar's segment
+// alphabet collapsed to "-". "Dominators §7" -> "dominators-7".
+function slug(id) {
+  const k = String(id)
+    .toLowerCase()
+    .replace(/[^a-z0-9_\-.~:@+]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return k && k !== "." && k !== ".." ? k.slice(0, 200) : "card";
+}
 function render(d) {
   const noStatus = d.specs.filter((s) => !s.status);
   const totDated = d.specs.reduce((a, s) => a + s.nDated, 0),
@@ -273,12 +283,21 @@ function render(d) {
   const quick = live.filter((e) => e.quick);
   const stale = d.decisions.filter((e) => !e.anchored);
   const decRow = (e) =>
-    `<div class="dec${e.resolved ? " done" : ""}${e.deferred ? " parked" : ""}">
-<div class="dec-h"><span class="dec-id">${esc(e.id)}</span><span class="dec-kind">${esc(e.kind)}</span><span class="dec-owner">${esc(e.owner)}</span>${e.quick && !e.resolved && !e.deferred ? '<span class="pill ok">minutes</span>' : ""}${e.resolved ? '<span class="pill ok">resolved — delete this entry</span>' : ""}${e.deferred ? `<span class="pill warn">deferred ${esc(e.deferred)}</span>` : ""}${e.anchored ? "" : '<span class="pill bad">STALE — anchor not found</span>'}${e.unverified ? '<span class="pill warn">verify cmd failed</span>' : ""}<span class="dec-raised">raised ${esc(e.raised)}</span></div>
+    `<div class="dec${e.resolved ? " done" : ""}${e.deferred ? " parked" : ""}" data-key="${slug(e.id)}" data-id="${esc(e.id).replace(/"/g, "&quot;")}">
+<div class="dec-h"><span class="dec-id">${esc(e.id)}</span><span class="pill ok rule-pill" hidden></span><span class="dec-kind">${esc(e.kind)}</span><span class="dec-owner">${esc(e.owner)}</span>${e.quick && !e.resolved && !e.deferred ? '<span class="pill ok">minutes</span>' : ""}${e.resolved ? '<span class="pill ok">resolved — delete this entry</span>' : ""}${e.deferred ? `<span class="pill warn">deferred ${esc(e.deferred)}</span>` : ""}${e.anchored ? "" : '<span class="pill bad">STALE — anchor not found</span>'}${e.unverified ? '<span class="pill warn">verify cmd failed</span>' : ""}<span class="dec-raised">raised ${esc(e.raised)}</span></div>
 <div class="dec-ask">${esc(e.ask)}</div>
 ${e.bench ? `<div class="dec-meta"><b>bench:</b> ${esc(e.bench)}</div>` : ""}
 ${e.next ? `<div class="dec-meta"><b>then:</b> ${esc(e.next)}</div>` : ""}
 <div class="dec-meta"><b>unblocks:</b> ${esc(e.unblocks)} · <b>owned by:</b> <span style="font-family:var(--mono)">${esc(e.source?.file)}${e.source?.ref ? ` @ ${esc(e.source.ref)}` : ""}</span></div>
+${
+  e.resolved
+    ? ""
+    : `<div class="rule" hidden>
+<label class="rule-l" for="rule-${slug(e.id)}">Ruling</label><select class="rule-sel" id="rule-${slug(e.id)}"><option value="">— unmarked —</option><option value="accept">accept</option><option value="modify">modify</option><option value="reject">reject</option><option value="defer">defer</option><option value="question">question</option></select>
+<textarea class="rule-notes" id="notes-${slug(e.id)}" rows="2" placeholder="Notes, in your words — they are quoted verbatim into the owning document."></textarea>
+<button class="rule-save" type="button" disabled>Save</button><span class="rule-status"></span>
+</div>`
+}
 </div>`;
   return `<title>L4 Programme Board</title>
 <style>
@@ -312,13 +331,22 @@ a{color:var(--accent)}
 .dec-h{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;font-family:var(--mono);font-size:12px;margin-bottom:5px}
 .dec-id{font-weight:700;font-size:14px;color:var(--accent)}.dec-kind{color:var(--dim)}.dec-owner{color:var(--fg)}.dec-raised{color:var(--dim);margin-left:auto}
 .dec-ask{font-size:14px}.dec-meta{font-size:12.5px;color:var(--dim);margin-top:4px}
+.rule{display:grid;grid-template-columns:auto minmax(120px,160px) 1fr auto;gap:8px 10px;align-items:start;margin-top:9px;padding-top:8px;border-top:1px dashed var(--line);font-family:var(--mono);font-size:12.5px}
+.rule-l{color:var(--dim);text-transform:uppercase;letter-spacing:.04em;font-size:11px;padding-top:6px}
+.rule-sel,.rule-notes{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:5px;padding:5px 7px;font:inherit}
+.rule-notes{grid-column:3;resize:vertical;min-height:2.6em;font-family:ui-serif,Georgia,serif;font-size:13.5px}
+.rule-save{grid-column:4;background:var(--accent);color:var(--bg);border:0;border-radius:5px;padding:6px 12px;font:inherit;cursor:pointer}
+.rule-save:disabled{opacity:.45;cursor:default}
+.rule-status{grid-column:2 / span 3;color:var(--dim);font-size:11.5px}
+.rule-sel:focus-visible,.rule-notes:focus-visible,.rule-save:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+@media (max-width:640px){.rule{grid-template-columns:1fr auto}.rule-l{grid-column:1 / span 2}.rule-notes{grid-column:1 / span 2}.rule-save{grid-column:2}.rule-status{grid-column:1 / span 2}}
 </style>
 <div class="wrap">
 <h1>L4 Programme Board</h1>
 <div class="sub">generated ${esc(d.generatedAt)} · unstable ${esc(d.unstableHead)} · main ${esc(d.mainHead)} · regenerate with <b>node etc/status-board.mjs</b></div>
 
 <h2>Waiting on a human<span class="n">${live.length} live · ${quick.length} answerable in minutes · ${d.decisions.length - live.length} deferred or resolved</span></h2>
-<p class="lede">The queue, in the order to take it. Each entry names the document that owns the decision; the anchor it cites was re-read when this page was generated${stale.length ? ` — <b>${stale.length} could not be found and are marked STALE</b>` : ", and every one was found"}. Marks go in the owning document, not here.</p>
+<p class="lede">The queue, in the order to take it. Each entry names the document that owns the decision; the anchor it cites was re-read when this page was generated${stale.length ? ` — <b>${stale.length} could not be found and are marked STALE</b>` : ", and every one was found"}. A ruling entered on a card below is the <b>intake</b>: the GM reads it back and records it in the owning document in the same change (CLAUDE.md §4). Until that lands, the document — not this page — is the record.</p>
 ${[...live.filter((e) => e.quick), ...live.filter((e) => !e.quick), ...d.decisions.filter((e) => e.deferred || e.resolved)].map(decRow).join("")}
 
 <h2>Committed, not PR'd<span class="n">${d.committed.length} branches · pushed, ahead of unstable, no PR, touched in 45 days</span></h2>
@@ -391,5 +419,44 @@ ${d.train
   )
   .join("")}
 </table></div>
-</div>`;
+</div>
+<script>
+(async () => {
+  // Rulings live in the published page's database (capability "db"),
+  // one document per card, keyed by the card's slug; the GM reads them
+  // back with the Artifact tool (collection "board-rulings"). Without the
+  // capability — a local file, a viewer without access — the widgets stay
+  // hidden and the page is the same static board it always was.
+  const use = window.claude && window.claude.use;
+  const db = use ? await use.call(window.claude, "db").catch(() => null) : null;
+  const cards = [...document.querySelectorAll(".dec[data-key]")];
+  if (!db) return;
+  const stamp = (at) => (at || "").slice(0, 16).replace("T", " ") + "Z";
+  for (const card of cards) {
+    const w = card.querySelector(".rule");
+    if (!w) continue;
+    const key = card.dataset.key, id = card.dataset.id;
+    const ref = db.doc("board-rulings/" + key);
+    const sel = w.querySelector(".rule-sel"), notes = w.querySelector(".rule-notes"),
+      btn = w.querySelector(".rule-save"), st = w.querySelector(".rule-status"),
+      pill = card.querySelector(".rule-pill");
+    const show = (v) => {
+      sel.value = v.ruling || ""; notes.value = v.notes || "";
+      st.textContent = v.at ? "saved " + stamp(v.at) : "";
+      pill.textContent = v.ruling ? "ruled: " + v.ruling : ""; pill.hidden = !v.ruling;
+    };
+    w.hidden = false;
+    try { const snap = await ref.get(); if (snap.exists) show(snap.data() || {}); }
+    catch (e) { st.textContent = "could not load the saved ruling (" + (e && e.code || e) + ")"; }
+    const dirty = () => { st.textContent = "unsaved"; btn.disabled = false; };
+    sel.addEventListener("change", dirty); notes.addEventListener("input", dirty);
+    btn.addEventListener("click", async () => {
+      btn.disabled = true; st.textContent = "saving…";
+      const doc = { id, key, ruling: sel.value, notes: notes.value, at: new Date().toISOString(), board: ${JSON.stringify(d.unstableHead)} };
+      try { await ref.set(doc); show(doc); }
+      catch (e) { st.textContent = "save failed (" + (e && e.code || e) + ") — try again"; btn.disabled = false; }
+    });
+  }
+})();
+</script>`;
 }
