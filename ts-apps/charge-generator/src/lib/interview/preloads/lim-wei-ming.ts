@@ -12,9 +12,9 @@ export const LIM_WEI_MING: Preload = {
   title: "A bank transfer from someone else's account (s 379)",
   citation: 'Penal Code 1871 s 378, Illustration (q)',
   prompt:
-    "Lim Wei Ming got into Tan Ah Kow's internet banking on 3 March 2026 at about 2 pm from a flat at Blk 50 Bedok South Ave 3 and moved $3,000 from Tan's account into his own. Tan noticed the next day and reported it. I have Tan's statement, the bank's transaction log and the IP records. Theft?",
+    "Lim Wei Ming got into Goh Siew Lan's internet banking on 3 March 2021 at about 11.15 pm from his flat at Blk 123 Ang Mo Kio Avenue 3 and moved $4,500 from her account into his own. She noticed the next day and reported it. I have her statement, the bank's transaction log and the IP records. Theft?",
   reply:
-    "Yes. Since 2020 s 378 covers intangible property: a person **moves** money by transferring it from one account to another (Explanation 6), and money is **movable property** (s 22). He took it **dishonestly** — a wrongful gain to himself — **out of Tan's possession** and **without his consent**, so **theft (s 378)** is made out and the charge lies under **s 379**. This is Illustration (q) to the section almost word for word.\n\nUnder CPC s 125 illustration (a) a theft charge need not say how the theft was done, so the body is short; the bank log and IP records go to the evidence graph rather than into the charge.",
+    "Yes. Since 2020 s 378 covers intangible property: a person **moves** money by transferring it from one account to another (Explanation 6), and money is **movable property** (s 22). He took it **dishonestly** — a wrongful gain to himself — **out of Goh Siew Lan's possession** and **without her consent**, so **theft (s 378)** is made out and the charge lies under **s 379**. This is Illustration (q) to the section almost word for word.\n\nUnder CPC s 125 illustration (a) a theft charge need not say how the theft was done, so the body is short; the bank log and IP records go to the evidence graph rather than into the charge.",
   tools: [
     {
       name: 'list_offences',
@@ -79,13 +79,13 @@ export const LIM_WEI_MING: Preload = {
         {
           id: 's-tan',
           kind: 'witness-statement-s22',
-          title: 'Statement of Tan Ah Kow',
-          maker: 'Tan Ah Kow',
+          title: 'Statement of Goh Siew Lan',
+          maker: 'Goh Siew Lan',
         },
         {
           id: 's-log',
           kind: 'documentary',
-          title: 'Bank transaction log, 3 March 2026',
+          title: 'Bank transaction log, 3 March 2021',
         },
         {
           id: 's-ip',
@@ -96,12 +96,12 @@ export const LIM_WEI_MING: Preload = {
       facts: [
         {
           id: 'f-transfer',
-          text: "$3,000 moved from Tan's account to Lim's.",
+          text: "$4,500 moved from Goh Siew Lan's account to Lim's.",
           sourceIds: ['s-log'],
         },
         {
           id: 'f-noconsent',
-          text: 'Tan did not authorise the transfer.',
+          text: 'Goh Siew Lan did not authorise the transfer.',
           sourceIds: ['s-tan'],
         },
         {
