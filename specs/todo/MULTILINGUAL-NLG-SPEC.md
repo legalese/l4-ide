@@ -1,11 +1,15 @@
 # Multilingual L4 — language-tagged `@nlg`, and the trilingual Penal Law
 
 _Status: **proposed, not landed — with one exception.** §4 (the `%` and `]` escapes) is
-**being implemented now** on branch `fix/nlg-escapes` and is not merged; everything else here
-is a proposal and no part of it is implemented. Every measurement in §2 was executed on
-2026-09-17 against `unstable` @ `cab6988d0` and canon `mengwong/drafts` @ `61a4755`, and §2.4
-carries a correction to an earlier draft of this file. Written on branch
-`spec/multilingual-nlg`._
+**implemented, gated and adversarially reviewed** on branch `fix/nlg-escapes` (`590bc3c56` +
+`53e9420d9`) and is **not merged**; everything else here is a proposal and no part of it is
+implemented. Every measurement in §2 was executed on 2026-09-17 against `unstable` @
+`cab6988d0` and canon `mengwong/drafts` @ `61a4755`. Six measurement errors in earlier drafts
+of this file have been corrected in place, each re-measured rather than taken on report —
+§2.3's gap count, §2.4's annotation census and its bare-inline count, a line citation, three
+dangling cross-references, and §4's claim about where decoding happens; §2.4 and §4.1 carry
+the corrections rather than hiding them. Written on branch `spec/multilingual-nlg`; §4.1 and
+R-M7 by the `nlg-locale` session._
 
 **One-line summary.** L4 can already be _written_ in any language — Hebrew identifiers work
 today, verified — but it can only be _read back_ in one, because `@nlg` carries a single
@@ -296,15 +300,18 @@ data TAnnotations = ... | TNlg !Text !AnnoType          -- today
 visible**: rendering an English page for a name that has only `@nlg:he` must emit the Hebrew
 _and record the fallback in the projection's fidelity report_, never silently substitute.
 
-## 4. Escapes for `%` and `]` — IN PROGRESS, not landed
+## 4. Escapes for `%` and `]` — IMPLEMENTED on `fix/nlg-escapes`, not merged
 
 Independent of the language work and being landed first, because both are live defects today
-(§2.4). **Branch `fix/nlg-escapes`; written 2026-09-17, not yet built or tested at time of
-writing, and not merged.**
+(§2.4). **Branch `fix/nlg-escapes` (`590bc3c56` + `53e9420d9`); built, tested and gated
+2026-09-17, reviewed adversarially (§4.1), not merged.**
 
 **Convention chosen: backslash.** `\%` → literal `%`, `\]` → literal `]`, `\\` → literal `\`.
-Any other `\x` is left untouched, so a stray backslash keeps its current meaning of "not
-special" and no existing annotation can change meaning.
+Any other `\x` is left untouched — the lexer consumes exactly the three escapes the decoder
+honours, so a backslash that cannot begin one stays an ordinary character, as it was before
+escapes existed. Nothing existing changes because **no `.l4` file in the tree contains a
+backslash at all** (measured 2026-09-17 at `cab6988d0`). That is a measurement, not a
+guarantee: an annotation that did contain `\%`, `\]` or `\\` would now render differently.
 
 Backslash over the printf-style `%%` that an earlier draft recommended, for two reasons:
 doubling does not generalise — `]]` as an escape for `]` reads badly and collides with the eye
@@ -317,13 +324,12 @@ adopt: §2.4 measured 0 uses of either in the corpus.
 law. So escapes must **not** be decoded at annotation-capture time. The split, mirroring how
 `TStringLit` carries `raw` and `decoded`:
 
-- `inlineAnno` keeps the backslash in the captured text, and only stops treating `\]` as the
-  terminator. The raw slice still round-trips.
+- `inlineNlgAnno` — the `[…]` lexer — keeps the backslash in the captured text, and only stops
+  treating `\]` as the terminator. The raw slice still round-trips.
 - `nlgString` — the second-pass tokenizer over already-captured annotation text — consumes an
   escape as a **unit** but keeps it **verbatim**. Consuming it as a unit is what stops the `%`
   in `\%` from reaching `nlgExprDelimiter` and opening an interpolation.
-- `L4.Nlg.unescapeNlgText` decodes, applied at `MkNlgText` in the `Linearize Nlg` instance.
-  That is the single point where annotation text becomes output.
+- `L4.Nlg.unescapeNlgText` decodes, at **every** render site.
 
 > **Do not decode in `nlgString`.** It was written that way first and it is wrong, because
 > `displayTokenType` maps `TNlgString t -> t` (`Lexer.hs:1126`) — that token's text is what
@@ -333,9 +339,65 @@ law. So escapes must **not** be decoded at annotation-capture time. The split, m
 > `10%and%20`, which parses and **silently means something else**. The loud half would have
 > been caught by any round-trip test; the silent half is the one that reaches production.
 
-Still owed on that branch: goldens covering a literal `%` and a literal `]` in both annotation
-forms, and confirmation that `exactprint identity` and the existing 131 annotations are
-unchanged.
+### 4.1 What an adversarial review changed, and the two rulings inside it
+
+The first cut (`590bc3c56`) passed the full gate — build, 3,467 golden examples, `exactprint
+identity`, the `prettyLayout` round-trip, `l4-cli-test`, `jl4-core-test`. A four-dimension
+adversarial pass over it returned **15 findings, 0 refuted**. Three mattered, and the green
+gate is the reason they are worth recording rather than just fixing.
+
+**(a) `@ref` was collateral damage.** `inlineAnno` has two callers, and the escape went into
+the shared body, so it reached `refAnnotation`'s `<<`/`>>` form. Nothing decodes a ref escape,
+so `<<sec 3\>>` did not merely capture the wrong text — `\>` was consumed as a unit and the
+annotation ran on to the **next** `>>` in the file, or, with none, failed the whole file's lex
+pointing at end-of-input rather than at the annotation. The repair splits the function:
+`inlineAnno` returns to its base body for `@ref`, and the NLG form gets `inlineNlgAnno`.
+Because `]` is one character, the `notFollowedBy` machinery that kept `<<a > b>>` working is
+no longer needed and went with it.
+
+> **Ruling — a literal `>>` inside `<<…>>` stays unrepresentable.** It was unrepresentable
+> before this work and the escape does not extend to it. `refAnnotation` is outside what this
+> spec rules on, and widening a change to a second annotation family on a fix branch's own
+> initiative is not that branch's call. The mechanism would be cheap — the decode side would
+> need `>` added — but it wants its own ruling. Raised by the `hebrew` session, agreed here.
+
+**(b) The lexer and the decoder disagreed about what an escape is.** The lexer consumed `\`
+plus _any_ character; `unescapeNlgText` decodes only `\\`, `\%`, `\]`. A pair the lexer
+swallowed and the decoder ignored changes what an annotation **captures** without changing
+what it **renders** — and it turned two shapes that lex today into parse errors, including an
+`@nlg` line annotation ending in a backslash, where there is no closing herald and so nothing
+to escape. `L4.Lexer.isNlgEscapable` is now the single set both sides use.
+
+**(c) The feature was half-wired, and the corpus goldens could not see it.**
+`unescapeNlgText` was reached only from `Linearize Nlg`, and an earlier draft of this section
+asserted that was "the single point where annotation text becomes output". **That was false.**
+`l4 render` (text, html, json, akn), the LSP document webview and `l4 blawx` each emitted the
+backslash to the reader. Worse, deleting every call site left the whole suite green: nothing
+asserted rendered annotation text, and nothing could — **no `.nlg.golden` in the tree
+witnesses annotation prose at all**, because that golden linearizes _directives_ and
+`Linearize (Directive Resolved)` routes `#EVAL` through `linearize e` rather than `lin e`. The
+repair adds `NlgRenderSpec`, which drives `buildDocument` end to end.
+
+> **Ruling — `Relational.Lower.linearNlg` does NOT decode, and that is deliberate.** Its
+> output is re-scanned for `%name%` slots by `Blawx.Lower.scanNlg`. Decoding there turns
+> `10\%and\%20` back into `10%and%20` and manufactures exactly the phantom slot the escape
+> exists to prevent — `slotNameShaped "and"` is `True`. The decode belongs to the literal
+> chunks the scan returns, i.e. in `nlgChunks`. Worth recording because two of the three
+> reviewers proposed decoding at both sites and the dissenting one was right: the majority
+> reading would have reintroduced the bug one layer down. The invariant is now a comment at
+> `linearNlg` so the next reader does not "fix" it.
+
+**Every new test was mutation-checked** — the fix was broken three ways and each test watched
+to go red: an unwired decoder turns 3 of `NlgRenderSpec`'s 4 examples red (the 4th is its own
+positive control and correctly stays green), re-sharing the escaping body turns the
+trailing-backslash `@ref` case red, and an escape no longer consumed as a unit turns the new
+fragment-level assertion red. That last one matters most: the _existing_ escaped-percent test
+passes on the **pre-fix** lexer too, because #957's tightness rule already declines `% and %`
+— so the entire `nlgString` hunk could have been reverted with every test green.
+
+**Still owed.** The other consumers of the relational IR's `@nlg` fields
+(`tdNlg`/`adNlg`/`rfNlg`/`dsNlg`) have not been audited for the same leak; only the Blawx leg
+is fixed. And there is no corpus `.l4` case carrying a backslash inside `<<…>>`.
 
 ## 5. Proposed: locale in the projections
 
@@ -404,8 +466,11 @@ have no counterpart to consult, so their English is ours alone and should be mar
 
 ## 8. Suggested order of work
 
-1. **`%` and `]` escapes (R-M3).** Smallest, independent, fixes two live defects. Underway on
-   `fix/nlg-escapes`; see §4 for the exactprint constraint that shapes it.
+1. **`%` and `]` escapes (R-M3).** ~~Smallest, independent, fixes two live defects.~~ **Done
+   on `fix/nlg-escapes`, awaiting review** — and it was not the smallest. It reached a second
+   annotation family, a second lexer and three renderers before it was finished; §4.1 is the
+   account. Read that before step 2, because the language tag touches the same three places
+   and the same green-gate-proves-nothing trap applies to it.
 2. **Language tag (R-M1, R-M2).** Lexer, `L4.Nlg` selection, check error on duplicates, goldens.
    Untagged behaviour must be provably unchanged — assert against the existing 131 annotations.
 3. **Projection locale (§5).** Start with `l4 render` and the docs, which have no interactive
