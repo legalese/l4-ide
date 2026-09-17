@@ -1,0 +1,84 @@
+{
+  "advancing": [
+    {
+      "event": {
+        "action": "Sign OF (Tenant OF \"Carol\")",
+        "at": 2,
+        "kind": "act",
+        "party": "Tenant OF \"Carol\""
+      },
+      "then": [
+        {
+          "action": "Deliver (EXACTLY theLandlord)",
+          "dueBy": 7,
+          "kind": "owed",
+          "modal": "MUST",
+          "party": "Landlord OF \"Ms Ng\"",
+          "remaining": 5
+        }
+      ]
+    }
+  ],
+  "breaching": [
+    {
+      "breach": {},
+      "event": {
+        "at": 15,
+        "deadline": 14,
+        "kind": "tick",
+        "whose": [
+          {
+            "action": "Sign (EXACTLY t)",
+            "modal": "MUST",
+            "party": "Tenant OF \"Carol\""
+          }
+        ]
+      }
+    }
+  ],
+  "clock": 2,
+  "contract": "`the tenancy`",
+  "deadlineNotKnown": [],
+  "discharging": [],
+  "events": [
+    "PARTY alice DOES Sign OF alice AT 1",
+    "PARTY bob DOES Sign OF bob AT 2"
+  ],
+  "format": 1,
+  "line": 85,
+  "nextDeadline": {
+    "at": 14,
+    "whose": [
+      {
+        "action": "Sign OF (Tenant OF \"Carol\")",
+        "modal": "MUST",
+        "party": "Tenant OF \"Carol\""
+      }
+    ]
+  },
+  "owed": [
+    {
+      "action": "Sign OF (Tenant OF \"Carol\")",
+      "dueBy": 14,
+      "group": {
+        "join": "barrier",
+        "total": 3
+      },
+      "kind": "owed",
+      "modal": "MUST",
+      "party": "Tenant OF \"Carol\"",
+      "remaining": 12
+    },
+    {
+      "done": 2,
+      "kind": "heldBack",
+      "total": 3,
+      "until": "allHave"
+    }
+  ],
+  "passedOver": [],
+  "standing": {
+    "status": "inProgress"
+  },
+  "untried": []
+}

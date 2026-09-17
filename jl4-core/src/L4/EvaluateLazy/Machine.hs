@@ -452,20 +452,48 @@ peekClock rf = peekWHNF rf >>= pure . \ case
   Just (ValNumber t) -> Just t
   _                  -> Nothing
 
--- | The party key of a forced party reference, if forced.
-peekParty :: Reference -> Eval (Maybe Text)
-peekParty rf = fmap partyKeyWHNF <$> peekWHNF rf
-
 -- | The action of a forced action reference, if forced.
 peekAction :: Reference -> Eval (Maybe Text)
 peekAction rf = fmap prettyLayout <$> peekWHNF rf
 
+-- | A forced value read through to normal form WITHOUT forcing anything:
+-- every reference under it is peeked, and the answer is 'Nothing' as soon
+-- as one is still a thunk. This is what lets the log carry a party in the
+-- form the list compares bearers by ('peekName') while keeping to the
+-- rule that it never changes what the machine evaluates. The depth cutoff
+-- mirrors 'nfAux''s: a cyclic value would otherwise loop.
+--
+-- Not 'peekNF', which is the partial reading a diagnostic's wording wants
+-- (an unevaluated part prints as @…@); this one is all-or-nothing, because
+-- a name with an @…@ in it compares equal to nothing.
+peekWholeNF :: WHNF -> Eval (Maybe (Value NF))
+peekWholeNF = go maximumStackSize
+  where
+    go d v
+      | d < 0     = pure Nothing
+      | otherwise = sequenceA <$> traverse (field d) v
+    field d rf = peekWHNF rf >>= \ case
+      Nothing -> pure Nothing
+      Just w  -> fmap MkNF <$> go (d - 1) w
+
+-- | The party as "L4.Lts.Marking" renders a live norm's bearer: the
+-- 'prettyLayout' of its @Value NF@, so that a step's 'nkBearerName' and a
+-- 'LiveNorm''s @lnBearer@ compare by equality. 'Nothing' unless every
+-- field has been forced; see 'peekWholeNF'.
+peekName :: WHNF -> Eval (Maybe Text)
+peekName v = fmap prettyLayout <$> peekWholeNF v
+
 -- | The event key for a scrutiny, from the pieces the frame holds. The
--- stamp is always in hand (it is what the deadline was compared with).
-eventKeyAt :: Rational -> Maybe Text -> Reference -> Eval EventKey
+-- stamp is always in hand (it is what the deadline was compared with);
+-- the party is passed when the frame holds it forced, and is then keyed
+-- as the ledger keys it and, if its fields are forced too, named as the
+-- list names it.
+eventKeyAt :: Rational -> Maybe WHNF -> Reference -> Eval EventKey
 eventKeyAt stamp mParty actRef = do
   action <- peekAction actRef
-  pure MkEventKey {ekStamp = stamp, ekParty = mParty, ekAction = action}
+  name <- maybe (pure Nothing) peekName mParty
+  pure MkEventKey
+    { ekStamp = stamp, ekParty = partyKeyWHNF <$> mParty, ekPartyName = name, ekAction = action }
 
 -- | The scrutiny an event-bearing step reports (§4.4): a re-offered event's
 -- second look is always 'Reoffered'; otherwise the site says. The argument
@@ -484,21 +512,38 @@ armNormKey party act = do
   mlog <- asks (.deonticLog)
   let site   = rangeOf act
       bearer = either (const Nothing) (Just . partyKeyWHNF) party
-  (activation, member) <- case mlog of
-    Nothing -> pure (0, Nothing)
+  (activation, member, name) <- case mlog of
+    Nothing -> pure (0, Nothing, Nothing)
     Just l  -> do
       n <- liftIO (bumpCounter l.dlActivations site)
       m <- case bearer of
         Nothing -> pure Nothing
         Just b  -> liftIO (Map.lookup (site, b) <$> readIORef l.dlMembers)
-      pure (n, m)
+      -- the name is known at arming only if something before this point
+      -- happened to force the party's fields; usually nothing has, and the
+      -- name is first learned at Contract8 ('naming')
+      nm <- either (const (pure Nothing)) peekName party
+      pure (n, m, nm)
   pure MkNormKey
-    { nkSite = site, nkActivation = activation, nkBearer = bearer
+    { nkSite = site, nkActivation = activation, nkBearer = bearer, nkBearerName = name
     , nkModal = act.modal, nkMember = member }
 
--- | Refresh a key's bearer once the machine has forced the party.
+-- | Refresh a key's bearer once the machine has forced the party to WHNF.
+-- Pure and lazy, so the log-off path pays nothing for it.
 bearing :: WHNF -> NormKey -> NormKey
 bearing v k = k {nkBearer = Just (partyKeyWHNF v)}
+
+-- | Refresh a key's bearer AND its comparable name, at a site where the
+-- machine has (or may have) forced the party's fields: after the party
+-- equality, and at 'ResolveParty'. The name is peeked, never forced, and a
+-- name already known is kept if this peek finds a thunk. With the log off
+-- this is 'bearing': nothing reads the name.
+naming :: WHNF -> NormKey -> Eval NormKey
+naming v k = asks (.deonticLog) >>= \ case
+  Nothing -> pure (bearing v k)
+  Just _  -> do
+    name <- peekName v
+    pure (bearing v k) {nkBearerName = name `mplus` k.nkBearerName}
 
 -- | The site an @EVERY@'s join steps are keyed by: the join line when there
 -- is one, else the whole rule.
@@ -516,7 +561,7 @@ armJoinKey d = do
     Nothing -> pure 0
     Just l  -> liftIO (bumpCounter l.dlActivations site)
   pure MkNormKey
-    { nkSite = site, nkActivation = activation, nkBearer = Nothing
+    { nkSite = site, nkActivation = activation, nkBearer = Nothing, nkBearerName = Nothing
     , nkModal = d.action.modal, nkMember = Nothing }
 
 -- | Register an @EVERY@'s cast, so each member's obligation can find its
@@ -540,11 +585,12 @@ breachSummary :: ReasonForBreach Reference -> Eval BreachSummary
 breachSummary reason = do
   let blame = breachBlame reason
   failures <- traverse failureSummary (toList (blameList blame))
-  (party, deadline) <- case blame.anchor of
-    MissedDeadline partyR _ d -> (, Just d) <$> peekParty partyR
-    DeclaredBreach mParty _   -> (, Nothing) <$> maybe (pure Nothing) peekParty mParty
+  (party, name, deadline) <- case blame.anchor of
+    MissedDeadline partyR _ d -> (\ (p, n) -> (p, n, Just d)) <$> blameOf partyR
+    DeclaredBreach mParty _   -> (\ (p, n) -> (p, n, Nothing)) <$> maybe (pure (Nothing, Nothing)) blameOf mParty
   pure MkBreachSummary
     { bsBlame = party
+    , bsBlameName = name
     , bsStamp = case reason of
         DeadlineMissed _ _ stamp _ -> Just stamp
         ExplicitBreach _           -> Nothing
@@ -553,6 +599,12 @@ breachSummary reason = do
     , bsAnchor = anchorIndex blame
     }
   where
+    -- the anchor's key and, if the fields are forced too, the name the list
+    -- compares bearers by; both peeked, never forced
+    blameOf rf = peekWHNF rf >>= \ case
+      Nothing -> pure (Nothing, Nothing)
+      Just v  -> (Just (partyKeyWHNF v),) <$> peekName v
+    peekParty rf = fmap partyKeyWHNF <$> peekWHNF rf
     failureSummary = \ case
       MissedDeadline partyR act d -> do
         party <- peekParty partyR
@@ -2065,13 +2117,13 @@ backwardContractFrame val = \ case
         -- is re-offered onward), a re-offered copy's look is 'Reoffered' —
         -- and since round 2 of the LEST pass (spec §5.2.1, 2026-09-16) the
         -- copy is handed on again either way, never consumed.
-        let expiredStep :: DS.Branch -> Maybe Text -> Eval (Maybe DeonticStep)
+        let expiredStep :: DS.Branch -> Maybe WHNF -> Eval (Maybe DeonticStep)
             expiredStep branch mBearer = asks (.deonticLog) >>= \ case
               Nothing -> pure Nothing
               Just _  -> do
-                mParty <- peekParty ev'party
+                mParty <- peekWHNF ev'party
                 ev <- eventKeyAt stamp mParty ev'act
-                let norm' = norm {nkBearer = maybe norm.nkBearer Just mBearer}
+                norm' <- maybe (pure norm) (`naming` norm) mBearer
                 pure $ Just $ plainStep (Just time') (Just ev)
                   (scrutinyOf ev'reoffered WitnessedOnly) norm' (Expired branch deadline)
         let lifecycleAt isHence t = MkLifecycle
@@ -2126,7 +2178,7 @@ backwardContractFrame val = \ case
                 -- forced it (a nullary constructor is allocated as a value,
                 -- so @PARTY Alice@ is known; a computed party may not be).
                 whenDeonticLog \ _ -> do
-                  mBearer <- peekParty partyR
+                  mBearer <- peekWHNF partyR
                   expiredStep ToBreach mBearer >>= traverse_ tellDeonticStep
                 continueBackward (ValBreached (DeadlineMissed ev'party ev'act stamp (singleBlame (MissedDeadline partyR act deadline))))
               Just lestFollowup -> reofferResolve False lestFollowup ToLest
@@ -2145,19 +2197,24 @@ backwardContractFrame val = \ case
   Contract7 PartyEqual {..} -> do
     pushCFrame (Contract8 ScrutinizeParty {ev'party = val, ..})
     runBinOpEquals party val
-  Contract8 ScrutinizeParty {..} ->
+  Contract8 ScrutinizeParty {..} -> do
+    -- P2b: the equality at Contract7 has forced the party's fields (all of
+    -- them on a match; up to the first difference otherwise), so this is
+    -- where the key learns the bearer's comparable name. Peeked, not
+    -- forced; a no-op with the log off.
+    named <- naming party norm
     case val of
       ValBool True -> do
-        pushCFrame (Contract11 (ActionDoesn'tmatch {..}))
-        pushCFrame (Contract9 ScrutinizeEnvironment {..})
+        pushCFrame (Contract11 (ActionDoesn'tmatch {norm = named, ..}))
+        pushCFrame (Contract9 ScrutinizeEnvironment {norm = named, ..})
         continuePattern ev'act env act.action
       ValBool False -> do
         whenDeonticLog \ l -> do
           stamp <- assertTime time
-          ev <- eventKeyAt stamp (Just (partyKeyWHNF ev'party)) ev'act
-          logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered WitnessedOnly) norm PartyMismatch)
+          ev <- eventKeyAt stamp (Just ev'party) ev'act
+          logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered WitnessedOnly) named PartyMismatch)
         newTime <- allocateValue time
-        tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
+        tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, norm = named, ..} events
       _ -> internalException $ RuntimeTypeError $
         "expected BOOLEAN but found: " <> prettyLayout val
   Contract11 ActionDoesn'tmatch {} ->
@@ -2199,7 +2256,7 @@ backwardContractFrame val = \ case
         -- step log shows the event at all. 'WitnessedOnly': the event stays
         -- on the stream (or 'Reoffered', for a copy handed down a LEST chain).
         whenDeonticLog \ l -> do
-          ev <- eventKeyAt stamp (Just (partyKeyWHNF ev'party)) ev'act
+          ev <- eventKeyAt stamp (Just ev'party) ev'act
           logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered WitnessedOnly) norm (EarlyAct open))
         newTime <- allocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
@@ -2208,7 +2265,7 @@ backwardContractFrame val = \ case
         -- is entered, so the log reads in machine order.
         let matchedStep branch = whenDeonticLog \ _ -> do
               stamp <- assertTime time
-              ev <- eventKeyAt stamp (Just (partyKeyWHNF ev'party)) ev'act
+              ev <- eventKeyAt stamp (Just ev'party) ev'act
               tellRoutedStep norm branch
                 (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered Consumed) norm (Matched branch))
         -- Action matched! What happens depends on the deontic modal:
@@ -2262,7 +2319,7 @@ backwardContractFrame val = \ case
         -- P2b: the action matched but the PROVIDED did not hold; next event.
         whenDeonticLog \ l -> do
           stamp <- assertTime time
-          ev <- eventKeyAt stamp (Just (partyKeyWHNF ev'party)) ev'act
+          ev <- eventKeyAt stamp (Just ev'party) ev'act
           logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered WitnessedOnly) norm GuardFailed)
         newTime <- allocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
@@ -2272,8 +2329,9 @@ backwardContractFrame val = \ case
     -- P2b: the party is forced; log the 'Expired' step Contract5 built,
     -- with the bearer filled in and the join progress worked out.
     for_ pending \ step -> for_ step.dsNorm \ norm ->
-      for_ (expiredBranch step.dsOutcome) \ branch ->
-        tellRoutedStep (bearing val norm) branch step
+      for_ (expiredBranch step.dsOutcome) \ branch -> do
+        named <- naming val norm
+        tellRoutedStep named branch step
     -- 'val' is the obligation party, now forced to WHNF by 'maybeEvaluate env party'
     -- on the deadline-passed / LEST path. Key it exactly as the matched HENCE path
     -- does, so a RECORD in the followup/reparation attributes to the real party.
@@ -3952,7 +4010,7 @@ patternMatchFailure = withPoppedFrame $ \ case
       stamp <- case time of
         ValNumber t -> pure t
         v -> internalException $ RuntimeTypeError $ "expected a NUMBER but got: " <> prettyLayout v
-      ev <- eventKeyAt stamp (Just (partyKeyWHNF ev'party)) ev'act
+      ev <- eventKeyAt stamp (Just ev'party) ev'act
       logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered WitnessedOnly) norm ActionMismatch)
     newTime <- allocateValue time
     pushFrame $ ContractFrame $ Contract1 ScrutinizeEvents {party = Right party, time = newTime, ..}

@@ -41,6 +41,9 @@
 --      members' own completion again, unmarked;
 --  19. an act before the window's opening edge (AFTER) — a nullity, logged
 --      as EarlyAct and passed over; then the act in the window;
+--  20. a record-shaped party (@Tenant OF "Alice"@): the key carries the
+--      bearer's rendered NAME from the step where the machine had forced
+--      its fields, and not before;
 --
 -- plus: the log-off path returns the same results as the log-on path, and
 -- a directive with no regulative content logs nothing.
@@ -130,6 +133,16 @@ keyPrefix = Text.takeWhile (/= '&')
 
 rawBearer :: DeonticStep -> Maybe Text.Text
 rawBearer s = (.nkBearer) =<< s.dsNorm
+
+-- | The bearer as the list writes it ('nkBearerName'): the forced value,
+-- fields and all, rendered as "L4.Lts.Marking" renders a live norm's
+-- party — so @Tenant OF "Alice"@, comparable by equality. Recorded only
+-- once the party comparison has forced the fields; 'Nothing' before.
+bearerName :: DeonticStep -> Maybe Text.Text
+bearerName s = (.nkBearerName) =<< s.dsNorm
+
+eventPartyName :: DeonticStep -> Maybe Text.Text
+eventPartyName s = (.ekPartyName) =<< s.dsEvent
 
 -- | The member's site and membership, for the EVERY shapes, so the tests can
 -- say "one site, two bearers, two ordinals".
@@ -271,6 +284,41 @@ forkSrc = Text.unlines $ everyPrologue <>
   , "  PARTY theLandlord DOES Deliver alice AT 2"
   , "  PARTY bob   DOES Sign bob   AT 3"
   , "  PARTY theLandlord DOES Deliver bob AT 4"
+  ]
+
+-- 18. the fork whose second member never signs: the landlord's day-20
+--     delivery reveals Bob's expiry, and his LEST is BREACH BY t
+forkBreachSrc :: Text.Text
+forkBreachSrc = Text.unlines $ everyPrologue <>
+  [ "GIVETH A DEONTIC Actor Action"
+  , "`receipts` MEANS"
+  , "    EVERY Tenant t IN tenants"
+  , "        MUST   Sign (EXACTLY t)"
+  , "        WITHIN 7"
+  , "        UPON   EACH"
+  , "        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY t) WITHIN 5)"
+  , "        LEST   BREACH BY t"
+  , ""
+  , "#TRACE `receipts` AT 0 WITH"
+  , "  PARTY alice DOES Sign alice AT 1"
+  , "  PARTY theLandlord DOES Deliver alice AT 2"
+  , "  PARTY theLandlord DOES Deliver bob AT 20"
+  ]
+
+-- 18. the barrier at its outset: no event has been compared, so no
+--     member's fields have been forced
+barrierFreshSrc :: Text.Text
+barrierFreshSrc = Text.unlines $ everyPrologue <>
+  [ "GIVETH A DEONTIC Actor Action"
+  , "`the tenancy` MEANS"
+  , "    EVERY Tenant t IN tenants"
+  , "        MUST   Sign (EXACTLY t)"
+  , "        WITHIN 14"
+  , "        ONCE   ALL HAVE"
+  , "        HENCE  (PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 5)"
+  , "        LEST   BREACH"
+  , ""
+  , "#TRACE `the tenancy` AT 0 WITH"
   ]
 
 -- 8. the join-line deadline: everyone signs, the last one after day 5
@@ -479,13 +527,14 @@ allSrcs =
   , ("or-left", orLeftSrc), ("waiting", waitingSrc), ("barrier-waiting", barrierWaitingSrc)
   , ("prohibition", prohibitionSrc), ("guard", guardSrc), ("action-mismatch", actionMismatchSrc)
   , ("barrier-fail", barrierFailSrc), ("barrier-stall", barrierStallSrc), ("barrier-breach", barrierBreachSrc)
-  , ("join-lest", joinLestSrc), ("early-act", earlyActSrc) ]
+  , ("join-lest", joinLestSrc), ("early-act", earlyActSrc)
+  , ("barrier-fresh", barrierFreshSrc), ("fork-breach", forkBreachSrc) ]
 
 -- | The 'Breached' step an explicit @BREACH@ with no @BY@ logs.
 bareBreach :: Row
 bareBreach = Row Nothing 0 Nothing
   (Breached MkBreachSummary
-    { bsBlame = Nothing, bsStamp = Nothing, bsDeadline = Nothing
+    { bsBlame = Nothing, bsBlameName = Nothing, bsStamp = Nothing, bsDeadline = Nothing
     -- R-T3: one declared failure, naming nobody, its own anchor
     , bsFailures = [DeclaredSummary NobodyNamed Nothing], bsAnchor = 0 })
   NoEvent Nothing Nothing Nothing
@@ -536,7 +585,7 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
       , Row Nothing 0 Nothing
           (Joined ValROr MkJoinNote
             { jnResult   = JoinBreached MkBreachSummary
-                { bsBlame = Just "Bob", bsStamp = Just 5, bsDeadline = Just 3
+                { bsBlame = Just "Bob", bsBlameName = Just "Bob", bsStamp = Just 5, bsDeadline = Just 3
                 -- R-T3: the compound names BOTH failures, left operand first,
                 -- anchored at Bob's (the right, by ROR's tie-break)
                 , bsFailures = [MissedSummary (Just "Alice") "MUST deliver" 3, MissedSummary (Just "Bob") "MUST pay 50" 3]
@@ -738,6 +787,45 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
       [ Row (Just "Alice") 1 (Just DMustNot) (EarlyAct 5)          WitnessedOnly (Just 2)  (Just 2) Nothing
       , Row (Just "Alice") 1 (Just DMustNot) (Expired ToHence 15)  WitnessedOnly (Just 16) (Just 2) Nothing
       ]
+
+  it "20. a record-shaped party: the rendered name is recorded once the party comparison has forced the fields, not before" $ do
+    -- With events (fixture 6's source): Alice's match, Bob's mismatch and
+    -- Bob's match all lie past the party equality at Contract7, which
+    -- forces the fields on both sides, so every member step names its
+    -- bearer and its event's party in the list's own rendering. The
+    -- expiry path (fixture 15's source) names the bearer at ResolveParty.
+    rs <- runLogged barrierSrc
+    let ss = stepsOf 0 rs
+    map bearerName ss `shouldBe`
+      [ Just "Tenant OF \"Alice\"", Just "Tenant OF \"Bob\"", Just "Tenant OF \"Bob\"", Nothing, Just "Landlord OF \"Ms Ng\"" ]
+    map eventPartyName ss `shouldBe`
+      [ Just "Tenant OF \"Alice\"", Just "Tenant OF \"Alice\"", Just "Tenant OF \"Bob\"", Nothing, Just "Landlord OF \"Ms Ng\"" ]
+    -- the ledger key stays what it was: the same head, an unforced-field
+    -- address after it. The two fields are two renderings, not one moved.
+    map (fmap keyPrefix . rawBearer) ss `shouldBe`
+      [ Just "Tenant OF ", Just "Tenant OF ", Just "Tenant OF ", Nothing, Just "Landlord OF " ]
+    rs15 <- runLogged barrierFailSrc
+    map bearerName (stepsOf 0 rs15) `shouldBe`
+      [ Just "Tenant OF \"Alice\"", Just "Tenant OF \"Bob\"", Just "Tenant OF \"Bob\"", Nothing, Nothing ]
+    -- Before any event: the roll call has forced each member to WHNF (the
+    -- cast test needs the constructor) but nothing has looked at a field,
+    -- so the key is the address form and the name is Nothing. The log
+    -- did not force it for its own sake.
+    fresh <- runLogged barrierFreshSrc
+    let ws = stepsOf 0 fresh
+    map (\ s -> s.dsOutcome) ws `shouldBe` [Waiting, Waiting]
+    map bearerName ws `shouldBe` [Nothing, Nothing]
+    map (fmap keyPrefix . rawBearer) ws `shouldBe` [Just "Tenant OF ", Just "Tenant OF "]
+    -- A nullary constructor party renders the same both ways.
+    rs1 <- runLogged matchSrc
+    map bearerName (stepsOf 0 rs1) `shouldBe` [Just "Alice", Just "Bob"]
+    -- A record-shaped blame: `LEST BREACH BY t` under a fork, where t is
+    -- Bob. The breach's party cell is the member's own, forced by the roll
+    -- call and the comparisons before it, so the summary names him in
+    -- the list's rendering beside the ledger key.
+    rsFork <- runLogged forkBreachSrc
+    [ (fmap keyPrefix b.bsBlame, b.bsBlameName) | s <- stepsOf 0 rsFork, Breached b <- [s.dsOutcome] ]
+      `shouldBe` [(Just "Tenant OF ", Just "Tenant OF \"Bob\"")]
 
   it "the log-off path is unchanged: every fixture renders the same result both ways" $
     for_ allSrcs \(name, src) -> do

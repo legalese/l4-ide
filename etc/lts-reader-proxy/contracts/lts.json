@@ -1,0 +1,71 @@
+{
+  "advancing": [],
+  "breaching": [
+    {
+      "breach": {
+        "due": 14,
+        "missed": "MUST return",
+        "party": "B",
+        "reason": "revealed when the clock ran on with nothing happening",
+        "seenAt": 15
+      },
+      "event": {
+        "at": 15,
+        "deadline": 14,
+        "kind": "tick",
+        "whose": [
+          {
+            "action": "return",
+            "modal": "MUST",
+            "party": "B"
+          }
+        ]
+      }
+    }
+  ],
+  "clock": 10,
+  "contract": "aContract",
+  "deadlineNotKnown": [],
+  "discharging": [],
+  "events": [
+    "PARTY S DOES delivery AT 2",
+    "PARTY B DOES payment OF 21 AT 4",
+    "`WAIT UNTIL` OF 10"
+  ],
+  "format": 1,
+  "line": 23,
+  "nextDeadline": {
+    "at": 14,
+    "whose": [
+      {
+        "action": "return",
+        "modal": "MUST",
+        "party": "B"
+      }
+    ]
+  },
+  "owed": [
+    {
+      "action": "return",
+      "dueBy": 14,
+      "kind": "owed",
+      "modal": "MUST",
+      "party": "B",
+      "remaining": 4
+    }
+  ],
+  "passedOver": [],
+  "standing": {
+    "status": "inProgress"
+  },
+  "untried": [
+    {
+      "event": {
+        "action": "return",
+        "kind": "act",
+        "party": "B"
+      },
+      "why": "the action binds `return`, which the what-if cannot choose"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+aContract — after 3 events, the clock stands at 10 (the #TRACE on line 23)
+    PARTY S DOES delivery AT 2
+    PARTY B DOES payment OF 21 AT 4
+    `WAIT UNTIL` OF 10
+  Standing: in progress.
+
+  Owed now:
+    - B MUST return — due by 14 (4 from now)
+
+  What would put someone in breach:
+    - nothing happens by 14 (the clock reaches 15) → B is in breach: MUST return was due by 14; the clock reached 15 without it
+
+  What could not be tried:
+    - B does return — the action binds `return`, which the what-if cannot choose
+
+  Next deadline: 14 (B: return)

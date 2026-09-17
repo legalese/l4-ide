@@ -1,0 +1,196 @@
+{
+  "fixture": "jl4/examples/bpmn/expected/modals-must-barrier-both-deadlines.bpmn",
+  "importWarnings": [],
+  "elements": [
+    {
+      "id": "Start_0",
+      "type": "bpmn:StartEvent",
+      "name": null,
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Start_0__Task_0"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "Task_0",
+      "type": "bpmn:Task",
+      "name": "MUST Approve ...",
+      "eventDefinitions": [],
+      "multiInstance": {
+        "type": "bpmn:MultiInstanceLoopCharacteristics",
+        "isSequential": false,
+        "loopCardinality": false,
+        "loopDataInputRef": false,
+        "completionCondition": null
+      },
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_0__End_1"
+      ],
+      "incoming": [
+        "Flow_Start_0__Task_0"
+      ]
+    },
+    {
+      "id": "End_1",
+      "type": "bpmn:EndEvent",
+      "name": "Fulfilled",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_Task_0__End_1"
+      ]
+    },
+    {
+      "id": "End_2",
+      "type": "bpmn:EndEvent",
+      "name": "Breach",
+      "eventDefinitions": [
+        "bpmn:ErrorEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_Boundary_0__End_2"
+      ]
+    },
+    {
+      "id": "Boundary_0",
+      "type": "bpmn:BoundaryEvent",
+      "name": "after P30D",
+      "eventDefinitions": [
+        "bpmn:TimerEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": true,
+      "attachedTo": "Task_0",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Boundary_0__End_2"
+      ],
+      "incoming": []
+    }
+  ],
+  "unsupportedElements": [],
+  "pausePoints": [
+    "Task_0"
+  ],
+  "exclusiveGateways": [],
+  "started": {
+    "tokensOn": [
+      "Task_0"
+    ],
+    "boundarySubscriptions": [
+      "Boundary_0"
+    ],
+    "triggers": [
+      "Start_0",
+      "Task_0",
+      "Boundary_0"
+    ],
+    "history": [
+      "Start_0",
+      "Flow_Start_0__Task_0",
+      "Task_0"
+    ],
+    "endEventsReached": [],
+    "log": [
+      "Process started 0qp8yj0",
+      "Start Event 0qp8yj0"
+    ],
+    "afterWaiting3s": {
+      "tokensOn": [
+        "Task_0"
+      ],
+      "triggers": [
+        "Start_0",
+        "Task_0",
+        "Boundary_0"
+      ],
+      "endEventsReached": []
+    }
+  },
+  "breach": {
+    "arm": null,
+    "continuedFirst": [],
+    "fired": "Boundary_0",
+    "tokensOn": [],
+    "boundarySubscriptions": [],
+    "triggers": [
+      "Start_0"
+    ],
+    "history": [
+      "Start_0",
+      "Flow_Start_0__Task_0",
+      "Task_0",
+      "Boundary_0",
+      "Flow_Boundary_0__End_2",
+      "End_2"
+    ],
+    "endEventsReached": [
+      "End_2"
+    ],
+    "log": [
+      "Process started 02m26qa",
+      "Start Event 02m26qa",
+      "MUST Approve ... 02m26qa",
+      "after P30D 02m26qa",
+      "Breach 02m26qa",
+      "Process finished 02m26qa"
+    ]
+  },
+  "happy": [
+    {
+      "arm": null,
+      "continued": [
+        "Task_0"
+      ],
+      "steps": [
+        {
+          "tokensOn": [
+            "Task_0"
+          ],
+          "continued": "Task_0"
+        }
+      ],
+      "hitStepLimit": false,
+      "tokensOn": [],
+      "boundarySubscriptions": [],
+      "triggers": [
+        "Start_0"
+      ],
+      "history": [
+        "Start_0",
+        "Flow_Start_0__Task_0",
+        "Task_0",
+        "Flow_Task_0__End_1",
+        "End_1"
+      ],
+      "endEventsReached": [
+        "End_1"
+      ],
+      "log": [
+        "Process started 0dc1csw",
+        "Start Event 0dc1csw",
+        "MUST Approve ... 0dc1csw",
+        "Fulfilled 0dc1csw",
+        "Process finished 0dc1csw"
+      ]
+    }
+  ],
+  "pageErrors": []
+}

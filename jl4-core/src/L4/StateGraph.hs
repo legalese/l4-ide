@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
--- | State Graph extraction and visualization for L4 regulative rules
+-- | State Graph extraction for L4 regulative rules
 --
 -- This module extracts state transition graphs from L4 regulative rules
--- (obligations with HENCE/LEST chains) and renders them as GraphViz DOT.
+-- (obligations with HENCE/LEST chains). Rendering them as GraphViz DOT is
+-- "L4.StateGraph.Dot"'s job, and the dominator query over them is
+-- "L4.StateGraph.Dominators"'s; this module is the IR they both read.
 --
 -- Inspired by Flood & Goodenough's "Contract as Automaton" model.
 --
@@ -21,8 +23,15 @@
 --   - ROR  → a @OneOf@ junction: exactly one branch runs
 --   - IF/THEN/ELSE over regulative arms → a @OneOf@ junction whose branch
 --     edges carry the guard that selects them (see 'guardedIfBranches')
---   - a @HENCE@ back into the rule being extracted → an edge to the initial
---     state, so a renewing duty is a cycle rather than a dangling stub
+--   - a @HENCE@ \/ @LEST@ into a named rule → an edge into that rule's own
+--     entry state, drawn once per path however many arms on that path point
+--     at it (the sibling branches of a @RAND@ \/ @ROR@ each draw their own
+--     copy, see 'extractFan'); back into the rule being extracted, that is
+--     the initial state, so a renewing duty is a cycle rather than a
+--     dangling stub (see 'wireTarget')
+--   - every obligation edge carries the source range of its @RAction@
+--     ('labelSite'): the static half of the correlation key that lines a
+--     drawn edge up with the step the evaluator logs for it
 --   - EVERY … → ONE transition labelled with the quantifier (the cast is a
 --     run-time fact, R-T6), whose join line — @ONCE …@ barrier or @UPON EACH@
 --     fork — travels structurally in 'labelQuantifier' and is drawn on the edge
@@ -45,25 +54,22 @@ module L4.StateGraph
   , JoinLabelKind(..)
   , memberDeadline
   , thresholdText
-    -- * Options
-  , StateGraphOptions(..)
-  , defaultStateGraphOptions
     -- * Extraction
   , extractStateGraph
   , extractStateGraphs
-    -- * Rendering
-  , stateGraphToDot
     -- * Arm vocabulary
   , lestArmWording
   , noTriggerWording
   ) where
 
 import Base
+import qualified Base.Map as Map
 import qualified Base.Text as Text
-import qualified Data.Text.Lazy as Text.Lazy
 import Control.Applicative ((<|>))
 import qualified Control.Monad.State.Strict as St
 
+import L4.Annotation (HasSrcRange (..))
+import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax
   ( Expr(..)
   , Resolved
@@ -86,13 +92,6 @@ import L4.Syntax
   , getUnique
   )
 import L4.Print (LayoutPrinter (..), docText, prettyLayout)
-
--- GraphViz imports
-import qualified Data.GraphViz as GV
-import qualified Data.GraphViz.Attributes.Complete as GV
-import Data.Graph.Inductive.Graph (Node, LNode, LEdge)
-import qualified Data.Graph.Inductive.Graph as FGL
-import qualified Data.Graph.Inductive.PatriciaTree as FGL
 
 -- | Convert a Resolved name to Text.
 --
@@ -190,6 +189,21 @@ data TransitionLabel = TransitionLabel
     -- @PARTY@ rule, a @LEST@ caption and a junction's branch edge all leave it
     -- 'Nothing'. It is what makes a barrier and a fork different graphs; see
     -- 'JoinLabelKind'.
+  , labelSite :: Maybe SrcRange
+    -- ^ @rangeOf@ the 'RAction' this edge was extracted from — the same
+    -- range the evaluator stamps on the step it logs for that obligation
+    -- (@nkSite@ in "L4.EvaluateLazy.DeonticStep", set by @armNormKey@ in
+    -- "L4.EvaluateLazy.Machine" from the very same @rangeOf act@). It is
+    -- the static half of the correlation key of
+    -- @specs\/todo\/lexipedia-superset\/LTS-VISUALISER.md@ §3.4 (B1); the
+    -- runtime half is the activation ordinal, which only a run can count.
+    --
+    -- Both arms of an obligation carry it — the @HENCE@ edge and the @LEST@
+    -- edge are the two outcomes of ONE obligation, and the step logged for
+    -- its expiry carries the same site as the step logged for its
+    -- performance; 'transType' says which outcome an edge is. A junction's
+    -- branch edge has no obligation behind it and leaves this 'Nothing', as
+    -- does a hand-built fixture.
   } deriving (Eq, Show)
 
 -- | One conjunct of a 'BranchGuard': the condition as the reader sees it, plus
@@ -422,23 +436,6 @@ data StateGraph = StateGraph
   , sgInitialState :: StateId
   } deriving (Eq, Show)
 
--- | Options for state graph rendering
-data StateGraphOptions = StateGraphOptions
-  { showDeadlines   :: Bool   -- ^ Include temporal constraints on edges
-  , showGuards      :: Bool   -- ^ Include PROVIDED conditions
-  , compactLabels   :: Bool   -- ^ Use shorter labels
-  , showModal       :: Bool   -- ^ Show deontic modal in labels
-  } deriving (Eq, Show)
-
--- | Default options with all information shown
-defaultStateGraphOptions :: StateGraphOptions
-defaultStateGraphOptions = StateGraphOptions
-  { showDeadlines = True
-  , showGuards    = True
-  , compactLabels = False
-  , showModal     = True
-  }
-
 --------------------------------------------------------------------------------
 -- Extraction State Monad
 --------------------------------------------------------------------------------
@@ -448,11 +445,32 @@ data ExtractState = ExtractState
   { esNextId      :: StateId
   , esStates      :: [ContractState]
   , esTransitions :: [Transition]
-  , esSelf        :: Maybe Unique
-    -- ^ The rule currently being extracted, so that a @HENCE@ back into it is
-    -- recognisable as renewal rather than as an unknown target. See
-    -- 'TargetSelf'.
+  , esRules       :: Rules
+    -- ^ Every regulative rule of the module, so that an arm naming one can
+    -- be followed into it rather than stopping at a state called @next@.
+  , esMemo        :: Map Unique StateId
+    -- ^ The entry state of each named rule drawn on the path being
+    -- extracted. Seeded with the rule being extracted at 'initialStateId',
+    -- so a @HENCE@ back into it is a back-edge to the start, and a second
+    -- arm into a rule already on the path reuses its state: this is what
+    -- closes the loop (LTS-VISUALISER §3.4, B2), and it is what makes the
+    -- graph a transition system rather than a tree. The scope is the path,
+    -- not the graph: a @RAND@ \/ @ROR@ branch inherits the memo and gives
+    -- back what it added ('perBranch'), so a rule that two branches both
+    -- name is two states, one per instance the evaluator runs.
+    --
+    -- Keyed by the rule's 'Unique', not by a source range. The memo answers
+    -- "has this /rule/ been given a state?", and a rule's identity is its
+    -- @DECIDE@; two arms written at two different ranges that both name it
+    -- must land on one state. A range identifies an /arm/ — that is what
+    -- 'labelSite' carries on the edge — not the rule the arm points at.
   }
+
+-- | The regulative rules of a module, by the 'Unique' of their @DECIDE@:
+-- the rule's name as drawn, and its body with any @WHERE@ \/ @LET@ peeled
+-- (what 'findRegulativeExpr' returns). Only rules /in this module/ are
+-- here; an arm naming an imported rule is still an unknown target.
+type Rules = Map Unique (Text, Expr Resolved)
 
 type ExtractM = St.State ExtractState
 
@@ -492,10 +510,16 @@ getTerminalState name stype = do
 -- AST Extraction
 --------------------------------------------------------------------------------
 
--- | Extract all state graphs from a module
+-- | Extract all state graphs from a module: one per regulative rule, in
+-- declaration order. Every graph is extracted against the whole module's
+-- 'Rules', so a rule whose arm names another rule draws that rule's states
+-- inside its own graph (and the named rule still gets a graph of its own).
 extractStateGraphs :: Module Resolved -> [StateGraph]
 extractStateGraphs (MkModule _ _ section) =
-  extractFromSection section
+  let rules = regulativeRules section
+  in [ runExtraction rules u name body | (u, (name, body)) <- regulativeRulesInOrder section ]
+  where
+    regulativeRules = Map.fromList . regulativeRulesInOrder
 
 -- | Extract the first state graph from a module (convenience function)
 extractStateGraph :: Module Resolved -> Maybe StateGraph
@@ -503,21 +527,18 @@ extractStateGraph m = case extractStateGraphs m of
   (sg:_) -> Just sg
   []     -> Nothing
 
--- | Extract state graphs from a section
-extractFromSection :: Section Resolved -> [StateGraph]
-extractFromSection (MkSection _ mName _ _ decls) =
-  let sectionName = maybe "contract" resolvedToText mName
-  in concatMap (extractFromTopDecl sectionName) decls
-
--- | Extract from a top-level declaration
-extractFromTopDecl :: Text -> TopDecl Resolved -> [StateGraph]
-extractFromTopDecl _contextName = \case
-  Decide _ (MkDecide _ _ (MkAppForm _ name _ _) body) ->
-    case findRegulativeExpr body of
-      Just regExpr -> [runExtraction (getUnique name) (resolvedToText name) regExpr]
-      Nothing      -> []
-  Section _ sec -> extractFromSection sec
-  _ -> []
+-- | Every @DECIDE@ of a section (subsections included) whose body is
+-- regulative, in declaration order, with its drawn name and peeled body.
+regulativeRulesInOrder :: Section Resolved -> [(Unique, (Text, Expr Resolved))]
+regulativeRulesInOrder (MkSection _ _ _ _ decls) = concatMap ofDecl decls
+  where
+    ofDecl = \case
+      Decide _ (MkDecide _ _ (MkAppForm _ name _ _) body) ->
+        case findRegulativeExpr body of
+          Just regExpr -> [(getUnique name, (resolvedToText name, regExpr))]
+          Nothing      -> []
+      Section _ sec -> regulativeRulesInOrder sec
+      _ -> []
 
 -- | Find a regulative expression in an expression tree.
 --
@@ -605,13 +626,14 @@ initialStateId :: StateId
 initialStateId = 0
 
 -- | Run the extraction monad and build a StateGraph
-runExtraction :: Unique -> Text -> Expr Resolved -> StateGraph
-runExtraction self name expr =
+runExtraction :: Rules -> Unique -> Text -> Expr Resolved -> StateGraph
+runExtraction rules self name expr =
   let initialState = ExtractState
         { esNextId = 0
         , esStates = []
         , esTransitions = []
-        , esSelf = Just self
+        , esRules = rules
+        , esMemo = Map.singleton self initialStateId
         }
       finalState = St.execState (extractExpr Nothing expr) initialState
   in StateGraph
@@ -697,9 +719,32 @@ flattenROr = \case
 -- splitting is one event, not two — and each branch gets its own entry state
 -- hanging off it. That keeps the branch set recoverable: the junction's
 -- out-edges are exactly the branches, one apiece, and nothing else.
+--
+-- Each branch is extracted with the memo ('esMemo') it found on entry, and
+-- what a branch adds to the memo is forgotten when it ends: a named rule
+-- that two branches of one @RAND@ \/ @ROR@ both reach is drawn once per
+-- branch, not shared. That is the evaluator's shape — @RBinOp1@ \/ @RBinOp2@
+-- in @L4.EvaluateLazy.Machine@ run /both/ operands, so @z RAND z@ is two
+-- instances of @z@ — and it is what the dominator views need: they run a
+-- junction's branches in sequence, and a state shared between two branches
+-- would be sequenced with itself (a self-loop in place of the edge to the
+-- sink, and \"No path reaches FULFILLED\" for a rule that plainly does;
+-- @ok/contracts.l4@'s @a@, until 2026-09-16). A loop still closes: a rule
+-- on the path /above/ the junction is in the memo each branch inherits, so
+-- an arm back into it is a back-edge. An @IF@'s arms are exclusive — the
+-- facts run one — and keep sharing ('extractIfFan'), as do an obligation's
+-- @HENCE@ and @LEST@, which are two outcomes of which exactly one occurs.
 extractFan :: FanKind -> Maybe StateId -> [Expr Resolved] -> ExtractM ()
 extractFan kind mFromState branches =
-  extractGuardedFan kind mFromState [(Nothing, b) | b <- branches]
+  extractGuardedFanWith perBranch kind mFromState [(Nothing, b) | b <- branches]
+
+-- | Run one branch's extraction and restore the memo afterwards, so what the
+-- branch memoised is visible below it and nowhere else.
+perBranch :: ExtractM () -> ExtractM ()
+perBranch act = do
+  memo <- St.gets (.esMemo)
+  act
+  St.modify $ \st -> st { esMemo = memo }
 
 -- | 'extractGuardedFan' over @IF@ arms, whose guards are structured.
 extractIfFan :: Maybe StateId -> [(BranchGuard, Expr Resolved)] -> ExtractM ()
@@ -721,44 +766,97 @@ extractIf mFromState expr
 -- | As 'extractFan', with a guard attached to each branch edge.
 extractGuardedFan
   :: FanKind -> Maybe StateId -> [(Maybe BranchGuard, Expr Resolved)] -> ExtractM ()
-extractGuardedFan kind mFromState branches = do
+extractGuardedFan = extractGuardedFanWith id
+
+-- | 'extractGuardedFan' with each branch's extraction wrapped: 'perBranch'
+-- for a @RAND@ \/ @ROR@, whose branches all run, and 'id' for an @IF@, whose
+-- arms are exclusive (see 'extractFan').
+extractGuardedFanWith
+  :: (ExtractM () -> ExtractM ())
+  -> FanKind -> Maybe StateId -> [(Maybe BranchGuard, Expr Resolved)] -> ExtractM ()
+extractGuardedFanWith wrap kind mFromState branches = do
   junction <- case mFromState of
     Just sid -> pure sid
     Nothing  -> newState "initial" InitialState
   markFan junction kind
-  traverse_ (uncurry (extractBranch junction)) branches
+  traverse_ (wrap . uncurry (extractBranch junction)) branches
 
 -- | Extract one branch of a junction, wiring the junction to its entry state.
+-- A branch that is just @FULFILLED@ or @BREACH@ has no work in it, so it
+-- needs no entry state: the junction points straight at the terminal — and
+-- likewise a branch naming a rule points straight at that rule's state.
 extractBranch :: StateId -> Maybe BranchGuard -> Expr Resolved -> ExtractM ()
-extractBranch junction mGuard branch = do
-  self <- St.gets (.esSelf)
-  let label = fanLabel mGuard
-  case classifyTarget self branch of
-    -- A branch that is just FULFILLED or BREACH has no work in it, so it needs
-    -- no entry state: the junction points straight at the terminal.
-    TargetFulfilled -> do
-      fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
-      addTransition junction fulfilledId label DefaultTransition
+extractBranch junction mGuard branch =
+  wireTarget junction (fanLabel mGuard) DefaultTransition (branchStateName branch) branch
 
-    TargetBreach -> do
-      breachId <- getTerminalState "Breach" TerminalBreach
-      addTransition junction breachId label DefaultTransition
-
-    -- The rule calling itself from inside a branch: the arm renews the whole
-    -- rule rather than doing anything of its own.
-    TargetSelf ->
-      addTransition junction initialStateId label DefaultTransition
+-- | Wire an arm — a @HENCE@, a @LEST@, or a junction's branch — from a state
+-- to whatever its expression denotes, creating the target's state when the
+-- target needs one and does not have one yet.
+--
+-- The five targets, and where each lands:
+--
+-- * @FULFILLED@ \/ @BREACH@: the shared terminal ('getTerminalState').
+-- * an inline obligation: a fresh state named for it, extracted below.
+-- * a __named rule__ (this one included): its entry state from 'esMemo' if
+--   it has one, else a fresh state named after the rule, memoised, with the
+--   rule's body extracted from it. So the second arm into a rule lands on
+--   the first arm's state when both arms are on one path (an obligation's
+--   @HENCE@ and @LEST@, an @IF@'s arms) — but not when they are sibling
+--   branches of a @RAND@ \/ @ROR@, see 'extractFan' — and an arm back into
+--   the rule being extracted lands on the start — a loop, closed. Until
+--   2026-09-16 only the last of those was done, and by a special case; an
+--   arm into any /other/ rule made a dead-end state called @next@ or
+--   @failure@, which is why every graph was a tree (LTS-VISUALISER §3.3,
+--   gap 3).
+-- * anything else: a fresh state under the caller's fallback name, with
+--   whatever structure 'extractExpr' can find in the expression below it.
+--
+-- The named rule's arguments are deliberately ignored, exactly as a
+-- renewing rule's were. A state graph is a control-flow abstraction: it can
+-- say the contract continues into that rule, and it cannot say it does so
+-- with one fewer cycle remaining. What is lost is the /termination
+-- argument/, and that loss is real — see the BPMN fidelity report's
+-- @P-CYCLE@.
+wireTarget
+  :: StateId          -- ^ the state the arm leaves
+  -> TransitionLabel  -- ^ the arm's caption
+  -> TransitionType
+  -> Text             -- ^ the state name to use for an unrecognised target
+  -> Expr Resolved    -- ^ the arm's expression
+  -> ExtractM ()
+wireTarget from label ttype otherName expr = do
+  rules <- St.gets (.esRules)
+  case classifyTarget rules expr of
+    TargetFulfilled -> terminal "Fulfilled" TerminalFulfilled
+    TargetBreach    -> terminal "Breach" TerminalBreach
 
     TargetDeonton obl -> do
       entryId <- newState (describeDeonton obl) IntermediateState
-      addTransition junction entryId label DefaultTransition
+      addTransition from entryId label ttype
       extractDeonton (Just entryId) obl
 
+    TargetNamed u name body -> do
+      memo <- St.gets (.esMemo)
+      case Map.lookup u memo of
+        Just sid -> addTransition from sid label ttype
+        Nothing -> do
+          entryId <- newState name IntermediateState
+          -- Memoise BEFORE extracting the body, or a rule that names itself
+          -- from inside that body would be entered again.
+          St.modify $ \st -> st { esMemo = Map.insert u entryId st.esMemo }
+          addTransition from entryId label ttype
+          -- A rule whose body is RAND/ROR/IF marks this very state as the
+          -- junction.
+          extractExpr (Just entryId) body
+
     TargetOther -> do
-      entryId <- newState (branchStateName branch) IntermediateState
-      addTransition junction entryId label DefaultTransition
-      -- A nested RAND/ROR/IF marks this very state as the inner junction.
-      extractExpr (Just entryId) branch
+      entryId <- newState otherName IntermediateState
+      addTransition from entryId label ttype
+      extractExpr (Just entryId) expr
+  where
+    terminal nm ty = do
+      sid <- getTerminalState nm ty
+      addTransition from sid label ttype
 
 -- | Name for the entry state of a branch that is neither a bare obligation
 -- nor a terminal.
@@ -788,6 +886,7 @@ fanLabel mGuard = TransitionLabel
   , labelGuard    = mGuard >>= renderBranchGuard
   , labelBranch   = mGuard
   , labelQuantifier = Nothing
+  , labelSite     = Nothing
   }
 
 -- | Extract an obligation as a state transition.
@@ -841,6 +940,10 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
         JoinUpon _ _ d ->
           MkJoinLabel { joinKind = Fork, joinDeadline = closingText <$> d }
 
+      -- The key's static half (B1): the same @rangeOf@ of the same
+      -- 'RAction' that @armNormKey@ stamps on the runtime step.
+      site = rangeOf action
+
       label = TransitionLabel
         { labelParty    = partyText
         , labelModal    = modalVal
@@ -850,6 +953,7 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
         , labelGuard    = guardText
         , labelBranch   = Nothing
         , labelQuantifier = quantifier
+        , labelSite     = site
         }
 
       -- The caption for whichever LEST arm this obligation turns out to have.
@@ -872,43 +976,16 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
         , labelGuard    = Nothing
         , labelBranch   = Nothing
         , labelQuantifier = Nothing
+        , labelSite     = site
         }
 
       defaultToBreach = do
         breachId <- getTerminalState "Breach" TerminalBreach
         addTransition fromState breachId lestLabel LestTransition
 
-  self <- St.gets (.esSelf)
-
   -- Handle HENCE (success path)
   case hence of
-    Just henceExpr -> do
-      case classifyTarget self henceExpr of
-        TargetFulfilled -> do
-          fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
-          addTransition fromState fulfilledId label HenceTransition
-
-        TargetBreach -> do
-          breachId <- getTerminalState "Breach" TerminalBreach
-          addTransition fromState breachId label HenceTransition
-
-        TargetDeonton nextObl -> do
-          -- Create intermediate state for the next obligation
-          let nextStateName = describeDeonton nextObl
-          nextStateId <- newState nextStateName IntermediateState
-          addTransition fromState nextStateId label HenceTransition
-          -- Recursively extract the next obligation
-          extractDeonton (Just nextStateId) nextObl
-
-        -- The duty renews: HENCE back into the rule being extracted.
-        TargetSelf ->
-          addTransition fromState initialStateId label HenceTransition
-
-        TargetOther -> do
-          -- Unknown target - create generic next state
-          nextStateId <- newState "next" IntermediateState
-          addTransition fromState nextStateId label HenceTransition
-          extractExpr (Just nextStateId) henceExpr
+    Just henceExpr -> wireTarget fromState label HenceTransition "next" henceExpr
 
     -- No HENCE specified. Every modal defaults it to FULFILLED — see the HENCE
     -- table in doc/reference/regulative/README.md and @fromMaybe fulfilExpr@ in
@@ -932,31 +1009,12 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
   -- from the modal by 'lestArmWording'. They used to share the literal word
   -- "timeout" instead, which on a prohibition asserted the exact opposite of
   -- the rule.
+  --
+  -- A @LEST@ back into the rule's own name used to be the one arm captioned
+  -- with a literal @\"timeout\"@ and no modal, left over from before #927;
+  -- it now goes through 'wireTarget' with the same caption as its siblings.
   case lest of
-    Just lestExpr -> do
-      case classifyTarget self lestExpr of
-        TargetFulfilled -> do
-          fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
-          addTransition fromState fulfilledId lestLabel LestTransition
-
-        TargetBreach -> do
-          breachId <- getTerminalState "Breach" TerminalBreach
-          addTransition fromState breachId lestLabel LestTransition
-
-        TargetDeonton nextObl -> do
-          let nextStateName = describeDeonton nextObl
-          nextStateId <- newState nextStateName IntermediateState
-          addTransition fromState nextStateId lestLabel LestTransition
-          extractDeonton (Just nextStateId) nextObl
-
-        TargetSelf -> do
-          let timeoutLabel = TransitionLabel Nothing Nothing "timeout" Nothing Nothing Nothing Nothing Nothing
-          addTransition fromState initialStateId timeoutLabel LestTransition
-
-        TargetOther -> do
-          nextStateId <- newState "failure" IntermediateState
-          addTransition fromState nextStateId lestLabel LestTransition
-          extractExpr (Just nextStateId) lestExpr
+    Just lestExpr -> wireTarget fromState lestLabel LestTransition "failure" lestExpr
 
     Nothing -> do
       -- No LEST specified - use default based on modal
@@ -1028,36 +1086,35 @@ data Target
   = TargetFulfilled
   | TargetBreach
   | TargetDeonton (Deonton Resolved)
-  | TargetSelf
-    -- ^ The rule being extracted, applied to fresh arguments: a renewing duty.
+  | TargetNamed Unique Text (Expr Resolved)
+    -- ^ A regulative rule of this module, applied to whatever arguments: its
+    -- 'Unique', its drawn name, and its peeled body. The rule being
+    -- extracted is one of these — a renewing duty is written
+    -- @HENCE \<this rule\> \<updated state\>@, an 'App' /with arguments/ —
+    -- and lands on the start state through 'esMemo'.
   | TargetOther
 
--- | Classify what a HENCE/LEST expression points to, given the 'Unique' of the
--- rule currently being extracted.
+-- | Classify what a HENCE/LEST expression points to, given the module's
+-- regulative rules.
 --
--- The @self@ case matters because a renewing obligation is written
--- @HENCE \<this rule\> \<updated state\>@, which is an 'App' /with arguments/.
--- Until 2026-07-27 that fell through to 'TargetOther', which manufactured an
--- intermediate state literally named after the rule and left it with no
--- outgoing transition — so the loop was reported as a dangling path rather
--- than as a loop, and @P-CYCLE@ could never fire because the cycle never
--- reached the graph. Reg CF's annual Form C-AR cycle
--- (@jl4\/examples\/legal\/regcf\/regcf.l4@) is exactly this shape.
---
--- The arguments are deliberately ignored. A state graph is a control-flow
--- abstraction: it can say the duty renews, and it cannot say the renewal
--- happens with one fewer cycle remaining. What is lost is the /termination
--- argument/, and that loss is real — see the fidelity report's @P-CYCLE@.
-classifyTarget :: Maybe Unique -> Expr Resolved -> Target
-classifyTarget self = \case
+-- A named rule's arguments are ignored; see 'wireTarget' for why. Until
+-- 2026-07-27 a renewing duty fell through to 'TargetOther', which
+-- manufactured an intermediate state literally named after the rule and left
+-- it with no outgoing transition — so the loop was reported as a dangling
+-- path rather than as a loop, and @P-CYCLE@ could never fire because the
+-- cycle never reached the graph. Reg CF's annual Form C-AR cycle
+-- (@jl4\/examples\/legal\/regcf\/regcf.l4@) is exactly this shape. Until
+-- 2026-09-16 an arm into any /other/ rule still did.
+classifyTarget :: Rules -> Expr Resolved -> Target
+classifyTarget rules = \case
   App _ name [] | isFulfilled name -> TargetFulfilled
-  App _ name _ | Just u <- self, getUnique name == u -> TargetSelf
+  App _ name _ | Just (nm, body) <- Map.lookup (getUnique name) rules -> TargetNamed (getUnique name) nm body
   Breach{} -> TargetBreach
   -- Not a breach: a refusal is not a deontic outcome at all.
   Refuse{} -> TargetOther
   Regulative _ obl -> TargetDeonton obl
-  Where _ e _ -> classifyTarget self e
-  LetIn _ _ e -> classifyTarget self e
+  Where _ e _ -> classifyTarget rules e
+  LetIn _ _ e -> classifyTarget rules e
   _ -> TargetOther
 
 -- | Generate a descriptive name for an obligation (for intermediate states)
@@ -1099,209 +1156,3 @@ prettyPattern = \case
   PatCons _ h _   -> prettyPattern h <> " ..."
   PatExpr _ e     -> prettyLayout e
   PatLit _ lit    -> prettyLayout lit
-
---------------------------------------------------------------------------------
--- GraphViz DOT Generation
---------------------------------------------------------------------------------
-
--- | Node attributes for FGL graph
-data NodeAttrs = NodeAttrs
-  { naLabel     :: Text
-  , naFillColor :: Text
-  , naShape     :: Text
-  , naStyle     :: Text
-  } deriving (Eq, Show)
-
--- | Edge attributes for FGL graph
-data EdgeAttrs = EdgeAttrs
-  { eaLabel :: Text
-  , eaColor :: Text
-  , eaStyle :: Text
-  } deriving (Eq, Show)
-
-type ContractGraph = FGL.Gr NodeAttrs EdgeAttrs
-
--- | Convert a StateGraph to GraphViz DOT format
-stateGraphToDot :: StateGraphOptions -> StateGraph -> Text
-stateGraphToDot opts sg =
-  let graph = buildFGLGraph opts sg
-      dotGraph = graphToDot opts sg graph
-  in Text.Lazy.toStrict $ GV.printDotGraph dotGraph
-
--- | Build an FGL graph from a StateGraph
-buildFGLGraph :: StateGraphOptions -> StateGraph -> ContractGraph
-buildFGLGraph opts StateGraph{..} =
-  let fanOf sid = maybe Linear (.stateFan) (find (\s -> s.stateId == sid) sgStates)
-      nodes = map (stateToNode opts) sgStates
-      edges = map (\t -> transitionToEdge opts (fanOf t.transFrom) t) sgTransitions
-  in FGL.mkGraph nodes edges
-
--- | Convert a ContractState to an FGL node
-stateToNode :: StateGraphOptions -> ContractState -> LNode NodeAttrs
-stateToNode _ ContractState{..} =
-  let (fillColor, shape, style) = case (stateFan, stateType) of
-        -- Junctions are drawn as diamonds and say outright which kind they
-        -- are; the fan-out is the whole point of the node.
-        (AllOf, _)                    -> (allOfColor, "diamond", "filled")
-        (OneOf, _)                    -> (oneOfColor, "diamond", "filled")
-        (Linear, InitialState)        -> ("#e8f4fd", "ellipse", "filled")
-        (Linear, IntermediateState)   -> ("#ffffff", "ellipse", "filled")
-        (Linear, TerminalFulfilled)   -> ("#d4edda", "doublecircle", "filled")
-        (Linear, TerminalBreach)      -> ("#f8d7da", "doublecircle", "filled")
-      attrs = NodeAttrs
-        { naLabel     = stateName <> fanSuffix stateFan
-        , naFillColor = fillColor
-        , naShape     = shape
-        , naStyle     = style
-        }
-  in (stateId, attrs)
-
--- | Fill colour for an @RAND@ junction (violet).
-allOfColor :: Text
-allOfColor = "#e6dcf5"
-
--- | Fill colour for an @ROR@ junction (amber).
-oneOfColor :: Text
-oneOfColor = "#fde8cc"
-
--- | The junction kind, spelled out on the node label so no reader has to
--- infer it from the shape alone.
-fanSuffix :: FanKind -> Text
-fanSuffix = \case
-  Linear -> ""
-  AllOf  -> "\nALL OF"
-  OneOf  -> "\nONE OF"
-
--- | Convert a Transition to an FGL edge. The 'FanKind' is that of the
--- transition's source state: edges leaving a junction are branch selections,
--- not obligations, and are drawn to match the junction.
-transitionToEdge :: StateGraphOptions -> FanKind -> Transition -> LEdge EdgeAttrs
-transitionToEdge opts fromFan Transition{..} =
-  let label = formatTransitionLabel opts transLabel
-      (color, style) = case (transType, fromFan) of
-        (DefaultTransition, AllOf) -> (allOfEdgeColor, "solid")  -- Violet: every branch
-        (DefaultTransition, OneOf) -> (oneOfEdgeColor, "dotted") -- Amber: one branch
-        (HenceTransition, _)       -> ("#28a745", "solid")       -- Green for success
-        (LestTransition, _)        -> ("#dc3545", "dashed")      -- Red dashed for failure
-        (DefaultTransition, _)     -> ("#6c757d", "solid")       -- Gray for neutral
-      attrs = EdgeAttrs
-        { eaLabel = label
-        , eaColor = color
-        , eaStyle = style
-        }
-  in (transFrom, transTo, attrs)
-
--- | Edge colour out of an @RAND@ junction.
-allOfEdgeColor :: Text
-allOfEdgeColor = "#6f42c1"
-
--- | Edge colour out of an @ROR@ junction.
-oneOfEdgeColor :: Text
-oneOfEdgeColor = "#e8850c"
-
--- | Format a transition label for display
-formatTransitionLabel :: StateGraphOptions -> TransitionLabel -> Text
-formatTransitionLabel opts TransitionLabel{..} =
-  let -- The modal is a qualifier on a party's action — "Alice MUST pay" — so it
-      -- is drawn only where there is a party to qualify. A LEST edge carries the
-      -- modal for consumers that hold only that edge, but its caption is not a
-      -- restatement of the rule; it names what became of it. "SHANT violation"
-      -- would read as a second and contradictory copy of the obligation.
-      modalPart
-        | not opts.showModal = Nothing
-        | isNothing labelParty = Nothing
-        | otherwise = fmap formatModal labelModal
-      parts = catMaybes
-        [ labelParty
-        , modalPart
-        , Just labelAction
-        , if opts.showDeadlines then fmap (\o -> "[AFTER " <> o <> "]") labelOpening else Nothing
-        , if opts.showDeadlines then fmap (\d -> "[" <> d <> "]") labelDeadline else Nothing
-        , if opts.showGuards then fmap (\g -> "IF " <> g) labelGuard else Nothing
-        ]
-      -- The join line, as the source spells it, on a line of its own under the
-      -- obligation — the one place the picture says whether the continuation
-      -- fires once or once per member.
-      joinPart = do
-        q <- labelQuantifier
-        j <- q.quantJoin
-        let kind = case j.joinKind of
-              Barrier th -> "ONCE " <> th
-              Fork       -> "UPON EACH"
-            dl | opts.showDeadlines = maybe "" (" WITHIN " <>) j.joinDeadline
-               | otherwise          = ""
-        pure (kind <> dl)
-  in Text.intercalate " " parts <> maybe "" ("\n" <>) joinPart
-
--- | Format a deontic modal for display
-formatModal :: DeonticModal -> Text
-formatModal = \case
-  DMust    -> "MUST"
-  DMay     -> "MAY"
-  DMustNot -> "SHANT"
-  DDo      -> "DO"
-
--- | Convert FGL graph to GraphViz DotGraph
-graphToDot :: StateGraphOptions -> StateGraph -> ContractGraph -> GV.DotGraph Node
-graphToDot _opts StateGraph{..} graph =
-  GV.graphToDot params graph
-  where
-    params = GV.nonClusteredParams
-      { GV.globalAttributes =
-          [ GV.GraphAttrs
-              [ GV.RankDir GV.FromTop
-              , GV.Label (GV.StrLabel (Text.Lazy.fromStrict sgName))
-              , GV.LabelLoc GV.VTop
-              , GV.FontName "Helvetica"
-              , GV.FontSize 14
-              ]
-          , GV.NodeAttrs
-              [ GV.FontName "Helvetica"
-              , GV.FontSize 11
-              ]
-          , GV.EdgeAttrs
-              [ GV.FontName "Helvetica"
-              , GV.FontSize 10
-              ]
-          ]
-      , GV.fmtNode = \(_, attrs) ->
-          [ GV.toLabel attrs.naLabel
-          , GV.FillColor [GV.toWC (GV.X11Color GV.White)]
-          , GV.style (parseStyle attrs.naStyle)
-          , GV.Shape (parseShape attrs.naShape)
-          , GV.FillColor [GV.toWC (parseColor attrs.naFillColor)]
-          ]
-      , GV.fmtEdge = \(_, _, attrs) ->
-          [ GV.toLabel attrs.eaLabel
-          , GV.Color [GV.toWC (parseColor attrs.eaColor)]
-          , GV.style (parseEdgeStyle attrs.eaStyle)
-          ]
-      }
-
--- | Parse a style string
-parseStyle :: Text -> GV.Style
-parseStyle "filled" = GV.filled
-parseStyle _        = GV.filled
-
--- | Parse an edge style string
-parseEdgeStyle :: Text -> GV.Style
-parseEdgeStyle "dashed" = GV.dashed
-parseEdgeStyle "dotted" = GV.dotted
-parseEdgeStyle _        = GV.solid
-
--- | Parse a shape string
-parseShape :: Text -> GV.Shape
-parseShape "doublecircle" = GV.DoubleCircle
-parseShape "box"          = GV.BoxShape
-parseShape "diamond"      = GV.DiamondShape
-parseShape _              = GV.Ellipse
-
--- | Parse a hex color to GraphViz color
-parseColor :: Text -> GV.Color
-parseColor hex = case Text.unpack hex of
-  ('#':r1:r2:g1:g2:b1:b2:[]) ->
-    let r = read ("0x" ++ [r1, r2]) :: Int
-        g = read ("0x" ++ [g1, g2]) :: Int
-        b = read ("0x" ++ [b1, b2]) :: Int
-    in GV.RGB (fromIntegral r) (fromIntegral g) (fromIntegral b)
-  _ -> GV.X11Color GV.Gray

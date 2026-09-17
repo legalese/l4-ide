@@ -1,0 +1,17 @@
+-- Fixture for @repo/state-graph-render: a rule whose HENCE is the rule's own
+-- name, so the graph has a self-loop (0 -> 0) as well as a LEST arm. Its DOT
+-- (self-loop.dot, beside it) was written by `l4 state-graph self-loop.l4`;
+-- regenerate the DOT when the emitter changes, not by hand.
+
+DECLARE Person IS ONE OF `The Tenant`, `The Landlord`
+DECLARE Action IS ONE OF `pay the rent`, `serve notice`
+
+GIVETH DEONTIC Person Action
+`the monthly cycle` MEANS
+  PARTY `The Tenant`
+  MUST  `pay the rent`
+  WITHIN 30
+  HENCE `the monthly cycle`
+  LEST (PARTY `The Landlord`
+        MUST  `serve notice`
+        WITHIN 7)

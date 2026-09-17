@@ -25,7 +25,8 @@
         "type": "bpmn:MultiInstanceLoopCharacteristics",
         "isSequential": false,
         "loopCardinality": false,
-        "loopDataInputRef": false
+        "loopDataInputRef": false,
+        "completionCondition": null
       },
       "cancelActivity": null,
       "attachedTo": null,
@@ -142,8 +143,8 @@
     ],
     "endEventsReached": [],
     "log": [
-      "Process started 1wqtple",
-      "Start Event 1wqtple"
+      "Process started 0cnncwf",
+      "Start Event 0cnncwf"
     ],
     "afterWaiting3s": {
       "tokensOn": [
@@ -178,12 +179,12 @@
       "End_3"
     ],
     "log": [
-      "Process started 1907uwl",
-      "Start Event 1907uwl",
-      "MUST Sign ... 1907uwl",
-      "after P14D 1907uwl",
-      "Breach 1907uwl",
-      "Process finished 1907uwl"
+      "Process started 0npmxa6",
+      "Start Event 0npmxa6",
+      "MUST Sign ... 0npmxa6",
+      "after P14D 0npmxa6",
+      "Breach 0npmxa6",
+      "Process finished 0npmxa6"
     ]
   },
   "happy": [
@@ -226,12 +227,12 @@
         "End_2"
       ],
       "log": [
-        "Process started 113m481",
-        "Start Event 113m481",
-        "MUST Sign ... 113m481",
-        "MUST Deliver ... 113m481",
-        "Fulfilled 113m481",
-        "Process finished 113m481"
+        "Process started 0x3oll9",
+        "Start Event 0x3oll9",
+        "MUST Sign ... 0x3oll9",
+        "MUST Deliver ... 0x3oll9",
+        "Fulfilled 0x3oll9",
+        "Process finished 0x3oll9"
       ]
     }
   ],

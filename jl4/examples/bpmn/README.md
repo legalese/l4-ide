@@ -54,8 +54,10 @@ Three things the extractor learned in the process, all visible in the goldens:
 - **A `HENCE` back into the rule being extracted is a loop.** It is an `App` with
   arguments, which used to fall through to "unknown target" and produce a dead-end
   state named `next`; `P-CYCLE` could not fire because there was no cycle in the
-  graph to detect. `TargetSelf` now edges back to the initial state, and `P-CYCLE`
-  fires.
+  graph to detect. A `HENCE` into any named rule of the module, the rule itself
+  included, now lands on that rule's memoised state (`wireTarget`, since
+  2026-09-16; the memo is per path, so the two branches of a `RAND`/`ROR` each
+  draw their own copy of a rule both name), and `P-CYCLE` fires.
 - **A junction's branch edges carry their guards.** `Lower.hs`'s `branches` passed
   `Nothing`, so an exclusive gateway drew a free choice and the condition landed on
   the flow *out of the task* — the diagram read "pick an arm, do the work, then test
@@ -110,7 +112,14 @@ byte-identical fidelity report, because `L4.StateGraph.extractDeonton` never rea
   loss). BPMN has shapes for once-per-member — a multi-instance subProcess around the continuation,
   or the `None` completion behaviour caught by a non-interrupting boundary — and this exporter
   emits neither. Both notes are written "the diagram says…; the rule says…", because the reader
-  has to disbelieve the drawing rather than fill it in.
+  has to disbelieve the drawing rather than fill it in. Two gaps in that reporting were measured
+  2026-09-16 and fixed the same day (`d544ed22`): a `MAY` fork with a continuation
+  (`modals-may-fork`) had its lapse timer drawn into the continuation — the chair's `MUST Publish`
+  — which the runtime never does (`ok/every/run-modals.l4` §7: nobody approves, the chair publishes
+  late, FULFILLED); the state graph now draws the fork's lapse as a LEST arm to Fulfilled, as the
+  barrier's has been since 2026-09-15, and the golden reads `Boundary_0 → End_2`. And
+  `P-FORK-CANCEL` is now emitted on the `MAY` fork too (`modals-may-fork.fidelity.txt`), whose
+  timer is interrupting like the `MUST` forks' (`modals-may-fork.bpmn:36`).
 - **A deadline written only on the join line arms the boundary timer** (`memberDeadline` in
   `L4.StateGraph`, mirroring the evaluator). When the act has a deadline of its own, that one is
   on the timer and the join line's is reported undrawn as `P-JOIN-DEADLINE` (lossy).
@@ -338,11 +347,23 @@ cd etc/bpmn-token-sim && npm ci && npm run build && npm run run
 ```
 
 It is not a check and has no verdict. The short version of what it found
-(2026-09-15): the simulator accepts all eight files without complaint and
-animates a `MUST`, a `MAY` and a `SHANT` with the same token and the same
-buttons; `tenancy-barrier` and `tenancy-fork` animate identically; no timer fired on
-its own in 4.5 s of wall clock (the simulator has no clock — timers are play
-buttons); and a breach end event does not stop the siblings.
+(2026-09-15, re-run 2026-09-15 17:19 UTC over all fourteen — 2026-09-16 in
+Singapore — and again at 20:25 UTC after `d544ed22`): the simulator accepts every
+file without complaint and animates a `MUST`, a `MAY` and a `SHANT` with the
+same token and the same buttons; every barrier/fork pair animates identically —
+`tenancy-*`, `modals-shant-*`, `modals-must-*` and, since `d544ed22`,
+`modals-may-*`; no timer fired on its own in 4.5 s of wall clock (the simulator
+has no clock — timers are play buttons); a breach end event does not stop the
+siblings; and the `SHANT`'s `completionCondition` is imported but never
+consulted — one instance, one click. The 17:19 run had found one pair that
+differed: `modals-may-fork`'s lapse timer landed on the chair's `MUST Publish`
+where the barrier's landed on Fulfilled. The runtime does what the barrier drew
+in both cases — a permission nobody exercised creates no duty
+(`ok/every/run-modals.l4` §7, measured 2026-09-16) — so the fork's drawing was
+wrong; `d544ed22` fixed the state graph, the golden now reads `Boundary_0 →
+End_2`, and the 20:25 run animates the pair identically (measured;
+`P2A-TOKEN-SIM-BASELINE.md` §3.7). `Lower.hs`'s `KNOWN WRONG` note is back to
+naming one shape, the bare `PARTY … MAY` it was written for.
 
 ## Asking an actual engine: the jBPM/KIE second opinion
 

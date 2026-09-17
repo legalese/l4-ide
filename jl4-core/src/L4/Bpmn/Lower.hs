@@ -457,8 +457,9 @@ stateGraphToBpmn opts sg =
   -- 'chainFor' already put after it, and which is where the loop belongs
   -- anyway: the renewal re-tests the guards, it does not re-start the process.
   --
-  -- This is not a stylistic preference. @HENCE \<this rule\>@ (see
-  -- 'L4.StateGraph.TargetSelf') is the shape that first pointed an edge back at
+  -- This is not a stylistic preference. @HENCE \<this rule\>@ (a
+  -- @TargetNamed@ landing on the memoised start state — @wireTarget@ in
+  -- "L4.StateGraph") is the shape that first pointed an edge back at
   -- the initial state, and drawing it at @Start_0@ produced a file that
   -- @etc\/check-bpmn-soundness.mjs@ refuses to play ("no start event to put a
   -- token on") and that jBPM refuses to parse outright: /A start node
@@ -561,7 +562,16 @@ stateGraphToBpmn opts sg =
           --     PARTY Alice DOES pay AT 3   ==> PARTY Bob MUST deliver WITHIN 10
           --
           -- so in that shape this flow draws the lapse arriving at Bob's
-          -- obligation, which it never does. The root cause is upstream —
+          -- obligation, which it never does. The quantified MAY used to be a
+          -- second such shape — a fork-joined EVERY … MAY with a HENCE lapses
+          -- to FULFILLED at runtime (measured 2026-09-16, ok/every/run-modals.l4
+          -- §7) and this synthesis drew its lapse into the chair's duty — until
+          -- the state graph started drawing a LEST edge to Fulfilled for a
+          -- quantified MAY under either join (the barrier on 2026-09-15, the
+          -- fork in d544ed22; the DMay arm in 'extractDeonton'), after which
+          -- 'chainFor' synthesises no lapse node for it (its guard wants
+          -- @lestOf sid@ to be Nothing) and 'lapses' below is empty. The
+          -- root cause for the shape that remains is upstream —
           -- 'L4.StateGraph.extractDeonton' emits no LEST edge for a bare MAY, so
           -- there is nothing here to follow and this synthesis is guessing. See
           -- the NOTE at that site; fixing it retires this whole branch.

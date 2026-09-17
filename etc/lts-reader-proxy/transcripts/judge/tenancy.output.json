@@ -1,0 +1,88 @@
+{
+  "rows": [
+    {
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 0, 1, 1, 0],
+      "rationale": "a1 names all three tenants, landlord, day 7. a2 'cannot tell' but truth says payment discharges — 0. a3 clock-8 breach named to Alice matches. a4 'at time 0 before any action' = at the start — accepted. a5 'cannot tell' but truth gives the receipt obligation — 0."
+    },
+    {
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 0, 1, 0, 0],
+      "rationale": "a1 correct. a2 'cannot tell' — 0. a3 clock-8/Alice breach correct (hedge on Bob/Carol is harmless). a4 explicitly says it cannot identify the live rule/branch/state — 0. a5 'cannot tell' — 0."
+    },
+    {
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 0],
+      "rationale": "a1 tenants→landlord correct. a2 each tenant's own Pay discharges its obligation — correct despite noting the what-if limitation. a3 nothing-by-7/clock-8 breach to Alice correct. a4 at the start with all three payment obligations live matches the three-branch fork. a5 'cannot tell' — 0."
+    },
+    {
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 0, 1, 1, 0],
+      "rationale": "a1 correct. a2 states the right inference but then retracts to 'cannot tell' as its verdict — scored 0 per the rule. a3 correct (Alice at clock 8). a4 at the start, three obligations owed — correct. a5 'cannot tell' — 0."
+    },
+    {
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 0, 1, 1],
+      "rationale": "a1 tenants pay Ms Ng — correct. a2 tenant payment discharges, then landlord receipts — matches. a3 'a timeout' with no deadline and no party named — too unspecific to match 7-day/5-day breaches. a4 initial state = at the start. a5 landlord must issue receipts after payment — core obligation/party right, does not assert all-must-pay-first."
+    },
+    {
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 1, 0, 1, 1],
+      "rationale": "a1, a2 correct. a3 generic 'timeout in either state' names neither deadline nor party — 0. a4 initial state at day 0 — correct. a5 after a tenant pays, landlord must issue receipts to that tenant — matches the per-tenant truth."
+    },
+    {
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All five match: tenants owe within 7, landlord owes nothing yet; payment then receipt discharge; 7-day tenant timeout and 5-day landlord timeout breach; initial state with payment rule live; after payment landlord must Receipt within 5 days."
+    },
+    {
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [0, 1, 1, 1, 1],
+      "rationale": "a1 'nothing is owed yet' contradicts the truth that all three tenants owe payment — 0. a2 payment then receipt discharge with [7]/[5] — correct. a3 both timeouts with the [7] and [5] windows — correct. a4 node 0 initial — correct. a5 after payment landlord must Receipt — correct."
+    },
+    {
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 0],
+      "rationale": "a1–a4 match: tenants→Ms Ng within 7; payment then receipts within 5 discharge; 7-day and 5-day timers breach; Start_0 into multi-instance Task_0 one per tenant. a5 says the receipt obligation follows Task_0 completing (all tenants), whereas truth says one payment triggers that tenant's receipt while the others still owe — trigger event wrong, 0."
+    },
+    {
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 0],
+      "rationale": "a1–a4 correct (obligation, parties, 7/5-day deadlines, start state with multi-instance Pay live). a5 explicitly says 'after all tenants complete their payments' — contradicts the per-branch truth, 0."
+    },
+    {
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 0],
+      "rationale": "a1 'nothing owed yet' is immediately qualified with each tenant's obligation to Pay within 7 days — accepted. a2–a4 correct (per-tenant Pay discharge, 7-day/5-day breaches, Start_0 into multi-instance Task_0). a5 'cannot tell' — truth gives the answer, 0."
+    },
+    {
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 0],
+      "rationale": "a1 correctly frames tenants under active obligation to pay. a2–a4 correct. a5 conditions the landlord's receipt obligation on the last tenant instance completing (all instances finish) — contradicts the truth's per-branch receipt after a single payment, 0."
+    }
+  ]
+}
