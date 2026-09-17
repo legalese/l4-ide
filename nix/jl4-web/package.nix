@@ -75,6 +75,13 @@ buildNpmPackage rec {
     npm run build
     popd
 
+    # state-graph-render depends only on @viz-js/viz (external), so its place
+    # in this order is free; jl4-web imports it, so it must be built before
+    # jl4-web's vite build resolves "@repo/state-graph-render".
+    pushd ./state-graph-render
+    npm run build
+    popd
+
     popd
 
     pushd ./ts-apps
