@@ -56,3 +56,22 @@ GIVETH A NUMBER
 `the duty on` m [rate \] per unit, see s.3 \% of value] MEANS m TIMES 0.2
 
 #EVAL `the duty on` 50
+
+-- A backslash that cannot BEGIN an escape stays ordinary text, exactly as it
+-- was before escapes existed. The lexer consumes only the escapes the decoder
+-- honours (`\%`, `\]`, `\\`), so `\q` is two ordinary characters; and a line
+-- annotation has no closing herald, so a trailing `\` has nothing to escape.
+-- Both of these lexed before this feature and must still lex. The exactprint
+-- golden pins that they re-emit unchanged.
+GIVEN q IS A NUMBER
+GIVETH A NUMBER
+@nlg a discount of 50\
+DECIDE discounted IS q TIMES 0.5
+
+#EVAL discounted 80
+
+GIVEN r IS A NUMBER
+GIVETH A NUMBER
+`note on` r [see s.3\q here] MEANS r TIMES 1
+
+#EVAL `note on` 7

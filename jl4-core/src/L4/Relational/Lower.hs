@@ -578,6 +578,16 @@ linearNlg = \case
   other                 -> squash (simpleLinearizer other)
  where
   squash = Text.unwords . Text.words
+  -- NB: annotation text is emitted with its backslash escapes STILL IN IT, and
+  -- that is load-bearing rather than an oversight. This output is re-scanned
+  -- for @%name%@ slots by 'L4.Blawx.Lower.scanNlg', and the @%@ this function
+  -- writes around a reference is the delimiter that scan looks for. Decoding
+  -- @\\%@ to @%@ here would put an indistinguishable @%@ into the sentence:
+  -- @10\\%and\\%20@ would become @10%and%20@ and scanNlg would cut a phantom
+  -- slot at @%and%@, because @slotNameShaped "and"@ is 'True' — which is the
+  -- very failure the escape was added to prevent, reintroduced one layer down.
+  -- 'L4.Blawx.Lower.nlgChunks' decodes the literal chunks after the split.
+  -- See the call-site table in 'L4.Nlg.unescapeNlgText'.
   frag = \case
     MkNlgText _ t -> t
     MkNlgRef  _ r -> "%" <> rawNameToText (rawName (getActual r)) <> "%"

@@ -19,10 +19,12 @@
 module NlgPercentSpec (spec) where
 
 import Base
+import qualified Base.Text as Text
 
+import Data.Char (isSpace)
 import L4.Nlg (unescapeNlgText)
 import L4.Parser (PState (..), execParser, module')
-import L4.Syntax (Nlg (..), NlgFragment (..), nameToText)
+import L4.Syntax (Name, Nlg (..), NlgFragment (..), nameToText)
 import Test.Hspec
 
 -- | Every @\@nlg@ annotation in the source, in source order, reduced to the list
@@ -45,6 +47,38 @@ nlgRefs src = do
     MkParsedNlg _ frags -> [nameToText n | MkNlgRef _ n <- frags]
     MkResolvedNlg{}     -> []
     MkInvalidNlg{}      -> []
+
+-- | Every @\@nlg@ annotation reduced to its fragments, in order: a text
+-- fragment as @T:\<verbatim\>@, a reference as @R:\<name\>@. Whitespace-only
+-- fragments are dropped, because 'textFragment' mints one fragment per token
+-- and the spaces are not what any of these tests are about.
+--
+-- This sees something 'nlgRefs' cannot. 'nlgRefs' reports which names an
+-- annotation BINDS, so it goes quiet when the question is how the prose was
+-- CUT — and the whole point of consuming @\\%@ as a unit in the lexer is that
+-- @10\\%and\\%20@ stays ONE text fragment instead of being split into three
+-- around a reference.
+nlgFrags :: Text -> IO [[Text]]
+nlgFrags src = do
+  let uri = toNormalizedUri (Uri "file:///nlg-percent-spec-frags")
+  case execParser (module' uri) uri src of
+    Left errs -> do
+      expectationFailure $ "Parser failed: " <> show errs
+      error "unreachable"
+    Right (_module, _warnings, pstate) ->
+      pure (map fragsOf (reverse pstate.nlgs))
+ where
+  fragsOf :: Nlg -> [Text]
+  fragsOf = \ case
+    MkParsedNlg _ frags -> [ f | Just f <- map render frags ]
+    MkResolvedNlg{}     -> []
+    MkInvalidNlg{}      -> []
+
+  render :: NlgFragment Name -> Maybe Text
+  render = \ case
+    MkNlgText _ t | Text.all isSpace t -> Nothing
+                  | otherwise          -> Just ("T:" <> t)
+    MkNlgRef  _ n -> Just ("R:" <> nameToText n)
 
 spec :: Spec
 spec = describe "a literal % in @nlg prose is not a reference delimiter" $ do
@@ -154,3 +188,59 @@ spec = describe "a literal % in @nlg prose is not a reference delimiter" $ do
 
     it "does not consume a trailing lone backslash" $
       unescapeNlgText "trailing \\" `shouldBe` "trailing \\"
+
+  -- The fragment shape, which the ref list above cannot see. Without these two,
+  -- the whole `nlgString` hunk can be reverted and every other test stays green:
+  -- the escaped-percent case passes on the PRE-fix lexer too, because #957's
+  -- tightness rule already declines `% and %`. What tightness does NOT do is
+  -- keep the prose in one piece.
+  describe "an escaped percent keeps the prose in one text fragment" $ do
+    it "does not split `10\\%and\\%20` around a reference" $ do
+      frags <-
+        nlgFrags
+          "GIVEN n IS A NUMBER\n\
+          \GIVETH A NUMBER\n\
+          \@nlg between 10\\%and\\%20 for %n%\n\
+          \DECIDE `the levy on` IS n TIMES 2\n"
+      frags `shouldBe` [["T:between", "T:10\\%and\\%20", "T:for", "R:n"]]
+
+    it "shows the unescaped shape really is cut into three, so the test above bites" $ do
+      -- The positive control for the fragment assertion, matching the one the
+      -- ref-list tests already carry.
+      frags <-
+        nlgFrags
+          "GIVEN n IS A NUMBER\n\
+          \GIVETH A NUMBER\n\
+          \@nlg between 10%and%20 for %n%\n\
+          \DECIDE `the levy on` IS n TIMES 2\n"
+      frags `shouldBe` [["T:between", "T:10", "R:and", "T:20", "T:for", "R:n"]]
+
+  -- The lexer consumes exactly the escapes the decoder honours
+  -- ('L4.Lexer.isNlgEscapable' = `unescapeNlgText`'s "\\%]"). A lexer that
+  -- swallowed any `\c` would change what an annotation CAPTURES without
+  -- changing what it RENDERS, and would turn two shapes that lex today into
+  -- parse errors. These are the missing direction: not "does the decoder leave
+  -- `\q` alone", which is about the decoder, but "does the text still lex".
+  describe "a backslash that cannot begin an escape stays ordinary text" $ do
+    it "accepts an @nlg LINE annotation whose text ends in a backslash" $ do
+      -- There is no closing herald on a line annotation, so there is nothing
+      -- here to escape. This lexed before escapes existed and must still lex.
+      frags <-
+        nlgFrags
+          "GIVEN n IS A NUMBER\n\
+          \GIVETH A NUMBER\n\
+          \@nlg a discount of 50\\\n\
+          \DECIDE discounted IS n\n"
+      frags `shouldBe` [["T:a", "T:discount", "T:of", "T:50\\"]]
+
+    it "accepts an unknown escape inside a bare inline annotation" $ do
+      frags <-
+        nlgFrags
+          "GIVEN n IS A NUMBER\n\
+          \GIVETH A NUMBER\n\
+          \`note on` n [see s.3\\q here] MEANS n\n"
+      -- `s` lexes as an identifier and `.3\q` as the following nlgString run,
+      -- so the prose arrives in four fragments rather than three. That split
+      -- is pre-existing token structure and not what this test is about; what
+      -- matters is that it LEXES and that the `\q` survives verbatim.
+      frags `shouldBe` [["T:see", "T:s", "T:.3\\q", "T:here"]]
