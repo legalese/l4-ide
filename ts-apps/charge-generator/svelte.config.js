@@ -36,6 +36,11 @@ const config = {
           'http://127.0.0.1:8080',
           'http://localhost:18099',
           'http://127.0.0.1:18099',
+          // the demo host, reached from other machines on the LAN by name
+          'http://nye:18099',
+          'http://nye.local:18099',
+          'http://192.168.252.125:18099',
+          'http://192.168.252.23:18099',
           'https://dev.jl4.legalese.com',
           'https://jl4.legalese.com',
           'https://legalese.cloud',
