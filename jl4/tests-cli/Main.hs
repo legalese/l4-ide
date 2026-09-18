@@ -480,6 +480,9 @@ objField _ _ = Nothing
 fixtureDir :: FilePath
 fixtureDir = "tests-cli/fixtures"
 
+bilingualFixture :: FilePath
+bilingualFixture = fixtureDir </> "bilingual.l4"
+
 cleanFixture, evalFixture, errorFixture, garbageFixture :: FilePath
 cleanFixture   = fixtureDir </> "clean.l4"
 evalFixture    = fixtureDir </> "eval.l4"
@@ -1431,6 +1434,56 @@ spec bin = do
     it "writes nothing to stdout and exits non-zero on a broken file" $ do
       Output code _ _ <- runL4 bin ["format", garbageFixture]
       code `shouldSatisfy` (/= ExitSuccess)
+
+  ----------------------------------------------------------------------------
+  -- One encoding, several languages.
+  --
+  -- The property that matters is not just "--lang he prints Hebrew" but the
+  -- pair with it: a rule that has NO rendering in the requested language falls
+  -- back to its default, so a half-finished translation produces a whole
+  -- document rather than one with holes in it. The fixture carries one rule
+  -- with both renderings and one with only English, so a single run shows
+  -- both halves.
+  --
+  -- Asserted at the CLI rather than only in `NlgMultiplicitySpec` because the
+  -- flag is the user surface, and because `l4 render` reaches the annotation
+  -- through a completely different path from `l4 nlg` — the exporter in
+  -- `L4.Export.Document`, not the linearizer. Both are language-aware for the
+  -- same reason (`L4.Nlg.selectLanguage` moves the chosen rendering into the
+  -- slot each already reads), and that shared reason is exactly the kind that
+  -- looks fine until one of the two paths is changed.
+  ----------------------------------------------------------------------------
+  describe "l4 --lang (one encoding, several languages)" $ do
+    it "l4 nlg selects the requested language" $ do
+      Output code sout _ <- runL4 bin ["nlg", "--lang", "he", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("עולה על הסף" `isInfixOf`)
+
+    it "l4 nlg falls back for a rule with no rendering in that language" $ do
+      Output code sout _ <- runL4 bin ["nlg", "--lang", "he", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      -- `is small` is English-only; asking for Hebrew must still render it.
+      sout `shouldSatisfy` ("is under the threshold" `isInfixOf`)
+
+    it "l4 nlg with no --lang uses the default rendering" $ do
+      Output code sout _ <- runL4 bin ["nlg", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("exceeds the threshold" `isInfixOf`)
+      sout `shouldNotSatisfy` ("עולה על הסף" `isInfixOf`)
+
+    it "l4 render reaches the same annotations, through the exporter" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "text", "--lang", "he", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("עולה על הסף" `isInfixOf`)
+      sout `shouldSatisfy` ("is under the threshold" `isInfixOf`)
+
+    it "a language the file does not carry leaves the output unchanged" $ do
+      -- The safety property for every existing caller: selection can only ever
+      -- swap in a rendering that is actually there. `zz` is carried by nothing,
+      -- so this must equal the no-flag output byte for byte.
+      Output _ plain _ <- runL4 bin ["render", "--format", "text", bilingualFixture]
+      Output _ asked _ <- runL4 bin ["render", "--format", "text", "--lang", "zz", bilingualFixture]
+      asked `shouldBe` plain
 
   describe "l4 ast" $ do
     it "dumps a parsed AST for a clean file" $ do

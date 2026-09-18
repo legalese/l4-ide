@@ -292,6 +292,19 @@ $ l4 nlg --lang he contract.l4  > contract.he.txt
 
 Two runs, one argument apart. That is the bilingual set.
 
+`l4 render` takes the same flag, and that is the one you want for a document
+somebody reads — the prose above is the linearizer's output, while `render`
+produces the formatted article:
+
+```console
+$ l4 render --format html --lang en contract.l4 -o contract.en.html
+$ l4 render --format html --lang he contract.l4 -o contract.he.html
+```
+
+Every format `render` supports — `text`, `html`, `akn`, `json`, `plan` —
+follows the flag, because the language is chosen before the document is built
+rather than inside each writer.
+
 ### Translate incrementally
 
 A rule with no rendering in the language you asked for falls back to its default
