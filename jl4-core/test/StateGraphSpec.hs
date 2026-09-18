@@ -464,15 +464,17 @@ spec = do
 
     it "sends a quantified permission's lapse to Fulfilled under either join" $ do
       -- A LEST edge to the Fulfilled terminal, captioned as a lapse, out of
-      -- the initial state — for the barrier and for the fork alike. A PARTY
-      -- MAY still draws none here (the pre-existing single-party gap).
+      -- the initial state — for the barrier and for the fork alike, and since
+      -- 2026-09-17 for a single-party PARTY MAY too, which used to draw none.
+      -- The quantified cases came first only because the join made the gap
+      -- visible; the rule was never about the quantifier.
       let lapseOf src = case graphFor src of
             Left errs -> Left (show errs)
             Right sg -> Right [ (t.transLabel.labelAction, nameOf sg t.transTo)
                               | t <- lestEdges sg, t.transFrom == sg.sgInitialState ]
       lapseOf mayBarrierSrc `shouldBe` Right [("lapses", "Fulfilled")]
       lapseOf mayForkSrc `shouldBe` Right [("lapses", "Fulfilled")]
-      lapseOf (defaultLestSrc "MAY") `shouldBe` Right []
+      lapseOf (defaultLestSrc "MAY") `shouldBe` Right [("lapses", "Fulfilled")]
 
     -- 'noDeadlineLestSrc', below, is the control: with no WITHIN anywhere the
     -- caption IS 'noTriggerWording'. Here there is one, on the join line, and
@@ -663,8 +665,13 @@ spec = do
       it "still defaults a prohibition to a violation into Breach" $
         lestCaptions (defaultLestSrc "SHANT") `shouldBe` Right ["violation"]
 
-      it "still draws no LEST arm at all for a bare permission" $
-        lestCaptions (defaultLestSrc "MAY") `shouldBe` Right []
+      -- Until 2026-09-17 this arm was drawn only under a quantifier's join and
+      -- a single-party permission got nothing, so a rule whose expiry reaches
+      -- FULFILLED showed no route there at all. 'bareSrc "MAY"' below is the
+      -- control that says the fix did not go one step too far: with no WITHIN
+      -- there is no expiry event, so there is still no arm to draw.
+      it "now draws a bare permission's lapse, which used to be drawn nowhere" $
+        lestCaptions (defaultLestSrc "MAY") `shouldBe` Right ["lapses"]
 
       -- DO is documented as requiring an explicit LEST, and the extractor used
       -- to believe the documentation and draw nothing — leaving a rule whose
@@ -681,6 +688,9 @@ spec = do
         lestCaptions (bareSrc "MUST") `shouldBe` Right [noTriggerWording]
         lestCaptions (bareSrc "DO") `shouldBe` Right [noTriggerWording]
         lestCaptions (bareSrc "SHANT") `shouldBe` Right ["violation"]
+        -- The control for the arm above: a permission with no WITHIN cannot
+        -- lapse, so nothing is drawn — the deadline, not the modal, decides
+        -- whether there is an arm.
         lestCaptions (bareSrc "MAY") `shouldBe` Right []
 
     -- L4.Bpmn.Lower reads the obligation's modal off `henceOf sid <|> lestOf

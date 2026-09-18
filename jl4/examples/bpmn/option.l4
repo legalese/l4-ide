@@ -1,0 +1,40 @@
+-- A permission whose exercise creates somebody else's obligation: the shape in
+-- which a lapse and a HENCE part company.
+--
+-- `the option` is an option to purchase. If the buyer exercises it, the seller
+-- owes a transfer. If the buyer does not, the option LAPSES and nobody owes
+-- anything — the rule ends fulfilled. Those are two different destinations, and
+-- the deadline is what decides between them.
+--
+-- Until 2026-09-17 the state graph drew only one of them. L4.StateGraph emitted
+-- no LEST edge for a single-party MAY, so the graph had no route to FULFILLED
+-- at all, and L4.Bpmn.Lower filled the gap by synthesising a timer of its own
+-- and sending it "wherever HENCE lands" — which here is the seller's
+-- obligation. The emitted diagram therefore said that a buyer who lets the
+-- option expire obliges the seller to transfer the shares anyway.
+--
+-- It went unnoticed because every other permission in this corpus has no HENCE,
+-- or a HENCE of FULFILLED, and in those shapes the two arms land on the same
+-- state and the guess is invisible (see `handover`, whose four permissions all
+-- route to the same Fulfilled end event either way). This file is the witness
+-- for the shape where the guess is wrong.
+
+DECLARE Actor IS ONE OF
+    Buyer  HAS name IS A STRING
+    Seller HAS name IS A STRING
+
+DECLARE Action IS ONE OF
+    Exercise HAS who IS AN Actor
+    Transfer HAS who IS AN Actor, to IS AN Actor
+
+theBuyer  MEANS Buyer OF "Ms Tan"
+theSeller MEANS Seller OF "Mr Lim"
+
+GIVETH A DEONTIC Actor Action
+`the option` MEANS
+    PARTY  theBuyer
+    MAY    Exercise (EXACTLY theBuyer)
+    WITHIN 30
+    HENCE  (PARTY  theSeller
+                MUST   Transfer (EXACTLY theSeller) (EXACTLY theBuyer)
+                WITHIN 14)

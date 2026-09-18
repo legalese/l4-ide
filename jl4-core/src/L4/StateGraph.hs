@@ -1019,51 +1019,55 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
     Nothing -> do
       -- No LEST specified - use default based on modal
       case action.modal of
-        -- MAY without LEST: the permission lapses to FULFILLED, and for the
-        -- common shape — no HENCE, or HENCE FULFILLED — that is where the HENCE
-        -- edge already goes, so there is no second arrow to draw.
+        -- MAY without LEST: the permission lapses to FULFILLED, and that is a
+        -- real edge, drawn here rather than left for a consumer to synthesise.
         --
-        -- NOTE (not fixed here): when a bare MAY's HENCE points at another
-        -- OBLIGATION the two arms genuinely part company, and this draws only
-        -- one of them. Measured:
+        -- Where HENCE is absent or is FULFILLED the lapse lands on the same
+        -- state the HENCE edge lands on, by a second route and under its own
+        -- caption. Where HENCE points at another OBLIGATION the two arms part
+        -- company, and this is then the only route to FULFILLED there is.
+        -- Measured:
         --
         --   PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)
         --     (`WAIT UNTIL` 100)          ==> FULFILLED
         --     PARTY Alice DOES pay AT 3   ==> PARTY Bob MUST deliver WITHIN 10
         --
-        -- so expiry reaches FULFILLED (@fromMaybe fulfilExpr lest@) while HENCE
-        -- reaches Bob's obligation, and the graph shows no route to FULFILLED at
-        -- all. L4.Bpmn.Lower inherits the gap and makes it worse, sending its
-        -- synthesised lapse timer "wherever HENCE lands" — which in this shape
-        -- is the wrong place. Fixing it means emitting a real lapse edge here
-        -- and retiring that synthesis, which moves BPMN output for every
-        -- permission; it is a separate change from smucclaw/l4-ide#927.
-        DMay -> case quantifier >>= (.quantJoin) of
-          -- Under EITHER join a lapsed member's arm goes to Fulfilled, never
-          -- to where HENCE goes. Barrier: a lapsed member means the join can
-          -- never fire, the HENCE is skipped and the member's own FULFILLED is
-          -- returned as the barrier's (Machine.hs, Barrier1's last arm and the
-          -- note on 'barrierFail'). Fork: the HENCE arises only from a
-          -- member's ACT; a member whose permission expires unexercised
-          -- spawns nothing. Both measured, 2026-09-15/16, on the corporate
-          -- resolution (spec §2.2.1 Pattern B): nobody approves and the chair
-          -- publishes anyway → FULFILLED under both joins; one approval with
-          -- no publication → BREACHED (the chair), fork and barrier alike
-          -- (ok/every/tests/run-modals.golden). Drawing the arm here is what
-          -- stops L4.Bpmn.Lower's synthesised lapse timer from routing
-          -- "wherever HENCE lands", which manufactured the chair's duty to
-          -- publish a resolution that did not pass.
-          --
-          -- A first version of this arm drew it for the barrier only, on the
-          -- concurrency review's reading that a fork "carries the real HENCE"
-          -- per member. That reading was wrong at runtime and was caught by
-          -- re-measurement the next day. The single-party PARTY MAY keeps the
-          -- pre-existing gap noted above; it is the same defect and the same
-          -- fix, and moves the handover goldens, so it is its own change.
-          Just _ -> do
-            fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
-            addTransition fromState fulfilledId lestLabel LestTransition
-          Nothing -> pure ()
+        -- so expiry reaches FULFILLED (@fromMaybe fulfilExpr lest@ in
+        -- L4.EvaluateLazy.Machine) while HENCE reaches Bob's obligation. Until
+        -- 2026-09-17 this arm was drawn only under a quantifier's join line and
+        -- the single-party case drew nothing, so the graph showed no route to
+        -- FULFILLED at all; L4.Bpmn.Lower inherited the gap and made it worse,
+        -- synthesising a lapse timer that routed "wherever HENCE lands", which
+        -- in this shape is the wrong place. Drawing the edge here retires that
+        -- synthesis (smucclaw\/l4-ide#927 is a different bug in the same area).
+        --
+        -- Under a quantifier's join the same arm goes to Fulfilled and never to
+        -- where HENCE goes. Barrier: a lapsed member means the join can never
+        -- fire, the HENCE is skipped and the member's own FULFILLED is returned
+        -- as the barrier's (Machine.hs, Barrier1's last arm and the note on
+        -- 'barrierFail'). Fork: the HENCE arises only from a member's ACT; a
+        -- member whose permission expires unexercised spawns nothing. Both
+        -- measured, 2026-09-15\/16, on the corporate resolution (spec §2.2.1
+        -- Pattern B): nobody approves and the chair publishes anyway →
+        -- FULFILLED under both joins; one approval with no publication →
+        -- BREACHED, the chair, fork and barrier alike
+        -- (ok\/every\/tests\/run-modals.golden). A first version of that arm
+        -- drew it for the barrier only, on the concurrency review's reading
+        -- that a fork "carries the real HENCE" per member; that reading was
+        -- wrong at runtime and was caught by re-measurement the next day.
+        --
+        -- THE DEADLINE DECIDES WHETHER THERE IS AN ARM AT ALL, which is
+        -- 'lestArmWording's rule read back: with no @WITHIN@ there is no expiry
+        -- event, so nothing can take this edge. An explicit @LEST@ with no
+        -- @WITHIN@ is still drawn, captioned 'noTriggerWording', because the
+        -- author wrote one and the graph says why it cannot fire; a synthesised
+        -- arm has no such author, and inventing an unreachable edge where the
+        -- source is silent would be the graph asserting something of its own.
+        DMay
+          | isJust (memberDeadline label) -> do
+              fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
+              addTransition fromState fulfilledId lestLabel LestTransition
+          | otherwise -> pure ()
         -- MUST/SHANT without LEST default to Breach; only the way in differs,
         -- and 'lestArmWording' is where that difference is spelled.
         DMust -> defaultToBreach

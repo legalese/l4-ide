@@ -18,6 +18,9 @@ digraph {
       ,style=filled
       ,shape=doublecircle
       ,fillcolor="#d4edda"];
+    0 -> 1 [label=lapses
+           ,color="#dc3545"
+           ,style=dashed];
     0 -> 1 [label="Bob MAY drink [30]"
            ,color="#28a745"
            ,style=solid];
