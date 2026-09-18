@@ -38,10 +38,13 @@ module L4.Bpmn.IR
     -- * Flow nodes and sequence flows
   , FlowNode (..)
   , NodeKind (..)
+  , EndKind (..)
   , MultiInstance (..)
+  , LoopCollection (..)
   , GatewayKind (..)
   , GatewayFlow (..)
   , BoundaryTrigger (..)
+  , boundaryInterrupts
   , SequenceFlow (..)
   , nodeWidth
   , nodeHeight
@@ -201,15 +204,22 @@ defaultBpmnOptions = BpmnOptions {optDeadlineUnit = AssumeDays, optWiring = Noth
 -- Process structure
 --------------------------------------------------------------------------------
 
--- | What a flow node /is/. Every node in this IR is one of BPMN's five shapes
--- that a state graph can motivate; there is deliberately no @userTask@,
--- @serviceTask@ or @subProcess@, because a 'L4.StateGraph.StateGraph' carries
--- nothing that would justify choosing one.
+-- | What a flow node /is/. Every node here is a BPMN shape a state graph can
+-- motivate; there is deliberately no @userTask@ and no @serviceTask@, because
+-- a 'L4.StateGraph.StateGraph' carries nothing that would justify choosing
+-- between them.
+--
+-- __@subProcess@ was on that list until a fork motivated one.__ The rule has
+-- not changed — a shape earns its place by being forced, not by being
+-- available — and 'MultiInstanceScope' says what forces it. Do not read its
+-- arrival as licence for the other two: what a fork needs is a token SCOPE,
+-- which is a control-flow fact the graph does state, where \"is this act
+-- performed by a human or a service\" is not.
 data NodeKind
   = -- | @\<startEvent\>@
     StartEvent
-  | -- | @\<endEvent\>@; 'True' adds an @\<errorEventDefinition\>@ (a breach).
-    EndEvent !Bool
+  | -- | @\<endEvent\>@, of one of three kinds.
+    EndEvent !EndKind
   | -- | @\<task\>@ — abstract, because we do not know who or what performs it.
     Task
   | -- | @\<exclusiveGateway\>@ \/ @\<parallelGateway\>@.
@@ -222,6 +232,68 @@ data NodeKind
     -- exists only where a 'DmnWiring' says the guard has a home in the emitted
     -- DMN. See 'L4.Bpmn.Lower' and PROCESS-TRACK.md §8.3.
     BusinessRule !DmnCall
+  | -- | @\<subProcess\>@ carrying
+    -- @\<multiInstanceLoopCharacteristics isSequential="false"\>@: one
+    -- INSTANCE per member of a fork's cast, each with its own copy of
+    -- everything inside it.
+    --
+    -- __Why a scope and not a marker on the task.__ A barrier (@ONCE ALL
+    -- HAVE@) fires its continuation once, when the last member has performed,
+    -- which is exactly what a multi-instance /activity/ already means — so a
+    -- barrier needs no scope and does not get one. A fork (@UPON EACH@) fires
+    -- its continuation once per member, as that member performs, and a
+    -- continuation drawn outside the activity cannot do that however the
+    -- activity is marked. Putting the continuation INSIDE buys three things
+    -- the marker cannot:
+    --
+    -- * the continuation is per member, which is what @UPON EACH@ says;
+    -- * the member's @WITHIN@ lives on the member's own activity, so the
+    --   timer cancels that member and not the group (@P-FORK-CANCEL@);
+    -- * an EMPTY cast draws correctly. A multi-instance activity over an
+    --   empty collection completes at once and its outgoing flow IS taken —
+    --   right for a barrier, where \"all zero have acted\" is vacuously true,
+    --   and for a fork it MANUFACTURES an obligation nobody owes. With the
+    --   continuation inside there is no instance to run it, which is the
+    --   answer L4 gives. Measured 2026-09-16: at n=0 the barrier fires its
+    --   HENCE and the fork goes to @FULFILLED@.
+    --
+    -- __It is not free, and the cost is worth stating where it is emitted.__
+    -- A multi-instance sub-process synchronises at its own end and a fork does
+    -- not. That is invisible until a fork's continuation feeds shared
+    -- downstream flow, and then the file says the group waits where L4 says it
+    -- does not. See @P-FORK-JOIN@.
+    --
+    -- Carries no 'MultiInstance': a scope always completes when every instance
+    -- does. That is not an omission, it is a guard — see 'MultiInstance', whose
+    -- @CompleteOnFirst@ means \"cancel the siblings\" and is false for every
+    -- L4 rule when applied to a scope.
+    MultiInstanceScope
+  deriving stock (Eq, Show)
+
+-- | What an @\<endEvent\>@ terminates.
+data EndKind
+  = -- | A plain end: this path is over.
+    PlainEnd
+  | -- | @\<errorEventDefinition\>@ — a breach.
+    --
+    -- Only ever emitted at TOP LEVEL. An error event is fixed /interrupting/
+    -- in BPMN 2.0, so an error thrown inside a multi-instance instance would
+    -- cancel its siblings: one tenant's breach would silently end every other
+    -- tenant's obligation, which no L4 rule says. Inside a scope the breach
+    -- path ends with 'EscalationEnd' instead.
+    ErrorEnd
+  | -- | @\<escalationEventDefinition\>@ — a breach RAISED FROM INSIDE a
+    -- multi-instance instance, to be caught by a non-interrupting boundary on
+    -- the scope.
+    --
+    -- Escalation is the sanctioned non-interrupting throw. Measured 2026-09-16
+    -- against jBPM 7.74.1 with three instances all throwing: the inner nodes
+    -- fire 3x each, the catch fires 3x, and the scope\'s own end still fires
+    -- 1x — so n throws give n tokens and nothing collapses. @cancelActivity=
+    -- "false"@ on an /error/ boundary is accepted without complaint by both
+    -- bpmn-moddle and jBPM, which settles nothing in its favour: the
+    -- divergence would be silent at run time, and this one is not.
+    EscalationEnd
   deriving stock (Eq, Show)
 
 data GatewayKind = ExclusiveGateway | ParallelGateway
@@ -246,7 +318,18 @@ data GatewayKind = ExclusiveGateway | ParallelGateway
 -- @no subletting@, whose golden says BREACH with one act. So a prohibition's
 -- activity completes on the FIRST instance to complete, via a
 -- @\<completionCondition\>@ that is derived from the source, not invented.
--- The fork (@UPON EACH@) is the shape BPMN cannot draw this way; see @P-FORK@.
+-- The fork (@UPON EACH@) is the shape BPMN cannot draw this way; see @P-FORK@
+-- and 'MultiInstanceScope', which draws it as a scope instead.
+--
+-- __This type describes a multi-instance TASK and cannot reach a scope.__
+-- 'MultiInstanceScope' takes no 'MultiInstance' argument, so @CompleteOnFirst@
+-- has nowhere to go and the wrong thing is unrepresentable rather than merely
+-- unwritten. What it would have meant is worth saying, because it reads
+-- plausible: \"the scope completes as soon as one instance does\" cancels every
+-- other instance, so one member\'s breach would end every other member\'s
+-- obligation. A prohibition does complete on the first act — that is R-Q5 —
+-- but it completes the GROUP\'s activity, and a fork\'s instances are not the
+-- group.
 data MultiInstance
   = -- | completes when every instance has: the barrier, for @MUST@\/@MAY@\/@DO@
     CompleteWhenAll
@@ -266,7 +349,7 @@ data MultiInstance
 data GatewayFlow = Unspecified | Diverging | Converging | Mixed
   deriving stock (Eq, Show)
 
--- | The trigger on an interrupting boundary event.
+-- | The trigger on a boundary event.
 --
 -- BPMN requires a boundary event to carry exactly one trigger — there is no
 -- \"none\" boundary event — so a @LEST@ whose deadline we could not turn into an
@@ -277,7 +360,23 @@ data BoundaryTrigger
     TimerAfter !Text
   | -- | @\<conditionalEventDefinition\>@ with the raw text as its condition.
     WhenCondition !Text
+  | -- | @\<escalationEventDefinition\>@, catching an 'EscalationEnd' thrown
+    -- inside a 'MultiInstanceScope'.
+    CatchEscalation
   deriving stock (Eq, Show)
+
+-- | Whether a boundary event cancels the activity it is attached to.
+--
+-- Derived from the trigger rather than carried alongside it, because in this
+-- IR the two are not independent: a deadline expiring ends the obligation it
+-- bounds, and an escalation caught from one instance of a scope must NOT end
+-- the other instances. BPMN would allow either flag on either trigger; we emit
+-- one combination each, and this function is where that is stated once.
+boundaryInterrupts :: BoundaryTrigger -> Bool
+boundaryInterrupts = \case
+  TimerAfter _ -> True
+  WhenCondition _ -> True
+  CatchEscalation -> False
 
 data FlowNode = FlowNode
   { nodeId :: !Text
@@ -288,8 +387,48 @@ data FlowNode = FlowNode
     nodeDoc :: !(Maybe Text)
   , -- | The party this node belongs to; 'Nothing' lands in the default lane.
     nodeLane :: !(Maybe Text)
-  , -- | Set on the task of an @EVERY@ obligation and on nothing else.
+  , -- | Set on the task of an @EVERY@ obligation and on nothing else. A
+    -- 'MultiInstanceScope' carries its own multi-instance-ness in its kind and
+    -- leaves this 'Nothing'.
     nodeMultiInstance :: !(Maybe MultiInstance)
+  , -- | The 'MultiInstanceScope' this node is drawn inside, if any.
+    --
+    -- The nesting is recorded on the CHILD rather than as a list on the
+    -- parent, because the diagram interchange is flat: BPMN DI puts a
+    -- sub-process\'s children in the same @\<BPMNPlane\>@ as everything else,
+    -- in absolute plane coordinates, with only @isExpanded@ on the parent
+    -- shape to say it is a box rather than a marker. A nested IR would have to
+    -- be flattened again to lay it out.
+    --
+    -- A boundary event attached to a scope is NOT its child: it hangs on the
+    -- outside of the border and belongs to whatever contains the scope.
+    nodeParent :: !(Maybe Text)
+  , -- | The cast a multi-instance activity draws its instances from. Meaning­
+    -- less on a node that is neither multi-instance nor a scope.
+    nodeLoopCollection :: !(Maybe LoopCollection)
+  }
+  deriving stock (Eq, Show)
+
+-- | What a multi-instance activity loops over: @\<loopDataInputRef\>@ and the
+-- @\<inputDataItem\>@ each instance binds.
+--
+-- __Name the variable for the CAST, never for the roll.__ @loopDataInputRef@
+-- names a PROCESS VARIABLE, and the file claims nothing about what is in it —
+-- an engine is told to supply one. That stays true only while the name does
+-- not imply an answer. @EVERY Tenant t IN everyone@ arms a cast of tenants,
+-- not a cast of @everyone@ (see 'L4.StateGraph.quantCast'), so a variable
+-- called @everyone@ invites seeding it with the roll and turns an honest
+-- \"supply this\" into a false statement of who is bound. Called
+-- @\<rule\>_cast@, it does not, and @P-CAST@ says in prose what to put in it —
+-- a sentence that cannot be written without 'L4.StateGraph.quantCast' and
+-- 'L4.StateGraph.quantFilter'.
+data LoopCollection = LoopCollection
+  { loopVariable :: !Text
+    -- ^ the process variable to loop over — @\<rule\>_cast@
+  , loopItem :: !Text
+    -- ^ the item each instance binds: the @EVERY@\'s member variable, as the
+    -- source spells it (@t@ in @EVERY Tenant t@), so that a reader can match
+    -- the BPMN back to the rule.
   }
   deriving stock (Eq, Show)
 
@@ -348,6 +487,13 @@ data BpmnExport = BpmnExport
   , -- | 'True' when at least one end event is an error end, so the emitter
     -- knows to declare the shared @\<error\>@ root element.
     bxHasError :: !Bool
+  , -- | 'True' when at least one end event is an 'EscalationEnd', so the
+    -- emitter knows to declare the shared @\<escalation\>@ root element.
+    --
+    -- Separate from 'bxHasError' rather than folded into it: a file can have
+    -- both (a fork whose members escalate, inside a process whose own breach
+    -- is an error), and a throw with no matching declaration is malformed.
+    bxHasEscalation :: !Bool
   , bxFidelity :: !FidelityReport
   }
   deriving stock (Eq, Show)
@@ -380,6 +526,9 @@ data ShapeKind
     PoolShape
   | -- | A lane band; gets @isHorizontal@.
     LaneShape
+  | -- | An expanded sub-process: a box drawn around its children, which are
+    -- siblings of it in the same plane. Gets @isExpanded@.
+    ExpandedShape
   deriving stock (Eq, Show)
 
 data Shape = Shape
@@ -417,6 +566,9 @@ nodeWidth = \case
   Gateway _ _ -> 50
   Task -> 100
   BusinessRule _ -> 100
+  -- A scope is sized from what it contains ('L4.Bpmn.Lower'), never from this
+  -- table; the figure is a floor for an empty one.
+  MultiInstanceScope -> 200
 
 nodeHeight :: NodeKind -> Int
 nodeHeight = \case
@@ -426,3 +578,4 @@ nodeHeight = \case
   Gateway _ _ -> 50
   Task -> 80
   BusinessRule _ -> 80
+  MultiInstanceScope -> 160

@@ -97,6 +97,7 @@ stateGraphToBpmn opts sg =
           }
     , bxDiagram = diagram
     , bxHasError = any isErrorEnd allNodes
+    , bxHasEscalation = any isEscalationEnd allNodes
     , bxFidelity = foldl' (flip addNote) (emptyReport "BPMN 2.0") findings
     }
  where
@@ -144,13 +145,11 @@ stateGraphToBpmn opts sg =
     StateChain
       { scNodes = nodes
       , scBoundary = boundary
-      , scLapse = lapse
       , scFindings =
           taskFindings
             <> quantifierFindings
             <> branchGuardFindings
             <> boundaryFindings
-            <> lapseFindings
             <> undrawnDeadlineFindings
             <> danglingFindings
       }
@@ -167,6 +166,8 @@ stateGraphToBpmn opts sg =
         , nodeDoc = Nothing
         , nodeLane = Nothing
         , nodeMultiInstance = Nothing
+        , nodeParent = Nothing
+        , nodeLoopCollection = Nothing
         }
       | s.stateType == InitialState
       ]
@@ -182,6 +183,8 @@ stateGraphToBpmn opts sg =
         , nodeDoc = Just (fanDoc s.stateFan)
         , nodeLane = Nothing
         , nodeMultiInstance = Nothing
+        , nodeParent = Nothing
+        , nodeLoopCollection = Nothing
         }
       | s.stateFan /= Linear
       ]
@@ -201,6 +204,14 @@ stateGraphToBpmn opts sg =
                   )
             , nodeLane = t.transLabel.labelParty
             , nodeMultiInstance = multiInstanceFor t.transLabel
+            , nodeParent = Nothing
+            , -- A BARRIER's task is the multi-instance activity itself and
+              -- takes the collection here. A fork's does not keep it:
+              -- 'addForkScope' moves both the marker and the collection up to
+              -- the scope, because there the activity that runs once per
+              -- member is the box and not this task.
+              nodeLoopCollection =
+                loopCollectionFor sg.sgName =<< t.transLabel.labelQuantifier
             }
         ]
 
@@ -208,10 +219,12 @@ stateGraphToBpmn opts sg =
       [ FlowNode
         { nodeId = "End_" <> tag
         , nodeName = s.stateName
-        , nodeKind = EndEvent (s.stateType == TerminalBreach)
+        , nodeKind = EndEvent (if s.stateType == TerminalBreach then ErrorEnd else PlainEnd)
         , nodeDoc = Nothing
         , nodeLane = Nothing
         , nodeMultiInstance = Nothing
+        , nodeParent = Nothing
+        , nodeLoopCollection = Nothing
         }
       | s.stateType == TerminalFulfilled || s.stateType == TerminalBreach
       ]
@@ -223,10 +236,12 @@ stateGraphToBpmn opts sg =
       [ FlowNode
         { nodeId = "End_" <> tag
         , nodeName = s.stateName
-        , nodeKind = EndEvent False
+        , nodeKind = EndEvent PlainEnd
         , nodeDoc = Just "no outgoing transition in the source state graph"
         , nodeLane = Nothing
         , nodeMultiInstance = Nothing
+        , nodeParent = Nothing
+        , nodeLoopCollection = Nothing
         }
       | null startNodes && null gatewayNodes && null taskNodes && null endNodes
       ]
@@ -261,38 +276,8 @@ stateGraphToBpmn opts sg =
                   , nodeDoc = Just (boundaryDoc modal deadline)
                   , nodeLane = host.nodeLane
                   , nodeMultiInstance = Nothing
-                  }
-            , finds
-            )
-      _ -> (Nothing, [])
-
-    -- A permission with a deadline and no LEST still has somewhere for its
-    -- timer to go: expiry of an unexercised MAY routes to FULFILLED, the same
-    -- place HENCE goes. So synthesise the boundary event and draw the lapse
-    -- rather than dropping the WITHIN and filing a note about it. Confessing a
-    -- loss you could have avoided is not honesty.
-    --
-    -- The word for it comes from 'lestArmWording', not from a literal here:
-    -- this node draws the very arm that function names, and two spellings of
-    -- one vocabulary is the shape smucclaw/l4-ide#927 was about. The guard
-    -- below only fires with a deadline in hand, which is the case in which
-    -- 'lestArmWording' says @lapses@.
-    (lapse, lapseFindings) = case (modal, lestOf sid, deadline, taskNodes) of
-      (Just DMay, Nothing, Just d, host : _) ->
-        let lid = "Lapse_" <> tag
-            lapseWord = lestArmWording DMay (Just d)
-            (trigger, finds) = boundaryTrigger opts modal lid lapseWord deadline
-         in ( Just
-                FlowNode
-                  { nodeId = lid
-                  , nodeName = triggerName modal deadline trigger lapseWord
-                  , nodeKind = Boundary host.nodeId trigger
-                  , nodeDoc =
-                      Just
-                        "the permission lapses: the deadline passes without it \
-                        \being exercised, which routes where HENCE routes"
-                  , nodeLane = host.nodeLane
-                  , nodeMultiInstance = Nothing
+                  , nodeParent = Nothing
+                  , nodeLoopCollection = Nothing
                   }
             , finds
             )
@@ -318,7 +303,6 @@ stateGraphToBpmn opts sg =
             \element's <documentation>"
         }
       | isNothing boundary
-      , isNothing lapse
       , Just d <- [deadline]
       , tn <- take 1 taskNodes
       ]
@@ -328,7 +312,7 @@ stateGraphToBpmn opts sg =
       _ -> []
 
     quantifierFindings = case (obligation, taskNodes) of
-      (Just t, tn : _) -> quantifierNotes tn t.transLabel (isJust boundary)
+      (Just t, tn : _) -> quantifierNotes tn t.transLabel
       _ -> []
 
     -- The @IF@ that chose between arms. This is the branch-edge counterpart of
@@ -437,7 +421,7 @@ stateGraphToBpmn opts sg =
 
   baseNodes :: [FlowNode]
   baseNodes =
-    concat [c.scNodes <> maybeToList c.scBoundary <> maybeToList c.scLapse | (_, c) <- chains]
+    concat [c.scNodes <> maybeToList c.scBoundary | (_, c) <- chains]
 
   -- Which state each node came from; needed to tell a flow that leaves a
   -- parallel branch from one that merely happens to end at the same place.
@@ -446,7 +430,7 @@ stateGraphToBpmn opts sg =
     Map.fromList
       [ (n.nodeId, sid)
       | (sid, c) <- chains
-      , n <- c.scNodes <> maybeToList c.scBoundary <> maybeToList c.scLapse
+      , n <- c.scNodes <> maybeToList c.scBoundary
       ]
 
   -- Where an edge from ANOTHER state lands when it arrives here.
@@ -488,9 +472,6 @@ stateGraphToBpmn opts sg =
 
   boundaryOf :: StateId -> Maybe Text
   boundaryOf sid = chainOf sid >>= \c -> (.nodeId) <$> c.scBoundary
-
-  lapseOf :: StateId -> Maybe Text
-  lapseOf sid = chainOf sid >>= \c -> (.nodeId) <$> c.scLapse
 
   ------------------------------------------------------------------
   -- Pass 2: flows
@@ -549,40 +530,7 @@ stateGraphToBpmn opts sg =
             , Just src <- [gatewayOf sid <|> lastChainNode sid]
             , Just tgt <- [entryOf t.transTo]
             ]
-          -- The lapse timer lands wherever HENCE lands.
-          --
-          -- KNOWN WRONG in one shape, and not fixed here. The evaluator routes
-          -- an unexercised MAY's expiry through @fromMaybe fulfilExpr lest@,
-          -- i.e. to FULFILLED — which is where HENCE goes only when HENCE is
-          -- absent or is FULFILLED. Give a bare MAY a HENCE that points at
-          -- another obligation and the two part company. Measured:
-          --
-          --   PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)
-          --     (`WAIT UNTIL` 100)          ==> FULFILLED
-          --     PARTY Alice DOES pay AT 3   ==> PARTY Bob MUST deliver WITHIN 10
-          --
-          -- so in that shape this flow draws the lapse arriving at Bob's
-          -- obligation, which it never does. The quantified MAY used to be a
-          -- second such shape — a fork-joined EVERY … MAY with a HENCE lapses
-          -- to FULFILLED at runtime (measured 2026-09-16, ok/every/run-modals.l4
-          -- §7) and this synthesis drew its lapse into the chair's duty — until
-          -- the state graph started drawing a LEST edge to Fulfilled for a
-          -- quantified MAY under either join (the barrier on 2026-09-15, the
-          -- fork in d544ed22; the DMay arm in 'extractDeonton'), after which
-          -- 'chainFor' synthesises no lapse node for it (its guard wants
-          -- @lestOf sid@ to be Nothing) and 'lapses' below is empty. The
-          -- root cause for the shape that remains is upstream —
-          -- 'L4.StateGraph.extractDeonton' emits no LEST edge for a bare MAY, so
-          -- there is nothing here to follow and this synthesis is guessing. See
-          -- the NOTE at that site; fixing it retires this whole branch.
-          lapses =
-            [ plainEdge src tgt Nothing
-            | t <- outOf sid
-            , t.transType == HenceTransition
-            , Just src <- [lapseOf sid]
-            , Just tgt <- [entryOf t.transTo]
-            ]
-       in hence <> lest <> branches <> lapses
+       in hence <> lest <> branches
 
     lastChainNode sid = chainOf sid >>= \c -> (.nodeId) <$> listToMaybe (reverse c.scNodes)
 
@@ -826,6 +774,8 @@ stateGraphToBpmn opts sg =
                 , nodeDoc = Just (decideDoc wg.wgCall)
                 , nodeLane = Nothing
                 , nodeMultiInstance = Nothing
+                , nodeParent = Nothing
+                , nodeLoopCollection = Nothing
                 }
             redirect e
               | e.edTo == gw = e {edTo = did}
@@ -839,14 +789,538 @@ stateGraphToBpmn opts sg =
   -- Joins for RAND
   ------------------------------------------------------------------
 
-  allFlows = numberFlows wiredEdges
+  allFlows = numberFlows scopedEdges
 
   -- Last, because @gatewayDirection@ is the one attribute that describes the
   -- rest of the file rather than its own node: it cannot be settled until every
   -- edge — including the ones 'addJoin' redirects and the ones 'wireDecisions'
   -- reroutes — is final.
   allNodes :: [FlowNode]
-  allNodes = withGatewayDirections allFlows wiredNodes
+  allNodes = withGatewayDirections allFlows scopedNodes
+
+  ------------------------------------------------------------------
+  -- Pass 4: a fork becomes a multi-instance scope
+  ------------------------------------------------------------------
+
+  -- Runs after every other rewrite, because it needs the graph the file will
+  -- actually contain: 'addJoin' moves edges and 'wireDecisions' reroutes them,
+  -- and a pass that partitions nodes into "inside the scope" and "outside" has
+  -- to partition the final ones. It runs before 'numberFlows', so the edges it
+  -- adds are numbered with the rest, and before 'withGatewayDirections', so any
+  -- gateway it moves is still described by its final edges.
+  (scopedNodes, scopedEdges, scopeFindings) =
+    foldl' addForkScope (wiredNodes, wiredEdges, []) forkRoots
+
+  statesById :: Map StateId ContractState
+  statesById = Map.fromList [(s.stateId, s) | s <- sg.sgStates]
+
+  typeOfState :: StateId -> Maybe StateType
+  typeOfState sid = (.stateType) <$> Map.lookup sid statesById
+
+  isTerminalState :: StateId -> Bool
+  isTerminalState sid = case typeOfState sid of
+    Just TerminalFulfilled -> True
+    Just TerminalBreach -> True
+    _ -> False
+
+  -- The quantifier of a state's obligation, when its join line is a fork.
+  forkAt :: StateId -> Maybe Quantifier
+  forkAt sid = do
+    t <- henceOf sid <|> lestOf sid
+    q <- t.transLabel.labelQuantifier
+    j <- q.quantJoin
+    case j.joinKind of
+      Fork -> Just q
+      Barrier _ -> Nothing
+
+  forkModalAt :: StateId -> Maybe DeonticModal
+  forkModalAt sid = (henceOf sid <|> lestOf sid) >>= (.transLabel.labelModal)
+
+  forkRoots :: [StateId]
+  forkRoots = [sid | (sid, _) <- chains, isJust (forkAt sid)]
+
+  -- Every state a member's own run can reach, stopping at the terminals.
+  --
+  -- This is the region that moves inside the scope: the member's obligation and
+  -- its continuation. The terminals are excluded because they are SHARED — one
+  -- @Fulfilled@ circle for the whole graph — and a shared node cannot be inside
+  -- one instance. Arrivals at them from within the region are re-pointed at
+  -- ends of the scope's own instead.
+  forkRegion :: StateId -> Set StateId
+  forkRegion root = go (Set.singleton root) [root]
+   where
+    go seen [] = seen
+    go seen (x : xs) =
+      let nexts =
+            [ y
+            | y <- Map.findWithDefault [] x succsOf
+            , not (isTerminalState y)
+            , not (Set.member y seen)
+            ]
+       in go (foldr Set.insert seen nexts) (nexts <> xs)
+
+  -- | Rewrite one fork's obligation and continuation into a multi-instance
+  -- sub-process.
+  --
+  -- __It refuses rather than approximating.__ Everything it cannot draw is
+  -- checked before anything is moved, and on any of those the flat drawing is
+  -- kept and @P-FORK@ is filed, naming which check failed. That is why @P-FORK@
+  -- is emitted HERE and not with the other quantifier notes: a fidelity note
+  -- has to describe the file that was emitted, and until this pass has run
+  -- nothing knows which of the two shapes that is.
+  addForkScope
+    :: ([FlowNode], [Edge], [FidelityNote])
+    -> StateId
+    -> ([FlowNode], [Edge], [FidelityNote])
+  addForkScope (ns, es, fs) root = case refusal of
+    Just why -> (ns, es, fs <> flatForkNotes why)
+    Nothing -> (rewritten, es', fs <> scopeNotes)
+   where
+    tag = Text.pack (show root)
+    scopeId = "Scope_" <> tag
+    innerStartId = "StartScope_" <> tag
+    innerEndId = "EndScope_" <> tag
+    innerThrowId = "EscScope_" <> tag
+    escBoundaryId = "BoundaryEsc_" <> tag
+
+    region = forkRegion root
+    mq = forkAt root
+
+    stateOfNode n = Map.lookup n.nodeId nodeState
+
+    -- The nodes that move inside. A start event does not: it is instance
+    -- creation for the PROCESS, and the scope gets one of its own below.
+    innerIds :: Set Text
+    innerIds =
+      Set.fromList
+        [ n.nodeId
+        | n <- ns
+        , Just sid <- [stateOfNode n]
+        , Set.member sid region
+        , n.nodeKind /= StartEvent
+        ]
+
+    isInner x = Set.member x innerIds
+
+    -- The shared terminal of each kind, as a node id.
+    terminalNodeOf :: StateType -> Maybe Text
+    terminalNodeOf ty =
+      listToMaybe
+        [ n.nodeId
+        | n <- ns
+        , EndEvent _ <- [n.nodeKind]
+        , Just sid <- [stateOfNode n]
+        , typeOfState sid == Just ty
+        ]
+
+    fulfilledId = terminalNodeOf TerminalFulfilled
+    breachId = terminalNodeOf TerminalBreach
+
+    -- Edges leaving the region for somewhere that is not a shared terminal.
+    escapes =
+      [ e
+      | e <- es
+      , isInner e.edFrom
+      , not (isInner e.edTo)
+      , Just e.edTo /= fulfilledId
+      , Just e.edTo /= breachId
+      ]
+
+    -- Where the outside flows in.
+    entries = nubOrd [e.edTo | e <- es, not (isInner e.edFrom), isInner e.edTo]
+
+    -- A state inside the region that something outside the region also reaches
+    -- is shared, and cannot be copied into one instance without being taken
+    -- away from whoever else reaches it.
+    intruders =
+      [ t.transTo
+      | t <- sg.sgTransitions
+      , Set.member t.transTo region
+      , t.transTo /= root
+      , not (Set.member t.transFrom region)
+      ]
+
+    refusal :: Maybe Text
+    refusal
+      | isNothing mq = Just "this state's obligation is not a fork"
+      | Set.null innerIds =
+          Just "the fork's obligation produced no activity to enclose"
+      | not (null intruders) =
+          Just
+            "the continuation is reached from outside the fork as well as from \
+            \inside it, so it is shared between the members and something else, \
+            \and a sub-process would take it away from that other path"
+      | not (null escapes) =
+          Just
+            "the continuation leaves the fork for somewhere that is neither \
+            \Fulfilled nor Breach, and a sequence flow cannot cross a \
+            \sub-process border"
+      | length entries /= 1 =
+          Just
+            ( "the fork's activity is entered from "
+                <> Text.pack (show (length entries))
+                <> " places, and a sub-process has exactly one start event"
+            )
+      | otherwise = Nothing
+
+    -- Guarded by 'refusal', which rejects any count but one.
+    entry = fromMaybe scopeId (listToMaybe entries)
+
+    -- Does any path inside end in breach? Only then is there anything to
+    -- escalate, and only then is the boundary that catches it drawn.
+    throwsBreach = any (\e -> isInner e.edFrom && Just e.edTo == breachId) es
+
+    ------------------------------------------------------------------
+    -- nodes
+    ------------------------------------------------------------------
+
+    memberLane = case [n.nodeLane | n <- ns, n.nodeId == entry] of
+      (l : _) -> l
+      [] -> Nothing
+
+    rewritten = filter keep (map reparent ns) <> newNodes
+
+    -- | THE FORK GETS ITS OWN TOP-LEVEL TERMINALS, and does not borrow the
+    -- shared ones.
+    --
+    -- Both of the graph's terminals mean something different on this path, so
+    -- sharing them is not an economy, it is a category error:
+    --
+    -- * __Breach.__ An error end event does not consume one token and leave the
+    --   rest running: it ends every active thread in its process, which
+    --   includes the instances still going. A breach that correctly escaped one
+    --   instance without interrupting its siblings would kill them one flow
+    --   later, and a duty another member had already earned would vanish. So
+    --   the fork's breach end is a PLAIN end (@P-FORK-BREACH-UNMARKED@). But a
+    --   breach terminal that a NON-fork path also reaches still has to
+    --   terminate for that path — under @RAND@ one operand's breach is the
+    --   whole contract's — so the two cannot be the same element.
+    -- * __Fulfilled.__ With the continuation inside, this flow is taken when
+    --   every run has ENDED, whichever way each ended. Calling that
+    --   @Fulfilled@ asserts a fold this file does not compute
+    --   (@P-FORK-VERDICT@), and a non-fork path arriving at the same circle
+    --   does mean fulfilled.
+    --
+    -- __An earlier cut demoted the shared terminals in place, guarded by \"only
+    -- when the fork is their sole feeder\".__ That is correct on every golden in
+    -- the corpus and wrong the moment anything else breaches: measured on a
+    -- @RAND@ of a fork beside a @PARTY@ obligation, both @LEST BREACH@, the
+    -- guard simply did not fire and the file kept 409 markings that could
+    -- complete only by terminating. A correctness cliff hidden behind a
+    -- condition that happens to hold everywhere you have looked is worse than
+    -- the bug it patches, because the goldens say it is fixed. Giving the fork
+    -- its own elements has no condition to get wrong.
+    --
+    -- Whatever the fork stops feeding is then dropped if nothing else feeds it,
+    -- because an end event with no incoming flow is a dead node and the gate
+    -- says so.
+    keep n = n.nodeId `notElem` orphanedTerminals
+
+    orphanedTerminals =
+      [ t
+      | t <- catMaybes [fulfilledId, breachId]
+      , not (any ((== t) . (.edTo)) es')
+      ]
+
+    groupEndId = "EndGroup_" <> tag
+    breachOutId = "EndBreach_" <> tag
+
+    -- No apostrophe: it would be XML-escaped into the one attribute a reader
+    -- sees on the shape. No verdict either — see 'forkVerdictNote'.
+    groupEndName = "every run has ended"
+
+    -- Inside the scope the act is performed ONCE, by this member. The
+    -- multi-instance marker moves to the scope; leaving it on the task as well
+    -- would say each member performs the act as many times as there are
+    -- members.
+    reparent n
+      | isInner n.nodeId =
+          n
+            { nodeParent = Just scopeId
+            , nodeMultiInstance = Nothing
+            , nodeLoopCollection = Nothing
+            }
+      | otherwise = n
+
+    newNodes =
+      [ FlowNode
+          { nodeId = scopeId
+          , nodeName = scopeName
+          , nodeKind = MultiInstanceScope
+          , nodeDoc = Just scopeDoc
+          , nodeLane = memberLane
+          , nodeMultiInstance = Nothing
+          , nodeParent = Nothing
+          , nodeLoopCollection = loopCollectionFor sg.sgName =<< mq
+          }
+      , FlowNode
+          { nodeId = groupEndId
+          , nodeName = groupEndName
+          , nodeKind = EndEvent PlainEnd
+          , nodeDoc =
+              Just
+                "every member's instance has ended, whichever way each ended. \
+                \Not the same statement as the rule being fulfilled: see \
+                \P-FORK-VERDICT."
+          , nodeLane = Nothing
+          , nodeMultiInstance = Nothing
+          , nodeParent = Nothing
+          , nodeLoopCollection = Nothing
+          }
+      , FlowNode
+          { nodeId = innerStartId
+          , nodeName = ""
+          , nodeKind = StartEvent
+          , nodeDoc = Just "one instance per member of the cast"
+          , nodeLane = Nothing
+          , nodeMultiInstance = Nothing
+          , nodeParent = Just scopeId
+          , nodeLoopCollection = Nothing
+          }
+      , FlowNode
+          { nodeId = innerEndId
+          , nodeName = "Fulfilled"
+          , nodeKind = EndEvent PlainEnd
+          , nodeDoc =
+              Just
+                "this member is done. The instance of every other member is \
+                \unaffected: that is what UPON EACH says, and what enclosing the \
+                \continuation here is for."
+          , nodeLane = Nothing
+          , nodeMultiInstance = Nothing
+          , nodeParent = Just scopeId
+          , nodeLoopCollection = Nothing
+          }
+      ]
+        <> concat
+          [ [ FlowNode
+               { nodeId = innerThrowId
+               , nodeName = "Breach"
+               , nodeKind = EndEvent EscalationEnd
+               , nodeDoc =
+                   Just
+                     "this member breached. Raised as an escalation and not as \
+                     \an error: an error event is interrupting in BPMN 2.0, so \
+                     \an error thrown here would cancel the instance of every \
+                     \other member, which the rule does not say."
+               , nodeLane = Nothing
+               , nodeMultiInstance = Nothing
+               , nodeParent = Just scopeId
+               , nodeLoopCollection = Nothing
+               }
+           , FlowNode
+               { nodeId = breachOutId
+               , nodeName = "Breach"
+               , nodeKind = EndEvent PlainEnd
+               , nodeDoc =
+                   Just
+                     "a member breached. A plain end and not an error end: an \
+                     \error end event ends every active thread in the process, \
+                     \so it would cancel the instances of the members who did \
+                     \not breach. See P-FORK-BREACH-UNMARKED."
+               , nodeLane = Nothing
+               , nodeMultiInstance = Nothing
+               , nodeParent = Nothing
+               , nodeLoopCollection = Nothing
+               }
+           , FlowNode
+               { nodeId = escBoundaryId
+               , nodeName = escalationCatchName
+               , nodeKind = Boundary scopeId CatchEscalation
+               , nodeDoc =
+                   Just
+                     "catches a breach raised by one member, without \
+                     \interrupting the group: every other member remains bound, \
+                     \and a second breach is caught here too."
+               , nodeLane = memberLane
+               , nodeMultiInstance = Nothing
+               , nodeParent = Nothing
+               , nodeLoopCollection = Nothing
+               }
+            ]
+          | throwsBreach
+          ]
+
+    scopeName = maybe "each member" (\q -> "each " <> castWords q) mq
+
+    scopeDoc =
+      "One instance per member of the cast, all live at once. The join line is \
+      \UPON EACH, so everything this box contains — the act, its deadline, and \
+      \what follows it — belongs to ONE member and runs once per member."
+
+    ------------------------------------------------------------------
+    -- edges
+    ------------------------------------------------------------------
+
+    es' = map reroute es <> newEdges
+
+    reroute e
+      | isInner e.edFrom && isInner e.edTo = e
+      | isInner e.edTo = e {edTo = scopeId}
+      | isInner e.edFrom, Just e.edTo == fulfilledId = e {edTo = innerEndId}
+      | isInner e.edFrom, Just e.edTo == breachId = e {edTo = innerThrowId}
+      | otherwise = e
+
+    newEdges =
+      [plainEdge innerStartId entry Nothing]
+        <> [plainEdge scopeId groupEndId Nothing]
+        <> [plainEdge escBoundaryId breachOutId Nothing | throwsBreach]
+
+    ------------------------------------------------------------------
+    -- findings
+    ------------------------------------------------------------------
+
+    scopeNotes = forkJoinNote <> forkLaneNote <> forkVerdictNote <> forkUnmarkedNote
+
+    forkJoinNote =
+      [ MkFidelityNote
+          { code = "P-FORK-JOIN"
+          , severity = Lossy
+          , element = scopeId
+          , range = Nothing
+          , message =
+              "The diagram says: this sub-process completes when every \
+              \member's instance has, and only then is its outgoing flow \
+              \taken. UPON EACH gives each member an independent run and the \
+              \group never regroups. What the wait IS faithful to is the \
+              \rule's own verdict \8212 the runtime folds the members with \
+              \RAND, so the rule is fulfilled only once every member's run is, \
+              \which is exactly what this flow waits for. What it is not \
+              \faithful to is timing: anything drawn after this box happens \
+              \after the LAST member, where the rule lets each member's own \
+              \consequences run as that member acts. Note also that a member's \
+              \continuation does not end inside the instance on every path \
+              \\8212 its breach arm leaves, through the escalation and the \
+              \boundary \8212 so \8216everything is enclosed\8217 holds of the \
+              \ordinary path only."
+          , lost =
+              "the timing of anything drawn after this box, which the rule \
+              \attaches to each member and the diagram attaches to the last of \
+              \them; not the rule-level verdict, which the wait gets right"
+          }
+      ]
+
+    -- The one thing about a fork that BPMN cannot express without inventing
+    -- data, stated rather than drawn. The exporter declines elsewhere for the
+    -- same reason: P-NOJOIN declines a gateway it cannot prove, P-CAST declines
+    -- a loopCardinality, and 'MultiInstanceScope' has no slot for
+    -- @CompleteOnFirst@.
+    forkVerdictNote =
+      [ MkFidelityNote
+          { code = "P-FORK-VERDICT"
+          , severity = Lossy
+          , element = groupEndId
+          , range = Nothing
+          , message =
+              "The rule's own verdict is not drawn. Each member's run ends \
+              \inside the sub-process, at that member's own Fulfilled or \
+              \Breach, and the rule is fulfilled only if EVERY member's is \
+              \(the runtime folds the members with RAND). BPMN can take the \
+              \sub-process's outgoing flow when every instance has ended, \
+              \which is what this file draws and what the end event is now \
+              \named for \8212 but it cannot make that terminal depend on how \
+              \they ended without a variable this exporter does not invent. So \
+              \the terminal says the runs are over and says nothing about the \
+              \outcome."
+          , lost =
+              "the fold over the members: whether the rule as a whole was \
+              \fulfilled or breached, which the per-member ends carry \
+              \individually and nothing here aggregates"
+          }
+      ]
+
+    -- Filed only where the demotion actually happened, so it cannot claim a
+    -- loss on a file that kept its error end.
+    forkUnmarkedNote =
+      [ MkFidelityNote
+          { code = "P-FORK-BREACH-UNMARKED"
+          , severity = Advisory
+          , element = breachOutId
+          , range = Nothing
+          , message =
+              "This breach end carries no errorEventDefinition, where a \
+              \single-party rule's would. One here would be read by an engine \
+              \as ending the whole process, and so would cancel the instances \
+              \of every member who has not breached \8212 a member's failure is \
+              \that member's, and the others stay bound. The end event is still \
+              \named Breach and is still reached only by a member's breach; \
+              \what it no longer carries is the machine-readable marking."
+          , lost =
+              "the breach as an error an engine can catch, at the one place \
+              \catching it would do more harm than not"
+          }
+      | throwsBreach
+      ]
+
+    forkLaneNote =
+      [ MkFidelityNote
+          { code = "P-FORK-LANES"
+          , severity = Advisory
+          , element = scopeId
+          , range = Nothing
+          , message =
+              "The parties inside this sub-process are not drawn as lane \
+              \bands. A lane partitions the flow elements of the process it \
+              \sits in, and these are one level down; naming them from the \
+              \outer laneSet would be a reference across a boundary the \
+              \notation does not have. Each enclosed element still names its \
+              \party in its own <documentation>. The box itself sits in ONE \
+              \band, the members\8217, which is the wrong band for any enclosed \
+              \act somebody else performs: a continuation owed by a \
+              \counterparty is drawn inside the members\8217 lane."
+          , lost =
+              "the party bands inside the scope, not the parties themselves; \
+              \and the box\8217s own band, which is right for the members and \
+              \wrong for whoever owes their continuation"
+          }
+      | isJust memberLane || any (isJust . (.nodeLane)) [n | n <- ns, isInner n.nodeId]
+      ]
+
+    -- The shape this pass did NOT draw, described as it was before it existed.
+    flatForkNotes why =
+      [ MkFidelityNote
+          { code = "P-FORK"
+          , severity = Lossy
+          , element = fromMaybe scopeId (listToMaybe (Set.toList innerIds))
+          , range = Nothing
+          , message =
+              "The diagram says: what follows this activity happens once, \
+              \after the last instance completes. The rule says: the join line \
+              \is UPON EACH, and what follows fires once per member, as that \
+              \member completes. This exporter draws a fork as a multi-instance \
+              \sub-process enclosing the continuation, which does say \
+              \once-per-member — but not here, because "
+                <> why
+                <> "."
+          , lost =
+              "the per-member firing of the continuation; what is drawn fires \
+              \once, for the group"
+          }
+      | isJust mq
+      ]
+        <> [ MkFidelityNote
+               { code = "P-FORK-CANCEL"
+               , severity = Lossy
+               , element = fromMaybe scopeId (listToMaybe (Set.toList innerIds))
+               , range = Nothing
+               , message =
+                   "And drawn flat, the timer on the activity is interrupting \
+                   \and cancels EVERY instance: a member who has already acted \
+                   \has already started their own continuation, which another \
+                   \member's failure does not touch. So an obligation that \
+                   \arose in L4 is absent from the diagram, and a party who \
+                   \breached it is drawn as owing nothing. Enclosing the fork \
+                   \is what removes this, and it is what could not be done \
+                   \here."
+               , lost =
+                   "every continuation spawned before the timer fired, and the \
+                   \breaches of those continuations"
+               }
+           | isJust mq
+           -- Not on a prohibition: there the timer is the COMPLIANCE arm and
+           -- cancelling every instance when it fires is right.
+           , forkModalAt root /= Just DMustNot
+           ]
 
   (wiredNodes, wiredEdges) = wireDecisions (rawNodes, joinedEdges)
 
@@ -877,7 +1351,7 @@ stateGraphToBpmn opts sg =
   -- and required two or more, which passes happily for a branch containing an
   -- interrupting boundary event (@cancelActivity="true"@ makes its two arms
   -- mutually exclusive: two edges, one token), a @ROR@ (an exclusive gateway:
-  -- n edges, one token), or a lapse timer (same shape again). Each of those
+  -- n edges, one token). Each of those
   -- emits a join that waits forever for a token nothing will ever send, and the
   -- emitted BPMN deadlocks — a strictly worse failure than not drawing the
   -- gateway at all, because a reader can see a missing gateway and cannot see a
@@ -930,6 +1404,8 @@ stateGraphToBpmn opts sg =
                             \delivers exactly one token"
                       , nodeLane = Nothing
                       , nodeMultiInstance = Nothing
+                      , nodeParent = Nothing
+                      , nodeLoopCollection = Nothing
                       }
                in ( nodes <> [joinNode]
                   , map redirect edges <> [plainEdge jid tgt Nothing]
@@ -966,9 +1442,9 @@ stateGraphToBpmn opts sg =
           Left
             ( "one of its branches reaches the join by "
                 <> Text.pack (show (length several))
-                <> " different routes — an interrupting boundary event, a ROR, \
-                   \or a lapse timer — of which at most one will fire, whereas \
-                   \a parallel join would wait for every one of them"
+                <> " different routes — an interrupting boundary event or a \
+                   \ROR — of which at most one will fire, whereas a parallel \
+                   \join would wait for every one of them"
             )
 
     exitsOf b = Set.filter (\s -> null (Map.findWithDefault [] s succsOf)) (reachFrom b)
@@ -1046,21 +1522,36 @@ stateGraphToBpmn opts sg =
   parties :: [Text]
   parties = nubOrd [p | n <- allNodes, Just p <- [n.nodeLane]]
 
+  -- A lane partitions the flow elements of the process it sits in, and a node
+  -- inside a 'MultiInstanceScope' is one level down. Naming it from the outer
+  -- laneSet is a reference across a boundary the notation does not have; the
+  -- XSD would not catch it, because flowNodeRef is a bare IDREF. See
+  -- @P-FORK-LANES@, which tells the reader what the file therefore does not say.
+  laneable :: [FlowNode]
+  laneable = [n | n <- allNodes, isNothing n.nodeParent]
+
   unassigned :: [Text]
-  unassigned = [n.nodeId | n <- allNodes, isNothing n.nodeLane]
+  unassigned = [n.nodeId | n <- laneable, isNothing n.nodeLane]
 
   lanes :: [BpmnLane]
   lanes
     | null parties = []
     | otherwise = partyLanes <> defaultLane
    where
+    -- A party whose every node moved inside a scope has no flow elements left
+    -- at this level, and an empty band is worse than no band: it draws a lane
+    -- for a party the diagram no longer shows doing anything, which reads as
+    -- "this party has nothing to do" rather than "their act is drawn one level
+    -- down". @P-FORK-LANES@ is what tells the reader the difference.
     partyLanes =
       [ BpmnLane
         { laneId = "Lane_" <> Text.pack (show i) <> "_" <> ncName p
         , laneName = p
-        , laneNodes = [n.nodeId | n <- allNodes, n.nodeLane == Just p]
+        , laneNodes = members
         }
       | (i, p) <- zip [1 :: Int ..] parties
+      , let members = [n.nodeId | n <- laneable, n.nodeLane == Just p]
+      , not (null members)
       ]
     defaultLane =
       [ BpmnLane
@@ -1107,6 +1598,24 @@ stateGraphToBpmn opts sg =
       <> cycleFindings
       <> [bearerFinding | not (null parties)]
       <> [ruleVersionFinding]
+      <> scopeFindings
+      & retargetToScope
+
+  -- A note about the multi-instance activity has to name the element that
+  -- carries the marker. @P-CAST@ is built in the chain pass, against the task,
+  -- and for a fork the marker and the collection end up on the SCOPE — so the
+  -- note pointed a reader at an element where neither is. Re-pointed once the
+  -- nesting is known, which is the only place it can be.
+  retargetToScope :: [FidelityNote] -> [FidelityNote]
+  retargetToScope = map go
+   where
+    parentOf =
+      Map.fromList [(n.nodeId, pid) | n <- allNodes, Just pid <- [n.nodeParent]]
+    go note
+      | note.code `elem` ["P-CAST"]
+      , Just pid <- Map.lookup note.element parentOf =
+          note {element = pid}
+      | otherwise = note
 
   ------------------------------------------------------------------
   -- Shapes the types permit that today's extractor cannot reach
@@ -1234,10 +1743,15 @@ stateGraphToBpmn opts sg =
       , element = processId
       , range = Nothing
       , message =
+          -- The lanes the file actually contains, not every party the graph
+          -- mentions. A party whose only act moved inside a 'MultiInstanceScope'
+          -- has no band at this level ('partyLanes' drops the empty one), and
+          -- listing it here would send a reader looking for a lane that is not
+          -- in the document. @P-FORK-LANES@ is what accounts for the difference.
           "A lane says who performs the work, where L4's PARTY says who owes \
           \the obligation, and this diagram can only show the first (lanes \
           \here: "
-            <> Text.intercalate ", " parties
+            <> Text.intercalate ", " [p | p <- parties, p `elem` map (.laneName) lanes]
             <> ")."
       , lost =
           "the bearer, as distinct from the performer — the two come apart \
@@ -1261,7 +1775,12 @@ stateGraphToBpmn opts sg =
 
 isErrorEnd :: FlowNode -> Bool
 isErrorEnd n = case n.nodeKind of
-  EndEvent isError -> isError
+  EndEvent ErrorEnd -> True
+  _ -> False
+
+isEscalationEnd :: FlowNode -> Bool
+isEscalationEnd n = case n.nodeKind of
+  EndEvent EscalationEnd -> True
   _ -> False
 
 -- | Restate every gateway's @gatewayDirection@ as what its edges actually say.
@@ -1388,10 +1907,6 @@ decideDoc c =
 data StateChain = StateChain
   { scNodes :: [FlowNode]
   , scBoundary :: Maybe FlowNode
-  , -- | A synthesised timer for a permission that lapses; see 'chainFor'. It
-    -- is a boundary event like 'scBoundary', but its outflow goes to the HENCE
-    -- target rather than the LEST one.
-    scLapse :: Maybe FlowNode
   , scFindings :: [FidelityNote]
   }
 
@@ -1512,28 +2027,18 @@ quantifierDoc l = case l.labelQuantifier of
             " ONCE " <> th <> ": what follows arises only if every member \
             \exercises the permission; a member whose permission lapses ends \
             \the rule as fulfilled with nothing following, which is where the \
-            \lapse timer routes."
+            \timer on this activity routes."
           _ ->
             " ONCE " <> th <> ": the outgoing flow fires once, when every \
             \instance has completed \8212 which is what a parallel multi-instance \
             \activity's completion means, so this barrier is drawn faithfully."
         Just Fork ->
-          " UPON EACH: in the source, what follows fires once per member as \
-          \that member completes. A multi-instance activity fires its outgoing \
-          \flow once, after the last instance, so what follows is drawn once \
-          \(P-FORK)"
-            <> case l.labelModal of
-              -- The note this clause cites is not filed for a prohibition —
-              -- there the timer is the compliance arm, and cancelling every
-              -- instance when it fires is right ('quantifierNotes') — so the
-              -- <documentation> must not send the reader to look for it
-              -- (adversarial pass of 2026-09-16, R1-4).
-              Just DMustNot ->
-                "; the timer on this activity is the compliance arm, and \
-                \cancelling every instance when it fires is right."
-              _ ->
-                ", and the timer on this activity cancels every instance \
-                \(P-FORK-CANCEL)."
+          " UPON EACH: what follows fires once per member, as that member \
+          \completes. Everything after this act is drawn INSIDE a multi-instance \
+          \sub-process, so each member gets their own copy of it and their own \
+          \deadline; the box, not this task, carries the multi-instance marker. \
+          \What the enclosure adds and the rule does not have is a \
+          \synchronisation at the end of the box (P-FORK-JOIN)."
 
 -- | How an @EVERY@'s activity completes. Keyed on the MODAL as well as on the
 -- quantifier: the positional pattern in 'L4.StateGraph.extractDeonton' guards
@@ -1546,6 +2051,56 @@ multiInstanceFor l = case l.labelQuantifier of
   Just _ -> Just $ case l.labelModal of
     Just DMustNot -> CompleteOnFirst
     _ -> CompleteWhenAll
+
+-- | Is this obligation's join line a fork?
+--
+-- Read off the label rather than passed down, because the notes that need it
+-- are built in the chain pass, before 'addForkScope' has decided anything.
+isForkLabel :: TransitionLabel -> Bool
+isForkLabel l = case l.labelQuantifier >>= (.quantJoin) of
+  Just j -> case j.joinKind of Fork -> True; Barrier _ -> False
+  Nothing -> False
+
+-- | The cast word, or a neutral one when the @EVERY@ is bare.
+--
+-- \"member\" rather than a guess at the party type's name: `EVERY p` ranges over
+-- every value of the party type and names no subset, so there is no word to
+-- borrow.
+castWords :: Quantifier -> Text
+castWords q = fromMaybe "member" q.quantCast
+
+-- | The collection a multi-instance activity loops over, when the rule gives
+-- something to name it after.
+--
+-- Emitted whenever the @EVERY@ has an @IN@ roll — and named for the RULE, not
+-- for the roll. @loopDataInputRef@ names a process variable and the file claims
+-- nothing about its contents, which is only true while the name does not imply
+-- an answer. The roll is not the cast (see 'L4.StateGraph.quantCast'): a roll
+-- of three can arm a cast of two, so a variable called @everyone@ invites
+-- seeding it with the roll and turns \"supply this\" into a false statement of
+-- who is bound. @\<rule\>_cast@ cannot be seeded by reflex, and @P-CAST@ says in
+-- prose what belongs in it.
+--
+-- With no @IN@ roll there is nothing to point at: the cast is every value of
+-- the party type, which is a set the source never enumerates.
+-- The name carries the member VARIABLE as well as the rule, because a rule can
+-- hold more than one @EVERY@ — @EVERY d IN board … HENCE (EVERY s IN
+-- shareholders …)@ — and a name derived from the rule alone gave both of them
+-- one variable. The file stayed well formed and an engine would have armed both
+-- casts from one list, while the two @P-CAST@ notes named two different rolls
+-- for it. Nothing checked that, and no corpus file has the shape; found by
+-- review, 2026-09-19.
+--
+-- Still not named for the roll: @\<rule\>_\<var\>_cast@ says which binder it
+-- fills, not what goes in it.
+loopCollectionFor :: Text -> Quantifier -> Maybe LoopCollection
+loopCollectionFor ruleName q = do
+  _ <- q.quantRoll
+  pure
+    LoopCollection
+      { loopVariable = ncName ruleName <> "_" <> ncName q.quantVar <> "_cast"
+      , loopItem = q.quantVar
+      }
 
 -- | The boundary event's name — the words a reader sees on the diagram, with no
 -- @\<documentation\>@ open.
@@ -1590,9 +2145,27 @@ triggerName (Just DMustNot) mDue trigger _ = case trigger of
     -- residual and never reaches HENCE. This used to read "the act is not
     -- performed", naming an event that never fires.
     | otherwise -> noTriggerWording
+  CatchEscalation -> escalationCatchName
 triggerName _ _ trigger fallback = case trigger of
   TimerAfter iso -> "after " <> iso
   WhenCondition _ -> if Text.null (Text.strip fallback) then "otherwise" else fallback
+  CatchEscalation -> escalationCatchName
+
+-- | The caption on the escalation boundary of a 'MultiInstanceScope'.
+--
+-- It is deliberately NOT one member's wording. Every arm this function
+-- otherwise names belongs to a single obligation — \"after P7D\", \"violation\" —
+-- because outside a scope there is one. This node is attached to the group and
+-- fires once per instance that throws, so a caption naming a member would be
+-- read as naming THE member, and there is no such member: the boundary cannot
+-- tell you which tenant breached, only that one did. Saying less is the only
+-- thing available that is true.
+--
+-- The same shortfall on the top-level arm is what every-each reported for the
+-- barrier: a quantified breach ends in the one shared @Error_breach@, which
+-- names no party either.
+escalationCatchName :: Text
+escalationCatchName = "a member breached"
 
 -- | Which node each arm of the obligation leaves from: @(HENCE source, LEST
 -- source)@, given the task and the deadline's boundary event.
@@ -1661,9 +2234,27 @@ boundaryDoc (Just DMustNot) Nothing =
   \performed, so this is the HENCE arm — but the rule sets no WITHIN, so \
   \nothing reaches it: a prohibition with no deadline is discharged by neither \
   \the clock nor the act"
--- a BEFORE's label carries its own keyword ('closingClause'), so the
--- preposition is the label's, not ours: "not discharged BEFORE date", never
--- "within BEFORE date" (adversarial pass of 2026-09-16, G8)
+-- A permission is not an obligation and does not fail to be discharged: it
+-- LAPSES, and the rule then ends fulfilled. Before 2026-09-17 a bare permission
+-- never reached this function — L4.Bpmn.Lower synthesised its own timer node
+-- with its own wording — so the sentence below only had to cover the other
+-- modals. Now that L4.StateGraph draws the lapse as a real LEST edge, this is
+-- the node that carries it, and it has to say so.
+--
+-- Both equations below carry the BEFORE guard, because a BEFORE label supplies
+-- its OWN preposition ('closingClause'): "not exercised BEFORE date", never
+-- "not exercised within BEFORE date" (adversarial pass of 2026-09-16, G8). The
+-- guard and the permission wording arrived on separate branches and are both
+-- needed — taking either side of that merge alone would have restored the other
+-- one's defect.
+boundaryDoc (Just DMay) (Just d)
+  | "BEFORE " `Text.isPrefixOf` d =
+      "the permission lapses: it is not exercised " <> d <> ", so the rule ends fulfilled"
+  | otherwise =
+      "the permission lapses: it is not exercised within " <> d <> ", so the rule ends fulfilled"
+boundaryDoc (Just DMay) Nothing =
+  "the permission would lapse when its deadline passed unexercised — but the \
+  \rule sets no WITHIN, so nothing reaches this arm"
 boundaryDoc _ (Just d)
   | "BEFORE " `Text.isPrefixOf` d = "LEST: the obligation is not discharged " <> d
   | otherwise                     = "LEST: the obligation is not discharged within " <> d
@@ -1960,8 +2551,8 @@ numberWithUnit t = do
 -- @UPON EACH WITHIN 3@ and a last act on day 20 is FULFILLED): nothing is
 -- lost between source and diagram, but the clause is dead in both, and the
 -- reader should learn that rather than be told BPMN dropped it.
-quantifierNotes :: FlowNode -> TransitionLabel -> Bool -> [FidelityNote]
-quantifierNotes n l hasCancellingTimer = case l.labelQuantifier of
+quantifierNotes :: FlowNode -> TransitionLabel -> [FidelityNote]
+quantifierNotes n l = case l.labelQuantifier of
   Nothing -> []
   Just q ->
     [ MkFidelityNote
@@ -1973,25 +2564,50 @@ quantifierNotes n l hasCancellingTimer = case l.labelQuantifier of
             "The obligation binds every member of a cast (\8216"
               <> fromMaybe "EVERY" l.labelParty
               <> "\8217), drawn as a parallel multi-instance activity with no \
-                 \loopCardinality and no loopDataInputRef: L4 fixes the cast only \
-                 \when the rule runs, so this file cannot say how many instances \
-                 \there are."
+                 \loopCardinality: L4 fixes the cast only when the rule runs, so \
+                 \this file cannot say how many instances there are."
               <> maybe
                 ""
                 ( \roll ->
-                    " The source draws the cast from \8216"
+                    " The activity loops over a process variable an engine must \
+                    \supply. THE ROLL IS NOT THE CAST, so read this before \
+                    \seeding it: the source draws from \8216"
                       <> roll
-                      <> "\8217; an engine needs that list supplied as the activity's \
-                         \collection, which this exporter does not emit because the \
-                         \graph it lowers carries no data objects."
+                      <> "\8217, and then narrows"
+                      <> maybe
+                        ""
+                        (\c -> " to those built by \8216" <> c <> "\8217")
+                        q.quantCast
+                      <> ( if isJust q.quantFilter
+                             then " and again by the WHO condition"
+                             else ""
+                         )
+                      <> ". The variable is named for the rule and not for \8216"
+                      <> roll
+                      <> "\8217 for exactly that reason: seeding it with the roll \
+                         \would arm instances the rule does not."
                 )
                 q.quantRoll
-        , lost =
-            "the cardinality as something an engine could read; one of \
-            \loopCardinality or a collection has to be supplied before this \
-            \activity can execute (measured 2026-09-15: jbpm-bpmn2 7.74.1 \
-            \rejects the file as it stands \8212 \8216ForEach has no collection \
-            \expression\8217)"
+        , lost = case q.quantRoll of
+            Just _ ->
+              "the cardinality as something an engine could read: WHO is in \
+              \the cast, which only the rule's own run can answer. The file \
+              \declares the variable and loops over it, so an engine accepts \
+              \it and runs it over whatever is put in it (measured \
+              \2026-09-19, jbpm-bpmn2 7.74.1: compiles and completes, where \
+              \the same golden without a collection was rejected outright on \
+              \2026-09-15; seeded with three members the continuation fires \
+              \three times). Note what an UNSEEDED run does NOT show: the \
+              \collection is empty, so the activity completes at once and \
+              \nothing inside it runs."
+            Nothing ->
+              "the cast as something an engine could read at all. This rule \
+              \has no IN roll \8212 it ranges over a type, narrowed by a WHO \
+              \condition \8212 so there is no list for the file to point at, \
+              \and no loopDataInputRef is emitted. jbpm-bpmn2 7.74.1 rejects \
+              \such a file outright (\8216ForEach has no collection \
+              \expression\8217, measured 2026-09-15); supplying one means \
+              \writing down a membership the source states as a predicate."
         }
     ]
       <> [ MkFidelityNote
@@ -2010,54 +2626,48 @@ quantifierNotes n l hasCancellingTimer = case l.labelQuantifier of
                  \completionCondition would wait for every member to offend"
              }
          | Just DMustNot <- [l.labelModal]
+         -- NOT on a fork. 'multiInstanceFor' does say @CompleteOnFirst@ for a
+         -- prohibition, but a fork's activity is the SCOPE, and 'addForkScope'
+         -- clears the marker on everything it encloses — so the file contains
+         -- no @completionCondition@ at all and this note described an
+         -- attribute that was not there. The shape is right (each member
+         -- offends severally, and completing the scope on the first act would
+         -- cancel the others); it was the note that was wrong, and it
+         -- contradicted the task's own @\<documentation\>@ two elements away.
+         , not (isForkLabel l)
          ]
       <> [ MkFidelityNote
-             { code = "P-FORK"
+             { code = "P-PROHIBITION-EMPTY"
              , severity = Lossy
              , element = n.nodeId
              , range = Nothing
              , message =
-                 "The diagram says: what follows this activity happens once, after \
-                 \the last instance completes. The rule says: the join line is UPON \
-                 \EACH, and what follows fires once per member, as that member \
-                 \completes. BPMN has shapes for once-per-member \8212 a \
-                 \multi-instance subProcess enclosing the continuation, or a None \
-                 \completion behaviour caught by a non-interrupting boundary event \
-                 \\8212 and this exporter emits neither."
+                 "The diagram says: with an EMPTY cast this activity completes \
+                 \at once \8212 a multi-instance activity over an empty \
+                 \collection does \8212 and its completion is the breach arm, \
+                 \so the rule ends BREACHED with nobody having done anything. \
+                 \The rule says the opposite: an empty cast is FULFILLED, \
+                 \because nobody is bound and so nothing is forbidden \
+                 \(measured: startBarrier joins at its arming, and the \
+                 \\8216nobody\8217 trace in ok/every/run-roll.l4 and the empty \
+                 \roll in run-in.l4 both run to FULFILLED). The \
+                 \completion condition is right for every non-empty cast and \
+                 \inverts on the empty one, which is the case an engine reaches \
+                 \first if nobody supplies the collection."
              , lost =
-                 "the per-member firing of the continuation; what is drawn fires \
-                 \once, for the group"
+                 "the empty cast, which the diagram breaches and the rule \
+                 \fulfils \8212 and it is REACHABLE: jbpm-bpmn2 7.74.1 runs \
+                 \this file unseeded and reports ABORTED via the breach end"
              }
-         | Just j <- [q.quantJoin]
-         , Fork <- [j.joinKind]
+         | Just DMustNot <- [l.labelModal]
+         , not (isForkLabel l)
          ]
-      <> [ MkFidelityNote
-             { code = "P-FORK-CANCEL"
-             , severity = Lossy
-             , element = n.nodeId
-             , range = Nothing
-             , message =
-                 "The diagram says: when the timer on this activity fires, every \
-                 \instance is cancelled and nothing drawn after the activity is \
-                 \reached. The rule says: a member who has already acted has \
-                 \already started their own continuation, which another member's \
-                 \failure does not touch \8212 so an obligation that arose in L4 \
-                 \is absent from the diagram, and a party who breached it is \
-                 \drawn as owing nothing."
-             , lost =
-                 "every continuation spawned before the timer fired, and the \
-                 \breaches of those continuations"
-             }
-         | Just j <- [q.quantJoin]
-         , Fork <- [j.joinKind]
-         , hasCancellingTimer
-         -- Not for a prohibition: there the timer is the COMPLIANCE arm, and
-         -- cancelling every instance when it fires is right — nobody
-         -- offended, everybody's prohibition is discharged. What a SHANT fork
-         -- loses instead is that the first offender completes the activity
-         -- for all, which is the once-for-the-group loss P-FORK already names.
-         , l.labelModal /= Just DMustNot
-         ]
+      -- P-FORK and P-FORK-CANCEL used to be filed here, unconditionally, for
+      -- every fork. They are now filed by 'addForkScope' and only when it has
+      -- REFUSED to draw the scope, because the shape they describe is the one
+      -- this exporter emits only in that case. Filing them from here would
+      -- have reported a loss against a file that does not have it, which is
+      -- the same class of error as not reporting one that does.
       <> [ MkFidelityNote
              { code = "P-JOIN-DEADLINE"
              , severity = case j.joinKind of Barrier _ -> Lossy; Fork -> Advisory
@@ -2279,6 +2889,13 @@ minGutterWidth = 80
 minChannelGap = 4
 gutterInset = 14
 
+-- | How far a sub-process box is drawn outside its contents, and the extra it
+-- gets at the bottom so that a boundary event hanging off an inner task stays
+-- inside it.
+scopePad, scopePadBottomExtra :: Int
+scopePad = 24
+scopePadBottomExtra = 20
+
 poolX, poolY, laneLabelWidth, laneLeftPad, poolRightPad :: Int
 poolX = 130
 poolY = 80
@@ -2341,13 +2958,22 @@ layoutDiagram li =
       , nid <- lane.laneNodes
       ]
 
-  laneOf n = Map.findWithDefault 0 n.nodeId laneIndex
+  -- A node inside a scope is not in any lane — a lane may only name the flow
+  -- elements of its own process ('laneable' in 'stateGraphToBpmn') — so for
+  -- LAYOUT it bands with the scope that contains it. Without this it would fall
+  -- to the default of lane 0, which is a band chosen by accident: correct only
+  -- when the scope happens to sit in the first lane.
+  laneOf n = Map.findWithDefault 0 (fromMaybe n.nodeId n.nodeParent) laneIndex
   laneCount = max 1 (length li.liLanes)
 
   isBoundary n = case n.nodeKind of Boundary _ _ -> True; _ -> False
+  isScope n = n.nodeKind == MultiInstanceScope
 
   -- Boundary events sit on their host's border and so take no row of their own.
-  placed = filter (not . isBoundary) nodes
+  -- Neither does a scope: it is drawn AROUND its children, which do, so giving
+  -- it a row of its own would reserve a second empty band beside the one its
+  -- contents already occupy.
+  placed = filter (\n -> not (isBoundary n) && not (isScope n)) nodes
 
   rowOf :: Map Text Int
   rowOf =
@@ -2381,10 +3007,23 @@ layoutDiagram li =
 
   laneRows lane = Map.findWithDefault 1 lane laneRowsOf
 
+  -- A lane holding a scope has to be tall enough for the BOX as well as for
+  -- the rows inside it: the box is its children's bounding rectangle grown by
+  -- 'scopePad' on every side, and without the allowance its bottom edge would
+  -- be drawn across the lane below.
+  laneScopeExtra :: Int -> Int
+  laneScopeExtra l
+    | any (\n -> isScope n && laneOf n == l) nodes = 2 * scopePad + scopePadBottomExtra
+    | otherwise = 0
+
   laneHeightOf :: Map Int Int
   laneHeightOf =
     Map.fromList
-      [ (l, max minLaneHeight (lanePadTop + laneRows l * rowHeight + lanePadBottom))
+      [ ( l
+        , max
+            minLaneHeight
+            (lanePadTop + laneRows l * rowHeight + lanePadBottom + laneScopeExtra l)
+        )
       | l <- [0 .. laneCount - 1]
       ]
 
@@ -2407,8 +3046,52 @@ layoutDiagram li =
   ------------------------------------------------------------------
 
   boundsOf :: Map Text Bounds
-  boundsOf = Map.fromList (map plain placed <> map onBorder (filter isBoundary nodes))
+  boundsOf = Map.fromList (plainList <> scopeList <> map onBorder (filter isBoundary nodes))
    where
+    plainList = map plain placed
+    plainMap = Map.fromList plainList
+
+    -- A scope is sized from what it holds, never from the 'nodeWidth' table.
+    -- Only its PLACED children are measured: a boundary event hanging off an
+    -- inner task is positioned from that task and reaches at most half its own
+    -- height below it, which 'scopePadBottomExtra' covers without needing the
+    -- boundary's bounds to exist first — and they do not yet, because this is
+    -- where they are being computed.
+    scopeList =
+      [ (n.nodeId, scopeBounds n)
+      | n <- nodes
+      , isScope n
+      ]
+
+    -- KNOWN, cosmetic, not fixed: the scope's two EXTERNAL edges are routed by
+    -- the ordinary waypoint code, which knows nothing about the box, so both
+    -- cut across it — the flow in enters at the box's left edge from a node
+    -- inside its x-range, and the flow out leaves at the right edge and doubles
+    -- back. Visible in any modeller; harmless to every checker, since jBPM
+    -- ignores BPMNDI entirely and bpmn-moddle only asks that a shape exists.
+    -- Routing around a container is a layout feature, not a fix to this
+    -- function.
+    scopeBounds n = case kidBounds of
+      [] -> Bounds contentX0 (laneTop (laneOf n) + lanePadTop) (nodeWidth n.nodeKind) (nodeHeight n.nodeKind)
+      bs ->
+        let x0 = minimum [b.bx | b <- bs]
+            y0 = minimum [b.by | b <- bs]
+            x1 = maximum [b.bx + b.bw | b <- bs]
+            y1 = maximum [b.by + b.bh | b <- bs]
+         in Bounds
+              { bx = x0 - scopePad
+              , by = y0 - scopePad
+              , bw = x1 - x0 + 2 * scopePad
+              , bh = y1 - y0 + 2 * scopePad + scopePadBottomExtra
+              }
+     where
+      kidBounds =
+        [ b
+        | k <- nodes
+        , k.nodeParent == Just n.nodeId
+        , Just b <- [Map.lookup k.nodeId plainMap]
+        ]
+
     plain n =
       let w = nodeWidth n.nodeKind
           h = nodeHeight n.nodeKind
@@ -2427,9 +3110,12 @@ layoutDiagram li =
       let w = nodeWidth n.nodeKind
           h = nodeHeight n.nodeKind
           host = case n.nodeKind of Boundary hid _ -> hid; _ -> n.nodeId
+          -- A boundary hangs off a task, or off a SCOPE — the escalation catch
+          -- of a multi-instance sub-process is attached to the box itself — so
+          -- both tables have to be in scope here.
           hb =
             fromMaybe (Bounds contentX0 poolY taskSlotWidth (nodeHeight Task)) $
-              lookup host (map plain placed)
+              lookup host (plainList <> scopeList)
        in ( n.nodeId
           , Bounds
               { bx = hb.bx + hb.bw - w - 10
@@ -2443,7 +3129,7 @@ layoutDiagram li =
     [ Shape
       { shapeId = "Shape_" <> n.nodeId
       , shapeOf = n.nodeId
-      , shapeKind = PlainShape
+      , shapeKind = if isScope n then ExpandedShape else PlainShape
       , shapeBounds = b
       }
     | n <- nodes

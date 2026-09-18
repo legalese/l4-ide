@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_receipts_and_delivery"
+                  targetNamespace="https://l4.legalese.com/bpmn"
+                  exporter="jl4 (L4.Bpmn)"
+                  exporterVersion="1">
+  <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
+  <bpmn:escalation id="Escalation_breach" name="Breach" escalationCode="BREACH" />
+  <bpmn:itemDefinition id="Item_receipts_and_delivery_t_cast" structureRef="java.util.List" />
+  <bpmn:itemDefinition id="Item_receipts_and_delivery_t_cast_member" structureRef="java.lang.Object" />
+  <bpmn:collaboration id="Collaboration_receipts_and_delivery">
+    <bpmn:participant id="Participant_receipts_and_delivery" name="receipts and delivery" processRef="Process_receipts_and_delivery" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_receipts_and_delivery" name="receipts and delivery" isExecutable="false">
+    <bpmn:property id="receipts_and_delivery_t_cast" name="receipts_and_delivery_t_cast" itemSubjectRef="Item_receipts_and_delivery_t_cast" />
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_1_EVERY_Tenant_t_IN_tenants" name="EVERY Tenant t IN tenants">
+        <bpmn:flowNodeRef>Scope_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>BoundaryEsc_1</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_2_theLandlord" name="theLandlord">
+        <bpmn:flowNodeRef>Task_4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_4</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_unassigned" name="(unassigned)">
+        <bpmn:flowNodeRef>Start_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Split_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndGroup_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndBreach_1</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_0" />
+    <bpmn:parallelGateway id="Split_0" name="all of" gatewayDirection="Diverging">
+      <bpmn:documentation>RAND: every branch is entered</bpmn:documentation>
+    </bpmn:parallelGateway>
+    <bpmn:endEvent id="End_2" name="Fulfilled" />
+    <bpmn:endEvent id="End_3" name="Breach">
+      <bpmn:errorEventDefinition id="ErrorDef_End_3" errorRef="Error_breach" />
+    </bpmn:endEvent>
+    <bpmn:task id="Task_4" name="MUST Deliver ...">
+      <bpmn:documentation>PARTY theLandlord MUST Deliver ... WITHIN 14</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:boundaryEvent id="Boundary_4" name="after P14D" attachedToRef="Task_4" cancelActivity="true">
+      <bpmn:documentation>LEST: the obligation is not discharged within 14</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Boundary_4">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P14D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:subProcess id="Scope_1" name="each Tenant" triggeredByEvent="false">
+      <bpmn:documentation>One instance per member of the cast, all live at once. The join line is UPON EACH, so everything this box contains — the act, its deadline, and what follows it — belongs to ONE member and runs once per member.</bpmn:documentation>
+      <bpmn:ioSpecification id="IoSpec_Scope_1">
+        <bpmn:dataInput id="DataInput_Scope_1" name="receipts_and_delivery_t_cast" itemSubjectRef="Item_receipts_and_delivery_t_cast" isCollection="true" />
+        <bpmn:inputSet id="InputSet_Scope_1">
+          <bpmn:dataInputRefs>DataInput_Scope_1</bpmn:dataInputRefs>
+        </bpmn:inputSet>
+        <bpmn:outputSet id="OutputSet_Scope_1" />
+      </bpmn:ioSpecification>
+      <bpmn:dataInputAssociation id="DataInputAssoc_Scope_1">
+        <bpmn:sourceRef>receipts_and_delivery_t_cast</bpmn:sourceRef>
+        <bpmn:targetRef>DataInput_Scope_1</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Scope_1" isSequential="false">
+        <bpmn:loopDataInputRef>DataInput_Scope_1</bpmn:loopDataInputRef>
+        <bpmn:inputDataItem id="DataItem_Scope_1" name="t" itemSubjectRef="Item_receipts_and_delivery_t_cast_member" />
+      </bpmn:multiInstanceLoopCharacteristics>
+      <bpmn:task id="Task_1" name="MUST Pay ...">
+        <bpmn:documentation>EVERY Tenant t IN tenants MUST Pay ... WITHIN 7 UPON EACH — one instance per member of the cast, each bound to ‘t’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). UPON EACH: what follows fires once per member, as that member completes. Everything after this act is drawn INSIDE a multi-instance sub-process, so each member gets their own copy of it and their own deadline; the box, not this task, carries the multi-instance marker. What the enclosure adds and the rule does not have is a synchronisation at the end of the box (P-FORK-JOIN).</bpmn:documentation>
+      </bpmn:task>
+      <bpmn:boundaryEvent id="Boundary_1" name="after P7D" attachedToRef="Task_1" cancelActivity="true">
+        <bpmn:documentation>LEST: the obligation is not discharged within 7</bpmn:documentation>
+        <bpmn:timerEventDefinition id="Timer_Boundary_1">
+          <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P7D</bpmn:timeDuration>
+        </bpmn:timerEventDefinition>
+      </bpmn:boundaryEvent>
+      <bpmn:startEvent id="StartScope_1">
+        <bpmn:documentation>one instance per member of the cast</bpmn:documentation>
+      </bpmn:startEvent>
+      <bpmn:endEvent id="EndScope_1" name="Fulfilled">
+        <bpmn:documentation>this member is done. The instance of every other member is unaffected: that is what UPON EACH says, and what enclosing the continuation here is for.</bpmn:documentation>
+      </bpmn:endEvent>
+      <bpmn:endEvent id="EscScope_1" name="Breach">
+        <bpmn:documentation>this member breached. Raised as an escalation and not as an error: an error event is interrupting in BPMN 2.0, so an error thrown here would cancel the instance of every other member, which the rule does not say.</bpmn:documentation>
+        <bpmn:escalationEventDefinition id="EscDef_EscScope_1" escalationRef="Escalation_breach" />
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="Flow_Task_1__EndScope_1" sourceRef="Task_1" targetRef="EndScope_1" />
+      <bpmn:sequenceFlow id="Flow_Boundary_1__EscScope_1" sourceRef="Boundary_1" targetRef="EscScope_1" />
+      <bpmn:sequenceFlow id="Flow_StartScope_1__Task_1" sourceRef="StartScope_1" targetRef="Task_1" />
+    </bpmn:subProcess>
+    <bpmn:endEvent id="EndGroup_1" name="every run has ended">
+      <bpmn:documentation>every member&apos;s instance has ended, whichever way each ended. Not the same statement as the rule being fulfilled: see P-FORK-VERDICT.</bpmn:documentation>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="EndBreach_1" name="Breach">
+      <bpmn:documentation>a member breached. A plain end and not an error end: an error end event ends every active thread in the process, so it would cancel the instances of the members who did not breach. See P-FORK-BREACH-UNMARKED.</bpmn:documentation>
+    </bpmn:endEvent>
+    <bpmn:boundaryEvent id="BoundaryEsc_1" name="a member breached" attachedToRef="Scope_1" cancelActivity="false">
+      <bpmn:documentation>catches a breach raised by one member, without interrupting the group: every other member remains bound, and a second breach is caught here too.</bpmn:documentation>
+      <bpmn:escalationEventDefinition id="EscDef_BoundaryEsc_1" escalationRef="Escalation_breach" />
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_Start_0__Split_0" sourceRef="Start_0" targetRef="Split_0" />
+    <bpmn:sequenceFlow id="Flow_Split_0__Scope_1" sourceRef="Split_0" targetRef="Scope_1" />
+    <bpmn:sequenceFlow id="Flow_Split_0__Task_4" sourceRef="Split_0" targetRef="Task_4" />
+    <bpmn:sequenceFlow id="Flow_Task_4__End_2" sourceRef="Task_4" targetRef="End_2" />
+    <bpmn:sequenceFlow id="Flow_Boundary_4__End_3" sourceRef="Boundary_4" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Scope_1__EndGroup_1" sourceRef="Scope_1" targetRef="EndGroup_1" />
+    <bpmn:sequenceFlow id="Flow_BoundaryEsc_1__EndBreach_1" sourceRef="BoundaryEsc_1" targetRef="EndBreach_1" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_receipts_and_delivery">
+      <bpmndi:BPMNShape id="Shape_Participant_receipts_and_delivery" bpmnElement="Participant_receipts_and_delivery" isHorizontal="true">
+        <dc:Bounds x="130" y="80" width="770" height="1028" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_1_EVERY_Tenant_t_IN_tenants" bpmnElement="Lane_1_EVERY_Tenant_t_IN_tenants" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="740" height="348" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_2_theLandlord" bpmnElement="Lane_2_theLandlord" isHorizontal="true">
+        <dc:Bounds x="160" y="428" width="740" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_unassigned" bpmnElement="Lane_unassigned" isHorizontal="true">
+        <dc:Bounds x="160" y="588" width="740" height="520" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Start_0" bpmnElement="Start_0">
+        <dc:Bounds x="232" y="630" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Split_0" bpmnElement="Split_0">
+        <dc:Bounds x="405" y="623" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_1" bpmnElement="Task_1">
+        <dc:Bounds x="380" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Boundary_1" bpmnElement="Boundary_1">
+        <dc:Bounds x="434" y="162" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_2" bpmnElement="End_2">
+        <dc:Bounds x="772" y="630" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_3" bpmnElement="End_3">
+        <dc:Bounds x="772" y="750" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_4" bpmnElement="Task_4">
+        <dc:Bounds x="560" y="448" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Boundary_4" bpmnElement="Boundary_4">
+        <dc:Bounds x="614" y="510" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Scope_1" bpmnElement="Scope_1" isExpanded="true">
+        <dc:Bounds x="208" y="76" width="444" height="246" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndGroup_1" bpmnElement="EndGroup_1">
+        <dc:Bounds x="772" y="870" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_StartScope_1" bpmnElement="StartScope_1">
+        <dc:Bounds x="232" y="122" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndScope_1" bpmnElement="EndScope_1">
+        <dc:Bounds x="592" y="122" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EscScope_1" bpmnElement="EscScope_1">
+        <dc:Bounds x="592" y="242" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndBreach_1" bpmnElement="EndBreach_1">
+        <dc:Bounds x="772" y="990" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_BoundaryEsc_1" bpmnElement="BoundaryEsc_1">
+        <dc:Bounds x="606" y="304" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Split_0" bpmnElement="Flow_Start_0__Split_0">
+        <di:waypoint x="268" y="648" />
+        <di:waypoint x="314" y="648" />
+        <di:waypoint x="405" y="648" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Split_0__Scope_1" bpmnElement="Flow_Split_0__Scope_1">
+        <di:waypoint x="455" y="648" />
+        <di:waypoint x="494" y="648" />
+        <di:waypoint x="494" y="199" />
+        <di:waypoint x="208" y="199" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Split_0__Task_4" bpmnElement="Flow_Split_0__Task_4">
+        <di:waypoint x="455" y="648" />
+        <di:waypoint x="511" y="648" />
+        <di:waypoint x="511" y="488" />
+        <di:waypoint x="560" y="488" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_1__EndScope_1" bpmnElement="Flow_Task_1__EndScope_1">
+        <di:waypoint x="480" y="140" />
+        <di:waypoint x="528" y="140" />
+        <di:waypoint x="592" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_1__EscScope_1" bpmnElement="Flow_Boundary_1__EscScope_1">
+        <di:waypoint x="452" y="198" />
+        <di:waypoint x="545" y="198" />
+        <di:waypoint x="545" y="260" />
+        <di:waypoint x="592" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_4__End_2" bpmnElement="Flow_Task_4__End_2">
+        <di:waypoint x="660" y="488" />
+        <di:waypoint x="674" y="488" />
+        <di:waypoint x="674" y="648" />
+        <di:waypoint x="772" y="648" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_4__End_3" bpmnElement="Flow_Boundary_4__End_3">
+        <di:waypoint x="632" y="546" />
+        <di:waypoint x="691" y="546" />
+        <di:waypoint x="691" y="768" />
+        <di:waypoint x="772" y="768" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_StartScope_1__Task_1" bpmnElement="Flow_StartScope_1__Task_1">
+        <di:waypoint x="268" y="140" />
+        <di:waypoint x="331" y="140" />
+        <di:waypoint x="380" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Scope_1__EndGroup_1" bpmnElement="Flow_Scope_1__EndGroup_1">
+        <di:waypoint x="652" y="199" />
+        <di:waypoint x="708" y="199" />
+        <di:waypoint x="708" y="888" />
+        <di:waypoint x="772" y="888" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_BoundaryEsc_1__EndBreach_1" bpmnElement="Flow_BoundaryEsc_1__EndBreach_1">
+        <di:waypoint x="624" y="340" />
+        <di:waypoint x="725" y="340" />
+        <di:waypoint x="725" y="1008" />
+        <di:waypoint x="772" y="1008" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

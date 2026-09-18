@@ -240,15 +240,12 @@ that can actually be taken. The fourth runs the other way.
    though the running contract tells them apart.
 3. **Deadlines are labels.** Whether a deadline can be met given the ones before it is not worked
    out; the picture shows `WITHIN 30` as text.
-4. **A single party's lapsing `MAY` is not drawn.** When a bare `PARTY … MAY` (no `LEST`) has a
-   `HENCE` that leads on to another obligation, the running contract ends `FULFILLED` if the
-   permission simply expires — but the drawing shows only the `HENCE` route, so the acts beyond
-   it are listed as required when they can in fact be bypassed. This is the one case where an act
-   on the list is not truly necessary; it is a gap in the drawing (noted in the extractor's source,
-   `StateGraph.hs`, at the `DMay` case of `extractDeonton`) rather than in the question. An
-   `EVERY … MAY` does not have this gap: under `ONCE ALL HAVE` and under `UPON EACH` alike, the
-   lapse is drawn as a red `lapses` arrow to `FULFILLED`, and the answer for `FULFILLED` is then
-   "nothing in particular", which is right — the continuation can be bypassed.
+4. **A permission with no deadline cannot lapse, and draws nothing.** A `MAY` with no `WITHIN`
+   has no moment at which it expires, so there is no arrow for one, and the routes the map shows
+   are the only routes there are. (A `MAY` that _does_ carry a `WITHIN` draws its lapse as a red
+   `lapses` arrow to `FULFILLED`, so an act that a lapse can bypass is not listed as required.
+   Until 2026-09-17 that arrow was drawn only for an `EVERY … MAY`, and a single party's
+   permission was the one case where an act on this list was not truly necessary.)
 
 So "nothing in particular" means the drawing shows more than one route, not that every route is
 live. To know what a particular sequence of events actually does, run it: a `#TRACE` directive
@@ -283,14 +280,13 @@ hand-over, not the arguments: a rule called with `amount` and the same rule call
 file, a `RECORD` step, or anything else that is not a rule of this file — is drawn as an arrow
 into a place labelled `next` (for `HENCE`) or `failure` (for `LEST`), and stops there.
 
-**A single party's `MAY` with no `LEST` has no red arrow.** A permission nobody exercises simply
-ends, so the default there is `FULFILLED`, and for a `PARTY … MAY` the map draws only the green
-arrow. If such a `MAY` has a `HENCE` that leads on to another obligation, the lapse route to
-`FULFILLED` is not drawn at all — the map shows only the `HENCE` path, and a rule that can in fact
-end quietly looks as if it cannot. An `EVERY … MAY` is drawn correctly: under either join line its
-lapse gets a red arrow captioned `lapses` straight to `FULFILLED`, because an expired permission
-spawns no continuation for any member. A `MAY` with an explicit `LEST` gets a red arrow captioned
-`lapses` too.
+**A `MAY` gets its red arrow from its deadline, not from a `LEST`.** A permission nobody exercises
+simply ends, so where it can expire the map draws a red arrow captioned `lapses` straight to
+`FULFILLED` — for a single `PARTY … MAY` and for an `EVERY … MAY` under either join line alike,
+and whether or not a `LEST` was written. That matters most when the `HENCE` leads on to another
+obligation, because then the two arrows genuinely part company: exercising the permission creates
+somebody's duty, letting it expire creates nobody's. A `MAY` with no `WITHIN` gets no red arrow,
+which is not an omission — with no deadline there is no moment at which it lapses.
 
 **An `EVERY` is one arrow, not one per member.** `EVERY Tenant t IN tenants MUST Sign` is drawn as
 a single arrow labelled with the quantifier, because who the tenants are is only known when the

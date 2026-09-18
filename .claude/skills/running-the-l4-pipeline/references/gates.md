@@ -96,6 +96,31 @@ That exclusion is right for the receipts list and was **wrong for the corpus sec
 
 ---
 
+## Provisional grants — review PENDING, not review DISPENSED WITH
+
+Added 2026-09-15 (SPEC.md §7.3.2). A third state beside `satisfied` and `waived`, for the case the other two could not say: **the review has not happened yet.**
+
+**It is the default.** A run with no review on record grants HG1 provisionally — with a reason marked `AUTOMATIC:`, so a reader can tell it from a human's — and proceeds to the end rather than stopping at `p6-tests`. `--require-review` restores the refusal. The automatic grant is HG1-only: HG2 is excluded by the branch condition, because its subject is an outward-facing act and there is no evidence to gather ahead of it.
+
+The invocation is in SKILL.md step 5, beside the waiver it is not — written down once, there, so there is only one copy to keep true.
+
+§7.3's sentence is "after P5, **before P6's tests are treated as specifications**". The gate is about what the downstream artifacts are permitted to _claim_, not about whether the machine may compute them — and running P6 and P8 before the review is what puts the divergence witnesses and the `unsat` / `dead-branch` findings **in front of** the reviewer. A provisional run is the briefing pack for HG1. Withholding the evidence until after the review had the order backwards.
+
+What it does and does not buy:
+
+- **The stages run**, and every receipt carries `produced_under.state: provisional`, derived from the journal by `receipt.mjs` and assertable by no phase script.
+- **Nothing is servable.** `store.mjs` ranks grants `satisfied > waived > provisional` — a ranking of how much has been _claimed_, not of recency, so a provisional grant can never outrank a waiver over the same bytes however the ledger is ordered.
+- **There is no `--allow-provisional`**, deliberately. `--allow-waived` exists because a waiver is a judgement a caller can read and weigh; a provisional grant has no judgement in it. The remedy is the review.
+- **The verdict is `PROVISIONAL`**, exit 0. The accounting is complete and the review is not. It is not a flavour of `COMPLETE`, because `COMPLETE` is the word a reader skims for.
+- **It binds to the corpus digest**, exactly as a waiver does. Edit the encoding and the gate re-opens.
+- **Promotion is free.** Sign HG1 over an unmoved corpus and re-run: the stages replay, the same bytes are re-admitted under the satisfied blessing, and the verdict returns to `COMPLETE`. `servability()` is content-addressed, so no promotion machinery was needed or written.
+
+**HG2 admits no provisional grant**, and the refusal is enforced in two places — the driver (`--provisional HG2` exits 2) and the ledger writer (`checkClaim`), because the CLI is not the only caller. The reason is not the waiver's reason and is stated separately: nothing downstream of HG2 is _evidence for_ HG2. P10 is the outward act itself.
+
+Pick the state that is true. Passing `--waive HG1` and `--provisional HG1` together is refused as contradictory — a waiver says the review did not apply, a provisional grant says it has not happened. Before this state existed, `--waive` was the only route and got used for both, which made the gate table say something false.
+
+---
+
 ## Waivers
 
 When no signer is enrolled — or when the gate genuinely does not apply to what this run is doing — the honest route is an explicit waiver, passed to the driver as `--waive HG1="<reason>"`. The invocation is in SKILL.md step 5; it is written down once, there, so there is only one copy to keep true.

@@ -36,6 +36,16 @@
 // the file UNSOUND, because a file that lies about its own shape is not one any
 // verdict should be read off.
 //
+// A PARTIAL IMPLEMENTATION THAT TURNS A REFUSAL INTO A WRONG ANSWER IS A
+// REGRESSION, even though it is strictly more done — and "more done" is what
+// makes it tempting to ship. This file has the instance: the reader learned to
+// nest one commit before `expandScopes` existed, and in between, a file with a
+// sub-process stopped saying "NOT CHECKED: this checker plays one process only"
+// and started saying "UNBOUNDED or TOO LARGE", which is false and tells a
+// reader nothing they can act on. The refusal was restored and the expansion
+// landed whole. If you are part-way through teaching this checker a new
+// construct, leave the refusal standing until the new path is complete.
+//
 // PROPER COMPLETION IS DELIBERATELY NOT AN ERROR HERE. A classic WF-net demands
 // exactly one token in one sink; BPMN instead completes when every token has
 // been consumed, and consuming several at several end events is legal. The
@@ -119,8 +129,6 @@ const REFUSED = {
     "its token game needs the branch conditions this checker does not read",
   complexGateway:
     "a complex gateway's activation rule is an arbitrary expression",
-  subProcess:
-    "a sub-process has its own token scope; this checker plays one process only",
   transaction: "a transaction sub-process adds compensation semantics",
   adHocSubProcess: "an ad-hoc sub-process has no sequence flow to play",
 };
@@ -154,9 +162,21 @@ function readBpmn(xml) {
   const refusals = [];
   const processes = [];
   const stack = [];
-  let current = null; // the process being filled
+  let current = null; // the CONTAINER being filled: a process, or a sub-process scope
   let inDiagram = 0;
   let openEnd = null; // the <endEvent> currently open, if any
+
+  // This reader used to be flat, and `subProcess` was refused because of it: a
+  // sub-process's children live in the same document, so they would be scanned
+  // straight into the parent's node map and played as siblings. It now keeps a
+  // stack of containers instead, so a scope's children are its own.
+  //
+  // `scopes` is the container stack; `current` is its top. `activities` is the
+  // stack of activity elements currently open, so that a
+  // <multiInstanceLoopCharacteristics> can be recorded on the activity that
+  // encloses it — which is the parent element, not the container.
+  const scopes = [];
+  const activities = [];
 
   for (const m of text.matchAll(TAG_RE)) {
     const [, closing, qname, attrChunk] = m;
@@ -174,7 +194,18 @@ function readBpmn(xml) {
 
     if (closing) {
       const popped = stack.pop();
-      if (popped === "process") current = null;
+      if (popped === "process") {
+        scopes.pop();
+        current = null;
+      }
+      if (popped === "subProcess") {
+        // Read here, expanded by `expandScopes`, which is where what can and
+        // cannot be played is decided. Nothing is refused at read time.
+        scopes.pop();
+        current = scopes[scopes.length - 1] ?? null;
+        activities.pop();
+      }
+      if (ACTIVITIES.has(popped)) activities.pop();
       if (popped === "endEvent") openEnd = null;
       continue;
     }
@@ -194,6 +225,16 @@ function readBpmn(xml) {
       continue;
     }
 
+    // An ESCALATION end does neither: it throws to a catcher, and a
+    // non-interrupting boundary on the enclosing scope catches it without
+    // cancelling anything. That is the only construct BPMN has for "this member
+    // breached and the others carry on", so it is read rather than treated as a
+    // plain end. See `expandScopes`.
+    if (openEnd && name === "escalationEventDefinition") {
+      openEnd.throwsEscalation = true;
+      continue;
+    }
+
     if (name === "process") {
       current = {
         id: a.id ?? `process_${processes.length}`,
@@ -203,6 +244,7 @@ function readBpmn(xml) {
         boundaries: [], // { id, name, attachedTo, interrupting }
       };
       processes.push(current);
+      scopes.push(current);
       continue;
     }
     if (!current) continue; // laneSet inside collaboration, extensions, etc.
@@ -210,6 +252,55 @@ function readBpmn(xml) {
     // Object.hasOwn, not `in`: `in` walks Object.prototype, so an element named
     // `constructor` or `toString` would "match" and yield a function body as its
     // refusal reason.
+    // A sub-process is a node in its parent AND a container of its own. Its
+    // boundary events are siblings in the parent (they attach to it from
+    // outside), so only sequence flows and flow nodes go inward.
+    if (name === "subProcess") {
+      const scope = {
+        id: a.id,
+        name: a.name ?? "",
+        nodes: new Map(),
+        flows: [],
+        boundaries: [],
+      };
+      const node = {
+        id: a.id,
+        kind: "subProcess",
+        name: a.name ?? "",
+        scope,
+      };
+      current.nodes.set(a.id, node);
+      if (isLeaf) {
+        // <subProcess/> with no children: an empty scope, which is legal and
+        // behaves as a pass-through. Nothing to push.
+        continue;
+      }
+      scopes.push(scope);
+      current = scope;
+      activities.push(node);
+      continue;
+    }
+
+    // <multiInstanceLoopCharacteristics> belongs to the activity that ENCLOSES
+    // it, which is the open element rather than the open container: on a task
+    // there is no container at all. `isSequential` defaults to true per the
+    // XSD, which is the opposite of what the exporter writes, so it is read
+    // rather than assumed.
+    if (name === "multiInstanceLoopCharacteristics") {
+      const owner = activities[activities.length - 1];
+      if (owner)
+        owner.multiInstance = {
+          isSequential: a.isSequential !== "false",
+          completionCondition: false,
+        };
+      continue;
+    }
+    if (name === "completionCondition") {
+      const owner = activities[activities.length - 1];
+      if (owner?.multiInstance) owner.multiInstance.completionCondition = true;
+      continue;
+    }
+
     if (Object.hasOwn(REFUSED, name)) {
       refusals.push(`${name} ${a.id ?? "(no id)"}: ${REFUSED[name]}`);
       continue;
@@ -251,9 +342,424 @@ function readBpmn(xml) {
         node.gatewayDirection = a.gatewayDirection;
       current.nodes.set(a.id, node);
       if (name === "endEvent" && !isLeaf) openEnd = node;
+      // An open activity can enclose a <multiInstanceLoopCharacteristics>.
+      if (ACTIVITIES.has(name) && !isLeaf) activities.push(node);
     }
   }
   return { processes, refusals };
+}
+
+// ---------------------------------------------------------------------------
+// Sub-process scopes -> a flat net, by COPY-EXPANSION
+// ---------------------------------------------------------------------------
+//
+// A multi-instance scope is played by building n STRUCTURAL COPIES of its
+// interior, spliced between a synthetic parallel split and join. The whole
+// design rests on ONE INVARIANT:
+//
+//   NO COPY SHARES A PLACE WITH ANY OTHER COPY.
+//
+// Two results follow, and they are corollaries rather than separate rules:
+//
+//   * THE EXPANSION IS A P/T NET. A transition needs a fixed input set. A
+//     cancel on the SCOPE would have to consume the running places of whichever
+//     copies happen to be live, which is not fixed — so it is not expressible
+//     here, and it is refused rather than approximated. ("First token out wins"
+//     would strand the other copies and report UNSOUND for an artifact of the
+//     model.)
+//   * n = 2 IS A SOUND CUTOFF. The expansion is a symmetric product, so a
+//     structural property that holds of two independent copies holds of n by
+//     symmetry. n = 3 is not "more thorough": it buys only more interleavings
+//     of the same structures, at k^n for an interior of k states. It could only
+//     catch a defect that depends on a specific count >= 3, and the exporter
+//     emits no such construct.
+//
+// THAT CUTOFF HAS AN EXPIRY. `ONCE SOME m OF … HAVE` (EVERY-EACH-QUANTIFIER-SPEC
+// phase 3) fires on m tokens in a SHARED ACCUMULATOR: expressible in P/T, but
+// the accumulator is not 1-safe and the copies are no longer independent, so it
+// breaks the invariant and the cutoff at the same moment. The MODEL needs
+// revisiting then, not just the constant. `ONCE sum OF amount AT LEAST rent`
+// accumulates an arbitrary quantity that is not a token count at any n; that one
+// belongs in REFUSED when it lands.
+//
+// WHY BOTH n = 0 AND n = 2, AND NEVER n = 1 ALONE:
+//
+//   n = 0  checks the OUTSIDE of the scope — with no copies the interior is
+//          empty, so the question is what the process does when the cast is
+//          empty. Measured in the evaluator, that is where the two join lines
+//          diverge most: a barrier fires its continuation ("all zero of them
+//          have acted" is vacuously true) and a fork fires nothing.
+//   n = 1  would make a fork and a barrier indistinguishable — one copy, one
+//          continuation, either way. A gate exploring only n = 1 would go green
+//          on a drawing that had lost its join, which is the defect
+//          legalese/l4-ide#395 fixed, reproduced inside the checker that exists
+//          to catch it.
+//   n = 2  is the least n that tells them apart.
+//
+// WHAT "SOUND AT 0 INSTANCES" DOES NOT MEAN, because the two claims want to
+// collapse and they have different evidence and different owners. Soundness
+// here is about TOKEN FLOW: the net completes, nothing strands, nothing
+// deadlocks. Whether an empty cast is drawn CORRECTLY is a different claim
+// entirely, and it is settled by the shape rather than by this gate — the
+// fork's continuation sits inside the instance, so zero instances give zero
+// continuations, while a barrier's sits outside and still fires once. That is a
+// question about what the diagram MEANS, answered in the exporter and in the
+// quantifier spec, and this checker cannot see it. "We explored n = 0" must
+// never be read as "the empty-cast case is verified".
+const INSTANCE_COUNTS = [0, 2];
+
+// Does this end event throw rather than end? An escalation end inside a scope
+// is caught by a non-interrupting boundary on the scope, which is how BPMN says
+// "this member breached; the others carry on".
+const isThrow = (node) => node.kind === "endEvent" && node.throwsEscalation;
+
+// Expand every sub-process scope in `proc` into `n` copies of its interior.
+// Returns a flat process plus the copy -> source id map every finding is
+// reported through, because `Task_0#1` names nothing a reader can find in the
+// file.
+function expandScopes(proc, n) {
+  const refusals = [];
+  const notes = []; // said out loud, but not a defect
+  const sourceOf = new Map(); // copy id -> source id
+  const nodes = new Map();
+  const flows = [];
+  const boundaries = [];
+
+  const scopeNodes = [...proc.nodes.values()].filter(
+    (x) => x.kind === "subProcess",
+  );
+  if (scopeNodes.length === 0)
+    return {
+      proc,
+      refusals,
+      notes,
+      sourceOf,
+      fanIn: new Set(),
+      expanded: false,
+    };
+
+  const scopeIds = new Set(scopeNodes.map((x) => x.id));
+
+  // Boundaries on a scope: only the non-interrupting kind can be played, and it
+  // is played by routing the interior's throws straight to its outgoing flow.
+  const scopeBoundary = new Map(); // scope id -> boundary
+  for (const b of proc.boundaries) {
+    if (!scopeIds.has(b.attachedTo)) {
+      boundaries.push(b);
+      continue;
+    }
+    if (b.interrupting) {
+      refusals.push(
+        `boundaryEvent ${b.id}: an INTERRUPTING boundary on sub-process ` +
+          `${b.attachedTo} cancels whichever instances are live, which is not a ` +
+          `fixed set of places and so is not expressible as a P/T transition. ` +
+          `Model the deadline inside the instance instead, where each copy ` +
+          `carries its own race.`,
+      );
+      continue;
+    }
+    scopeBoundary.set(b.attachedTo, b);
+  }
+
+  // Everything that is not a scope, and not a boundary on one, survives as is.
+  const onAScope = new Set(
+    proc.boundaries.filter((b) => scopeIds.has(b.attachedTo)).map((b) => b.id),
+  );
+  for (const x of proc.nodes.values()) {
+    if (x.kind === "subProcess") continue;
+    // A boundary on a scope is not an ordinary node here: at n > 0 it is
+    // rebuilt as the relay the interior's throws flow into, and at n = 0 it is
+    // dropped with the region behind it.
+    if (onAScope.has(x.id)) continue;
+    nodes.set(x.id, x);
+  }
+
+  const rewritten = new Map(); // scope id -> { split, join }
+  const droppedSources = new Set(); // nodes not built at this count
+  for (const sc of scopeNodes) {
+    const mi = sc.multiInstance;
+    if (mi?.isSequential) {
+      refusals.push(
+        `subProcess ${sc.id}: a SEQUENTIAL multi-instance scope is a loop, not ` +
+          `a parallel expansion; its token game is not this one`,
+      );
+      continue;
+    }
+    // THE EXECUTABLE FORM OF A DESIGN DECISION. A completionCondition says the
+    // scope completes before its instances do — which is right for a
+    // prohibition drawn as a multi-instance TASK, where there is no interior
+    // for the rule to govern, and wrong for a scope, where the instances left
+    // running when it fires would have to be cancelled: the same
+    // not-a-fixed-set-of-places problem as an interrupting boundary. The
+    // exporter is not supposed to put one here; this is the guard that says so
+    // where the violation would occur rather than in a comment somewhere else.
+    if (mi?.completionCondition) {
+      refusals.push(
+        `subProcess ${sc.id}: a completionCondition on a SCOPE would complete it ` +
+          `while instances are still running, and cancelling those is not a ` +
+          `fixed set of places. A completion rule belongs on a multi-instance ` +
+          `TASK, which has no interior for it to govern.`,
+      );
+      continue;
+    }
+    if ([...sc.scope.nodes.values()].some((x) => x.kind === "subProcess")) {
+      refusals.push(
+        `subProcess ${sc.id}: a nested scope; this expansion is one level deep`,
+      );
+      continue;
+    }
+
+    const split = `${sc.id}:split`;
+    const join = `${sc.id}:join`;
+    nodes.set(split, {
+      id: split,
+      kind: "parallelGateway",
+      name: `${sc.name || sc.id} (split)`,
+    });
+    nodes.set(join, {
+      id: join,
+      kind: "parallelGateway",
+      name: `${sc.name || sc.id} (join)`,
+    });
+    sourceOf.set(split, sc.id);
+    sourceOf.set(join, sc.id);
+    rewritten.set(sc.id, { split, join });
+
+    // A non-interrupting boundary becomes an ordinary relay node: the interior's
+    // throws flow into it and out along its own edges, and the copies that did
+    // not throw carry on to the join. That IS the non-interrupting semantics.
+    // ...but only when there are instances to throw. At n = 0 nothing inside
+    // can escalate, so a relay here would be an orphan with no incoming flow —
+    // a STRUCTURE finding about the checker's own construction rather than
+    // about the file. It is dropped instead, along with its outgoing edges, and
+    // whatever they led to is simply unreachable at this count. S3 is asked
+    // across counts, so a breach end that only fires when somebody breaches is
+    // not reported as dead.
+    const b = n > 0 ? scopeBoundary.get(sc.id) : undefined;
+    if (b) {
+      nodes.set(b.id, {
+        id: b.id,
+        kind: "intermediateCatchEvent",
+        name: b.name,
+      });
+      sourceOf.set(b.id, b.id);
+    }
+    if (n === 0)
+      for (const bb of scopeBoundary.values()) droppedSources.add(bb.id);
+
+    const inner = sc.scope;
+    const innerStarts = [...inner.nodes.values()].filter(
+      (x) => x.kind === "startEvent",
+    );
+    const innerEnds = [...inner.nodes.values()].filter(
+      (x) => x.kind === "endEvent",
+    );
+    const throwing = innerEnds.filter(isThrow);
+    // Asked of the FILE, not of this count: whether a throw has a catcher is a
+    // property of the diagram, and at n = 0 the relay is deliberately not built.
+    if (throwing.length && !scopeBoundary.has(sc.id)) {
+      refusals.push(
+        `subProcess ${sc.id}: an escalation end event inside it has nothing to ` +
+          `catch it — a non-interrupting boundary on the scope is what makes ` +
+          `one member's breach visible without cancelling the others`,
+      );
+      continue;
+    }
+
+    if (n === 0) {
+      // An empty collection completes the activity at once and takes its
+      // outgoing flow. Nothing inside runs — which is the whole point of the
+      // n = 0 pass.
+      flows.push({ id: `${sc.id}:empty`, source: split, target: join });
+    }
+    for (let i = 0; i < n; i++) {
+      const cp = (id) => `${id}#${i}`;
+      // One "this instance is finished" gateway per COPY, XOR, merging every
+      // path that reaches a normal end inside it.
+      //
+      // Without it the join waits on one token per (instance x arrival flow),
+      // and an interior with two ways to reach its end — the act completing,
+      // or its deadline expiring — deadlocks the moment every instance takes
+      // the same one of them. Measured on the emitter's own `modals-may-fork`
+      // golden: at n = 2, both directors let the permission lapse, both
+      // boundary flows carry a token, and the join sits waiting forever on the
+      // two flows out of the task nobody performed. The file was correct; the
+      // model was counting arrivals where the semantics count instances.
+      //
+      // XOR is right here because a sub-process instance completes when it has
+      // no tokens left, and these copies hold exactly one: an interrupting
+      // boundary makes "performed" and "expired" exclusive. An interior that
+      // really does run two tokens concurrently has to rejoin them at a
+      // parallel gateway before its end event, and if it does not, that is an
+      // uncontrolled merge S4 reports on its own.
+      const done = `${sc.id}:done#${i}`;
+      nodes.set(done, {
+        id: done,
+        kind: "exclusiveGateway",
+        name: `${sc.name || sc.id} (instance ${i} done)`,
+      });
+      sourceOf.set(done, sc.id);
+      flows.push({
+        id: `${sc.id}:done#${i}->join`,
+        source: done,
+        target: join,
+      });
+      for (const x of inner.nodes.values()) {
+        if (x.kind === "startEvent" || x.kind === "endEvent") continue;
+        nodes.set(cp(x.id), { ...x, id: cp(x.id), name: x.name });
+        sourceOf.set(cp(x.id), x.id);
+      }
+      for (const bb of inner.boundaries) {
+        boundaries.push({
+          ...bb,
+          id: cp(bb.id),
+          attachedTo: cp(bb.attachedTo),
+        });
+        nodes.set(cp(bb.id), {
+          id: cp(bb.id),
+          kind: "boundaryEvent",
+          name: bb.name,
+        });
+        sourceOf.set(cp(bb.id), bb.id);
+      }
+      // A THROWING end event is TWO facts, and the model needs both.
+      //
+      // It throws the escalation, which the non-interrupting boundary catches;
+      // and it consumes this path's token, which — since a copy holds exactly
+      // one — means the instance is FINISHED. BPMN completes a sub-process
+      // instance when it has no tokens left, and an escalation end leaves none.
+      //
+      // Routing the throw straight at the catcher, as this did until
+      // 2026-09-19, recorded only the first: a copy that threw never signalled
+      // its own `done`, so the scope's join waited on it forever. Measured on
+      // the exporter's tenancy-fork golden with its breach end made
+      // non-terminating — 2 deadlocked markings, S1 and S2 red, on a correct
+      // file. It was invisible while the breach end was an ERROR end, because
+      // reaching one discards every remaining token and so rescued exactly
+      // those markings: the file scored SOUND, and 39 of its 67 markings could
+      // "complete" ONLY by terminating. A gate passing for that reason is not
+      // passing.
+      //
+      // So the throw is a node of its own with two outgoing flows. An ordinary
+      // (non-gateway) node produces EVERY outgoing flow from one incoming
+      // token, which is BPMN's uncontrolled parallel split and is what makes
+      // these two facts simultaneous rather than a choice. 1-safety is
+      // unaffected: the two targets are different places, each holding one.
+      for (const e of innerEnds.filter(isThrow)) {
+        if (!b) continue; // n = 0, or refused above for want of a catcher
+        const th = cp(`${e.id}:throw`);
+        nodes.set(th, {
+          id: th,
+          kind: "intermediateThrowEvent",
+          name: e.name,
+        });
+        sourceOf.set(th, e.id);
+        flows.push({ id: `${th}->catch`, source: th, target: b.id });
+        flows.push({ id: `${th}->done`, source: th, target: done });
+      }
+
+      const startIds = new Set(innerStarts.map((x) => x.id));
+      const endOf = new Map(innerEnds.map((x) => [x.id, x]));
+      for (const f of inner.flows) {
+        const src = startIds.has(f.source) ? split : cp(f.source);
+        let tgt;
+        if (endOf.has(f.target)) {
+          const e = endOf.get(f.target);
+          tgt = isThrow(e) ? cp(`${e.id}:throw`) : done;
+        } else {
+          tgt = cp(f.target);
+        }
+        flows.push({ id: cp(f.id), source: src, target: tgt });
+      }
+    }
+  }
+
+  // Kept for n = 0, where no copy exists to reach the join at all.
+  //
+  // It used to carry more weight than that, and wrongly: it read "if NO
+  // interior path ends normally — every one of them throws — then nothing
+  // reaches the join". That was a workaround for the defect fixed above,
+  // treating the all-throw case as special instead of noticing that a throwing
+  // instance still finishes. The mixed case — some copies throw, some do not —
+  // fell through it and deadlocked. A rule that handles the extreme and not the
+  // general one is a sign the semantics are wrong, not the boundary condition.
+  for (const [scId, { join }] of rewritten) {
+    if (flows.some((f) => f.target === join)) continue;
+    notes.push(
+      `subProcess ${scId}: no interior path ends normally at ${n} instance(s), ` +
+        `so the scope can only be left by escalation — nothing downstream of ` +
+        `its ordinary completion is reachable`,
+    );
+    droppedSources.add(join);
+    nodes.delete(join);
+  }
+
+  // AT n = 0 THE ESCALATION REGION CANNOT BE ENTERED, so it is not part of the
+  // model at this count — and dropping only its entry would leave whatever it
+  // led to with no incoming flow, which the structure checks would report as a
+  // malformed FILE. That would be a complaint about this construction rather
+  // than about the diagram. So the drop is transitive: a node survives only if
+  // something still reaches it.
+  if (droppedSources.size) {
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (const x of [...nodes.keys()]) {
+        if (droppedSources.has(x)) continue;
+        // Over the REWRITTEN graph, for the same reason the flow loop below is:
+        // a node fed only by a scope is fed, after expansion, by that scope's
+        // join, and asking the original flows would say it is still reachable.
+        const feeds = [
+          ...proc.flows.map((f) => ({
+            source: rewritten.get(f.source)?.join ?? f.source,
+            target: rewritten.get(f.target)?.split ?? f.target,
+          })),
+          ...flows,
+        ].filter((f) => f.target === x);
+        if (feeds.length === 0) continue; // a start event, or already isolated
+        if (feeds.every((f) => droppedSources.has(f.source))) {
+          droppedSources.add(x);
+          nodes.delete(x);
+          changed = true;
+        }
+      }
+    }
+  }
+
+  for (const f of proc.flows) {
+    const toScope = rewritten.get(f.target);
+    const fromScope = rewritten.get(f.source);
+    // Asked of the REWRITTEN endpoints: a flow out of a scope leaves from the
+    // synthetic join, so testing the original `Sub_0` would keep an edge whose
+    // source no longer exists and report it as a dangling reference in the file.
+    const source = fromScope ? fromScope.join : f.source;
+    const target = toScope ? toScope.split : f.target;
+    if (droppedSources.has(source) || droppedSources.has(target)) continue;
+    flows.push({ id: f.id, source, target });
+  }
+
+  // THE ONE PLACE COPIES ARE NOT INDEPENDENT, and it is inherent rather than a
+  // modelling choice: every copy's escalation throw funnels into the SAME
+  // non-interrupting boundary and leaves along its SINGLE outgoing flow. n
+  // members can breach, so that flow can hold up to n tokens.
+  //
+  // BPMN permits it — a sequence flow is not a 1-safe place in the spec — and
+  // it is what "one member breached and the others carry on" MEANS. So S4 is
+  // reported as a bound on these flows instead of a failure, and nowhere else.
+  // Anything DOWNSTREAM of them is not exempt: today the exporter sends the
+  // catch straight to a terminating end, so there is no downstream, and if that
+  // ever changes the finding should fire.
+  const fanIn = new Set();
+  for (const b of scopeBoundary.values())
+    for (const f of flows) if (f.source === b.id) fanIn.add(`flow:${f.id}`);
+
+  return {
+    proc: { id: proc.id, name: proc.name, nodes, flows, boundaries },
+    refusals,
+    notes,
+    sourceOf,
+    fanIn,
+    expanded: true,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -696,101 +1202,166 @@ for (const file of files) {
     continue;
   }
 
-  for (const proc of parsed.processes) {
-    const label = `${file} [${proc.name || proc.id}]`;
-    const net = buildNet(proc);
-    if (net.starts.length > 1) {
-      console.error(
-        `${label}: UNSUPPORTED — NOT CHECKED: ${net.starts.length} start events; ` +
-          "each starts its own instance and this checker plays one",
-      );
-      worst = Math.max(worst, 3);
-      continue;
-    }
-    if (net.starts.length === 0) {
-      console.error(
-        `${label}: UNSUPPORTED — NOT CHECKED: no start event to put a token on`,
-      );
-      worst = Math.max(worst, 3);
-      continue;
-    }
+  for (const proc0 of parsed.processes) {
+    const label0 = `${file} [${proc0.name || proc0.id}]`;
 
-    const r = explore(net);
-    if (r.overflowed) {
-      console.error(
-        `${label}: UNBOUNDED or TOO LARGE — NOT CHECKED: exceeded ` +
-          `${MAX_TOKENS_PER_PLACE} tokens on a place or ${MAX_STATES} markings. ` +
-          "An unbounded net is itself a defect; a large one needs a real model checker.",
-      );
-      worst = Math.max(worst, 3);
-      continue;
-    }
-
-    const deadNodes = [...proc.nodes.values()].filter(
-      (n) => !r.firedNodes.has(n.id) && n.kind !== "startEvent",
+    // A process containing a sub-process scope is played once per instance
+    // count, and must be sound at EVERY one of them. A process without a scope
+    // is played exactly as before — same output, same verdict — so nothing
+    // about the fourteen existing goldens moves.
+    const hasScope = [...proc0.nodes.values()].some(
+      (x) => x.kind === "subProcess",
     );
-    const doomed = r.stuck.filter((k) => !r.deadlocks.includes(k));
+    const counts = hasScope ? INSTANCE_COUNTS : [null];
 
-    const results = [
-      ["S1 option to complete", r.completable && r.stuck.length === 0],
-      ["S2 no deadlock", r.deadlocks.length === 0],
-      ["S3 no dead flow node", deadNodes.length === 0],
-      ["S4 safe (1-bounded)", r.unsafePlaces.size === 0],
-    ];
-    const sound = results.every(([, ok]) => ok) && net.problems.length === 0;
+    // S3 IS ASKED ACROSS THE COUNTS, NOT WITHIN ONE. At n = 0 a scope has no
+    // copies, so everything reachable only through its interior fires zero
+    // times — including, for a fork, the boundary that catches a member's
+    // breach and the breach end itself. That is not a dead branch; it is what
+    // an empty cast MEANS. A node is dead only if it fires in no run at any
+    // count, so the fired sets are unioned here, by SOURCE id, before any
+    // verdict is read off.
+    const firedAnywhere = new Set();
+    if (hasScope)
+      for (const n of INSTANCE_COUNTS) {
+        const pre = expandScopes(proc0, n);
+        if (pre.refusals.length) break;
+        const preNet = buildNet(pre.proc);
+        if (preNet.problems.length || preNet.starts.length !== 1) break;
+        const preRun = explore(preNet);
+        for (const id of preRun.firedNodes)
+          firedAnywhere.add(pre.sourceOf.get(id) ?? id);
+      }
+    for (const n of counts) {
+      const ex =
+        n === null
+          ? { proc: proc0, refusals: [], sourceOf: new Map(), fanIn: new Set() }
+          : expandScopes(proc0, n);
+      if (ex.refusals.length) {
+        console.error(`${label0}: UNSUPPORTED — NOT CHECKED`);
+        for (const r of ex.refusals) console.error(`  - ${r}`);
+        worst = Math.max(worst, 3);
+        break;
+      }
+      const proc = ex.proc;
+      // Findings name the id a reader can find in the FILE. A copy is reported
+      // as its source with the copy in parentheses; `Task_0#1` alone names
+      // nothing.
+      const srcOf = (id) => {
+        const src = ex.sourceOf.get(id);
+        return src && src !== id ? `${src} (instance copy ${id})` : id;
+      };
+      const label = n === null ? label0 : `${label0} @ ${n} instance(s)`;
+      const net = buildNet(proc);
+      if (net.starts.length > 1) {
+        console.error(
+          `${label}: UNSUPPORTED — NOT CHECKED: ${net.starts.length} start events; ` +
+            "each starts its own instance and this checker plays one",
+        );
+        worst = Math.max(worst, 3);
+        continue;
+      }
+      if (net.starts.length === 0) {
+        console.error(
+          `${label}: UNSUPPORTED — NOT CHECKED: no start event to put a token on`,
+        );
+        worst = Math.max(worst, 3);
+        continue;
+      }
 
-    console.log(`${label}: ${sound ? "SOUND" : "UNSOUND"}`);
-    for (const [name, ok] of results)
-      console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}`);
-    console.log(
-      `  info  ${r.states.size} reachable markings, peak ${r.peak} concurrent token(s), ` +
-        `${net.transitions.length} net transitions`,
-    );
-    // Say this out loud. Terminating end events make S1 satisfiable by aborting,
-    // so a reader must be able to tell "completes" from "gives up".
-    if (net.terminators.length) {
-      console.log(
-        `  info  ${net.terminators.length} terminating end event(s): ` +
-          net.terminators.map((n) => describe(n)).join(", ") +
-          " — reaching one discards every remaining token",
+      const r = explore(net);
+      if (r.overflowed) {
+        console.error(
+          `${label}: UNBOUNDED or TOO LARGE — NOT CHECKED: exceeded ` +
+            `${MAX_TOKENS_PER_PLACE} tokens on a place or ${MAX_STATES} markings. ` +
+            "An unbounded net is itself a defect; a large one needs a real model checker.",
+        );
+        worst = Math.max(worst, 3);
+        continue;
+      }
+
+      const deadNodes = [...proc.nodes.values()].filter(
+        (x) =>
+          !r.firedNodes.has(x.id) &&
+          x.kind !== "startEvent" &&
+          !firedAnywhere.has(ex.sourceOf.get(x.id) ?? x.id),
       );
+      const doomed = r.stuck.filter((k) => !r.deadlocks.includes(k));
+
+      const results = [
+        ["S1 option to complete", r.completable && r.stuck.length === 0],
+        ["S2 no deadlock", r.deadlocks.length === 0],
+        ["S3 no dead flow node", deadNodes.length === 0],
+        [
+          "S4 safe (1-bounded)",
+          [...r.unsafePlaces].every((pl) => ex.fanIn.has(pl)),
+        ],
+      ];
+      const sound = results.every(([, ok]) => ok) && net.problems.length === 0;
+
+      console.log(`${label}: ${sound ? "SOUND" : "UNSOUND"}`);
+      for (const [name, ok] of results)
+        console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}`);
       console.log(
-        `  info  ${r.onlyViaTerminate} marking(s) can reach completion ONLY by terminating`,
+        `  info  ${r.states.size} reachable markings, peak ${r.peak} concurrent token(s), ` +
+          `${net.transitions.length} net transitions`,
       );
+      // Say this out loud. Terminating end events make S1 satisfiable by aborting,
+      // so a reader must be able to tell "completes" from "gives up".
+      if (net.terminators.length) {
+        console.log(
+          `  info  ${net.terminators.length} terminating end event(s): ` +
+            net.terminators.map((t) => describe(t)).join(", ") +
+            " — reaching one discards every remaining token",
+        );
+        console.log(
+          `  info  ${r.onlyViaTerminate} marking(s) can reach completion ONLY by terminating`,
+        );
+      }
+
+      for (const p of net.problems) console.log(`  STRUCTURE  ${p}`);
+
+      if (r.deadlocks.length) {
+        console.log(
+          `  ${r.deadlocks.length} deadlocked marking(s). Shortest witness:`,
+        );
+        const shortest = r.deadlocks
+          .map((k) => [k, traceTo(r.states, k)])
+          .sort((a, b) => a[1].length - b[1].length)[0];
+        for (const [i, step] of shortest[1].entries())
+          console.log(`      ${i + 1}. ${step}`);
+        console.log(`    stuck here, nothing is enabled:`);
+        for (const l of explainStuck(net, r.states.get(shortest[0]).marking))
+          console.log(`      ${l}`);
+        if (verbose)
+          for (const k of r.deadlocks)
+            console.log(`    deadlock marking: ${k || "(empty)"}`);
+      }
+      if (doomed.length)
+        console.log(
+          `  ${doomed.length} further marking(s) can still move but have no path to completion left`,
+        );
+      if (!r.completable)
+        console.log(
+          `  completion is unreachable from the start: no run consumes every token`,
+        );
+      for (const note of ex.notes ?? []) console.log(`  info  ${note}`);
+      for (const dn of deadNodes)
+        console.log(
+          `  DEAD  ${describe(dn)} (${dn.kind}) can never fire — ${srcOf(dn.id)}`,
+        );
+      for (const pl of r.unsafePlaces)
+        if (ex.fanIn.has(pl))
+          console.log(
+            `  info  ${pl} can hold up to ${n} token(s) — the escalation fan-in of a ` +
+              `multi-instance scope, where every instance's throw meets the one ` +
+              `boundary that catches it. Bounded by the instance count, and the ` +
+              `only place copies are not independent.`,
+          );
+        else console.log(`  UNSAFE  ${pl} can hold more than one token`);
+
+      if (!sound) worst = Math.max(worst, 1);
     }
-
-    for (const p of net.problems) console.log(`  STRUCTURE  ${p}`);
-
-    if (r.deadlocks.length) {
-      console.log(
-        `  ${r.deadlocks.length} deadlocked marking(s). Shortest witness:`,
-      );
-      const shortest = r.deadlocks
-        .map((k) => [k, traceTo(r.states, k)])
-        .sort((a, b) => a[1].length - b[1].length)[0];
-      for (const [i, step] of shortest[1].entries())
-        console.log(`      ${i + 1}. ${step}`);
-      console.log(`    stuck here, nothing is enabled:`);
-      for (const l of explainStuck(net, r.states.get(shortest[0]).marking))
-        console.log(`      ${l}`);
-      if (verbose)
-        for (const k of r.deadlocks)
-          console.log(`    deadlock marking: ${k || "(empty)"}`);
-    }
-    if (doomed.length)
-      console.log(
-        `  ${doomed.length} further marking(s) can still move but have no path to completion left`,
-      );
-    if (!r.completable)
-      console.log(
-        `  completion is unreachable from the start: no run consumes every token`,
-      );
-    for (const n of deadNodes)
-      console.log(`  DEAD  ${describe(n)} (${n.kind}) can never fire`);
-    for (const p of r.unsafePlaces)
-      console.log(`  UNSAFE  ${p} can hold more than one token`);
-
-    if (!sound) worst = Math.max(worst, 1);
   }
 }
 process.exit(worst);

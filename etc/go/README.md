@@ -273,7 +273,7 @@ through a generated probe module, and emits `denovo-diff.{json,md,rows.json}`. E
 agreement · `1` at least one divergence, which under SPEC.md §8 is the **better** outcome · `2`
 usage · `4` broken.
 
-It **never triages**: every witness reads `UNTRIAGED`, because SPEC.md §8's three dispositions are
+It **never triages**: every witness reads `UNTRIAGED`, because SPEC.md §8.0's three dispositions (converge / fork / defect) are
 judgements and belong to the reviewer. Read the report's **Sensitivity** table alongside its
 agreement counts — a (pair, fact) leaf the battery perturbed without ever moving an answer is a
 surface on which agreement is silence rather than evidence.

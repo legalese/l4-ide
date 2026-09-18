@@ -183,6 +183,10 @@ function gatesTable() {
     if (g.state === "satisfied")
       how = `satisfied by \`${g.signature_file ?? "(no signature file recorded)"}\``;
     else if (g.state === "waived") how = `**waived**: ${esc(g.reason)}`;
+    else if (g.state === "provisional")
+      how =
+        `**PROVISIONAL — the review named here has NOT happened**: ${esc(g.reason)}. ` +
+        `The stages behind this gate ran and their artifacts are stamped provisional; nothing produced under it is servable, and the gate is still open.`;
     else how = `**refused**: ${esc(g.reason)}`;
     return `| ${g.gate} | ${g.state} | ${how} |`;
   });
@@ -735,7 +739,7 @@ function triageSection() {
     r.status === "SKIPPED" || r.status === "DEGRADED"
       ? []
       : [
-          `The comparator evaluated **${esc(m.evaluations ?? "?")}** (pair, row) cells over ${esc(m.pairs ?? "?")} declared pair(s): ${esc(m.agreed ?? "?")} agreed, **${esc(m.diverged ?? "?")} diverged**, ${esc(m.untriaged ?? "?")} untriaged. Every divergence witness is emitted \`UNTRIAGED\` in the \`denovo-diff.md\` artifact; triaging them (encoding error / genuine ambiguity / improvement) is the reviewer's act, and a run that finds a divergence is §8's *better* pass.`,
+          `The comparator evaluated **${esc(m.evaluations ?? "?")}** (pair, row) cells over ${esc(m.pairs ?? "?")} declared pair(s): ${esc(m.agreed ?? "?")} agreed, **${esc(m.diverged ?? "?")} diverged**, ${esc(m.untriaged ?? "?")} untriaged. Every divergence witness is emitted \`UNTRIAGED\` in the \`denovo-diff.md\` artifact; triaging them (converge / fork / defect, SPEC.md §8.0) is the reviewer's act, and a run that finds a divergence is §8's *better* pass.`,
           "",
         ];
   return [...head, receiptBlock(r, "`p8-diff`")].join("\n");
@@ -812,6 +816,8 @@ const VERDICT_GLOSS = {
   INCOMPLETE:
     "INCOMPLETE means a declared stage has no receipt, or a non-PASS receipt gave no reason. The gaps are listed below.",
   GATE: "GATE means a human gate was not satisfied and the run refused to continue past it.",
+  PROVISIONAL:
+    "PROVISIONAL means the accounting is complete and the REVIEW IS NOT. A human gate was granted provisionally — recorded, reasoned and bound to the corpus digest, but standing in for a review that has still to happen — so the stages behind it ran and every artifact they produced is stamped `provisional` and is not servable. Read the findings below as evidence prepared FOR that review, not as anything the review has endorsed. The gates table names the gate and the reason.",
   BROKEN:
     "BROKEN means a harness defect, not a finding about the corpus. Nothing below should be read as a statement about the encoding.",
 };
@@ -834,6 +840,13 @@ const values = {
     ? "verifies"
     : `**DOES NOT VERIFY** — ${chain.problems.join("; ")}`,
   "run.verdict": end?.verdict ?? mv.verdict,
+  // The destination is a PATH, and the branch is deliberately absent from it:
+  // which drafts shelf an encoding lands on is a fact about who deposits it,
+  // resolved at deposit time by lib/canon-destination.mjs. Saying "a drafts
+  // branch" rather than naming one is the accurate claim, not a hedge.
+  "run.canon_destination": begin?.canon_destination
+    ? `\`${esc(begin.canon_destination)}/\` in **legalese/canon**, on the depositor's own drafts branch (named at deposit time; never the default branch)`
+    : "_no `canon` block in this subject's sidecar, so no destination is declared. A guessed path on a public repository is worse than an absent one._",
   "run.verdict_gloss":
     VERDICT_GLOSS[end?.verdict ?? mv.verdict] ?? "(no gloss recorded)",
   "gates.table": gatesTable(),

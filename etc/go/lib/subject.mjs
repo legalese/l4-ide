@@ -209,7 +209,40 @@ export function loadSubject(id, selectedEncoding = "primary") {
     "comparison",
     "encodings",
     "explainer",
+    "canon",
   ]);
+  // WHERE THIS SUBJECT'S ENCODINGS ARE DESTINED, in `legalese/canon`.
+  //
+  // Optional. A subject with no `canon` block has no declared destination, and
+  // p10 says exactly that instead of guessing one — a guessed path on a public
+  // repo is worse than an absent one.
+  //
+  // Only the SUBJECT PATH lives here, because only it is a fact about the law.
+  // The branch is a fact about WHO is depositing (`<username>/drafts`) and is
+  // resolved per-run in lib/canon-destination.mjs; the encoding row id is the
+  // encoding's own id, which canon's drafts branch already agrees with —
+  // subjects/sg/succession/encodings/cleanroom-2026-08/ is filed under exactly
+  // the id this sidecar calls that encoding.
+  if (desc.canon !== undefined) {
+    if (typeof desc.canon !== "object" || desc.canon === null)
+      die("subject.json: 'canon' must be an object");
+    checkKeys("subject.json 'canon'", desc.canon, [
+      "subject_path",
+      "primary_row",
+    ]);
+    // The row name the COMMITTED encoding takes in canon. Separate from
+    // subject_path because `primary` is the driver's selector and not a row
+    // name — canon rules that no row is primary — so the committed encoding
+    // needs a name naming its occasion, as every other row there does.
+    if (
+      desc.canon.primary_row !== undefined &&
+      (typeof desc.canon.primary_row !== "string" || !desc.canon.primary_row)
+    )
+      die("subject.json: canon.primary_row must be a non-empty string");
+    if (typeof desc.canon.subject_path !== "string" || !desc.canon.subject_path)
+      die("subject.json: canon.subject_path must be a non-empty string");
+  }
+
   for (const k of ["id", "display_name", "citation", "source_url"]) {
     if (typeof desc[k] !== "string" || !desc[k])
       die(`subject.json: '${k}' must be a non-empty string`);
@@ -540,6 +573,7 @@ export function loadSubject(id, selectedEncoding = "primary") {
         "checks",
         "legs",
         "roadmap",
+        "encoder",
       ]);
 
       const out = {
@@ -548,7 +582,45 @@ export function loadSubject(id, selectedEncoding = "primary") {
         GO_S_MIN_DATED_ARMS: "",
         GO_S_MIN_ASSERTIONS: "",
         GO_S_ENCODING_DMN_CASES: "",
+        GO_S_ENCODING_ENCODER_MODEL: "",
+        GO_S_ENCODING_ENCODER_DATE: "",
+        GO_S_ENCODING_ENCODER_SKILL: "",
       };
+      // WHO — or WHAT — PRODUCED THIS ENCODING.
+      //
+      // Optional, because encodings predating this key exist and an absent
+      // encoder is an honest "not recorded" rather than a defect. But it is the
+      // dimension the whole comparison programme turns on: two independent
+      // encodings of one statute are only evidence about MODELS if the run
+      // knows which model made each, and without it the acceptance diff can say
+      // that two encodings disagree and never that Sonnet and Opus disagree.
+      //
+      // `model` is written as the exact API model id (`claude-opus-5`), not a
+      // family name: "opus" stops identifying anything the moment there are two,
+      // and the cost projection joins on this string.
+      if (e.encoder !== undefined) {
+        if (typeof e.encoder !== "object" || e.encoder === null)
+          die(`encodings['${encId}'].encoder must be an object`);
+        checkKeys(`encodings['${encId}'].encoder`, e.encoder, [
+          "model",
+          "date",
+          "skill_version",
+          "notes",
+        ]);
+        for (const k of ["model", "date", "skill_version", "notes"])
+          if (e.encoder[k] !== undefined && typeof e.encoder[k] !== "string")
+            die(`encodings['${encId}'].encoder.${k} must be a string`);
+        if (
+          e.encoder.date !== undefined &&
+          !/^\d{4}-\d{2}-\d{2}$/.test(e.encoder.date)
+        )
+          die(
+            `encodings['${encId}'].encoder.date must be YYYY-MM-DD — it is the date the ENCODING was made, which is what makes a later comparison against a newer model meaningful`,
+          );
+        out.GO_S_ENCODING_ENCODER_MODEL = e.encoder.model ?? "";
+        out.GO_S_ENCODING_ENCODER_DATE = e.encoder.date ?? "";
+        out.GO_S_ENCODING_ENCODER_SKILL = e.encoder.skill_version ?? "";
+      }
       // REQUIRED, unlike every other key here. An encoding with no modules is
       // not an under-specified encoding, it is not an encoding — and the old
       // schema allowed exactly that, because `denovo` was a grab-bag in which
@@ -726,6 +798,8 @@ export function loadSubject(id, selectedEncoding = "primary") {
       GO_S_MIN_ASSERTIONS: String(desc.checks.min_assertions),
       GO_S_EXPLAINER_DIR: explainerDir,
       GO_S_LEGS: legs.join(" "),
+      GO_S_CANON_PATH: desc.canon?.subject_path ?? "",
+      GO_S_CANON_PRIMARY_ROW: desc.canon?.primary_row ?? "",
       ...extra,
       ...env,
       // THE SELECTION WINS, LAST. Spread after the committed defaults so a run

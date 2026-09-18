@@ -2,7 +2,7 @@
 
 **Status: MEASURED 2026-09-15 over eight goldens; RE-MEASURED 2026-09-15 17:19 UTC over all fourteen (2026-09-16 SGT); RE-MEASURED again 2026-09-15 20:25 UTC over all fourteen, after `d544ed22` moved `modals-may-fork`** (the
 six `modals-*` goldens `6daf1d9d` added on legalese/l4-ide#395 are covered in §3.7; the committed
-`out/` is the third run in full — see the **Run** bullet below). This is the experiment [LTS-VISUALISER.md](./LTS-VISUALISER.md)
+`out/` carries PER-FIXTURE provenance since 2026-09-17, not one run — see the **Run** bullet below and `out/run-meta.json`). This is the experiment [LTS-VISUALISER.md](./LTS-VISUALISER.md)
 §7.2 stages as **P2a** — _"point `bpmn-io/bpmn-js-token-simulation` (MIT) at P1's shipped output
 and write down, case by case, what it cannot say."_ It is **not** the gate. §7.3 makes P2a′ (the
 list baseline, a reader experiment) the primary gate and this the secondary one, and §7.2's second
@@ -59,7 +59,16 @@ What was run, on what, with what:
   Third, `npm ci && npm run build && npm run run`, 2026-09-15 **20:25:02 UTC** (`out/run-meta.json`;
   2026-09-16 04:25 in Singapore), over all fourteen, same Chrome, same Node, same `npm ls`, after
   `d544ed22` (legalese/l4-ide#395) replaced the `modals-may-fork` golden — its lapse timer is now
-  `Boundary_0 → End_2`, not `Lapse_0 → Task_1`. **The committed `out/` is the third run in full.**
+  `Boundary_0 → End_2`, not `Lapse_0 → Task_1`. **The committed `out/` WAS the third run in full; SUPERSEDED 2026-09-17.** `handover` and the
+  new `option` fixture were re-run on 2026-09-17 (Chrome 153) after legalese/l4-ide's PARTY MAY
+  lapse arm turned `handover`'s four synthesised `Lapse_n` boundary events into ordinary
+  `Boundary_n` ones; the other thirteen are still the 2026-09-15 20:25:02 UTC bytes. A full re-run
+  was deliberately NOT taken, for the reason this very paragraph documents two sentences down:
+  the instance ids and the parallel arrival order churn between runs, so re-running everything
+  moves every file and hides the ones that actually changed. `out/run-meta.json` now records
+  provenance per fixture, which is the honest substitute until the harness sorts `tokensOn`/
+  `triggers` and stubs the instance id — after which one full re-run becomes run 4, the first
+  diffable baseline, and "one run, all files from that run" becomes cheap to honour again.
   With the instance ids masked (`jq 'del(.. | .log?)'` on both), twelve of the fourteen JSONs were
   **identical** to the second run's; `modals-may-fork` differs in the timer's id, its target and
   the whole `breach` scenario (§3.7), and `consultation` differs only in the arrival order of
@@ -186,14 +195,22 @@ straight to Breach, no `RAND` ever started), `offering.happy.png` (finished; two
 
 ### 3.3 `handover` — a named deadline, a `RAND`, a `ROR` of permissions, lapse timers
 
-| question                               | what the simulator shows                                                                                                                                                                                                                                                                                                                                                                                           | tag      |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
-| the named deadline (`P-DEADLINE`)      | `Boundary_0` is a conditional boundary carrying `` `grace period` `` as text. The simulator offered it as a play button exactly like a timer (`started.triggers: […, "Boundary_0"]`). That its duration is a _name_ the L4 source resolves to 14 is invisible; that it is not a timer at all is invisible.                                                                                                         | MEASURED |
-| the `LEST` arm as a `ROR` of `MAY`s    | Firing `Boundary_0` moved the token through `Split_5` ("one of") to **`Task_6` only** (`breach.tokensOn: ["Task_6"]`, `MAY retain the deposit`), because the exclusive gateway's arm was the default first flow. In L4 a `ROR` of permissions is resolved by whichever act happens; here the reader must **choose the arm at the gateway before either permission is exercised**, and the other arm is greyed out. | MEASURED |
-| the `RAND` of `MAY`s with lapse timers | Both tokens sat on `Task_2` and `Task_4` with `Lapse_2`/`Lapse_4` clickable. Continuing both reached Fulfilled twice. A permission not exercised is not representable except by clicking its lapse timer — there is no "decline".                                                                                                                                                                                  | MEASURED |
-| what do I owe right now?               | After `Boundary_0`: a token on `MAY retain the deposit`. Nothing says the tenant is in breach — there is **no breach end in this file** (`Split_5` leads only to Fulfilled), so the animation of the tenant's failure ends in _"Fulfilled"_.                                                                                                                                                                       | MEASURED |
-| what discharges / breaches it?         | For the `MAY`s: click or timer, both to Fulfilled — the picture correctly shows there is nothing to breach, and incorrectly makes the permission look like a task to be done.                                                                                                                                                                                                                                      | MEASURED |
-| `P-NOJOIN` on `Split_1`                | No join drawn; both permission tokens end independently. Correct by construction and invisible as a loss.                                                                                                                                                                                                                                                                                                          | MEASURED |
+> **Re-measured 2026-09-17 on `handover` alone** (Chrome 153; `out/run-meta.json`'s `perFixture`
+> block records it). The PARTY MAY lapse arm turned this file's four synthesised `Lapse_n`
+> boundary events into ordinary `Boundary_n` ones — `L4.StateGraph` now draws a permission's
+> lapse as a real `LEST` edge, so `L4.Bpmn.Lower` no longer synthesises a timer of its own.
+> Nothing else about the diagram moved: same shape, same flows, same terminals, and the same
+> jBPM verdict. The row below is measured on that run; the rest of this section is still the
+> 2026-09-15 20:25:02 UTC run, which is what `perFixture` exists to say.
+
+| question                               | what the simulator shows                                                                                                                                                                                                                                                                                                                                                                                                                        | tag                 |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| the named deadline (`P-DEADLINE`)      | `Boundary_0` is a conditional boundary carrying `` `grace period` `` as text. The simulator offered it as a play button exactly like a timer (`started.triggers: […, "Boundary_0"]`). That its duration is a _name_ the L4 source resolves to 14 is invisible; that it is not a timer at all is invisible.                                                                                                                                      | MEASURED            |
+| the `LEST` arm as a `ROR` of `MAY`s    | Firing `Boundary_0` moved the token through `Split_5` ("one of") to **`Task_6` only** (`breach.tokensOn: ["Task_6"]`, `MAY retain the deposit`), because the exclusive gateway's arm was the default first flow. In L4 a `ROR` of permissions is resolved by whichever act happens; here the reader must **choose the arm at the gateway before either permission is exercised**, and the other arm is greyed out.                              | MEASURED            |
+| the `RAND` of `MAY`s with lapse timers | Both tokens sat on `Task_2` and `Task_4` (`happy[0].steps[1].tokensOn`) with `Boundary_2`/`Boundary_4` — the ordinary boundary events that replaced `Lapse_2`/`Lapse_4` on 2026-09-17 — hung on them. Continuing both reached Fulfilled twice (`endEventsReached: ["End_3","End_3"]`). A permission not exercised is still not representable except by clicking its timer; there is no "decline", and renaming the element did not give it one. | MEASURED 2026-09-17 |
+| what do I owe right now?               | After `Boundary_0`: a token on `MAY retain the deposit`. Nothing says the tenant is in breach — there is **no breach end in this file** (`Split_5` leads only to Fulfilled), so the animation of the tenant's failure ends in _"Fulfilled"_.                                                                                                                                                                                                    | MEASURED            |
+| what discharges / breaches it?         | For the `MAY`s: click or timer, both to Fulfilled — the picture correctly shows there is nothing to breach, and incorrectly makes the permission look like a task to be done.                                                                                                                                                                                                                                                                   | MEASURED            |
+| `P-NOJOIN` on `Split_1`                | No join drawn; both permission tokens end independently. Correct by construction and invisible as a loss.                                                                                                                                                                                                                                                                                                                                       | MEASURED            |
 
 Screenshots: `handover.png`, `handover.breach.png` (token on the chosen `ROR` arm, other arm
 greyed), `handover.happy-arm0.png` / `-arm1.png` (identical: the gateway is only on the `LEST` path).
@@ -378,6 +395,8 @@ this particular animation to say what the rule says.
 - `etc/bpmn-token-sim/` — `package.json`, `src/app.js`, `index.html`, `build.mjs`, `run.mjs`,
   `README.md`, `package-lock.json` (committed, so `npm ci` pins the transitive tree),
   `.gitignore` (`node_modules/`, `dist/` ignored; `out/` un-ignored).
-- `etc/bpmn-token-sim/out/` — 46 screenshots (28–58 KB each), fourteen `<fixture>.json`, `run-meta.json`
-  (all from the 2026-09-15 20:25:02 UTC run, the third — unsorted and unmasked; the harness has been
-  diffable since `983d4a82a`, and run 4 is the first `out/` that will be).
+- `etc/bpmn-token-sim/out/` — 49 screenshots (28–58 KB each), fifteen `<fixture>.json`,
+  `run-meta.json` (thirteen fixtures from the 2026-09-15 20:25:02 UTC run, the third — unsorted and
+  unmasked; `handover` and `option` from the 2026-09-17 run — `run-meta.json`'s `perFixture` block
+  says which is which). The harness has been diffable since `983d4a82a`, and run 4 is the first
+  `out/` that will be.

@@ -19,6 +19,7 @@ import Test.Hspec
 import Data.Text (Text)
 import qualified Data.Text as Text
 
+import Data.Maybe (isJust)
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS)
@@ -246,6 +247,27 @@ noJoinSrc =
   , "    WITHIN 3"
   ]
 
+-- | An @EVERY@ whose cast is narrowed twice over, so that the roll, the cast
+-- word and the filter are three different things in one rule.
+--
+-- Modelled on @jl4\/examples\/ok\/every\/run-fork.l4@, which puts the landlord
+-- in the roll on purpose so the cast word @Tenant@ is doing visible work. Here
+-- the filter narrows again, to one member of a roll of three.
+castAndFilterSrc :: [Text]
+castAndFilterSrc =
+  [ "DECLARE Actor IS ONE OF"
+  , "    Landlord HAS name IS A STRING"
+  , "    Tenant   HAS name IS A STRING"
+  , "everyone MEANS LIST (Tenant OF \"Alice\"), (Tenant OF \"Bob\"), (Landlord OF \"Ms Ng\")"
+  , "GIVETH DEONTIC Actor Action"
+  , "`group` MEANS"
+  , "  EVERY Tenant t IN everyone WHO t EQUALS Tenant OF \"Alice\""
+  , "    MUST pay"
+  , "    WITHIN 3"
+  , "    UPON EACH"
+  , "    HENCE FULFILLED"
+  ]
+
 -- | Two obligations and a @#TRACE@ that discharges both, so the evaluator
 -- logs a step for each. The chain's shape is @DeonticStepSpec@'s first
 -- fixture; what is tested here is the join between that log and this graph.
@@ -435,11 +457,13 @@ spec = do
   describe "the join line of an EVERY" $ do
     it "carries the barrier on the HENCE edge, structurally" $
       quantifiers barrierSrc
-        `shouldBe` Right [Just (MkQuantifier "p" Nothing (Just (MkJoinLabel (Barrier "ALL HAVE") Nothing)))]
+        `shouldBe` Right
+          [Just (MkQuantifier "p" Nothing Nothing Nothing (Just (MkJoinLabel (Barrier "ALL HAVE") Nothing)))]
 
     it "carries the fork on the HENCE edge, structurally" $
       quantifiers forkSrc
-        `shouldBe` Right [Just (MkQuantifier "p" Nothing (Just (MkJoinLabel Fork Nothing)))]
+        `shouldBe` Right
+          [Just (MkQuantifier "p" Nothing Nothing Nothing (Just (MkJoinLabel Fork Nothing)))]
 
     it "gives the barrier and the fork different graphs" $ do
       length (filter id (zipWith (/=) barrierSrc forkSrc)) `shouldBe` 1
@@ -449,7 +473,23 @@ spec = do
       quantifiers linearSrc `shouldBe` Right [Nothing, Nothing]
 
     it "records an EVERY with no continuation as quantified but unjoined" $
-      quantifiers noJoinSrc `shouldBe` Right [Just (MkQuantifier "p" Nothing Nothing)]
+      quantifiers noJoinSrc
+        `shouldBe` Right [Just (MkQuantifier "p" Nothing Nothing Nothing Nothing)]
+
+    it "carries the cast word and the WHO filter, because the roll is not the cast" $
+      -- The three narrowings are three different fields, and a projection that
+      -- reads only the roll would declare an instance per member of a roll of
+      -- three for a rule L4 arms once. Before these fields existed the
+      -- extractor discarded the cast word and the filter, so no consumer could
+      -- tell this rule from `EVERY t IN everyone`, which is a different rule.
+      case quantifiers castAndFilterSrc of
+        Left errs -> expectationFailure (show errs)
+        Right [Just q] -> do
+          q.quantVar    `shouldBe` "t"
+          q.quantCast   `shouldBe` Just "Tenant"
+          q.quantRoll   `shouldBe` Just "everyone"
+          q.quantFilter `shouldSatisfy` isJust
+        Right other -> expectationFailure ("expected one quantified edge, got " <> show other)
 
     it "keeps the join line's WITHIN apart from the act's" $
       theHenceEdge bothDeadlinesSrc \t -> do
@@ -464,15 +504,17 @@ spec = do
 
     it "sends a quantified permission's lapse to Fulfilled under either join" $ do
       -- A LEST edge to the Fulfilled terminal, captioned as a lapse, out of
-      -- the initial state — for the barrier and for the fork alike. A PARTY
-      -- MAY still draws none here (the pre-existing single-party gap).
+      -- the initial state — for the barrier and for the fork alike, and since
+      -- 2026-09-17 for a single-party PARTY MAY too, which used to draw none.
+      -- The quantified cases came first only because the join made the gap
+      -- visible; the rule was never about the quantifier.
       let lapseOf src = case graphFor src of
             Left errs -> Left (show errs)
             Right sg -> Right [ (t.transLabel.labelAction, nameOf sg t.transTo)
                               | t <- lestEdges sg, t.transFrom == sg.sgInitialState ]
       lapseOf mayBarrierSrc `shouldBe` Right [("lapses", "Fulfilled")]
       lapseOf mayForkSrc `shouldBe` Right [("lapses", "Fulfilled")]
-      lapseOf (defaultLestSrc "MAY") `shouldBe` Right []
+      lapseOf (defaultLestSrc "MAY") `shouldBe` Right [("lapses", "Fulfilled")]
 
     -- 'noDeadlineLestSrc', below, is the control: with no WITHIN anywhere the
     -- caption IS 'noTriggerWording'. Here there is one, on the join line, and
@@ -663,8 +705,13 @@ spec = do
       it "still defaults a prohibition to a violation into Breach" $
         lestCaptions (defaultLestSrc "SHANT") `shouldBe` Right ["violation"]
 
-      it "still draws no LEST arm at all for a bare permission" $
-        lestCaptions (defaultLestSrc "MAY") `shouldBe` Right []
+      -- Until 2026-09-17 this arm was drawn only under a quantifier's join and
+      -- a single-party permission got nothing, so a rule whose expiry reaches
+      -- FULFILLED showed no route there at all. 'bareSrc "MAY"' below is the
+      -- control that says the fix did not go one step too far: with no WITHIN
+      -- there is no expiry event, so there is still no arm to draw.
+      it "now draws a bare permission's lapse, which used to be drawn nowhere" $
+        lestCaptions (defaultLestSrc "MAY") `shouldBe` Right ["lapses"]
 
       -- DO is documented as requiring an explicit LEST, and the extractor used
       -- to believe the documentation and draw nothing — leaving a rule whose
@@ -681,6 +728,9 @@ spec = do
         lestCaptions (bareSrc "MUST") `shouldBe` Right [noTriggerWording]
         lestCaptions (bareSrc "DO") `shouldBe` Right [noTriggerWording]
         lestCaptions (bareSrc "SHANT") `shouldBe` Right ["violation"]
+        -- The control for the arm above: a permission with no WITHIN cannot
+        -- lapse, so nothing is drawn — the deadline, not the modal, decides
+        -- whether there is an arm.
         lestCaptions (bareSrc "MAY") `shouldBe` Right []
 
     -- L4.Bpmn.Lower reads the obligation's modal off `henceOf sid <|> lestOf
