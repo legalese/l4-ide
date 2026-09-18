@@ -10,13 +10,13 @@
                   exporterVersion="1">
   <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
   <bpmn:escalation id="Escalation_breach" name="Breach" escalationCode="BREACH" />
-  <bpmn:itemDefinition id="Item_receipts_and_delivery_cast" structureRef="java.util.List" />
-  <bpmn:itemDefinition id="Item_receipts_and_delivery_cast_member" structureRef="java.lang.Object" />
+  <bpmn:itemDefinition id="Item_receipts_and_delivery_t_cast" structureRef="java.util.List" />
+  <bpmn:itemDefinition id="Item_receipts_and_delivery_t_cast_member" structureRef="java.lang.Object" />
   <bpmn:collaboration id="Collaboration_receipts_and_delivery">
     <bpmn:participant id="Participant_receipts_and_delivery" name="receipts and delivery" processRef="Process_receipts_and_delivery" />
   </bpmn:collaboration>
   <bpmn:process id="Process_receipts_and_delivery" name="receipts and delivery" isExecutable="false">
-    <bpmn:property id="receipts_and_delivery_cast" name="receipts_and_delivery_cast" itemSubjectRef="Item_receipts_and_delivery_cast" />
+    <bpmn:property id="receipts_and_delivery_t_cast" name="receipts_and_delivery_t_cast" itemSubjectRef="Item_receipts_and_delivery_t_cast" />
     <bpmn:laneSet id="LaneSet_1">
       <bpmn:lane id="Lane_1_EVERY_Tenant_t_IN_tenants" name="EVERY Tenant t IN tenants">
         <bpmn:flowNodeRef>Scope_1</bpmn:flowNodeRef>
@@ -55,19 +55,19 @@
     <bpmn:subProcess id="Scope_1" name="each Tenant" triggeredByEvent="false">
       <bpmn:documentation>One instance per member of the cast, all live at once. The join line is UPON EACH, so everything this box contains — the act, its deadline, and what follows it — belongs to ONE member and runs once per member.</bpmn:documentation>
       <bpmn:ioSpecification id="IoSpec_Scope_1">
-        <bpmn:dataInput id="DataInput_Scope_1" name="receipts_and_delivery_cast" itemSubjectRef="Item_receipts_and_delivery_cast" isCollection="true" />
+        <bpmn:dataInput id="DataInput_Scope_1" name="receipts_and_delivery_t_cast" itemSubjectRef="Item_receipts_and_delivery_t_cast" isCollection="true" />
         <bpmn:inputSet id="InputSet_Scope_1">
           <bpmn:dataInputRefs>DataInput_Scope_1</bpmn:dataInputRefs>
         </bpmn:inputSet>
         <bpmn:outputSet id="OutputSet_Scope_1" />
       </bpmn:ioSpecification>
       <bpmn:dataInputAssociation id="DataInputAssoc_Scope_1">
-        <bpmn:sourceRef>receipts_and_delivery_cast</bpmn:sourceRef>
+        <bpmn:sourceRef>receipts_and_delivery_t_cast</bpmn:sourceRef>
         <bpmn:targetRef>DataInput_Scope_1</bpmn:targetRef>
       </bpmn:dataInputAssociation>
       <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Scope_1" isSequential="false">
         <bpmn:loopDataInputRef>DataInput_Scope_1</bpmn:loopDataInputRef>
-        <bpmn:inputDataItem id="DataItem_Scope_1" name="t" itemSubjectRef="Item_receipts_and_delivery_cast_member" />
+        <bpmn:inputDataItem id="DataItem_Scope_1" name="t" itemSubjectRef="Item_receipts_and_delivery_t_cast_member" />
       </bpmn:multiInstanceLoopCharacteristics>
       <bpmn:task id="Task_1" name="MUST Pay ...">
         <bpmn:documentation>EVERY Tenant t IN tenants MUST Pay ... WITHIN 7 UPON EACH — one instance per member of the cast, each bound to ‘t’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). UPON EACH: what follows fires once per member, as that member completes. Everything after this act is drawn INSIDE a multi-instance sub-process, so each member gets their own copy of it and their own deadline; the box, not this task, carries the multi-instance marker. What the enclosure adds and the rule does not have is a synchronisation at the end of the box (P-FORK-JOIN).</bpmn:documentation>

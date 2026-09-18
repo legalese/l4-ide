@@ -80,9 +80,27 @@
 # This harness never seeds the variable, so the collection is empty, the
 # ForEachNode completes at once, and the instance body NEVER RUNS. Census on
 # tenancy-fork.bpmn: StartNode 1x, ForEachNode 1x, EndNode 1x, and nothing else.
-# That is a real and useful result — it is the EMPTY CAST executing correctly on
-# an independent engine, which is the case the flat drawing got silently wrong —
-# but it is not evidence that a member's obligation runs. Do not read it as one.
+# That is a real and useful result for the FORK rows — it is the empty cast
+# executing correctly on an independent engine, which is the case the flat
+# drawing got silently wrong — but it is not evidence that a member's obligation
+# runs. Do not read it as one.
+#
+# AND IT IS NOT TRUE OF EVERY ROW. modals-shant-barrier.bpmn is errors=0
+# verdict=ABORTED, and the abort is the empty cast running INCORRECTLY: a SHANT
+# barrier completes on the first instance (completionCondition
+# nrOfCompletedInstances >= 1, which is right — one act is the breach), that
+# completion IS the LEST arm, and a multi-instance activity over an empty
+# collection completes at once. So the engine reaches the breach end with nobody
+# having done anything, where L4 says an empty cast is FULFILLED (startBarrier
+# joins at its arming; ok/every/run-roll.l4's 'nobody' and run-in.l4's empty roll
+# both golden FULFILLED).
+#
+# The DRAWING defect predates this branch. Its REACHABILITY does not: before the
+# collection landed, jBPM refused the file and never executed it. So this branch
+# turned a latent inversion into one an engine demonstrates, which is a reason to
+# declare it rather than leave the row looking like a pass. P-PROHIBITION-EMPTY
+# (lossy) now says it on the activity, and this note exists so that the ABORTED
+# verdict in the table below is not read as "the rule breached".
 #
 # The body was measured separately, on a scratchpad copy of the harness patched
 # only at its startProcess line to seed receipts_cast with three members (repo

@@ -9,13 +9,13 @@
                   exporter="jl4 (L4.Bpmn)"
                   exporterVersion="1">
   <bpmn:escalation id="Escalation_breach" name="Breach" escalationCode="BREACH" />
-  <bpmn:itemDefinition id="Item_approve__or_else_cast" structureRef="java.util.List" />
-  <bpmn:itemDefinition id="Item_approve__or_else_cast_member" structureRef="java.lang.Object" />
+  <bpmn:itemDefinition id="Item_approve__or_else_d_cast" structureRef="java.util.List" />
+  <bpmn:itemDefinition id="Item_approve__or_else_d_cast_member" structureRef="java.lang.Object" />
   <bpmn:collaboration id="Collaboration_approve__or_else">
     <bpmn:participant id="Participant_approve__or_else" name="approve, or else" processRef="Process_approve__or_else" />
   </bpmn:collaboration>
   <bpmn:process id="Process_approve__or_else" name="approve, or else" isExecutable="false">
-    <bpmn:property id="approve__or_else_cast" name="approve__or_else_cast" itemSubjectRef="Item_approve__or_else_cast" />
+    <bpmn:property id="approve__or_else_d_cast" name="approve__or_else_d_cast" itemSubjectRef="Item_approve__or_else_d_cast" />
     <bpmn:laneSet id="LaneSet_1">
       <bpmn:lane id="Lane_1_EVERY_Director_d_IN_board" name="EVERY Director d IN board">
         <bpmn:flowNodeRef>Scope_0</bpmn:flowNodeRef>
@@ -31,19 +31,19 @@
     <bpmn:subProcess id="Scope_0" name="each Director" triggeredByEvent="false">
       <bpmn:documentation>One instance per member of the cast, all live at once. The join line is UPON EACH, so everything this box contains — the act, its deadline, and what follows it — belongs to ONE member and runs once per member.</bpmn:documentation>
       <bpmn:ioSpecification id="IoSpec_Scope_0">
-        <bpmn:dataInput id="DataInput_Scope_0" name="approve__or_else_cast" itemSubjectRef="Item_approve__or_else_cast" isCollection="true" />
+        <bpmn:dataInput id="DataInput_Scope_0" name="approve__or_else_d_cast" itemSubjectRef="Item_approve__or_else_d_cast" isCollection="true" />
         <bpmn:inputSet id="InputSet_Scope_0">
           <bpmn:dataInputRefs>DataInput_Scope_0</bpmn:dataInputRefs>
         </bpmn:inputSet>
         <bpmn:outputSet id="OutputSet_Scope_0" />
       </bpmn:ioSpecification>
       <bpmn:dataInputAssociation id="DataInputAssoc_Scope_0">
-        <bpmn:sourceRef>approve__or_else_cast</bpmn:sourceRef>
+        <bpmn:sourceRef>approve__or_else_d_cast</bpmn:sourceRef>
         <bpmn:targetRef>DataInput_Scope_0</bpmn:targetRef>
       </bpmn:dataInputAssociation>
       <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Scope_0" isSequential="false">
         <bpmn:loopDataInputRef>DataInput_Scope_0</bpmn:loopDataInputRef>
-        <bpmn:inputDataItem id="DataItem_Scope_0" name="d" itemSubjectRef="Item_approve__or_else_cast_member" />
+        <bpmn:inputDataItem id="DataItem_Scope_0" name="d" itemSubjectRef="Item_approve__or_else_d_cast_member" />
       </bpmn:multiInstanceLoopCharacteristics>
       <bpmn:task id="Task_0" name="MUST Approve ...">
         <bpmn:documentation>EVERY Director d IN board MUST Approve ... UPON EACH WITHIN 10 — one instance per member of the cast, each bound to ‘d’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). UPON EACH: what follows fires once per member, as that member completes. Everything after this act is drawn INSIDE a multi-instance sub-process, so each member gets their own copy of it and their own deadline; the box, not this task, carries the multi-instance marker. What the enclosure adds and the rule does not have is a synchronisation at the end of the box (P-FORK-JOIN).</bpmn:documentation>

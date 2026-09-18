@@ -9,13 +9,13 @@
                   exporter="jl4 (L4.Bpmn)"
                   exporterVersion="1">
   <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
-  <bpmn:itemDefinition id="Item_no_subletting_cast" structureRef="java.util.List" />
-  <bpmn:itemDefinition id="Item_no_subletting_cast_member" structureRef="java.lang.Object" />
+  <bpmn:itemDefinition id="Item_no_subletting_d_cast" structureRef="java.util.List" />
+  <bpmn:itemDefinition id="Item_no_subletting_d_cast_member" structureRef="java.lang.Object" />
   <bpmn:collaboration id="Collaboration_no_subletting">
     <bpmn:participant id="Participant_no_subletting" name="no subletting" processRef="Process_no_subletting" />
   </bpmn:collaboration>
   <bpmn:process id="Process_no_subletting" name="no subletting" isExecutable="false">
-    <bpmn:property id="no_subletting_cast" name="no_subletting_cast" itemSubjectRef="Item_no_subletting_cast" />
+    <bpmn:property id="no_subletting_d_cast" name="no_subletting_d_cast" itemSubjectRef="Item_no_subletting_d_cast" />
     <bpmn:laneSet id="LaneSet_1">
       <bpmn:lane id="Lane_1_EVERY_Director_d_IN_board" name="EVERY Director d IN board">
         <bpmn:flowNodeRef>Task_0</bpmn:flowNodeRef>
@@ -31,19 +31,19 @@
     <bpmn:task id="Task_0" name="SHANT Sublet ...">
       <bpmn:documentation>EVERY Director d IN board SHANT Sublet ... WITHIN 30 ONCE ALL HAVE — completing this activity means the prohibited act was performed, which is the LEST arm — one instance per member of the cast, each bound to ‘d’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). ONCE ALL HAVE: for a prohibition one member&apos;s act is the breach, so the activity completes on the FIRST instance to complete (completionCondition nrOfCompletedInstances &gt;= 1) and its completion is the LEST arm.</bpmn:documentation>
       <bpmn:ioSpecification id="IoSpec_Task_0">
-        <bpmn:dataInput id="DataInput_Task_0" name="no_subletting_cast" itemSubjectRef="Item_no_subletting_cast" isCollection="true" />
+        <bpmn:dataInput id="DataInput_Task_0" name="no_subletting_d_cast" itemSubjectRef="Item_no_subletting_d_cast" isCollection="true" />
         <bpmn:inputSet id="InputSet_Task_0">
           <bpmn:dataInputRefs>DataInput_Task_0</bpmn:dataInputRefs>
         </bpmn:inputSet>
         <bpmn:outputSet id="OutputSet_Task_0" />
       </bpmn:ioSpecification>
       <bpmn:dataInputAssociation id="DataInputAssoc_Task_0">
-        <bpmn:sourceRef>no_subletting_cast</bpmn:sourceRef>
+        <bpmn:sourceRef>no_subletting_d_cast</bpmn:sourceRef>
         <bpmn:targetRef>DataInput_Task_0</bpmn:targetRef>
       </bpmn:dataInputAssociation>
       <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Task_0" isSequential="false">
         <bpmn:loopDataInputRef>DataInput_Task_0</bpmn:loopDataInputRef>
-        <bpmn:inputDataItem id="DataItem_Task_0" name="d" itemSubjectRef="Item_no_subletting_cast_member" />
+        <bpmn:inputDataItem id="DataItem_Task_0" name="d" itemSubjectRef="Item_no_subletting_d_cast_member" />
         <bpmn:completionCondition xsi:type="bpmn:tFormalExpression">nrOfCompletedInstances &gt;= 1</bpmn:completionCondition>
       </bpmn:multiInstanceLoopCharacteristics>
     </bpmn:task>

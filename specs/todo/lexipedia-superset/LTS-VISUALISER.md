@@ -2318,8 +2318,17 @@ the goldens report it fixed.
 So the fork gets **its own** top-level terminals — `EndGroup_<n>` ("every run has ended") and
 `EndBreach_<n>` — and the shared ones are dropped when nothing else feeds them. There is no
 condition left to get wrong. On the probe the fork's contribution goes to zero and 113 remain,
-which are the landlord's own breach terminating under `RAND` — pre-existing, the same mechanism as
-`offering.bpmn`'s long-standing 370, and a separate question from this one.
+which are the landlord's own breach terminating under `RAND`. That is pre-existing and **already
+declared** — `offering.fidelity.txt`'s `P-NOJOIN` says a branch reaching BREACH "abandons its
+siblings rather than waiting for them" — but it is a declared LOSS, not a faithful drawing, and the
+difference matters because the first draft of this section called it faithful. L4 does not abandon
+the sibling conjunct: `ok/every/run-blame.l4` §8 is a `RAND` whose left operand breaches at once and
+whose right is still evaluated to its deadline and named separately in the verdict
+(`run-blame.l4:16`: "when both sides are lost, both sides' failures are named, left first"). So the
+113 are real loss, correctly attributed to `P-NOJOIN` and correctly out of scope here. One wording
+gap worth knowing: `P-NOJOIN`'s "siblings" reads as the other `RAND` branches, and nothing in it
+extends to _every instance of a multi-instance scope inside one of them_, which is what it now also
+covers.
 
 Measured, and the numbers separate the defect from the faithful case cleanly — markings that can
 complete ONLY by terminating, at two instances:

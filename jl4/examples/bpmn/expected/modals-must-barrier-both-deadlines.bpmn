@@ -9,13 +9,13 @@
                   exporter="jl4 (L4.Bpmn)"
                   exporterVersion="1">
   <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
-  <bpmn:itemDefinition id="Item_quorum_by_ten_cast" structureRef="java.util.List" />
-  <bpmn:itemDefinition id="Item_quorum_by_ten_cast_member" structureRef="java.lang.Object" />
+  <bpmn:itemDefinition id="Item_quorum_by_ten_d_cast" structureRef="java.util.List" />
+  <bpmn:itemDefinition id="Item_quorum_by_ten_d_cast_member" structureRef="java.lang.Object" />
   <bpmn:collaboration id="Collaboration_quorum_by_ten">
     <bpmn:participant id="Participant_quorum_by_ten" name="quorum by ten" processRef="Process_quorum_by_ten" />
   </bpmn:collaboration>
   <bpmn:process id="Process_quorum_by_ten" name="quorum by ten" isExecutable="false">
-    <bpmn:property id="quorum_by_ten_cast" name="quorum_by_ten_cast" itemSubjectRef="Item_quorum_by_ten_cast" />
+    <bpmn:property id="quorum_by_ten_d_cast" name="quorum_by_ten_d_cast" itemSubjectRef="Item_quorum_by_ten_d_cast" />
     <bpmn:laneSet id="LaneSet_1">
       <bpmn:lane id="Lane_1_EVERY_Director_d_IN_board" name="EVERY Director d IN board">
         <bpmn:flowNodeRef>Task_0</bpmn:flowNodeRef>
@@ -31,19 +31,19 @@
     <bpmn:task id="Task_0" name="MUST Approve ...">
       <bpmn:documentation>EVERY Director d IN board MUST Approve ... WITHIN 30 ONCE ALL HAVE WITHIN 10 — one instance per member of the cast, each bound to ‘d’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). ONCE ALL HAVE: the outgoing flow fires once, when every instance has completed — which is what a parallel multi-instance activity&apos;s completion means, so this barrier is drawn faithfully.</bpmn:documentation>
       <bpmn:ioSpecification id="IoSpec_Task_0">
-        <bpmn:dataInput id="DataInput_Task_0" name="quorum_by_ten_cast" itemSubjectRef="Item_quorum_by_ten_cast" isCollection="true" />
+        <bpmn:dataInput id="DataInput_Task_0" name="quorum_by_ten_d_cast" itemSubjectRef="Item_quorum_by_ten_d_cast" isCollection="true" />
         <bpmn:inputSet id="InputSet_Task_0">
           <bpmn:dataInputRefs>DataInput_Task_0</bpmn:dataInputRefs>
         </bpmn:inputSet>
         <bpmn:outputSet id="OutputSet_Task_0" />
       </bpmn:ioSpecification>
       <bpmn:dataInputAssociation id="DataInputAssoc_Task_0">
-        <bpmn:sourceRef>quorum_by_ten_cast</bpmn:sourceRef>
+        <bpmn:sourceRef>quorum_by_ten_d_cast</bpmn:sourceRef>
         <bpmn:targetRef>DataInput_Task_0</bpmn:targetRef>
       </bpmn:dataInputAssociation>
       <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Task_0" isSequential="false">
         <bpmn:loopDataInputRef>DataInput_Task_0</bpmn:loopDataInputRef>
-        <bpmn:inputDataItem id="DataItem_Task_0" name="d" itemSubjectRef="Item_quorum_by_ten_cast_member" />
+        <bpmn:inputDataItem id="DataItem_Task_0" name="d" itemSubjectRef="Item_quorum_by_ten_d_cast_member" />
       </bpmn:multiInstanceLoopCharacteristics>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_0" name="after P30D" attachedToRef="Task_0" cancelActivity="true">

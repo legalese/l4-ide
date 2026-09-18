@@ -92,8 +92,11 @@ byte-identical fidelity report, because `L4.StateGraph.extractDeonton` never rea
 - **The activity carries `<multiInstanceLoopCharacteristics isSequential="false">`** with no
   `loopCardinality` — an `EVERY`'s cast is fixed only when the rule runs, and a count would be
   invented — but it does carry a `loopDataInputRef`, because naming a variable an engine must fill
-  is a request rather than a claim. The variable is `<rule>_cast`, declared as a process
-  `<property>`, wired in through an `<ioSpecification>`. **Not a `<dataObject>`**, which is the
+  is a request rather than a claim. The variable is `<rule>_<member>_cast`, declared as a
+  process `<property>`, wired in through an `<ioSpecification>`. The member variable is in the name
+  because a rule can hold more than one `EVERY` with different rolls, and a name taken from the
+  rule alone gave both of them one variable — well formed, and an engine would have armed both
+  casts from one list. **Not a `<dataObject>`**, which is the
   vanilla spelling and which bpmn-moddle accepts silently while jBPM refuses to parse the file at
   all (measured 2026-09-19, both spellings). `P-CAST` (advisory) says what to seed it with, and
   warns that the roll is not the cast: `EVERY Tenant t IN tenants` binds tenants, so seeding the

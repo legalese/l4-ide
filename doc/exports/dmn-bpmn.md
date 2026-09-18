@@ -124,7 +124,7 @@ and the rule simply ends. Before this export drew the sub-process, a fork with a
 an obligation that nobody owed.
 
 **The group's list.** The activity loops over a process variable the file declares and names
-`<rule>_cast`. An engine or a modeler has to put the actual members in it before the diagram can
+`<rule>_<member>_cast`. An engine or a modeler has to put the actual members in it before the diagram can
 run, and the `P-CAST` note says so. Read that note before you fill it in: **the list the rule draws
 from is not the group.** `EVERY Tenant t IN everyone` means "every tenant among `everyone`", so if
 `everyone` also holds the landlord, seeding the variable with `everyone` starts one run too many —
@@ -146,9 +146,16 @@ The notes that go with a quantified rule:
   inside still names its party in its own documentation.
 - `P-JOIN-DEADLINE` (lossy): the join line had a `WITHIN` of its own beside the act's, and only the
   act's is drawn as a timer.
-- `P-PROHIBITION-FIRST` (advisory): a `SHANT` barrier completes on the **first** member's act,
+- `P-PROHIBITION-FIRST` (advisory): a `SHANT` **barrier** completes on the **first** member's act,
   since one act is the breach. Without that, "completes when every director has sublet" would
-  exonerate the first one.
+  exonerate the first one. It is not filed on a `SHANT` fork, whose activity is the box and which
+  carries no such condition — each member offends severally, and completing the box on the first
+  act would cancel the rest.
+- `P-PROHIBITION-EMPTY` (lossy): the same condition inverts on an **empty** group. A multi-instance
+  activity over an empty list completes at once, and for a prohibition that completion is the
+  breach arm — so the diagram ends breached with nobody having done anything, where the rule says
+  an empty group is fulfilled because nobody is bound. Reachable rather than theoretical: jBPM runs
+  the file that way if you supply no list.
 
 **A breach by one member does not end the others**, and getting that right takes two things, not
 one. Inside the box a breach is an _escalation_ thrown out to a non-interrupting event on the

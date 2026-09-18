@@ -833,6 +833,9 @@ stateGraphToBpmn opts sg =
       Fork -> Just q
       Barrier _ -> Nothing
 
+  forkModalAt :: StateId -> Maybe DeonticModal
+  forkModalAt sid = (henceOf sid <|> lestOf sid) >>= (.transLabel.labelModal)
+
   forkRoots :: [StateId]
   forkRoots = [sid | (sid, _) <- chains, isJust (forkAt sid)]
 
@@ -1178,15 +1181,22 @@ stateGraphToBpmn opts sg =
           , message =
               "The diagram says: this sub-process completes when every \
               \member's instance has, and only then is its outgoing flow \
-              \taken. The rule says nothing of the kind — UPON EACH gives each \
-              \member an independent run and the group never synchronises. The \
-              \two agree wherever a member's continuation ends inside that \
-              \member's own instance, which is what this file draws; they \
-              \disagree the moment a fork's continuation feeds flow shared with \
-              \anything outside the scope."
+              \taken. UPON EACH gives each member an independent run and the \
+              \group never regroups. What the wait IS faithful to is the \
+              \rule's own verdict \8212 the runtime folds the members with \
+              \RAND, so the rule is fulfilled only once every member's run is, \
+              \which is exactly what this flow waits for. What it is not \
+              \faithful to is timing: anything drawn after this box happens \
+              \after the LAST member, where the rule lets each member's own \
+              \consequences run as that member acts. Note also that a member's \
+              \continuation does not end inside the instance on every path \
+              \\8212 its breach arm leaves, through the escalation and the \
+              \boundary \8212 so \8216everything is enclosed\8217 holds of the \
+              \ordinary path only."
           , lost =
-              "nothing in this file; the enclosing sub-process adds a \
-              \synchronisation at its end that the rule does not have"
+              "the timing of anything drawn after this box, which the rule \
+              \attaches to each member and the diagram attaches to the last of \
+              \them; not the rule-level verdict, which the wait gets right"
           }
       ]
 
@@ -1254,8 +1264,14 @@ stateGraphToBpmn opts sg =
               \sits in, and these are one level down; naming them from the \
               \outer laneSet would be a reference across a boundary the \
               \notation does not have. Each enclosed element still names its \
-              \party in its own <documentation>."
-          , lost = "the party bands inside the scope, not the parties themselves"
+              \party in its own <documentation>. The box itself sits in ONE \
+              \band, the members\8217, which is the wrong band for any enclosed \
+              \act somebody else performs: a continuation owed by a \
+              \counterparty is drawn inside the members\8217 lane."
+          , lost =
+              "the party bands inside the scope, not the parties themselves; \
+              \and the box\8217s own band, which is right for the members and \
+              \wrong for whoever owes their continuation"
           }
       | isJust memberLane || any (isJust . (.nodeLane)) [n | n <- ns, isInner n.nodeId]
       ]
@@ -1282,6 +1298,29 @@ stateGraphToBpmn opts sg =
           }
       | isJust mq
       ]
+        <> [ MkFidelityNote
+               { code = "P-FORK-CANCEL"
+               , severity = Lossy
+               , element = fromMaybe scopeId (listToMaybe (Set.toList innerIds))
+               , range = Nothing
+               , message =
+                   "And drawn flat, the timer on the activity is interrupting \
+                   \and cancels EVERY instance: a member who has already acted \
+                   \has already started their own continuation, which another \
+                   \member's failure does not touch. So an obligation that \
+                   \arose in L4 is absent from the diagram, and a party who \
+                   \breached it is drawn as owing nothing. Enclosing the fork \
+                   \is what removes this, and it is what could not be done \
+                   \here."
+               , lost =
+                   "every continuation spawned before the timer fired, and the \
+                   \breaches of those continuations"
+               }
+           | isJust mq
+           -- Not on a prohibition: there the timer is the COMPLIANCE arm and
+           -- cancelling every instance when it fires is right.
+           , forkModalAt root /= Just DMustNot
+           ]
 
   (wiredNodes, wiredEdges) = wireDecisions (rawNodes, joinedEdges)
 
@@ -1560,6 +1599,23 @@ stateGraphToBpmn opts sg =
       <> [bearerFinding | not (null parties)]
       <> [ruleVersionFinding]
       <> scopeFindings
+      & retargetToScope
+
+  -- A note about the multi-instance activity has to name the element that
+  -- carries the marker. @P-CAST@ is built in the chain pass, against the task,
+  -- and for a fork the marker and the collection end up on the SCOPE — so the
+  -- note pointed a reader at an element where neither is. Re-pointed once the
+  -- nesting is known, which is the only place it can be.
+  retargetToScope :: [FidelityNote] -> [FidelityNote]
+  retargetToScope = map go
+   where
+    parentOf =
+      Map.fromList [(n.nodeId, pid) | n <- allNodes, Just pid <- [n.nodeParent]]
+    go note
+      | note.code `elem` ["P-CAST"]
+      , Just pid <- Map.lookup note.element parentOf =
+          note {element = pid}
+      | otherwise = note
 
   ------------------------------------------------------------------
   -- Shapes the types permit that today's extractor cannot reach
@@ -1996,6 +2052,15 @@ multiInstanceFor l = case l.labelQuantifier of
     Just DMustNot -> CompleteOnFirst
     _ -> CompleteWhenAll
 
+-- | Is this obligation's join line a fork?
+--
+-- Read off the label rather than passed down, because the notes that need it
+-- are built in the chain pass, before 'addForkScope' has decided anything.
+isForkLabel :: TransitionLabel -> Bool
+isForkLabel l = case l.labelQuantifier >>= (.quantJoin) of
+  Just j -> case j.joinKind of Fork -> True; Barrier _ -> False
+  Nothing -> False
+
 -- | The cast word, or a neutral one when the @EVERY@ is bare.
 --
 -- \"member\" rather than a guess at the party type's name: `EVERY p` ranges over
@@ -2018,12 +2083,22 @@ castWords q = fromMaybe "member" q.quantCast
 --
 -- With no @IN@ roll there is nothing to point at: the cast is every value of
 -- the party type, which is a set the source never enumerates.
+-- The name carries the member VARIABLE as well as the rule, because a rule can
+-- hold more than one @EVERY@ — @EVERY d IN board … HENCE (EVERY s IN
+-- shareholders …)@ — and a name derived from the rule alone gave both of them
+-- one variable. The file stayed well formed and an engine would have armed both
+-- casts from one list, while the two @P-CAST@ notes named two different rolls
+-- for it. Nothing checked that, and no corpus file has the shape; found by
+-- review, 2026-09-19.
+--
+-- Still not named for the roll: @\<rule\>_\<var\>_cast@ says which binder it
+-- fills, not what goes in it.
 loopCollectionFor :: Text -> Quantifier -> Maybe LoopCollection
 loopCollectionFor ruleName q = do
   _ <- q.quantRoll
   pure
     LoopCollection
-      { loopVariable = ncName ruleName <> "_cast"
+      { loopVariable = ncName ruleName <> "_" <> ncName q.quantVar <> "_cast"
       , loopItem = q.quantVar
       }
 
@@ -2513,16 +2588,26 @@ quantifierNotes n l = case l.labelQuantifier of
                          \would arm instances the rule does not."
                 )
                 q.quantRoll
-        , lost =
-            "the cardinality as something an engine could read: WHO is in the \
-            \cast, which only the rule's own run can answer. The file now \
-            \declares the variable and loops over it, so an engine accepts it \
-            \and runs it \8212 over whatever is in it, including nothing \
-            \(measured 2026-09-19, jbpm-bpmn2 7.74.1: compiles and completes, \
-            \where the same golden without a collection was rejected outright \
-            \on 2026-09-15; unseeded the cast is empty and the body never \
-            \runs, and seeded with three members the continuation fires three \
-            \times)"
+        , lost = case q.quantRoll of
+            Just _ ->
+              "the cardinality as something an engine could read: WHO is in \
+              \the cast, which only the rule's own run can answer. The file \
+              \declares the variable and loops over it, so an engine accepts \
+              \it and runs it over whatever is put in it (measured \
+              \2026-09-19, jbpm-bpmn2 7.74.1: compiles and completes, where \
+              \the same golden without a collection was rejected outright on \
+              \2026-09-15; seeded with three members the continuation fires \
+              \three times). Note what an UNSEEDED run does NOT show: the \
+              \collection is empty, so the activity completes at once and \
+              \nothing inside it runs."
+            Nothing ->
+              "the cast as something an engine could read at all. This rule \
+              \has no IN roll \8212 it ranges over a type, narrowed by a WHO \
+              \condition \8212 so there is no list for the file to point at, \
+              \and no loopDataInputRef is emitted. jbpm-bpmn2 7.74.1 rejects \
+              \such a file outright (\8216ForEach has no collection \
+              \expression\8217, measured 2026-09-15); supplying one means \
+              \writing down a membership the source states as a predicate."
         }
     ]
       <> [ MkFidelityNote
@@ -2541,6 +2626,41 @@ quantifierNotes n l = case l.labelQuantifier of
                  \completionCondition would wait for every member to offend"
              }
          | Just DMustNot <- [l.labelModal]
+         -- NOT on a fork. 'multiInstanceFor' does say @CompleteOnFirst@ for a
+         -- prohibition, but a fork's activity is the SCOPE, and 'addForkScope'
+         -- clears the marker on everything it encloses — so the file contains
+         -- no @completionCondition@ at all and this note described an
+         -- attribute that was not there. The shape is right (each member
+         -- offends severally, and completing the scope on the first act would
+         -- cancel the others); it was the note that was wrong, and it
+         -- contradicted the task's own @\<documentation\>@ two elements away.
+         , not (isForkLabel l)
+         ]
+      <> [ MkFidelityNote
+             { code = "P-PROHIBITION-EMPTY"
+             , severity = Lossy
+             , element = n.nodeId
+             , range = Nothing
+             , message =
+                 "The diagram says: with an EMPTY cast this activity completes \
+                 \at once \8212 a multi-instance activity over an empty \
+                 \collection does \8212 and its completion is the breach arm, \
+                 \so the rule ends BREACHED with nobody having done anything. \
+                 \The rule says the opposite: an empty cast is FULFILLED, \
+                 \because nobody is bound and so nothing is forbidden \
+                 \(measured: startBarrier joins at its arming, and the \
+                 \\8216nobody\8217 trace in ok/every/run-roll.l4 and the empty \
+                 \roll in run-in.l4 both run to FULFILLED). The \
+                 \completion condition is right for every non-empty cast and \
+                 \inverts on the empty one, which is the case an engine reaches \
+                 \first if nobody supplies the collection."
+             , lost =
+                 "the empty cast, which the diagram breaches and the rule \
+                 \fulfils \8212 and it is REACHABLE: jbpm-bpmn2 7.74.1 runs \
+                 \this file unseeded and reports ABORTED via the breach end"
+             }
+         | Just DMustNot <- [l.labelModal]
+         , not (isForkLabel l)
          ]
       -- P-FORK and P-FORK-CANCEL used to be filed here, unconditionally, for
       -- every fork. They are now filed by 'addForkScope' and only when it has
