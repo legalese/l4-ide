@@ -1718,12 +1718,15 @@ past — is refused by name after a bounded number of stalled hand-offs, not con
 model an event scrutinised k+1 times for k expired layers, not at most twice, and a refusal as a
 possible end of the walk.)_
 
-_(R6, the state layer — ANSWERED and BUILT 2026-09-19, `lts/p2-followups-2`. Until then the
-mark was the act layer's only: a barrier whose `ONCE … WITHIN` was missed hands its `LEST` the
-members' OWN cells from the first event past the state deadline (`BarrierTrim`, 2026-09-16), and
-the `LEST`'s look at the completion that landed after the deadline was logged as a fresh
-`WitnessedOnly`/`Consumed` — EVERY-EACH-QUANTIFIER-SPEC §5.2.1's S3 made pairing those looks by
-stamp, party and action a consumer contract. Now it is a mark: `dsScrutiny` reads `Reoffered` for
+_(The state layer's mark — BUILT 2026-09-19, `lts/p2-followups-2`. This does not answer R6,
+which is §8's question of how the re-offered event is DRAWN, and stays open; what it closes is one
+more gap in the data R6 will draw from, so that `dsScrutiny` is right for every re-look before
+anyone decides the frames. Until then the mark was the act layer's only: a barrier whose
+`ONCE … WITHIN` was missed hands its `LEST` the members' OWN cells from the first event past the
+state deadline (`BarrierTrim`, 2026-09-16), and the `LEST`'s look at the completion that landed
+after the deadline was logged as a fresh `WitnessedOnly`/`Consumed` — EVERY-EACH-QUANTIFIER-SPEC
+§5.2.1's S3 made pairing those looks by stamp, party and action a consumer contract. Now it is a
+mark: `dsScrutiny` reads `Reoffered` for
 a look, anywhere under that hand-off, at a cell one of the barrier's members had looked at, and
 stays fresh for a cell no member reached — including one stamped AT the last completion but
 placed after it, which a "re-offered up to the last completion's stamp" watermark would have
@@ -2683,12 +2686,15 @@ plus, for B and C, the position in plain words, and a `truth.json` per contract:
   artifact** (`etc/lts-reader-proxy/tenancy/probes.out:15` and `:11`): with Alice paid at 3, the
   what-if for the landlord's `Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)` is
   refused with the replay's own `Internal error: amount is not in scope` as its reason —
-  `reifyExpr` (`jl4-core/src/L4/Lts/WhatIf.hs:539`) cannot read a member's open pattern
-  variable through the `HENCE`; the verdict (untried) is right, the wording is not the list's.
+  `reifyExpr` (`jl4-core/src/L4/Lts/WhatIf.hs:539`, as of the run's `0139c6c5`) cannot read a
+  member's open pattern variable through the `HENCE`; the verdict (untried) is right, the wording
+  is not the list's.
   _The first is fixed 2026-09-19 (§2.4, amended; every-each round 2 O2): the refusal is now
-  made before the replay and reads "the action binds `amount`, which the what-if cannot
-  choose", and the receipt is still named with its member._
-  And the tick past 7 prints as `the clock reaches 7.5` — `tickPast` (`WhatIf.hs:278`) going
+  made before the replay, by `closedAction`, and reads "the action binds `amount`, which the
+  what-if cannot choose", and the receipt is still named with its member; `tenancy/probes.out`
+  is re-cut from that binary, so its line 15 reads the new sentence._
+  And the tick past 7 prints as `the clock reaches 7.5` — `tickPast` (`WhatIf.hs:278`, as of
+  `0139c6c5`) going
   half-way to the next live deadline, as §2.4 says, which a reader is not told.
 
 ### 7.4 The empirical warrant, corrected

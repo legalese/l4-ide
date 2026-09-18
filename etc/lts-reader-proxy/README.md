@@ -72,7 +72,11 @@ L4=$(cd <worktree with a build> && cabal list-bin l4) etc/lts-reader-proxy/prepa
 
 from the repo root; needs `jq` and `node`. The committed artifacts were cut with the `l4` built
 from `lts/p2-stack` at `0139c6c5` (re-cut 2026-09-16 on `lts/p2-followups` after the bearer
-change: only `probes.out` moved, see RESULTS.md). It rewrites A/B/C, `lts.json`, `probes.out` and
+change: only `probes.out` moved, see RESULTS.md; and `tenancy/probes.out` and
+`every-run-example/probes.out` alone were re-cut 2026-09-19 from `lts/p2-followups-2`, see item 1
+below — a full rerun on a current binary also moves A, B, `lts.json` and `manifest.json` with
+what `unstable` has changed since, which is a re-cut of the readers' inputs and has not been
+done). It rewrites A/B/C, `lts.json`, `probes.out` and
 `manifest.json`, and fails if `every-run-example`'s rule stops exporting byte-identically to the
 `tenancy-barrier` golden. `truth.json` and `history.txt` are hand-written and are **not**
 regenerated: after a rerun, diff `lts.json` and `probes.out` and re-read the answers.
@@ -88,8 +92,14 @@ reader artifact:
 1. With Alice paid at 3, the list's what-if for the landlord's receipt is refused with
    `Internal error: amount is not in scope` (`probes.out:15`). The fork's `HENCE` says
    `Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)`, where `amount` is the member's
-   own pattern variable, left open for the event to fill; `reifyExpr` (`jl4-core/src/L4/Lts/WhatIf.hs:539`) cannot read it, and the
+   own pattern variable, left open for the event to fill; `reifyExpr` (`jl4-core/src/L4/Lts/WhatIf.hs:539`, as of the run's `0139c6c5`) cannot read it, and the
    replay's error text is printed as the reason. The verdict is right (the act is untried); the
-   reason should be the list's own wording.
+   reason should be the list's own wording. _Fixed 2026-09-19 on `lts/p2-followups-2`
+   (`closedAction`, `WhatIf.hs`): the line now reads "the action binds `amount`, which the
+   what-if cannot choose". `tenancy/probes.out` and `every-run-example/probes.out` were re-cut
+   with that binary — the only two files here it moves, and the same rerun also picks up what
+   `unstable` changed since `0139c6c5` (a breach line now lists the names it carries, in order;
+   a group's fallback is clocked at the missed deadline). The other artifacts, `manifest.json`
+   included, are still the run's: they are what the readers were shown._
 2. The tick past 7 prints as `the clock reaches 7.5` because the next live deadline is 8 and
-   `tickPast` (`WhatIf.hs:278`) goes half-way. By design (§2.4, the P2c block), but a reader will not know that.
+   `tickPast` (`WhatIf.hs:278`, as of `0139c6c5`) goes half-way. By design (§2.4, the P2c block), but a reader will not know that.

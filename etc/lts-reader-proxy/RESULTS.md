@@ -114,8 +114,9 @@ what-if **could** be tried (Carol's `Sign` binds nothing open), the list scored 
 _(2026-09-19: the sibling refusal seen one step past the `tenancy` position — `probes.out:15`,
 where the landlord's receipt was refused with the evaluator's own "Internal error: amount is not
 in scope" — now reads the same "the action binds `amount`, which the what-if cannot choose"
-sentence, made before any replay (`WhatIf.hs`, `closedAction`). The three artifacts above are
-`PatVar` refusals and were already worded this way; nothing in this measurement moves. The
+sentence, made before any replay (`WhatIf.hs`, `closedAction`); `tenancy/probes.out` is re-cut
+from that binary, so its line 15 is the new sentence. The three artifacts above are `PatVar`
+refusals and were already worded this way; nothing in this measurement moves. The
 `:525`/`:216` line numbers are as of the run.)_
 
 So the Q2 gap measured here is a gap in **`WhatIf`'s coverage of open pattern variables**, not a
