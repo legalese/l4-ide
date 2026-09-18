@@ -17,6 +17,7 @@ until it blocked the change that introduced it.
 | `mi-subprocess-fork.bpmn` | a multi-instance sub-process is **played by copy-expansion**, and its escalation fan-in is the one place copies are not independent |
 | `mi-subprocess-two-ways-to-done.bpmn` | an instance is finished by **whichever** of its paths reaches an end, not by all of them |
 | `mi-subprocess-throw-and-finish.bpmn` | an instance that **throws** is also **finished** — the escalation leaves, and the instance has no tokens left |
+| `mi-subprocess-every-instance-throws.bpmn` | the same, in its strongest form — EVERY instance throws and the scope still completes; the one fixture with a **measured engine** answer |
 
 ## `joined-beside-breach.bpmn`
 
@@ -155,3 +156,60 @@ the boundary condition.
 | `etc/check-bpmn-soundness.mjs` **before the fix** | **UNSOUND** at 2, S1+S2 fail, 2 deadlocked markings        |
 
 Measured by reverting the fix, not argued.
+
+## `mi-subprocess-every-instance-throws.bpmn`
+
+`mi-subprocess-throw-and-finish.bpmn` has one instance throw and another complete
+normally. This one has **every** instance throw, and it exists because that is
+the case where an assumption became load-bearing in two places at once.
+
+The emitter's `P-FORK-VERDICT` asserts that BPMN takes the sub-process's outgoing
+flow when every instance has ended. The checker was taught, in the commit above,
+that a throwing instance is a finished instance. Both follow from the spec — a
+sub-process instance completes when it has no tokens left, and an escalation end
+leaves none — and **neither had been measured on an engine.** Every row in
+`etc/bpmn-kie-baseline.txt` is an unseeded empty cast, so nothing in it runs an
+instance at all, and the seeded census recorded there has all three members
+complying. So no committed run had ever thrown an escalation.
+
+That is the dangerous shape: the exporter and the gate depending on the same
+unmeasured fact, in the same direction. If jBPM did not complete an instance that
+ended by escalation, the consequence would not be a wording problem — it would be
+a hang on the scope, and the gate could no longer see it, because it had been
+taught to assume otherwise.
+
+### Measured, jbpm-bpmn2 7.74.1, three members, every one throwing
+
+Seeded through a scratchpad copy of `etc/kie/KieBpmnCheck.java` patched only at
+its `startProcess` line (the repo harness never seeds; the technique is in
+PROCESS-TRACK.md §8.1):
+
+```
+   [fire census]
+      1x  (unnamed) [StartNode]
+      1x  each member [ForEachNode]
+      3x  (unnamed) [StartNode]          <- one instance per member
+      3x  MUST Pay ... [HumanTaskNode]
+      3x  Breach [FaultNode]             <- every instance THROWS
+      3x  Breach [EndNode]               <- the catch fires once per throw
+      1x  every run has ended [EndNode]  <- AND THE SCOPE STILL COMPLETES
+[PHASE 2 execute] COMPLETED
+```
+
+The last two lines are the answer. The scope completes with every instance
+having ended by escalation, so a throwing instance is a finished instance on a
+real engine and not only in the spec. The `3x` on the outer breach end is worth
+noting too: the non-interrupting boundary really does fire once per breaching
+member, which is what makes a member's breach visible without cancelling anyone.
+
+| checker                                           | verdict                                                   |
+| ------------------------------------------------- | --------------------------------------------------------- |
+| `etc/validate-bpmn.mjs` (bpmn-moddle)             | OK — 0 warnings, 7 flow nodes, 5 sequence flows, all drawn |
+| `etc/check-bpmn-soundness.mjs`                    | **SOUND** at 0 and at 2 instances                         |
+| `etc/check-bpmn-soundness.mjs` **before the fix** | **UNSOUND** at 2                                          |
+| `etc/kie/KieBpmnCheck.java`, seeded with 3        | **COMPLETED**, census above                               |
+
+It is not in `../expected/` because the exporter cannot emit it: a fork whose
+every path throws would need a rule with no fulfilling act at all. It is a probe
+of the ENGINE, kept because the claim it settles is one two different pieces of
+this repo now rest on.
