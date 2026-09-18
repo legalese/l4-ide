@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -- | LTS-VISUALISER §2.4 / P2c: the enabled set in the REPLAY form.
 --
@@ -33,7 +34,8 @@
 --      event has compared yet — is refused before any replay, with the
 --      what-if's own wording, never the evaluator's "not in scope"; and one
 --      the residual HAS forced (a GIVEN under a projection) is read through
---      and tried.
+--      and tried. A WHERE local under a section is refused the same way and
+--      named as the rule wrote it, not section-qualified.
 module LtsWhatIfSpec (spec) where
 
 import Data.Foldable (for_)
@@ -41,9 +43,10 @@ import qualified Data.Text as Text
 
 import L4.API.VirtualFS (vfsFromList, checkWithImports)
 import L4.Import.Resolution (TypeCheckWithDepsResult (..))
-import L4.EvaluateLazy (resolveEvalConfig)
+import L4.Evaluate.ValueLazy (NF (..))
+import L4.EvaluateLazy (EvalDirectiveResult (..), EvalDirectiveValue (..), ReductionOutcome (..), resolveEvalConfig)
 import L4.EvaluateLazy.DeonticStep (Branch (..), DeonticStep (..), StepOutcome (..))
-import L4.EvaluateLazy.Machine (emptyEnvironment)
+import L4.EvaluateLazy.Machine (emptyEnvironment, pattern ValFulfilled)
 import L4.Lts.Marking
 import L4.Lts.WhatIf
 import L4.Print (prettyLayout)
@@ -328,6 +331,31 @@ givenSrc = Text.unlines
   , "    PARTY Tenant DOES Deliver Tenant Tenant Widget AT 1"
   ]
 
+-- 10''. A WHERE local under a section. `y` is fixed by the rule, not by
+--       the event, but the residual holds it unforced at the outset, so the
+--       what-if cannot supply it either and refuses as it does a GIVEN. The
+--       resolver spells a local declared under `§ inner` as `inner.y`; the
+--       refusal must spell it as the action beside it does.
+whereSrc :: Text.Text
+whereSrc = Text.unlines
+  [ "DECLARE Actor IS ONE OF Alice, Bob"
+  , "DECLARE Action IS ONE OF pay HAS amt IS A NUMBER"
+  , ""
+  , "§ inner"
+  , ""
+  , "GIVETH A DEONTIC Actor Action"
+  , "c1 MEANS"
+  , "  PARTY Alice"
+  , "  MUST pay (y PLUS 1)"
+  , "  WITHIN 10"
+  , "  WHERE y MEANS 41"
+  , ""
+  , "#TRACE c1 AT 0 WITH"
+  , ""
+  , "#TRACE c1 AT 0 WITH"
+  , "  PARTY Alice DOES pay OF 42 AT 1"
+  ]
+
 spec :: Spec
 spec = describe "LTS-VISUALISER §2.4 / P2c: the enabled set by replay" $ do
 
@@ -503,6 +531,28 @@ spec = describe "LTS-VISUALISER §2.4 / P2c: the enabled set by replay" $ do
     case forced.esOutcomes of
       (o : _) -> fmap prettyLayout o.ocCandidate.cdShape `shouldBe` Just "Deliver OF Tenant, ((Person OF Tenant, Landlord)'s landlord), Widget"
       []      -> expectationFailure "no outcomes"
+
+  it "10''. a WHERE local under a section: refused by its unqualified name, the one the action beside it prints" $ do
+    -- Pinned from the runtime on 2026-09-19: before it the line read
+    -- `pay OF (y PLUS 1) — the action binds `inner.y``, one name two ways.
+    outset <- enabledAt 0 whereSrc
+    map row outset.esOutcomes `shouldBe`
+      [ Row (CouldNot "Alice" "pay (y PLUS 1)") Untriable
+      , Row (TickAt 11 ["Alice"]) (Breaches (Just "Alice")) ]
+    case outset.esOutcomes of
+      (o : _) -> do
+        o.ocCandidate.cdHypothetical `shouldBe` Left "the action binds `y`, which the what-if cannot choose"
+        fmap prettyLayout o.ocCandidate.cdShape `shouldBe` Just "pay OF (y PLUS 1)"
+      [] -> expectationFailure "no outcomes"
+    -- the rule fixes y at 41, so the act with 42 is the one the contract
+    -- takes: the position after it is fulfilled, nothing owed, nothing to try
+    done <- enabledAt 1 whereSrc
+    done.esPosition.posClock `shouldBe` 1
+    done.esPosition.posResult.result `shouldSatisfy` \ case
+      Reduction (Reduced (MkNF ValFulfilled)) -> True
+      _                                       -> False
+    done.esPosition.posMarking `shouldBe` []
+    map row done.esOutcomes `shouldBe` []
 
   it "tickPast lands one unit past a lone deadline, and half-way to a nearer next one" $ do
     tickPast [10] 10 `shouldBe` 11

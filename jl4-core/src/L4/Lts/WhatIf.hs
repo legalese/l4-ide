@@ -651,8 +651,14 @@ patternExpr env = \ case
 -- because to the reader they are the same fact — the event must carry the
 -- value and the list has no basis for picking one — and because the list's
 -- consumers key on it (`etc/lts-reader-proxy/RESULTS.md` §3.1).
+--
+-- The name is spelled as the rule wrote it, without its section. A local
+-- declared under a @§@ — a @WHERE@'s @y@ — resolves to a section-qualified
+-- name, and until 2026-09-19 the refusal printed that (\`inner.y\`) beside
+-- an action printed by 'prettyLayout' as @pay OF (y PLUS 1)@, so the two
+-- halves of one line spelled one name two ways.
 cannotChoose :: Name -> Text
-cannotChoose v = "the action binds `" <> nameToText v <> "`, which the what-if cannot choose"
+cannotChoose v = "the action binds `" <> unqualifiedNameToText v <> "`, which the what-if cannot choose"
 
 -- | An instantiated action the replay can evaluate, or the reason it
 -- cannot: the first local it still names that the residual holds unforced
