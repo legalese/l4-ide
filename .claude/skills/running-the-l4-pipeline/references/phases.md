@@ -45,7 +45,9 @@ The corpus modules, cases files and goldens named below are the subject's declar
 | `p9-cost`      | measures what the run cost: the driver's own per-stage wall clock off the journal, and the agent sessions' tokens and tool calls off the harness transcripts the `session` rows name                 | `cost-ledger.json`                                                                                                         |
 | `p9-report`    | renders the conversion report from the journal and checks that every section SPEC.md §P9 requires is present                                                                                         | `report.md`, `report.html`                                                                                                 |
 
-`p0-preflight` and `p3-check` are ungated. Everything from `p6-tests` on is behind HG1.
+`p0-preflight` and `p3-check` are ungated. Everything from `p6-tests` on is behind HG1 — **except `p9-cost`, which is HG1-exempt** (SPEC.md §7.3.0, ruled 2026-09-15). The criterion is that HG1 gates a stage whose output makes a claim about the ENCODING; `p9-cost` measures the RUN and reports identical figures over an isomorphic encoding and a nonsensical one. Gating it meant the cost ledger was only readable after a review that had not happened, which is exactly backwards for the question it answers. `etc/go/selftest.mjs` pins the exempt set to that one member, measured from `go.sh plan`'s own output.
+
+HG1 can also be granted **provisionally** rather than waived, in which case every stage below runs and stamps its artifacts `provisional` — see [gates.md](gates.md).
 
 ### What `p9-cost` can measure, and what it can only bound
 

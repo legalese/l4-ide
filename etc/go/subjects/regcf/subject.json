@@ -92,5 +92,8 @@
     },
     "p7-wizard": {},
     "p7-akn": {}
+  },
+  "canon": {
+    "subject_path": "us/regcf"
   }
 }

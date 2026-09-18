@@ -190,6 +190,16 @@ export function checkReceipt(r, ctx = {}) {
  * carries a reason, and every gate is either signed or explicitly waived on the
  * record.
  *
+ * PROVISIONAL is that same accounting over work whose HG1 review is still to
+ * come. It is deliberately NOT a flavour of COMPLETE: the stages all ran and
+ * accounted for themselves, so exit is 0 and the run is usable — but the word
+ * COMPLETE is the one a reader skims for, and letting it cover unreviewed work
+ * would make the gate table the only place the difference survived. A run is
+ * PROVISIONAL when any gate is open on a `provisional` grant; every artifact it
+ * produced carries `produced_under.state provisional` and store.mjs refuses to
+ * serve any of it, so the verdict is a summary of a fact already on each
+ * receipt rather than the only record of it.
+ *
  * It judges a RUN and not a milestone: G0-G4 describe what this tooling can do,
  * in the order it was built, and a body of law does not pass through them
  * (R9, §3.9). The rule itself is unchanged — only the thing it is a rule about
@@ -219,8 +229,26 @@ export function runVerdict({ declared, receipts, gates }) {
   const unexplained = receipts.filter(
     (r) => r.status !== "PASS" && !(r.reason && String(r.reason).trim()),
   );
+  // `ungated` is "this gate has not been resolved at all". A provisional grant
+  // IS a resolution — recorded, reasoned, bound to the corpus digest — so it
+  // does not belong here; it belongs in its own bucket, below.
   const ungated = (gates || []).filter(
-    (g) => g.state !== "satisfied" && g.state !== "waived",
+    (g) =>
+      g.state !== "satisfied" &&
+      g.state !== "waived" &&
+      g.state !== "provisional",
+  );
+  // A gate is provisional only while NOTHING STRONGER covers it. Promotion is
+  // the ordinary path — sign HG1 over an unmoved corpus and re-run — and after
+  // it the journal holds both rows. Reading the provisional one as still
+  // current would make a promoted run report PROVISIONAL forever.
+  const stronger = new Set(
+    (gates || [])
+      .filter((g) => g.state === "satisfied" || g.state === "waived")
+      .map((g) => g.gate),
+  );
+  const provisional = (gates || []).filter(
+    (g) => g.state === "provisional" && !stronger.has(g.gate),
   );
 
   if (broken.length)
@@ -231,9 +259,18 @@ export function runVerdict({ declared, receipts, gates }) {
       broken,
       unexplained,
       ungated,
+      provisional,
     };
   if (ungated.length)
-    return { verdict: "GATE", exit: 3, missing, broken, unexplained, ungated };
+    return {
+      verdict: "GATE",
+      exit: 3,
+      missing,
+      broken,
+      unexplained,
+      ungated,
+      provisional,
+    };
   if (missing.length || unexplained.length)
     return {
       verdict: "INCOMPLETE",
@@ -242,6 +279,21 @@ export function runVerdict({ declared, receipts, gates }) {
       broken,
       unexplained,
       ungated,
+      provisional,
+    };
+  // AFTER the accounting checks, not before: a provisional run that is also
+  // missing a stage is INCOMPLETE, because the thing wrong with it is something
+  // the run itself can fix. PROVISIONAL is the verdict for a run with nothing
+  // left to do but be reviewed.
+  if (provisional.length)
+    return {
+      verdict: "PROVISIONAL",
+      exit: 0,
+      missing,
+      broken,
+      unexplained,
+      ungated,
+      provisional,
     };
   return {
     verdict: "COMPLETE",
@@ -250,6 +302,7 @@ export function runVerdict({ declared, receipts, gates }) {
     broken,
     unexplained,
     ungated,
+    provisional,
   };
 }
 

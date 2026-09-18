@@ -15,16 +15,17 @@
 
 # Conversion report — {{run.subject}} ({{run.encoding}})
 
-|             |                                                                                  |
-| ----------- | -------------------------------------------------------------------------------- |
-| run id      | `{{run.id}}`                                                                     |
-| encoding    | {{run.encoding}} — {{run.encoding_gloss}}                                        |
-| subject     | {{run.subject}}                                                                  |
-| repo HEAD   | `{{run.repo_head}}` ({{run.tree_state}})                                         |
-| clock       | `{{run.fixed_now}}`                                                              |
-| `l4` binary | `{{run.l4_binary}}`                                                              |
-| journal     | `{{run.journal_path}}` — {{run.record_count}} records, chain {{run.chain_state}} |
-| verdict     | **{{run.verdict}}**                                                              |
+|              |                                                                                  |
+| ------------ | -------------------------------------------------------------------------------- |
+| run id       | `{{run.id}}`                                                                     |
+| encoding     | {{run.encoding}} — {{run.encoding_gloss}}                                        |
+| subject      | {{run.subject}}                                                                  |
+| repo HEAD    | `{{run.repo_head}}` ({{run.tree_state}})                                         |
+| clock        | `{{run.fixed_now}}`                                                              |
+| `l4` binary  | `{{run.l4_binary}}`                                                              |
+| journal      | `{{run.journal_path}}` — {{run.record_count}} records, chain {{run.chain_state}} |
+| verdict      | **{{run.verdict}}**                                                              |
+| destined for | {{run.canon_destination}}                                                        |
 
 > {{run.verdict_gloss}}
 
