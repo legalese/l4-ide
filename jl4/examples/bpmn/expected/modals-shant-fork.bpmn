@@ -8,7 +8,6 @@
                   targetNamespace="https://l4.legalese.com/bpmn"
                   exporter="jl4 (L4.Bpmn)"
                   exporterVersion="1">
-  <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
   <bpmn:escalation id="Escalation_breach" name="Breach" escalationCode="BREACH" />
   <bpmn:itemDefinition id="Item_no_subletting__severally_cast" structureRef="java.util.List" />
   <bpmn:itemDefinition id="Item_no_subletting__severally_cast_member" structureRef="java.lang.Object" />
@@ -29,10 +28,8 @@
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="Start_0" />
-    <bpmn:endEvent id="End_1" name="Fulfilled" />
-    <bpmn:endEvent id="End_2" name="Breach">
-      <bpmn:errorEventDefinition id="ErrorDef_End_2" errorRef="Error_breach" />
-    </bpmn:endEvent>
+    <bpmn:endEvent id="End_1" name="every run has ended" />
+    <bpmn:endEvent id="End_2" name="Breach" />
     <bpmn:subProcess id="Scope_0" name="each Director" triggeredByEvent="false">
       <bpmn:documentation>One instance per member of the cast, all live at once. The join line is UPON EACH, so everything this box contains — the act, its deadline, and what follows it — belongs to ONE member and runs once per member.</bpmn:documentation>
       <bpmn:ioSpecification id="IoSpec_Scope_0">

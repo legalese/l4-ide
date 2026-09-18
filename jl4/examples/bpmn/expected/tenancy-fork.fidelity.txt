@@ -26,3 +26,9 @@ fidelity report — BPMN 2.0
   [P-FORK-LANES] advisory — Scope_0
       The parties inside this sub-process are not drawn as lane bands. A lane partitions the flow elements of the process it sits in, and these are one level down; naming them from the outer laneSet would be a reference across a boundary the notation does not have. Each enclosed element still names its party in its own <documentation>.
       lost: the party bands inside the scope, not the parties themselves
+  [P-FORK-VERDICT] lossy — End_2
+      The rule's own verdict is not drawn. Each member's run ends inside the sub-process, at that member's own Fulfilled or Breach, and the rule is fulfilled only if EVERY member's is (the runtime folds the members with RAND). BPMN can take the sub-process's outgoing flow when every instance has ended, which is what this file draws and what the end event is now named for — but it cannot make that terminal depend on how they ended without a variable this exporter does not invent. So the terminal says the runs are over and says nothing about the outcome.
+      lost: the fold over the members: whether the rule as a whole was fulfilled or breached, which the per-member ends carry individually and nothing here aggregates
+  [P-FORK-BREACH-UNMARKED] advisory — End_3
+      This breach end carries no errorEventDefinition, where a single-party rule's would. One here would be read by an engine as ending the whole process, and so would cancel the instances of every member who has not breached — a member's failure is that member's, and the others stay bound. The end event is still named Breach and is still reached only by a member's breach; what it no longer carries is the machine-readable marking.
+      lost: the breach as an error an engine can catch, at the one place catching it would do more harm than not

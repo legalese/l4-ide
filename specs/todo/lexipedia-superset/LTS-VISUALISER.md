@@ -2296,6 +2296,45 @@ What that discharges, and what it does not:
   residual still does not carry the join line, so `markingOf` still cannot build the join place.
   P2h's second half remains owed, and remains a runtime change rather than a drawing rule.
 
+**The first cut of this relocated `P-FORK-CANCEL` instead of discharging it, and the review caught
+it.** The escalation left the instance without interrupting its siblings, correctly — and then
+reached the top-level ERROR end, which ends every active thread in the process, including the
+instances still running. A duty another member had already earned vanished one flow later.
+`run-fork.golden` keeps exactly that duty on the matching trace, so the loss was verbatim the old
+note's: "every continuation spawned before the timer fired". Worse, the emitted file asserted the
+opposite in its own `<documentation>` on the boundary — "every other member remains bound" — and
+this spec, `EVERY.md` and the fixture README all said "discharged" in four places.
+
+Fixed by demoting the terminals once the edges are final, and only where the fork is their sole
+feeder: the breach end loses its `errorEventDefinition`, and the fulfilled end loses the name
+`Fulfilled`, because with the continuation inside, that flow is taken when every run has ENDED and
+not when the rule is fulfilled. Measured, and the numbers separate the defect from the faithful
+case cleanly — markings that can complete ONLY by terminating, at two instances:
+
+| golden                           | before | after |
+| -------------------------------- | ------ | ----- |
+| `tenancy-fork`                   | 121    | 0     |
+| `modals-may-fork`                | 108    | 0     |
+| `modals-shant-fork`              | 78     | 0     |
+| `modals-must-fork-join-deadline` | 78     | 0     |
+| the four barrier goldens         | 1–2    | 1–2   |
+
+A barrier failing as a group and ending everything is `ONCE ALL HAVE`, so 1–2 is right there and
+unchanged. Two notes come out of the demotion: `P-FORK-BREACH-UNMARKED` (advisory) and
+`P-FORK-VERDICT` (lossy — the rule's verdict is the fold over members, which BPMN cannot express
+without inventing data, so it is declined rather than drawn wrongly; the terminal is named "every
+run has ended").
+
+**What is worth keeping about how this was found.** Not by the gate. The gate reported the number
+on every single run, under `info`:
+
+> `info  121 marking(s) can reach completion ONLY by terminating`
+
+and scored the file SOUND, which it was, because terminating is a legitimate way to complete. The
+line was printed, read, and not connected — by me, in this session, twice. It took an adversarial
+reader asked specifically about concurrency semantics. A gate that tells you the truth in a
+severity class nobody triages is a gate you have not finished building.
+
 One finding of the checker's own, recorded because it is the shape §5's gate arguments are about:
 teaching `check-bpmn-soundness.mjs` to expand scopes made its synthetic join wait for one token per
 (instance × arrival flow) rather than one per instance, so any interior with two ways to reach its

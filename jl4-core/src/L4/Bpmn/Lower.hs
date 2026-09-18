@@ -979,7 +979,54 @@ stateGraphToBpmn opts sg =
       (l : _) -> l
       [] -> Nothing
 
-    rewritten = map reparent ns <> newNodes
+    rewritten = map (retermine . reparent) ns <> newNodes
+
+    -- The two top-level terminals have to be re-read once the edges are final,
+    -- because what they MEAN changed when the continuation moved inside.
+    --
+    -- The breach end stops being an error end. An error end event does not
+    -- consume one token and leave the rest running: it ends every active thread
+    -- in its process, which at top level includes the live instances of this
+    -- scope. So a breach that correctly escaped one instance without
+    -- interrupting its siblings would kill them one flow later, and the
+    -- continuation another member had already earned would vanish — which is
+    -- exactly the loss @P-FORK-CANCEL@ used to name, relocated rather than
+    -- repaired. Measured: with the error end in place, @tenancy-fork@ at two
+    -- instances had 121 markings that could complete ONLY by terminating; the
+    -- barrier goldens, where failing as a group IS the rule, have one or two.
+    --
+    -- Only when every arrival is a fork's escalation. A breach terminal that
+    -- something else also reaches is still that other path's error end, and
+    -- @offering.bpmn@'s terminate is a modelled outcome, not a defect.
+    --
+    -- The fulfilled end stops claiming a verdict. With the continuation inside,
+    -- this flow is taken when every member's run has ENDED, whichever way each
+    -- ended; calling it \"Fulfilled\" would assert the fold over the members,
+    -- which this file does not compute. See @P-FORK-VERDICT@.
+    retermine n
+      | Just n.nodeId == breachId, breachIsOursAlone =
+          n {nodeKind = EndEvent PlainEnd}
+      | Just n.nodeId == fulfilledId, fulfilledIsOursAlone =
+          n {nodeName = groupEndName}
+      | otherwise = n
+
+    -- No apostrophe: it would be XML-escaped into the one attribute a reader
+    -- sees on the shape. No verdict either — see 'forkVerdictNote'.
+    groupEndName = "every run has ended"
+
+    arrivalsAt x = [e | e <- es', e.edTo == x]
+
+    breachIsOursAlone = case breachId of
+      Nothing -> False
+      Just b -> case arrivalsAt b of
+        [] -> False
+        as -> all ((== escBoundaryId) . (.edFrom)) as
+
+    fulfilledIsOursAlone = case fulfilledId of
+      Nothing -> False
+      Just f -> case arrivalsAt f of
+        [] -> False
+        as -> all ((== scopeId) . (.edFrom)) as
 
     -- Inside the scope the act is performed ONCE, by this member. The
     -- multi-instance marker moves to the scope; leaving it on the task as well
@@ -1096,7 +1143,7 @@ stateGraphToBpmn opts sg =
     -- findings
     ------------------------------------------------------------------
 
-    scopeNotes = forkJoinNote <> forkLaneNote
+    scopeNotes = forkJoinNote <> forkLaneNote <> forkVerdictNote <> forkUnmarkedNote
 
     forkJoinNote =
       [ MkFidelityNote
@@ -1117,6 +1164,59 @@ stateGraphToBpmn opts sg =
               "nothing in this file; the enclosing sub-process adds a \
               \synchronisation at its end that the rule does not have"
           }
+      ]
+
+    -- The one thing about a fork that BPMN cannot express without inventing
+    -- data, stated rather than drawn. The exporter declines elsewhere for the
+    -- same reason: P-NOJOIN declines a gateway it cannot prove, P-CAST declines
+    -- a loopCardinality, and 'MultiInstanceScope' has no slot for
+    -- @CompleteOnFirst@.
+    forkVerdictNote =
+      [ MkFidelityNote
+          { code = "P-FORK-VERDICT"
+          , severity = Lossy
+          , element = fromMaybe scopeId fulfilledId
+          , range = Nothing
+          , message =
+              "The rule's own verdict is not drawn. Each member's run ends \
+              \inside the sub-process, at that member's own Fulfilled or \
+              \Breach, and the rule is fulfilled only if EVERY member's is \
+              \(the runtime folds the members with RAND). BPMN can take the \
+              \sub-process's outgoing flow when every instance has ended, \
+              \which is what this file draws and what the end event is now \
+              \named for \8212 but it cannot make that terminal depend on how \
+              \they ended without a variable this exporter does not invent. So \
+              \the terminal says the runs are over and says nothing about the \
+              \outcome."
+          , lost =
+              "the fold over the members: whether the rule as a whole was \
+              \fulfilled or breached, which the per-member ends carry \
+              \individually and nothing here aggregates"
+          }
+      | fulfilledIsOursAlone
+      ]
+
+    -- Filed only where the demotion actually happened, so it cannot claim a
+    -- loss on a file that kept its error end.
+    forkUnmarkedNote =
+      [ MkFidelityNote
+          { code = "P-FORK-BREACH-UNMARKED"
+          , severity = Advisory
+          , element = fromMaybe scopeId breachId
+          , range = Nothing
+          , message =
+              "This breach end carries no errorEventDefinition, where a \
+              \single-party rule's would. One here would be read by an engine \
+              \as ending the whole process, and so would cancel the instances \
+              \of every member who has not breached \8212 a member's failure is \
+              \that member's, and the others stay bound. The end event is still \
+              \named Breach and is still reached only by a member's breach; \
+              \what it no longer carries is the machine-readable marking."
+          , lost =
+              "the breach as an error an engine can catch, at the one place \
+              \catching it would do more harm than not"
+          }
+      | breachIsOursAlone
       ]
 
     forkLaneNote =

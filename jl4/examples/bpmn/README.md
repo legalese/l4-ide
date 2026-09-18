@@ -130,6 +130,23 @@ byte-identical fidelity report, because `L4.StateGraph.extractDeonton` never rea
   tenant's breach would cancel every other tenant's obligation. Measured under jBPM 7.74.1 before
   the shape was built, and again on the emitted golden after.
 
+  **And the top-level end that escalation reaches is a PLAIN end, which is the same argument one
+  step out and which the first cut of this branch got wrong.** An error end event ends every active
+  thread in its process — including the instances still running — so a breach that had correctly
+  escaped one instance without interrupting its siblings killed them one flow later. The loss was
+  not discharged, it had moved one hop, and the emitted file said otherwise in its own
+  `<documentation>`. Measured: with the error end, `tenancy-fork` at two instances had **121
+  markings that could complete only by terminating**, and `modals-may-fork` 108; with it demoted,
+  zero. The barrier goldens have one or two either way, because a barrier failing as a group IS the
+  rule. Found by the concurrency review, not by the gate — which reported the number on every run
+  under `info`, where nobody was reading it.
+
+  Two notes come out of that: `P-FORK-BREACH-UNMARKED` (advisory — the end is still named Breach
+  and still reached only by a breach, but carries no machine-readable error marking) and
+  `P-FORK-VERDICT` (lossy — the rule's verdict is the fold over the members, and BPMN cannot make
+  the group's terminal depend on it without inventing data, so the terminal is named
+  "every run has ended" and the fold is declined rather than drawn wrongly).
+
   Two earlier reporting gaps, measured 2026-09-16 and fixed the same day (`d544ed22`), are still
   worth knowing: a `MAY` fork with a continuation (`modals-may-fork`) had its lapse timer drawn
   into the chair's `MUST Publish`, which the runtime never does (`ok/every/run-modals.l4` §7:

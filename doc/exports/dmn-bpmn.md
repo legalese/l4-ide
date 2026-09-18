@@ -150,11 +150,28 @@ The notes that go with a quantified rule:
   since one act is the breach. Without that, "completes when every director has sublet" would
   exonerate the first one.
 
-**A breach by one member does not end the others.** Inside the box a breach is drawn as an
-_escalation_ thrown out to a non-interrupting event on the boundary, which then reaches the
-diagram's error end. It is drawn that way because BPMN's error events always interrupt: an error
-thrown inside one member's run would cancel every other member's, which no rule says. What the
-boundary cannot tell you is _which_ member breached — it says only that one did.
+**A breach by one member does not end the others**, and getting that right takes two things, not
+one. Inside the box a breach is an _escalation_ thrown out to a non-interrupting event on the
+boundary, because BPMN's error events always interrupt and an error thrown inside one member's run
+would cancel every other member's. And the end event that escalation reaches is a **plain** end,
+not an error end — for the same reason one step further out. An error end event does not consume
+one token and leave the rest running: it ends every active thread in the process, which includes
+the members still going. So a breach that had correctly escaped one instance without interrupting
+its siblings would have killed them one flow later, and a duty another member had already earned
+would have vanished from the diagram. What the boundary cannot tell you is _which_ member
+breached; it says only that one did.
+
+The cost of that plain end is declared as `P-FORK-BREACH-UNMARKED` (advisory): the end is still
+named Breach and is still reached only by a member's breach, but it no longer carries the
+machine-readable error marking a single-party rule's breach does.
+
+**The rule's own verdict is not drawn, and that is deliberate** (`P-FORK-VERDICT`, lossy). Each
+member's run ends inside the box, at that member's own Fulfilled or Breach, and the rule is
+fulfilled only if every member's is. BPMN can take the box's outgoing flow when every instance has
+ended — which is what the file draws, and why that end event is named "every run has ended" rather
+than "Fulfilled" — but it cannot make that terminal depend on _how_ they ended without a variable
+this export does not invent. Declining to draw an aggregation it cannot compute is the same choice
+made for `loopCardinality` and for an unprovable gateway.
 
 **A permission's timer ends the rule fulfilled**, rather than leading into what follows: a
 resolution that did not pass creates no duty to publish it, and under `UPON EACH` what follows
