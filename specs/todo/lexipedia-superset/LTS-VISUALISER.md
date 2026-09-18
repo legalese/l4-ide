@@ -2262,6 +2262,49 @@ sniffing user-visible strings. P2b's `DeonticStep` has to carry the join, or the
 
 The measurement behind that correction originated on `lts/p2a-remeasure` as `11199a16` (the two `#TRACE`s on `jl4/examples/ok/every/run-modals.l4` §7, goldened in `ok/every/tests/run-modals.golden`, and P2A-TOKEN-SIM-BASELINE.md §3.7) and was folded into legalese/l4-ide#395 as `d544ed22`, which also emits `P-FORK-CANCEL` on the `MAY` fork.
 
+#### LANDED 2026-09-19: the fork is a multi-instance sub-process, and E is no longer isomorphic
+
+The reviewer's finding on E — that a barrier and a fork were "isomorphic automata with different
+labels, not different automata", so nothing reasoning over structure could tell them apart — is
+**now false, deliberately.** The BPMN exporter encloses a fork's obligation, its deadline and its
+whole continuation in a `<subProcess>` carrying the multi-instance marker, where a barrier keeps
+the marker on the task. One copy outside the join versus _n_ copies inside it: the distinction is
+structural in the emitted artifact, which is the first place in this arc that it is.
+
+What that discharges, and what it does not:
+
+- **`P-FORK` and `P-FORK-CANCEL` are discharged.** They now exist only as a refusal: `addForkScope`
+  files `P-FORK`, naming which check failed, when it declines to enclose a continuation it cannot
+  (shared with a path outside the fork, leaving for a third destination, or more than one entry).
+  A fidelity note has to describe the file that was emitted, so they moved out of `quantifierNotes`
+  and into the pass that knows which of the two shapes was drawn.
+- **The empty cast, which none of the earlier notes reached.** `P-FORK`'s wording was an n≥1
+  framing. At n=0 the loss ran the other way: a multi-instance activity over an empty collection
+  completes at once and its outgoing flow IS taken, which is right for a barrier and MANUFACTURED
+  an obligation for a flat fork. With the continuation inside, there is no instance to run it.
+  `etc/check-bpmn-soundness.mjs` plays the emitted goldens at n ∈ {0, 2} and both are SOUND.
+- **New in their place:** `P-FORK-JOIN` (a sub-process regroups at its end and a fork does not —
+  immaterial while each continuation ends inside its own instance, material the moment one feeds
+  shared downstream flow) and `P-FORK-LANES`.
+- **Class (d) in `etc/bpmn-kie-baseline.txt` is closed**, RESULT 12 → 4. The exporter now emits the
+  collection, and jBPM accepts all eight quantified goldens. Two measurements worth keeping: a
+  `<dataObject>` is the vanilla BPMN 2.0 spelling and jBPM refuses to PARSE it (bpmn-moddle accepts
+  it silently), where a process `<property>` is accepted by both; and an unseeded `COMPLETED` on
+  these rows means the empty cast ran, not that a member's obligation did — seeded with three
+  members, `MUST Receipt` fires three times where the flat drawing fired once.
+- **The second half is still gated where it was.** Nothing here touches `barrierFinish`: the
+  residual still does not carry the join line, so `markingOf` still cannot build the join place.
+  P2h's second half remains owed, and remains a runtime change rather than a drawing rule.
+
+One finding of the checker's own, recorded because it is the shape §5's gate arguments are about:
+teaching `check-bpmn-soundness.mjs` to expand scopes made its synthetic join wait for one token per
+(instance × arrival flow) rather than one per instance, so any interior with two ways to reach its
+end deadlocked **in the model** while the file was correct. It was found by the exporter's own
+`modals-may-fork` golden coming back UNSOUND, not by inspection, and the checker looked like it was
+working while it did — it produced a deadlock witness naming real flows. Fixed with one XOR
+"instance finished" gateway per copy; pinned by `jl4/examples/bpmn/sound/mi-subprocess-two-ways-to-done.bpmn`,
+which was verified by reverting the fix and watching it fail.
+
 #### What follows for P2
 
 **This is P2's problem before it is P1's.** §5.1's division of labour gives P1 the shape and P2 the

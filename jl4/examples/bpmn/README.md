@@ -15,7 +15,7 @@ did not. Predicates are a different matter, and belong to the ladder; see
 | `handover.l4`     | A deadline that is a _name_ (no timer, no invented duration), a `RAND` and a `ROR`, and four permissions whose deadlines are drawn as lapse arms |
 | `consultation.l4` | The only one that draws a converging parallel gateway: a `RAND` of deadline-free permissions, one branch of which is a chain                  |
 | `../legal/regcf/regcf.l4` | The real 992-line Reg CF corpus — **three** rules, so three golden pairs (`regcf-reporting`, `regcf-advertising`, `regcf-resale`): a renewing obligation drawn as a loop, `IF`-headed duties with guarded gateway arms, named deadlines, two prohibitions. Read from `examples/legal/`, not copied here — see below |
-| `tenancy.l4`      | A quantified obligation (`EVERY`) under each join — **two** rules, so two golden pairs (`tenancy-barrier`, `tenancy-fork`): a parallel multi-instance task, `P-CAST` on both, `P-FORK` on the fork alone. The witness that a barrier and a fork export differently; see below |
+| `tenancy.l4`      | A quantified obligation (`EVERY`) under each join — **two** rules, so two golden pairs (`tenancy-barrier`, `tenancy-fork`): a multi-instance **task** for the barrier and a multi-instance **sub-process** for the fork, `P-CAST` on both. The witness that a barrier and a fork export differently, and since 2026-09-19 that they are not the same graph with a different label; see below |
 | `option.l4`       | A single `PARTY … MAY` whose `HENCE` is another party's obligation: the one shape in which a permission's lapse and its `HENCE` have different destinations. The witness that the lapse arm ends the rule fulfilled instead of creating the seller's duty; see below |
 | `modals.l4`       | The other modal × join cells — **six** rules, six golden pairs (`modals-*`): a `SHANT` barrier completing on the first act, a `MAY` barrier whose lapse goes to fulfilled, their fork twins, and the two-deadline shapes. Cut after the 2026-09-15 review found the marker inverted two of these and nothing exercised them |
 
@@ -82,45 +82,64 @@ Three directories of `.bpmn`, read by `etc/check-bpmn-soundness.selftest.mjs`:
 | `sound/`    | hand-written diagrams the gate must **not** flag            | SOUND       |
 | `unsound/`  | hand-written and historical diagrams the gate **must** catch | UNSOUND, on a named property |
 
-## A quantified obligation is one multi-instance task
+## A quantified obligation is multi-instance — a task, or a whole scope
 
 `tenancy.l4` is the reference page's own pair (`doc/reference/regulative/every-run-example.l4`)
 with the traces left out. Until 2026-09-15 the two rules exported to byte-identical XML and a
 byte-identical fidelity report, because `L4.StateGraph.extractDeonton` never read `Deonton.join`
 — the fix is recorded in `specs/todo/EVERY-EACH-QUANTIFIER-SPEC.md` §2.5. What they export to now:
 
-- **The task carries `<multiInstanceLoopCharacteristics isSequential="false">`** with neither a
-  `loopCardinality` nor a `loopDataInputRef`: an `EVERY`'s cast is fixed only when the rule runs,
-  and inventing either attribute would be a claim the source does not make. `P-CAST` (advisory)
-  says so and names the roll (`tenants`) an engine would need as the collection. jBPM confirms the
-  gap — it rejects both files with _ForEach has no collection expression_ — which is why both sit
-  in `etc/bpmn-kie-baseline.txt` as class (d), REJECTED, while our own token-play gate and
-  bpmn-moddle accept them.
+- **The activity carries `<multiInstanceLoopCharacteristics isSequential="false">`** with no
+  `loopCardinality` — an `EVERY`'s cast is fixed only when the rule runs, and a count would be
+  invented — but it does carry a `loopDataInputRef`, because naming a variable an engine must fill
+  is a request rather than a claim. The variable is `<rule>_cast`, declared as a process
+  `<property>`, wired in through an `<ioSpecification>`. **Not a `<dataObject>`**, which is the
+  vanilla spelling and which bpmn-moddle accepts silently while jBPM refuses to parse the file at
+  all (measured 2026-09-19, both spellings). `P-CAST` (advisory) says what to seed it with, and
+  warns that the roll is not the cast: `EVERY Tenant t IN tenants` binds tenants, so seeding the
+  variable with a list that also holds the landlord starts a run for somebody the rule does not
+  bind. Both files are now `errors=0` under jBPM, where until 2026-09-19 they were class (d),
+  REJECTED, on _ForEach has no collection expression_.
 - **A `MUST` barrier (`ONCE ALL HAVE`) needs nothing more.** A parallel multi-instance activity
   fires its outgoing flow once, when the last instance completes — that _is_ the barrier, and the
   documentation on the task says so. **Not so for the other modals**, which the review of
   2026-09-15 caught: a `SHANT` completes on the _first_ instance (`completionCondition
   nrOfCompletedInstances >= 1`, read off R-Q5 — one act is the breach; `P-PROHIBITION-FIRST`), and
   a quantified `MAY`'s lapse — under either join — is a LEST arm to Fulfilled in the state graph,
-  so the exporter's synthesised "lapse routes where HENCE routes" never fires for it: a resolution
+  so the lapse never routes where `HENCE` routes: a resolution
   that did not pass creates no duty to publish it, and under a fork the continuation arises only
   from a member's act, never from a lapse (measured 2026-09-16; a first cut drew the fork the
   other way on the review's word). `modals.l4` pins every cell.
-- **The fork (`UPON EACH`) is the one this exporter does not draw faithfully.** The source fires
-  the continuation once per member as that member completes; the activity fires once, after all of
-  them (`P-FORK`, lossy), and its interrupting timer cancels every instance, so a continuation a
-  member already earned is never drawn as arising (`P-FORK-CANCEL`, lossy — the fork's largest
-  loss). BPMN has shapes for once-per-member — a multi-instance subProcess around the continuation,
-  or the `None` completion behaviour caught by a non-interrupting boundary — and this exporter
-  emits neither. Both notes are written "the diagram says…; the rule says…", because the reader
-  has to disbelieve the drawing rather than fill it in. Two gaps in that reporting were measured
-  2026-09-16 and fixed the same day (`d544ed22`): a `MAY` fork with a continuation
-  (`modals-may-fork`) had its lapse timer drawn into the continuation — the chair's `MUST Publish`
-  — which the runtime never does (`ok/every/run-modals.l4` §7: nobody approves, the chair publishes
-  late, FULFILLED); the state graph now draws the fork's lapse as a LEST arm to Fulfilled, as the
-  barrier's has been since 2026-09-15, and the golden reads `Boundary_0 → End_2`. And
-  `P-FORK-CANCEL` is now emitted on the `MAY` fork too (`modals-may-fork.fidelity.txt`), whose
-  timer is interrupting like the `MUST` forks' (`modals-may-fork.bpmn:36`).
+- **The fork (`UPON EACH`) is a `<subProcess>`, and that is new on 2026-09-19.** Until then it was
+  the barrier's drawing with two notes attached — `P-FORK` (the continuation fires once, for the
+  group) and `P-FORK-CANCEL` (the timer cancels every instance, so a continuation a member had
+  already earned was never drawn as arising). Both are now **discharged**: the member's act, its
+  deadline and its whole continuation are enclosed, the marker is on the box, and each member gets
+  their own copy. `P-FORK` survives only as a refusal — `addForkScope` files it, naming which check
+  failed, when it declines to enclose a continuation it cannot (one shared with a path outside the
+  fork, one leaving for a third destination, more than one entry).
+
+  Three things follow from enclosing rather than marking. The continuation is per member. The
+  timer is per member. And an **empty cast** draws correctly: a multi-instance activity over an
+  empty list completes at once and takes its outgoing flow, which is right for a barrier ("all zero
+  have acted" is vacuously true) and MANUFACTURED an obligation for a flat fork. `P-FORK`'s old
+  wording never reached that case — it is an n≥1 framing, and at n=0 the loss ran the other way.
+
+  A breach inside an instance is an **escalation end**, caught by a **non-interrupting escalation
+  boundary** on the box. Not an error end: errors are fixed interrupting in BPMN 2.0, so one
+  tenant's breach would cancel every other tenant's obligation. Measured under jBPM 7.74.1 before
+  the shape was built, and again on the emitted golden after.
+
+  Two earlier reporting gaps, measured 2026-09-16 and fixed the same day (`d544ed22`), are still
+  worth knowing: a `MAY` fork with a continuation (`modals-may-fork`) had its lapse timer drawn
+  into the chair's `MUST Publish`, which the runtime never does (`ok/every/run-modals.l4` §7:
+  nobody approves, the chair publishes late, FULFILLED). The state graph draws a fork's lapse as a
+  LEST arm to Fulfilled, as the barrier's has since 2026-09-15.
+
+  New in the fork's place: `P-FORK-JOIN` (lossy — a sub-process regroups at its end and a fork
+  does not; immaterial while each continuation ends inside its own instance, material the moment
+  one feeds shared downstream flow) and `P-FORK-LANES` (advisory — a lane may only name the flow
+  elements of its own process, so the parties inside the box have no bands).
 - **A deadline written only on the join line arms the boundary timer** (`memberDeadline` in
   `L4.StateGraph`, mirroring the evaluator). When the act has a deadline of its own, that one is
   on the timer and the join line's is reported undrawn as `P-JOIN-DEADLINE` (lossy).
