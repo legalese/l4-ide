@@ -176,16 +176,23 @@ body {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
-.ladder-host svg {
+.ladder-host svg,
+.lightbox-host svg {
   display: block;
 }
-.ladder-host .lad-clickable {
+.ladder-host .lad-clickable,
+.lightbox-host .lad-clickable {
   cursor: pointer;
 }
 /* MEASURED 2026-09-17: the click act rides on the box <rect>, and the label
    <text> is drawn ON TOP of it with no act of its own, so a click on the words
-   — which is where everyone clicks — routed nowhere. Let it fall through. */
-.ladder-host text {
+   — which is where everyone clicks — routed nowhere. Let it fall through.
+   MEASURED AGAIN 2026-09-18: the lightbox zoom (a second, independently
+   mounted LadderController) reintroduced exactly this trap, because it draws
+   into `.lightbox-host` rather than `.ladder-host` and this rule named the
+   class, not the pattern. Same fix, same reason, second host. */
+.ladder-host text,
+.lightbox-host text {
   pointer-events: none;
 }
 

@@ -23,6 +23,23 @@
   const clip = (s: string, n: number): string =>
     s.length > n ? s.slice(0, n - 1) + '…' : s
   const chars = (w: number): number => Math.floor((w - 12) / 6.4)
+
+  // Nodes are truncated to fit their pill; a mouseover tooltip carries the
+  // full text, since that is the only place it exists once clip() has run.
+  let tip = $state<{ x: number; y: number; text: string } | null>(null)
+  function fullText(n: (typeof out.nodes)[number]): string {
+    const body = n.sub ? `${n.label} — ${n.sub}` : n.label
+    return n.gap ? `${body} (no evidence yet — ask about this)` : body
+  }
+  function showTip(e: MouseEvent, n: (typeof out.nodes)[number]): void {
+    tip = { x: e.clientX + 14, y: e.clientY + 14, text: fullText(n) }
+  }
+  function moveTip(e: MouseEvent): void {
+    if (tip) tip = { ...tip, x: e.clientX + 14, y: e.clientY + 14 }
+  }
+  function hideTip(): void {
+    tip = null
+  }
 </script>
 
 <div class="dag-wrap">
@@ -50,7 +67,13 @@
       />
     {/each}
     {#each out.nodes as n (n.id)}
-      <g transform={`translate(${n.x - n.w / 2} ${n.y - n.h / 2})`}>
+      <g
+        role="listitem"
+        transform={`translate(${n.x - n.w / 2} ${n.y - n.h / 2})`}
+        onmouseenter={(e) => showTip(e, n)}
+        onmousemove={moveTip}
+        onmouseleave={hideTip}
+      >
         <rect
           width={n.w}
           height={n.h}
@@ -60,6 +83,7 @@
           stroke={n.gap ? '#c8376a' : 'currentColor'}
           stroke-opacity={n.gap ? 0.9 : 0.45}
           stroke-dasharray={n.gap ? '4 3' : undefined}
+          pointer-events="all"
         />
         <text
           x={n.w / 2}
@@ -82,14 +106,14 @@
             {clip(n.sub, chars(n.w) + 4)}
           </text>
         {/if}
-        <title
-          >{n.gap
-            ? 'No evidence yet — ask about this'
-            : n.label + (n.sub ? ' — ' + n.sub : '')}</title
-        >
       </g>
     {/each}
   </svg>
+  {#if tip}
+    <div class="dag-tip" style:left={`${tip.x}px`} style:top={`${tip.y}px`}>
+      {tip.text}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -101,5 +125,19 @@
     color: var(--ink);
     max-width: 100%;
     height: auto;
+  }
+  .dag-tip {
+    position: fixed;
+    z-index: 40;
+    max-width: 260px;
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 0.8rem;
+    line-height: 1.35;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    pointer-events: none;
   }
 </style>
