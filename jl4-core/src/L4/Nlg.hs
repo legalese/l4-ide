@@ -9,7 +9,7 @@ import Base
 import qualified Base.Text as Text
 
 import L4.Annotation
-import L4.Lexer (PosToken)
+import L4.Lexer (PosToken, isNlgEscapable)
 import L4.Syntax
 import L4.Utils.Ratio (prettyRatio)
 import L4.Desugar
@@ -462,9 +462,10 @@ instance Linearize Nlg where
 --     @slotNameShaped "and"@ is 'True'. The decode belongs to the literal
 --     chunks that scan returns, which is where 'nlgChunks' applies it.
 --
--- @\\%@, @\\]@ and @\\\\@ decode; that set is 'L4.Lexer.isNlgEscapable', and the
--- lexer consumes exactly it, so the two sides cannot disagree about whether an
--- escape happened. Any other @\\x@ is two ordinary characters throughout.
+-- @\\%@, @\\]@ and @\\\\@ decode; that set is 'L4.Lexer.isNlgEscapable', which this
+-- decoder CALLS rather than restates, and the lexer consumes exactly it, so the
+-- two sides cannot disagree about whether an escape happened. Any other @\\x@ is
+-- two ordinary characters throughout.
 --
 -- Pre-existing annotations are unaffected because the tree contains no
 -- backslash in any @.l4@ file (measured 2026-09-17,
@@ -477,7 +478,7 @@ unescapeNlgText t
   | otherwise = Text.pack (go (Text.unpack t))
   where
     go = \ case
-      '\\' : c : rest | c `elem` ("\\%]" :: String) -> c : go rest
+      '\\' : c : rest | isNlgEscapable c -> c : go rest
       c : rest -> c : go rest
       [] -> []
 
