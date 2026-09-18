@@ -250,6 +250,21 @@ renderBranchGuard bg = case branchGuardAtoms bg of
 data Quantifier = MkQuantifier
   { quantVar  :: Text
     -- ^ the member variable — @t@ in @EVERY Tenant t@
+  , quantCast :: Maybe Text
+    -- ^ the cast word — @Tenant@ in @EVERY Tenant t IN tenants@ — as written.
+    -- A /constructor/ of the party type under the value-actor encoding, not a
+    -- type ('L4.Syntax.Every').
+  , quantFilter :: Maybe Text
+    -- ^ the @WHO@ filter, as written.
+    --
+    -- Together with 'quantCast' this is what a projection needs to know that
+    -- __the roll is not the cast__. Both narrow: a roll of four can arm a cast
+    -- of three, and @jl4\/examples\/ok\/every\/run-fork.l4@ does exactly that
+    -- on purpose. So a projection that points a collection at 'quantRoll' and
+    -- says nothing else is not merely declining to state the narrowing — it is
+    -- stating an instance count that L4 denies. Until these two fields existed
+    -- the extractor discarded both, and no consumer could tell the cases apart
+    -- in order to say so.
   , quantRoll :: Maybe Text
     -- ^ the roll the cast is drawn from — @tenants@ in @EVERY Tenant t IN
     -- tenants@ — as written. Its /members/ are a run-time fact (R-T6); its
@@ -317,6 +332,38 @@ memberDeadline l =
 -- rent@) as further constructors, and each must say how it is drawn. Under
 -- @-Wall -Werror@ a new constructor fails this build rather than drawing as
 -- nothing.
+--
+-- __What this exhaustiveness does NOT buy, measured 2026-09-17.__ It was
+-- claimed here that a new constructor would force every consumer to decide how
+-- to handle it. That is false, and the claim was doing harm by reading as a
+-- guarantee. This function flattens the threshold to 'Text' at the boundary —
+-- 'JoinLabelKind'\'s @Barrier@ carries the rendered string, not the
+-- 'Threshold' — so a count or measure form breaks exactly ONE function, this
+-- one, whose job is a caption. The author writes @"SOME 2 OF … HAVE"@, the
+-- build goes green, and no consumer that must /decide/ ever sees a type
+-- change. Two of them then lie at exit 0: @L4.Lts.List@ renders "one of N who
+-- must all act before the next step" and @L4.Lts.Marking@ "a barrier of N",
+-- both false for a count threshold.
+--
+-- So when phase 3 lands, the build stops HERE and nowhere else, which makes
+-- this comment the only place the next person is known to be standing. What
+-- else must change, none of it forced by the compiler:
+--
+-- * 'JoinLabelKind'\'s @Barrier@ should carry the 'Threshold' and render at
+--   each use site, so growth breaks every consumer that must choose. That is
+--   the real fix; everything below is what it would have caught.
+-- * @L4.Lts.List@ and @L4.Lts.Marking@\'s barrier captions, above.
+-- * @L4.Bpmn.Lower@\'s completion condition, which reads @ALL HAVE@ off the
+--   string, and its refusal for the measure form — @sum OF amount AT LEAST
+--   rent@ is not a P\/T construct and cannot be a @completionCondition@.
+-- * @etc\/check-bpmn-soundness.mjs@\'s no-shared-place invariant, and with it
+--   the n ∈ {0,2} cutoff: a count threshold needs a shared accumulator, which
+--   is not 1-safe, so the expansion MODEL needs revisiting and not just the
+--   constant. Its header says this too.
+--
+-- This is the same shape as the @join@ field one layer down: there a record
+-- pattern let a constructor grow invisibly, here flattening to 'Text' at a
+-- boundary does.
 thresholdText :: Threshold Resolved -> Text
 thresholdText = \case
   AllHave _ -> "ALL HAVE"
@@ -926,13 +973,21 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
 
       -- Exhaustive on the join and on the threshold, with no wildcard arm, so
       -- a new form of either is a compile error here and not a silent drawing.
+      --
+      -- The 'Every' pattern is POSITIONAL and binds all five fields for the
+      -- same reason 'extractDeonton' does: a record pattern let 'MkDeonton'
+      -- grow a @join@ field that nothing read, and the two join kinds lowered
+      -- to byte-identical BPMN for as long as that lasted. A sixth field on
+      -- 'L4.Syntax.Every' now stops this build.
       quantifier = case subject of
         Party{} -> Nothing
-        Every _ _ v mRoll _ ->
+        Every _ mCast v mRoll mFilter ->
           Just MkQuantifier
-            { quantVar  = prettyLayout v
-            , quantRoll = prettyLayout <$> mRoll
-            , quantJoin = joinLabel <$> mJoin
+            { quantVar    = prettyLayout v
+            , quantCast   = prettyLayout <$> mCast
+            , quantFilter = prettyLayout <$> mFilter
+            , quantRoll   = prettyLayout <$> mRoll
+            , quantJoin   = joinLabel <$> mJoin
             }
       joinLabel = \case
         JoinOnce _ th d ->
