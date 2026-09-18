@@ -175,15 +175,20 @@ each in the code with a comment saying so:
   direct, pinned dependency for that one import).
 
 **Measured on this branch, 2026-09-19** (Chrome 153.0.8010.53, Node v26.4.0,
-macOS): the full fourteen twice in a row, `diff -r` of the fourteen JSONs
-**empty**; `run-meta.json` differs in its fifteen `runAt` lines and nothing
-else; **46 of 46 screenshots byte-identical**. Before the seeded palette, the
-same test had the JSONs empty and 0 of 46 screenshots identical, every
-difference inside the scope-coloured badges. After the fork shape landed
-(sixteen fixtures), the same test over the five fork fixtures plus
-`handover`, `offering`, `regcf-reporting` and `consultation`, twice: nine JSONs
-identical, 29 of 29 screenshots byte-identical. **What is claimed and what is
-not:** the JSONs are deterministic by construction. The screenshots were
+macOS). First, before the fork shape: the full fourteen twice in a row,
+`diff -r` of the fourteen JSONs **empty**; `run-meta.json` differs in its
+fifteen `runAt` lines and nothing else; **46 of 46 screenshots
+byte-identical**. Before the seeded palette, the same test had the JSONs empty
+and 0 of 46 screenshots identical, every difference inside the scope-coloured
+badges. After the fork shape landed (sixteen fixtures), the same test over the
+five fork fixtures plus `handover`, `offering`, `regcf-reporting` and
+`consultation`, twice: nine JSONs identical, 29 of 29 screenshots
+byte-identical. Then **run 4, the committed `out/`** (2026-09-18 23:23 UTC,
+harness `9cd110c5d`): all sixteen twice, back to back — `diff -r -x '*.png'`
+names one file, `run-meta.json`, in 17 hunks, every one a `runAt` line (the
+top-level one and the sixteen `perFixture` entries); no fixture JSON differs;
+`cmp` on every PNG pair, **52 of 52 byte-identical**. **What is claimed and
+what is not:** the JSONs are deterministic by construction. The screenshots were
 byte-identical on one machine; they are rendered by the machine's Chrome and
 its fonts, and no claim is made that another machine, Chrome or OS produces
 the same bytes — a screenshot diff after a browser bump is expected and is
@@ -239,7 +244,7 @@ entries of the fixtures it did not re-run and dropping any whose
 `<fixture>.json` is no longer in the directory; `fixtures` lists what this run
 touched. The browser and library versions live
 in this file and only here — no `out/<fixture>.json` carries them — so a
-browser bump is a `run-meta.json` line, not a fifteen-file diff.
+browser bump is a `run-meta.json` line, not a sixteen-file diff.
 
 ## What it deliberately is not
 
