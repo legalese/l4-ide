@@ -599,7 +599,11 @@ function expandScopes(proc, n) {
         name: `${sc.name || sc.id} (instance ${i} done)`,
       });
       sourceOf.set(done, sc.id);
-      flows.push({ id: `${sc.id}:done#${i}->join`, source: done, target: join });
+      flows.push({
+        id: `${sc.id}:done#${i}->join`,
+        source: done,
+        target: join,
+      });
       for (const x of inner.nodes.values()) {
         if (x.kind === "startEvent" || x.kind === "endEvent") continue;
         nodes.set(cp(x.id), { ...x, id: cp(x.id), name: x.name });
