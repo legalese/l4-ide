@@ -66,6 +66,32 @@ What was run, on what, with what:
   `Task_1`/`Task_4` after its parallel split — the same reordering the second run had already
   seen. Screenshots: 46, 28–58 KB each; none over 200 KB.
 
+- **Diffable as of 2026-09-19 (harness commit `983d4a82a`, branch `lts/token-sim-determinism`).**
+  The churn the three runs above kept working around — instance ids in every log line, and the
+  arrival order of concurrent tokens in `tokensOn`/`triggers`/`history` — is gone from the
+  harness, not from the report: `run.mjs` sorts every set-valued id array and masks scope ids to
+  `<scope-N>` by first appearance per fixture; `src/app.js` replaces the simulator's token
+  animation with one that completes in release order (the `history` reordering was a
+  `requestAnimationFrame` race, not the routing — and not the library's `randomize` option
+  either, which reads a field it never sets) and seeds the per-page scope palette; and
+  `run-meta.json` carries provenance per fixture (`perFixture`, merged across subset runs). The
+  acceptance test, run on this branch: the full set twice in a row into two scratch directories,
+  `diff -r` of the fourteen JSONs: **empty** (`run-meta.json` differs in its `runAt` lines only).
+  Screenshots: 46 of 46 byte-identical; that claim is for one machine and one Chrome, and the
+  README's **Determinism** section, which owns the details, says what is and is not claimed.
+  Against the committed `out/`, the same run changes 644 lines across the fourteen JSONs — 510
+  are the id mask, 130 are sorts (28 `triggers` arrays, two `tokensOn`, two `steps[].tokensOn`,
+  one `endEventsReached`; every one the same set reordered), and 4 are `consultation`'s
+  `started.history` tail, where two concurrent tokens now arrive in release order rather than
+  frame order; **none is a diagram change**: every `continued`, `continuedFirst` and
+  breach/happy `history` is identical to the committed value.
+  **The committed `out/` is still the 2026-09-15 20:25 run**, unsorted and unmasked, and the
+  `MEASURED` values above are read from it: this branch changes the apparatus and not the
+  evidence. The first diffable baseline — "one run, all files from that run", run 4 — is a
+  regeneration that follows legalese/l4-ide#425 (which regenerates `handover` and adds `option`,
+  and hand-writes a `perFixture` block with a `_note` that this harness change makes redundant);
+  it is not on this branch, and every `out/` file here predates it.
+
 **Every claim below is tagged.** `MEASURED` means the harness ran it and the value is in
 `out/<fixture>.json` (field named where it matters) or visible in the linked screenshot. `READ`
 means it comes from the simulator's source at `node_modules/bpmn-js-token-simulation/lib/…` (0.40.0, per `package.json`)
@@ -353,4 +379,5 @@ this particular animation to say what the rule says.
   `README.md`, `package-lock.json` (committed, so `npm ci` pins the transitive tree),
   `.gitignore` (`node_modules/`, `dist/` ignored; `out/` un-ignored).
 - `etc/bpmn-token-sim/out/` — 46 screenshots (28–58 KB each), fourteen `<fixture>.json`, `run-meta.json`
-  (all from the 2026-09-15 20:25:02 UTC run, the third).
+  (all from the 2026-09-15 20:25:02 UTC run, the third — unsorted and unmasked; the harness has been
+  diffable since `983d4a82a`, and run 4 is the first `out/` that will be).
