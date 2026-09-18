@@ -2,9 +2,9 @@
     "$defs": {
         "Der Gegenstand": {
             "enum": [
-                "eine WillenserklÃ¤rung ist abzugeben",
+                "eine Willenserklärung ist abzugeben",
                 "eine Leistung ist zu bewirken",
-                "eine VerjÃ¤hrungsfrist lÃ¤uft ab",
+                "eine Verjährungsfrist läuft ab",
                 "eine Rechtsfolge tritt lediglich ein"
             ],
             "type": "string"
@@ -44,7 +44,7 @@
         },
         "Fristfall": {
             "properties": {
-                "der AnknÃ¼pfungstag": {
+                "der Anknüpfungstag": {
                     "format": "date",
                     "type": "string"
                 },
@@ -57,8 +57,8 @@
                 "die Fristdauer": {
                     "$ref": "#/$defs/Fristdauer"
                 },
-                "die maÃgebenden Orte": {
-                    "$ref": "#/$defs/Die maÃgebenden Orte"
+                "die maßgebenden Orte": {
+                    "$ref": "#/$defs/Die maßgebenden Orte"
                 },
                 "eine abweichende Bestimmung": {
                     "anyOf": [
@@ -73,11 +73,11 @@
                 }
             },
             "required": [
-                "der AnknÃ¼pfungstag",
+                "der Anknüpfungstag",
                 "die Art des Fristbeginns",
                 "die Fristdauer",
                 "der Gegenstand der Frist",
-                "die maÃgebenden Orte"
+                "die maßgebenden Orte"
             ],
             "type": "object"
         }
