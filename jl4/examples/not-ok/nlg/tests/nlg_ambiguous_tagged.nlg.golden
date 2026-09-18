@@ -1,0 +1,14 @@
+
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: nlg_ambiguous_tagged.l4
+  Hidden: no
+  Range: 8:8-8:18
+  Source: parser
+  Severity: DiagnosticSeverity_Warning
+  Code: <none>
+  Message:
+    More than one NLG annotation in language `he` attached to: `is large`
+    The following annotations would be attached:
+
+    * `one rendering`
+    * `another rendering`

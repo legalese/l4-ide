@@ -52,6 +52,7 @@ import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Generics.SOP as SOP
 import L4.Annotation
+import L4.Lexer (LangTag)
 import L4.Syntax
 import L4.Parser.SrcSpan
 
@@ -64,7 +65,10 @@ import L4.Parser.SrcSpan
 data Warning
   = NotAttached NlgWithSpan
   | UnknownLocation Nlg
-  | Ambiguous Name [NlgWithSpan] -- Must be at least two
+  | Ambiguous Name (Maybe LangTag) [NlgWithSpan]
+    -- ^ Two or more annotations on one name IN THE SAME LANGUAGE (the tag, or
+    -- 'Nothing' for untagged). Must be at least two. Annotations in other
+    -- languages on the same name are unaffected and still attach.
   | RefUnattached RefWithSpan
     -- ^ A @ref could not be attached to any following AST node.
   | RefNoLocation Ref
@@ -387,18 +391,74 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Aka n) where
 instance HasNlg Name where
   addNlg a = extendNlgA a $ case a of
     MkName ann raw -> do
-      ann' <- liftNlgA $ do
-        nlgs <- takeNlgComments
-        case nlgs of
-          [nlg] -> do
-            pure $ setNlg nlg.payload ann
-          [] ->
-            pure ann
-          ns -> do
-            addWarning $ Ambiguous a ns
-            pure ann
-
+      ann' <- liftNlgA (attachNlgsByLanguage a ann =<< takeNlgComments)
       pure $ MkName ann' raw
+
+-- | Attach the annotations in scope for one name, partitioned by the language
+-- each one declares.
+--
+-- Before language tags, ANY two annotations on one name were an ambiguity and
+-- neither was attached. That is right when both are renderings of the same
+-- node in the same language, and it becomes wrong the moment one of them says
+-- @\@nlg:he@ — because a bilingual document is exactly a document with two
+-- renderings per name, so under the old rule every annotated name in one lost
+-- both of them. The tag was recognised and then had nowhere to go.
+--
+-- So the collision is per-LANGUAGE rather than per-name:
+--
+--   * Two annotations with different tags both attach. One becomes the
+--     default and the rest become 'annNlgAlts'.
+--   * Two with the SAME tag — including two untagged ones, which is the only
+--     shape that existed before — is still an ambiguity, still warns, and
+--     still attaches neither. The warning now says which language.
+--   * A collision in one language does not poison the others. Two @\@nlg:he@
+--     and one @\@nlg:en@ leaves the English rendering attached, because
+--     nothing about it is ambiguous.
+--
+-- __Which one is the default.__ The untagged annotation if there is one;
+-- otherwise the first in source order. An untagged rendering is the one that
+-- declined to name a language, so it is what a caller who did not name one
+-- should get. The consequence that matters most is the backward-compatible
+-- one: a name with exactly ONE annotation lands in the default slot whether
+-- it is tagged or not, so every existing reader of 'annNlg' — all ~28 of
+-- them, none of which knows tags exist — keeps working, and a monolingual
+-- Hebrew document behaves exactly as it did before.
+attachNlgsByLanguage :: Name -> Anno -> [NlgWithSpan] -> NlgM Anno
+attachNlgsByLanguage a ann nlgs = do
+  let
+    grouped = groupByLanguage nlgs
+    unique  = [ (tag, one) | (tag, [one]) <- grouped ]
+  for_ grouped $ \ (tag, grp) ->
+    case grp of
+      (_ : _ : _) -> addWarning $ Ambiguous a tag grp
+      _           -> pure ()
+  pure $ case pickDefault unique of
+    Nothing         -> ann
+    Just (d, alts)  -> setNlgs d.payload (fmap (.payload) alts) ann
+
+-- | The annotations grouped by declared language: each group in source order,
+-- and the groups in order of first appearance.
+--
+-- Sorted by source position explicitly rather than trusting the order they
+-- arrive in. They reach here through two accumulators that each prepend
+-- ('addNlg' into the parser state, then 'preprocessNlgs'), so the incoming
+-- order is a property of how many times the list has been reversed — which is
+-- not a thing to encode "first in source order" on top of.
+groupByLanguage :: [NlgWithSpan] -> [(Maybe LangTag, [NlgWithSpan])]
+groupByLanguage ns0 =
+  [ (tag, filter ((== tag) . lang) ns) | tag <- tagsInOrder ]
+ where
+  ns = List.sortOn (.range) ns0
+  lang = nlgLangTag . (.payload)
+  tagsInOrder = List.foldl' (\ seen n -> if lang n `elem` seen then seen else seen <> [lang n]) [] ns
+
+-- | Split the unambiguous renderings into the default one and the rest.
+pickDefault :: [(Maybe LangTag, NlgWithSpan)] -> Maybe (NlgWithSpan, [NlgWithSpan])
+pickDefault xs = case break (isNothing . fst) xs of
+  (before, (_, untagged) : after) -> Just (untagged, fmap snd before <> fmap snd after)
+  (_, []) -> case xs of
+    []              -> Nothing
+    ((_, d) : rest) -> Just (d, fmap snd rest)
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
   addNlg expr = extendNlgA expr $ case expr of

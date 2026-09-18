@@ -574,7 +574,7 @@ descFromAnno ann = do
 -- borrowed, because borrowing it would make two unrelated outputs move together.
 linearNlg :: Nlg -> Text
 linearNlg = \case
-  MkResolvedNlg _ frags -> squash (Text.concat (map frag frags))
+  MkResolvedNlg _ _ frags -> squash (Text.concat (map frag frags))
   other                 -> squash (simpleLinearizer other)
  where
   squash = Text.unwords . Text.words

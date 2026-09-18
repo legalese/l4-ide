@@ -7,7 +7,8 @@ File: nlg_ambiguous1.l4
   Severity: DiagnosticSeverity_Warning
   Code: <none>
   Message:
-    More than one NLG annotation attached to: `Section Head`
+    More than one untagged NLG annotation attached to: `Section Head`
+    If these are renderings in different languages, tag each one: @nlg:en, @nlg:he.
     The following annotations would be attached:
 
     * `NLG annotation to section names are valid.`

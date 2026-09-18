@@ -21,6 +21,13 @@
 -- its golden and broken @jl4-test@ at the same time. Change both, in one commit,
 -- or neither.
 --
+-- @--lang@ does not breach that. 'L4.Nlg.selectLanguage' 'Nothing' is the
+-- identity, so the no-flag payload is byte-identical to the golden producer's
+-- and stays that way by construction; the flag only moves an already-attached
+-- rendering into the slot the payload already reads. Producing a bilingual
+-- document SET is then two runs of this command differing in one argument,
+-- which is the point of the flag.
+--
 -- Two post-processing steps the golden producer applies are deliberately NOT
 -- applied here, because on this payload both are the identity:
 --
@@ -49,6 +56,7 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
+import L4.Lexer (LangTag (..))
 import qualified L4.Nlg as Nlg
 import L4.Syntax
 
@@ -61,6 +69,7 @@ import L4.Cli.Common
 data NlgOptions = NlgOptions
   { nlgFile     :: FilePath
   , nlgOutput   :: Maybe FilePath
+  , nlgLang     :: Maybe LangTag
   , nlgFixedNow :: FixedNowOpt
   }
 
@@ -73,6 +82,13 @@ nlgOptionsParser = NlgOptions
            <> short 'o'
            <> metavar "FILE"
            <> help "Write to FILE instead of stdout"
+            )
+        )
+  <*> optional
+        ( MkLangTag <$> strOption
+            ( long "lang"
+           <> metavar "SUBTAG"
+           <> help "Render using the @nlg:SUBTAG annotations, e.g. --lang he. A node with no rendering in that language falls back to its default one, so a partial translation still produces a whole document."
             )
         )
   <*> fixedNowParser
@@ -96,13 +112,16 @@ nlgCmd opts = do
     Just tc -> do
       putDiagnostics errs
       case opts.nlgOutput of
-        Just f  -> Text.writeFile f (linearizeModule tc.module')
-        Nothing -> Text.putStr (linearizeModule tc.module')
+        Just f  -> Text.writeFile f (linearizeModule opts.nlgLang tc.module')
+        Nothing -> Text.putStr (linearizeModule opts.nlgLang tc.module')
       exitSuccess
 
--- | The payload. Keep byte-identical to @jl4NlgAnnotationsGolden@'s @output_@.
-linearizeModule :: Module Resolved -> Text
-linearizeModule mod' =
+-- | The payload. Byte-identical to @jl4NlgAnnotationsGolden@'s @output_@ when
+-- no language is requested — 'Nlg.selectLanguage' 'Nothing' is the identity,
+-- so that holds by construction rather than by care.
+linearizeModule :: Maybe LangTag -> Module Resolved -> Text
+linearizeModule mlang mod'' =
   Text.unlines (fmap Nlg.simpleLinearizer directives)
   where
+    mod' = Nlg.selectLanguage mlang mod''
     directives = Optics.toListOf (Optics.gplate @(Directive Resolved)) mod'
