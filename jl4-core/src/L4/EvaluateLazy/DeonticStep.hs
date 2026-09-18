@@ -15,9 +15,11 @@
 -- a lazy 'NormKey' through the contract frames (never forced), the
 -- re-offer mark @ev'reoffered@ the machine already looked up at @Contract1@
 -- (a @Bool@ when P2b was built; the EVERY wave's LEST pass re-typed it, see
--- 'Reoffered') through six more frames past the one that consults it, and
--- a @pending :: Maybe DeonticStep@ (always 'Nothing' when off) on the
--- @ResolveParty@ frame.
+-- 'Reoffered') through six more frames past the one that consults it, the
+-- state layer's @ev'relooked :: Bool@ beside it (always 'False' when off;
+-- 'dlMemberLooks'), a @pending :: Maybe DeonticStep@ (always 'Nothing' when
+-- off) on the @ResolveParty@ frame, and a 'False' on every
+-- @RestoreCurrentParty@ frame ('dlRelookScope').
 --
 -- == What a consumer can rely on
 --
@@ -33,16 +35,25 @@
 --   whose expiry it revealed, then 'Reoffered' by each continuation it was
 --   handed to in turn (§4.4; an event past @k@ LEST windows appears @k+1@
 --   times, EVERY-EACH-QUANTIFIER-SPEC §5.2.1). The animator must not draw
---   that as several events. A barrier's STATE-layer
---   @LEST@ (@ONCE ALL HAVE WITHIN d@ missed, 'JoinExpired') is handed the
---   members' own stream from the first event past the state deadline on
---   (@BarrierTrim@, 2026-09-16), UNMARKED: an event a member 'Consumed' —
---   the completion that landed after the deadline — appears again under
---   the @LEST@'s obligation as a fresh look ('WitnessedOnly' on a
---   mismatch, 'Consumed' on a match), not as 'Reoffered'. The re-offer
---   mark is the act layer's (@Contract5@); nothing marks the state layer's
---   hand-off. A consumer counting events must pair those looks by stamp,
---   party and action, not by the mark (pinned by DeonticStepSpec case 18).
+--   that as several events. A barrier's STATE-layer @LEST@ (@ONCE ALL HAVE
+--   WITHIN d@ missed, 'JoinExpired') is handed the members' own stream
+--   from the first event past the state deadline on (@BarrierTrim@,
+--   2026-09-16), and since 2026-09-19 (R6\/S3) its second looks are marked
+--   too: a look, anywhere under that hand-off, at an event one of the
+--   barrier's members had already looked at — the completion that landed
+--   after the deadline, and whatever the members passed over on the way to
+--   it — is 'Reoffered'; an event no member reached is a fresh look. The
+--   act layer marks a COPY it allocates (@ev'reoffered@, @Contract5@); the
+--   state layer hands on the members' own cells, so its mark is kept
+--   beside the log ('dlMemberLooks', 'dlRelookScope') and read at
+--   @Contract1@, and the machine never consults it. So a consumer counting
+--   events counts every 'Reoffered' step as zero, whichever layer handed
+--   the event on (pinned by DeonticStepSpec case 18). What is NOT marked:
+--   a look by a sibling operand of an @AND@\/@OR@ at an event the other
+--   operand also looked at (two obligations, one stream, no hand-off), and
+--   the barrier's HENCE, whose stream starts after the FIRST completion in
+--   roll order at the latest stamp — a later-roll member's same-stamp
+--   completion can sit in it, and is looked at again unmarked.
 --
 -- == Loud and silent
 --
@@ -76,7 +87,8 @@ module L4.EvaluateLazy.DeonticStep
 
 import Base
 import qualified Base.Map as Map
-import L4.Evaluate.ValueLazy (RBinOp (..))
+import qualified Base.Set as Set
+import L4.Evaluate.ValueLazy (Address, RBinOp (..))
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax (DeonticModal (..), Resolved, Threshold (..))
 
@@ -259,7 +271,10 @@ data Scrutiny
     -- @k@ LEST windows is looked at @k+1@ times, the last look by the first
     -- layer whose window it is not past), including a look that reveals
     -- another expiry; a chain whose deadlines stop advancing is refused by
-    -- the machine, never consumed
+    -- the machine, never consumed. Also (2026-09-19, R6\/S3) a look under a
+    -- barrier's state-layer @LEST@ at an event one of that barrier's
+    -- members had already looked at — the same cell, not a copy; see
+    -- 'dlMemberLooks'
   | NoEvent
     -- ^ the step had no event: the stream ran out, or a join reduced
   deriving stock (Eq, Show, Generic)
@@ -447,8 +462,30 @@ data DeonticLog = MkDeonticLog
     -- 'ValObligation' a member becomes has no slot for its membership.
   , dlJoinDone    :: !(IORef (Map (Maybe SrcRange) Int))
     -- ^ per barrier (join site), how many arms are satisfied so far
+  , dlMemberLooks :: !(IORef (Set (Maybe SrcRange, Address)))
+    -- ^ the state layer's re-offer mark (R6\/S3, 2026-09-19): every event a
+    -- barrier member has looked at, as @(join site, the event's store
+    -- address)@, written at @Contract1@ when the looking obligation is a
+    -- barrier member. Keyed by the event's own address because the state
+    -- layer's @LEST@ is handed the members' own cells, not copies — the act
+    -- layer's mark ('L4.EvaluateLazy.ContractFrame.Reoffered') is on a copy
+    -- it allocates, and the machine reads that one at @Contract5@; this one
+    -- the machine never reads. Keyed by the join too, so that a sibling
+    -- barrier's members, or an @AND@ operand that scanned the same cells
+    -- earlier, do not make a fresh look read as a second one.
+  , dlRelookScope :: !(IORef [Maybe SrcRange])
+    -- ^ the joins whose state-layer @LEST@ hand-off the machine is
+    -- currently inside, innermost first: pushed by @barrierStateLest@ and
+    -- popped by the @RestoreCurrentParty@ frame that hand-off already
+    -- leaves on the stack (so the extent is exactly the continuation's,
+    -- unwinding included). A look at @Contract1@ is a re-look iff its event
+    -- is in 'dlMemberLooks' under one of these joins — the enclosing ones
+    -- too, since a barrier nested under another's @LEST@ is handed cells
+    -- the outer members had looked at. Empty outside any such hand-off, so
+    -- members' own parallel looks at one stream are never marked.
   }
 
 newDeonticLog :: IO DeonticLog
 newDeonticLog =
   MkDeonticLog <$> newIORef mempty <*> newIORef Map.empty <*> newIORef Map.empty <*> newIORef Map.empty
+    <*> newIORef Set.empty <*> newIORef []

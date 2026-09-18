@@ -38,7 +38,9 @@
 --  17. a barrier with no LEST whose MUST member misses — JoinFailed ToBreach;
 --  18. a barrier whose last completion comes after the ONCE … WITHIN, and
 --      whose LEST is an obligation — the state layer's LEST looks at the
---      members' own completion again, unmarked;
+--      members' own completion again, marked Reoffered (R6/S3, 2026-09-19);
+--      18b. the same with a fresh event at the completion's own stamp, which
+--      no member reached and which stays unmarked;
 --  19. an act before the window's opening edge (AFTER) — a nullity, logged
 --      as EarlyAct and passed over; then the act in the window;
 --  20. a record-shaped party (@Tenant OF "Alice"@): the key carries the
@@ -486,7 +488,8 @@ barrierBreachSrc = Text.unlines $ everyPrologue <>
 -- 18. the join-line deadline missed, with a LEST that is an obligation: the
 --     state layer's LEST is handed the members' stream from the first event
 --     past the state deadline on (Machine's BarrierTrim, EVERY-EACH-QUANTIFIER-SPEC
---     §5.2, 2026-09-16), and nothing marks that hand-off
+--     §5.2, 2026-09-16); since 2026-09-19 (R6/S3) the log marks its second
+--     look at a cell a member had looked at
 joinLestSrc :: Text.Text
 joinLestSrc = Text.unlines $ everyPrologue <>
   [ "GIVETH A DEONTIC Actor Action"
@@ -502,6 +505,28 @@ joinLestSrc = Text.unlines $ everyPrologue <>
   , "  PARTY alice DOES Sign alice AT 1"
   , "  PARTY bob   DOES Sign bob   AT 9"
   , "  PARTY theLandlord DOES Deliver theLandlord AT 12"
+  ]
+
+-- 18b. as 18, but the landlord's Deliver lands AT the last completion's
+--      stamp, after it in the trace: no member reached it, so the LEST's
+--      look at it is a first look. This is the corner a stamp watermark
+--      ("re-offered up to the last completion") would get wrong, and why the
+--      mark is by the cell the member looked at rather than by stamp.
+joinLestTieSrc :: Text.Text
+joinLestTieSrc = Text.unlines $ everyPrologue <>
+  [ "GIVETH A DEONTIC Actor Action"
+  , "`sign by day 5` MEANS"
+  , "    EVERY Tenant t IN tenants"
+  , "        MUST   Sign t"
+  , "        WITHIN 14"
+  , "        ONCE   ALL HAVE WITHIN 5"
+  , "        HENCE  FULFILLED"
+  , "        LEST   (PARTY theLandlord MUST Deliver theLandlord WITHIN 10)"
+  , ""
+  , "#TRACE `sign by day 5` AT 0 WITH"
+  , "  PARTY alice DOES Sign alice AT 1"
+  , "  PARTY bob   DOES Sign bob   AT 9"
+  , "  PARTY theLandlord DOES Deliver theLandlord AT 9"
   ]
 
 -- 19. the window's opening edge (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X6):
@@ -776,28 +801,46 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
       , Row Nothing 1 (Just DMust) (JoinFailed ToBreach) NoEvent Nothing (Just 20) Nothing
       ]
 
-  it "18. a join-line deadline whose LEST is an obligation: the LEST looks at the last completion again, UNMARKED (§4.4's mark is the act layer's), then takes its own event" $ do
+  it "18. a join-line deadline whose LEST is an obligation: the LEST looks at the last completion again, marked Reoffered (the state layer's mark, R6/S3), then takes its own event" $ do
     rs <- runLogged joinLestSrc
     let ss = stepsOf 0 rs
     -- Bob's Sign at 9 is Consumed by member 2 and then, being the first
     -- event past the state deadline 5, is the head of the stream the LEST
     -- is handed (BarrierTrim): the landlord's obligation logs its look at
-    -- it as a plain PartyMismatch, WitnessedOnly — NOT Reoffered. Two rows
-    -- for one event, paired by stamp, party and action, not by the mark.
-    -- Pinned from the runtime on 2026-09-17 (adversarial round 1 of the
-    -- third rebase, S3); before the trim the LEST was handed the whole
-    -- stream, so alice's Sign at 1 was looked at again too.
+    -- it as a PartyMismatch, and since 2026-09-19 (R6/S3) as Reoffered —
+    -- the same cell a member had looked at, seen again under the barrier's
+    -- state-layer LEST. Two rows for one event, the second marked, as the
+    -- act layer's re-offer is. The landlord's own Deliver at 12 no member
+    -- reached, and it is a fresh Consumed. Row 5 re-pinned from the
+    -- runtime on 2026-09-19; it read WitnessedOnly from 2026-09-17 (S3),
+    -- when the pairing was a consumer contract rather than a mark.
     map row ss `shouldBe`
       [ Row (Just "Tenant OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) (Just (MemberSatisfied 1 2))
       , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
       , Row (Just "Tenant OF ") 2 (Just DMust) (Matched ToHence) Consumed (Just 9) (Just 9) (Just (MemberSatisfied 2 2))
       , Row Nothing 1 (Just DMust) (JoinExpired ToLest 5) NoEvent Nothing (Just 9) Nothing
-      , Row (Just "Landlord OF ") 1 (Just DMust) PartyMismatch WitnessedOnly (Just 9) (Just 9) Nothing
+      , Row (Just "Landlord OF ") 1 (Just DMust) PartyMismatch Reoffered (Just 9) (Just 9) Nothing
       , Row (Just "Landlord OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 12) (Just 12) Nothing
       ]
-    -- the same event, twice, and neither look carries the mark
+    -- the same event, twice, and exactly the second look carries the mark
     length [ s | s <- ss, Just e <- [s.dsEvent], e.ekStamp == 9 ] `shouldBe` 2
-    [ s.dsScrutiny | s <- ss, s.dsScrutiny == Reoffered ] `shouldBe` []
+    [ (.ekStamp) <$> s.dsEvent | s <- ss, s.dsScrutiny == Reoffered ] `shouldBe` [Just 9]
+
+  it "18b. a fresh event at the last completion's own stamp, after it in the trace, is not marked: the mark is the cell a member looked at, not the stamp" $ do
+    rs <- runLogged joinLestTieSrc
+    let ss = stepsOf 0 rs
+    -- Bob's Sign at 9 is looked at again under the LEST (Reoffered); the
+    -- landlord's Deliver, also at 9 but after it, no member reached, and
+    -- the LEST's look at it is its first: Consumed, unmarked.
+    map row ss `shouldBe`
+      [ Row (Just "Tenant OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) (Just (MemberSatisfied 1 2))
+      , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
+      , Row (Just "Tenant OF ") 2 (Just DMust) (Matched ToHence) Consumed (Just 9) (Just 9) (Just (MemberSatisfied 2 2))
+      , Row Nothing 1 (Just DMust) (JoinExpired ToLest 5) NoEvent Nothing (Just 9) Nothing
+      , Row (Just "Landlord OF ") 1 (Just DMust) PartyMismatch Reoffered (Just 9) (Just 9) Nothing
+      , Row (Just "Landlord OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 9) (Just 9) Nothing
+      ]
+    [ keyPrefix <$> ((.ekParty) =<< s.dsEvent) | s <- ss, s.dsScrutiny == Reoffered ] `shouldBe` [Just "Tenant OF "]
 
   it "19. an act before the window opens is EarlyAct, WitnessedOnly, carrying the opening; the obligation stands, and the act in the window matches" $ do
     rs <- runLogged earlyActSrc

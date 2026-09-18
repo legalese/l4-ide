@@ -175,7 +175,15 @@ data Frame =
   -- BEFORE the followup runs (so it is processed LAST, after the whole subtree),
   -- mirroring the 'EvalAsOfSystemTime2' save/restore-frame idiom. Carries the
   -- party to restore TO (the enclosing party, or Nothing at the outer level).
-  | RestoreCurrentParty (Maybe Text)
+  --
+  -- The 'Bool' is the deontic step log's (P2b, R6\/S3): 'True' when this
+  -- hand-off pushed a join onto the log's re-look scope ('enterRelookScope',
+  -- from 'barrierStateLest' only, and only with the log on), so that the
+  -- same frame pops it — on the success path and when unwinding — and the
+  -- scope's extent is exactly the continuation's. 'False' everywhere else,
+  -- and the frame then touches the log not at all; with the log off it is
+  -- always 'False'. No extra frame, so the stack is the same in both modes.
+  | RestoreCurrentParty (Maybe Text) Bool
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
   | ConsiderWhen1 Reference {- -} (Expr Resolved) [Branch Resolved] Environment
@@ -398,9 +406,10 @@ traceEval ta = do
 -- Every call site goes through 'whenDeonticLog', so with the log off the
 -- machine computes nothing for it; what it does do is carry state it never
 -- reads — a lazy 'NormKey' through the contract frames, @ev'reoffered@ past
--- @Contract5@ (the only frame that consults it), and a @pending@ step
--- (always 'Nothing' when off) on 'ResolvePartyFrame'. The types are in
--- "L4.EvaluateLazy.DeonticStep".
+-- @Contract5@ (the only frame that consults it), @ev'relooked@ (always
+-- 'False' when off) beside it, a @pending@ step (always 'Nothing' when off)
+-- on 'ResolvePartyFrame', and a 'False' on every 'RestoreCurrentParty'
+-- frame. The types are in "L4.EvaluateLazy.DeonticStep".
 -----------------------------------------------------------------------------
 
 -- | Run a log-side action only when the log is on. The action receives the
@@ -496,12 +505,53 @@ eventKeyAt stamp mParty actRef = do
     { ekStamp = stamp, ekParty = partyKeyWHNF <$> mParty, ekPartyName = name, ekAction = action }
 
 -- | The scrutiny an event-bearing step reports (§4.4): a re-offered event's
--- second look is always 'Reoffered'; otherwise the site says. The argument
--- is the frame's @ev'reoffered@ — the mark a re-offered copy carries, or
+-- second look is always 'Reoffered'; otherwise the site says. The arguments
+-- are the frame's @ev'reoffered@ — the mark a re-offered copy carries, or
 -- 'Nothing' for a fresh event (spec §5.2.1; the mark's payload is the
--- machine's business, and the log reads only whether there is one).
-scrutinyOf :: Maybe mark -> Scrutiny -> Scrutiny
-scrutinyOf reoffered s = if isJust reoffered then Reoffered else s
+-- machine's business, and the log reads only whether there is one) — and
+-- its @ev'relooked@, the state layer's mark ('relookAt'; R6\/S3). Either
+-- makes the look a second one.
+scrutinyOf :: Maybe mark -> Bool -> Scrutiny -> Scrutiny
+scrutinyOf reoffered relooked s = if isJust reoffered || relooked then Reoffered else s
+
+-- | The state layer's re-offer mark, read at 'Contract1' for the event just
+-- taken off the stream (R6\/S3, 2026-09-19; 'DeonticLog.dlMemberLooks').
+-- Two things, both only with the log on: if the looking obligation is a
+-- barrier member, the look is recorded under its join, so the barrier's
+-- state-layer @LEST@ can recognise the cell later; and the look is a
+-- re-look iff the cell was recorded under a join whose @LEST@ hand-off the
+-- machine is inside ('dlRelookScope'). The lookup comes first: a member's
+-- own look at a cell an earlier member looked at is not a re-look (no
+-- hand-off), and the scope is empty then anyway. Peeks nothing; the
+-- address is the reference's own.
+relookAt :: NormKey -> Reference -> Eval Bool
+relookAt norm e = asks (.deonticLog) >>= \ case
+  Nothing -> pure False
+  Just l  -> liftIO do
+    scope <- readIORef l.dlRelookScope
+    looks <- readIORef l.dlMemberLooks
+    let relooked = any (\ j -> Set.member (j, e.address) looks) scope
+    case norm.nkMember of
+      Just m | isBarrier m.moJoin ->
+        modifyIORef' l.dlMemberLooks (Set.insert (m.moJoinSite, e.address))
+      _ -> pure ()
+    pure relooked
+
+-- | Enter a join's state-layer @LEST@ hand-off, for the log: push the join
+-- onto the re-look scope. Returns whether it did (only with the log on), so
+-- the 'RestoreCurrentParty' frame of the same hand-off knows to
+-- 'leaveRelookScope'.
+enterRelookScope :: Maybe SrcRange -> Eval Bool
+enterRelookScope j = asks (.deonticLog) >>= \ case
+  Nothing -> pure False
+  Just l  -> liftIO (modifyIORef' l.dlRelookScope (j :)) >> pure True
+
+-- | Leave the innermost state-layer @LEST@ hand-off (see 'enterRelookScope').
+-- Only ever called for a push that happened, so the scope is non-empty;
+-- an empty one is left empty rather than made an error, since the log is
+-- not allowed to stop the machine.
+leaveRelookScope :: Eval ()
+leaveRelookScope = whenDeonticLog \ l -> liftIO (modifyIORef' l.dlRelookScope (drop 1))
 
 -- | The key an obligation is armed with when it meets its event stream (the
 -- @App1@ arm below). With the log off this is a lazy record that nothing
@@ -694,7 +744,9 @@ unwindFrame = \ case
   WhenNextFrame originalCtx _ _ _        -> putTemporalContext originalCtx
   ValueAtFrame originalCtx               -> putTemporalContext originalCtx
   DeepPinRestore originalCtx             -> putTemporalContext originalCtx
-  RestoreCurrentParty mOriginal          -> putCurrentParty mOriginal
+  RestoreCurrentParty mOriginal scoped   -> do
+    putCurrentParty mOriginal
+    when scoped leaveRelookScope
   UpdateThunk rf saved displaced         -> do
     -- Close this force's read span exactly as the success path does (the
     -- reads made before the abort soundly over-approximate the enclosing
@@ -1453,10 +1505,12 @@ backward val = withPoppedFrame $ \ case
     let key = partyKeyWHNF val
     ledger <- partyLedgerEval key
     finishRead mode cellVal ledger
-  Just (RestoreCurrentParty mOriginal) -> do
+  Just (RestoreCurrentParty mOriginal scoped) -> do
     -- the HENCE/LEST followup (and its App1 continuation) has fully evaluated:
     -- restore the enclosing acting party and pass the value on unchanged (M4).
+    -- A state-layer LEST hand-off also leaves the log's re-look scope here.
     putCurrentParty mOriginal
+    when scoped leaveRelookScope
     continueBackward val
   Just (BinBuiltin1 binOp r) -> do
     pushFrame (BinBuiltin2 binOp val)
@@ -1895,6 +1949,9 @@ backwardContractFrame val = \ case
     case val of
       ValCons e es -> do
         ev'reoffered <- isReoffered e
+        -- P2b: the state layer's mark, read (and, for a barrier member,
+        -- written) beside the act layer's; 'False' with the log off
+        ev'relooked <- relookAt norm e
         -- one more event taken: 'seen' is now this event's position in the
         -- stream, which is what a barrier orders same-stamp failures by
         pushCFrame (Contract2 ScrutinizeEvent {events = es, seen = seen + 1, ..})
@@ -2129,7 +2186,7 @@ backwardContractFrame val = \ case
                 ev <- eventKeyAt stamp mParty ev'act
                 norm' <- maybe (pure norm) (`naming` norm) mBearer
                 pure $ Just $ plainStep (Just time') (Just ev)
-                  (scrutinyOf ev'reoffered WitnessedOnly) norm' (Expired branch deadline)
+                  (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) norm' (Expired branch deadline)
         let lifecycleAt isHence t = MkLifecycle
               { join = if isHence then Just t else Nothing
               , deadline = Just deadlineR
@@ -2216,7 +2273,7 @@ backwardContractFrame val = \ case
         whenDeonticLog \ l -> do
           stamp <- assertTime time
           ev <- eventKeyAt stamp (Just ev'party) ev'act
-          logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered WitnessedOnly) named PartyMismatch)
+          logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) named PartyMismatch)
         newTime <- allocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, norm = named, ..} events
       _ -> internalException $ RuntimeTypeError $
@@ -2261,7 +2318,7 @@ backwardContractFrame val = \ case
         -- on the stream (or 'Reoffered', for a copy handed down a LEST chain).
         whenDeonticLog \ l -> do
           ev <- eventKeyAt stamp (Just ev'party) ev'act
-          logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered WitnessedOnly) norm (EarlyAct open))
+          logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) norm (EarlyAct open))
         newTime <- allocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
       ValBool True -> do
@@ -2271,7 +2328,7 @@ backwardContractFrame val = \ case
               stamp <- assertTime time
               ev <- eventKeyAt stamp (Just ev'party) ev'act
               tellRoutedStep norm branch
-                (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered Consumed) norm (Matched branch))
+                (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered ev'relooked Consumed) norm (Matched branch))
         -- Action matched! What happens depends on the deontic modal:
         -- MUST/MAY/DO: action done = success → continue with HENCE (followup)
         -- MUST NOT: action done = VIOLATION → continue with LEST (or BREACH if no LEST)
@@ -2324,7 +2381,7 @@ backwardContractFrame val = \ case
         whenDeonticLog \ l -> do
           stamp <- assertTime time
           ev <- eventKeyAt stamp (Just ev'party) ev'act
-          logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered WitnessedOnly) norm GuardFailed)
+          logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) norm GuardFailed)
         newTime <- allocateValue time
         tryNextEvent ScrutinizeEvents {party = Right party, time = newTime, ..} events
       _ -> internalException $ RuntimeTypeError $
@@ -2848,7 +2905,7 @@ backwardContractFrame val = \ case
     continueWithFollowup mParty lifecycle env followup events time seen = do
       mOriginal <- getCurrentParty
       putCurrentParty mParty
-      pushFrame (RestoreCurrentParty mOriginal)
+      pushFrame (RestoreCurrentParty mOriginal False)
       args <- case followup of
         App _ r [] | isSentinel r -> do
           posRef <- allocateValue (ValNumber (fromIntegral seen))
@@ -3454,7 +3511,7 @@ fireBarrierHence ctx deadlineRef timeRef eventsRef = do
     logStep l (plainStep clock Nothing NoEvent ctx.norm JoinReleased)
   mOriginal <- getCurrentParty
   putCurrentParty Nothing
-  pushFrame (RestoreCurrentParty mOriginal)
+  pushFrame (RestoreCurrentParty mOriginal False)
   pushFrame (App1 [timeRef, eventsRef] Nothing)
   let lifecycle = MkLifecycle {join = Just timeRef, deadline = deadlineRef, armed = ctx.time}
   pushFrame (ContractFrame (Handoff lifecycle))
@@ -3498,7 +3555,7 @@ barrierFail ctx deadlineRef timeRef eventsRef = case ctx.deonton.lest of
       logStep l (plainStep clock Nothing NoEvent ctx.norm (JoinFailed ToLest))
     mOriginal <- getCurrentParty
     putCurrentParty Nothing
-    pushFrame (RestoreCurrentParty mOriginal)
+    pushFrame (RestoreCurrentParty mOriginal False)
     pushFrame (App1 [timeRef, eventsRef] Nothing)
     let lifecycle = MkLifecycle {join = Nothing, deadline = deadlineRef, armed = ctx.time}
     pushFrame (ContractFrame (Handoff lifecycle))
@@ -3539,11 +3596,23 @@ barrierStateMissed ctx joinTime deadline = case ctx.deonton.lest of
 -- | The state-layer LEST, applied to the trimmed stream ('BarrierTrim'):
 -- @cellRef@ is the first cell of the barrier's stream whose event is
 -- stamped after the state deadline (or the empty list).
+--
+-- P2b (R6\/S3, 2026-09-19): those cells are the members' own, not copies,
+-- and the members had looked at every one of them up to the last
+-- completion. The log marks that second look as 'Reoffered' — the act
+-- layer's mark is on a copy ('markReoffered'), which cannot be borrowed
+-- here without the machine reading it at 'Contract5' — by entering the
+-- join into the log's re-look scope for the continuation's extent
+-- ('enterRelookScope'; the 'RestoreCurrentParty' frame leaves it), inside
+-- which 'Contract1' reads a look at a member-looked-at cell as a re-look
+-- ('relookAt'). With the log off none of this runs and the frame is the
+-- one this function always pushed.
 barrierStateLest :: QuantCtx -> RExpr -> Reference -> Reference -> Machine Config
 barrierStateLest ctx lestExpr tRef cellRef = do
   mOriginal <- getCurrentParty
   putCurrentParty Nothing
-  pushFrame (RestoreCurrentParty mOriginal)
+  scoped <- enterRelookScope (joinSiteOf ctx.deonton)
+  pushFrame (RestoreCurrentParty mOriginal scoped)
   pushFrame (App1 [tRef, cellRef] Nothing)
   let lifecycle = MkLifecycle {join = Nothing, deadline = Just tRef, armed = ctx.time}
   pushFrame (ContractFrame (Handoff lifecycle))
@@ -4015,7 +4084,7 @@ patternMatchFailure = withPoppedFrame $ \ case
         ValNumber t -> pure t
         v -> internalException $ RuntimeTypeError $ "expected a NUMBER but got: " <> prettyLayout v
       ev <- eventKeyAt stamp (Just ev'party) ev'act
-      logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered WitnessedOnly) norm ActionMismatch)
+      logStep l (plainStep (Just stamp) (Just ev) (scrutinyOf ev'reoffered ev'relooked WitnessedOnly) norm ActionMismatch)
     newTime <- allocateValue time
     pushFrame $ ContractFrame $ Contract1 ScrutinizeEvents {party = Right party, time = newTime, ..}
     continueRef events

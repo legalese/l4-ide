@@ -1718,6 +1718,28 @@ past — is refused by name after a bounded number of stalled hand-offs, not con
 model an event scrutinised k+1 times for k expired layers, not at most twice, and a refusal as a
 possible end of the walk.)_
 
+_(R6, the state layer — ANSWERED and BUILT 2026-09-19, `lts/p2-followups-2`. Until then the
+mark was the act layer's only: a barrier whose `ONCE … WITHIN` was missed hands its `LEST` the
+members' OWN cells from the first event past the state deadline (`BarrierTrim`, 2026-09-16), and
+the `LEST`'s look at the completion that landed after the deadline was logged as a fresh
+`WitnessedOnly`/`Consumed` — EVERY-EACH-QUANTIFIER-SPEC §5.2.1's S3 made pairing those looks by
+stamp, party and action a consumer contract. Now it is a mark: `dsScrutiny` reads `Reoffered` for
+a look, anywhere under that hand-off, at a cell one of the barrier's members had looked at, and
+stays fresh for a cell no member reached — including one stamped AT the last completion but
+placed after it, which a "re-offered up to the last completion's stamp" watermark would have
+marked though nobody had seen it (`DeonticStepSpec` cases 18 and 18b pin both). `markReoffered`
+was not borrowed: it marks a copy the act layer allocates and Contract5 reads its stall count from
+it, so putting it on the members' shared cells would have counted a state re-look as a stalled
+hand-off under a `LEST` with a non-positive `WITHIN` (the refusal one layer earlier) and leaked
+to every other scanner of the stream (an `AND` sibling). The state layer's mark
+is the log's own — `dlMemberLooks`, every barrier member's look keyed by join and cell address,
+and `dlRelookScope`, the joins whose state-`LEST` hand-off the machine is inside, entered by
+`barrierStateLest` and left by the `RestoreCurrentParty` frame that hand-off already pushes — read
+beside `ev'reoffered` at Contract1 into `ev'relooked`, which the machine never consults; with the
+log off nothing is written, read or pushed, and the goldens are unchanged. Not marked, and said so
+in `DeonticStep.hs`: a sibling operand's look at the same stream (no hand-off), and the HENCE's
+stream, which starts after the first-in-roll-order completion at the latest stamp.)_
+
 A naive "one event, one animation frame" misrepresents this. `dsScrutiny` is the explicit
 **witness-versus-consume** distinction, and the scrubber must be able to show the same event
 twice without the viewer concluding it happened twice.
