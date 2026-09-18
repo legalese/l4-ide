@@ -16,6 +16,7 @@ until it blocked the change that introduced it.
 | `joined-beside-breach.bpmn` | an error end event **terminates the instance**, discarding every remaining token |
 | `mi-subprocess-fork.bpmn` | a multi-instance sub-process is **played by copy-expansion**, and its escalation fan-in is the one place copies are not independent |
 | `mi-subprocess-two-ways-to-done.bpmn` | an instance is finished by **whichever** of its paths reaches an end, not by all of them |
+| `mi-subprocess-throw-and-finish.bpmn` | an instance that **throws** is also **finished** — the escalation leaves, and the instance has no tokens left |
 
 ## `joined-beside-breach.bpmn`
 
@@ -106,3 +107,51 @@ finding takes.
 The exporter's goldens cannot serve as this fixture, for the reason the last
 section gives: they move whenever the exporter does. This one is hand-written
 and holds still.
+
+## `mi-subprocess-throw-and-finish.bpmn`
+
+The same fork, with the members allowed to disagree: one completes its act, the
+other lets the deadline expire and throws. The scope's escalation boundary is
+non-interrupting, and the top-level `Breach` end is a **plain** end event, so
+nothing terminates anything.
+
+A throwing end event is **two facts**, and a model needs both. It throws the
+escalation, which the boundary catches; and it consumes that path's token, which
+— since an instance holds exactly one — means the instance is **finished**. BPMN
+completes a sub-process instance when it has no tokens left, and an escalation
+end leaves none.
+
+The expansion recorded only the first. A copy that threw never signalled its own
+`done`, so the scope's join waited on it forever.
+
+### Why this was invisible until the breach end stopped terminating
+
+It is the more interesting half. While the top-level `Breach` end carried an
+`errorEventDefinition`, reaching it **discarded every remaining token** — which
+is exactly the stuck join. The file scored SOUND, and the gate said so in the
+same breath without anyone reading it that way:
+
+```
+tenancy-fork.bpmn [receipts] @ 2 instance(s): SOUND
+  info  1 terminating end event(s): End_3 "Breach" — reaching one discards every remaining token
+  info  39 marking(s) can reach completion ONLY by terminating
+```
+
+Thirty-nine of sixty-seven markings could complete *only* by terminating. Those
+are the deadlocks, rescued by the terminate. **A gate that passes for that reason
+is not passing**, and the second `info` line was the tell, printed on every run.
+
+The earlier workaround is worth naming too, because it is the shape of the
+mistake: the expansion already had a rule for "if NO interior path ends normally,
+nothing reaches the join, so drop the join". That handles the extreme case and
+lets the general one through — some copies throw, some do not. A rule that covers
+the boundary condition and not the middle is a sign the semantics are wrong, not
+the boundary condition.
+
+| checker                                           | verdict                                                    |
+| ------------------------------------------------- | ---------------------------------------------------------- |
+| `etc/validate-bpmn.mjs` (bpmn-moddle)             | OK — 0 warnings, 10 flow nodes, 7 sequence flows, all drawn |
+| `etc/check-bpmn-soundness.mjs`                    | **SOUND** at 0 and at 2 instances                          |
+| `etc/check-bpmn-soundness.mjs` **before the fix** | **UNSOUND** at 2, S1+S2 fail, 2 deadlocked markings        |
+
+Measured by reverting the fix, not argued.
