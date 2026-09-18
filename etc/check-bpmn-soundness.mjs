@@ -618,6 +618,42 @@ function expandScopes(proc, n) {
         });
         sourceOf.set(cp(bb.id), bb.id);
       }
+      // A THROWING end event is TWO facts, and the model needs both.
+      //
+      // It throws the escalation, which the non-interrupting boundary catches;
+      // and it consumes this path's token, which — since a copy holds exactly
+      // one — means the instance is FINISHED. BPMN completes a sub-process
+      // instance when it has no tokens left, and an escalation end leaves none.
+      //
+      // Routing the throw straight at the catcher, as this did until
+      // 2026-09-19, recorded only the first: a copy that threw never signalled
+      // its own `done`, so the scope's join waited on it forever. Measured on
+      // the exporter's tenancy-fork golden with its breach end made
+      // non-terminating — 2 deadlocked markings, S1 and S2 red, on a correct
+      // file. It was invisible while the breach end was an ERROR end, because
+      // reaching one discards every remaining token and so rescued exactly
+      // those markings: the file scored SOUND, and 39 of its 67 markings could
+      // "complete" ONLY by terminating. A gate passing for that reason is not
+      // passing.
+      //
+      // So the throw is a node of its own with two outgoing flows. An ordinary
+      // (non-gateway) node produces EVERY outgoing flow from one incoming
+      // token, which is BPMN's uncontrolled parallel split and is what makes
+      // these two facts simultaneous rather than a choice. 1-safety is
+      // unaffected: the two targets are different places, each holding one.
+      for (const e of innerEnds.filter(isThrow)) {
+        if (!b) continue; // n = 0, or refused above for want of a catcher
+        const th = cp(`${e.id}:throw`);
+        nodes.set(th, {
+          id: th,
+          kind: "intermediateThrowEvent",
+          name: e.name,
+        });
+        sourceOf.set(th, e.id);
+        flows.push({ id: `${th}->catch`, source: th, target: b.id });
+        flows.push({ id: `${th}->done`, source: th, target: done });
+      }
+
       const startIds = new Set(innerStarts.map((x) => x.id));
       const endOf = new Map(innerEnds.map((x) => [x.id, x]));
       for (const f of inner.flows) {
@@ -625,7 +661,7 @@ function expandScopes(proc, n) {
         let tgt;
         if (endOf.has(f.target)) {
           const e = endOf.get(f.target);
-          tgt = isThrow(e) ? b.id : done;
+          tgt = isThrow(e) ? cp(`${e.id}:throw`) : done;
         } else {
           tgt = cp(f.target);
         }
@@ -634,12 +670,15 @@ function expandScopes(proc, n) {
     }
   }
 
-  // The mirror of the rule below, and the same argument: if NO interior path
-  // ends normally — every one of them throws — then nothing reaches the join,
-  // and the scope can only ever be left by escalation. That is a fact about the
-  // diagram and worth saying, but the join is a gateway this expansion invented,
-  // so reporting it as a malformed flow node would be blaming the model for the
-  // drawing. It is dropped with whatever it fed, and said plainly instead.
+  // Kept for n = 0, where no copy exists to reach the join at all.
+  //
+  // It used to carry more weight than that, and wrongly: it read "if NO
+  // interior path ends normally — every one of them throws — then nothing
+  // reaches the join". That was a workaround for the defect fixed above,
+  // treating the all-throw case as special instead of noticing that a throwing
+  // instance still finishes. The mixed case — some copies throw, some do not —
+  // fell through it and deadlocked. A rule that handles the extreme and not the
+  // general one is a sign the semantics are wrong, not the boundary condition.
   for (const [scId, { join }] of rewritten) {
     if (flows.some((f) => f.target === join)) continue;
     notes.push(
