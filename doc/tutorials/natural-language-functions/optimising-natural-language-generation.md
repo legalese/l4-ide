@@ -4,14 +4,18 @@
 
 ---
 
-L4 can render your rules back into formatted English prose — in the VS Code
+L4 can render your rules back into formatted prose — in the VS Code
 **Render** tab, or with `l4 render`. The renderer is **deterministic**: it walks
-your code and turns each construct into a sentence or an outline. That means the
+your code and turns each construct into a sentence or an outline. It is also
+**language-agnostic**: it prints the words you wrote, so a file written in
+English reads as English and one written in Hebrew reads as Hebrew. Nothing in
+the renderer knows the difference. This tutorial is in English because its
+examples are. That means the
 quality of the generated prose is mostly in your hands. Well-named, well-shaped
 rules read almost like professionally drafted legal writing with no extra effort; awkward ones read like a
 transcript of an algorithm.
 
-This tutorial shows how to get transparent English prose out of the renderer, using three increasingly powerful levers:
+This tutorial shows how to get transparent prose out of the renderer, using three increasingly powerful levers:
 
 1. **Names** — backticked identifiers and parameter names.
 2. **Shape** — mixfix word order, control flow, section titles, and arithmetic.

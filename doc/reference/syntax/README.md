@@ -148,6 +148,46 @@ want the annotation to end with a backslash. Any other character after a
 backslash is left completely alone: `\q` is still a backslash followed by a
 `q`.
 
+#### Labelling the language: `@nlg:he`
+
+A heralded `@nlg` can say which language its prose is in, by putting a language
+subtag straight after the herald:
+
+```l4
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the amount %amount% is large
+  IF amount GREATER THAN 100
+```
+
+**What this does today, and what it does not.** The tag is recognised, kept
+with the annotation, and written back out unchanged by `l4 format`. **Nothing
+chooses between languages yet.** A name still carries at most one `@nlg`, so
+you cannot yet write an English rendering and a Hebrew rendering of the same
+rule and ask for one of them. Writing `@nlg:he` labels your prose; it does not
+produce a Hebrew document.
+
+**L4 has no idea what language you are writing in.** The renderer prints
+whatever the annotation says, so an annotation written in Hebrew has always
+produced Hebrew output, with or without a tag. The tag records what you wrote.
+It does not translate, and it never has to be present for a non-English
+annotation to work.
+
+**Why label at all, then?** Because the label is what a later reader — a
+person, a tool, or a translator — needs in order to tell two renderings apart.
+It is worth writing now if your encoding is multilingual, so that the
+information is already in the source when selection arrives.
+
+**The bare inline form cannot be tagged.** `[…]` has nowhere to put a subtag —
+the annotation is just brackets around prose — so `@nlg:he` is available only
+on the heralded form. If you need a language on an inline gloss, use the
+heralded form for that annotation.
+
+**A colon that is not a subtag is ordinary text.** A subtag is letters, digits
+and hyphens, so `@nlg:he` and `@nlg:zh-Hant` are tags, while `@nlg: see below`
+has no tag and the colon is simply the first character of the prose. Text you
+wrote before tags existed still means what it meant.
+
 ### @ref
 
 Cross-references to legal sources.
