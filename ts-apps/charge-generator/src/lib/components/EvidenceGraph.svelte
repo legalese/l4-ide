@@ -1,104 +1,101 @@
 <script lang="ts">
   import type { DagLayout } from '$lib/evidence/graph'
+  import { forceLayoutDag } from '$lib/evidence/force-layout'
 
   /**
-   * The evidence DAG, drawn as four columns: charge → elements → facts →
-   * sources. A dashed node is a GAP — an element no fact supports, or a fact
-   * no source supports — and is what the interview should ask about next.
-   * Pure SVG from a pure layout; presentational attributes only (CSP).
+   * The evidence DAG: charge → elements → facts → sources, laid out by a
+   * column-constrained force simulation (`force-layout.ts`) so each rank
+   * spreads around the nodes it connects to. A dashed node is a GAP — an
+   * element no fact supports, or a fact no source supports — and is what the
+   * interview should ask about next. Pure SVG; presentational attributes only.
    */
   let { dag }: { dag: DagLayout } = $props()
+  const out = $derived(forceLayoutDag(dag))
 
-  const COL_W = 190
-  const ROW_H = 54
-  const PAD = 12
-  const BOX_H = 40
-  const width = COL_W * 4 + PAD * 2
-  const height = $derived(PAD * 2 + Math.max(1, dag.rows) * ROW_H)
-
-  const x = (col: number): number => PAD + col * COL_W
-  const y = (row: number): number => PAD + row * ROW_H
-  const pos = $derived(
-    new Map(dag.nodes.map((n) => [n.id, { x: x(n.col), y: y(n.row) }]))
-  )
-
-  function edgePath(from: string, to: string): string {
-    const a = pos.get(from)
-    const b = pos.get(to)
-    if (!a || !b) return ''
-    const x1 = a.x + COL_W - 16
-    const y1 = a.y + BOX_H / 2
-    const x2 = b.x
-    const y2 = b.y + BOX_H / 2
+  function edgePath(e: (typeof out.edges)[number]): string {
+    const x1 = e.from.x + e.from.w / 2
+    const y1 = e.from.y
+    const x2 = e.to.x - e.to.w / 2
+    const y2 = e.to.y
     const mx = (x1 + x2) / 2
     return `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`
   }
-
   const clip = (s: string, n: number): string =>
     s.length > n ? s.slice(0, n - 1) + '…' : s
+  const chars = (w: number): number => Math.floor((w - 12) / 6.4)
 </script>
 
-<svg
-  class="dag"
-  viewBox={`0 0 ${width} ${height}`}
-  width="100%"
-  role="img"
-  aria-label="Evidence graph: charge, elements, facts, sources"
->
-  <g
-    class="heads"
-    font-size="11"
-    font-weight="700"
-    fill="currentColor"
-    opacity="0.6"
+<div class="dag-wrap">
+  <svg
+    class="dag"
+    viewBox={`0 0 ${out.width} ${out.height}`}
+    width={out.width}
+    height={out.height}
+    role="img"
+    aria-label="Evidence graph: charge, elements, facts, sources"
   >
-    <text x={x(0)} y="9">charge</text>
-    <text x={x(1)} y="9">elements</text>
-    <text x={x(2)} y="9">facts</text>
-    <text x={x(3)} y="9">sources</text>
-  </g>
-  {#each dag.edges as e (e.from + '>' + e.to)}
-    <path
-      d={edgePath(e.from, e.to)}
-      fill="none"
-      stroke="currentColor"
-      stroke-opacity="0.35"
-      stroke-width="1.2"
-    />
-  {/each}
-  {#each dag.nodes as n (n.id)}
-    {@const p = pos.get(n.id)}
-    {#if p}
-      <g transform={`translate(${p.x} ${p.y})`}>
+    <g font-size="11" font-weight="700" fill="currentColor" opacity="0.55">
+      <text x="14" y="10">charge</text>
+      <text x="204" y="10">elements</text>
+      <text x="394" y="10">facts</text>
+      <text x="584" y="10">sources</text>
+    </g>
+    {#each out.edges as e (e.from.id + '>' + e.to.id)}
+      <path
+        d={edgePath(e)}
+        fill="none"
+        stroke="currentColor"
+        stroke-opacity="0.32"
+        stroke-width="1.2"
+      />
+    {/each}
+    {#each out.nodes as n (n.id)}
+      <g transform={`translate(${n.x - n.w / 2} ${n.y - n.h / 2})`}>
         <rect
-          width={COL_W - 16}
-          height={BOX_H}
-          rx="7"
+          width={n.w}
+          height={n.h}
+          rx={n.h / 2}
           fill={n.gap ? 'none' : 'currentColor'}
-          fill-opacity={n.gap ? 0 : 0.06}
+          fill-opacity={n.gap ? 0 : 0.07}
           stroke={n.gap ? '#c8376a' : 'currentColor'}
-          stroke-opacity={n.gap ? 0.9 : 0.4}
+          stroke-opacity={n.gap ? 0.9 : 0.45}
           stroke-dasharray={n.gap ? '4 3' : undefined}
         />
-        <text x="8" y={n.sub ? 16 : 24} font-size="11.5" fill="currentColor">
-          {clip(n.label, 30)}
+        <text
+          x={n.w / 2}
+          y={n.sub ? 15 : n.h / 2 + 4}
+          font-size="11"
+          text-anchor="middle"
+          fill="currentColor"
+        >
+          {clip(n.label, chars(n.w))}
         </text>
         {#if n.sub}
-          <text x="8" y="31" font-size="10" fill="currentColor" opacity="0.65"
-            >{clip(n.sub, 32)}</text
+          <text
+            x={n.w / 2}
+            y="28"
+            font-size="9.5"
+            text-anchor="middle"
+            fill="currentColor"
+            opacity="0.65"
           >
+            {clip(n.sub, chars(n.w) + 4)}
+          </text>
         {/if}
-        {#if n.gap}
-          <title>No evidence yet — ask about this</title>
-        {:else}
-          <title>{n.label}{n.sub ? ' — ' + n.sub : ''}</title>
-        {/if}
+        <title
+          >{n.gap
+            ? 'No evidence yet — ask about this'
+            : n.label + (n.sub ? ' — ' + n.sub : '')}</title
+        >
       </g>
-    {/if}
-  {/each}
-</svg>
+    {/each}
+  </svg>
+</div>
 
 <style>
+  .dag-wrap {
+    overflow-x: auto;
+  }
   .dag {
     display: block;
     color: var(--ink);

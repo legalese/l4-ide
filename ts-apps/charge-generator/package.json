@@ -25,6 +25,7 @@
     "@sveltejs/kit": "^2.16.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
     "@tailwindcss/vite": "^4.0.6",
+    "@types/d3-force": "^3.0.10",
     "eslint": "^9.16.0",
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.4.1",
@@ -41,6 +42,7 @@
     "@anthropic-ai/sdk": "^0.126.0",
     "@repo/ladder-core": "*",
     "@repo/ladder-svg": "*",
+    "d3-force": "^3.0.0",
     "jl4-client-rpc": "*",
     "marked": "14.0.0",
     "zod": "^3.25.0"
