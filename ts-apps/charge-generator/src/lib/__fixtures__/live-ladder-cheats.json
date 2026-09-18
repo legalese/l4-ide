@@ -1,0 +1,1011 @@
+{
+  "funDecl": {
+    "$type": "FunDecl",
+    "body": {
+      "$type": "And",
+      "args": [
+        {
+          "$type": "InertE",
+          "context": "InertAnd",
+          "id": { "id": 3 },
+          "text": "Whoever, by"
+        },
+        {
+          "$type": "UBoolVar",
+          "atomId": "cb1d1a13-8d57-5802-bceb-1aa532ea9c53",
+          "canInline": false,
+          "id": { "id": 4 },
+          "name": { "label": "f's `deceived the victim`", "unique": 5 },
+          "typically": null,
+          "value": "UnknownV"
+        },
+        {
+          "$type": "InertE",
+          "context": "InertAnd",
+          "id": { "id": 6 },
+          "text": ", whether or not such deception was the sole or main inducement,"
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "1b7347c2-23d8-5cd5-b3fd-4f2fc25f949a",
+              "canInline": false,
+              "id": { "id": 8 },
+              "name": { "label": "f's fraudulently", "unique": 9 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "55060ae9-44a2-5975-9b69-c015ec57f3e8",
+              "canInline": false,
+              "id": { "id": 10 },
+              "name": { "label": "f's dishonestly", "unique": 11 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "edc33c95-2a4c-5dad-b1b7-1af2e9069716",
+              "canInline": false,
+              "id": { "id": 12 },
+              "name": { "label": "f's intentionally", "unique": 13 },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 7 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "1b7347c2-23d8-5cd5-b3fd-4f2fc25f949a",
+              "canInline": false,
+              "id": { "id": 15 },
+              "name": { "label": "f's fraudulently", "unique": 16 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "55060ae9-44a2-5975-9b69-c015ec57f3e8",
+              "canInline": false,
+              "id": { "id": 17 },
+              "name": { "label": "f's dishonestly", "unique": 18 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 19 },
+              "text": "induces the person so deceived to"
+            }
+          ],
+          "id": { "id": 14 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "1b7347c2-23d8-5cd5-b3fd-4f2fc25f949a",
+              "canInline": false,
+              "id": { "id": 21 },
+              "name": { "label": "f's fraudulently", "unique": 22 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "55060ae9-44a2-5975-9b69-c015ec57f3e8",
+              "canInline": false,
+              "id": { "id": 23 },
+              "name": { "label": "f's dishonestly", "unique": 24 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "f5d52845-7092-5f91-a083-09726442a518",
+              "canInline": false,
+              "id": { "id": 25 },
+              "name": { "label": "f's do", "unique": 26 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "43834005-ed41-5ff2-a0fc-891c2b07c400",
+              "canInline": false,
+              "id": { "id": 27 },
+              "name": { "label": "f's `omit to do`", "unique": 28 },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 20 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "1b7347c2-23d8-5cd5-b3fd-4f2fc25f949a",
+              "canInline": false,
+              "id": { "id": 30 },
+              "name": { "label": "f's fraudulently", "unique": 31 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "55060ae9-44a2-5975-9b69-c015ec57f3e8",
+              "canInline": false,
+              "id": { "id": 32 },
+              "name": { "label": "f's dishonestly", "unique": 33 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 34 },
+              "text": "anything which he would not do or omit to do if he were not so deceived, and which act or omission"
+            }
+          ],
+          "id": { "id": 29 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "1b7347c2-23d8-5cd5-b3fd-4f2fc25f949a",
+              "canInline": false,
+              "id": { "id": 36 },
+              "name": { "label": "f's fraudulently", "unique": 37 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "55060ae9-44a2-5975-9b69-c015ec57f3e8",
+              "canInline": false,
+              "id": { "id": 38 },
+              "name": { "label": "f's dishonestly", "unique": 39 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "5f0ee3b4-5eef-5f3f-916b-8d329b63d09e",
+              "canInline": false,
+              "id": { "id": 40 },
+              "name": { "label": "f's causes", "unique": 41 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "27378db9-1fef-575d-ab63-c48d71ff9662",
+              "canInline": false,
+              "id": { "id": 42 },
+              "name": { "label": "f's `likely to cause`", "unique": 43 },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 35 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "1b7347c2-23d8-5cd5-b3fd-4f2fc25f949a",
+              "canInline": false,
+              "id": { "id": 45 },
+              "name": { "label": "f's fraudulently", "unique": 46 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "55060ae9-44a2-5975-9b69-c015ec57f3e8",
+              "canInline": false,
+              "id": { "id": 47 },
+              "name": { "label": "f's dishonestly", "unique": 48 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "9c7a4e65-9276-52a5-9e08-fc395b12e80f",
+              "canInline": false,
+              "id": { "id": 49 },
+              "name": { "label": "f's damage", "unique": 50 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "43ec655c-f8b7-5f06-880b-baaa713d6f32",
+              "canInline": false,
+              "id": { "id": 51 },
+              "name": { "label": "f's harm", "unique": 52 },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 44 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "1b7347c2-23d8-5cd5-b3fd-4f2fc25f949a",
+              "canInline": false,
+              "id": { "id": 54 },
+              "name": { "label": "f's fraudulently", "unique": 55 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "55060ae9-44a2-5975-9b69-c015ec57f3e8",
+              "canInline": false,
+              "id": { "id": 56 },
+              "name": { "label": "f's dishonestly", "unique": 57 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 58 },
+              "text": "to any person in"
+            }
+          ],
+          "id": { "id": 53 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "1b7347c2-23d8-5cd5-b3fd-4f2fc25f949a",
+              "canInline": false,
+              "id": { "id": 60 },
+              "name": { "label": "f's fraudulently", "unique": 61 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "55060ae9-44a2-5975-9b69-c015ec57f3e8",
+              "canInline": false,
+              "id": { "id": 62 },
+              "name": { "label": "f's dishonestly", "unique": 63 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "9df584d5-3964-51ae-b425-da7c5dc097aa",
+              "canInline": false,
+              "id": { "id": 64 },
+              "name": { "label": "f's body", "unique": 65 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "770ddae5-a747-544c-9f66-aa3ace6ad093",
+              "canInline": false,
+              "id": { "id": 66 },
+              "name": { "label": "f's mind", "unique": 67 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "67cd99ac-83ad-530b-9033-1bcbc917ebcb",
+              "canInline": false,
+              "id": { "id": 68 },
+              "name": { "label": "f's reputation", "unique": 69 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "1bc753ea-752d-5b43-a23d-b7d670311504",
+              "canInline": false,
+              "id": { "id": 70 },
+              "name": { "label": "f's property", "unique": 71 },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 59 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 73 },
+              "text": "induces the person so deceived to"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "edc33c95-2a4c-5dad-b1b7-1af2e9069716",
+              "canInline": false,
+              "id": { "id": 74 },
+              "name": { "label": "f's intentionally", "unique": 75 },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 72 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 77 },
+              "text": "induces the person so deceived to"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 78 },
+              "text": "induces the person so deceived to"
+            }
+          ],
+          "id": { "id": 76 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 80 },
+              "text": "induces the person so deceived to"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "f5d52845-7092-5f91-a083-09726442a518",
+              "canInline": false,
+              "id": { "id": 81 },
+              "name": { "label": "f's do", "unique": 82 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "43834005-ed41-5ff2-a0fc-891c2b07c400",
+              "canInline": false,
+              "id": { "id": 83 },
+              "name": { "label": "f's `omit to do`", "unique": 84 },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 79 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 86 },
+              "text": "induces the person so deceived to"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 87 },
+              "text": "anything which he would not do or omit to do if he were not so deceived, and which act or omission"
+            }
+          ],
+          "id": { "id": 85 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 89 },
+              "text": "induces the person so deceived to"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "5f0ee3b4-5eef-5f3f-916b-8d329b63d09e",
+              "canInline": false,
+              "id": { "id": 90 },
+              "name": { "label": "f's causes", "unique": 91 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "27378db9-1fef-575d-ab63-c48d71ff9662",
+              "canInline": false,
+              "id": { "id": 92 },
+              "name": { "label": "f's `likely to cause`", "unique": 93 },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 88 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 95 },
+              "text": "induces the person so deceived to"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "9c7a4e65-9276-52a5-9e08-fc395b12e80f",
+              "canInline": false,
+              "id": { "id": 96 },
+              "name": { "label": "f's damage", "unique": 97 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "43ec655c-f8b7-5f06-880b-baaa713d6f32",
+              "canInline": false,
+              "id": { "id": 98 },
+              "name": { "label": "f's harm", "unique": 99 },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 94 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 101 },
+              "text": "induces the person so deceived to"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 102 },
+              "text": "to any person in"
+            }
+          ],
+          "id": { "id": 100 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 104 },
+              "text": "induces the person so deceived to"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "9df584d5-3964-51ae-b425-da7c5dc097aa",
+              "canInline": false,
+              "id": { "id": 105 },
+              "name": { "label": "f's body", "unique": 106 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "770ddae5-a747-544c-9f66-aa3ace6ad093",
+              "canInline": false,
+              "id": { "id": 107 },
+              "name": { "label": "f's mind", "unique": 108 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "67cd99ac-83ad-530b-9033-1bcbc917ebcb",
+              "canInline": false,
+              "id": { "id": 109 },
+              "name": { "label": "f's reputation", "unique": 110 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "1bc753ea-752d-5b43-a23d-b7d670311504",
+              "canInline": false,
+              "id": { "id": 111 },
+              "name": { "label": "f's property", "unique": 112 },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 103 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "2d7defff-0010-5371-8ebd-7fe95239ec35",
+              "canInline": false,
+              "id": { "id": 114 },
+              "name": { "label": "f's deliver", "unique": 115 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "9b625f0f-e473-5374-bbd8-3d942f038344",
+              "canInline": false,
+              "id": { "id": 116 },
+              "name": { "label": "f's `cause the delivery`", "unique": 117 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertOr",
+              "id": { "id": 118 },
+              "text": "of any property to any person, or to"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "10ce97e8-9b4e-5f88-9f04-b516677cb9f1",
+              "canInline": false,
+              "id": { "id": 119 },
+              "name": {
+                "label": "f's `consent that any person shall retain any property`",
+                "unique": 120
+              },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "edc33c95-2a4c-5dad-b1b7-1af2e9069716",
+              "canInline": false,
+              "id": { "id": 121 },
+              "name": { "label": "f's intentionally", "unique": 122 },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 113 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "2d7defff-0010-5371-8ebd-7fe95239ec35",
+              "canInline": false,
+              "id": { "id": 124 },
+              "name": { "label": "f's deliver", "unique": 125 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "9b625f0f-e473-5374-bbd8-3d942f038344",
+              "canInline": false,
+              "id": { "id": 126 },
+              "name": { "label": "f's `cause the delivery`", "unique": 127 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertOr",
+              "id": { "id": 128 },
+              "text": "of any property to any person, or to"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "10ce97e8-9b4e-5f88-9f04-b516677cb9f1",
+              "canInline": false,
+              "id": { "id": 129 },
+              "name": {
+                "label": "f's `consent that any person shall retain any property`",
+                "unique": 130
+              },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 131 },
+              "text": "induces the person so deceived to"
+            }
+          ],
+          "id": { "id": 123 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "2d7defff-0010-5371-8ebd-7fe95239ec35",
+              "canInline": false,
+              "id": { "id": 133 },
+              "name": { "label": "f's deliver", "unique": 134 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "9b625f0f-e473-5374-bbd8-3d942f038344",
+              "canInline": false,
+              "id": { "id": 135 },
+              "name": { "label": "f's `cause the delivery`", "unique": 136 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertOr",
+              "id": { "id": 137 },
+              "text": "of any property to any person, or to"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "10ce97e8-9b4e-5f88-9f04-b516677cb9f1",
+              "canInline": false,
+              "id": { "id": 138 },
+              "name": {
+                "label": "f's `consent that any person shall retain any property`",
+                "unique": 139
+              },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "f5d52845-7092-5f91-a083-09726442a518",
+              "canInline": false,
+              "id": { "id": 140 },
+              "name": { "label": "f's do", "unique": 141 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "43834005-ed41-5ff2-a0fc-891c2b07c400",
+              "canInline": false,
+              "id": { "id": 142 },
+              "name": { "label": "f's `omit to do`", "unique": 143 },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 132 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "2d7defff-0010-5371-8ebd-7fe95239ec35",
+              "canInline": false,
+              "id": { "id": 145 },
+              "name": { "label": "f's deliver", "unique": 146 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "9b625f0f-e473-5374-bbd8-3d942f038344",
+              "canInline": false,
+              "id": { "id": 147 },
+              "name": { "label": "f's `cause the delivery`", "unique": 148 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertOr",
+              "id": { "id": 149 },
+              "text": "of any property to any person, or to"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "10ce97e8-9b4e-5f88-9f04-b516677cb9f1",
+              "canInline": false,
+              "id": { "id": 150 },
+              "name": {
+                "label": "f's `consent that any person shall retain any property`",
+                "unique": 151
+              },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 152 },
+              "text": "anything which he would not do or omit to do if he were not so deceived, and which act or omission"
+            }
+          ],
+          "id": { "id": 144 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "2d7defff-0010-5371-8ebd-7fe95239ec35",
+              "canInline": false,
+              "id": { "id": 154 },
+              "name": { "label": "f's deliver", "unique": 155 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "9b625f0f-e473-5374-bbd8-3d942f038344",
+              "canInline": false,
+              "id": { "id": 156 },
+              "name": { "label": "f's `cause the delivery`", "unique": 157 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertOr",
+              "id": { "id": 158 },
+              "text": "of any property to any person, or to"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "10ce97e8-9b4e-5f88-9f04-b516677cb9f1",
+              "canInline": false,
+              "id": { "id": 159 },
+              "name": {
+                "label": "f's `consent that any person shall retain any property`",
+                "unique": 160
+              },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "5f0ee3b4-5eef-5f3f-916b-8d329b63d09e",
+              "canInline": false,
+              "id": { "id": 161 },
+              "name": { "label": "f's causes", "unique": 162 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "27378db9-1fef-575d-ab63-c48d71ff9662",
+              "canInline": false,
+              "id": { "id": 163 },
+              "name": { "label": "f's `likely to cause`", "unique": 164 },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 153 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "2d7defff-0010-5371-8ebd-7fe95239ec35",
+              "canInline": false,
+              "id": { "id": 166 },
+              "name": { "label": "f's deliver", "unique": 167 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "9b625f0f-e473-5374-bbd8-3d942f038344",
+              "canInline": false,
+              "id": { "id": 168 },
+              "name": { "label": "f's `cause the delivery`", "unique": 169 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertOr",
+              "id": { "id": 170 },
+              "text": "of any property to any person, or to"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "10ce97e8-9b4e-5f88-9f04-b516677cb9f1",
+              "canInline": false,
+              "id": { "id": 171 },
+              "name": {
+                "label": "f's `consent that any person shall retain any property`",
+                "unique": 172
+              },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "9c7a4e65-9276-52a5-9e08-fc395b12e80f",
+              "canInline": false,
+              "id": { "id": 173 },
+              "name": { "label": "f's damage", "unique": 174 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "43ec655c-f8b7-5f06-880b-baaa713d6f32",
+              "canInline": false,
+              "id": { "id": 175 },
+              "name": { "label": "f's harm", "unique": 176 },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 165 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "2d7defff-0010-5371-8ebd-7fe95239ec35",
+              "canInline": false,
+              "id": { "id": 178 },
+              "name": { "label": "f's deliver", "unique": 179 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "9b625f0f-e473-5374-bbd8-3d942f038344",
+              "canInline": false,
+              "id": { "id": 180 },
+              "name": { "label": "f's `cause the delivery`", "unique": 181 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertOr",
+              "id": { "id": 182 },
+              "text": "of any property to any person, or to"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "10ce97e8-9b4e-5f88-9f04-b516677cb9f1",
+              "canInline": false,
+              "id": { "id": 183 },
+              "name": {
+                "label": "f's `consent that any person shall retain any property`",
+                "unique": 184
+              },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertAnd",
+              "id": { "id": 185 },
+              "text": "to any person in"
+            }
+          ],
+          "id": { "id": 177 }
+        },
+        {
+          "$type": "Or",
+          "args": [
+            {
+              "$type": "UBoolVar",
+              "atomId": "2d7defff-0010-5371-8ebd-7fe95239ec35",
+              "canInline": false,
+              "id": { "id": 187 },
+              "name": { "label": "f's deliver", "unique": 188 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "9b625f0f-e473-5374-bbd8-3d942f038344",
+              "canInline": false,
+              "id": { "id": 189 },
+              "name": { "label": "f's `cause the delivery`", "unique": 190 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "InertE",
+              "context": "InertOr",
+              "id": { "id": 191 },
+              "text": "of any property to any person, or to"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "10ce97e8-9b4e-5f88-9f04-b516677cb9f1",
+              "canInline": false,
+              "id": { "id": 192 },
+              "name": {
+                "label": "f's `consent that any person shall retain any property`",
+                "unique": 193
+              },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "9df584d5-3964-51ae-b425-da7c5dc097aa",
+              "canInline": false,
+              "id": { "id": 194 },
+              "name": { "label": "f's body", "unique": 195 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "770ddae5-a747-544c-9f66-aa3ace6ad093",
+              "canInline": false,
+              "id": { "id": 196 },
+              "name": { "label": "f's mind", "unique": 197 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "67cd99ac-83ad-530b-9033-1bcbc917ebcb",
+              "canInline": false,
+              "id": { "id": 198 },
+              "name": { "label": "f's reputation", "unique": 199 },
+              "typically": null,
+              "value": "UnknownV"
+            },
+            {
+              "$type": "UBoolVar",
+              "atomId": "1bc753ea-752d-5b43-a23d-b7d670311504",
+              "canInline": false,
+              "id": { "id": 200 },
+              "name": { "label": "f's property", "unique": 201 },
+              "typically": null,
+              "value": "UnknownV"
+            }
+          ],
+          "id": { "id": 186 }
+        }
+      ],
+      "id": { "id": 2 }
+    },
+    "id": { "id": 1 },
+    "name": { "label": "cheats", "unique": 28 },
+    "params": [{ "label": "f", "unique": 29 }]
+  },
+  "verDocId": { "uri": "file://cheats.l4", "version": 1 }
+}
