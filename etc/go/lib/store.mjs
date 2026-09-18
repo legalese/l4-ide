@@ -263,7 +263,14 @@ export function servability(root, sha) {
   // "some record", not "the record": content addressing means the blessing
   // attaches to the BYTES. If any admission of these bytes was under a
   // satisfied grant, they are what was blessed, whichever run produced them.
-  let best = null;
+  // THE RANKING IS satisfied > waived > provisional, and it is a ranking of how
+  // much has been CLAIMED, not of how recent the row is. A waiver is a
+  // considered judgement that the gate did not apply to this work; a
+  // provisional grant claims only that the review has not happened yet. So a
+  // provisional grant may never outrank a waiver over the same bytes, however
+  // it is ordered in the ledger — and neither is servable.
+  let waived = null;
+  let provisional = null;
   for (const a of admissions) {
     const b = a.produced_under?.blessing
       ? byId.get(a.produced_under.blessing)
@@ -271,12 +278,14 @@ export function servability(root, sha) {
     if (!b) continue;
     if (b.state === "satisfied")
       return { servable: true, state: "satisfied", blessing: b };
-    if (b.state === "waived" && !best) best = b;
+    if (b.state === "waived" && !waived) waived = b;
+    if (b.state === "provisional" && !provisional) provisional = b;
   }
+  const best = waived ?? provisional;
   if (best)
     return {
       servable: false,
-      state: "waived",
+      state: best.state,
       blessing: best,
       reason: best.reason ?? "no reason recorded",
     };
@@ -310,7 +319,7 @@ export function checkClaim(rec) {
     `unknown gate '${rec.gate}' (SPEC.md §7.3 defines HG1 and HG2)`,
   );
   need(
-    ["satisfied", "waived", "refused"].includes(rec.state),
+    ["satisfied", "waived", "provisional", "refused"].includes(rec.state),
     `unknown state '${rec.state}'`,
   );
   if (rec.state === "satisfied") {
@@ -319,7 +328,11 @@ export function checkClaim(rec) {
     need(rec.namespace, "state 'satisfied' with no signing namespace");
     need(rec.payload_digest, "state 'satisfied' with no payload_digest");
   }
-  if (rec.state === "waived" || rec.state === "refused")
+  if (
+    rec.state === "waived" ||
+    rec.state === "provisional" ||
+    rec.state === "refused"
+  )
     need(rec.reason, `state '${rec.state}' with no reason`);
   // HG2's unwaivability moves OUT of go.sh's prose and INTO the writer. A
   // waived-HG2 record in a ledger nothing sweeps is a permanent claim that the
@@ -327,6 +340,18 @@ export function checkClaim(rec) {
   need(
     !(rec.gate === "HG2" && rec.state === "waived"),
     "HG2 may never be waived (SPEC.md §7.3); a waived-HG2 record in a durable ledger could never be withdrawn",
+  );
+  // ... and neither may it be granted provisionally. The two refusals are
+  // separate `need`s rather than one because they are refused for DIFFERENT
+  // reasons, and a reader who only ever sees the merged message would learn the
+  // weaker one: a waiver claims the review did not apply, a provisional grant
+  // claims it is still to come. Nothing downstream of HG2 is evidence for HG2 —
+  // P10 is the outward act itself — so there is nothing a provisional HG2 could
+  // usefully produce, and a durable record of one would permanently assert that
+  // publication went ahead pending permission.
+  need(
+    !(rec.gate === "HG2" && rec.state === "provisional"),
+    "HG2 admits no provisional grant (SPEC.md §7.3): its downstream stage is the outward-facing act, not evidence for the decision",
   );
   need(Array.isArray(rec.covers), "no covers[] array");
   return { ok: problems.length === 0, problems };

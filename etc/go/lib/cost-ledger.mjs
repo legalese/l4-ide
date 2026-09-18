@@ -584,7 +584,10 @@ export function buildLedger({ sessions, from, to, label, root, pipeline }) {
   // script CALLS NO MODEL, so a `during <stage>` row can only be work the
   // session was doing concurrently with the driver, never the stage's own cost.
   // The `between` rows are where a pipeline's tokens actually go.
-  const brackets = pipeline?.brackets ?? [];
+  // segment_brackets, not brackets: agent `work` brackets label spend even
+  // though they may not attest time. See the two-bracket-set note where they
+  // are built.
+  const brackets = pipeline?.segment_brackets ?? pipeline?.brackets ?? [];
   const segs = new Map();
   for (const ev of allEvents) {
     if (!Number.isFinite(ev.t)) continue;
@@ -710,22 +713,46 @@ export function unionMs(intervals) {
  * A stage re-run within one journal yields TWO brackets, which is right: a
  * stage run twice occupied the machine twice.
  */
-export function bracketsFrom(rows) {
+export function bracketsFrom(rows, { includeWork = false } = {}) {
   const out = [];
   const open = new Map();
+  // A `work` bracket the agent never closed. Left to run forever it would
+  // swallow the rest of the timeline, so it is closed at the next event that
+  // proves the agent moved on: the next `stage_begin`, or the next `work begin`.
+  // An agent that crashes mid-phase is ordinary, and the bracket it leaves must
+  // degrade to "until something else happened" rather than "until the heat
+  // death of the run".
+  let work = null;
+  const closeWork = (t) => {
+    if (work && t > work.from)
+      out.push({ stage: work.stage, from: work.from, to: t, declared: true });
+    work = null;
+  };
   for (const r of rows) {
     if (!r.ts) continue;
     const t = Date.parse(r.ts);
     if (!Number.isFinite(t)) continue;
-    if (r.kind === "stage_begin") open.set(r.stage, t);
-    else if (r.kind === "stage_end") {
+    if (r.kind === "stage_begin") {
+      if (includeWork) closeWork(t);
+      open.set(r.stage, t);
+    } else if (r.kind === "stage_end") {
       const b = open.get(r.stage);
       open.delete(r.stage);
       if (b !== undefined && !r.replayed_from && t >= b)
-        out.push({ stage: r.stage, from: b, to: t });
+        out.push({ stage: r.stage, from: b, to: t, declared: false });
+    } else if (includeWork && r.kind === "work") {
+      if (r.state === "begin") {
+        closeWork(t);
+        work = { stage: r.phase, from: t };
+      } else if (r.state === "end") closeWork(t);
     }
   }
-  return out.sort((a, b) => a.from - b.from);
+  return out.sort(
+    // On a tie the DRIVER's bracket wins, because labelAt returns the first
+    // match: a stage that ran inside a work bracket the agent forgot to close
+    // must read as the stage, which is attested, not as the agent's claim.
+    (a, b) => a.from - b.from || Number(a.declared) - Number(b.declared),
+  );
 }
 
 /**
@@ -767,6 +794,11 @@ export function labelAt(t, brackets) {
         stage: brackets[i].stage,
         after: null,
         before: null,
+        // Whether this bracket was the agent's own claim about its working time
+        // rather than the driver's measurement of a phase script. It changes
+        // what the row MEANS, so it travels with the label instead of being
+        // looked up again later and possibly differently.
+        declared: Boolean(brackets[i].declared),
       };
   }
   return brackets.length
@@ -781,7 +813,9 @@ export function labelAt(t, brackets) {
 
 export const segKey = (l) =>
   l.kind === "during"
-    ? `during:${l.stage}`
+    ? l.declared
+      ? `encoding:${l.stage}`
+      : `during:${l.stage}`
     : l.kind === "before"
       ? `before:${l.before}`
       : l.kind === "after"
@@ -792,7 +826,9 @@ export const segKey = (l) =>
 
 export const segTitle = (l) =>
   l.kind === "during"
-    ? `during ${l.stage}`
+    ? l.declared
+      ? `agent working on ${l.stage}`
+      : `during ${l.stage}`
     : l.kind === "before"
       ? `before ${l.before}`
       : l.kind === "after"
@@ -843,6 +879,21 @@ export function pipelineFromJournal(journalPath) {
   // attribution in buildLedger — two would drift.
   const brackets = bracketsFrom(rows);
   for (const b of brackets) intervals.push([b.from, b.to]);
+  // TWO BRACKET SETS, AND THE DIFFERENCE IS THE EVIDENCE CLASS.
+  //
+  // `brackets` is what the DRIVER measured: it took both readings itself, and
+  // `go.sh verify` refuses a row claiming more time than its own
+  // stage_begin→stage_end span. Those are the only ones that may widen
+  // `busy_ms_lower_bound`, which is a floor the run can stand behind.
+  //
+  // `segment_brackets` adds the agent's own declared `work` brackets, which say
+  // "I was encoding P3 between these two moments". That is a CLAIM, not a
+  // measurement — nothing stops an agent bracketing an hour it spent elsewhere
+  // — so it may label spend and may not attest time. Labelling is still worth a
+  // great deal: without it, every token the agent spends reading a statute lands
+  // in an unattributable `between p0-preflight and p3-check` bucket, which is
+  // precisely the figure "what does encoding a statute cost?" needs.
+  const segment_brackets = bracketsFrom(rows, { includeWork: true });
   return {
     standing: "attested",
     run_id: begin?.run_id ?? null,
@@ -905,6 +956,7 @@ export function pipelineFromJournal(journalPath) {
     measured_through: stages.length ? stages[stages.length - 1].stage : null,
     busy_intervals: intervals,
     brackets,
+    segment_brackets,
   };
 }
 
