@@ -7,3 +7,13 @@
           eligible IS A BOOLEAN @ref "Section 4(1)(a) of the Act"
 
 #EVAL age
+
+-- A literal percent sign or close bracket in an `@nlg` annotation is written
+-- with a backslash in front of it. Here the rate range `10%and%20` would
+-- otherwise read `and` as a parameter name, silently.
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+`the levy on` amount [a rate between 10\%and\%20 applied to %amount%]
+MEANS amount TIMES 0.15
+
+#EVAL `the levy on` 100

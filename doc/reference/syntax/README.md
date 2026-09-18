@@ -117,6 +117,37 @@ Natural language generation hints.
 
 See [annotation-example.l4](annotation-example.l4)
 
+#### Writing a literal `%` or `]`
+
+Inside `@nlg`, `%` marks a parameter to fill in — `%age%` is replaced by the
+value of `age` — and `]` ends a bracketed annotation. To write either
+character as itself, put a backslash in front of it.
+
+| you write            | you get           | without the backslash             |
+| -------------------- | ----------------- | --------------------------------- |
+| `10\%and\%20`        | `10%and%20`       | `and` is read as a parameter name |
+| `[rate \] per unit]` | `rate ] per unit` | the annotation ends early         |
+| `\\`                 | `\`               | —                                 |
+
+**Most of the time you do not need this.** A percent sign with a space after it
+is already ordinary text, so `a 5% levy on %amount%` works as written and fills
+in `amount`. The backslash is for the case with no space — `10%and%20`, where
+L4 cannot tell a written-out range from a parameter.
+
+**The two mistakes fail very differently, and the quiet one is the one to
+watch.** A stray `]` ends the annotation early and you get a parse error
+pointing at the leftover text — annoying, but it tells you. A stray `%` pair
+tells you nothing: if the word between the two percent signs happens to name
+one of your parameters, L4 quietly substitutes that value, and your sentence
+comes out with a number where you wrote a word. Nothing is reported, and the
+rule still runs.
+
+**What this costs.** A backslash immediately before the closing `]` no longer
+ends the annotation, because `\]` now means a literal `]`. Write `\\` if you
+want the annotation to end with a backslash. Any other character after a
+backslash is left completely alone: `\q` is still a backslash followed by a
+`q`.
+
 ### @ref
 
 Cross-references to legal sources.
