@@ -432,7 +432,7 @@ annotations = ["nlg", "ref", "ref-map", "ref-src"]
 nlgAnnotation :: Lexer (Text, AnnoType)
 nlgAnnotation =
   lineAnno "@nlg"
-    <|> inlineAnno (Text.singleton nlgInlineAnnotationOpenChar) (Text.singleton nlgInlineAnnotationCloseChar)
+    <|> inlineNlgAnno
   <?> "Natural Language Generation Annotation"
 
 nlgInlineAnnotationCloseChar :: Char
@@ -470,14 +470,59 @@ fixityAnnotation =
 nonexhaustiveAnnotation :: Lexer Text
 nonexhaustiveAnnotation = fst <$> lineAnno "@nonexhaustive"
 
+-- | A run of literal text inside an NLG annotation.
+--
+-- This is the RENDER-side lexer: it runs over the text an annotation already
+-- captured, so it looks like the right place to DECODE escapes. It is not.
+-- The annotation token keeps the raw slice (see 'inlineNlgAnno'), because
+-- 'toNlgAnno' re-emits that text verbatim for exactprint.
+--
+-- A backslash escape is consumed as a UNIT and kept VERBATIM — @\\%@ stays the
+-- two characters @\\@ and @%@. Two things follow, and both are the point:
+--
+--   * the @%@ inside @\\%@ never reaches 'nlgExprDelimiter', so it cannot open
+--     an interpolation. That is what makes @10\\%and\\%20@ mean what it says
+--     instead of silently rendering as @10\`and\`20@.
+--   * 'displayTokenType' re-emits this text for exactprint, so keeping the
+--     backslash is what makes @l4 format@ round-trip. DECODING HERE IS A BUG:
+--     it was written that way first, and the formatter duly stripped the
+--     backslash, turning a correct annotation into one that either fails to
+--     parse (@\\]@) or silently changes meaning (@\\%@).
+--
+-- Decoding happens once, at render time, in 'L4.Nlg.unescapeNlgText'.
 nlgString :: Lexer Text
 nlgString =
-  takeWhile1P (Just "character") (\c -> c `notElem` nlgSpecialChars && not (isSpace c))
+  Text.concat <$> some (escaped <|> plain <|> loneBackslash)
   where
+    escaped = try (Text.cons <$> char '\\' <*> (Text.singleton <$> satisfy isNlgEscapable))
+    plain = takeWhile1P (Just "character") (\c -> not (isNlgSpecial c) && not (isSpace c))
+
+    -- A backslash that cannot begin an escape is an ordinary character, which
+    -- is exactly what it was before escapes existed. Without this alternative
+    -- an annotation whose text ENDS in a backslash stops lexing altogether —
+    -- @\@nlg a discount of 50\\@ — because 'escaped' needs a character after
+    -- the backslash and 'plain' excludes it. There is no closing herald on a
+    -- line annotation, so there is nothing there to escape.
+    loneBackslash = Text.singleton <$> char '\\'
+
+    isNlgSpecial c = c == '\\' || c `elem` nlgSpecialChars
     nlgSpecialChars =
       [ nlgInlineAnnotationCloseChar
       , nlgExprDelimiterSymbol
       ]
+
+-- | The characters a backslash may escape inside an NLG annotation.
+--
+-- This set is deliberately EQUAL to the set 'L4.Nlg.unescapeNlgText' decodes.
+-- A lexer that swallows a @\\x@ the decoder will not decode is how a stray
+-- backslash changes what an annotation captures without changing what it
+-- renders: the two sides disagree about whether an escape happened. Any other
+-- @\\x@ is two ordinary characters, on both sides alike.
+isNlgEscapable :: Char -> Bool
+isNlgEscapable c =
+  c == '\\'
+    || c == nlgExprDelimiterSymbol
+    || c == nlgInlineAnnotationCloseChar
 
 nlgExprDelimiter :: Lexer Char
 nlgExprDelimiter =
@@ -486,11 +531,60 @@ nlgExprDelimiter =
 nlgExprDelimiterSymbol :: Char
 nlgExprDelimiterSymbol = '%'
 
+-- | An annotation delimited by heralds, e.g. @\<\<...\>\>@, captured verbatim
+-- up to the first closing herald.
+--
+-- __There are no escapes here, and that is deliberate.__ This is the lexer
+-- reached by @\@ref@'s inline form. An escape it cannot decode would be worse
+-- than no escape at all: 'L4.Nlg.unescapeNlgText' runs only on the NLG
+-- linearizer's path, so a backslash consumed here would be kept for ever, and
+-- text that used to be writable would stop being writable.
+--
+-- Measured on a revision that did share the escaping body with the NLG form:
+-- @\<\<sec 3\\\>\>@ silently swallowed everything up to the NEXT @\>\>@ in the
+-- file, and with no later @\>\>@ it failed the whole file's lex, pointing at
+-- end-of-input rather than at the annotation.
+--
+-- The NLG form has its own lexer, 'inlineNlgAnno'. A literal @\>\>@ inside a
+-- @\<\<...\>\>@ stays unrepresentable, exactly as it was before escapes
+-- existed; that is a separate question and wants its own ruling.
 inlineAnno :: Text -> Text -> Lexer (Text, AnnoType)
 inlineAnno openingHerald closingHerald = do
   _o <- string openingHerald
   (anno, _c) <- manyTill_ anySingle (string closingHerald)
   pure (Text.pack anno, InlineAnno)
+
+-- | The NLG inline annotation, @[...]@, in which a backslash escapes.
+--
+-- @[a \\] b]@ is one annotation whose text is @a \\] b@, rather than truncating
+-- at the first @]@ and leaving @ b]@ to fail the enclosing parse with
+-- @unexpected ]@.
+--
+-- The backslash is KEPT in the captured text. That text is what 'toNlgAnno'
+-- re-emits for exactprint, so dropping it here would make the printer lose the
+-- escape and change the annotation's meaning on the next parse. Decoding
+-- happens on the render side; see 'L4.Nlg.unescapeNlgText'.
+--
+-- The single thing this costs: @[note\\]@, a backslash immediately before the
+-- terminator, no longer closes the annotation, because @\\]@ is now an escaped
+-- @]@. Write @[note\\\\]@ for a trailing backslash. Measured 2026-09-17: zero
+-- @.l4@ files in the tree contain a backslash at all, so nothing existing is
+-- affected -- which is a measurement, not a guarantee.
+inlineNlgAnno :: Lexer (Text, AnnoType)
+inlineNlgAnno = do
+  _o <- char nlgInlineAnnotationOpenChar
+  anno <- Text.concat <$> many (escapedChar <|> plainChunk <|> loneBackslash)
+  _c <- char nlgInlineAnnotationCloseChar
+  pure (anno, InlineAnno)
+  where
+    escapedChar = try (Text.cons <$> char '\\' <*> (Text.singleton <$> satisfy isNlgEscapable))
+    plainChunk =
+      takeWhile1P (Just "character") (\c -> c /= '\\' && c /= nlgInlineAnnotationCloseChar)
+    -- As in 'nlgString': a backslash that cannot begin an escape stays an
+    -- ordinary character, so @[note\\q]@ still lexes and still means what it
+    -- meant. Every alternative consumes at least one character, so 'many'
+    -- cannot spin on a zero-width success.
+    loneBackslash = Text.singleton <$> char '\\'
 
 lineAnno :: Text -> Lexer (Text, AnnoType)
 lineAnno herald = do

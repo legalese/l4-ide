@@ -199,6 +199,7 @@ import Data.Char
 import qualified Data.Set as Set
 
 import L4.Blawx.IR
+import L4.Nlg (unescapeNlgText)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Relational.IR
 import L4.Syntax (Unique (..))
@@ -1126,7 +1127,13 @@ nlgChunks who rng vars sentence
   | otherwise = Left errs
  where
   (rawChunks, slots) = scanNlg sentence
-  chunks   = map Text.strip rawChunks
+  -- Decode AFTER the scan, never before. 'L4.Relational.Lower.linearNlg'
+  -- hands us the annotation text with its escapes intact precisely so that
+  -- scanNlg above still sees @10\%and\%20@ rather than @10%and%20@ and does
+  -- not cut a phantom slot at @%and%@ ('slotNameShaped' "and" is True).
+  -- Once the slots are separated, the literal chunks are output, so the
+  -- escape has to come off here or @l4 blawx@ emits the backslash.
+  chunks   = map (Text.strip . unescapeNlgText) rawChunks
   interior = drop 1 (take (max 0 (length chunks - 1)) chunks)
   err = blawxErr who rng (LEUnsupported "@nlg slot structure (Blawx)")
   slotTxt sl = if sl.nsBlawxStyle then "@(" <> sl.nsName <> ")" else "%" <> sl.nsName <> "%"

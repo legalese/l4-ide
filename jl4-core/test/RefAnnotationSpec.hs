@@ -113,3 +113,37 @@ spec = describe "@ref annotations attach to arbitrary AST nodes" $ do
       Just t  -> t `shouldSatisfy` Text.isInfixOf "section-leading"
       Nothing ->
         expectationFailure "Expected the leading @ref to attach to the first declaration"
+
+  -- The inline `<<…>>` form shares its lexer with `@nlg`'s `[…]` form only in
+  -- the sense that both are "an annotation between heralds". They must NOT
+  -- share an escape: `L4.Nlg.unescapeNlgText` runs on the NLG linearizer's path
+  -- alone, so a backslash consumed on the ref path would be kept for ever and
+  -- the pre-escape text would stop being writable.
+  --
+  -- Both cases below pass on `unstable` and both were broken, briefly, by a
+  -- first cut of the `\%`/`\]` escape that let `refAnnotation` share the
+  -- escaping body. Neither had a witness anywhere in the corpus or the specs,
+  -- which is why they are here.
+  -- An inline @ref attaches to the node that FOLLOWS it, so these put the
+  -- annotation above the body rather than after it; trailing it would leave it
+  -- unattached and the assertion would be about nothing.
+  describe "the inline @ref form has no escapes and captures verbatim" $ do
+    it "keeps a lone > as ordinary text rather than ending the annotation" $ do
+      bodies <-
+        decideBodyRefs
+          "GIVEN x IS A BOOLEAN\nDECIDE p IF\n  <<s.5 > s.3>>\n  x\n"
+      case bodies of
+        [(_, Just t)] -> t `shouldSatisfy` Text.isInfixOf "s.5 > s.3"
+        _ -> expectationFailure $ "Expected one DECIDE carrying a @ref, got: " <> show (length bodies)
+
+    it "keeps a trailing backslash as ordinary text rather than escaping the closer" $ do
+      -- With a shared escape this did not merely capture the wrong text: `\>`
+      -- was consumed as a unit, so the annotation ran on to the NEXT `>>` in
+      -- the file, or — with none — failed the whole file's lex at end of input,
+      -- reporting a position nowhere near the annotation.
+      bodies <-
+        decideBodyRefs
+          "GIVEN x IS A BOOLEAN\nDECIDE p IF\n  <<see s.5\\>>\n  x\n"
+      case bodies of
+        [(_, Just t)] -> t `shouldSatisfy` Text.isInfixOf "see s.5\\"
+        _ -> expectationFailure $ "Expected one DECIDE carrying a @ref, got: " <> show (length bodies)

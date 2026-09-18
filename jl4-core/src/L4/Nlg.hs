@@ -2,13 +2,14 @@ module L4.Nlg (
   simpleLinearizer,
   Linearize (..),
   lin,
+  unescapeNlgText,
 ) where
 
 import Base
 import qualified Base.Text as Text
 
 import L4.Annotation
-import L4.Lexer (PosToken)
+import L4.Lexer (PosToken, isNlgEscapable)
 import L4.Syntax
 import L4.Utils.Ratio (prettyRatio)
 import L4.Desugar
@@ -429,13 +430,57 @@ instance Linearize Nlg where
    where
     linParsedFragment :: NlgFragment Name -> LinTree
     linParsedFragment = \ case
-      MkNlgText _ t -> user t
+      MkNlgText _ t -> user (unescapeNlgText t)
       MkNlgRef  _ n -> linearize n
 
     linResolvedFragment :: NlgFragment Resolved -> LinTree
     linResolvedFragment = \ case
-      MkNlgText _ t -> user t
+      MkNlgText _ t -> user (unescapeNlgText t)
       MkNlgRef  _ n -> linearize n
+
+-- | Decode the backslash escapes an NLG annotation may carry.
+--
+-- The lexer deliberately keeps @\\%@ and @\\]@ verbatim (see
+-- 'L4.Lexer.inlineNlgAnno'), because that same text is what exactprint
+-- re-emits — decoding earlier makes @l4 format@ strip the backslash and change
+-- the annotation's meaning. So the decode happens on the render side instead.
+--
+-- __Every renderer must call this; two deliberately do not.__ An earlier
+-- revision of this comment claimed the 'Linearize' instance below was "the
+-- single point where annotation text becomes output". That was false, and it
+-- shipped a half-wired feature: @l4 render@ (text, html, json and akn), the
+-- LSP document webview and @l4 blawx@ all rendered the backslash literally.
+-- The current call sites are this instance, 'L4.Export.Document.renderNlgWith'
+-- and 'L4.Blawx.Lower.nlgChunks'. The two abstainers, and why:
+--
+--   * 'L4.Print' keeps the text raw because it is the printer — exactprint and
+--     @prettyLayout@ must re-emit the source bytes.
+--   * 'L4.Relational.Lower.linearNlg' keeps it raw because its output is
+--     re-scanned for @%name%@ slots by 'L4.Blawx.Lower.scanNlg'. Decoding
+--     there would turn @10\\%and\\%20@ back into @10%and%20@ and manufacture
+--     exactly the phantom slot the escape exists to prevent —
+--     @slotNameShaped "and"@ is 'True'. The decode belongs to the literal
+--     chunks that scan returns, which is where 'nlgChunks' applies it.
+--
+-- @\\%@, @\\]@ and @\\\\@ decode; that set is 'L4.Lexer.isNlgEscapable', which this
+-- decoder CALLS rather than restates, and the lexer consumes exactly it, so the
+-- two sides cannot disagree about whether an escape happened. Any other @\\x@ is
+-- two ordinary characters throughout.
+--
+-- Pre-existing annotations are unaffected because the tree contains no
+-- backslash in any @.l4@ file (measured 2026-09-17,
+-- @git grep '\\\\' -- '*.l4'@ → 0 lines). That is a measurement, not a
+-- guarantee: an annotation that did contain @\\%@, @\\]@ or @\\\\@ would now
+-- render differently.
+unescapeNlgText :: Text -> Text
+unescapeNlgText t
+  | not (Text.any (== '\\') t) = t        -- the overwhelmingly common case
+  | otherwise = Text.pack (go (Text.unpack t))
+  where
+    go = \ case
+      '\\' : c : rest | isNlgEscapable c -> c : go rest
+      c : rest -> c : go rest
+      [] -> []
 
 hcat :: [LinTree] -> LinTree
 hcat = mconcat . intersperse space
