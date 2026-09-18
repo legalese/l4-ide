@@ -574,6 +574,32 @@ function expandScopes(proc, n) {
     }
     for (let i = 0; i < n; i++) {
       const cp = (id) => `${id}#${i}`;
+      // One "this instance is finished" gateway per COPY, XOR, merging every
+      // path that reaches a normal end inside it.
+      //
+      // Without it the join waits on one token per (instance x arrival flow),
+      // and an interior with two ways to reach its end — the act completing,
+      // or its deadline expiring — deadlocks the moment every instance takes
+      // the same one of them. Measured on the emitter's own `modals-may-fork`
+      // golden: at n = 2, both directors let the permission lapse, both
+      // boundary flows carry a token, and the join sits waiting forever on the
+      // two flows out of the task nobody performed. The file was correct; the
+      // model was counting arrivals where the semantics count instances.
+      //
+      // XOR is right here because a sub-process instance completes when it has
+      // no tokens left, and these copies hold exactly one: an interrupting
+      // boundary makes "performed" and "expired" exclusive. An interior that
+      // really does run two tokens concurrently has to rejoin them at a
+      // parallel gateway before its end event, and if it does not, that is an
+      // uncontrolled merge S4 reports on its own.
+      const done = `${sc.id}:done#${i}`;
+      nodes.set(done, {
+        id: done,
+        kind: "exclusiveGateway",
+        name: `${sc.name || sc.id} (instance ${i} done)`,
+      });
+      sourceOf.set(done, sc.id);
+      flows.push({ id: `${sc.id}:done#${i}->join`, source: done, target: join });
       for (const x of inner.nodes.values()) {
         if (x.kind === "startEvent" || x.kind === "endEvent") continue;
         nodes.set(cp(x.id), { ...x, id: cp(x.id), name: x.name });
@@ -599,7 +625,7 @@ function expandScopes(proc, n) {
         let tgt;
         if (endOf.has(f.target)) {
           const e = endOf.get(f.target);
-          tgt = isThrow(e) ? b.id : join;
+          tgt = isThrow(e) ? b.id : done;
         } else {
           tgt = cp(f.target);
         }
