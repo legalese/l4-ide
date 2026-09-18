@@ -97,6 +97,7 @@ stateGraphToBpmn opts sg =
           }
     , bxDiagram = diagram
     , bxHasError = any isErrorEnd allNodes
+    , bxHasEscalation = any isEscalationEnd allNodes
     , bxFidelity = foldl' (flip addNote) (emptyReport "BPMN 2.0") findings
     }
  where
@@ -165,6 +166,8 @@ stateGraphToBpmn opts sg =
         , nodeDoc = Nothing
         , nodeLane = Nothing
         , nodeMultiInstance = Nothing
+        , nodeParent = Nothing
+        , nodeLoopCollection = Nothing
         }
       | s.stateType == InitialState
       ]
@@ -180,6 +183,8 @@ stateGraphToBpmn opts sg =
         , nodeDoc = Just (fanDoc s.stateFan)
         , nodeLane = Nothing
         , nodeMultiInstance = Nothing
+        , nodeParent = Nothing
+        , nodeLoopCollection = Nothing
         }
       | s.stateFan /= Linear
       ]
@@ -199,6 +204,8 @@ stateGraphToBpmn opts sg =
                   )
             , nodeLane = t.transLabel.labelParty
             , nodeMultiInstance = multiInstanceFor t.transLabel
+            , nodeParent = Nothing
+            , nodeLoopCollection = Nothing
             }
         ]
 
@@ -206,10 +213,12 @@ stateGraphToBpmn opts sg =
       [ FlowNode
         { nodeId = "End_" <> tag
         , nodeName = s.stateName
-        , nodeKind = EndEvent (s.stateType == TerminalBreach)
+        , nodeKind = EndEvent (if s.stateType == TerminalBreach then ErrorEnd else PlainEnd)
         , nodeDoc = Nothing
         , nodeLane = Nothing
         , nodeMultiInstance = Nothing
+        , nodeParent = Nothing
+        , nodeLoopCollection = Nothing
         }
       | s.stateType == TerminalFulfilled || s.stateType == TerminalBreach
       ]
@@ -221,10 +230,12 @@ stateGraphToBpmn opts sg =
       [ FlowNode
         { nodeId = "End_" <> tag
         , nodeName = s.stateName
-        , nodeKind = EndEvent False
+        , nodeKind = EndEvent PlainEnd
         , nodeDoc = Just "no outgoing transition in the source state graph"
         , nodeLane = Nothing
         , nodeMultiInstance = Nothing
+        , nodeParent = Nothing
+        , nodeLoopCollection = Nothing
         }
       | null startNodes && null gatewayNodes && null taskNodes && null endNodes
       ]
@@ -259,6 +270,8 @@ stateGraphToBpmn opts sg =
                   , nodeDoc = Just (boundaryDoc modal deadline)
                   , nodeLane = host.nodeLane
                   , nodeMultiInstance = Nothing
+                  , nodeParent = Nothing
+                  , nodeLoopCollection = Nothing
                   }
             , finds
             )
@@ -755,6 +768,8 @@ stateGraphToBpmn opts sg =
                 , nodeDoc = Just (decideDoc wg.wgCall)
                 , nodeLane = Nothing
                 , nodeMultiInstance = Nothing
+                , nodeParent = Nothing
+                , nodeLoopCollection = Nothing
                 }
             redirect e
               | e.edTo == gw = e {edTo = did}
@@ -859,6 +874,8 @@ stateGraphToBpmn opts sg =
                             \delivers exactly one token"
                       , nodeLane = Nothing
                       , nodeMultiInstance = Nothing
+                      , nodeParent = Nothing
+                      , nodeLoopCollection = Nothing
                       }
                in ( nodes <> [joinNode]
                   , map redirect edges <> [plainEdge jid tgt Nothing]
@@ -1190,7 +1207,12 @@ stateGraphToBpmn opts sg =
 
 isErrorEnd :: FlowNode -> Bool
 isErrorEnd n = case n.nodeKind of
-  EndEvent isError -> isError
+  EndEvent ErrorEnd -> True
+  _ -> False
+
+isEscalationEnd :: FlowNode -> Bool
+isEscalationEnd n = case n.nodeKind of
+  EndEvent EscalationEnd -> True
   _ -> False
 
 -- | Restate every gateway's @gatewayDirection@ as what its edges actually say.
@@ -1515,9 +1537,27 @@ triggerName (Just DMustNot) mDue trigger _ = case trigger of
     -- residual and never reaches HENCE. This used to read "the act is not
     -- performed", naming an event that never fires.
     | otherwise -> noTriggerWording
+  CatchEscalation -> escalationCatchName
 triggerName _ _ trigger fallback = case trigger of
   TimerAfter iso -> "after " <> iso
   WhenCondition _ -> if Text.null (Text.strip fallback) then "otherwise" else fallback
+  CatchEscalation -> escalationCatchName
+
+-- | The caption on the escalation boundary of a 'MultiInstanceScope'.
+--
+-- It is deliberately NOT one member's wording. Every arm this function
+-- otherwise names belongs to a single obligation — \"after P7D\", \"violation\" —
+-- because outside a scope there is one. This node is attached to the group and
+-- fires once per instance that throws, so a caption naming a member would be
+-- read as naming THE member, and there is no such member: the boundary cannot
+-- tell you which tenant breached, only that one did. Saying less is the only
+-- thing available that is true.
+--
+-- The same shortfall on the top-level arm is what every-each reported for the
+-- barrier: a quantified breach ends in the one shared @Error_breach@, which
+-- names no party either.
+escalationCatchName :: Text
+escalationCatchName = "a member breached"
 
 -- | Which node each arm of the obligation leaves from: @(HENCE source, LEST
 -- source)@, given the task and the deadline's boundary event.
