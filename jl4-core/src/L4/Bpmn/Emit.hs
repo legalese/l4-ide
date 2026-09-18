@@ -122,6 +122,7 @@ processLines bx =
       ]
   ]
     <> laneSetLines p
+    <> dataObjectLines p
     <> concatMap (nodeLines p 2) [n | n <- p.procNodes, isNothing n.nodeParent]
     <> concatMap (flowLines 2) (topLevelFlows p)
     <> [closeTag 1 "bpmn:process"]
@@ -191,7 +192,7 @@ nodeLines p depth node = case node.nodeKind of
             "bpmn:escalationEventDefinition"
             [("id", "EscDef_" <> node.nodeId), ("escalationRef", sharedEscalationId)]
         ]
-  Task -> element "bpmn:task" [] (multiInstanceLines (depth + 1) node)
+  Task -> element "bpmn:task" [] (activityDataLines (depth + 1) node)
   Gateway kind flow ->
     element (gatewayTag kind) [("gatewayDirection", flowDirection flow)] []
   Boundary host trigger ->
@@ -213,7 +214,7 @@ nodeLines p depth node = case node.nodeKind of
     element
       "bpmn:subProcess"
       [("triggeredByEvent", "false")]
-      ( multiInstanceLines (depth + 1) node
+      ( activityDataLines (depth + 1) node
           <> concatMap (nodeLines p (depth + 1)) (childrenOf p node.nodeId)
           <> concatMap (flowLines (depth + 1)) (flowsInside p node.nodeId)
       )
@@ -225,6 +226,93 @@ nodeLines p depth node = case node.nodeKind of
           then [selfClose depth tag as]
           else [openTag depth tag as] <> body <> [closeTag depth tag]
   nameAttr = [("name", node.nodeName) | not (Text.null node.nodeName)]
+
+-- | The collection a multi-instance activity loops over, as the three things
+-- BPMN needs to resolve it.
+--
+-- __@loopDataInputRef@ is an IDREF, not a name.__ Emitting the variable name
+-- into it directly reads correctly and does not resolve: bpmn-moddle answers
+-- @unresolved reference@, because the element it points at has to exist. So an
+-- activity with a collection declares:
+--
+-- * an @\<ioSpecification\>@ with a @\<dataInput\>@ the loop can point at;
+-- * a @\<dataInputAssociation\>@ joining that input to the process-level data
+--   object ('dataObjectLines'), which is where the list actually lives.
+--
+-- The data object is what an engine or a modeller binds; the data input is the
+-- activity's own end of the wire. Both carry the same name — @\<rule\>_cast@ —
+-- so a reader sees one variable rather than the plumbing.
+--
+-- @isCollection="true"@ on both says the thing is a list. It is the one claim
+-- here that is about CONTENTS rather than about wiring, and it is safe because
+-- it follows from being an @EVERY@'s cast at all, not from any guess at who is
+-- in it.
+activityDataLines :: Int -> FlowNode -> [Text]
+activityDataLines depth node = case node.nodeLoopCollection of
+  Nothing -> multiInstanceLines depth node
+  Just c ->
+    [ openTag depth "bpmn:ioSpecification" [("id", "IoSpec_" <> node.nodeId)]
+    , selfClose
+        (depth + 1)
+        "bpmn:dataInput"
+        [ ("id", dataInputId node)
+        , ("name", c.loopVariable)
+        , ("isCollection", "true")
+        ]
+    , openTag (depth + 1) "bpmn:inputSet" [("id", "InputSet_" <> node.nodeId)]
+    , textEl (depth + 2) "bpmn:dataInputRefs" [] (dataInputId node)
+    , closeTag (depth + 1) "bpmn:inputSet"
+    , selfClose (depth + 1) "bpmn:outputSet" [("id", "OutputSet_" <> node.nodeId)]
+    , closeTag depth "bpmn:ioSpecification"
+    , openTag
+        depth
+        "bpmn:dataInputAssociation"
+        [("id", "DataInputAssoc_" <> node.nodeId)]
+    , textEl (depth + 1) "bpmn:sourceRef" [] (dataObjectRefId c.loopVariable)
+    , textEl (depth + 1) "bpmn:targetRef" [] (dataInputId node)
+    , closeTag depth "bpmn:dataInputAssociation"
+    ]
+      <> multiInstanceLines depth node
+
+dataInputId :: FlowNode -> Text
+dataInputId node = "DataInput_" <> node.nodeId
+
+dataObjectId, dataObjectRefId :: Text -> Text
+dataObjectId v = "DataObject_" <> v
+dataObjectRefId v = "DataObjectRef_" <> v
+
+-- | One @\<dataObject\>@ per distinct collection, with the
+-- @\<dataObjectReference\>@ that flow elements point at.
+--
+-- A data object is a flow element of the PROCESS even when the only activity
+-- that reads it is inside a sub-process: BPMN scopes data by declaration, and
+-- declaring it inside the scope would give each instance its own empty copy of
+-- the list it is supposed to be iterating.
+--
+-- Deduplicated by name, because two rules in one file can draw from one cast —
+-- and because a repeated @id@ is the kind of malformedness no schema validator
+-- reports.
+dataObjectLines :: BpmnProcess -> [Text]
+dataObjectLines p =
+  concat
+    [ [ selfClose
+          2
+          "bpmn:dataObject"
+          [("id", dataObjectId v), ("name", v), ("isCollection", "true")]
+      , selfClose
+          2
+          "bpmn:dataObjectReference"
+          [ ("id", dataObjectRefId v)
+          , ("name", v)
+          , ("dataObjectRef", dataObjectId v)
+          ]
+      ]
+    | v <- collectionNames p
+    ]
+
+collectionNames :: BpmnProcess -> [Text]
+collectionNames p =
+  Set.toAscList (Set.fromList [c.loopVariable | n <- p.procNodes, Just c <- [n.nodeLoopCollection]])
 
 -- | The loop characteristics of an @EVERY@'s activity — a multi-instance task
 -- or a 'MultiInstanceScope'. Emitted after the @\<documentation\>@, which is the
@@ -267,8 +355,11 @@ multiInstanceLines depth node = case (node.nodeKind, node.nodeMultiInstance) of
   collectionLines = case node.nodeLoopCollection of
     Nothing -> []
     Just c ->
-      [ textEl (depth + 1) "bpmn:loopDataInputRef" [] c.loopVariable
-      , textEl (depth + 1) "bpmn:inputDataItem" [("name", c.loopItem)] ""
+      [ textEl (depth + 1) "bpmn:loopDataInputRef" [] (dataInputId node)
+      , selfClose
+          (depth + 1)
+          "bpmn:inputDataItem"
+          [("id", "DataItem_" <> node.nodeId), ("name", c.loopItem)]
       ]
 
 gatewayTag :: GatewayKind -> Text

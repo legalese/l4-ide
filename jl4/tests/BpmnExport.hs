@@ -723,16 +723,26 @@ data Terminal = ToFulfilled | ToBreach | ToBoth | ToNeither
 
 terminalFrom :: BpmnExport -> Text -> Terminal
 terminalFrom bx start =
-  case (reachesEnd False, reachesEnd True) of
+  case (reachesEnd [PlainEnd], reachesEnd [ErrorEnd, EscalationEnd]) of
     (True, True) -> ToBoth
     (True, False) -> ToFulfilled
     (False, True) -> ToBreach
     (False, False) -> ToNeither
  where
   reached = Set.toList (reachableFrom bx start)
-  reachesEnd wantError =
+  -- An escalation end is a breach: inside a multi-instance scope a member's
+  -- LEST arm ends by THROWING rather than by being an error end, because an
+  -- error would cancel the other members. A test asking "does this path reach
+  -- breach" is asking about the rule, not about which BPMN event shape carries
+  -- it, so both count.
+  reachesEnd kinds =
     any
-      (\nid -> maybe False ((== EndEvent wantError) . (.nodeKind)) (nodeNamed bx nid))
+      ( \nid ->
+          maybe
+            False
+            (\n -> case n.nodeKind of EndEvent k -> k `elem` kinds; _ -> False)
+            (nodeNamed bx nid)
+      )
       reached
 
 -- | The two arms of an obligation's race, as terminals:
@@ -1086,13 +1096,13 @@ spec = do
         xml = renderBpmn bx
 
     it "a breach terminal is an error end event" $ do
-      let breaches = [n | n <- bx.bxProcess.procNodes, n.nodeKind == EndEvent True]
+      let breaches = [n | n <- bx.bxProcess.procNodes, n.nodeKind == EndEvent ErrorEnd]
       map (.nodeName) breaches `shouldBe` ["Breach"]
       xml `shouldSatisfy` Text.isInfixOf "<bpmn:errorEventDefinition"
       xml `shouldSatisfy` Text.isInfixOf "<bpmn:error id=\"Error_breach\""
 
     it "a fulfilled terminal is a plain end event" $
-      [n.nodeName | n <- bx.bxProcess.procNodes, n.nodeKind == EndEvent False]
+      [n.nodeName | n <- bx.bxProcess.procNodes, n.nodeKind == EndEvent PlainEnd]
         `shouldBe` ["Fulfilled"]
 
   describe "lanes" $ do
@@ -1965,7 +1975,7 @@ spec = do
       -- on the review's reading rather than a run; the run says FULFILLED.
       let lapseEndsFulfilled bx = case lapses bx of
             [("Boundary_0", [tgt])] ->
-              maybe Nothing (\n -> Just n.nodeKind) (nodeNamed bx tgt) `shouldBe` Just (EndEvent False)
+              maybe Nothing (\n -> Just n.nodeKind) (nodeNamed bx tgt) `shouldBe` Just (EndEvent PlainEnd)
             other -> expectationFailure ("expected one boundary on Task_0 with one flow, got " <> show other)
       it "under a barrier, a lapse ends the rule fulfilled with nothing following" $
         lapseEndsFulfilled mayBarrier
@@ -2010,7 +2020,7 @@ spec = do
           -- as the kind: "is an end event" would still pass if the graph grew
           -- a second one and the flow went to the wrong end.
           map (\n -> (n.nodeKind, n.nodeName)) (maybeToList (nodeNamed permission tgt))
-            `shouldBe` [(EndEvent False, "Fulfilled")]
+            `shouldBe` [(EndEvent PlainEnd, "Fulfilled")]
         other -> expectationFailure ("expected one boundary on Task_0 with one flow, got " <> show other)
     it "draws no arm at all when the permission has no deadline to lapse at" $ do
       onTask0 noDeadline `shouldBe` []

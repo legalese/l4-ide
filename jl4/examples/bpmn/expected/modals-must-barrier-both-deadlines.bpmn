@@ -24,10 +24,26 @@
         <bpmn:flowNodeRef>End_2</bpmn:flowNodeRef>
       </bpmn:lane>
     </bpmn:laneSet>
+    <bpmn:dataObject id="DataObject_quorum_by_ten_cast" name="quorum_by_ten_cast" isCollection="true" />
+    <bpmn:dataObjectReference id="DataObjectRef_quorum_by_ten_cast" name="quorum_by_ten_cast" dataObjectRef="DataObject_quorum_by_ten_cast" />
     <bpmn:startEvent id="Start_0" />
     <bpmn:task id="Task_0" name="MUST Approve ...">
       <bpmn:documentation>EVERY Director d IN board MUST Approve ... WITHIN 30 ONCE ALL HAVE WITHIN 10 — one instance per member of the cast, each bound to ‘d’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). ONCE ALL HAVE: the outgoing flow fires once, when every instance has completed — which is what a parallel multi-instance activity&apos;s completion means, so this barrier is drawn faithfully.</bpmn:documentation>
-      <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Task_0" isSequential="false" />
+      <bpmn:ioSpecification id="IoSpec_Task_0">
+        <bpmn:dataInput id="DataInput_Task_0" name="quorum_by_ten_cast" isCollection="true" />
+        <bpmn:inputSet id="InputSet_Task_0">
+          <bpmn:dataInputRefs>DataInput_Task_0</bpmn:dataInputRefs>
+        </bpmn:inputSet>
+        <bpmn:outputSet id="OutputSet_Task_0" />
+      </bpmn:ioSpecification>
+      <bpmn:dataInputAssociation id="DataInputAssoc_Task_0">
+        <bpmn:sourceRef>DataObjectRef_quorum_by_ten_cast</bpmn:sourceRef>
+        <bpmn:targetRef>DataInput_Task_0</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Task_0" isSequential="false">
+        <bpmn:loopDataInputRef>DataInput_Task_0</bpmn:loopDataInputRef>
+        <bpmn:inputDataItem id="DataItem_Task_0" name="d" />
+      </bpmn:multiInstanceLoopCharacteristics>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_0" name="after P30D" attachedToRef="Task_0" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within 30</bpmn:documentation>

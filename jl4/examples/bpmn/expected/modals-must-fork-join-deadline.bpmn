@@ -9,14 +9,15 @@
                   exporter="jl4 (L4.Bpmn)"
                   exporterVersion="1">
   <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
+  <bpmn:escalation id="Escalation_breach" name="Breach" escalationCode="BREACH" />
   <bpmn:collaboration id="Collaboration_approve__or_else">
     <bpmn:participant id="Participant_approve__or_else" name="approve, or else" processRef="Process_approve__or_else" />
   </bpmn:collaboration>
   <bpmn:process id="Process_approve__or_else" name="approve, or else" isExecutable="false">
     <bpmn:laneSet id="LaneSet_1">
       <bpmn:lane id="Lane_1_EVERY_Director_d_IN_board" name="EVERY Director d IN board">
-        <bpmn:flowNodeRef>Task_0</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Boundary_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Scope_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>BoundaryEsc_0</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_unassigned" name="(unassigned)">
         <bpmn:flowNodeRef>Start_0</bpmn:flowNodeRef>
@@ -24,38 +25,74 @@
         <bpmn:flowNodeRef>End_2</bpmn:flowNodeRef>
       </bpmn:lane>
     </bpmn:laneSet>
+    <bpmn:dataObject id="DataObject_approve__or_else_cast" name="approve__or_else_cast" isCollection="true" />
+    <bpmn:dataObjectReference id="DataObjectRef_approve__or_else_cast" name="approve__or_else_cast" dataObjectRef="DataObject_approve__or_else_cast" />
     <bpmn:startEvent id="Start_0" />
-    <bpmn:task id="Task_0" name="MUST Approve ...">
-      <bpmn:documentation>EVERY Director d IN board MUST Approve ... UPON EACH WITHIN 10 — one instance per member of the cast, each bound to ‘d’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). UPON EACH: in the source, what follows fires once per member as that member completes. A multi-instance activity fires its outgoing flow once, after the last instance, so what follows is drawn once (P-FORK), and the timer on this activity cancels every instance (P-FORK-CANCEL).</bpmn:documentation>
-      <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Task_0" isSequential="false" />
-    </bpmn:task>
-    <bpmn:boundaryEvent id="Boundary_0" name="after P10D" attachedToRef="Task_0" cancelActivity="true">
-      <bpmn:documentation>LEST: the obligation is not discharged within 10</bpmn:documentation>
-      <bpmn:timerEventDefinition id="Timer_Boundary_0">
-        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P10D</bpmn:timeDuration>
-      </bpmn:timerEventDefinition>
-    </bpmn:boundaryEvent>
     <bpmn:endEvent id="End_1" name="Fulfilled" />
     <bpmn:endEvent id="End_2" name="Breach">
       <bpmn:errorEventDefinition id="ErrorDef_End_2" errorRef="Error_breach" />
     </bpmn:endEvent>
-    <bpmn:sequenceFlow id="Flow_Start_0__Task_0" sourceRef="Start_0" targetRef="Task_0" />
-    <bpmn:sequenceFlow id="Flow_Task_0__End_1" sourceRef="Task_0" targetRef="End_1" />
-    <bpmn:sequenceFlow id="Flow_Boundary_0__End_2" sourceRef="Boundary_0" targetRef="End_2" />
+    <bpmn:subProcess id="Scope_0" name="each Director" triggeredByEvent="false">
+      <bpmn:documentation>One instance per member of the cast, all live at once. The join line is UPON EACH, so everything this box contains — the act, its deadline, and what follows it — belongs to ONE member and runs once per member.</bpmn:documentation>
+      <bpmn:ioSpecification id="IoSpec_Scope_0">
+        <bpmn:dataInput id="DataInput_Scope_0" name="approve__or_else_cast" isCollection="true" />
+        <bpmn:inputSet id="InputSet_Scope_0">
+          <bpmn:dataInputRefs>DataInput_Scope_0</bpmn:dataInputRefs>
+        </bpmn:inputSet>
+        <bpmn:outputSet id="OutputSet_Scope_0" />
+      </bpmn:ioSpecification>
+      <bpmn:dataInputAssociation id="DataInputAssoc_Scope_0">
+        <bpmn:sourceRef>DataObjectRef_approve__or_else_cast</bpmn:sourceRef>
+        <bpmn:targetRef>DataInput_Scope_0</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Scope_0" isSequential="false">
+        <bpmn:loopDataInputRef>DataInput_Scope_0</bpmn:loopDataInputRef>
+        <bpmn:inputDataItem id="DataItem_Scope_0" name="d" />
+      </bpmn:multiInstanceLoopCharacteristics>
+      <bpmn:task id="Task_0" name="MUST Approve ...">
+        <bpmn:documentation>EVERY Director d IN board MUST Approve ... UPON EACH WITHIN 10 — one instance per member of the cast, each bound to ‘d’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). UPON EACH: what follows fires once per member, as that member completes. Everything after this act is drawn INSIDE a multi-instance sub-process, so each member gets their own copy of it and their own deadline; the box, not this task, carries the multi-instance marker. What the enclosure adds and the rule does not have is a synchronisation at the end of the box (P-FORK-JOIN).</bpmn:documentation>
+      </bpmn:task>
+      <bpmn:boundaryEvent id="Boundary_0" name="after P10D" attachedToRef="Task_0" cancelActivity="true">
+        <bpmn:documentation>LEST: the obligation is not discharged within 10</bpmn:documentation>
+        <bpmn:timerEventDefinition id="Timer_Boundary_0">
+          <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P10D</bpmn:timeDuration>
+        </bpmn:timerEventDefinition>
+      </bpmn:boundaryEvent>
+      <bpmn:startEvent id="StartScope_0">
+        <bpmn:documentation>one instance per member of the cast</bpmn:documentation>
+      </bpmn:startEvent>
+      <bpmn:endEvent id="EndScope_0" name="Fulfilled">
+        <bpmn:documentation>this member is done. The instance of every other member is unaffected: that is what UPON EACH says, and what enclosing the continuation here is for.</bpmn:documentation>
+      </bpmn:endEvent>
+      <bpmn:endEvent id="EscScope_0" name="Breach">
+        <bpmn:documentation>this member breached. Raised as an escalation and not as an error: an error event is interrupting in BPMN 2.0, so an error thrown here would cancel the instance of every other member, which the rule does not say.</bpmn:documentation>
+        <bpmn:escalationEventDefinition id="EscDef_EscScope_0" escalationRef="Escalation_breach" />
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="Flow_Task_0__EndScope_0" sourceRef="Task_0" targetRef="EndScope_0" />
+      <bpmn:sequenceFlow id="Flow_Boundary_0__EscScope_0" sourceRef="Boundary_0" targetRef="EscScope_0" />
+      <bpmn:sequenceFlow id="Flow_StartScope_0__Task_0" sourceRef="StartScope_0" targetRef="Task_0" />
+    </bpmn:subProcess>
+    <bpmn:boundaryEvent id="BoundaryEsc_0" name="a member breached" attachedToRef="Scope_0" cancelActivity="false">
+      <bpmn:documentation>catches a breach raised by one member, without interrupting the group: every other member remains bound, and a second breach is caught here too.</bpmn:documentation>
+      <bpmn:escalationEventDefinition id="EscDef_BoundaryEsc_0" escalationRef="Escalation_breach" />
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_Start_0__Scope_0" sourceRef="Start_0" targetRef="Scope_0" />
+    <bpmn:sequenceFlow id="Flow_Scope_0__End_1" sourceRef="Scope_0" targetRef="End_1" />
+    <bpmn:sequenceFlow id="Flow_BoundaryEsc_0__End_2" sourceRef="BoundaryEsc_0" targetRef="End_2" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_approve__or_else">
       <bpmndi:BPMNShape id="Shape_Participant_approve__or_else" bpmnElement="Participant_approve__or_else" isHorizontal="true">
-        <dc:Bounds x="130" y="80" width="590" height="440" />
+        <dc:Bounds x="130" y="80" width="590" height="628" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Lane_1_EVERY_Director_d_IN_board" bpmnElement="Lane_1_EVERY_Director_d_IN_board" isHorizontal="true">
-        <dc:Bounds x="160" y="80" width="560" height="160" />
+        <dc:Bounds x="160" y="80" width="560" height="348" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Lane_unassigned" bpmnElement="Lane_unassigned" isHorizontal="true">
-        <dc:Bounds x="160" y="240" width="560" height="280" />
+        <dc:Bounds x="160" y="428" width="560" height="280" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Start_0" bpmnElement="Start_0">
-        <dc:Bounds x="232" y="282" width="36" height="36" />
+        <dc:Bounds x="232" y="470" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Task_0" bpmnElement="Task_0">
         <dc:Bounds x="380" y="100" width="100" height="80" />
@@ -64,28 +101,59 @@
         <dc:Bounds x="434" y="162" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_End_1" bpmnElement="End_1">
-        <dc:Bounds x="592" y="282" width="36" height="36" />
+        <dc:Bounds x="592" y="470" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_End_2" bpmnElement="End_2">
-        <dc:Bounds x="592" y="402" width="36" height="36" />
+        <dc:Bounds x="592" y="590" width="36" height="36" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Task_0" bpmnElement="Flow_Start_0__Task_0">
-        <di:waypoint x="268" y="300" />
-        <di:waypoint x="314" y="300" />
-        <di:waypoint x="314" y="140" />
-        <di:waypoint x="380" y="140" />
+      <bpmndi:BPMNShape id="Shape_Scope_0" bpmnElement="Scope_0" isExpanded="true">
+        <dc:Bounds x="208" y="76" width="444" height="246" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_StartScope_0" bpmnElement="StartScope_0">
+        <dc:Bounds x="232" y="122" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndScope_0" bpmnElement="EndScope_0">
+        <dc:Bounds x="592" y="122" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EscScope_0" bpmnElement="EscScope_0">
+        <dc:Bounds x="592" y="242" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_BoundaryEsc_0" bpmnElement="BoundaryEsc_0">
+        <dc:Bounds x="606" y="304" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Scope_0" bpmnElement="Flow_Start_0__Scope_0">
+        <di:waypoint x="268" y="488" />
+        <di:waypoint x="314" y="488" />
+        <di:waypoint x="314" y="199" />
+        <di:waypoint x="208" y="199" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Edge_Flow_Task_0__End_1" bpmnElement="Flow_Task_0__End_1">
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_0__EndScope_0" bpmnElement="Flow_Task_0__EndScope_0">
         <di:waypoint x="480" y="140" />
         <di:waypoint x="494" y="140" />
-        <di:waypoint x="494" y="300" />
-        <di:waypoint x="592" y="300" />
+        <di:waypoint x="592" y="140" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_0__End_2" bpmnElement="Flow_Boundary_0__End_2">
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_0__EscScope_0" bpmnElement="Flow_Boundary_0__EscScope_0">
         <di:waypoint x="452" y="198" />
-        <di:waypoint x="546" y="198" />
-        <di:waypoint x="546" y="420" />
-        <di:waypoint x="592" y="420" />
+        <di:waypoint x="511" y="198" />
+        <di:waypoint x="511" y="260" />
+        <di:waypoint x="592" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_StartScope_0__Task_0" bpmnElement="Flow_StartScope_0__Task_0">
+        <di:waypoint x="268" y="140" />
+        <di:waypoint x="331" y="140" />
+        <di:waypoint x="380" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Scope_0__End_1" bpmnElement="Flow_Scope_0__End_1">
+        <di:waypoint x="652" y="199" />
+        <di:waypoint x="528" y="199" />
+        <di:waypoint x="528" y="488" />
+        <di:waypoint x="592" y="488" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_BoundaryEsc_0__End_2" bpmnElement="Flow_BoundaryEsc_0__End_2">
+        <di:waypoint x="624" y="340" />
+        <di:waypoint x="545" y="340" />
+        <di:waypoint x="545" y="608" />
+        <di:waypoint x="592" y="608" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
