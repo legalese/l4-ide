@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_throwprobe"
+                  targetNamespace="https://l4.legalese.com/bpmn"
+                  exporter="jl4 (L4.Bpmn)" exporterVersion="1">
+  <bpmn:escalation id="Escalation_breach" name="Breach" escalationCode="BREACH" />
+  <bpmn:itemDefinition id="Item_cast" structureRef="java.util.List" />
+  <bpmn:itemDefinition id="Item_m" structureRef="java.lang.Object" />
+  <bpmn:process id="Process_throwprobe" name="does a throwing instance finish" isExecutable="false">
+    <bpmn:property id="probe_t_cast" name="probe_t_cast" itemSubjectRef="Item_cast" />
+    <bpmn:startEvent id="Start_0" />
+    <bpmn:subProcess id="Scope_0" name="each member">
+      <bpmn:documentation>Every instance ends by THROWING. The question this file
+settles is whether an instance that threw is an instance that has FINISHED: BPMN
+says a sub-process instance completes when it has no tokens left, and an
+escalation end leaves none, so the scope should still complete and take its
+outgoing flow.</bpmn:documentation>
+      <bpmn:ioSpecification id="IoSpec_Scope_0">
+        <bpmn:dataInput id="DataInput_Scope_0" name="probe_t_cast" itemSubjectRef="Item_cast" isCollection="true" />
+        <bpmn:inputSet id="InputSet_Scope_0"><bpmn:dataInputRefs>DataInput_Scope_0</bpmn:dataInputRefs></bpmn:inputSet>
+        <bpmn:outputSet id="OutputSet_Scope_0" />
+      </bpmn:ioSpecification>
+      <bpmn:dataInputAssociation id="DataInputAssoc_Scope_0">
+        <bpmn:sourceRef>probe_t_cast</bpmn:sourceRef><bpmn:targetRef>DataInput_Scope_0</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:multiInstanceLoopCharacteristics id="MI_Scope_0" isSequential="false">
+        <bpmn:loopDataInputRef>DataInput_Scope_0</bpmn:loopDataInputRef>
+        <bpmn:inputDataItem id="DataItem_Scope_0" name="t" itemSubjectRef="Item_m" />
+      </bpmn:multiInstanceLoopCharacteristics>
+      <bpmn:startEvent id="StartScope_0" />
+      <bpmn:task id="Task_0" name="MUST Pay ..." />
+      <bpmn:endEvent id="EscScope_0" name="Breach">
+        <bpmn:escalationEventDefinition id="EscDef_EscScope_0" escalationRef="Escalation_breach" />
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="Flow_s0" sourceRef="StartScope_0" targetRef="Task_0" />
+      <bpmn:sequenceFlow id="Flow_s1" sourceRef="Task_0" targetRef="EscScope_0" />
+    </bpmn:subProcess>
+    <bpmn:boundaryEvent id="BoundaryEsc_0" name="a member breached" attachedToRef="Scope_0" cancelActivity="false">
+      <bpmn:escalationEventDefinition id="EscDef_BoundaryEsc_0" escalationRef="Escalation_breach" />
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="EndGroup_0" name="every run has ended" />
+    <bpmn:endEvent id="EndBreach_0" name="Breach" />
+    <bpmn:sequenceFlow id="Flow_t0" sourceRef="Start_0" targetRef="Scope_0" />
+    <bpmn:sequenceFlow id="Flow_t1" sourceRef="Scope_0" targetRef="EndGroup_0" />
+    <bpmn:sequenceFlow id="Flow_t2" sourceRef="BoundaryEsc_0" targetRef="EndBreach_0" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_0">
+    <bpmndi:BPMNPlane id="Plane_0" bpmnElement="Process_throwprobe">
+      <bpmndi:BPMNShape id="Shape_Start_0" bpmnElement="Start_0">
+        <dc:Bounds x="160" y="160" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Scope_0" bpmnElement="Scope_0" isExpanded="true">
+        <dc:Bounds x="250" y="100" width="420" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_StartScope_0" bpmnElement="StartScope_0">
+        <dc:Bounds x="290" y="160" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_0" bpmnElement="Task_0">
+        <dc:Bounds x="380" y="138" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EscScope_0" bpmnElement="EscScope_0">
+        <dc:Bounds x="570" y="160" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_BoundaryEsc_0" bpmnElement="BoundaryEsc_0">
+        <dc:Bounds x="620" y="242" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndGroup_0" bpmnElement="EndGroup_0">
+        <dc:Bounds x="740" y="160" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndBreach_0" bpmnElement="EndBreach_0">
+        <dc:Bounds x="740" y="242" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_t0" bpmnElement="Flow_t0">
+        <di:waypoint x="196" y="178" /><di:waypoint x="250" y="178" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_t1" bpmnElement="Flow_t1">
+        <di:waypoint x="670" y="178" /><di:waypoint x="740" y="178" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_t2" bpmnElement="Flow_t2">
+        <di:waypoint x="656" y="260" /><di:waypoint x="740" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_s0" bpmnElement="Flow_s0">
+        <di:waypoint x="326" y="178" /><di:waypoint x="380" y="178" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_s1" bpmnElement="Flow_s1">
+        <di:waypoint x="480" y="178" /><di:waypoint x="570" y="178" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
