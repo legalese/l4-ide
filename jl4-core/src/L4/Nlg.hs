@@ -462,16 +462,23 @@ instance Linearize Nlg where
 --     @slotNameShaped "and"@ is 'True'. The decode belongs to the literal
 --     chunks that scan returns, which is where 'nlgChunks' applies it.
 --
--- @\\%@, @\\]@ and @\\\\@ decode; that set is 'L4.Lexer.isNlgEscapable', which this
--- decoder CALLS rather than restates, and the lexer consumes exactly it, so the
--- two sides cannot disagree about whether an escape happened. Any other @\\x@ is
--- two ordinary characters throughout.
+-- @\\%@, @\\]@, @\\[@ and @\\\\@ decode; that set is 'L4.Lexer.isNlgEscapable',
+-- which this decoder CALLS rather than restates, and the lexer consumes exactly
+-- it, so the two sides cannot disagree about whether an escape happened. Any
+-- other @\\x@ is two ordinary characters throughout. @\\[@ joined the set on
+-- 2026-09-19 and is the one member that protects nothing — see the ruling at
+-- 'L4.Lexer.isNlgEscapable' for why a redundant escape is still worth accepting.
 --
--- Pre-existing annotations are unaffected because the tree contains no
--- backslash in any @.l4@ file (measured 2026-09-17,
--- @git grep '\\\\' -- '*.l4'@ → 0 lines). That is a measurement, not a
--- guarantee: an annotation that did contain @\\%@, @\\]@ or @\\\\@ would now
--- render differently.
+-- __Corrected 2026-09-19.__ This comment used to say the tree contained no
+-- backslash in any @.l4@ file at all (measured 2026-09-17, 0 lines). That is no
+-- longer true: @git grep '\\\\' -- '*.l4'@ finds 10 lines across 4 files. The
+-- claim that matters survives re-measurement in a narrower form — exactly ONE
+-- of those backslashes is inside an NLG annotation, the @10\\%and\\%20@ in
+-- @doc\/reference\/syntax\/annotation-example.l4@, and it is a @\\%@ that
+-- already decoded. The rest are @\\"@ and @\\t@ inside ordinary string
+-- literals, which this decoder never sees. So no existing annotation changes
+-- meaning. State the narrow claim: the broad one drifted within two days of
+-- being written, because string literals kept being added.
 unescapeNlgText :: Text -> Text
 unescapeNlgText t
   | not (Text.any (== '\\') t) = t        -- the overwhelmingly common case
