@@ -156,6 +156,29 @@ Cross-references to legal sources.
 
 See [annotation-example.l4](annotation-example.l4)
 
+#### Writing a literal `>>`
+
+The inline form ends at `>>`, so a citation that contains those two characters
+would otherwise stop halfway. Put a backslash before the angle bracket:
+
+| you write                | you get             |
+| ------------------------ | ------------------- |
+| `<<see s.5 \>> onward>>` | `see s.5 >> onward` |
+| `<<\\>>`                 | `\`                 |
+
+**A single `>` needs nothing.** `<<s.5 > s.3>>` has always worked and still
+does — only the doubled `>>` closes a citation, so a lone one is ordinary
+text.
+
+**What this costs.** A citation can no longer end with a backslash, because
+`\>` now means a literal `>`; write `\\` instead. Any other character after a
+backslash is left alone, so `\q` is still a backslash followed by a `q`.
+
+This is the same idea as the `\%` and `\]` escapes in `@nlg` above, but the
+character set is deliberately different: `%` and `]` are ordinary text in a
+citation, and `>` is ordinary text in an `@nlg` annotation. Each annotation
+escapes only what would otherwise be read as punctuation in that annotation.
+
 ### @ref-src / @ref-map
 
 Source references and mappings.

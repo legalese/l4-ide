@@ -17,3 +17,13 @@ GIVETH A NUMBER
 MEANS amount TIMES 0.15
 
 #EVAL `the levy on` 100
+
+-- A citation containing a literal `>>` needs a backslash before the angle
+-- bracket, or the inline `@ref` form would end halfway through it.
+GIVEN claimant IS A BOOLEAN
+GIVETH A BOOLEAN
+`is eligible` claimant MEANS
+  <<Section 4(1)(a) \>> as amended>>
+  claimant
+
+#EVAL `is eligible` TRUE
