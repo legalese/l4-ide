@@ -151,12 +151,18 @@ nlgAnnotationP :: Parser (Epa Nlg)
 nlgAnnotationP = do
   currentPosition <- getSourcePos
   moduleUri <- asks (.moduleUri)
-  rawText <- hidden $ spacedTokenWs (\ case
-    TAnnotations (TNlg t ty) -> Just $ toNlgAnno t ty
+  rawAnno <- hidden $ spacedTokenWs (\ case
+    TAnnotations (TNlg mtag t ty) -> Just (mtag, ty, toNlgAnno mtag t ty)
     _ -> Nothing)
     "Natural Language Annotation"
 
   let
+    -- The reconstructed text MUST still carry the tag: it is what gets
+    -- re-lexed below, and 'mkPosTokens' seeds the inner tokens' positions by
+    -- advancing over it.
+    (nlgLangTag, nlgAnnoTy) = case rawAnno.payload of (m, ty, _) -> (m, ty)
+    rawText = (\ (_, _, t) -> t) <$> rawAnno
+
     nlgParser :: Parser Nlg
     nlgParser =
       blockNlg <|> lineNlg
@@ -174,7 +180,7 @@ nlgAnnotationP = do
     lineNlg = do
       attachAnno $
         MkParsedNlg emptyAnno
-          <$  annoLexeme (spacedTokenWs_ $ TAnnotations TNlgPrefix)
+          <$  annoLexeme (spacedTokenWsSatisfy isNlgPrefixToken "@nlg annotation herald")
           <*> annoHole   (nlgFragment False)
 
     nlgFragment :: Bool -> Parser [NlgFragment Name]
@@ -195,7 +201,7 @@ nlgAnnotationP = do
             traverse_ registerParseError (bundleErrors err)
             attachAnno $
               MkInvalidNlg emptyAnno
-                <$ annoEpa (pure $ TNlg <$> rawText)
+                <$ annoEpa (pure $ (\ t -> TNlg nlgLangTag t nlgAnnoTy) <$> rawText)
 
           Right nlg ->
             pure nlg
@@ -309,9 +315,28 @@ spacedTokenWs cond lbl =
       )
     <?> lbl
 
-spacedTokenWs_ :: TokenType -> Parser (Lexeme PosToken)
-spacedTokenWs_ tt =
-  lexemeWs (plainToken tt)
+-- | 'spacedTokenWs' for a token type that carries a payload, discarding the
+-- payload.
+--
+-- Replaced the equality-matching @spacedTokenWs_@, which became dead when the
+-- @\@nlg@ herald gained a language tag: its last caller was 'lineNlg'.
+--
+-- 'plainToken' matches by EQUALITY on the whole 'TokenType', so it cannot
+-- match a constructor whose argument varies — @TNlgPrefix (Just "he")@ is not
+-- @TNlgPrefix Nothing@. Anything with a payload needs this instead.
+spacedTokenWsSatisfy :: (TokenType -> Bool) -> String -> Parser (Lexeme PosToken)
+spacedTokenWsSatisfy f lbl =
+  lexemeWs (satisfyToken f lbl)
+
+satisfyToken :: (TokenType -> Bool) -> String -> Parser PosToken
+satisfyToken f lbl =
+  token (\ t -> if f (computedPayload t) then Just t else Nothing) Set.empty
+    <?> lbl
+
+isNlgPrefixToken :: TokenType -> Bool
+isNlgPrefixToken = \ case
+  TAnnotations (TNlgPrefix _) -> True
+  _ -> False
 
 plainToken :: TokenType -> Parser PosToken
 plainToken tt = do

@@ -234,6 +234,7 @@ test-suite jl4-core-test
     ExportValidationSpec
     CatalaLowerSpec
     NumberLiteralSpec
+    NlgLangTagSpec
     DirectiveRenameSpec
     DirectiveAmbiguitySpec
     ResolutionCascadeSpec
@@ -277,6 +278,7 @@ test-suite jl4-core-test
     deepseq,
     hspec,
     jl4-core,
+    megaparsec,
     text,
     time,
     vector

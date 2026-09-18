@@ -51,6 +51,19 @@ data AnnoType
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (ToExpr, NFData)
 
+-- | A language subtag on an @\@nlg@ annotation: the @he@ in @\@nlg:he@.
+--
+-- Carried on the HERALDED form only. The bare inline @[…]@ form has no free
+-- position for one — 'toAnno's inline branch is @oh <> t <> ch@ with nothing
+-- between the opening bracket and the text — which is why that form stays
+-- untaggable (ruled 2026-09-17; @[\@he …]@ is pre-approved for later).
+--
+-- Not validated as BCP 47 here. The lexer's job is to capture it; rejecting
+-- @\@nlg:klingon@ belongs later, where a diagnostic can carry a source span.
+newtype LangTag = MkLangTag Text
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving anyclass (ToExpr, NFData)
+
 data TDirectives
   = TLazyEvalDirective
   | TLazyEvalTraceDirective
@@ -71,12 +84,12 @@ directives = Map.fromList
   ]
 
 data TAnnotations
-  = TNlg          !Text !AnnoType
+  = TNlg          !(Maybe LangTag) !Text !AnnoType
   | TRefSrc       !Text
   | TRefMap       !Text
   | TRef          !Text !AnnoType
   | TNlgString    !Text
-  | TNlgPrefix    -- ^ "@nlg"
+  | TNlgPrefix    !(Maybe LangTag) -- ^ "@nlg", optionally ":he"
   | TDesc         !Text -- ^ "@desc"
   | TExport       !Text -- ^ "@export"
   | TFixity       !FixityDirection !Text -- ^ "@infixl" / "@infixr" / "@infix"
@@ -429,11 +442,33 @@ data TokenType
 annotations :: [Text]
 annotations = ["nlg", "ref", "ref-map", "ref-src"]
 
-nlgAnnotation :: Lexer (Text, AnnoType)
+nlgAnnotation :: Lexer (Maybe LangTag, Text, AnnoType)
 nlgAnnotation =
-  lineAnno "@nlg"
-    <|> inlineNlgAnno
+  lineNlgAnno
+    <|> (\ (t, ty) -> (Nothing, t, ty)) <$> inlineNlgAnno
   <?> "Natural Language Generation Annotation"
+
+-- | @\@nlg@ or @\@nlg:he@, then the rest of the line.
+--
+-- Deliberately NOT a widening of 'lineAnno': that is shared by @\@ref-src@,
+-- @\@ref-map@, @\@desc@, @\@export@, @\@infixl@ and @\@nonexhaustive@, none
+-- of which takes a colon parameter.
+lineNlgAnno :: Lexer (Maybe LangTag, Text, AnnoType)
+lineNlgAnno = do
+  _ <- string "@nlg"
+  mtag <- optional langTag
+  t <- takeWhileP (Just "character") (/= '\n')
+  pure (mtag, t, LineAnno)
+
+-- | @:he@. Backtracks whole, so a colon that does not begin a well-formed tag
+-- stays ordinary annotation text — @\@nlg: see below@ means what it did before
+-- tags existed.
+langTag :: Lexer LangTag
+langTag =
+  try (char ':' *> (MkLangTag <$> takeWhile1P (Just "language subtag") isLangTagChar))
+
+isLangTagChar :: Char -> Bool
+isLangTagChar c = isAsciiLower c || isAsciiUpper c || isDigit c || c == '-'
 
 nlgInlineAnnotationCloseChar :: Char
 nlgInlineAnnotationCloseChar = ']'
@@ -754,7 +789,7 @@ annotationsPayload = asum
   , TExport       <$> exportAnnotation
   , uncurry TFixity <$> fixityAnnotation
   , TNonexhaustive      <$> nonexhaustiveAnnotation
-  , uncurry TNlg  <$> nlgAnnotation
+  , (\ (mtag, t, ty) -> TNlg mtag t ty) <$> nlgAnnotation
   , uncurry TRef  <$> refAnnotation
   ]
 
@@ -795,7 +830,7 @@ nlgTokenPayload = asum
   , TIdentifiers . TIdentifier <$> identifier
   , TSymbols TNlgOpen          <$  char nlgInlineAnnotationOpenChar
   , TSymbols TNlgClose         <$  char nlgInlineAnnotationCloseChar
-  , TAnnotations TNlgPrefix    <$  "@nlg"
+  , TAnnotations . TNlgPrefix  <$> (string "@nlg" *> optional langTag)
   , TAnnotations . TNlgString  <$> nlgString
   ]
 
@@ -1203,9 +1238,23 @@ toAnno lh oh ch t = \ case
   LineAnno -> lh <> t
 
 
-toRefAnno, toNlgAnno :: Text -> AnnoType -> Text
+toRefAnno :: Text -> AnnoType -> Text
 toRefAnno = toAnno "@ref" "<<" ">>"
-toNlgAnno = toAnno "@nlg" "[" "]"
+
+-- | Re-emit an @\@nlg@ annotation's source text, tag included.
+--
+-- This is on the EXACTPRINT path twice over, so the tag is not cosmetic here:
+-- 'L4.Parser.nlgAnnotationP' rebuilds the annotation with this function and
+-- re-lexes the result, and inner token positions are seeded by advancing over
+-- that text ('mkPosTokens'). Drop the @:he@ and every inner token's column
+-- shifts by three, silently.
+toNlgAnno :: Maybe LangTag -> Text -> AnnoType -> Text
+toNlgAnno mtag t = \ case
+  InlineAnno -> "[" <> t <> "]"
+  LineAnno   -> "@nlg" <> langTagSuffix mtag <> t
+
+langTagSuffix :: Maybe LangTag -> Text
+langTagSuffix = maybe "" (\ (MkLangTag tag) -> ":" <> tag)
 
 displayPosToken :: PosToken -> Text
 displayPosToken (MkPosToken _r tt) =
@@ -1254,12 +1303,12 @@ displayTokenType = \case
     TRationalLit t _i -> t
     TStringLit raw _  -> raw
   TAnnotations ann -> case ann of
-    TNlg t ty         -> toNlgAnno t ty
+    TNlg mtag t ty    -> toNlgAnno mtag t ty
     TRef t ty         -> toRefAnno t ty
     TRefSrc t         -> "@ref-src" <> t
     TRefMap t         -> "@ref-map" <> t
     TNlgString t      -> t
-    TNlgPrefix        -> "@nlg"
+    TNlgPrefix mtag   -> "@nlg" <> langTagSuffix mtag
     TDesc t           -> "@desc" <> t
     TExport t         -> "@export" <> t
     TFixity dir t     -> fixityHerald dir <> t

@@ -27,3 +27,13 @@ GIVETH A BOOLEAN
   claimant
 
 #EVAL `is eligible` TRUE
+
+-- A heralded `@nlg` may carry a language subtag. The tag is recorded and
+-- round-trips; nothing selects on it yet, and an untagged annotation is
+-- unchanged by its existence.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is a large amount` @nlg:en the amount %amount% is large
+  IF amount GREATER THAN 100
+
+#EVAL `is a large amount` 150
