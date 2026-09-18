@@ -26,10 +26,20 @@
 --   so that no other live deadline lies between.
 --
 -- A shape the what-if cannot instantiate — an action pattern that BINDS a
--- variable (@pay amount@ with no @EXACTLY@), a party the machine never
--- forced and whose expression mentions a local it cannot read — is still
--- listed, as 'Left' with the reason. It is not silently dropped: an
--- enabled set that omitted it would say "nothing else can happen".
+-- variable (@pay amount@ with no @EXACTLY@), or one that NAMES a local the
+-- residual holds unforced and the replay cannot resolve (@Receipt … amount@
+-- in a @HENCE@ under @UPON EACH@, the member's @amount@ never having been
+-- compared; a rule @GIVEN@ nothing has read yet), a party the machine
+-- never forced and whose expression mentions a local it cannot read — is
+-- still listed, as 'Left' with the reason. It is not silently dropped: an
+-- enabled set that omitted it would say "nothing else can happen". The
+-- second of those is told from a module-level name STATICALLY
+-- ('openLocals'), before any replay: the replay evaluates the
+-- hypothetical in the module's top-level environment, whose keys
+-- 'position' records ('posReplayScope'), so a name the obligation closed
+-- over that is not among them can only fail there — and until 2026-09-19
+-- it did, surfacing the evaluator's own "Internal error: amount is not in
+-- scope" as the reason (LTS-VISUALISER §7.3, every-each round 2 O2).
 --
 -- == Cost
 --
@@ -71,13 +81,17 @@ module L4.Lts.WhatIf
   , untried
     -- * Instantiating a shape
   , patternExpr
+  , closedAction
+  , openLocals
   , reifyExpr
   , reifyNF
   ) where
 
 import Base
 import qualified Base.Map as Map
+import qualified Base.Set as Set
 import qualified Base.Text as Text
+import qualified Optics
 
 import L4.Annotation (emptyAnno)
 import L4.Evaluate.ValueLazy hiding (Blame)
@@ -141,11 +155,19 @@ data Position = MkPosition
   , posClock    :: !Rational
     -- ^ the stamp of the last event scrutinised (else the @AT@): the clock
     -- every 'Remaining' countdown in the marking counts from
+  , posReplayScope :: !(Set Unique)
+    -- ^ the names the replay resolves when it evaluates a hypothetical: the
+    -- module's own top-level bindings, as the replay's own pass built them
+    -- ('replay' returns that heap; only its keys are kept), and the
+    -- imports' ('rigEnv'). Builtins are known by their sort and are not
+    -- listed. A local an obligation closed over — a pattern-bound or
+    -- @GIVEN@-bound name — is not among them, which is how 'openLocals'
+    -- tells the two apart without a second resolver.
   }
 
 -- | Replay the trace as written.
 position :: Rig -> Trace -> IO (Maybe Position)
-position rig tr = replay rig tr [] >>= pure . fmap \ (res, steps) ->
+position rig tr = replay rig tr [] >>= pure . \ (topLevel, mres) -> flip fmap mres \ (res, steps) ->
   let ctx = contextOf steps
       residual = case res.result of
         Reduction (Reduced (MkNF v)) -> Just v
@@ -159,6 +181,7 @@ position rig tr = replay rig tr [] >>= pure . fmap \ (res, steps) ->
       , posContext  = ctx
       , posMarking  = maybe [] (markingOf ctx) residual
       , posClock    = maximum (0 : literalStamps <> loggedClocks)
+      , posReplayScope = Map.keysSet topLevel <> Map.keysSet rig.rigEnv
       }
 
 -- | The stamp an authored event carries, when it is a literal: the @AT@ of
@@ -208,6 +231,14 @@ data Candidate = MkCandidate
   { cdKind         :: !CandidateKind
   , cdHypothetical :: !(Either Text Hypothetical)
     -- ^ 'Left' names why the shape could not be instantiated
+  , cdShape        :: !(Maybe (Expr Resolved))
+    -- ^ for an act, the action as far as the residual could instantiate it
+    -- ('patternExpr' then 'reifyExpr'), kept for NAMING the candidate even
+    -- when 'cdHypothetical' is 'Left' because a local in it is still open
+    -- ('closedAction'): a refused @Receipt theLandlord t amount@ under a
+    -- fork still says which member @t@ is. 'Nothing' when the pattern has no
+    -- expression form at all (it binds, or is a list pattern), and for a
+    -- tick.
   }
   deriving stock (Eq, Show)
 
@@ -225,22 +256,23 @@ candidatesOf pos = case pos.posResidual of
         paired = [ (raw, renderLive pos.posContext raw) | raw <- raws ]
     acts <- for paired \ (raw, live) -> do
       party <- either (fmap Just . reifyExpr raw.roEnv) (reifyValue reifyNF) raw.roParty
-      action <- patternExpr raw.roEnv raw.roAction.action
+      shape <- patternExpr raw.roEnv raw.roAction.action
       let hyp = do
             p <- maybe (Left "the party was never forced and could not be read back") Right party
-            a <- action
+            a <- shape >>= closedAction pos.posReplayScope raw.roEnv
             pure Act {hyParty = p, hyAction = a, hyAt = pos.posClock}
-      pure MkCandidate {cdKind = ActBy live, cdHypothetical = hyp}
+      pure MkCandidate {cdKind = ActBy live, cdHypothetical = hyp, cdShape = either (const Nothing) Just shape}
     dues <- for paired \ (raw, live) -> (live,) <$> deadlineOf pos.posClock raw
     let deadlines =
           Map.fromListWith (<>) [ (d, [live]) | (live, Right d) <- dues ]
         ticks =
           [ MkCandidate
               { cdKind = TickPast d (reverse ns)
-              , cdHypothetical = Right (Tick (tickPast (Map.keys deadlines) d)) }
+              , cdHypothetical = Right (Tick (tickPast (Map.keys deadlines) d))
+              , cdShape = Nothing }
           | (d, ns) <- Map.toList deadlines ]
         noTicks =
-          [ MkCandidate {cdKind = NoTick live, cdHypothetical = Left why}
+          [ MkCandidate {cdKind = NoTick live, cdHypothetical = Left why, cdShape = Nothing}
           | (live, Left why) <- dues ]
     pure (acts <> ticks <> noTicks)
 
@@ -390,8 +422,8 @@ data Outcome = MkOutcome
 -- | Endpoint 22 \/ 24: append the hypothetical and run.
 whatIf :: Rig -> Trace -> Position -> Hypothetical -> IO (Verdict, [DeonticStep])
 whatIf rig tr pos hyp = replay rig tr [hypotheticalExpr hyp] >>= pure . \ case
-  Nothing -> (Untried "the replay produced no result", [])
-  Just (res, steps) -> (classify (contextOf steps) res, afterCommonPrefix pos.posSteps steps)
+  (_, Nothing) -> (Untried "the replay produced no result", [])
+  (_, Just (res, steps)) -> (classify (contextOf steps) res, afterCommonPrefix pos.posSteps steps)
 
 -- | One candidate, tried: 'whatIf' on its hypothetical, with the tick's
 -- stamp checked against what the machine did with it.
@@ -576,13 +608,15 @@ untried es = [ o | o <- es.esOutcomes, Untried _ <- [o.ocVerdict] ]
 
 -- | Run the module with every directive dropped except this trace, which
 -- gets the extra events appended. The directive is found by equality with
--- the one the module carries.
-replay :: Rig -> Trace -> [Expr Resolved] -> IO (Maybe (EvalDirectiveResult, [DeonticStep]))
+-- the one the module carries. Beside the result, the module's own top-level
+-- heap as this run built it — the environment the hypothetical was
+-- evaluated in, over 'rigEnv' and the builtins ('posReplayScope').
+replay :: Rig -> Trace -> [Expr Resolved] -> IO (Environment, Maybe (EvalDirectiveResult, [DeonticStep]))
 replay rig tr extra = do
   let MkModule a uri section = rig.rigModule
       m' = MkModule a uri (rewrite section)
-  (_, results) <- execEvalModuleWithDeonticLog rig.rigConfig rig.rigEntityInfo rig.rigEnv m'
-  pure (listToMaybe results)
+  (topLevel, results) <- execEvalModuleWithDeonticLog rig.rigConfig rig.rigEntityInfo rig.rigEnv m'
+  pure (topLevel, listToMaybe results)
   where
     rewrite (MkSection a n aka given decls) = MkSection a n aka given (mapMaybe keep decls)
     keep = \ case
@@ -595,10 +629,15 @@ replay rig tr extra = do
 
 -- | An action pattern as an event's action, if the pattern determines one.
 -- A pattern that BINDS ('PatVar') does not: the what-if has no basis for
--- choosing the value, so the shape is reported and not tried.
+-- choosing the value, so the shape is reported and not tried. An
+-- expression operand is read through the residual's heap ('reifyExpr');
+-- whether what is left still names a local the replay cannot resolve is
+-- 'closedAction''s question, asked by 'candidatesOf' on the whole
+-- instantiated action, since a constructor pattern's operands are each
+-- read here on their own.
 patternExpr :: Environment -> Pattern Resolved -> IO (Either Text (Expr Resolved))
 patternExpr env = \ case
-  PatVar _ v -> pure (Left ("the action binds `" <> nameToText (getOriginal v) <> "`, which the what-if cannot choose"))
+  PatVar _ v -> pure (Left (cannotChoose (getOriginal v)))
   PatLit _ l -> pure (Right (Lit emptyAnno l))
   PatExpr _ e -> Right <$> reifyExpr env e
   PatApp _ con ps -> do
@@ -606,18 +645,68 @@ patternExpr env = \ case
     pure (App emptyAnno con <$> sequence args)
   PatCons _ _ _ -> pure (Left "the action is a list pattern, which the what-if does not instantiate")
 
+-- | The one refusal wording for a name the what-if would have to supply
+-- and cannot: the pattern's own variable ('PatVar'), or a local the
+-- residual holds unforced ('openLocals'). The same sentence for both,
+-- because to the reader they are the same fact — the event must carry the
+-- value and the list has no basis for picking one — and because the list's
+-- consumers key on it (`etc/lts-reader-proxy/RESULTS.md` §3.1).
+cannotChoose :: Name -> Text
+cannotChoose v = "the action binds `" <> nameToText v <> "`, which the what-if cannot choose"
+
+-- | An instantiated action the replay can evaluate, or the reason it
+-- cannot: the first local it still names that the residual holds unforced
+-- and the replay's scope does not resolve. Asked BEFORE the replay, so the
+-- refusal is the what-if's own sentence and never the evaluator's
+-- "Internal error: amount is not in scope" (which is what a replay of such
+-- an action produced until 2026-09-19).
+closedAction :: Set Unique -> Environment -> Expr Resolved -> Either Text (Expr Resolved)
+closedAction scope env e = case openLocals scope env e of
+  (v : _) -> Left (cannotChoose v)
+  []      -> Right e
+
+-- | The names in an expression that the replay cannot resolve and the
+-- residual cannot supply: each @Var@ whose unique the obligation's
+-- environment holds — a local it closed over, still there after
+-- 'reifyExpr' because it is unforced or unspellable — and that is neither
+-- a module top-level name nor an import (the replay's scope,
+-- 'posReplayScope') nor a builtin (sort @\'b\'@, minted by
+-- "L4.TypeCheck.Environment.TH"). In source order, once per occurrence.
+--
+-- A @Var@ the environment does NOT hold is left alone: it is bound inside
+-- the expression itself (a @WHERE@ local, a lambda's input), or it is
+-- genuinely broken — and a genuinely broken one must reach the replay and
+-- fail there, loudly, as 'Untried' with the evaluator's own message. This
+-- function narrows only the case it can name with confidence.
+openLocals :: Set Unique -> Environment -> Expr Resolved -> [Name]
+openLocals scope env e =
+  [ getOriginal r
+  | Var _ r <- Optics.toListOf (Optics.cosmosOf (Optics.gplate @(Expr Resolved))) e
+  , let u = getUnique r
+  , Map.member u env
+  , u.sort /= 'b'
+  , not (Set.member u scope)
+  ]
+
 -- | Substitute what the residual's heap has already forced. A @Var@ bound
 -- in the obligation's environment to a forced value becomes that value's
 -- literal form ('reifyRef'), so an @EXACTLY t@ under an @EVERY@ names the
 -- member; anything unforced, or not a value this can spell, is left as
 -- written and resolves — or fails, loudly, as 'Untried' — when the replay
--- evaluates it in the module's environment.
+-- evaluates it in the module's environment ('closedAction' catches the
+-- unforced-local case first). Every @Var@ in the expression is visited,
+-- under any operator: until 2026-09-19 only the arguments of an @App@ were,
+-- so @Deliver Tenant (p's landlord) what@ kept its @p@ under the projection
+-- unread even when the residual had forced it, and the replay then failed
+-- on a name it could have been handed as a literal (measured:
+-- @ok/regulative-reference-expressions.l4@'s @projection operand@, one
+-- mismatched event in, listed "Internal error: p is not in scope" before
+-- and discharging after).
 reifyExpr :: Environment -> Expr Resolved -> IO (Expr Resolved)
-reifyExpr env = \ case
+reifyExpr env = Optics.transformMOf (Optics.gplate @(Expr Resolved)) \ case
   Var a r -> case Map.lookup (getUnique r) env of
     Just rf -> fromMaybe (Var a r) <$> reifyRef rf
     Nothing -> pure (Var a r)
-  App a f args -> App a f <$> traverse (reifyExpr env) args
   other -> pure other
 
 -- | A forced reference, spelled as an expression; 'Nothing' if it is not

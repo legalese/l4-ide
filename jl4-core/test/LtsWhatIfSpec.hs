@@ -27,9 +27,16 @@
 --      as too early — the machine's word, read from its EarlyAct step —
 --      and the tick past opening + WITHIN breaches, both before any event
 --      (the WITHIN re-anchored on the opening) and after an early act (the
---      residual's due counted from the opening, not the clock).
+--      residual's due counted from the opening, not the clock);
+--  10. an action that NAMES a local the residual holds unforced — a member's
+--      pattern-bound `amount` read through a fork's HENCE; a rule GIVEN no
+--      event has compared yet — is refused before any replay, with the
+--      what-if's own wording, never the evaluator's "not in scope"; and one
+--      the residual HAS forced (a GIVEN under a projection) is read through
+--      and tried.
 module LtsWhatIfSpec (spec) where
 
+import Data.Foldable (for_)
 import qualified Data.Text as Text
 
 import L4.API.VirtualFS (vfsFromList, checkWithImports)
@@ -39,6 +46,7 @@ import L4.EvaluateLazy.DeonticStep (Branch (..), DeonticStep (..), StepOutcome (
 import L4.EvaluateLazy.Machine (emptyEnvironment)
 import L4.Lts.Marking
 import L4.Lts.WhatIf
+import L4.Print (prettyLayout)
 import L4.Syntax (DeonticModal (..))
 import L4.TracePolicy (apiDefaultPolicy)
 
@@ -243,6 +251,83 @@ forkSrc = Text.unlines $ everyPrologue <>
   , "#TRACE `receipts` AT 0 WITH"
   ]
 
+-- 10. jl4/examples/ok/every/run-fork.l4's `receipts`, verbatim, at its
+--     second trace: Alice paid at 1 and was not receipted; Bob paid at 3 and
+--     was receipted at 4. Alice's receipt is still owed. Its `amount` is the
+--     one her Pay bound — closed over by the HENCE, never compared (Bob's
+--     receipt stopped at `t`), so unforced in the residual — and the replay
+--     evaluates a hypothetical in the module's scope, where no `amount`
+--     exists. Until 2026-09-19 that surfaced as "Internal error: amount is
+--     not in scope" under "What could not be tried" (every-each round 2,
+--     O2; the reader proxy's one actionable finding).
+runForkSrc :: Text.Text
+runForkSrc = Text.unlines
+  [ "IMPORT prelude"
+  , "DECLARE Actor IS ONE OF"
+  , "    Landlord HAS name IS A STRING"
+  , "    Tenant   HAS name IS A STRING"
+  , "DECLARE Action IS ONE OF"
+  , "    Pay     HAS payer  IS AN Actor, payee IS AN Actor, amount IS A NUMBER"
+  , "    Receipt HAS issuer IS AN Actor, to    IS AN Actor, amount IS A NUMBER"
+  , "theLandlord MEANS Landlord OF \"Ms Ng\""
+  , "alice       MEANS Tenant OF \"Alice\""
+  , "bob         MEANS Tenant OF \"Bob\""
+  , "everyone MEANS LIST alice, bob, theLandlord"
+  , "GIVETH A DEONTIC Actor Action"
+  , "`receipts` MEANS"
+  , "    EVERY Tenant t IN everyone"
+  , "        MUST   Pay t theLandlord amount"
+  , "        WITHIN 7"
+  , "        UPON   EACH"
+  , "        HENCE  (PARTY theLandlord"
+  , "                    MUST   Receipt theLandlord t amount"
+  , "                    WITHIN 5)"
+  , "        LEST   BREACH BY t"
+  , ""
+  , "#TRACE `receipts` AT 0 WITH"
+  , "  PARTY alice DOES Pay alice theLandlord 100 AT 1"
+  , "  PARTY bob   DOES Pay bob   theLandlord 200 AT 3"
+  , "  PARTY theLandlord DOES Receipt theLandlord bob 200 AT 4"
+  ]
+
+-- 10'. jl4/examples/ok/regulative-reference-expressions.l4's cases (1) and
+--      (2), verbatim. A rule GIVEN is a local the obligation closed over,
+--      like a pattern's binding; whether the what-if can read it is whether
+--      the residual has forced it. `price` at the outset: no event has
+--      compared `price PLUS 50`, so it is unforced and the act is refused.
+--      `p` one mismatched event in: the comparison forced `p's landlord`,
+--      so `p` is read through as `Person OF Tenant, Landlord` — under the
+--      projection, which the first cut of `reifyExpr` did not look under —
+--      and the act is tried and discharges.
+givenSrc :: Text.Text
+givenSrc = Text.unlines
+  [ "DECLARE Thing IS ONE OF Widget, Gadget"
+  , "DECLARE Actor IS ONE OF Landlord, Tenant"
+  , "DECLARE Person HAS who IS AN Actor"
+  , "                   landlord IS AN Actor"
+  , "DECLARE Action IS ONE OF"
+  , "    pay HAS `how much` IS A NUMBER"
+  , "    Deliver HAS sender IS AN Actor"
+  , "                recipient IS AN Actor"
+  , "                what IS A Thing"
+  , ""
+  , "GIVEN price IS A NUMBER"
+  , "GIVETH A DEONTIC Actor Action"
+  , "`arithmetic operand` MEANS"
+  , "    PARTY Tenant MUST pay (price PLUS 50) WITHIN 10 HENCE FULFILLED LEST BREACH"
+  , ""
+  , "GIVEN p IS A Person"
+  , "      what IS A Thing"
+  , "GIVETH A DEONTIC Actor Action"
+  , "`projection operand` MEANS"
+  , "    PARTY Tenant MUST Deliver Tenant (p's landlord) what WITHIN 10 HENCE FULFILLED LEST BREACH"
+  , ""
+  , "#TRACE `arithmetic operand` 100 AT 0 WITH"
+  , ""
+  , "#TRACE `projection operand` (Person Tenant Landlord) Widget AT 0 WITH"
+  , "    PARTY Tenant DOES Deliver Tenant Tenant Widget AT 1"
+  ]
+
 spec :: Spec
 spec = describe "LTS-VISUALISER §2.4 / P2c: the enabled set by replay" $ do
 
@@ -382,6 +467,42 @@ spec = describe "LTS-VISUALISER §2.4 / P2c: the enabled set by replay" $ do
     map row es'.esOutcomes `shouldBe`
       [ Row (ActOf "Alice" "deliver" 2) (Passed (TooEarly 5))
       , Row (TickAt 16 ["Alice"]) (Breaches (Just "Alice")) ]
+
+  it "10. a fork's HENCE naming the member's open `amount`: refused before the replay, in the what-if's words, never the evaluator's" $ do
+    es <- enabledAt 0 runForkSrc
+    es.esPosition.posClock `shouldBe` 4
+    map row es.esOutcomes `shouldBe`
+      [ Row (CouldNot "Landlord OF \"Ms Ng\"" "Receipt theLandlord t amount") Untriable
+      , Row (TickAt 7 ["Landlord OF \"Ms Ng\""]) (Breaches (Just "Landlord OF \"Ms Ng\"")) ]
+    case es.esOutcomes of
+      (o : _) -> do
+        o.ocCandidate.cdHypothetical `shouldBe` Left "the action binds `amount`, which the what-if cannot choose"
+        -- the refusal is the candidate's, so no replay ran and no steps came of it
+        o.ocSteps `shouldBe` []
+        -- and the shape is still named as far as the residual could read it:
+        -- the member `t` is Alice, only `amount` is open
+        fmap prettyLayout o.ocCandidate.cdShape `shouldBe` Just "Receipt OF (Landlord OF \"Ms Ng\"), (Tenant OF \"Alice\"), amount"
+      [] -> expectationFailure "no outcomes"
+    -- nothing anywhere says "not in scope"
+    for_ es.esOutcomes \ o -> case o.ocVerdict of
+      Untried why -> why `shouldNotSatisfy` Text.isInfixOf "not in scope"
+      _           -> pure ()
+
+  it "10'. a rule GIVEN: unforced at the outset it is refused the same way; forced by a comparison it is read through a projection and tried" $ do
+    outset <- enabledAt 0 givenSrc
+    map row outset.esOutcomes `shouldBe`
+      [ Row (CouldNot "Tenant" "pay (price PLUS 50)") Untriable
+      , Row (TickAt 11 ["Tenant"]) (Breaches Nothing) ]
+    case outset.esOutcomes of
+      (o : _) -> o.ocCandidate.cdHypothetical `shouldBe` Left "the action binds `price`, which the what-if cannot choose"
+      []      -> expectationFailure "no outcomes"
+    forced <- enabledAt 1 givenSrc
+    map row forced.esOutcomes `shouldBe`
+      [ Row (ActOf "Tenant" "Deliver Tenant (p's landlord) what" 1) Discharges
+      , Row (TickAt 11 ["Tenant"]) (Breaches Nothing) ]
+    case forced.esOutcomes of
+      (o : _) -> fmap prettyLayout o.ocCandidate.cdShape `shouldBe` Just "Deliver OF Tenant, ((Person OF Tenant, Landlord)'s landlord), Widget"
+      []      -> expectationFailure "no outcomes"
 
   it "tickPast lands one unit past a lone deadline, and half-way to a nearer next one" $ do
     tickPast [10] 10 `shouldBe` 11

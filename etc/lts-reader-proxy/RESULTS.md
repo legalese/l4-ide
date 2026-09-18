@@ -111,6 +111,13 @@ doing the owed act discharges it, which the list never says, and the judge's "ca
 rule took the rest. On `every-run-example`, the one contract where the
 what-if **could** be tried (Carol's `Sign` binds nothing open), the list scored **4/4** on Q2.
 
+_(2026-09-19: the sibling refusal seen one step past the `tenancy` position — `probes.out:15`,
+where the landlord's receipt was refused with the evaluator's own "Internal error: amount is not
+in scope" — now reads the same "the action binds `amount`, which the what-if cannot choose"
+sentence, made before any replay (`WhatIf.hs`, `closedAction`). The three artifacts above are
+`PatVar` refusals and were already worded this way; nothing in this measurement moves. The
+`:525`/`:216` line numbers are as of the run.)_
+
 So the Q2 gap measured here is a gap in **`WhatIf`'s coverage of open pattern variables**, not a
 gap between a list and a picture. `truth.json`'s own Q2 answer for `contracts` is exactly the
 sentence the list could print: _"any act by B on or before day 14 discharges it, because `return`

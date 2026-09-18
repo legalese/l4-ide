@@ -655,7 +655,26 @@ deadline` and a tick AT the deadline reveals nothing); and a listed refusal, whe
   cannot be instantiated — an action pattern that BINDS (`payment price`: "the action binds
   `price`, which the what-if cannot choose"), a `WITHIN` that was never evaluated and is not a
   literal (`deadlineOf`, `:264`). Refusals are listed, not dropped: an enabled set that omitted
-  them would say "nothing else can happen". Each candidate's `LiveNorm` is rendered by
+  them would say "nothing else can happen". **Amended 2026-09-19 (every-each round 2, O2; the
+  proxy's one actionable finding, §7.7):** an action that NAMES a local the residual holds
+  unforced — a member's pattern-bound `amount` read through a fork's `HENCE`
+  (`ok/every/run-fork.l4`); a rule `GIVEN` no event has compared yet — is the same refusal,
+  with the same sentence, and it is made BEFORE any replay (`closedAction`/`openLocals`): the
+  replay evaluates a hypothetical in the module's top-level environment, whose keys `position`
+  now records (`posReplayScope`, from the heap `replay` returns, plus `rigEnv`; builtins by
+  sort), so a `Var` the obligation's environment holds that is neither there nor a builtin can
+  only fail at replay — and until this date it did, surfacing the evaluator's own "Internal
+  error: amount is not in scope" as the `Untried` reason (measured on `run-fork.l4`'s second
+  trace and on `regulative-reference-expressions.l4`'s `projection operand`). A genuinely broken
+  name — one the environment does NOT hold — is deliberately left to the replay, so an
+  unexpected exception still surfaces loudly. Two things came with it: `reifyExpr` now visits
+  every `Var` under any operator (it read only `App` arguments before, so `p` under `p's
+  landlord` stayed unread even when forced, and that witness now discharges rather than
+  refuses); and a candidate carries `cdShape`, the action as far as the residual could read it,
+  so the refused receipt is still named `Receipt OF (Landlord OF "Ms Ng"), (Tenant OF "Alice"),
+  amount` — the member known, the sum open — where a `PatVar` pattern, which has no expression
+  form, is still named as the pattern. Pinned in `LtsWhatIfSpec` cases 10 and 10'. Each
+  candidate's `LiveNorm` is rendered by
   `renderLive` (`Marking.hs:354`) from the very `RawObligation` its act is built from — the
   first cut paired `liveObligations` with the marking's `InEffect` list by `zip`, on the
   unguarded assumption that two walks agree in order; review 2026-09-15 replaced that with one
@@ -719,6 +738,10 @@ Bob's act discharges, the tick past 3 + 5 breaches. A `SHANT` with no `LEST` —
 never states. A `MAY` with a `HENCE` — the act advances, the tick discharges (`LEST` defaulting to
 `FULFILLED`). `contracts.l4`'s `aContract` one event in — `payment price` is listed `Untried`
 naming the binder; the tick past 2 + 3 advances to the `LEST`'s `EXACTLY payment OF fine`. A
+fork's `HENCE` naming the member's open `amount` (`run-fork.l4`) and a rule `GIVEN` at its
+outset — refused before the replay, `ocSteps` empty, no verdict text containing "not in scope";
+the same `GIVEN` once a comparison has forced it — read through a projection and discharging
+(cases 10, 10', added 2026-09-19). A
 barrier of three with nobody acted — each member's act is **`Advancing`** with the `Awaiting` at
 1 of 3, the tick breaches; with two acted — the last member's act is **`Discharging`** (the
 `HENCE` is `FULFILLED`), the tick breaches. A fork — each member's act advances its **own**
@@ -2618,6 +2641,9 @@ plus, for B and C, the position in plain words, and a `truth.json` per contract:
   refused with the replay's own `Internal error: amount is not in scope` as its reason —
   `reifyExpr` (`jl4-core/src/L4/Lts/WhatIf.hs:539`) cannot read a member's open pattern
   variable through the `HENCE`; the verdict (untried) is right, the wording is not the list's.
+  _The first is fixed 2026-09-19 (§2.4, amended; every-each round 2 O2): the refusal is now
+  made before the replay and reads "the action binds `amount`, which the what-if cannot
+  choose", and the receipt is still named with its member._
   And the tick past 7 prints as `the clock reaches 7.5` — `tickPast` (`WhatIf.hs:278`) going
   half-way to the next live deadline, as §2.4 says, which a reader is not told.
 

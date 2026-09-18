@@ -147,7 +147,7 @@ reportFrom tr es =
     , rpNext     = listToMaybe (sortOn fst confirmedTicks)
     , rpUnknown  = unknown
     , rpDeadlines = [ (n, d) | (d, ns) <- confirmedTicks, n <- ns ]
-    , rpActions  = [ (n, prettyLayout h.hyAction) | o <- es.esOutcomes, (ActBy n, Right h) <- [(o.ocCandidate.cdKind, o.ocCandidate.cdHypothetical)] ]
+    , rpActions  = [ (n, prettyLayout a) | o <- es.esOutcomes, ActBy n <- [o.ocCandidate.cdKind], Just a <- [o.ocCandidate.cdShape] ]
     , rpSteps    = pos.posSteps
     }
   where
@@ -371,11 +371,14 @@ familyLine f = case f.faJoin of
   Fork         -> "one of " <> textShow f.faTotal <> ", each with a next step of their own"
   Distributive -> "one of " <> textShow f.faTotal
 
--- | The hypothetical, in words: who does what, or time passing.
+-- | The hypothetical, in words: who does what, or time passing. An act the
+-- what-if refused is still named as far as the residual could instantiate
+-- it ('Candidate.cdShape'), and as the pattern only when it could not at
+-- all.
 candidateLine :: Outcome -> Text
 candidateLine o = case (o.ocCandidate.cdKind, o.ocCandidate.cdHypothetical) of
   (ActBy n, Right h)       -> bearerText n.lnBearer <> " does " <> prettyLayout h.hyAction <> " now (at " <> prettyRatio h.hyAt <> ")"
-  (ActBy n, Left _)        -> bearerText n.lnBearer <> " does " <> n.lnAction
+  (ActBy n, Left _)        -> bearerText n.lnBearer <> " does " <> maybe n.lnAction prettyLayout o.ocCandidate.cdShape
   (TickPast d _, Right h)  -> "nothing happens by " <> prettyRatio d <> " (the clock reaches " <> prettyRatio h.hyAt <> ")"
   (TickPast d _, Left _)   -> "nothing happens by " <> prettyRatio d
   (NoTick n, _)            -> "time runs out on " <> normLine [] n
@@ -679,7 +682,7 @@ blameJson b = Aeson.object $ catMaybes
 candidateJson :: Outcome -> Aeson.Value
 candidateJson o = case (o.ocCandidate.cdKind, o.ocCandidate.cdHypothetical) of
   (ActBy n, Right h) -> Aeson.object ["kind" .= ("act" :: Text), "party" .= bearerText n.lnBearer, "action" .= prettyLayout h.hyAction, "at" .= ratio h.hyAt]
-  (ActBy n, Left _) -> Aeson.object ["kind" .= ("act" :: Text), "party" .= bearerText n.lnBearer, "action" .= n.lnAction]
+  (ActBy n, Left _) -> Aeson.object ["kind" .= ("act" :: Text), "party" .= bearerText n.lnBearer, "action" .= maybe n.lnAction prettyLayout o.ocCandidate.cdShape]
   (TickPast d ns, Right h) -> Aeson.object ["kind" .= ("tick" :: Text), "deadline" .= ratio d, "at" .= ratio h.hyAt, "whose" .= map (normJson []) ns]
   (TickPast d ns, Left _) -> Aeson.object ["kind" .= ("tick" :: Text), "deadline" .= ratio d, "whose" .= map (normJson []) ns]
   (NoTick n, _) -> Aeson.object ["kind" .= ("noTick" :: Text), "whose" .= [normJson [] n]]
