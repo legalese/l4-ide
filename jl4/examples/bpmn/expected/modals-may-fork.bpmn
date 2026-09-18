@@ -23,13 +23,11 @@
       </bpmn:lane>
       <bpmn:lane id="Lane_unassigned" name="(unassigned)">
         <bpmn:flowNodeRef>Start_0</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>End_2</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>End_3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndGroup_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndBreach_0</bpmn:flowNodeRef>
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="Start_0" />
-    <bpmn:endEvent id="End_2" name="every run has ended" />
-    <bpmn:endEvent id="End_3" name="Breach" />
     <bpmn:subProcess id="Scope_0" name="each Director" triggeredByEvent="false">
       <bpmn:documentation>One instance per member of the cast, all live at once. The join line is UPON EACH, so everything this box contains — the act, its deadline, and what follows it — belongs to ONE member and runs once per member.</bpmn:documentation>
       <bpmn:ioSpecification id="IoSpec_Scope_0">
@@ -81,13 +79,19 @@
       <bpmn:sequenceFlow id="Flow_Boundary_1__EscScope_0" sourceRef="Boundary_1" targetRef="EscScope_0" />
       <bpmn:sequenceFlow id="Flow_StartScope_0__Task_0" sourceRef="StartScope_0" targetRef="Task_0" />
     </bpmn:subProcess>
+    <bpmn:endEvent id="EndGroup_0" name="every run has ended">
+      <bpmn:documentation>every member&apos;s instance has ended, whichever way each ended. Not the same statement as the rule being fulfilled: see P-FORK-VERDICT.</bpmn:documentation>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="EndBreach_0" name="Breach">
+      <bpmn:documentation>a member breached. A plain end and not an error end: an error end event ends every active thread in the process, so it would cancel the instances of the members who did not breach. See P-FORK-BREACH-UNMARKED.</bpmn:documentation>
+    </bpmn:endEvent>
     <bpmn:boundaryEvent id="BoundaryEsc_0" name="a member breached" attachedToRef="Scope_0" cancelActivity="false">
       <bpmn:documentation>catches a breach raised by one member, without interrupting the group: every other member remains bound, and a second breach is caught here too.</bpmn:documentation>
       <bpmn:escalationEventDefinition id="EscDef_BoundaryEsc_0" escalationRef="Escalation_breach" />
     </bpmn:boundaryEvent>
     <bpmn:sequenceFlow id="Flow_Start_0__Scope_0" sourceRef="Start_0" targetRef="Scope_0" />
-    <bpmn:sequenceFlow id="Flow_Scope_0__End_2" sourceRef="Scope_0" targetRef="End_2" />
-    <bpmn:sequenceFlow id="Flow_BoundaryEsc_0__End_3" sourceRef="BoundaryEsc_0" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Scope_0__EndGroup_0" sourceRef="Scope_0" targetRef="EndGroup_0" />
+    <bpmn:sequenceFlow id="Flow_BoundaryEsc_0__EndBreach_0" sourceRef="BoundaryEsc_0" targetRef="EndBreach_0" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_each_approval_is_published">
@@ -115,14 +119,11 @@
       <bpmndi:BPMNShape id="Shape_Boundary_1" bpmnElement="Boundary_1">
         <dc:Bounds x="614" y="162" width="36" height="36" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Shape_End_2" bpmnElement="End_2">
-        <dc:Bounds x="592" y="470" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Shape_End_3" bpmnElement="End_3">
-        <dc:Bounds x="592" y="590" width="36" height="36" />
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Scope_0" bpmnElement="Scope_0" isExpanded="true">
         <dc:Bounds x="208" y="76" width="624" height="246" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndGroup_0" bpmnElement="EndGroup_0">
+        <dc:Bounds x="592" y="470" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_StartScope_0" bpmnElement="StartScope_0">
         <dc:Bounds x="232" y="122" width="36" height="36" />
@@ -132,6 +133,9 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_EscScope_0" bpmnElement="EscScope_0">
         <dc:Bounds x="772" y="242" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndBreach_0" bpmnElement="EndBreach_0">
+        <dc:Bounds x="592" y="590" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_BoundaryEsc_0" bpmnElement="BoundaryEsc_0">
         <dc:Bounds x="786" y="304" width="36" height="36" />
@@ -171,13 +175,13 @@
         <di:waypoint x="331" y="140" />
         <di:waypoint x="380" y="140" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Edge_Flow_Scope_0__End_2" bpmnElement="Flow_Scope_0__End_2">
+      <bpmndi:BPMNEdge id="Edge_Flow_Scope_0__EndGroup_0" bpmnElement="Flow_Scope_0__EndGroup_0">
         <di:waypoint x="832" y="199" />
         <di:waypoint x="528" y="199" />
         <di:waypoint x="528" y="488" />
         <di:waypoint x="592" y="488" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Edge_Flow_BoundaryEsc_0__End_3" bpmnElement="Flow_BoundaryEsc_0__End_3">
+      <bpmndi:BPMNEdge id="Edge_Flow_BoundaryEsc_0__EndBreach_0" bpmnElement="Flow_BoundaryEsc_0__EndBreach_0">
         <di:waypoint x="804" y="340" />
         <di:waypoint x="545" y="340" />
         <di:waypoint x="545" y="608" />

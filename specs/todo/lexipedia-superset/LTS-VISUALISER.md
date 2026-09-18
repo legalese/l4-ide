@@ -2305,11 +2305,24 @@ note's: "every continuation spawned before the timer fired". Worse, the emitted 
 opposite in its own `<documentation>` on the boundary — "every other member remains bound" — and
 this spec, `EVERY.md` and the fixture README all said "discharged" in four places.
 
-Fixed by demoting the terminals once the edges are final, and only where the fork is their sole
-feeder: the breach end loses its `errorEventDefinition`, and the fulfilled end loses the name
-`Fulfilled`, because with the continuation inside, that flow is taken when every run has ENDED and
-not when the rule is fulfilled. Measured, and the numbers separate the defect from the faithful
-case cleanly — markings that can complete ONLY by terminating, at two instances:
+**The first fix for it was also wrong, and in a more instructive way.** It demoted the two shared
+terminals in place — the breach end losing its `errorEventDefinition`, the fulfilled end losing the
+name `Fulfilled` — guarded by "only where the fork is their sole feeder". That is correct on every
+golden in the corpus, and wrong the moment anything else breaches. Probed deliberately, because the
+guard was the part I distrusted: a `RAND` of a fork beside a `PARTY` obligation, both `LEST BREACH`,
+which is `ok/every/rand.l4`'s shape with one token changed. The guard did not fire and the file kept
+**409** markings that could complete only by terminating. A correctness cliff hidden behind a
+condition that happens to hold everywhere you have looked is worse than the bug it patches, because
+the goldens report it fixed.
+
+So the fork gets **its own** top-level terminals — `EndGroup_<n>` ("every run has ended") and
+`EndBreach_<n>` — and the shared ones are dropped when nothing else feeds them. There is no
+condition left to get wrong. On the probe the fork's contribution goes to zero and 113 remain,
+which are the landlord's own breach terminating under `RAND` — pre-existing, the same mechanism as
+`offering.bpmn`'s long-standing 370, and a separate question from this one.
+
+Measured, and the numbers separate the defect from the faithful case cleanly — markings that can
+complete ONLY by terminating, at two instances:
 
 | golden                           | before | after |
 | -------------------------------- | ------ | ----- |

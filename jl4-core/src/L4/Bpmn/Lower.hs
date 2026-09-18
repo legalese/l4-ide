@@ -958,10 +958,6 @@ stateGraphToBpmn opts sg =
                 <> Text.pack (show (length entries))
                 <> " places, and a sub-process has exactly one start event"
             )
-      | isNothing fulfilledId =
-          Just
-            "the graph has no Fulfilled terminal for the group to complete \
-            \into, so the scope would have no outgoing flow"
       | otherwise = Nothing
 
     -- Guarded by 'refusal', which rejects any count but one.
@@ -979,54 +975,56 @@ stateGraphToBpmn opts sg =
       (l : _) -> l
       [] -> Nothing
 
-    rewritten = map (retermine . reparent) ns <> newNodes
+    rewritten = filter keep (map reparent ns) <> newNodes
 
-    -- The two top-level terminals have to be re-read once the edges are final,
-    -- because what they MEAN changed when the continuation moved inside.
+    -- | THE FORK GETS ITS OWN TOP-LEVEL TERMINALS, and does not borrow the
+    -- shared ones.
     --
-    -- The breach end stops being an error end. An error end event does not
-    -- consume one token and leave the rest running: it ends every active thread
-    -- in its process, which at top level includes the live instances of this
-    -- scope. So a breach that correctly escaped one instance without
-    -- interrupting its siblings would kill them one flow later, and the
-    -- continuation another member had already earned would vanish — which is
-    -- exactly the loss @P-FORK-CANCEL@ used to name, relocated rather than
-    -- repaired. Measured: with the error end in place, @tenancy-fork@ at two
-    -- instances had 121 markings that could complete ONLY by terminating; the
-    -- barrier goldens, where failing as a group IS the rule, have one or two.
+    -- Both of the graph's terminals mean something different on this path, so
+    -- sharing them is not an economy, it is a category error:
     --
-    -- Only when every arrival is a fork's escalation. A breach terminal that
-    -- something else also reaches is still that other path's error end, and
-    -- @offering.bpmn@'s terminate is a modelled outcome, not a defect.
+    -- * __Breach.__ An error end event does not consume one token and leave the
+    --   rest running: it ends every active thread in its process, which
+    --   includes the instances still going. A breach that correctly escaped one
+    --   instance without interrupting its siblings would kill them one flow
+    --   later, and a duty another member had already earned would vanish. So
+    --   the fork's breach end is a PLAIN end (@P-FORK-BREACH-UNMARKED@). But a
+    --   breach terminal that a NON-fork path also reaches still has to
+    --   terminate for that path — under @RAND@ one operand's breach is the
+    --   whole contract's — so the two cannot be the same element.
+    -- * __Fulfilled.__ With the continuation inside, this flow is taken when
+    --   every run has ENDED, whichever way each ended. Calling that
+    --   @Fulfilled@ asserts a fold this file does not compute
+    --   (@P-FORK-VERDICT@), and a non-fork path arriving at the same circle
+    --   does mean fulfilled.
     --
-    -- The fulfilled end stops claiming a verdict. With the continuation inside,
-    -- this flow is taken when every member's run has ENDED, whichever way each
-    -- ended; calling it \"Fulfilled\" would assert the fold over the members,
-    -- which this file does not compute. See @P-FORK-VERDICT@.
-    retermine n
-      | Just n.nodeId == breachId, breachIsOursAlone =
-          n {nodeKind = EndEvent PlainEnd}
-      | Just n.nodeId == fulfilledId, fulfilledIsOursAlone =
-          n {nodeName = groupEndName}
-      | otherwise = n
+    -- __An earlier cut demoted the shared terminals in place, guarded by \"only
+    -- when the fork is their sole feeder\".__ That is correct on every golden in
+    -- the corpus and wrong the moment anything else breaches: measured on a
+    -- @RAND@ of a fork beside a @PARTY@ obligation, both @LEST BREACH@, the
+    -- guard simply did not fire and the file kept 409 markings that could
+    -- complete only by terminating. A correctness cliff hidden behind a
+    -- condition that happens to hold everywhere you have looked is worse than
+    -- the bug it patches, because the goldens say it is fixed. Giving the fork
+    -- its own elements has no condition to get wrong.
+    --
+    -- Whatever the fork stops feeding is then dropped if nothing else feeds it,
+    -- because an end event with no incoming flow is a dead node and the gate
+    -- says so.
+    keep n = n.nodeId `notElem` orphanedTerminals
+
+    orphanedTerminals =
+      [ t
+      | t <- catMaybes [fulfilledId, breachId]
+      , not (any ((== t) . (.edTo)) es')
+      ]
+
+    groupEndId = "EndGroup_" <> tag
+    breachOutId = "EndBreach_" <> tag
 
     -- No apostrophe: it would be XML-escaped into the one attribute a reader
     -- sees on the shape. No verdict either — see 'forkVerdictNote'.
     groupEndName = "every run has ended"
-
-    arrivalsAt x = [e | e <- es', e.edTo == x]
-
-    breachIsOursAlone = case breachId of
-      Nothing -> False
-      Just b -> case arrivalsAt b of
-        [] -> False
-        as -> all ((== escBoundaryId) . (.edFrom)) as
-
-    fulfilledIsOursAlone = case fulfilledId of
-      Nothing -> False
-      Just f -> case arrivalsAt f of
-        [] -> False
-        as -> all ((== scopeId) . (.edFrom)) as
 
     -- Inside the scope the act is performed ONCE, by this member. The
     -- multi-instance marker moves to the scope; leaving it on the task as well
@@ -1051,6 +1049,20 @@ stateGraphToBpmn opts sg =
           , nodeMultiInstance = Nothing
           , nodeParent = Nothing
           , nodeLoopCollection = loopCollectionFor sg.sgName =<< mq
+          }
+      , FlowNode
+          { nodeId = groupEndId
+          , nodeName = groupEndName
+          , nodeKind = EndEvent PlainEnd
+          , nodeDoc =
+              Just
+                "every member's instance has ended, whichever way each ended. \
+                \Not the same statement as the rule being fulfilled: see \
+                \P-FORK-VERDICT."
+          , nodeLane = Nothing
+          , nodeMultiInstance = Nothing
+          , nodeParent = Nothing
+          , nodeLoopCollection = Nothing
           }
       , FlowNode
           { nodeId = innerStartId
@@ -1094,6 +1106,21 @@ stateGraphToBpmn opts sg =
                , nodeLoopCollection = Nothing
                }
            , FlowNode
+               { nodeId = breachOutId
+               , nodeName = "Breach"
+               , nodeKind = EndEvent PlainEnd
+               , nodeDoc =
+                   Just
+                     "a member breached. A plain end and not an error end: an \
+                     \error end event ends every active thread in the process, \
+                     \so it would cancel the instances of the members who did \
+                     \not breach. See P-FORK-BREACH-UNMARKED."
+               , nodeLane = Nothing
+               , nodeMultiInstance = Nothing
+               , nodeParent = Nothing
+               , nodeLoopCollection = Nothing
+               }
+           , FlowNode
                { nodeId = escBoundaryId
                , nodeName = escalationCatchName
                , nodeKind = Boundary scopeId CatchEscalation
@@ -1133,11 +1160,8 @@ stateGraphToBpmn opts sg =
 
     newEdges =
       [plainEdge innerStartId entry Nothing]
-        <> [plainEdge scopeId f Nothing | f <- maybeToList fulfilledId]
-        <> [ plainEdge escBoundaryId b Nothing
-           | throwsBreach
-           , b <- maybeToList breachId
-           ]
+        <> [plainEdge scopeId groupEndId Nothing]
+        <> [plainEdge escBoundaryId breachOutId Nothing | throwsBreach]
 
     ------------------------------------------------------------------
     -- findings
@@ -1175,7 +1199,7 @@ stateGraphToBpmn opts sg =
       [ MkFidelityNote
           { code = "P-FORK-VERDICT"
           , severity = Lossy
-          , element = fromMaybe scopeId fulfilledId
+          , element = groupEndId
           , range = Nothing
           , message =
               "The rule's own verdict is not drawn. Each member's run ends \
@@ -1193,7 +1217,6 @@ stateGraphToBpmn opts sg =
               \fulfilled or breached, which the per-member ends carry \
               \individually and nothing here aggregates"
           }
-      | fulfilledIsOursAlone
       ]
 
     -- Filed only where the demotion actually happened, so it cannot claim a
@@ -1202,7 +1225,7 @@ stateGraphToBpmn opts sg =
       [ MkFidelityNote
           { code = "P-FORK-BREACH-UNMARKED"
           , severity = Advisory
-          , element = fromMaybe scopeId breachId
+          , element = breachOutId
           , range = Nothing
           , message =
               "This breach end carries no errorEventDefinition, where a \
@@ -1216,7 +1239,7 @@ stateGraphToBpmn opts sg =
               "the breach as an error an engine can catch, at the one place \
               \catching it would do more harm than not"
           }
-      | breachIsOursAlone
+      | throwsBreach
       ]
 
     forkLaneNote =
