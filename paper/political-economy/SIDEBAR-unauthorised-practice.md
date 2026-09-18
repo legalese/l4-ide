@@ -11,8 +11,10 @@
 > Profession Act 1966 (Singapore), ss 32–36 and s 77, full text from the lawplain `statutes`
 > corpus, current as amended by Act 37 of 2023 wef 17/07/2024; _Choo Cheng Tong Wilfred v Phua
 > Swee Khiang_ [2021] SGHC 154 at [6] and [77]–[80]; _Public Prosecutor v Lim Tean_ [2026] SGHC 44
-> at [67]. **Legal information, not legal advice**, and this is a policy note, not an opinion on
-> anybody's exposure.
+> at [67]; and, for §5e, Ellia Pikri, "Why Ironically, Law Startups Face A Lot Of Legal Challenges
+> In Malaysia", _Vulcan Post_, 8 May 2017 (added 2026-09-18) — trade press, read in full, and
+> secondary for every legal claim it makes. **Legal information, not legal advice**, and this is a
+> policy note, not an opinion on anybody's exposure.
 
 ---
 
@@ -503,6 +505,79 @@ unbounded loops moves you from undecidable to decidable. Keep the two claims apa
 will separate them for you. It is also the tidiest defence of L4's design: the restriction that
 looks like a limitation is precisely what makes the region map available.
 
+## 5e. The Malaysian record: enclosure enforced from the lawyer's side
+
+> Source: Ellia Pikri, ["Why Ironically, Law Startups Face A Lot Of Legal Challenges In
+> Malaysia"](https://vulcanpost.com/609959/legal-law-startup-malaysia-bar-council-touting/),
+> _Vulcan Post_, 8 May 2017. Added 2026-09-18. Trade press; the founders are interviewed and the
+> Bar Council is not. Every legal proposition below is the article's, and none of the underlying
+> provisions or decisions has been read — see §7.
+
+The Singapore material (§1–§2) and the US material (§5a) share a shape: the enclosure is a
+**prohibition on the unlicensed actor**, and the fight is over what the unlicensed actor may be
+said to be doing. The Malaysian record as this article reports it has a **different shape, and it
+is the more efficient one**: the Bar Council did not need a practice-of-law offence against any
+startup, because it could reach the same result through the **conduct rules that bind its own
+members**.
+
+**The lever is the touting prohibition.** The article cites "Legal Profession (Practice and
+Etiquette) Rules 1978, particularly the Subsections (1) and (2) of the above-mentioned Section 37
+of the LPA" — a citation that conflates the Act with the Rules, and which is one of the things to
+check — and glosses it as: no lawyer may advertise directly to clients, and "there can't be a
+third-party who can act as an advocate and solicitor to bring clients to these lawyers." Read that
+gloss against a lawyer-directory startup and the consequence is immediate. **A platform that
+lists lawyers is lawful for the platform and an offence for every lawyer on it.** The supply the
+platform needs is the licensed supply, and the licensed supply is the one party the guild can
+discipline without a prosecutor, a court, or a statutory definition of "practice". Nothing has to
+be proved about what software _is_.
+
+Three instances, as reported:
+
+| Startup                    | What it did                                                                              | What happened                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CanLaw**                 | Free lawyer directory; proposed a monthly subscription charged to the listed lawyers.    | Approached the Bar Council itself, August 2016. Still "under review" at publication, nine months later. The founder's position: the free service breaches nothing, since a recommendation from a friend is not touting; only the paid model is in question.                                                                                                                       |
+| **BurgieLaw**              | Document templates plus lawyer consultations; offered a **15-minute free consultation**. | The Bar's committee "took an issue with the 15-minute free consultation construing it as placing at the disposal of any other person the services of an advocate and solicitor." BurgieLaw withdrew the free session and left pricing to the lawyers. Its own reading: "the section was originally drafted to combat touts and not to deal with legal tech or legal directories." |
+| **Dragon Law** (Hong Kong) | Document-drafting for the public.                                                        | "The outright banning … from entering the country altogether." Mechanism not stated; secondary.                                                                                                                                                                                                                                                                                   |
+| **Answers-In-Law**         | Not described.                                                                           | Sued in 2011; resolved 2015; "will not proceed with their services." Four years of litigation is the deterrent whether or not anything was decided.                                                                                                                                                                                                                               |
+
+Four things to take from it.
+
+**(i) The lever is on the other side of the market from the one this sidebar has been describing.**
+§0 says the supply-side enclosure "binds the accountable filler and not the adversarial one". The
+Malaysian version binds the _intermediary_ by binding the _professional_: it does not prohibit the
+citizen from asking or the machine from answering, it prohibits the lawyer from being findable
+through anyone but the guild. That is a cleaner enclosure than s 33, because it is enforced by
+membership discipline rather than by criminal process, and because its subject (the lawyer) has
+already consented to be bound.
+
+**(ii) The width is conceded from inside.** Foong Cheng Leong, co-deputy chair of the Bar Council's
+own Intellectual Property Committee, is quoted: "the restrictions in the LPA are very widely-worded
+and can be interpreted in a manner which means that all sorts of activities would breach the LPA."
+That is §1a's "wide reading" point about s 33(2), made about a different statute by a member of
+the body that would enforce it. A rule whose own enforcers describe it as reaching "all sorts of
+activities" is a rule whose scope is set by prosecutorial discretion, which is the medallion
+mechanism of §5.
+
+**(iii) Asking is not answered.** Both live startups went to the Bar Council voluntarily and were
+left in review. That is the soft form of the closure argued in [`SIDEBAR-who-acts.md`](SIDEBAR-who-acts.md)
+§4: the inquiry is permitted, and the non-answer does the work a refusal would, at no cost to the
+guild and with no reviewable decision. Compare the s 34(2) exemption power at §5, which is likewise
+a power that need never be exercised to have its effect.
+
+**(iv) The article's own remedy is the sandbox, again.** It closes by proposing that the Bar do
+what Bank Negara and the Securities Commission did for fintech — a sandbox "within their
+jurisdiction and watchful eye". That is the third independent arrival at the same structure, after
+Utah (2020) and Arizona (2020) in §7 and the s 34(2) rule-making power in §5. The pattern worth
+stating in the paper is that **every jurisdiction surveyed locates the fix in a regulator's
+discretionary carve-out, and none in a court's reading of what the machine does** — which is
+consistent with §5a(iv)'s finding that LegalZoom's durable wins were legislative and antitrust,
+not doctrinal.
+
+One thing not to take from it: the article was written in 2017 about a directory and a template
+shop. It says nothing about a system that applies rules to facts, which is the thing this sidebar
+is about, and the touting rule would not obviously reach a service with no lawyers in it at all.
+Its value is as evidence of the _mechanism_, not of the exposure of anything we build.
+
 ## 6. The steelman against all of the above
 
 Do not ship the argument without this, or it reads as a lobbying document.
@@ -551,6 +626,15 @@ Do not ship the argument without this, or it reads as a lobbying document.
   Reasoning System (System Description)" (IJCAR 2020) before relying on the CAD lineage in print,
   and do not overstate it: the claim to make is that decomposition yields a finite reviewable
   partition, not that legal templates are semialgebraic.
+- **The Malaysian material (§5e) is entirely from one 2017 trade-press article.** Read the Legal
+  Profession Act 1976 (Malaysia) s 37 and the Legal Profession (Practice and Etiquette) Rules 1978
+  in the original — the article cites them as one thing and they are two — and find out which
+  provision carries the "placing at the disposal of any other person the services of an advocate
+  and solicitor" wording that was applied to BurgieLaw. Establish what "banning" Dragon Law
+  consisted of, and what the _Answers-In-Law_ suit (2011–2015) was actually about and who brought
+  it; both are a sentence each in the source. Check whether the Bar Council ever ruled on CanLaw
+  or BurgieLaw after May 2017, and whether either still operates. Foong Cheng Leong's quotation is
+  second-hand in the article (it cites his earlier piece), so get that piece.
 - **Still unsurveyed: the Utah regulatory sandbox and Arizona's abolition of ER 5.4, both 2020.**
   They are the strongest evidence that the scope question is being reopened by regulators rather
   than by courts, and they are the closest structural analogue to the s 34(2) power.
