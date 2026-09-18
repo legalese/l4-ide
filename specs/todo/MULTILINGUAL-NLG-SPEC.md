@@ -1,9 +1,10 @@
 # Multilingual L4 — language-tagged `@nlg`, and the trilingual Penal Law
 
-_Status: **proposed, not landed — with one exception.** §4 (the `%` and `]` escapes) is
-**implemented, gated and adversarially reviewed** on branch `fix/nlg-escapes` (`590bc3c56` +
-`53e9420d9`) and is **not merged**; everything else here is a proposal and no part of it is
-implemented. Every measurement in §2 was executed on 2026-09-17 against `unstable` @
+_Status: **proposed, not landed — with two exceptions.** §4 (the `%` and `]` escapes) is
+**implemented and adversarially reviewed** on branch `fix/nlg-escapes` (PR #415), and
+§4.1(a)'s `\>` escape for `@ref` is implemented on `lang/ref-escape` (PR #418), which is
+**stacked on #415 and merges after it**. Neither is merged; everything else here is a proposal
+and no part of it is implemented. Every measurement in §2 was executed on 2026-09-17 against `unstable` @
 `cab6988d0` and canon `mengwong/drafts` @ `61a4755`. Seven measurement errors in earlier drafts
 of this file have been corrected in place, each re-measured rather than taken on report —
 §2.3's gap count, §2.4's annotation census and its bare-inline count, a line citation, three
@@ -337,11 +338,12 @@ data TAnnotations = ... | TNlg !Text !AnnoType          -- today
 visible**: rendering an English page for a name that has only `@nlg:he` must emit the Hebrew
 _and record the fallback in the projection's fidelity report_, never silently substitute.
 
-## 4. Escapes for `%` and `]` — IMPLEMENTED on `fix/nlg-escapes`, not merged
+## 4. Annotation escapes — `\%` and `\]` in `@nlg`, `\>` in `@ref` — IMPLEMENTED, not merged
 
 Independent of the language work and being landed first, because both are live defects today
-(§2.4). **Branch `fix/nlg-escapes` (`590bc3c56` + `53e9420d9`); built, tested and gated
-2026-09-17, reviewed adversarially (§4.1), not merged.**
+(§2.4). **Branch `fix/nlg-escapes`, PR #415; built, tested and gated 2026-09-17, reviewed
+adversarially (§4.1), not merged.** The branch has been rebased since, so PR #415 is the stable
+handle and a quoted SHA is not.
 
 **Convention chosen: backslash.** `\%` → literal `%`, `\]` → literal `]`, `\\` → literal `\`.
 Any other `\x` is left untouched — the lexer consumes exactly the three escapes the decoder
@@ -393,7 +395,7 @@ Because `]` is one character, the `notFollowedBy` machinery that kept `<<a > b>>
 no longer needed and went with it.
 
 > **Ruling — `\>` escapes a right angle bracket in `@ref`. RULED 2026-09-17 (Meng);
-> implementation owed.** A literal `>>` inside `<<…>>` was unrepresentable before this work and
+> IMPLEMENTED 2026-09-18 on `lang/ref-escape`, PR #418, stacked on #415.** A literal `>>` inside `<<…>>` was unrepresentable before this work and
 > the `\%`/`\]` escape deliberately did not extend to it — `refAnnotation` is a second
 > annotation family, and widening to it on a fix branch's own initiative was not that branch's
 > call. Raised by the `hebrew` session, deferred by this one, and then **ruled the other way**:
@@ -406,6 +408,25 @@ no longer needed and went with it.
 > is exactly the regression §4.1(a) records. So `\>` needs a decode site on the `@ref` path,
 > found by auditing what consumes ref text, before the lexer half is touched. Doing the lexer
 > half alone would reproduce the half-wired failure of §4.1(c) in a second family.
+>
+> **How it was done, because the deferral named the precondition.** The audit the deferral
+> asked for found the decode site, and it is not the one the NLG half uses: `@ref` text never
+> reaches the linearizer. It reaches the reader through the parser, so the decode is
+> `unescapeRefText` applied where the parser stores the citation on the `Ref` node
+> (`L4/Parser.hs:127`), which is off the print path — the exact printer walks the annotation's
+> tokens, not this field, so `exactprint identity` still holds. `L4.Lexer.isRefEscapable` is
+> the `@ref` counterpart of `isNlgEscapable` and admits `\\` and `\>` only. A lone `>` stays
+> ordinary, which is what keeps `<<s.5 > s.3>>` lexing, and has its own test. Five cases in
+> `RefAnnotationSpec`.
+>
+> **Two record-keeping notes, because this ruling was briefly hard to find, which is the
+> failure this section exists to prevent.** First, the commit was rebased when a docs commit
+> landed beneath it, so the SHA it was first announced under (`d0fd5b9a4`) no longer resolves;
+> the change carried forward is the same diff, compared byte for byte. Second, it is not on
+> `fix/nlg-escapes` and never was — §4.1(a) is that branch UN-widening off `@ref`, and the
+> escape is a separate stacked PR precisely so the un-widening and the re-widening are
+> reviewable apart. A reader looking for it on #415 will correctly fail to find it, which is
+> how the `hebrew` session came to ask whether a ruling had been silently dropped. It had not.
 
 **(b) The lexer and the decoder disagreed about what an escape is.** The lexer consumed `\`
 plus _any_ character; `unescapeNlgText` decodes only `\\`, `\%`, `\]`. A pair the lexer
@@ -413,6 +434,15 @@ swallowed and the decoder ignored changes what an annotation **captures** withou
 what it **renders** — and it turned two shapes that lex today into parse errors, including an
 `@nlg` line annotation ending in a backslash, where there is no closing herald and so nothing
 to escape. `L4.Lexer.isNlgEscapable` is now the single set both sides use.
+
+> **Naming the set is not the same as using it (2026-09-18).** The decoder went on restating it
+> as a literal — ``c `elem` "\\%]"`` — four lines under a haddock paragraph that said the set
+> _was_ `isNlgEscapable`, so the file asserted an invariant it did not enforce. It now calls the
+> predicate. No behaviour changed, because the literal and the predicate denoted the same three
+> characters; the point is that they can no longer drift, and the drift they would have had is
+> silent — a fourth escapable character would give a lexer that consumes `\[` as a unit and a
+> decoder that leaves the backslash in, with the comment still reading correctly. Found by the
+> `hebrew` session reading the branch rather than the diff.
 
 **(c) The feature was half-wired, and the corpus goldens could not see it.**
 `unescapeNlgText` was reached only from `Linearize Nlg`, and an earlier draft of this section
@@ -453,8 +483,25 @@ a dump that decoded would disagree with what the IR holds and would hide this in
 the goldens that exist to expose it. The audit is recorded at `linearNlg` with line numbers,
 not here, because that is where the next person to add a consumer will be reading.
 
-**Still owed.** One thing only: there is no corpus `.l4` case carrying a backslash inside
-`<<…>>`, so the `@ref` half of §4.1(a) is pinned by `RefAnnotationSpec` but not by the corpus.
+**Nothing owed — and the one item listed here has been withdrawn on its merits, not dropped.**
+An earlier draft of this section wanted a corpus `.l4` case carrying a backslash inside `<<…>>`.
+The `hebrew` session — whose bug §4.1(a) records — argued it out, and the argument is right.
+Such a file would assert that `<<sec 3\>>` type-checks cleanly. But type-checking cleanly is
+what the BASELINE does, and it is also what the broken version did whenever a later `>>`
+existed: it swallowed a whole rule and still reported success. The corpus case would have been
+green through the entire lifetime of the bug it was meant to guard. It is not a guard; it is a
+guard-shaped object.
+
+The instrument that does catch it is fragment-level, and it is already written.
+`RefAnnotationSpec`'s "keeps a trailing backslash as ordinary text rather than escaping the
+closer" asserts that the captured text of `<<see s.5\>>` is exactly `see s.5\`, and it goes red
+the moment anyone re-widens the escape back into the shared `inlineAnno` body — the exact
+regression §4.1(a) is about. It was mutation-checked when it was added.
+
+**The general lesson is worth more than the case, and generalises past this branch:** a corpus
+file tests that something is ACCEPTED; only an assertion over the captured fragment tests WHAT
+was accepted. Where a defect changes what a construct captures rather than whether it lexes,
+adding a corpus file is the intuitive move and the useless one.
 
 ## 5. Proposed: locale in the projections
 
@@ -523,11 +570,14 @@ have no counterpart to consult, so their English is ours alone and should be mar
 
 ## 8. Suggested order of work
 
-1. **`%` and `]` escapes (R-M3).** ~~Smallest, independent, fixes two live defects.~~ **Done
-   on `fix/nlg-escapes`, awaiting review** — and it was not the smallest. It reached a second
-   annotation family, a second lexer and three renderers before it was finished; §4.1 is the
-   account. Read that before step 2, because the language tag touches the same three places
-   and the same green-gate-proves-nothing trap applies to it.
+1. **Annotation escapes (R-M3).** ~~Smallest, independent, fixes two live defects.~~ **Done,
+   awaiting review, as a STACK of two PRs** — and it was not the smallest. `\%` and `\]` for
+   `@nlg` are PR #415 (`fix/nlg-escapes`); `\>` for `@ref` is PR #418 (`lang/ref-escape`),
+   which sits on top of it and must merge second, because #415's own repair was to un-widen
+   the shared lexer body off `@ref` and #418 re-widens it deliberately, with a decode site.
+   It reached a second annotation family, a second lexer and three renderers before it was
+   finished; §4.1 is the account. Read that before step 2, because the language tag touches
+   the same three places and the same green-gate-proves-nothing trap applies to it.
 2. **Fix smucclaw/l4-ide#962 (§2.6) — a precondition, not a parallel task.** Non-ASCII in a
    `.schema.golden` is double-encoded and the corruption round-trips, so the suite stays green
    while storing mojibake. A Hebrew-canonical encoding writes one schema golden per file, so
