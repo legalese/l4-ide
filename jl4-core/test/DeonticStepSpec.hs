@@ -44,6 +44,9 @@
 --  20. a record-shaped party (@Tenant OF "Alice"@): the key carries the
 --      bearer's rendered NAME from the step where the machine had forced
 --      its fields, and not before;
+--  21. a MEANS-named party that misses its deadline with no LEST: the
+--      machine never forces the party, so the key has neither ledger key
+--      nor name, and carries the party AS WRITTEN instead (O1, 2026-09-19);
 --
 -- plus: the log-off path returns the same results as the log-on path, and
 -- a directive with no regulative content logs nothing.
@@ -62,6 +65,7 @@ import L4.EvaluateLazy
   )
 import L4.EvaluateLazy.DeonticStep
 import L4.EvaluateLazy.Machine (emptyEnvironment)
+import L4.Lts.List (renderStep)
 import L4.Evaluate.ValueLazy (RBinOp (..))
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax (DeonticModal (..))
@@ -143,6 +147,11 @@ bearerName s = (.nkBearerName) =<< s.dsNorm
 
 eventPartyName :: DeonticStep -> Maybe Text.Text
 eventPartyName s = (.ekPartyName) =<< s.dsEvent
+
+-- | The bearer as the rule WROTE it ('nkBearerSource'): the source form of
+-- the @PARTY@ expression, rendered at arming without forcing anything.
+bearerSource :: DeonticStep -> Maybe Text.Text
+bearerSource s = (.nkBearerSource) =<< s.dsNorm
 
 -- | The member's site and membership, for the EVERY shapes, so the tests can
 -- say "one site, two bearers, two ordinals".
@@ -519,6 +528,25 @@ earlyActSrc = Text.unlines $ prologue <>
   , "  PARTY Bob DOES deliver AT 16"
   ]
 
+-- 21. a computed party — a MEANS name — that misses its deadline with no
+--     LEST (the shape of ok/every/run-lest.l4's trace at :108). The expiry
+--     is found from the event's stamp alone, before any party comparison,
+--     and with no continuation to run there is no ResolveParty frame to
+--     force the party in: the breach's own party cell is allocated as a
+--     thunk and only peeked. The second trace has no events at all, so
+--     the obligation logs Waiting before anything has looked at the party.
+computedPartyBreachSrc :: Text.Text
+computedPartyBreachSrc = Text.unlines $ everyPrologue <>
+  [ "GIVETH A DEONTIC Actor Action"
+  , "`deliver by day 5` MEANS"
+  , "    PARTY theLandlord MUST Deliver theLandlord WITHIN 5"
+  , ""
+  , "#TRACE `deliver by day 5` AT 0 WITH"
+  , "  PARTY alice DOES Sign alice AT 8"
+  , ""
+  , "#TRACE `deliver by day 5` AT 0 WITH"
+  ]
+
 -- Off-path proof: every fixture, both ways, same rendered result.
 allSrcs :: [(String, Text.Text)]
 allSrcs =
@@ -528,7 +556,8 @@ allSrcs =
   , ("prohibition", prohibitionSrc), ("guard", guardSrc), ("action-mismatch", actionMismatchSrc)
   , ("barrier-fail", barrierFailSrc), ("barrier-stall", barrierStallSrc), ("barrier-breach", barrierBreachSrc)
   , ("join-lest", joinLestSrc), ("early-act", earlyActSrc)
-  , ("barrier-fresh", barrierFreshSrc), ("fork-breach", forkBreachSrc) ]
+  , ("barrier-fresh", barrierFreshSrc), ("fork-breach", forkBreachSrc)
+  , ("computed-party-breach", computedPartyBreachSrc) ]
 
 -- | The 'Breached' step an explicit @BREACH@ with no @BY@ logs.
 bareBreach :: Row
@@ -826,6 +855,35 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
     rsFork <- runLogged forkBreachSrc
     [ (fmap keyPrefix b.bsBlame, b.bsBlameName) | s <- stepsOf 0 rsFork, Breached b <- [s.dsOutcome] ]
       `shouldBe` [(Just "Tenant OF ", Just "Tenant OF \"Bob\"")]
+
+  it "21. a MEANS-named party that misses with no LEST: no key, no name, the party as written — and the step says so" $ do
+    rs <- runLogged computedPartyBreachSrc
+    -- The breach: one step, Expired ToBreach, at the arming clock, revealed
+    -- by the event at 8. The machine never looked at the party, so the two
+    -- value renderings are Nothing; the written form is what there is.
+    map (\ s -> (s.dsOutcome, rawBearer s, bearerName s, bearerSource s)) (stepsOf 0 rs) `shouldBe`
+      [(Expired ToBreach 5, Nothing, Nothing, Just "theLandlord")]
+    map renderStep (stepsOf 0 rs) `shouldBe`
+      ["at 0: the event at 8; theLandlord (as written; not yet resolved) MUST — deadline 5 passed without the act; that is a breach"]
+    -- No events: Waiting, before anything has looked at the party either.
+    map (\ s -> (s.dsOutcome, rawBearer s, bearerName s, bearerSource s)) (stepsOf 1 rs) `shouldBe`
+      [(Waiting, Nothing, Nothing, Just "theLandlord")]
+    map renderStep (stepsOf 1 rs) `shouldBe`
+      ["at —: theLandlord (as written; not yet resolved) MUST — no more events; still waiting"]
+    -- A literal party is written as its literal; an EVERY member arrives
+    -- as a value and has no written form, its bearer being known already.
+    rs1 <- runLogged matchSrc
+    map bearerSource (stepsOf 0 rs1) `shouldBe` [Just "Alice", Just "Bob"]
+    fresh <- runLogged barrierFreshSrc
+    map bearerSource (stepsOf 0 fresh) `shouldBe` [Nothing, Nothing]
+    -- The written form is not a resolved party: where the machine did
+    -- force it (the landlord's HENCE in fixture 6, matched at 6), the
+    -- name is what the step prints, and the source sits unused beside it.
+    rs6 <- runLogged barrierSrc
+    map (\ s -> (bearerSource s, bearerName s)) (drop 4 (stepsOf 0 rs6)) `shouldBe`
+      [(Just "theLandlord", Just "Landlord OF \"Ms Ng\"")]
+    map renderStep (drop 4 (stepsOf 0 rs6)) `shouldBe`
+      ["at 6: Landlord OF \"Ms Ng\" does Deliver OF … at 6; Landlord OF \"Ms Ng\" MUST — done; on to what follows"]
 
   it "the log-off path is unchanged: every fixture renders the same result both ways" $
     for_ allSrcs \(name, src) -> do

@@ -512,6 +512,10 @@ armNormKey party act = do
   mlog <- asks (.deonticLog)
   let site   = rangeOf act
       bearer = either (const Nothing) (Just . partyKeyWHNF) party
+      -- the party as written: syntax, so rendering it forces nothing (O1).
+      -- A party that arrived as a value (an EVERY member) has no written
+      -- form here, and its bearer is known anyway.
+      source = either (Just . prettyLayout) (const Nothing) party
   (activation, member, name) <- case mlog of
     Nothing -> pure (0, Nothing, Nothing)
     Just l  -> do
@@ -526,7 +530,7 @@ armNormKey party act = do
       pure (n, m, nm)
   pure MkNormKey
     { nkSite = site, nkActivation = activation, nkBearer = bearer, nkBearerName = name
-    , nkModal = act.modal, nkMember = member }
+    , nkBearerSource = source, nkModal = act.modal, nkMember = member }
 
 -- | Refresh a key's bearer once the machine has forced the party to WHNF.
 -- Pure and lazy, so the log-off path pays nothing for it.
@@ -562,7 +566,7 @@ armJoinKey d = do
     Just l  -> liftIO (bumpCounter l.dlActivations site)
   pure MkNormKey
     { nkSite = site, nkActivation = activation, nkBearer = Nothing, nkBearerName = Nothing
-    , nkModal = d.action.modal, nkMember = Nothing }
+    , nkBearerSource = Nothing, nkModal = d.action.modal, nkMember = Nothing }
 
 -- | Register an @EVERY@'s cast, so each member's obligation can find its
 -- membership when it is armed ('armNormKey'). A barrier's arm count starts

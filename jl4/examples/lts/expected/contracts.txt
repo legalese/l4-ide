@@ -65,7 +65,7 @@ quux — after 3 events, the clock stands at 1 (the #TRACE on line 73)
   Standing: FULFILLED — nothing more is owed.
 
   Steps, in order:
-    at —: (party not yet known) MUST — no more events; still waiting
+    at —: B (as written; not yet resolved) MUST — no more events; still waiting
     at —: either part: fulfilled (decided by the second part)
 
 x — after 1 event, the clock stands at 4 (the #TRACE on line 87)

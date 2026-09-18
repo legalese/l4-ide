@@ -1411,7 +1411,29 @@ Text}` — the sketch left `EventKey` undefined. Party and action are peeked. (S
   (`Machine.hs:1904`) and an `Expired` step is built at `Contract5` but **logged at
   `ResolveParty`** (`:1992`), where the party is known. Measured: an expiry with no `LEST` never
   forces the party; the breach's own party cell is peeked instead, so `PARTY Alice` (a nullary
-  constructor, allocated as a value) is known and a computed party would not be.
+  constructor, allocated as a value) is known and a computed party would not be. **BUILT
+  2026-09-19 (O1, `lts/p2-followups-2`): `NormKey` `+ nkBearerSource :: Maybe Text`** — the party
+  AS WRITTEN, the `prettyLayout` of the `PARTY p` expression's syntax, taken at `armNormKey`.
+  It is source, not value, so recording it forces nothing (peek-never-force stands), and it is
+  what the log has on the one step neither `nkBearer` nor `nkBearerName` can be known: the
+  no-`LEST` breach of a computed party. `Nothing` for an obligation whose party arrived as a
+  value (an `EVERY` member; the roll call forced it and `nkBearer` knows it) and for a join's own
+  key. `List.hs` falls back to it when both value renderings are absent, **marked as the written
+  form**: `ok/every/run-lest.l4`'s trace at :108 now reads
+  `at 10: the event at 18; theLandlord (as written; not yet resolved) MUST — deadline 15 passed
+without the act; that is a breach` where it read `(party not yet known) MUST`; the JSON keeps
+  `party: null` and adds `partyAsWritten: "theLandlord"` beside it (only when `party` is null;
+  no existing field changes meaning, `format` stays 1). `theLandlord` and the Standing line's
+  `Landlord OF "Ms Ng"` are one party under two spellings and do NOT compare by equality, which
+  is what the marker is for. "(party not yet known)" survives for a key with no written form
+  either, i.e. the join's own key, which `renderStep` words as "the group" anyway. **Not done
+  for `FailureSummary`** (`MissedSummary`'s party, `PartyNamed Nothing`): those are read off a
+  `Failure Reference`, which holds the party as a heap reference and nothing else; carrying the
+  syntax there is a change to a wire type (`ValueLazy.Failure`, serialised by `ValueLazyJSON`),
+  not to the log, and the placeholder stays on those two lines. Pinned: `DeonticStepSpec` case
+  21 (the run-lest shape: a `MEANS`-named party, a missed deadline, no `LEST`; asserts the field
+  and the step text on both the breach and a `Waiting` before any event, `Just "Alice"` for a
+  literal, `Nothing` for a member, and that a forced name still wins over the source).
 - `StepOutcome`: the sketch's `Breached !BreachSummary` survives for exactly one site — the
   `BREACH` expression arm (`LEST BREACH`, `BREACH BY p`), where the machine constructs an
   `ExplicitBreach`; it carries no norm (a terminal is not an obligation) and no clock (the

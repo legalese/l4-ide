@@ -163,6 +163,20 @@ data NormKey = MkNormKey
     -- force: 'Nothing' while any field is a thunk, which is the case for a
     -- 'Waiting' step before any event has been compared. Where it is
     -- 'Nothing', 'nkBearer' is what there is.
+  , nkBearerSource :: !(Maybe Text)
+    -- ^ the party AS WRITTEN: the 'L4.Print.prettyLayout' of the @PARTY p@
+    -- expression's syntax — @theLandlord@ for @PARTY theLandlord@, @Landlord
+    -- OF "Ms Ng"@ for the literal — taken at arming ('armNormKey'). It is a
+    -- rendering of source, not of a value, so computing it forces nothing;
+    -- that is what lets it be known on the one step neither of the fields
+    -- above can be: the no-@LEST@ breach of a computed party, which the
+    -- machine allocates as a thunk and never forces (O1, 2026-09-19; the
+    -- witness is @ok/every/run-lest.l4@'s trace at :108). 'Nothing' for an
+    -- obligation whose party arrived as a value rather than an expression —
+    -- an @EVERY@ member, whose bearer the roll call has forced and 'nkBearer'
+    -- always knows — and for a join's own key. A consumer that prints it
+    -- must mark it as the written form: a name is not a resolved party, and
+    -- @theLandlord@ and @Landlord OF "Ms Ng"@ do not compare by equality.
   , nkModal      :: !DeonticModal
     -- ^ all four, including @DDo@
   , nkMember     :: !(Maybe MemberOf)
