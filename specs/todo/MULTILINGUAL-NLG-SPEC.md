@@ -338,6 +338,79 @@ data TAnnotations = ... | TNlg !Text !AnnoType          -- today
 visible**: rendering an English page for a name that has only `@nlg:he` must emit the Hebrew
 _and record the fallback in the projection's fidelity report_, never silently substitute.
 
+### 3.1 What the tag actually touches — mapped 2026-09-18
+
+Seven parallel readers over the subsystems, plus a completeness critic that overturned a
+consensus of four of them (§4.1(c) carries that correction). Everything below was measured on
+`lang/ref-escape`; probes were run with the installed `l4`, which is older than that branch but
+newer than every construct probed.
+
+**The blocker is not the lexer, and it fails silently.** `Extension.nlg` is a **single slot**
+(`Syntax.hs:867`, `annNlg :: Lens' Anno (Maybe Nlg)`), and `HasNlg Name`
+(`ResolveAnnotation.hs:387-401`) handles two `@nlg` on one name by emitting an `Ambiguous`
+**warning and attaching neither**. Reproduced: `@nlg` and `@nlg:he` on one `DECIDE` gives
+`Severity: Warning`, **exit 0**, and a render that falls back to the bare name — so the spec's own
+bilingual example renders nothing for that name even with a perfect lexer. A half-wired tag
+**erases prose while the build stays green**, which is §4.1(c)'s failure one layer up.
+
+**`@nlg:he` is already accepted today, silently, as English prose.** Measured: it lexes to the NLG
+fragments `":he" "the" …`, `l4 check` exits 0 with no diagnostic, `l4 render` prints
+`… :he the taxpayer owing k is caught`, and `l4 format` round-trips byte-identically. **So a
+Hebrew fixture written before the feature lands is green and wrong, and no golden catches it.**
+`@lang en`, by contrast, is a hard lex error today (`unexpected '@'`, exit 1) — nothing written
+against `@lang` can silently change meaning. The two halves of the proposal have opposite safety
+properties and that should drive which lands first.
+
+**There are two lexers for `@nlg`, not one.** The outer `nlgAnnotation` (`Lexer.hs:432`) captures
+the line into `TNlg`; the parser then **rebuilds** the annotation's source text with `toNlgAnno`
+and **re-lexes** it with a second lexer, `nlgTokenPayload` (`Lexer.hs:788`) — and it is those inner
+tokens that land in the Anno (`Parser.hs:211`) and that exactprint re-emits
+(`ExactPrint.hs:40`). Both must learn the tag. Omitting the inner one is the silent failure;
+omitting the outer one is loud. Two consequences:
+
+- the text handed to `execNlgLexer` must stay **byte-identical** to the source slice, because
+  inner token positions are seeded by advancing from the outer position (`Lexer.hs:871-884`) —
+  stripping the tag before re-lexing shifts every inner column silently;
+- `lineNlg` matches the prefix by **exact token equality** (`Parser.hs:177` via `:316-321`), so the
+  moment `TNlgPrefix` carries a payload it stops matching. It must become a predicate match; the
+  pattern already exists two functions away in `descP` and `fixityP`.
+
+**The precedent to copy is `@infixl 6`** — a typed discriminator in the token constructor plus an
+opaque rest-of-line `Text`, re-emitted as a pure function of that field (`Lexer.hs:1265`), with the
+payload validated late in the type checker. `TNlg` itself has only **5 mentions** in the tree
+(`Lexer.hs:74, 757, 1257`; `Parser.hs:155, 198`), so the constructor surface is genuinely small.
+
+**A locale must not be threaded as a parameter.** `L4.Nlg` has 13 `Linearize` instances, 103 `lin`
+call sites and 34 `linearize` call sites, and every instance body is purely monoidal — a parameter
+rewrites all of them, whereas making `LinTree` a Reader-and-Writer newtype leaves almost all
+untouched. The class signature is free to change: `Linearize` has **no instances outside
+`L4/Nlg.hs`** and `linearize` is **never called outside it**. Only `simpleLinearizer` escapes, at
+14 call sites across 5 modules.
+
+**A fidelity report already exists, and it does not reach far enough.**
+`jl4-core/src/L4/Interchange/Fidelity.hs` has the whole discipline — `.fidelity.txt` sidecars, 64
+committed goldens, a `--fail-on blocking|lossy|advisory` gate, and `etc/go` comparing them. But it
+is reachable from **four backends only**, and of the six things that consume `@nlg`, just
+`L4.Relational.Lower` has a channel in scope (`Relational/Lower.hs:195`). `l4 render`, `l4 nlg`,
+LSP hover and `L4.Blawx.Lower` have no report at all and return bare `Text`. **So §3's requirement
+that a locale miss be recorded rather than silently substituted is a larger piece of work than the
+tag itself**, and it should not gate the tag.
+
+**Nothing of this exists yet:** `LangTag`, `@lang`, and BCP 47 anything measure **0 hits** tree-wide.
+
+#### 3.1.1 Suggested split — three PRs, in this order
+
+1. **Multi-`@nlg` attachment.** `Maybe Nlg` becomes a per-language collection;
+   `ResolveAnnotation` partitions by tag; a duplicate tag is a check error. **No user-visible
+   syntax**, so it lands alone and its blast radius is the 10 read sites, not the language.
+2. **The tag.** Both lexers, `toNlgAnno`, both `displayTokenType` arms, the predicate match — plus
+   one `#EVAL` over a head-trailing-annotated corpus name, which turns `.nlg.golden` into a witness
+   for free (§4.1(c)). **Based on `unstable`, not stacked on the #962 fix** (§8 step 2). This is the
+   step that carries the documentation obligation, because it is the first point at which a user
+   can write the thing.
+3. **Locale selection and fidelity.** `LinTree` as Reader-and-Writer; extend the fidelity channel
+   to the `@nlg` consumers that have none.
+
 ## 4. Annotation escapes — `\%` and `\]` in `@nlg`, `\>` in `@ref` — IMPLEMENTED, not merged
 
 Independent of the language work and being landed first, because both are live defects today
@@ -449,10 +522,36 @@ to escape. `L4.Lexer.isNlgEscapable` is now the single set both sides use.
 asserted that was "the single point where annotation text becomes output". **That was false.**
 `l4 render` (text, html, json, akn), the LSP document webview and `l4 blawx` each emitted the
 backslash to the reader. Worse, deleting every call site left the whole suite green: nothing
-asserted rendered annotation text, and nothing could — **no `.nlg.golden` in the tree
-witnesses annotation prose at all**, because that golden linearizes _directives_ and
-`Linearize (Directive Resolved)` routes `#EVAL` through `linearize e` rather than `lin e`. The
-repair adds `NlgRenderSpec`, which drives `buildDocument` end to end.
+asserted rendered annotation text — **no `.nlg.golden` in the tree witnesses annotation prose at
+all**. The repair adds `NlgRenderSpec`, which drives `buildDocument` end to end.
+
+> **Correction 2026-09-18 — "and nothing could" was too strong, and the error is instructive.**
+> This paragraph used to continue "…and nothing could", explaining that `Linearize (Directive
+Resolved)` routes `#EVAL` through `linearize e` rather than `lin e`, so the golden is
+> structurally blind. **Measured: it is not blind, it is un-exercised.** A head-trailing
+> annotation does reach `.nlg.golden`, because `Linearize (Expr Resolved)` calls `lin` on the
+> applied head name:
+>
+> ```l4
+> DECIDE `head trail` @nlg A: the head-trailing sentence about %a%
+>   IF a > 5
+> #EVAL `head trail` 7
+> ```
+>
+> → `l4 nlg` prints `A: the head-trailing sentence about `a` with 7`. The same file with the
+> annotation in the after-`GIVETH` line position prints the bare `` `after giveth` with 7 ``.
+> That position is the one the corpus uses throughout — `jl4/examples/ok/nlg-percent.l4` puts
+> `@nlg 5% with %amount%` above its `DECIDE` — which is why every existing golden shows bare
+> names and why the blindness looked structural.
+>
+> **The claim was a measurement of the corpus read as a statement about the instrument**, which
+> is the same scope error as §4.1(c)'s own opening confession one layer up. Two practical
+> consequences. Building a second end-to-end harness in the `NlgRenderSpec` shape is **not**
+> required to witness selection: one `#EVAL` over a head-trailing-annotated name in any goldened
+> corpus file makes `.nlg.golden` a first-class witness, for free. And the position matrix is
+> itself the finding worth keeping — of five placements, only above-`GIVEN` and head-trailing
+> render at all, so **where an annotation sits decides whether it is output**, which the language
+> tag work inherits whole.
 
 > **Ruling — `Relational.Lower.linearNlg` does NOT decode, and that is deliberate.** Its
 > output is re-scanned for `%name%` slots by `Blawx.Lower.scanNlg`. Decoding there turns
@@ -578,14 +677,30 @@ have no counterpart to consult, so their English is ours alone and should be mar
    It reached a second annotation family, a second lexer and three renderers before it was
    finished; §4.1 is the account. Read that before step 2, because the language tag touches
    the same three places and the same green-gate-proves-nothing trap applies to it.
-2. **Fix smucclaw/l4-ide#962 (§2.6) — a precondition, not a parallel task.** Non-ASCII in a
+2. **Fix smucclaw/l4-ide#962 (§2.6) — a precondition for the ENCODING, but not for the tag.** Non-ASCII in a
    `.schema.golden` is double-encoded and the corruption round-trips, so the suite stays green
    while storing mojibake. A Hebrew-canonical encoding writes one schema golden per file, so
    this lands on every one of them silently. **Ruled 2026-09-17 (Meng): fix it**, before any
    Hebrew golden is blessed — otherwise the first thing the encoding proves is the wrong thing.
+
+   **Measured 2026-09-18 — this does NOT make step 3 stack on it.** A Hebrew `@nlg` string does
+   not reach a `.schema.golden` at all: `@nlg` and `@desc` are separate `Extension` fields
+   (`Syntax.hs:901` vs `:904`) and `annNlg` has zero occurrences in `L4/JsonSchema.hs` or
+   `L4/Export.hs`, the only two modules the schema golden uses. Hebrew reaches a schema golden by
+   two **other** routes, both the fixture author's to control: identifier **names** (witnessed —
+   `fristberechnung.schema.golden` carries `die maßgebenden Orte` from a file with no `@desc` and
+   no `@nlg`) and **`@desc`** (witnessed — 11 `"description"` strings in
+   `regcf-wizard.schema.golden`), and only where the file has an `@export` at all: **386 of 503**
+   schema goldens are the literal string `No @export annotations found in file`. So the ordering
+   constraint is real for the Hebrew encoding and absent for the language tag.
+
 3. **Language tag (R-M1, R-M2 — both now ruled, §3).** `@nlg:he` on the heralded form only;
    absent `@lang` means `en`. Lexer, `L4.Nlg` selection, check error on duplicates, goldens.
-   Untagged behaviour must be provably unchanged — assert against the existing 131 annotations.
+   Untagged behaviour must be provably unchanged — assert against **every heralded annotation in
+   the tree, counted at the commit under test**, not against a number quoted from here. The count
+   moves with the branch: 131 at `cab6988d0`, and 133 real of 143 lines (130 heralded, 10 in
+   comments) on `lang/ref-escape`, which adds documentation examples. A recount is one command;
+   a stale constant silently weakens the assertion.
    Do **not** build the bare form's `[@he …]` spelling: pre-approved, not commissioned.
 
    **This step carries a documentation obligation, and `specs/` does not discharge it**
