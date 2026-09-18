@@ -11,8 +11,13 @@
 > Profession Act 1966 (Singapore), ss 32–36 and s 77, full text from the lawplain `statutes`
 > corpus, current as amended by Act 37 of 2023 wef 17/07/2024; _Choo Cheng Tong Wilfred v Phua
 > Swee Khiang_ [2021] SGHC 154 at [6] and [77]–[80]; _Public Prosecutor v Lim Tean_ [2026] SGHC 44
-> at [67]. **Legal information, not legal advice**, and this is a policy note, not an opinion on
-> anybody's exposure.
+> at [67]; and, for §5e, Ellia Pikri, "Why Ironically, Law Startups Face A Lot Of Legal Challenges
+> In Malaysia", _Vulcan Post_, 8 May 2017 (added 2026-09-18) — trade press, read in full, and
+> secondary for every legal claim it makes; and for §5e's "ten years on", a 2026-09-18 web search
+> whose sources are cited inline there, of which only the Bar Council's Circular No 471/2025 (the
+> gazetted text of the Legal Profession (Publicity) Rules 2025, P.U. (A) 462) is primary. **Legal
+> information, not legal advice**, and this is a
+> policy note, not an opinion on anybody's exposure.
 
 ---
 
@@ -503,6 +508,193 @@ unbounded loops moves you from undecidable to decidable. Keep the two claims apa
 will separate them for you. It is also the tidiest defence of L4's design: the restriction that
 looks like a limitation is precisely what makes the region map available.
 
+## 5e. The Malaysian record: enclosure enforced from the lawyer's side
+
+> Source: Ellia Pikri, ["Why Ironically, Law Startups Face A Lot Of Legal Challenges In
+> Malaysia"](https://vulcanpost.com/609959/legal-law-startup-malaysia-bar-council-touting/),
+> _Vulcan Post_, 8 May 2017. Added 2026-09-18. Trade press; the founders are interviewed and the
+> Bar Council is not. Every legal proposition below is the article's, and none of the underlying
+> provisions or decisions has been read — see §7.
+
+**2017, as the article told it.** The Singapore material (§1–§2) and the US material (§5a) share a shape: the enclosure is a
+**prohibition on the unlicensed actor**, and the fight is over what the unlicensed actor may be
+said to be doing. The Malaysian record as this article reports it has a **different shape, and it
+is the more efficient one**: the Bar Council did not need a practice-of-law offence against any
+startup, because it could reach the same result through the **conduct rules that bind its own
+members**. (That is what the article's framing implies. The follow-up below shows it is half
+right: the Bar used both levers, and the one it used on Dragon Law was a practice-of-law
+offence.)
+
+**The lever is the touting prohibition.** The article cites "Legal Profession (Practice and
+Etiquette) Rules 1978, particularly the Subsections (1) and (2) of the above-mentioned Section 37
+of the LPA" — a citation that conflates the Act with the Rules, and which is one of the things to
+check — and glosses it as: no lawyer may advertise directly to clients, and "there can't be a
+third-party who can act as an advocate and solicitor to bring clients to these lawyers." Read that
+gloss against a lawyer-directory startup and the consequence is immediate. **A platform that
+lists lawyers is lawful for the platform and an offence for every lawyer on it.** The supply the
+platform needs is the licensed supply, and the licensed supply is the one party the guild can
+discipline without a prosecutor, a court, or a statutory definition of "practice". Nothing has to
+be proved about what software _is_.
+
+Three instances, as reported:
+
+| Startup                    | What it did                                                                              | What happened                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CanLaw**                 | Free lawyer directory; proposed a monthly subscription charged to the listed lawyers.    | Approached the Bar Council itself, August 2016. Still "under review" at publication, nine months later. The founder's position: the free service breaches nothing, since a recommendation from a friend is not touting; only the paid model is in question.                                                                                                                       |
+| **BurgieLaw**              | Document templates plus lawyer consultations; offered a **15-minute free consultation**. | The Bar's committee "took an issue with the 15-minute free consultation construing it as placing at the disposal of any other person the services of an advocate and solicitor." BurgieLaw withdrew the free session and left pricing to the lawyers. Its own reading: "the section was originally drafted to combat touts and not to deal with legal tech or legal directories." |
+| **Dragon Law** (Hong Kong) | Document-drafting for the public.                                                        | "The outright banning … from entering the country altogether." Mechanism not stated; secondary.                                                                                                                                                                                                                                                                                   |
+| **Answers-In-Law**         | Not described.                                                                           | Sued in 2011; resolved 2015; "will not proceed with their services." Four years of litigation is the deterrent whether or not anything was decided.                                                                                                                                                                                                                               |
+
+Four things to take from it.
+
+**(i) The lever is on the other side of the market from the one this sidebar has been describing.**
+§0 says the supply-side enclosure "binds the accountable filler and not the adversarial one". The
+Malaysian version binds the _intermediary_ by binding the _professional_: it does not prohibit the
+citizen from asking or the machine from answering, it prohibits the lawyer from being findable
+through anyone but the guild. That is a cleaner enclosure than s 33, because it is enforced by
+membership discipline rather than by criminal process, and because its subject (the lawyer) has
+already consented to be bound.
+
+**(ii) The width is conceded from inside.** Foong Cheng Leong, co-deputy chair of the Bar Council's
+own Intellectual Property Committee, is quoted: "the restrictions in the LPA are very widely-worded
+and can be interpreted in a manner which means that all sorts of activities would breach the LPA."
+That is §1a's "wide reading" point about s 33(2), made about a different statute by a member of
+the body that would enforce it. A rule whose own enforcers describe it as reaching "all sorts of
+activities" is a rule whose scope is set by prosecutorial discretion, which is the medallion
+mechanism of §5.
+
+**(iii) Asking is not answered.** Both live startups went to the Bar Council voluntarily and were
+left in review. That is the soft form of the closure argued in [`SIDEBAR-who-acts.md`](SIDEBAR-who-acts.md)
+§4: the inquiry is permitted, and the non-answer does the work a refusal would, at no cost to the
+guild and with no reviewable decision. Compare the s 34(2) exemption power at §5, which is likewise
+a power that need never be exercised to have its effect.
+
+**(iv) The article's own remedy is the sandbox, again.** It closes by proposing that the Bar do
+what Bank Negara and the Securities Commission did for fintech — a sandbox "within their
+jurisdiction and watchful eye". That is the third independent arrival at the same structure, after
+Utah (2020) and Arizona (2020) in §7 and the s 34(2) rule-making power in §5. The pattern worth
+stating in the paper is that **every jurisdiction surveyed locates the fix in a regulator's
+discretionary carve-out, and none in a court's reading of what the machine does** — which is
+consistent with §5a(iv)'s finding that LegalZoom's durable wins were legislative and antitrust,
+not doctrinal.
+
+One thing not to take from it: the article was written in 2017 about a directory and a template
+shop. It says nothing about a system that applies rules to facts, which is the thing this sidebar
+is about, and the touting rule would not obviously reach a service with no lawyers in it at all.
+Its value is as evidence of the _mechanism_, not of the exposure of anything we build.
+
+### Where are they now? Ten years on
+
+> Web search, 2026-09-18. Sources are linked inline. Everything here is secondary except the
+> gazetted text of the 2025 Publicity Rules, which was read from the Bar Council's own circular.
+> Domain checks (`curl`) were done the same day and are true of that day only.
+
+**The Bar had already ruled, six weeks before the article ran.** _The Malaysian Lawyer_ reported on
+[22 March 2017](https://themalaysianlawyer.com/2017/03/22/bar-council-finds-burgielaw-dragon-law-in-breach-lpa-yet-to-decide-on-canlaw/)
+that the Bar Council had found BurgieLaw's appointment-and-free-consultation service in breach of
+**s 37(3)** of the Legal Profession Act 1976 — "BurgieLaw has been disallowed from offering such
+services" — and Dragon Law "clearly in breach of **section 37(2)** of the LPA" for "undertaking
+work that is customarily carried out by an advocate and solicitor". CanLaw was still pending. So
+the _Vulcan Post_ piece's "both … still under review" was already stale for BurgieLaw when it was
+published, and the article's citation muddle resolves into three provisions, not one:
+
+| Provision                                  | Binds                     | Wording, as reported                                                                                      | Applied to |
+| ------------------------------------------ | ------------------------- | --------------------------------------------------------------------------------------------------------- | ---------- |
+| LPA 1976 **s 37(2)**                       | the _unauthorised_ person | doing work "customarily carried out by an advocate and solicitor"                                         | Dragon Law |
+| LPA 1976 **s 37(3)**                       | the _unauthorised_ person | "offers or agrees to place at the disposal of any other person the services of an advocate and solicitor" | BurgieLaw  |
+| Practice and Etiquette Rules 1978 **r 51** | the _lawyer_              | "shall not do or cause or allow to be done, anything for the purpose of touting"                          | (threat)   |
+
+(Provisions per [_The Malaysian Lawyer_, 15 June 2016](https://themalaysianlawyer.com/2016/06/15/malaysian-bar-dragon-law-legal-innovation/),
+Marcus van Geyzel, also carried by
+[Conventus Law](https://conventuslaw.com/report/malaysian-bar-councils-scrutiny-of-dragon-law/).
+Not read in the statute.)
+
+This corrects the flashback's point (i). Malaysia does have a practice-of-law offence against the
+unauthorised actor — s 37(2) is one, and it is the provision that stopped the document-drafting
+startup — so the Malaysian shape is not "lawyer-side only". It is **both levers at once**, and
+the division of labour is the finding: **the document tool was hit with the practice-of-law
+offence; the lawyer-marketplaces were hit with the touting provisions.** The article's
+lawyer-side framing was right for two of the three startups and wrong for the one that most
+resembles what this sidebar is about.
+
+**CanLaw** was asked by the Bar Council to cease operating the platform pending review
+([_Digital News Asia_, 2 November 2017](https://www.digitalnewsasia.com/startups/canlaw-pivots-bring-more-tech-legal-profession)),
+and pivoted within the month to **CanLaw Syariah**, an exclusive partnership with Persatuan
+Peguam Syarie Malaysia, live on 10 November 2017
+([_Business Today_](https://www.businesstoday.com.my/2017/11/13/syariah-lawyer-discovery-website-goes-live/)).
+That pivot is the cleanest confirmation of the mechanism in the whole record: **Syariah lawyers
+are not members of the Malaysian Bar, so the platform moved to the one population of lawyers the
+guild cannot discipline**, and kept the same code. No later Bar Council ruling on CanLaw was
+found. As of 2026-09-18 `canlaw.asia`, `canlaw.my` and `canlawsyariah.com` do not resolve;
+`canlaw.io` is an unrelated Canadian family-law chatbot and `canlawreport.com` an unrelated
+content site. The company appears to be gone, without a decision ever having been recorded
+against it.
+
+**BurgieLaw** is alive at [burgielaw.com](https://www.burgielaw.com/) as a template store —
+"Download Malaysian Legal Agreement Templates" — having, per
+[Crunchbase](https://www.crunchbase.com/organization/burgielaw) and an
+[Asia Law Portal interview](https://asialawportal.com/asia-pacific-legal-startups-an-interview-with-burgielaw-com-founder-ceo-lai-chee-hoe/)
+with founder Lai Chee Hoe, "pivoted its primary business to selling affordable ready-made legal
+templates". The consultation marketplace the Bar objected to is what died; the document business
+is what survived. Note the tension with Dragon Law, whose document business is what s 37(2) was
+applied to; whether the difference is that BurgieLaw's templates are static downloads rather
+than a builder, or that nobody has looked, is not known.
+
+**Dragon Law** rebranded as **Zegal** on entering the UK
+([Yahoo News Singapore](https://sg.news.yahoo.com/hong-kong-based-legaltech-startup-dragon-law-rebrands-064230864.html))
+and operates in Hong Kong, Singapore, Australia, New Zealand and the UK. Malaysia is not a
+supported jurisdiction; `zegal.com/malaysia` returns 404. It left and did not come back.
+
+**The rules moved, but not that provision.** The Legal Profession (Publicity) Rules 2025,
+P.U. (A) 462, were gazetted 18 December 2025 and came into force 1 January 2026, revoking the
+2001 Rules (Bar Council
+[Circular No 471/2025](https://www.malaysianbar.org.my/cms/upload_files/document/Circular%20No%20471-2025.pdf)).
+Three things in the text bear on the platform question, and s 37 of the Act is not one of
+them, because the Act is untouched:
+
+- **The Bar-approved-directory regime is gone.** The 2001 r 8 allowed advertising only in
+  publications "approved in writing by the Bar Council" and containing only "approved
+  information". The 2025 Rules have no approved list. "Publicise" now means "to make known to the
+  public through any medium", including "any exposure, whether paid for or not, in any public
+  medium" and "any contact with a prospective client initiated by or on behalf of the person"
+  (r 3(1)). A third-party lawyer directory is therefore no longer something the Bar must approve
+  in advance; it is something the lawyer is answerable for after the fact.
+- **r 7(a): no person shall in any publicity "specify the fees charged by the person for his or
+  its services."** CanLaw's model was three to five fee quotes returned to the client. Whether a
+  quote sent through a platform in answer to a client's request is "publicity" turns on r 3(1)(d),
+  and nobody has ruled on it. But the rule is a second, independent ground on which that model
+  now fails, whatever s 37 says.
+- **r 9 makes the lawyer answerable for the platform.** The lawyer "shall be responsible … to
+  ensure that any publicity relating to him or its practice is done in accordance with these
+  Rules, whether such publicity is done by the person, any employee of the person or any party
+  acting on behalf of the person" (r 9(1)); on any query "it shall be the responsibility of the
+  person to satisfy the Bar Council" (r 9(2)); and the Bar Council "may … order the person to
+  alter, modify, withdraw, remove or discontinue the publicity" (r 9(4)). That is the lawyer-side
+  lever of point (i), now written down as a rule with a reversed burden of proof, rather than
+  inferred from a touting provision.
+
+**The directory market, meanwhile, exists and is built on the Bar's own data.** The Bar runs
+[Find A Lawyer](https://legaldirectory.malaysianbar.org.my/), the registry of practising
+certificates. Third-party sites such as [FLMY](https://findlawyermalaysia.com/) ("Not affiliated
+with the Malaysian Bar") scrape it — "Every firm and lawyer here is sourced from the Malaysian
+Bar's own public legal directory" — list on the order of ten thousand firms and twenty-five
+thousand lawyers, sell sponsored placements, and relay "request a quote" enquiries to firms.
+That is, functionally, CanLaw's free tier plus the paid-listing tier the Bar sat on for nine
+months, running in the open in 2026. No enforcement action against any of them was found;
+absence of a report is not evidence there was none.
+
+**What ten years settled, then.** Not the law: s 37 reads as it did, no court has construed it
+against a platform, and the only decisions are committee findings reported second-hand. What
+settled is the _market_: the lawyer-marketplace startups are dead or pivoted, the document
+businesses survived where they sold static templates and left where they sold a builder, and the
+directory function migrated to (a) the guild itself and (b) scrapers of the guild's data that
+nobody has yet challenged. That is the medallion outcome of §5 with the serial numbers filed off:
+the enclosure held without a single reviewable decision, and the one contestable question — is a
+fee quote through an intermediary "publicity"? — has been re-asked by a new rule rather than
+answered. For this sidebar the standing lesson is (i)'s corrected form: **the jurisdiction had
+both a practice-of-law offence and a touting rule, and used the former on the software and the
+latter on the marketplaces** — which is the split a computational-law product should expect.
+
 ## 6. The steelman against all of the above
 
 Do not ship the argument without this, or it reads as a lobbying document.
@@ -551,6 +743,16 @@ Do not ship the argument without this, or it reads as a lobbying document.
   Reasoning System (System Description)" (IJCAR 2020) before relying on the CAD lineage in print,
   and do not overstate it: the claim to make is that decomposition yields a finite reviewable
   partition, not that legal templates are semialgebraic.
+- **The Malaysian material (§5e) rests on trade press and one gazetted instrument.** Read the
+  Legal Profession Act 1976 (Malaysia) s 37 in the original; the s 37(2)/(3) wording and its
+  application to Dragon Law and BurgieLaw are from _The Malaysian Lawyer_'s reporting of Bar
+  Council findings, not from any published decision, and r 51 of the 1978 Rules is likewise
+  quoted second-hand. Establish what the _Answers-In-Law_ suit (2011–2015) was about and who
+  brought it. Find out whether the Bar Council ever ruled on CanLaw's paid tier, and whether any
+  action has been taken against the scraper directories described in the "ten years on" note.
+  The 2025 Publicity Rules were read from the Bar Council's circular, which reproduces
+  P.U. (A) 462; the reading of r 3(1)(d) and r 7(a) against a fee-quote platform is this note's
+  and has no authority behind it.
 - **Still unsurveyed: the Utah regulatory sandbox and Arizona's abolition of ER 5.4, both 2020.**
   They are the strongest evidence that the scope question is being reopened by regulators rather
   than by courts, and they are the closest structural analogue to the s 34(2) power.
