@@ -2249,6 +2249,14 @@ spec = do
     , (regcfCorpus, "resale restriction", "regcf-resale")
     , ("bpmn" </> "tenancy.l4", "the tenancy", "tenancy-barrier")
     , ("bpmn" </> "tenancy.l4", "receipts", "tenancy-fork")
+    , -- The witness for the terminal split: a fork beside a PARTY obligation
+      -- that can also breach, so the shared breach terminal must stay an error
+      -- end for the party while the fork gets a plain one of its own. Cut
+      -- 2026-09-19 after a guard written as "only where the fork is the
+      -- terminal's sole feeder" was found to hold on every other fixture here
+      -- and to fail on this shape, leaving 409 markings that could complete
+      -- only by terminating.
+      ("bpmn" </> "tenancy.l4", "receipts and delivery", "tenancy-fork-beside-party")
     , ("bpmn" </> "modals.l4", "the resolution", "modals-may-barrier")
     , ("bpmn" </> "modals.l4", "no subletting", "modals-shant-barrier")
     , ("bpmn" </> "modals.l4", "each approval is published", "modals-may-fork")

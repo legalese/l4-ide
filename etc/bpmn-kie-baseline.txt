@@ -13,7 +13,6 @@
 # executed; the errors= count is the size of that refusal. It is NOT a
 # liveness defect. See jl4/examples/bpmn/unsound/README.md for which axes
 # are flavor differences and which are real gaps.
-# (jbpm-bpmn2 7.74.1.Final, JDK 17.0.20); the owning record is
 # specs/todo/lexipedia-superset/PROCESS-TRACK.md 8.1.
 # HAND-MAINTAINED BLOCK: --update rewrites this file without it, so re-add it
 # (against the owning record) after regenerating.
@@ -115,6 +114,22 @@
 # reads as a defect in the file under test and is not one. The clone now goes
 # beside its original. No golden's verdict depended on this before the fork
 # shape existed, because no file had a multi-incoming end event inside a scope.
+#
+# ADDED 2026-09-19 — tenancy-fork-beside-party.bpmn, a fork beside a PARTY
+# obligation in a RAND, both LEST BREACH. RESULT UNCHANGED at 4: the new row is
+# errors=0 COMPLETED like the other quantified ones.
+#
+# It is here as a WITNESS, not for coverage. A fork's breach end must not be an
+# error end — an error end ends every active thread in the process, so one
+# member's breach would cancel the members who had not breached. The first fix
+# demoted the SHARED breach terminal in place, guarded by "only where the fork
+# is its sole feeder", which holds on every other fixture in expected/ and
+# fails the moment anything else can breach. On this shape the guard did not
+# fire and the file kept 409 markings that could complete only by terminating.
+# The fork now emits its own EndGroup_<n>/EndBreach_<n>, so this file's shared
+# End_3 correctly KEEPS its error end for the landlord's breach (under RAND one
+# operand's breach is the whole contract's) while the fork's is plain.
+
 
 consultation.bpmn                        errors=0 warnings=0 verdict=COMPLETED
 handover.bpmn                            errors=4 warnings=0 verdict=REJECTED
@@ -130,6 +145,7 @@ regcf-advertising.bpmn                   errors=4 warnings=0 verdict=REJECTED
 regcf-reporting.bpmn                     errors=1 warnings=0 verdict=REJECTED
 regcf-resale.bpmn                        errors=6 warnings=0 verdict=REJECTED
 tenancy-barrier.bpmn                     errors=0 warnings=0 verdict=COMPLETED
+tenancy-fork-beside-party.bpmn           errors=0 warnings=0 verdict=COMPLETED
 tenancy-fork.bpmn                        errors=0 warnings=0 verdict=COMPLETED
 
 RESULT 4

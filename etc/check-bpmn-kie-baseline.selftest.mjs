@@ -153,6 +153,12 @@ FILE  tenancy-fork.bpmn
 [PHASE 0 adapt] 3 adaptation(s) — see the header for which are flavor axes and which are gaps
 [PHASE 1 compile] errors=0 warnings=0
 [PHASE 2 execute] COMPLETED — reaches an end state on the path explored
+=========================================================
+FILE  tenancy-fork-beside-party.bpmn
+=========================================================
+[PHASE 0 adapt] 2 adaptation(s) — see the header for which are flavor axes and which are gaps
+[PHASE 1 compile] errors=0 warnings=0
+[PHASE 2 execute] COMPLETED — reaches an end state on the path explored
 
 RESULT: 4 file(s) with findings.
 `;
