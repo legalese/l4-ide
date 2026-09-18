@@ -7,8 +7,8 @@ File: nlg_ambiguous1.l4
   Severity: DiagnosticSeverity_Warning
   Code: <none>
   Message:
-    More than one untagged NLG annotation attached to: `Section Head`
-    If these are renderings in different languages, tag each one: @nlg:en, @nlg:he.
+    More than one NLG annotation in language `en` attached to: `Section Head`
+    An untagged @nlg counts as the module's language (@lang, or `en` by default), so two untagged ones collide here too. Renderings in different languages need different tags.
     The following annotations would be attached:
 
     * `NLG annotation to section names are valid.`

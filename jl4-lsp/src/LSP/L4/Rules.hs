@@ -1033,16 +1033,19 @@ prettyNlgResolveWarning = \ case
     ]
   Resolve.Ambiguous name mtag nlgs -> Text.unlines $
     ( case mtag of
-        -- The hint is only right for the untagged case. Two annotations that
-        -- already share a tag are ambiguous in a way a tag cannot fix.
-        Nothing ->
-          [ "More than one untagged NLG annotation attached to: " <> Print.prettyLayout name
-          , "If these are renderings in different languages, tag each one: @nlg:en, @nlg:he."
-          ]
+        -- Every parsed annotation carries a language by the time it gets
+        -- here: an untagged one is stamped with the module's `@lang`, or with
+        -- `en`. So the hint has to cover BOTH shapes at once — it is wrong to
+        -- say "tag these" to someone who already tagged them `:he` twice, and
+        -- wrong to talk about `en` without saying where `en` came from.
         Just (Lexer.MkLangTag tag) ->
           [ "More than one NLG annotation in language `" <> tag <> "` attached to: "
               <> Print.prettyLayout name
+          , "An untagged @nlg counts as the module's language (@lang, or `en` by default), so two untagged ones collide here too. Renderings in different languages need different tags."
           ]
+        -- Only an annotation we could not parse reaches here without one.
+        Nothing ->
+          [ "More than one NLG annotation attached to: " <> Print.prettyLayout name ]
     ) <>
     [ "The following annotations would be attached:"
     , ""

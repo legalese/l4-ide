@@ -8,7 +8,7 @@ module L4.Syntax where
 
 import Base
 import L4.Annotation
-import L4.Lexer (PosToken (..), FixityDirection, LangTag, TokenType (TKeywords), TKeywords (TKExact))
+import L4.Lexer (PosToken (..), FixityDirection, LangTag (..), TokenType (TKeywords), TKeywords (TKExact))
 import L4.Parser.SrcSpan (SrcRange)
 
 #if defined(SERIALISE_ENABLED)
@@ -1244,6 +1244,33 @@ nlgLangTag = \ case
   MkInvalidNlg _      -> Nothing
   MkParsedNlg _ t _   -> t
   MkResolvedNlg _ t _ -> t
+
+-- | The language a module is written in when it does not say (R-M2, Meng
+-- 2026-09-17): @en@.
+--
+-- This is a DEFAULT, not a detection. L4 has no idea what language an
+-- annotation is in, and a corpus of Hebrew annotations that declares nothing
+-- is labelled @en@ by this and still renders Hebrew — the label is wrong, the
+-- output is not. The label starts to matter at fidelity reporting, which is
+-- why a module with more than one language is required to declare @\@lang@.
+defaultModuleLang :: LangTag
+defaultModuleLang = MkLangTag "en"
+
+-- | Give an untagged annotation the module's language.
+--
+-- Applied once, after parsing, to every annotation the module collected —
+-- which is what makes @\@lang he@ mean exactly "tag every herald in this
+-- module @:he@", and makes it order-independent: a declaration at the bottom
+-- of the file reaches the annotations above it.
+withDefaultLang :: LangTag -> Nlg -> Nlg
+withDefaultLang lang = \ case
+  -- An invalid annotation is left alone: we could not read its prose, so
+  -- asserting a language for it would be claiming more than we know.
+  n@MkInvalidNlg{}          -> n
+  MkParsedNlg a Nothing fs  -> MkParsedNlg a (Just lang) fs
+  n@MkParsedNlg{}           -> n
+  MkResolvedNlg a Nothing fs -> MkResolvedNlg a (Just lang) fs
+  n@MkResolvedNlg{}         -> n
 
 data NlgFragment n
   = MkNlgText Anno Text
