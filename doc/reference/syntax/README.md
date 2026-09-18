@@ -123,11 +123,12 @@ Inside `@nlg`, `%` marks a parameter to fill in — `%age%` is replaced by the
 value of `age` — and `]` ends a bracketed annotation. To write either
 character as itself, put a backslash in front of it.
 
-| you write            | you get           | without the backslash             |
-| -------------------- | ----------------- | --------------------------------- |
-| `10\%and\%20`        | `10%and%20`       | `and` is read as a parameter name |
-| `[rate \] per unit]` | `rate ] per unit` | the annotation ends early         |
-| `\\`                 | `\`               | —                                 |
+| you write               | you get             | without the backslash             |
+| ----------------------- | ------------------- | --------------------------------- |
+| `10\%and\%20`           | `10%and%20`         | `and` is read as a parameter name |
+| `[rate \] per unit]`    | `rate ] per unit`   | the annotation ends early         |
+| `[see note \[3\] here]` | `see note [3] here` | —                                 |
+| `\\`                    | `\`                 | —                                 |
 
 **Most of the time you do not need this.** A percent sign with a space after it
 is already ordinary text, so `a 5% levy on %amount%` works as written and fills
@@ -141,6 +142,14 @@ tells you nothing: if the word between the two percent signs happens to name
 one of your parameters, L4 quietly substitutes that value, and your sentence
 comes out with a number where you wrote a word. Nothing is reported, and the
 rule still runs.
+
+**An opening `[` never needs escaping, and you may escape it anyway.** Only
+the closing bracket ends an annotation, so `[see note [3] here]` is already
+correct as written. But nobody writes half a pair: reach for the backslash on
+the `]` and your hand puts one on the `[` too. `\[` therefore means a literal
+`[`, exactly as the bare character does, and the two spellings come out the
+same. Before that, only half the pair decoded and the leftover backslash
+turned up in the finished sentence with nothing reported.
 
 **What this costs.** A backslash immediately before the closing `]` no longer
 ends the annotation, because `\]` now means a literal `]`. Write `\\` if you
@@ -214,10 +223,11 @@ text.
 `\>` now means a literal `>`; write `\\` instead. Any other character after a
 backslash is left alone, so `\q` is still a backslash followed by a `q`.
 
-This is the same idea as the `\%` and `\]` escapes in `@nlg` above, but the
-character set is deliberately different: `%` and `]` are ordinary text in a
-citation, and `>` is ordinary text in an `@nlg` annotation. Each annotation
-escapes only what would otherwise be read as punctuation in that annotation.
+This is the same idea as the `\%`, `\]` and `\[` escapes in `@nlg` above, but
+the character set is deliberately different: `%`, `]` and `[` are ordinary
+text in a citation, and `>` is ordinary text in an `@nlg` annotation. Each
+annotation escapes only what would otherwise be read as punctuation in that
+annotation.
 
 ### @ref-src / @ref-map
 

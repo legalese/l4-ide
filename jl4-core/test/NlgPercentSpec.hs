@@ -176,6 +176,18 @@ spec = describe "a literal % in @nlg prose is not a reference delimiter" $ do
     it "decodes an escaped close bracket" $
       unescapeNlgText "a \\] literal" `shouldBe` "a ] literal"
 
+    -- `\[` protects nothing — a bare `[` is ordinary text in both annotation
+    -- forms — and is decoded anyway (ruled 2026-09-19). An author escaping the
+    -- closing bracket of a citation escapes the opening one in the same
+    -- keystroke, and while `\[` was NOT in the set, `[see note \[3\] here]`
+    -- rendered as `see note \[3] here`: half the pair decoded, and a backslash
+    -- nobody meant to write reached the prose, with no diagnostic.
+    it "decodes an escaped OPEN bracket, which never needed escaping" $
+      unescapeNlgText "a \\[ literal" `shouldBe` "a [ literal"
+
+    it "decodes both halves of an escaped bracket pair" $
+      unescapeNlgText "see note \\[3\\] here" `shouldBe` "see note [3] here"
+
     it "decodes an escaped backslash" $
       unescapeNlgText "a \\\\ backslash" `shouldBe` "a \\ backslash"
 
@@ -232,6 +244,19 @@ spec = describe "a literal % in @nlg prose is not a reference delimiter" $ do
           \@nlg a discount of 50\\\n\
           \DECIDE discounted IS n\n"
       frags `shouldBe` [["T:a", "T:discount", "T:of", "T:50\\"]]
+
+    it "accepts an escaped bracket PAIR inside a bare inline annotation" $ do
+      -- The habit spelling. It lexed before `\[` was escapable too — `\` was
+      -- a lone backslash and `[` ordinary text — so this is not the assertion
+      -- that bites; the decode tests above are. It is here because the lexer
+      -- now consumes `\[` as a unit, and a unit that stopped lexing would be
+      -- a parse error on source that used to work.
+      frags <-
+        nlgFrags
+          "GIVEN n IS A NUMBER\n\
+          \GIVETH A NUMBER\n\
+          \`note on` n [see note \\[3\\] here] MEANS n\n"
+      frags `shouldBe` [["T:see", "T:note", "T:\\[3\\]", "T:here"]]
 
     it "accepts an unknown escape inside a bare inline annotation" $ do
       frags <-

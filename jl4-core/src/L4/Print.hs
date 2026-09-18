@@ -197,7 +197,7 @@ class LayoutPrinter a where
 type LayoutPrinterWithName name = (LayoutPrinter name, HasName name)
 
 instance LayoutPrinter Name where
-  printWithLayout n = printWithLayout (rawName n)
+  printWithLayout n = printWithLayout (rawName n) <> inlineNlgOf n
 
 instance LayoutPrinter Resolved where
   printWithLayout r = printWithLayout (getActual r)
@@ -292,7 +292,12 @@ instance LayoutPrinterWithName a => LayoutPrinter (Type' a) where
     -- OF NUMBER, NUMBER` re-parses as a four-argument PAIR. The source keeps
     -- them apart with layout; on one line only brackets will do. (Measured:
     -- `PAIR OF (PAIR OF NUMBER, NUMBER), (PAIR OF NUMBER, NUMBER)` checks.)
-    TyApp _ n ps -> printWithLayout n <> case ps of
+    -- 'bareName', not 'printWithLayout': a TYPE never carries an annotation
+    -- into print. See 'inlineNlgOf' for why that is a narrowing and not an
+    -- inconsistency — a type is printed in evaluation results and diagnostics
+    -- as well as in source, and @#CHECK@ answering
+    -- @BOOLEAN [5% with %amount%]@ is the shape that made the point.
+    TyApp _ n ps -> bareName n <> case ps of
       [] -> mempty
       params@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap parensIfNeeded params))
     -- `FUNCTION FROM … AND … TO …` needs no brackets: its separators are
@@ -349,7 +354,13 @@ displayTypeVarNames =
 goDisplayTy :: Map Int Text -> Type' Resolved -> Doc ann
 goDisplayTy m = \ case
   Type _ -> "TYPE"
-  TyApp _ n ps -> printWithLayout n <> case ps of
+  -- 'bareName' here for the same reason as in the 'Type'' instance, and this
+  -- is the copy that actually reaches the user: a @#CHECK@ reports its
+  -- inferred type through THIS function, and it answered
+  -- @BOOLEAN [5% with %amount%]@ until it did. Being "a mirror of the 'Type''
+  -- layout instance" is what let it be missed — the instance was fixed first
+  -- and the golden did not move.
+  TyApp _ n ps -> bareName n <> case ps of
     [] -> mempty
     params@(_ : _) -> space <> "OF" <+> hsep (punctuate comma (fmap (goDisplayTy m) params))
   Fun _ args ty' ->
@@ -1220,6 +1231,113 @@ instance LayoutPrinter Desc where
   printWithLayout = \ case
     MkDesc _ann n -> pretty n
 
+-- | Re-emit the @\@nlg@ annotation carried by a name, in the bare inline form.
+--
+-- Measured 2026-09-19: an @\@nlg@ annotation attaches to a 'Name' node and to
+-- nothing else. That includes a trailing annotation which reads as though it
+-- sat on an expression — in @ok\/nlg_decide2.l4@ the @\@nlg Expression@ under
+-- @(a PLUS c)@ lands on the USE occurrence of @c@, not on the 'Expr'. So the
+-- name printer is the one hook that recovers all of them, and until it existed
+-- 'prettyLayout' dropped every annotation in the corpus (smucclaw\/l4-ide#966).
+--
+-- __The bracket form, not the @\@nlg@ herald, and that is forced.__ A heralded
+-- line annotation runs to the end of the line, so emitting one for a name in
+-- the middle of @DECIDE foo a b c IS@ would swallow the rest of the line, @IS@
+-- included, and the result would not re-parse. The bracket form is
+-- self-delimiting and therefore composes wherever a name is printed. Checked
+-- against the parser in every position a name occurs: appform head, appform
+-- parameter, GIVEN parameter, a type name, a record field, an enum constructor,
+-- and a use occurrence inside a body.
+--
+-- __Not on a type name, and that exclusion is load-bearing.__ A 'Type'' is
+-- printed in places that are not source — an evaluation result, a diagnostic,
+-- an LSP hover — so an annotation re-emitted there is noise rather than
+-- fidelity. @ok\/nlg-percent.l4@ made the point concretely: its @#CHECK@
+-- answered @BOOLEAN [5% with %amount%]@, because the annotation the author
+-- wrote above the @DECIDE@ had attached to the @GIVETH@ type. Which is the
+-- second reason for the exclusion — measured 2026-09-19, an annotation that
+-- reaches a type name is essentially always that misplacement (11 of 116
+-- across ten sampled files; @prelude.l4@ has 0 of 67), so what is suppressed
+-- here is an annotation that renders nowhere anyway.
+--
+-- __What it still cannot carry is a language tag.__ @\@nlg:he@ has no bracket
+-- spelling, so a tagged annotation prints here without its tag. That is a
+-- narrowing of this fix rather than a regression it introduces — the whole
+-- annotation was dropped before — and it is what the multiplicity work has to
+-- close, because that is the point at which a tag starts carrying meaning.
+inlineNlgOf :: Name -> Doc ann
+inlineNlgOf n = case Optics.view (annoOf Optics.% annNlg) n of
+  Nothing  -> mempty
+  Just nlg -> space <> brackets (printInlineNlg nlg)
+
+-- | An annotation rendered for the bracket form.
+--
+-- Deliberately not 'LayoutPrinter' 'Nlg', which is the hover\/diagnostic
+-- rendering: that one separates a reference fragment from its neighbour with
+-- @\<+\>@, and since whitespace between words is ALREADY its own text
+-- fragment, doing so here would add a space on every round trip — @%b%\'s@
+-- would print as @%b% \'s@, which re-parses into different fragments. A stray
+-- space is cosmetic in a hover and a defect in printed source.
+printInlineNlg :: Nlg -> Doc ann
+printInlineNlg = \ case
+  -- An invalid annotation has no text to re-emit. 'LayoutPrinter' 'Nlg' prints
+  -- the placeholder @Invalid Nlg@, which is the right thing in a hover and the
+  -- wrong thing here, where it would land in the file as prose.
+  MkInvalidNlg _        -> mempty
+  MkParsedNlg _ frags   -> foldMap inlineNlgFragment frags
+  MkResolvedNlg _ frags -> foldMap inlineNlgFragment frags
+
+inlineNlgFragment :: (LayoutPrinter a, HasName a) => NlgFragment a -> Doc ann
+inlineNlgFragment = \ case
+  MkNlgText _ t -> pretty (escapeInlineNlgText t)
+  -- Bare on purpose: going through 'LayoutPrinter' 'Name' would recurse into
+  -- this name\'s own annotation if it ever carried one.
+  MkNlgRef  _ n -> "%" <> bareName n <> "%"
+
+-- | A name with nothing attached — no @\@nlg@, just the identifier.
+--
+-- Still goes through 'LayoutPrinter' 'RawName', which is where the mixfix
+-- canonical-name repair lives, so this suppresses the annotation and nothing
+-- else.
+bareName :: (LayoutPrinter a, HasName a) => a -> Doc ann
+bareName = printWithLayout . rawName . getName
+
+-- | Escape a close bracket, so a LINE-form annotation survives being re-emitted
+-- in the bracket form.
+--
+-- Fragment text is stored VERBATIM — @\\%@ and @\\]@ reach the AST still
+-- escaped, so that exactprint can re-emit them byte for byte — so this steps
+-- OVER an existing escape pair rather than re-escaping its backslash.
+--
+-- Only @]@ needs it, and the asymmetry is the point. A line annotation runs to
+-- end of line and can therefore contain a bare @]@ (measured: @\@nlg see note
+-- [3] here@ stores @]@ as a fragment of its own), which in the bracket form
+-- would end the annotation early and leave the rest of the line as stray
+-- source. @[@ is ordinary text in BOTH forms, and @\\[@ is not an escape
+-- 'L4.Nlg.unescapeNlgText' honours, so escaping it would change what the
+-- annotation says rather than protect it.
+escapeInlineNlgText :: Text -> Text
+escapeInlineNlgText = Text.pack . go . Text.unpack
+ where
+  go :: String -> String
+  go = \ case
+    []             -> []
+    -- A LONE TRAILING BACKSLASH, which is the case that got away. A line
+    -- annotation may end in one — @\@nlg a discount of 50\\@ sits in
+    -- @ok\/nlg-percent.l4@ precisely to pin that a backslash which cannot
+    -- begin an escape is ordinary text. Copied through unchanged it lands
+    -- immediately before the @]@ this printer appends and escapes IT, so the
+    -- annotation never closes: the printed module swallowed the next five
+    -- lines into one annotation and stopped parsing. Doubling it decodes back
+    -- to the single backslash the author wrote.
+    --
+    -- Found by the corpus-wide round-trip suite, not by the unit tests, which
+    -- had the bare-@]@ case and not this one.
+    ['\\']         -> "\\\\"
+    '\\' : c : cs  -> '\\' : c : go cs
+    ']'  : cs      -> '\\' : ']' : go cs
+    c    : cs      -> c : go cs
+
 instance LayoutPrinterWithName a => LayoutPrinter (NlgFragment a) where
   printWithLayout = \ case
     MkNlgText _ t -> pretty t
@@ -1228,6 +1346,12 @@ instance LayoutPrinterWithName a => LayoutPrinter (NlgFragment a) where
 instance (LayoutPrinter a, LayoutPrinter b) => LayoutPrinter (Either a b) where
   printWithLayout = either printWithLayout printWithLayout
 
+-- The name-bearing arms print BARE names. A value is a RESULT, not source:
+-- @#EVAL foo@ answering @foo [the foo]@ would be handing the reader an
+-- authoring annotation where it asked for an answer. Same reason as the
+-- 'Type'' instance above; see 'inlineNlgOf'. (Those fields are 'Resolved'
+-- whatever @a@ is — @a@ is the recursive payload — so this needs no extra
+-- constraint.)
 instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
   printWithLayout = \ case
     Lazy.ValNumber i               -> pretty (prettyRatio i)
@@ -1249,9 +1373,9 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
     Lazy.ValTernaryBuiltinFun{}    -> "<builtin-function>"
     Lazy.ValPartialTernary{}       -> "<partial-function>"
     Lazy.ValPartialTernary2{}      -> "<partial-function>"
-    Lazy.ValAssumed r              -> printWithLayout r
-    Lazy.ValUnappliedConstructor r -> printWithLayout r
-    Lazy.ValConstructor r vs       -> printWithLayout r <> case vs of
+    Lazy.ValAssumed r              -> bareName r
+    Lazy.ValUnappliedConstructor r -> bareName r
+    Lazy.ValConstructor r vs       -> bareName r <> case vs of
       [] -> mempty
       vals@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap parensIfNeeded vals))
     Lazy.ValEnvironment _env       -> "<environment>"
@@ -1282,7 +1406,7 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
     Lazy.ValClosure{}              -> printWithLayout v
     Lazy.ValUnappliedConstructor{} -> printWithLayout v
     Lazy.ValAssumed{}              -> printWithLayout v
-    Lazy.ValConstructor r []       -> printWithLayout r
+    Lazy.ValConstructor r []       -> bareName r
     _ -> surround (printWithLayout v) "(" ")"
 
 -- | Pretty-print an 'NF' value, using named fields (WITH / IS syntax) for

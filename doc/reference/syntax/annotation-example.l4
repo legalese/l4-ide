@@ -18,6 +18,21 @@ MEANS amount TIMES 0.15
 
 #EVAL `the levy on` 100
 
+-- An opening `[` never needs escaping, but escaping it is accepted, because
+-- an author who escapes the closing bracket of a citation escapes the opening
+-- one in the same keystroke. Both spellings mean a literal bracket, and
+-- `l4 nlg` prints this one as "see note [3] on `amount`" with no backslash.
+--
+-- The annotation sits immediately after the name it describes. Put it after
+-- the parameter instead and it annotates the PARAMETER, which is why the
+-- phrasing would not show up at the call site.
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+DECIDE `the surcharge on` [see note \[3\] on %amount%] amount
+  IS amount TIMES 0.05
+
+#EVAL `the surcharge on` 100
+
 -- A citation containing a literal `>>` needs a backslash before the angle
 -- bracket, or the inline `@ref` form would end halfway through it.
 GIVEN claimant IS A BOOLEAN
