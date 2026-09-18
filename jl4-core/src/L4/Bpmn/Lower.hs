@@ -2391,11 +2391,15 @@ quantifierNotes n l = case l.labelQuantifier of
                 )
                 q.quantRoll
         , lost =
-            "the cardinality as something an engine could read; one of \
-            \loopCardinality or a collection has to be supplied before this \
-            \activity can execute (measured 2026-09-15: jbpm-bpmn2 7.74.1 \
-            \rejects the file as it stands \8212 \8216ForEach has no collection \
-            \expression\8217)"
+            "the cardinality as something an engine could read: WHO is in the \
+            \cast, which only the rule's own run can answer. The file now \
+            \declares the variable and loops over it, so an engine accepts it \
+            \and runs it \8212 over whatever is in it, including nothing \
+            \(measured 2026-09-19, jbpm-bpmn2 7.74.1: compiles and completes, \
+            \where the same golden without a collection was rejected outright \
+            \on 2026-09-15; unseeded the cast is empty and the body never \
+            \runs, and seeded with three members the continuation fires three \
+            \times)"
         }
     ]
       <> [ MkFidelityNote

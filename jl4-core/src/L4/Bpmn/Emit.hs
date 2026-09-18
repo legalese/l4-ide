@@ -33,6 +33,7 @@ renderBpmn bx =
       <> definitionsOpen bx
       <> errorDecl bx
       <> escalationDecl bx
+      <> itemDefinitionLines bx.bxProcess
       <> collaborationLines bx
       <> processLines bx
       <> diagramLines bx
@@ -121,8 +122,8 @@ processLines bx =
       , ("isExecutable", "false")
       ]
   ]
+    <> propertyLines p
     <> laneSetLines p
-    <> dataObjectLines p
     <> concatMap (nodeLines p 2) [n | n <- p.procNodes, isNothing n.nodeParent]
     <> concatMap (flowLines 2) (topLevelFlows p)
     <> [closeTag 1 "bpmn:process"]
@@ -236,10 +237,10 @@ nodeLines p depth node = case node.nodeKind of
 -- activity with a collection declares:
 --
 -- * an @\<ioSpecification\>@ with a @\<dataInput\>@ the loop can point at;
--- * a @\<dataInputAssociation\>@ joining that input to the process-level data
---   object ('dataObjectLines'), which is where the list actually lives.
+-- * a @\<dataInputAssociation\>@ joining that input to the process-level
+--   property ('propertyLines'), which is where the list actually lives.
 --
--- The data object is what an engine or a modeller binds; the data input is the
+-- The property is what an engine or a modeller binds; the data input is the
 -- activity's own end of the wire. Both carry the same name — @\<rule\>_cast@ —
 -- so a reader sees one variable rather than the plumbing.
 --
@@ -257,6 +258,7 @@ activityDataLines depth node = case node.nodeLoopCollection of
         "bpmn:dataInput"
         [ ("id", dataInputId node)
         , ("name", c.loopVariable)
+        , ("itemSubjectRef", listItemId c.loopVariable)
         , ("isCollection", "true")
         ]
     , openTag (depth + 1) "bpmn:inputSet" [("id", "InputSet_" <> node.nodeId)]
@@ -268,7 +270,7 @@ activityDataLines depth node = case node.nodeLoopCollection of
         depth
         "bpmn:dataInputAssociation"
         [("id", "DataInputAssoc_" <> node.nodeId)]
-    , textEl (depth + 1) "bpmn:sourceRef" [] (dataObjectRefId c.loopVariable)
+    , textEl (depth + 1) "bpmn:sourceRef" [] c.loopVariable
     , textEl (depth + 1) "bpmn:targetRef" [] (dataInputId node)
     , closeTag depth "bpmn:dataInputAssociation"
     ]
@@ -277,38 +279,61 @@ activityDataLines depth node = case node.nodeLoopCollection of
 dataInputId :: FlowNode -> Text
 dataInputId node = "DataInput_" <> node.nodeId
 
-dataObjectId, dataObjectRefId :: Text -> Text
-dataObjectId v = "DataObject_" <> v
-dataObjectRefId v = "DataObjectRef_" <> v
-
--- | One @\<dataObject\>@ per distinct collection, with the
--- @\<dataObjectReference\>@ that flow elements point at.
+-- | The item definitions a collection needs: one for the list, one for a member
+-- of it.
 --
--- A data object is a flow element of the PROCESS even when the only activity
--- that reads it is inside a sub-process: BPMN scopes data by declaration, and
--- declaring it inside the scope would give each instance its own empty copy of
--- the list it is supposed to be iterating.
+-- __Neither names an L4 type, and that is deliberate.__ @structureRef@ is a
+-- hint at the runtime representation, and the only two things this exporter
+-- knows are that a roll is a list and that its members are values. Writing the
+-- party type here would be a claim about the target's type system that the
+-- source cannot support — @Tenant@ is a /constructor/ under the value-actor
+-- encoding, not a type, and it is not a Java class in any case.
+itemDefinitionLines :: BpmnProcess -> [Text]
+itemDefinitionLines p =
+  concat
+    [ [ selfClose 1 "bpmn:itemDefinition" [("id", listItemId v), ("structureRef", "java.util.List")]
+      , selfClose 1 "bpmn:itemDefinition" [("id", memberItemId v), ("structureRef", "java.lang.Object")]
+      ]
+    | v <- collectionNames p
+    ]
+
+listItemId, memberItemId :: Text -> Text
+listItemId v = "Item_" <> v
+memberItemId v = "Item_" <> v <> "_member"
+
+-- | One @\<property\>@ per distinct collection: the process variable an engine
+-- is asked to supply.
+--
+-- __Measured, not chosen by taste (2026-09-19).__ The first cut emitted
+-- @\<dataObject\>@ plus @\<dataObjectReference\>@, which is the vanilla BPMN 2.0
+-- spelling and which bpmn-moddle accepts without complaint. jbpm-bpmn2 7.74.1
+-- REJECTS it outright — @\<dataObject\> is after an invalid element@, at parse
+-- time, so nothing in the file is executed. A @\<property\>@ carrying an
+-- @itemSubjectRef@ is accepted by both, and the same shape compiles AND runs a
+-- multi-instance sub-process end to end under jBPM.
+--
+-- It is also the more honest of the two: @loopDataInputRef@ wants a process
+-- VARIABLE, which is what a property is. A data object is a document drawn on
+-- the diagram, and the cast is not one.
+--
+-- A property is declared on the PROCESS even when the only activity that reads
+-- it is inside a sub-process. Declaring it inside the scope would give each
+-- instance its own copy of the list it is supposed to be iterating over.
 --
 -- Deduplicated by name, because two rules in one file can draw from one cast —
 -- and because a repeated @id@ is the kind of malformedness no schema validator
 -- reports.
-dataObjectLines :: BpmnProcess -> [Text]
-dataObjectLines p =
-  concat
-    [ [ selfClose
-          2
-          "bpmn:dataObject"
-          [("id", dataObjectId v), ("name", v), ("isCollection", "true")]
-      , selfClose
-          2
-          "bpmn:dataObjectReference"
-          [ ("id", dataObjectRefId v)
-          , ("name", v)
-          , ("dataObjectRef", dataObjectId v)
-          ]
-      ]
-    | v <- collectionNames p
-    ]
+--
+-- @tProcess@\'s XSD order puts @property@ BEFORE @laneSet@, which is why this is
+-- emitted where it is rather than beside the flow elements.
+propertyLines :: BpmnProcess -> [Text]
+propertyLines p =
+  [ selfClose
+      2
+      "bpmn:property"
+      [("id", v), ("name", v), ("itemSubjectRef", listItemId v)]
+  | v <- collectionNames p
+  ]
 
 collectionNames :: BpmnProcess -> [Text]
 collectionNames p =
@@ -359,7 +384,10 @@ multiInstanceLines depth node = case (node.nodeKind, node.nodeMultiInstance) of
       , selfClose
           (depth + 1)
           "bpmn:inputDataItem"
-          [("id", "DataItem_" <> node.nodeId), ("name", c.loopItem)]
+          [ ("id", "DataItem_" <> node.nodeId)
+          , ("name", c.loopItem)
+          , ("itemSubjectRef", memberItemId c.loopVariable)
+          ]
       ]
 
 gatewayTag :: GatewayKind -> Text
