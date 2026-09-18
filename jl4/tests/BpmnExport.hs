@@ -164,6 +164,22 @@ everySrc joinLine =
   , "    LEST BREACH"
   ]
 
+-- | The same rule with an @IN@ roll, which is what gives the multi-instance
+-- activity a collection to name. Without one there is no list for the file to
+-- point at: the cast is every value of the party type, narrowed by a @WHO@
+-- condition, which is a predicate and not an enumeration.
+everyRollSrc :: [Text]
+everyRollSrc =
+  [ "everyone MEANS LIST Alice, Bob"
+  , "`group` MEANS"
+  , "  EVERY p IN everyone"
+  , "    MUST pay"
+  , "    WITHIN 3"
+  , "    ONCE ALL HAVE"
+  , "    HENCE FULFILLED"
+  , "    LEST BREACH"
+  ]
+
 -- | A deadline on the join line beside the act's; and one on the join line
 -- alone, which is then the deadline that expires each member.
 everyBothDeadlinesSrc, everyJoinDeadlineSrc :: [Text]
@@ -1869,6 +1885,11 @@ spec = do
         both = exportOf defaultBpmnOptions "group" everyBothDeadlinesSrc
         joinOnly = exportOf defaultBpmnOptions "group" everyJoinDeadlineSrc
         party = exportOf defaultBpmnOptions "rule" mustSrc
+        scopesOf bx =
+          [n | n <- bx.bxProcess.procNodes, n.nodeKind == MultiInstanceScope]
+        theScope bx = case scopesOf bx of
+          [sc] -> sc
+          scs -> error ("expected one multi-instance scope, got " <> show (length scs))
         theTask bx = case tasks bx of
           [t] -> t
           ts -> error ("expected one task, got " <> show (length ts))
@@ -1880,27 +1901,93 @@ spec = do
       xmlOf "group" everyBarrierSrc `shouldNotBe` xmlOf "group" everyForkSrc
       barrier.bxFidelity `shouldNotBe` fork.bxFidelity
 
-    it "draws the task as a parallel multi-instance activity; a PARTY task is not one" $ do
+    -- THE structural claim of the sub-process shape, and the one worth
+    -- asserting on meaning rather than on bytes: a barrier marks the TASK
+    -- multi-instance, a fork marks a SCOPE and leaves the task plain. Until
+    -- 2026-09-19 both marked the task, and the two graphs were isomorphic
+    -- automata with different labels — which is to say nothing reasoning over
+    -- structure could tell them apart.
+    it "a barrier marks the task; a fork marks a scope and the task inside is plain" $ do
       (theTask barrier).nodeMultiInstance `shouldBe` Just CompleteWhenAll
-      (theTask fork).nodeMultiInstance `shouldBe` Just CompleteWhenAll
+      (theTask fork).nodeMultiInstance `shouldBe` Nothing
       (theTask party).nodeMultiInstance `shouldBe` Nothing
+      scopesOf barrier `shouldBe` []
+      length (scopesOf fork) `shouldBe` 1
+      -- and the member's act is INSIDE it, which is what makes the
+      -- continuation and the deadline per-member
+      (theTask fork).nodeParent `shouldBe` Just (theScope fork).nodeId
+      -- The closing bracket is deliberately not pinned: these fixtures are a
+      -- bare `EVERY p` with no IN roll, so there is no collection to name and
+      -- the element closes itself. A rule WITH a roll opens it and carries a
+      -- loopDataInputRef — asserted separately below.
       xmlOf "group" everyBarrierSrc
         `shouldSatisfy` Text.isInfixOf
-          "<bpmn:multiInstanceLoopCharacteristics id=\"MultiInstance_Task_0\" isSequential=\"false\" />"
+          "<bpmn:multiInstanceLoopCharacteristics id=\"MultiInstance_Task_0\" isSequential=\"false\""
+      xmlOf "group" everyForkSrc `shouldSatisfy` Text.isInfixOf "<bpmn:subProcess"
+      xmlOf "group" everyBarrierSrc `shouldSatisfy` (not . Text.isInfixOf "<bpmn:subProcess")
       xmlOf "rule" mustSrc `shouldSatisfy` (not . Text.isInfixOf "multiInstance")
+
+    -- A member's breach must not end the members who did not breach, and that
+    -- takes TWO things: an escalation rather than an error INSIDE (an error end
+    -- is fixed interrupting and would cancel the siblings), and a plain end
+    -- rather than an error end OUTSIDE (an error end there ends every active
+    -- thread in the process, including the instances still running). The second
+    -- was missed on the first cut of this shape and found by review.
+    it "a fork's breach leaves by escalation and lands on an end that terminates nothing" $ do
+      let ends bx = [k | n <- bx.bxProcess.procNodes, EndEvent k <- [n.nodeKind]]
+      ends fork `shouldSatisfy` elem EscalationEnd
+      ends fork `shouldSatisfy` (not . elem ErrorEnd)
+      -- the shared <error> goes with the last error end that needed it
+      xmlOf "group" everyForkSrc `shouldSatisfy` (not . Text.isInfixOf "errorEventDefinition")
+      xmlOf "group" everyForkSrc `shouldSatisfy` Text.isInfixOf "escalationEventDefinition"
 
     it "restates the join line in the task's documentation, and does not call an EVERY a PARTY" $ do
       (theTask barrier).nodeDoc `shouldSatisfy` maybe False (Text.isInfixOf "ONCE ALL HAVE")
       (theTask fork).nodeDoc `shouldSatisfy` maybe False (Text.isInfixOf "UPON EACH")
       (theTask barrier).nodeDoc `shouldSatisfy` maybe False (not . Text.isInfixOf "PARTY EVERY")
 
-    it "reports P-CAST on both joins and on neither PARTY rule, and P-FORK on the fork alone" $ do
+    -- A roll-less EVERY has no list for the file to point at, so no collection
+    -- is emitted and P-CAST's `lost` may not claim an engine will run it — jBPM
+    -- rejects such a file outright. The `message` had always gated the roll
+    -- sentence; the `lost` field did not (found by review, 2026-09-19).
+    it "emits a collection only where the rule gives a roll to name it after" $ do
+      xmlOf "group" everyBarrierSrc `shouldSatisfy` (not . Text.isInfixOf "loopDataInputRef")
+      map (.lost) (findingsFor "P-CAST" barrier)
+        `shouldSatisfy` all (Text.isInfixOf "no IN roll")
+      let withRoll = exportOf defaultBpmnOptions "group" everyRollSrc
+      xmlOf "group" everyRollSrc `shouldSatisfy` Text.isInfixOf "<bpmn:loopDataInputRef>"
+      xmlOf "group" everyRollSrc `shouldSatisfy` Text.isInfixOf "<bpmn:property id=\"group_p_cast\""
+      map (.lost) (findingsFor "P-CAST" withRoll)
+        `shouldSatisfy` all (not . Text.isInfixOf "no IN roll")
+
+    it "reports P-CAST on both joins and on neither PARTY rule" $ do
       length (findingsFor "P-CAST" barrier) `shouldBe` 1
       length (findingsFor "P-CAST" fork) `shouldBe` 1
       findingsFor "P-CAST" party `shouldBe` []
+      -- and names the element that actually carries the marker, which for a
+      -- fork is the scope and not the task a reader would otherwise be sent to
+      map (.element) (findingsFor "P-CAST" fork)
+        `shouldBe` [(theScope fork).nodeId]
+
+    -- P-FORK said the continuation is drawn once, for the group. The scope
+    -- draws it per member, so the note is DISCHARGED and filing it would report
+    -- a loss this file does not have. It survives only as a refusal, when
+    -- 'addForkScope' declines a shape it cannot enclose.
+    it "files no P-FORK and no P-FORK-CANCEL on a fork it actually drew" $ do
+      findingsFor "P-FORK" fork `shouldBe` []
+      findingsFor "P-FORK-CANCEL" fork `shouldBe` []
       findingsFor "P-FORK" barrier `shouldBe` []
-      length (findingsFor "P-FORK" fork) `shouldBe` 1
-      map (.severity) (findingsFor "P-FORK" fork) `shouldBe` [Lossy]
+
+    -- What the enclosure costs instead, filed on the fork alone.
+    it "files P-FORK-JOIN, P-FORK-VERDICT and P-FORK-BREACH-UNMARKED on the fork alone" $ do
+      length (findingsFor "P-FORK-JOIN" fork) `shouldBe` 1
+      length (findingsFor "P-FORK-VERDICT" fork) `shouldBe` 1
+      length (findingsFor "P-FORK-BREACH-UNMARKED" fork) `shouldBe` 1
+      findingsFor "P-FORK-JOIN" barrier `shouldBe` []
+      findingsFor "P-FORK-VERDICT" barrier `shouldBe` []
+      findingsFor "P-FORK-BREACH-UNMARKED" barrier `shouldBe` []
+      map (.severity) (findingsFor "P-FORK-VERDICT" fork) `shouldBe` [Lossy]
+      map (.severity) (findingsFor "P-FORK-BREACH-UNMARKED" fork) `shouldBe` [Advisory]
 
     it "reports the join line's own deadline as undrawn only when the act has one too" $ do
       length (findingsFor "P-JOIN-DEADLINE" both) `shouldBe` 1
@@ -1917,16 +2004,23 @@ spec = do
       map (.message) (findingsFor "P-JOIN-DEADLINE" forkBoth)
         `shouldSatisfy` all (Text.isInfixOf "does not enforce it on a fork either")
 
-    -- The fork's largest loss: the interrupting timer cancels every instance,
-    -- so a continuation a member already spawned is never drawn as arising.
-    it "names the cancelled continuations on a fork that has a timer, and only there" $ do
-      length (findingsFor "P-FORK-CANCEL" fork) `shouldBe` 1
-      findingsFor "P-FORK-CANCEL" barrier `shouldBe` []
-      -- a MAY fork's timer is its lapse, drawn as a LEST arm to Fulfilled, and
-      -- it cancels every instance too: a member who approved has already
-      -- spawned the continuation, which the timer deletes (measured: one
-      -- approval, no publication → the chair BREACHED)
-      length (findingsFor "P-FORK-CANCEL" (exportOf defaultBpmnOptions "group" mayForkSrc)) `shouldBe` 1
+    -- P-FORK-CANCEL was the fork's largest loss: the interrupting timer
+    -- cancelled every instance, so a continuation a member had already spawned
+    -- was never drawn as arising. The timer now hangs on the member's own
+    -- activity INSIDE the scope, so it cancels that member and nobody else —
+    -- which is the loss removed rather than relocated, and this asserts the
+    -- structural fact rather than the absence of a note.
+    it "a fork's deadline is per member: its timer is inside the scope" $ do
+      let timerBoundaries =
+            [ n
+            | n <- fork.bxProcess.procNodes
+            , Boundary _ (TimerAfter _) <- [n.nodeKind]
+            ]
+      timerBoundaries `shouldSatisfy` (not . null)
+      map (.nodeParent) timerBoundaries
+        `shouldSatisfy` all (== Just (theScope fork).nodeId)
+      findingsFor "P-FORK-CANCEL" (exportOf defaultBpmnOptions "group" mayForkSrc)
+        `shouldBe` []
 
     -- The modal × join cells the marker inverted. Both assertions are on
     -- MEANING: where a token ends up, not which element is present.
@@ -1936,25 +2030,49 @@ spec = do
           -- these fixtures continue into Bob's obligation, so they have two
           -- tasks; the quantified one is the first
           task0 bx = fromMaybe (error "no Task_0") (nodeNamed bx "Task_0")
-      it "completes on the first member's act, because one act is the breach" $ do
+      -- A BARRIER completes on the first act, because one act is the breach.
+      -- A FORK does not: its activity is the scope, each member offends
+      -- severally, and completing the box on the first act would cancel the
+      -- rest. The note follows the file — it named a completionCondition the
+      -- fork golden does not contain, and contradicted the task's own
+      -- documentation two elements away (found by review, 2026-09-19).
+      it "a barrier completes on the first act; a fork does not, and says neither" $ do
         (task0 shantBarrier).nodeMultiInstance `shouldBe` Just CompleteOnFirst
-        (task0 shantFork).nodeMultiInstance `shouldBe` Just CompleteOnFirst
+        (task0 shantFork).nodeMultiInstance `shouldBe` Nothing
         xmlOf "group" shantBarrierSrc
           `shouldSatisfy` Text.isInfixOf "<bpmn:completionCondition xsi:type=\"bpmn:tFormalExpression\">nrOfCompletedInstances &gt;= 1</bpmn:completionCondition>"
+        xmlOf "group" shantForkSrc `shouldSatisfy` (not . Text.isInfixOf "completionCondition")
         length (findingsFor "P-PROHIBITION-FIRST" shantBarrier) `shouldBe` 1
+        findingsFor "P-PROHIBITION-FIRST" shantFork `shouldBe` []
         findingsFor "P-PROHIBITION-FIRST" barrier `shouldBe` []
+
+      -- The same condition inverts on an EMPTY cast: the activity completes at
+      -- once and its completion IS the breach arm, so the diagram breaches
+      -- where the rule fulfils. Reachable, not theoretical — jBPM runs the file
+      -- that way when nobody supplies the collection.
+      it "declares that its completion condition inverts on an empty cast" $ do
+        length (findingsFor "P-PROHIBITION-EMPTY" shantBarrier) `shouldBe` 1
+        map (.severity) (findingsFor "P-PROHIBITION-EMPTY" shantBarrier) `shouldBe` [Lossy]
+        findingsFor "P-PROHIBITION-EMPTY" shantFork `shouldBe` []
+        findingsFor "P-PROHIBITION-EMPTY" barrier `shouldBe` []
       it "still races the arms the prohibition's way round: completing is the breach" $
         raceOutcome shantBarrier `shouldBe` (ToBreach, ToFulfilled)
-      it "does not report cancellation on a prohibition's fork, where the timer is compliance" $ do
+      it "reports neither cancellation nor P-FORK on a prohibition's fork" $ do
         findingsFor "P-FORK-CANCEL" shantFork `shouldBe` []
-        length (findingsFor "P-FORK" shantFork) `shouldBe` 1
+        findingsFor "P-FORK" shantFork `shouldBe` []
       -- and the <documentation> must not send the reader to a note the report
       -- does not contain (adversarial pass of 2026-09-16, R1-4; the MUST fork
       -- keeps the citation because it keeps the note)
-      it "nor does its documentation cite the note it does not file" $ do
+      -- The <documentation> must not send a reader to a note the report does
+      -- not contain. It used to cite P-FORK-CANCEL on a MUST fork and had to
+      -- be suppressed on a SHANT fork; now the note is filed on NEITHER, so
+      -- neither may cite it, and the general rule is asserted rather than the
+      -- one exception.
+      it "no fork's documentation cites a note its report does not carry" $ do
         (task0 shantFork).nodeDoc `shouldSatisfy` maybe False (not . Text.isInfixOf "P-FORK-CANCEL")
-        (task0 shantFork).nodeDoc `shouldSatisfy` maybe False (Text.isInfixOf "compliance arm")
-        (theTask fork).nodeDoc `shouldSatisfy` maybe False (Text.isInfixOf "(P-FORK-CANCEL)")
+        (theTask fork).nodeDoc `shouldSatisfy` maybe False (not . Text.isInfixOf "P-FORK-CANCEL")
+        (theTask fork).nodeDoc `shouldSatisfy` maybe False (not . Text.isInfixOf "(P-FORK)")
+        (theTask fork).nodeDoc `shouldSatisfy` maybe False (Text.isInfixOf "P-FORK-JOIN")
 
     describe "a permission under EVERY" $ do
       let mayBarrier = exportOf defaultBpmnOptions "group" mayBarrierSrc
