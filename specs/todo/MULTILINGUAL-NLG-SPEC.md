@@ -537,6 +537,27 @@ have no counterpart to consult, so their English is ours alone and should be mar
    absent `@lang` means `en`. Lexer, `L4.Nlg` selection, check error on duplicates, goldens.
    Untagged behaviour must be provably unchanged — assert against the existing 131 annotations.
    Do **not** build the bare form's `[@he …]` spelling: pre-approved, not commissioned.
+
+   **This step carries a documentation obligation, and `specs/` does not discharge it**
+   (CLAUDE.md §6: a user-writable construct needs a page under `doc/` in the shipping PR).
+   Three things are owed, and none is optional:
+
+   - a `@nlg:xx` section in `doc/reference/syntax/README.md`, stating the limit that the
+     bare `[…]` form is **not** taggable;
+   - a fix to `doc/tutorials/natural-language-functions/optimising-natural-language-generation.md`,
+     which today says L4 renders "formatted **English** prose" and treats English as a property
+     of the renderer rather than as a default — that sentence becomes false the moment a tag
+     ships;
+   - guidance on **producing a bilingual set of documents** from one encoding, which is the
+     thing the tag is actually for. Write that as the general case and derive the current
+     behaviour from it: **with no `@nlg:xx` tags and no `@lang`, English is the degenerate
+     default** — one language, selected by having no alternative. A reader who meets the
+     degenerate case first will read the tag as an exception; a reader who meets the general
+     case first will read today's behaviour as the special case it is.
+
+   An executable example belongs in a `.l4` file under `doc/`, not only in a fenced block:
+   `doc/test-docs.sh` type-checks the former and not the latter.
+
 4. **Projection locale (§5).** Start with `l4 render` and the docs, which have no interactive
    surface; the wizard and ladder diagrams follow.
 5. **Penal Law pilot.** One chapter, Hebrew-canonical, with `@nlg:en` informed by the ICJ text
