@@ -10,6 +10,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Start_0__Task_0"
@@ -25,11 +26,12 @@
         "type": "bpmn:MultiInstanceLoopCharacteristics",
         "isSequential": false,
         "loopCardinality": false,
-        "loopDataInputRef": false,
+        "loopDataInputRef": true,
         "completionCondition": null
       },
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_0__Task_1"
@@ -46,6 +48,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_1__End_2"
@@ -62,6 +65,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -78,6 +82,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -95,6 +100,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_1",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_1__End_3"
@@ -111,6 +117,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_0",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_0__End_3"
@@ -128,13 +135,14 @@
     "tokensOn": [
       "Task_0"
     ],
+    "instances": {},
     "boundarySubscriptions": [
       "Boundary_0"
     ],
     "triggers": [
+      "Boundary_0",
       "Start_0",
-      "Task_0",
-      "Boundary_0"
+      "Task_0"
     ],
     "history": [
       "Start_0",
@@ -142,18 +150,21 @@
       "Task_0"
     ],
     "endEventsReached": [],
+    "endEventsReachedTopLevel": [],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 0cnncwf",
-      "Start Event 0cnncwf"
+      "Process started <scope-1>",
+      "Start Event <scope-1>"
     ],
     "afterWaiting3s": {
       "tokensOn": [
         "Task_0"
       ],
+      "instances": {},
       "triggers": [
+        "Boundary_0",
         "Start_0",
-        "Task_0",
-        "Boundary_0"
+        "Task_0"
       ],
       "endEventsReached": []
     }
@@ -163,6 +174,7 @@
     "continuedFirst": [],
     "fired": "Boundary_0",
     "tokensOn": [],
+    "instances": {},
     "boundarySubscriptions": [],
     "triggers": [
       "Start_0"
@@ -178,13 +190,17 @@
     "endEventsReached": [
       "End_3"
     ],
+    "endEventsReachedTopLevel": [
+      "End_3"
+    ],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 0npmxa6",
-      "Start Event 0npmxa6",
-      "MUST Sign ... 0npmxa6",
-      "after P14D 0npmxa6",
-      "Breach 0npmxa6",
-      "Process finished 0npmxa6"
+      "Process started <scope-2>",
+      "Start Event <scope-2>",
+      "MUST Sign ... <scope-2>",
+      "after P14D <scope-2>",
+      "Breach <scope-2>",
+      "Process finished <scope-2>"
     ]
   },
   "happy": [
@@ -210,6 +226,7 @@
       ],
       "hitStepLimit": false,
       "tokensOn": [],
+      "instances": {},
       "boundarySubscriptions": [],
       "triggers": [
         "Start_0"
@@ -226,13 +243,17 @@
       "endEventsReached": [
         "End_2"
       ],
+      "endEventsReachedTopLevel": [
+        "End_2"
+      ],
+      "endEventsReachedInside": {},
       "log": [
-        "Process started 0x3oll9",
-        "Start Event 0x3oll9",
-        "MUST Sign ... 0x3oll9",
-        "MUST Deliver ... 0x3oll9",
-        "Fulfilled 0x3oll9",
-        "Process finished 0x3oll9"
+        "Process started <scope-3>",
+        "Start Event <scope-3>",
+        "MUST Sign ... <scope-3>",
+        "MUST Deliver ... <scope-3>",
+        "Fulfilled <scope-3>",
+        "Process finished <scope-3>"
       ]
     }
   ],

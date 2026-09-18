@@ -10,6 +10,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Start_0__Task_0"
@@ -24,6 +25,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_0__Split_1"
@@ -40,6 +42,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": "Diverging",
       "outgoing": [
         "Flow_Split_1__Task_2",
@@ -59,6 +62,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_2__End_3"
@@ -75,6 +79,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -94,6 +99,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -112,6 +118,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_5__End_4"
@@ -128,6 +135,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_6__End_3"
@@ -144,6 +152,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_7__End_4"
@@ -162,6 +171,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_7",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_7__End_3"
@@ -178,6 +188,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_6",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_6__End_4"
@@ -194,6 +205,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_5",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_5__End_3"
@@ -210,6 +222,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_2",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_2__End_4"
@@ -226,6 +239,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_0",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_0__End_4"
@@ -246,13 +260,14 @@
     "tokensOn": [
       "Task_0"
     ],
+    "instances": {},
     "boundarySubscriptions": [
       "Boundary_0"
     ],
     "triggers": [
+      "Boundary_0",
       "Start_0",
-      "Task_0",
-      "Boundary_0"
+      "Task_0"
     ],
     "history": [
       "Start_0",
@@ -260,18 +275,21 @@
       "Task_0"
     ],
     "endEventsReached": [],
+    "endEventsReachedTopLevel": [],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 1gi25py",
-      "Start Event 1gi25py"
+      "Process started <scope-1>",
+      "Start Event <scope-1>"
     ],
     "afterWaiting3s": {
       "tokensOn": [
         "Task_0"
       ],
+      "instances": {},
       "triggers": [
+        "Boundary_0",
         "Start_0",
-        "Task_0",
-        "Boundary_0"
+        "Task_0"
       ],
       "endEventsReached": []
     }
@@ -281,6 +299,7 @@
     "continuedFirst": [],
     "fired": "Boundary_0",
     "tokensOn": [],
+    "instances": {},
     "boundarySubscriptions": [],
     "triggers": [
       "Start_0"
@@ -296,13 +315,17 @@
     "endEventsReached": [
       "End_4"
     ],
+    "endEventsReachedTopLevel": [
+      "End_4"
+    ],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 0oqqhvj",
-      "Start Event 0oqqhvj",
-      "MUST file the offering statement 0oqqhvj",
-      "after P21D 0oqqhvj",
-      "Breach 0oqqhvj",
-      "Process finished 0oqqhvj"
+      "Process started <scope-2>",
+      "Start Event <scope-2>",
+      "MUST file the offering statement <scope-2>",
+      "after P21D <scope-2>",
+      "Breach <scope-2>",
+      "Process finished <scope-2>"
     ]
   },
   "happy": [
@@ -355,6 +378,7 @@
       ],
       "hitStepLimit": false,
       "tokensOn": [],
+      "instances": {},
       "boundarySubscriptions": [],
       "triggers": [
         "Start_0"
@@ -384,24 +408,31 @@
       ],
       "endEventsReached": [
         "End_3",
-        "End_4",
         "End_3",
+        "End_4",
         "End_4"
       ],
+      "endEventsReachedTopLevel": [
+        "End_3",
+        "End_3",
+        "End_4",
+        "End_4"
+      ],
+      "endEventsReachedInside": {},
       "log": [
-        "Process started 134v9j9",
-        "Start Event 134v9j9",
-        "MUST file the offering statement 134v9j9",
-        "all of 134v9j9",
-        "MUST check the investor limit 134v9j9",
-        "Fulfilled 134v9j9",
-        "SHANT advertise the terms 134v9j9",
-        "Breach 134v9j9",
-        "MUST file the annual report 134v9j9",
-        "Fulfilled 134v9j9",
-        "SHANT resell the securities 134v9j9",
-        "Breach 134v9j9",
-        "Process finished 134v9j9"
+        "Process started <scope-3>",
+        "Start Event <scope-3>",
+        "MUST file the offering statement <scope-3>",
+        "all of <scope-3>",
+        "MUST check the investor limit <scope-3>",
+        "Fulfilled <scope-3>",
+        "SHANT advertise the terms <scope-3>",
+        "Breach <scope-3>",
+        "MUST file the annual report <scope-3>",
+        "Fulfilled <scope-3>",
+        "SHANT resell the securities <scope-3>",
+        "Breach <scope-3>",
+        "Process finished <scope-3>"
       ]
     }
   ],

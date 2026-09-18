@@ -1,5 +1,5 @@
 {
-  "fixture": "jl4/examples/bpmn/expected/modals-may-fork.bpmn",
+  "fixture": "jl4/examples/bpmn/expected/tenancy-fork-beside-party.bpmn",
   "importWarnings": [],
   "elements": [
     {
@@ -13,14 +13,81 @@
       "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
-        "Flow_Start_0__Scope_0"
+        "Flow_Start_0__Split_0"
       ],
       "incoming": []
     },
     {
-      "id": "Scope_0",
+      "id": "Split_0",
+      "type": "bpmn:ParallelGateway",
+      "name": "all of",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "subProcess": null,
+      "gatewayDirection": "Diverging",
+      "outgoing": [
+        "Flow_Split_0__Scope_1",
+        "Flow_Split_0__Task_4"
+      ],
+      "incoming": [
+        "Flow_Start_0__Split_0"
+      ]
+    },
+    {
+      "id": "End_2",
+      "type": "bpmn:EndEvent",
+      "name": "Fulfilled",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "subProcess": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_Task_4__End_2"
+      ]
+    },
+    {
+      "id": "End_3",
+      "type": "bpmn:EndEvent",
+      "name": "Breach",
+      "eventDefinitions": [
+        "bpmn:ErrorEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "subProcess": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_Boundary_4__End_3"
+      ]
+    },
+    {
+      "id": "Task_4",
+      "type": "bpmn:Task",
+      "name": "MUST Deliver ...",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "subProcess": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Task_4__End_2"
+      ],
+      "incoming": [
+        "Flow_Split_0__Task_4"
+      ]
+    },
+    {
+      "id": "Scope_1",
       "type": "bpmn:SubProcess",
-      "name": "each Director",
+      "name": "each Tenant",
       "eventDefinitions": [],
       "multiInstance": {
         "type": "bpmn:MultiInstanceLoopCharacteristics",
@@ -34,79 +101,61 @@
       "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
-        "Flow_Scope_0__EndGroup_0"
+        "Flow_Scope_1__EndGroup_1"
       ],
       "incoming": [
-        "Flow_Start_0__Scope_0"
-      ]
-    },
-    {
-      "id": "Task_0",
-      "type": "bpmn:Task",
-      "name": "MAY Approve ...",
-      "eventDefinitions": [],
-      "multiInstance": null,
-      "cancelActivity": null,
-      "attachedTo": null,
-      "subProcess": "Scope_0",
-      "gatewayDirection": null,
-      "outgoing": [
-        "Flow_Task_0__Task_1"
-      ],
-      "incoming": [
-        "Flow_StartScope_0__Task_0"
+        "Flow_Split_0__Scope_1"
       ]
     },
     {
       "id": "Task_1",
       "type": "bpmn:Task",
-      "name": "MUST Publish ...",
+      "name": "MUST Pay ...",
       "eventDefinitions": [],
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
-      "subProcess": "Scope_0",
+      "subProcess": "Scope_1",
       "gatewayDirection": null,
       "outgoing": [
-        "Flow_Task_1__EndScope_0"
+        "Flow_Task_1__EndScope_1"
       ],
       "incoming": [
-        "Flow_Task_0__Task_1"
+        "Flow_StartScope_1__Task_1"
       ]
     },
     {
-      "id": "StartScope_0",
+      "id": "StartScope_1",
       "type": "bpmn:StartEvent",
       "name": null,
       "eventDefinitions": [],
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
-      "subProcess": "Scope_0",
+      "subProcess": "Scope_1",
       "gatewayDirection": null,
       "outgoing": [
-        "Flow_StartScope_0__Task_0"
+        "Flow_StartScope_1__Task_1"
       ],
       "incoming": []
     },
     {
-      "id": "EndScope_0",
+      "id": "EndScope_1",
       "type": "bpmn:EndEvent",
       "name": "Fulfilled",
       "eventDefinitions": [],
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
-      "subProcess": "Scope_0",
+      "subProcess": "Scope_1",
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
-        "Flow_Boundary_0__EndScope_0",
-        "Flow_Task_1__EndScope_0"
+        "Flow_Task_1__EndScope_1"
       ]
     },
     {
-      "id": "EscScope_0",
+      "id": "EscScope_1",
       "type": "bpmn:EndEvent",
       "name": "Breach",
       "eventDefinitions": [
@@ -115,15 +164,15 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
-      "subProcess": "Scope_0",
+      "subProcess": "Scope_1",
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
-        "Flow_Boundary_1__EscScope_0"
+        "Flow_Boundary_1__EscScope_1"
       ]
     },
     {
-      "id": "EndGroup_0",
+      "id": "EndGroup_1",
       "type": "bpmn:EndEvent",
       "name": "every run has ended",
       "eventDefinitions": [],
@@ -134,11 +183,11 @@
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
-        "Flow_Scope_0__EndGroup_0"
+        "Flow_Scope_1__EndGroup_1"
       ]
     },
     {
-      "id": "EndBreach_0",
+      "id": "EndBreach_1",
       "type": "bpmn:EndEvent",
       "name": "Breach",
       "eventDefinitions": [],
@@ -149,11 +198,11 @@
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
-        "Flow_BoundaryEsc_0__EndBreach_0"
+        "Flow_BoundaryEsc_1__EndBreach_1"
       ]
     },
     {
-      "id": "BoundaryEsc_0",
+      "id": "BoundaryEsc_1",
       "type": "bpmn:BoundaryEvent",
       "name": "a member breached",
       "eventDefinitions": [
@@ -161,80 +210,88 @@
       ],
       "multiInstance": null,
       "cancelActivity": false,
-      "attachedTo": "Scope_0",
+      "attachedTo": "Scope_1",
       "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
-        "Flow_BoundaryEsc_0__EndBreach_0"
+        "Flow_BoundaryEsc_1__EndBreach_1"
       ],
       "incoming": []
     },
     {
       "id": "Boundary_1",
       "type": "bpmn:BoundaryEvent",
-      "name": "after P5D",
+      "name": "after P7D",
       "eventDefinitions": [
         "bpmn:TimerEventDefinition"
       ],
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_1",
-      "subProcess": "Scope_0",
+      "subProcess": "Scope_1",
       "gatewayDirection": null,
       "outgoing": [
-        "Flow_Boundary_1__EscScope_0"
+        "Flow_Boundary_1__EscScope_1"
       ],
       "incoming": []
     },
     {
-      "id": "Boundary_0",
+      "id": "Boundary_4",
       "type": "bpmn:BoundaryEvent",
-      "name": "after P30D",
+      "name": "after P14D",
       "eventDefinitions": [
         "bpmn:TimerEventDefinition"
       ],
       "multiInstance": null,
       "cancelActivity": true,
-      "attachedTo": "Task_0",
-      "subProcess": "Scope_0",
+      "attachedTo": "Task_4",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
-        "Flow_Boundary_0__EndScope_0"
+        "Flow_Boundary_4__End_3"
       ],
       "incoming": []
     }
   ],
   "unsupportedElements": [],
   "pausePoints": [
-    "Task_0",
+    "Task_4",
     "Task_1"
   ],
   "exclusiveGateways": [],
   "started": {
     "tokensOn": [
-      "Scope_0",
-      "Task_0"
+      "Scope_1",
+      "Task_1",
+      "Task_4"
     ],
     "instances": {
-      "Scope_0": 1
+      "Scope_1": 1
     },
     "boundarySubscriptions": [
-      "BoundaryEsc_0",
-      "Boundary_0"
+      "BoundaryEsc_1",
+      "Boundary_1",
+      "Boundary_4"
     ],
     "triggers": [
-      "BoundaryEsc_0",
-      "Boundary_0",
+      "BoundaryEsc_1",
+      "Boundary_1",
+      "Boundary_4",
       "Start_0",
-      "Task_0"
+      "Task_1",
+      "Task_4"
     ],
     "history": [
       "Start_0",
-      "Flow_Start_0__Scope_0",
-      "Scope_0",
-      "StartScope_0",
-      "Flow_StartScope_0__Task_0",
-      "Task_0"
+      "Flow_Start_0__Split_0",
+      "Split_0",
+      "Flow_Split_0__Scope_1",
+      "Flow_Split_0__Task_4",
+      "Scope_1",
+      "StartScope_1",
+      "Flow_StartScope_1__Task_1",
+      "Task_4",
+      "Task_1"
     ],
     "endEventsReached": [],
     "endEventsReachedTopLevel": [],
@@ -242,22 +299,26 @@
     "log": [
       "Process started <scope-1>",
       "Start Event <scope-1>",
-      "each Director started <scope-2>",
+      "all of <scope-1>",
+      "each Tenant started <scope-2>",
       "Start Event <scope-2>"
     ],
     "afterWaiting3s": {
       "tokensOn": [
-        "Scope_0",
-        "Task_0"
+        "Scope_1",
+        "Task_1",
+        "Task_4"
       ],
       "instances": {
-        "Scope_0": 1
+        "Scope_1": 1
       },
       "triggers": [
-        "BoundaryEsc_0",
-        "Boundary_0",
+        "BoundaryEsc_1",
+        "Boundary_1",
+        "Boundary_4",
         "Start_0",
-        "Task_0"
+        "Task_1",
+        "Task_4"
       ],
       "endEventsReached": []
     }
@@ -265,69 +326,87 @@
   "breach": {
     "arm": null,
     "continuedFirst": [],
-    "fired": "Boundary_0",
-    "tokensOn": [],
+    "fired": "Boundary_1",
+    "tokensOn": [
+      "Task_4"
+    ],
     "instances": {},
-    "boundarySubscriptions": [],
+    "boundarySubscriptions": [
+      "Boundary_4"
+    ],
     "triggers": [
-      "Start_0"
+      "Boundary_4",
+      "Start_0",
+      "Task_4"
     ],
     "history": [
       "Start_0",
-      "Flow_Start_0__Scope_0",
-      "Scope_0",
-      "StartScope_0",
-      "Flow_StartScope_0__Task_0",
-      "Task_0",
-      "Boundary_0",
-      "Flow_Boundary_0__EndScope_0",
-      "EndScope_0",
-      "Flow_Scope_0__EndGroup_0",
-      "EndGroup_0"
+      "Flow_Start_0__Split_0",
+      "Split_0",
+      "Flow_Split_0__Scope_1",
+      "Flow_Split_0__Task_4",
+      "Scope_1",
+      "StartScope_1",
+      "Flow_StartScope_1__Task_1",
+      "Task_4",
+      "Task_1",
+      "Boundary_1",
+      "Flow_Boundary_1__EscScope_1",
+      "EscScope_1",
+      "BoundaryEsc_1",
+      "Flow_BoundaryEsc_1__EndBreach_1",
+      "Flow_Scope_1__EndGroup_1",
+      "EndBreach_1",
+      "EndGroup_1"
     ],
     "endEventsReached": [
-      "EndGroup_0",
-      "EndScope_0"
+      "EndBreach_1",
+      "EndGroup_1",
+      "EscScope_1"
     ],
     "endEventsReachedTopLevel": [
-      "EndGroup_0"
+      "EndBreach_1",
+      "EndGroup_1"
     ],
     "endEventsReachedInside": {
-      "Scope_0": [
-        "EndScope_0"
+      "Scope_1": [
+        "EscScope_1"
       ]
     },
     "log": [
       "Process started <scope-3>",
       "Start Event <scope-3>",
-      "each Director started <scope-4>",
+      "all of <scope-3>",
+      "each Tenant started <scope-4>",
       "Start Event <scope-4>",
-      "MAY Approve ... <scope-4>",
-      "after P30D <scope-4>",
-      "Fulfilled <scope-4>",
-      "each Director finished <scope-4>",
-      "every run has ended <scope-3>",
-      "Process finished <scope-3>"
+      "MUST Pay ... <scope-4>",
+      "after P7D <scope-4>",
+      "Breach <scope-4>",
+      "a member breached <scope-3>",
+      "each Tenant finished <scope-4>",
+      "Breach <scope-3>",
+      "every run has ended <scope-3>"
     ]
   },
   "happy": [
     {
       "arm": null,
       "continued": [
-        "Task_0",
+        "Task_4",
         "Task_1"
       ],
       "steps": [
         {
           "tokensOn": [
-            "Scope_0",
-            "Task_0"
+            "Scope_1",
+            "Task_1",
+            "Task_4"
           ],
-          "continued": "Task_0"
+          "continued": "Task_4"
         },
         {
           "tokensOn": [
-            "Scope_0",
+            "Scope_1",
             "Task_1"
           ],
           "continued": "Task_1"
@@ -342,39 +421,47 @@
       ],
       "history": [
         "Start_0",
-        "Flow_Start_0__Scope_0",
-        "Scope_0",
-        "StartScope_0",
-        "Flow_StartScope_0__Task_0",
-        "Task_0",
-        "Flow_Task_0__Task_1",
+        "Flow_Start_0__Split_0",
+        "Split_0",
+        "Flow_Split_0__Scope_1",
+        "Flow_Split_0__Task_4",
+        "Scope_1",
+        "StartScope_1",
+        "Flow_StartScope_1__Task_1",
+        "Task_4",
         "Task_1",
-        "Flow_Task_1__EndScope_0",
-        "EndScope_0",
-        "Flow_Scope_0__EndGroup_0",
-        "EndGroup_0"
+        "Flow_Task_4__End_2",
+        "End_2",
+        "Flow_Task_1__EndScope_1",
+        "EndScope_1",
+        "Flow_Scope_1__EndGroup_1",
+        "EndGroup_1"
       ],
       "endEventsReached": [
-        "EndGroup_0",
-        "EndScope_0"
+        "EndGroup_1",
+        "EndScope_1",
+        "End_2"
       ],
       "endEventsReachedTopLevel": [
-        "EndGroup_0"
+        "EndGroup_1",
+        "End_2"
       ],
       "endEventsReachedInside": {
-        "Scope_0": [
-          "EndScope_0"
+        "Scope_1": [
+          "EndScope_1"
         ]
       },
       "log": [
         "Process started <scope-5>",
         "Start Event <scope-5>",
-        "each Director started <scope-6>",
+        "all of <scope-5>",
+        "each Tenant started <scope-6>",
         "Start Event <scope-6>",
-        "MAY Approve ... <scope-6>",
-        "MUST Publish ... <scope-6>",
+        "MUST Deliver ... <scope-5>",
+        "Fulfilled <scope-5>",
+        "MUST Pay ... <scope-6>",
         "Fulfilled <scope-6>",
-        "each Director finished <scope-6>",
+        "each Tenant finished <scope-6>",
         "every run has ended <scope-5>",
         "Process finished <scope-5>"
       ]

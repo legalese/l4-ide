@@ -10,6 +10,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Start_0__Decide_0"
@@ -24,6 +25,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": "Diverging",
       "outgoing": [
         "Flow_Split_0__End_1",
@@ -41,6 +43,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -56,6 +59,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_2__End_3"
@@ -74,6 +78,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -88,6 +93,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Decide_0__Split_0"
@@ -106,6 +112,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_2",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_2__End_1"
@@ -131,10 +138,11 @@
     "tokensOn": [
       "Decide_0"
     ],
+    "instances": {},
     "boundarySubscriptions": [],
     "triggers": [
-      "Start_0",
-      "Decide_0"
+      "Decide_0",
+      "Start_0"
     ],
     "history": [
       "Start_0",
@@ -142,17 +150,20 @@
       "Decide_0"
     ],
     "endEventsReached": [],
+    "endEventsReachedTopLevel": [],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 0lw3nu3",
-      "Start Event 0lw3nu3"
+      "Process started <scope-1>",
+      "Start Event <scope-1>"
     ],
     "afterWaiting3s": {
       "tokensOn": [
         "Decide_0"
       ],
+      "instances": {},
       "triggers": [
-        "Start_0",
-        "Decide_0"
+        "Decide_0",
+        "Start_0"
       ],
       "endEventsReached": []
     }
@@ -164,6 +175,7 @@
     ],
     "fired": "Boundary_2",
     "tokensOn": [],
+    "instances": {},
     "boundarySubscriptions": [],
     "triggers": [
       "Start_0"
@@ -183,15 +195,19 @@
     "endEventsReached": [
       "End_1"
     ],
+    "endEventsReachedTopLevel": [
+      "End_1"
+    ],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 1qdiek4",
-      "Start Event 1qdiek4",
-      "notice complies with Rule 204(b) 1qdiek4",
-      "one of 1qdiek4",
-      "SHANT advertise the terms of the offering 1qdiek4",
-      "unreachable: no WITHIN 1qdiek4",
-      "Fulfilled 1qdiek4",
-      "Process finished 1qdiek4"
+      "Process started <scope-2>",
+      "Start Event <scope-2>",
+      "notice complies with Rule 204(b) <scope-2>",
+      "one of <scope-2>",
+      "SHANT advertise the terms of the offering <scope-2>",
+      "unreachable: no WITHIN <scope-2>",
+      "Fulfilled <scope-2>",
+      "Process finished <scope-2>"
     ]
   },
   "happy": [
@@ -210,6 +226,7 @@
       ],
       "hitStepLimit": false,
       "tokensOn": [],
+      "instances": {},
       "boundarySubscriptions": [],
       "triggers": [
         "Start_0"
@@ -226,13 +243,17 @@
       "endEventsReached": [
         "End_1"
       ],
+      "endEventsReachedTopLevel": [
+        "End_1"
+      ],
+      "endEventsReachedInside": {},
       "log": [
-        "Process started 1qq51xa",
-        "Start Event 1qq51xa",
-        "notice complies with Rule 204(b) 1qq51xa",
-        "one of 1qq51xa",
-        "Fulfilled 1qq51xa",
-        "Process finished 1qq51xa"
+        "Process started <scope-3>",
+        "Start Event <scope-3>",
+        "notice complies with Rule 204(b) <scope-3>",
+        "one of <scope-3>",
+        "Fulfilled <scope-3>",
+        "Process finished <scope-3>"
       ]
     },
     {
@@ -257,6 +278,7 @@
       ],
       "hitStepLimit": false,
       "tokensOn": [],
+      "instances": {},
       "boundarySubscriptions": [],
       "triggers": [
         "Start_0"
@@ -275,14 +297,18 @@
       "endEventsReached": [
         "End_3"
       ],
+      "endEventsReachedTopLevel": [
+        "End_3"
+      ],
+      "endEventsReachedInside": {},
       "log": [
-        "Process started 0dl04rb",
-        "Start Event 0dl04rb",
-        "notice complies with Rule 204(b) 0dl04rb",
-        "one of 0dl04rb",
-        "SHANT advertise the terms of the offering 0dl04rb",
-        "Breach 0dl04rb",
-        "Process finished 0dl04rb"
+        "Process started <scope-4>",
+        "Start Event <scope-4>",
+        "notice complies with Rule 204(b) <scope-4>",
+        "one of <scope-4>",
+        "SHANT advertise the terms of the offering <scope-4>",
+        "Breach <scope-4>",
+        "Process finished <scope-4>"
       ]
     }
   ],

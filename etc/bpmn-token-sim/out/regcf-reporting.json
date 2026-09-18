@@ -10,6 +10,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Start_0__Decide_0"
@@ -24,6 +25,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": "Diverging",
       "outgoing": [
         "Flow_Split_0__Task_1",
@@ -42,6 +44,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_1__End_2"
@@ -58,6 +61,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -75,6 +79,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -90,6 +95,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_4__Decide_0"
@@ -106,6 +112,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Decide_0__Split_0"
@@ -125,6 +132,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_4",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_4__End_3"
@@ -141,6 +149,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_1",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_1__End_3"
@@ -168,10 +177,11 @@
     "tokensOn": [
       "Decide_0"
     ],
+    "instances": {},
     "boundarySubscriptions": [],
     "triggers": [
-      "Start_0",
-      "Decide_0"
+      "Decide_0",
+      "Start_0"
     ],
     "history": [
       "Start_0",
@@ -179,17 +189,20 @@
       "Decide_0"
     ],
     "endEventsReached": [],
+    "endEventsReachedTopLevel": [],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 0ml7fqq",
-      "Start Event 0ml7fqq"
+      "Process started <scope-1>",
+      "Start Event <scope-1>"
     ],
     "afterWaiting3s": {
       "tokensOn": [
         "Decide_0"
       ],
+      "instances": {},
       "triggers": [
-        "Start_0",
-        "Decide_0"
+        "Decide_0",
+        "Start_0"
       ],
       "endEventsReached": []
     }
@@ -201,6 +214,7 @@
     ],
     "fired": "Boundary_1",
     "tokensOn": [],
+    "instances": {},
     "boundarySubscriptions": [],
     "triggers": [
       "Start_0"
@@ -220,15 +234,19 @@
     "endEventsReached": [
       "End_3"
     ],
+    "endEventsReachedTopLevel": [
+      "End_3"
+    ],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 1a5p8od",
-      "Start Event 1a5p8od",
-      "ongoing reporting obligation 1a5p8od",
-      "one of 1a5p8od",
-      "MUST file a Form C-TR termination of reporting 1a5p8od",
-      "timeout 1a5p8od",
-      "Breach 1a5p8od",
-      "Process finished 1a5p8od"
+      "Process started <scope-2>",
+      "Start Event <scope-2>",
+      "ongoing reporting obligation <scope-2>",
+      "one of <scope-2>",
+      "MUST file a Form C-TR termination of reporting <scope-2>",
+      "timeout <scope-2>",
+      "Breach <scope-2>",
+      "Process finished <scope-2>"
     ]
   },
   "happy": [
@@ -254,6 +272,7 @@
       ],
       "hitStepLimit": false,
       "tokensOn": [],
+      "instances": {},
       "boundarySubscriptions": [],
       "triggers": [
         "Start_0"
@@ -272,14 +291,18 @@
       "endEventsReached": [
         "End_2"
       ],
+      "endEventsReachedTopLevel": [
+        "End_2"
+      ],
+      "endEventsReachedInside": {},
       "log": [
-        "Process started 1p40v36",
-        "Start Event 1p40v36",
-        "ongoing reporting obligation 1p40v36",
-        "one of 1p40v36",
-        "MUST file a Form C-TR termination of reporting 1p40v36",
-        "Fulfilled 1p40v36",
-        "Process finished 1p40v36"
+        "Process started <scope-3>",
+        "Start Event <scope-3>",
+        "ongoing reporting obligation <scope-3>",
+        "one of <scope-3>",
+        "MUST file a Form C-TR termination of reporting <scope-3>",
+        "Fulfilled <scope-3>",
+        "Process finished <scope-3>"
       ]
     },
     {
@@ -297,6 +320,7 @@
       ],
       "hitStepLimit": false,
       "tokensOn": [],
+      "instances": {},
       "boundarySubscriptions": [],
       "triggers": [
         "Start_0"
@@ -313,13 +337,17 @@
       "endEventsReached": [
         "End_2"
       ],
+      "endEventsReachedTopLevel": [
+        "End_2"
+      ],
+      "endEventsReachedInside": {},
       "log": [
-        "Process started 0eixmdx",
-        "Start Event 0eixmdx",
-        "ongoing reporting obligation 0eixmdx",
-        "one of 0eixmdx",
-        "Fulfilled 0eixmdx",
-        "Process finished 0eixmdx"
+        "Process started <scope-4>",
+        "Start Event <scope-4>",
+        "ongoing reporting obligation <scope-4>",
+        "one of <scope-4>",
+        "Fulfilled <scope-4>",
+        "Process finished <scope-4>"
       ]
     },
     {
@@ -416,10 +444,11 @@
       "tokensOn": [
         "Decide_0"
       ],
+      "instances": {},
       "boundarySubscriptions": [],
       "triggers": [
-        "Start_0",
-        "Decide_0"
+        "Decide_0",
+        "Start_0"
       ],
       "history": [
         "Start_0",
@@ -463,27 +492,29 @@
         "Decide_0"
       ],
       "endEventsReached": [],
+      "endEventsReachedTopLevel": [],
+      "endEventsReachedInside": {},
       "log": [
-        "Process started 0hz0824",
-        "Start Event 0hz0824",
-        "ongoing reporting obligation 0hz0824",
-        "one of 0hz0824",
-        "MUST file a Form C-AR annual report 0hz0824",
-        "ongoing reporting obligation 0hz0824",
-        "one of 0hz0824",
-        "MUST file a Form C-AR annual report 0hz0824",
-        "ongoing reporting obligation 0hz0824",
-        "one of 0hz0824",
-        "MUST file a Form C-AR annual report 0hz0824",
-        "ongoing reporting obligation 0hz0824",
-        "one of 0hz0824",
-        "MUST file a Form C-AR annual report 0hz0824",
-        "ongoing reporting obligation 0hz0824",
-        "one of 0hz0824",
-        "MUST file a Form C-AR annual report 0hz0824",
-        "ongoing reporting obligation 0hz0824",
-        "one of 0hz0824",
-        "MUST file a Form C-AR annual report 0hz0824"
+        "Process started <scope-5>",
+        "Start Event <scope-5>",
+        "ongoing reporting obligation <scope-5>",
+        "one of <scope-5>",
+        "MUST file a Form C-AR annual report <scope-5>",
+        "ongoing reporting obligation <scope-5>",
+        "one of <scope-5>",
+        "MUST file a Form C-AR annual report <scope-5>",
+        "ongoing reporting obligation <scope-5>",
+        "one of <scope-5>",
+        "MUST file a Form C-AR annual report <scope-5>",
+        "ongoing reporting obligation <scope-5>",
+        "one of <scope-5>",
+        "MUST file a Form C-AR annual report <scope-5>",
+        "ongoing reporting obligation <scope-5>",
+        "one of <scope-5>",
+        "MUST file a Form C-AR annual report <scope-5>",
+        "ongoing reporting obligation <scope-5>",
+        "one of <scope-5>",
+        "MUST file a Form C-AR annual report <scope-5>"
       ]
     }
   ],
