@@ -3063,6 +3063,14 @@ layoutDiagram li =
       , isScope n
       ]
 
+    -- KNOWN, cosmetic, not fixed: the scope's two EXTERNAL edges are routed by
+    -- the ordinary waypoint code, which knows nothing about the box, so both
+    -- cut across it — the flow in enters at the box's left edge from a node
+    -- inside its x-range, and the flow out leaves at the right edge and doubles
+    -- back. Visible in any modeller; harmless to every checker, since jBPM
+    -- ignores BPMNDI entirely and bpmn-moddle only asks that a shape exists.
+    -- Routing around a container is a layout feature, not a fix to this
+    -- function.
     scopeBounds n = case kidBounds of
       [] -> Bounds contentX0 (laneTop (laneOf n) + lanePadTop) (nodeWidth n.nodeKind) (nodeHeight n.nodeKind)
       bs ->
