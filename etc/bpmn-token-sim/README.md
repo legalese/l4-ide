@@ -62,14 +62,19 @@ setting them everywhere is the most charitable reading of the tool.
 ## Determinism: what is sorted, what is masked, what is not
 
 The JSONs are diffable run-to-run: a re-run that changes nothing changes no
-`out/*.json`, so a diff after a fixture moves shows only the fixtures that
-moved. Five things make that true, each in the code with a comment saying so:
+`out/<fixture>.json` (only `run-meta.json`'s `runAt` lines), so a diff after a
+fixture moves shows only the fixtures that moved. Five things make that true,
+each in the code with a comment saying so:
 
-- **Sorted** — every array that reports a _set_ of element ids, which the
-  simulator hands back in arrival order (for concurrent tokens, in timing
-  order): `tokensOn`, `triggers`, `boundarySubscriptions`, `endEventsReached`
-  (in `started`, `started.afterWaiting3s`, `breach` and every `happy[k]`), and
-  `steps[].tokensOn`. Sorted with JavaScript's default string sort.
+- **Sorted** — every array that reports _which_ element ids, not in what order,
+  which the simulator hands back in arrival order (for concurrent tokens, in
+  timing order): `tokensOn`, `triggers`, `boundarySubscriptions`,
+  `endEventsReached` (in `started`, `started.afterWaiting3s`, `breach` and
+  every `happy[k]`), and `steps[].tokensOn`. Sorted with JavaScript's default
+  string sort. All but one are sets; `endEventsReached` is a **multiset** — one
+  entry per token that exited an end event, so two tokens reaching `End_3`
+  list it twice (`handover`, `offering`), and the report reads that count.
+  The order those exits fired in is in `history`.
 - **Left in fired order**, because the order is the meaning: `history` (the
   simulator's own path, `SimulationSupport.getHistory`), `continued`,
   `continuedFirst` and `steps[].continued`. Also untouched: `elements`,
@@ -152,7 +157,7 @@ fixture JSON in the directory, which run produced it:
   "tokenSim": "0.40.0",
   "browser": "chrome 153.0.8010.53",
   "node": "v26.4.0",
-  "harnessCommit": "ec20584c1",
+  "harnessCommit": "<git rev-parse --short HEAD>",
   "fixtures": ["consultation", "…"],
   "npmLs": ["…"],
   "viewport": { "width": 1280, "height": 860 },
@@ -166,11 +171,14 @@ fixture JSON in the directory, which run produced it:
 
 `bpmnjs` and `tokenSim` are the installed versions (`node_modules/*/package.json`),
 `harnessCommit` is `git rev-parse --short HEAD` with `-dirty` appended when
-`run.mjs`, `src/`, `build.mjs`, `index.html` or `package.json` have uncommitted
-changes — a run from an uncommitted harness is not reproducible from that
-commit. When `run.mjs` is given a subset of fixtures it **merges** into the
-existing `perFixture`, keeping the entries of the fixtures it did not re-run;
-`fixtures` lists what this run touched. The browser and library versions live
+`run.mjs`, `src/`, `build.mjs`, `index.html`, `package.json` or
+`package-lock.json` have uncommitted changes — a run from an uncommitted
+harness is not reproducible from that commit (the lockfile counts because it
+fixes the transitive tree that `npmLs` does not show). When `run.mjs` is given
+a subset of fixtures it **merges** into the existing `perFixture`, keeping the
+entries of the fixtures it did not re-run and dropping any whose
+`<fixture>.json` is no longer in the directory; `fixtures` lists what this run
+touched. The browser and library versions live
 in this file and only here — no `out/<fixture>.json` carries them — so a
 browser bump is a `run-meta.json` line, not a fifteen-file diff.
 

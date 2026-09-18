@@ -105,6 +105,14 @@ const sorted = (ids) => [...ids].sort();
 // span (src/app.js `log()`), never parsed out of the text, and this shape is
 // asserted so a library that changed its alphabet would fail loudly instead of
 // leaking a raw id into the JSON.
+//
+// (The simulator would accept its own id generator — `injector.get('scopeIds',
+// false)` at Simulator.js:45 — which would make this mask unnecessary. Not
+// taken: Log.js:456 and Notifications.js:67 `domify` the id unescaped as
+// element text, so an id spelled `<scope-N>` parses as an HTML tag; and
+// `ids.next()` at :481 runs for every scope — process, participant, children —
+// not only the ones that reach a log line, so the numbering would change too.
+// Masking on the way out leaves the simulator's own minting untouched.)
 const SCOPE_ID = /^[01][0-9a-z]{6}$/;
 
 // One mask per fixture: each distinct id becomes `<scope-N>`, N counted from 1
@@ -143,6 +151,10 @@ function summarise(state, trace, mask) {
     // A path in fired order (SimulationSupport.getHistory): order-meaningful,
     // left as the simulator reports it.
     history: state.history,
+    // A *multiset*, not a set: one entry per token that exited an end event,
+    // so two tokens reaching End_3 give it twice (handover, offering), and the
+    // count is read by the report. Sorted, because arrival order is timing;
+    // the fired order of the same exits is `history`.
     endEventsReached: sorted(
       (trace || [])
         .filter((t) => t.action === "exit" && /^End_/.test(t.element || ""))
@@ -303,7 +315,8 @@ for (const fixture of fixtures) {
 //
 // The top-level fields describe THIS run. `perFixture` says, for every JSON
 // in the directory, which run produced it — so after a subset run the entries
-// for fixtures not re-run are kept from the existing file, not dropped. The
+// for fixtures not re-run are kept from the existing file, not dropped, and
+// an entry whose JSON is gone from the directory is not kept. The
 // browser and library versions live here and only here: a fixture's JSON is
 // what the simulator reported, so a browser bump is a run-meta line.
 const installedVersion = (pkg) =>
@@ -311,10 +324,13 @@ const installedVersion = (pkg) =>
     .version;
 const git = (cmd) => execSync(`git ${cmd}`, { cwd: here }).toString().trim();
 // `-dirty` when the harness's own sources differ from the commit: a run from
-// an uncommitted harness is not reproducible from that commit.
+// an uncommitted harness is not reproducible from that commit. The lockfile is
+// on the list because it fixes the transitive tree, which `npm ls --depth=0`
+// below does not show.
 const harnessDirty =
-  git("status --porcelain -- run.mjs src build.mjs index.html package.json") !==
-  "";
+  git(
+    "status --porcelain -- run.mjs src build.mjs index.html package.json package-lock.json",
+  ) !== "";
 const provenance = {
   runAt,
   bpmnjs: installedVersion("bpmn-js"),
@@ -332,7 +348,14 @@ const metaPath = join(outDir, "run-meta.json");
 const previous = existsSync(metaPath)
   ? JSON.parse(readFileSync(metaPath, "utf8"))
   : {};
-const perFixture = { ...(previous.perFixture || {}) };
+// Kept entries are only those whose JSON is still in the directory: a fixture
+// renamed or deleted since the previous run drops out instead of being
+// carried forward under a name nothing produces any more.
+const perFixture = Object.fromEntries(
+  Object.entries(previous.perFixture || {}).filter(([name]) =>
+    existsSync(join(outDir, `${name}.json`)),
+  ),
+);
 for (const name of Object.keys(results)) perFixture[name] = { ...provenance };
 const meta = {
   ...provenance,
