@@ -361,6 +361,23 @@ Hebrew fixture written before the feature lands is green and wrong, and no golde
 against `@lang` can silently change meaning. The two halves of the proposal have opposite safety
 properties and that should drive which lands first.
 
+**The renderer has no notion of language at all — measured, and it makes the degenerate default
+more degenerate than §8 assumed.** A Hebrew `@nlg` renders Hebrew **today**, with no tag, no
+`@lang`, and no change to anything:
+
+```l4
+DECIDE `chayav` @nlg הנישום החייב ב-%a% נתפס
+  IF a > 5
+#EVAL `chayav` 7
+```
+
+→ `l4 nlg` prints `הנישום החייב ב-`a` נתפס with 7`, and `l4 render --format text` prints
+`Chayav holds if הנישום החייב ב-a נתפס.` So the renderer emits whatever bytes the annotation
+holds; **English is a property of the corpus, not of the renderer**, and there is no language
+concept anywhere for a tag to extend. The tag does not teach L4 to speak Hebrew — it can already
+do that. What the tag adds is the ability to hold **more than one** rendering of the same name,
+which is why §3.1.1 puts the single-slot repair first and the syntax second.
+
 **There are two lexers for `@nlg`, not one.** The outer `nlgAnnotation` (`Lexer.hs:432`) captures
 the line into `TNlg`; the parser then **rebuilds** the annotation's source text with `toNlgAnno`
 and **re-lexes** it with a second lexer, `nlgTokenPayload` (`Lexer.hs:788`) — and it is those inner
@@ -719,6 +736,15 @@ have no counterpart to consult, so their English is ours alone and should be mar
      default** — one language, selected by having no alternative. A reader who meets the
      degenerate case first will read the tag as an exception; a reader who meets the general
      case first will read today's behaviour as the special case it is.
+
+     **Measured 2026-09-18, and it makes that sentence stronger than it looks (§3.1):** the
+     renderer has no language concept whatsoever — a Hebrew `@nlg` renders Hebrew today, untagged.
+     So do not write that L4 "renders English" and gains other languages; write that L4 renders
+     **whatever the annotation says**, that a corpus written in English therefore reads as
+     English, and that the tag adds the ability to carry **more than one** rendering per name.
+     The existing tutorial sentence — "render your rules back into formatted English prose"
+     (`doc/tutorials/natural-language-functions/optimising-natural-language-generation.md:7`) —
+     is wrong in exactly this way today, before any tag ships.
 
    An executable example belongs in a `.l4` file under `doc/`, not only in a fenced block:
    `doc/test-docs.sh` type-checks the former and not the latter.
