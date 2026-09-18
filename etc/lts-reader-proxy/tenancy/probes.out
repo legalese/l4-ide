@@ -8,14 +8,11 @@ receipts — after 1 event, the clock stands at 3 (the #TRACE on line 61)
     - Tenant OF "Carol" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (4 from now) (one of 3, each with a next step of their own)
 
   What would put someone in breach:
-    - nothing happens by 7 (the clock reaches 7.5) → Tenant OF "Bob" is in breach
-    - nothing happens by 8 (the clock reaches 9) → Landlord OF "Ms Ng" is in breach: MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) was due by 8; the clock reached 9 without it
+    - nothing happens by 7 (the clock reaches 7.5) → Tenant OF "Bob" is in breach; the breach names, in order: Tenant OF "Bob", Tenant OF "Carol"
+    - nothing happens by 8 (the clock reaches 9) → Landlord OF "Ms Ng" is in breach: MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) was due by 8; the clock reached 9 without it; the breach names, in order: Landlord OF "Ms Ng" (MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount), due by 8), Tenant OF "Bob", Tenant OF "Carol"
 
   What could not be tried:
-    - theLandlord does Receipt OF (Landlord OF "Ms Ng"), (Tenant OF "Alice"), amount now (at 3) — Internal error:
-  amount
-is not in scope.
-Please report this as a bug.
+    - theLandlord does Receipt OF (Landlord OF "Ms Ng"), (Tenant OF "Alice"), amount — the action binds `amount`, which the what-if cannot choose
     - Tenant OF "Bob" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
     - Tenant OF "Carol" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
 
@@ -23,7 +20,7 @@ Please report this as a bug.
 
   Steps, in order:
     at 3: Tenant OF "Alice" does Pay OF …, …, … at 3; Tenant OF "Alice" MUST (member 1 of 3) — done; on to what follows (member 1 of 3: their own next step begins)
-    at 3: (party not yet known) MUST — no more events; still waiting
+    at 3: theLandlord (as written; not yet resolved) MUST — no more events; still waiting
     at 3: Tenant OF "Alice" does Pay OF …, …, … at 3; Tenant OF "Bob" MUST (member 2 of 3) — not this party's event; passed over
     at 3: Tenant OF "Bob" MUST (member 2 of 3) — no more events; still waiting
     at 3: Tenant OF "Alice" does Pay OF …, …, … at 3; Tenant OF "Carol" MUST (member 3 of 3) — not this party's event; passed over
@@ -41,14 +38,11 @@ receipts — after 1 event, the clock stands at 3 (the #TRACE on line 65)
     - Tenant OF "Carol" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (4 from now) (one of 3, each with a next step of their own)
 
   What would put someone in breach:
-    - nothing happens by 7 (the clock reaches 7.5) → Tenant OF "Bob" is in breach
-    - nothing happens by 8 (the clock reaches 9) → Landlord OF "Ms Ng" is in breach: MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) was due by 8; the clock reached 9 without it
+    - nothing happens by 7 (the clock reaches 7.5) → Tenant OF "Bob" is in breach; the breach names, in order: Tenant OF "Bob", Tenant OF "Carol"
+    - nothing happens by 8 (the clock reaches 9) → Landlord OF "Ms Ng" is in breach: MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) was due by 8; the clock reached 9 without it; the breach names, in order: Landlord OF "Ms Ng" (MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount), due by 8), Tenant OF "Bob", Tenant OF "Carol"
 
   What could not be tried:
-    - theLandlord does Receipt OF (Landlord OF "Ms Ng"), (Tenant OF "Alice"), amount now (at 3) — Internal error:
-  amount
-is not in scope.
-Please report this as a bug.
+    - theLandlord does Receipt OF (Landlord OF "Ms Ng"), (Tenant OF "Alice"), amount — the action binds `amount`, which the what-if cannot choose
     - Tenant OF "Bob" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
     - Tenant OF "Carol" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
 
@@ -56,7 +50,7 @@ Please report this as a bug.
 
   Steps, in order:
     at 3: Tenant OF "Alice" does Pay OF …, …, … at 3; Tenant OF "Alice" MUST (member 1 of 3) — done; on to what follows (member 1 of 3: their own next step begins)
-    at 3: (party not yet known) MUST — no more events; still waiting
+    at 3: theLandlord (as written; not yet resolved) MUST — no more events; still waiting
     at 3: Tenant OF "Alice" does Pay OF …, …, … at 3; Tenant OF "Bob" MUST (member 2 of 3) — not this party's event; passed over
     at 3: Tenant OF "Bob" MUST (member 2 of 3) — no more events; still waiting
     at 3: Tenant OF "Alice" does Pay OF …, …, … at 3; Tenant OF "Carol" MUST (member 3 of 3) — not this party's event; passed over
@@ -74,7 +68,7 @@ receipts — after 1 event, the clock stands at 3 (the #TRACE on line 69)
     - Tenant OF "Carol" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (4 from now) (one of 3, each with a next step of their own)
 
   What would put someone in breach:
-    - nothing happens by 7 (the clock reaches 8) → Tenant OF "Alice" is in breach
+    - nothing happens by 7 (the clock reaches 8) → Tenant OF "Alice" is in breach; the breach names, in order: Tenant OF "Alice", Tenant OF "Bob", Tenant OF "Carol"
 
   What could not be tried:
     - Tenant OF "Alice" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
@@ -103,14 +97,11 @@ receipts — after 1 event, the clock stands at 7 (the #TRACE on line 73)
     - Tenant OF "Carol" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (0 from now) (one of 3, each with a next step of their own)
 
   What would put someone in breach:
-    - nothing happens by 7 (the clock reaches 8) → Tenant OF "Bob" is in breach
-    - nothing happens by 12 (the clock reaches 13) → Landlord OF "Ms Ng" is in breach: MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) was due by 12; the clock reached 13 without it
+    - nothing happens by 7 (the clock reaches 8) → Tenant OF "Bob" is in breach; the breach names, in order: Tenant OF "Bob", Tenant OF "Carol"
+    - nothing happens by 12 (the clock reaches 13) → Landlord OF "Ms Ng" is in breach: MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) was due by 12; the clock reached 13 without it; the breach names, in order: Landlord OF "Ms Ng" (MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount), due by 12), Tenant OF "Bob", Tenant OF "Carol"
 
   What could not be tried:
-    - theLandlord does Receipt OF (Landlord OF "Ms Ng"), (Tenant OF "Alice"), amount now (at 7) — Internal error:
-  amount
-is not in scope.
-Please report this as a bug.
+    - theLandlord does Receipt OF (Landlord OF "Ms Ng"), (Tenant OF "Alice"), amount — the action binds `amount`, which the what-if cannot choose
     - Tenant OF "Bob" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
     - Tenant OF "Carol" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
 
@@ -118,7 +109,7 @@ Please report this as a bug.
 
   Steps, in order:
     at 7: Tenant OF "Alice" does Pay OF …, …, … at 7; Tenant OF "Alice" MUST (member 1 of 3) — done; on to what follows (member 1 of 3: their own next step begins)
-    at 7: (party not yet known) MUST — no more events; still waiting
+    at 7: theLandlord (as written; not yet resolved) MUST — no more events; still waiting
     at 7: Tenant OF "Alice" does Pay OF …, …, … at 7; Tenant OF "Bob" MUST (member 2 of 3) — not this party's event; passed over
     at 7: Tenant OF "Bob" MUST (member 2 of 3) — no more events; still waiting
     at 7: Tenant OF "Alice" does Pay OF …, …, … at 7; Tenant OF "Carol" MUST (member 3 of 3) — not this party's event; passed over
@@ -128,7 +119,7 @@ Please report this as a bug.
 
 receipts — after 1 event, the clock stands at 8 (the #TRACE on line 77)
     PARTY theLandlord DOES Deliver OF theLandlord AT 8
-  Standing: BREACHED — Tenant OF "Alice" is in breach.
+  Standing: BREACHED — Tenant OF "Alice" is in breach; the breach names, in order: Tenant OF "Alice", Tenant OF "Bob", Tenant OF "Carol".
 
   Steps, in order:
     at 0: the event at 8; Tenant OF … MUST (member 1 of 3) — deadline 7 passed without the act; on to the fallback (member 1 of 3: their own next step begins)
@@ -137,12 +128,12 @@ receipts — after 1 event, the clock stands at 8 (the #TRACE on line 77)
     at —: BREACH declared by Tenant OF …
     at 0: the event at 8; Tenant OF … MUST (member 3 of 3) — deadline 7 passed without the act; on to the fallback (member 3 of 3: their own next step begins)
     at —: BREACH declared by Tenant OF …
-    at —: both parts together: breached by Tenant OF … (decided by the first part, by the tie-break rule)
-    at —: both parts together: breached by Tenant OF … (decided by the first part, by the tie-break rule)
+    at —: both parts together: breached by Tenant OF … (decided by the first part, by the tie-break rule); names, in order: Tenant OF …, Tenant OF …
+    at —: both parts together: breached by Tenant OF … (decided by the first part, by the tie-break rule); names, in order: Tenant OF …, Tenant OF …, Tenant OF …
 
 receipts — after 1 event, the clock stands at 8 (the #TRACE on line 81)
     PARTY alice DOES Pay OF alice, theLandlord, 100 AT 8
-  Standing: BREACHED — Tenant OF "Alice" is in breach.
+  Standing: BREACHED — Tenant OF "Alice" is in breach; the breach names, in order: Tenant OF "Alice", Tenant OF "Bob", Tenant OF "Carol".
 
   Steps, in order:
     at 0: Tenant OF … does something at 8; Tenant OF … MUST (member 1 of 3) — deadline 7 passed without the act; on to the fallback (member 1 of 3: their own next step begins)
@@ -151,13 +142,13 @@ receipts — after 1 event, the clock stands at 8 (the #TRACE on line 81)
     at —: BREACH declared by Tenant OF …
     at 0: Tenant OF … does something at 8; Tenant OF … MUST (member 3 of 3) — deadline 7 passed without the act; on to the fallback (member 3 of 3: their own next step begins)
     at —: BREACH declared by Tenant OF …
-    at —: both parts together: breached by Tenant OF … (decided by the first part, by the tie-break rule)
-    at —: both parts together: breached by Tenant OF … (decided by the first part, by the tie-break rule)
+    at —: both parts together: breached by Tenant OF … (decided by the first part, by the tie-break rule); names, in order: Tenant OF …, Tenant OF …
+    at —: both parts together: breached by Tenant OF … (decided by the first part, by the tie-break rule); names, in order: Tenant OF …, Tenant OF …, Tenant OF …
 
 receipts — after 2 events, the clock stands at 9 (the #TRACE on line 85)
     PARTY alice DOES Pay OF alice, theLandlord, 100 AT 3
     PARTY theLandlord DOES Deliver OF theLandlord AT 9
-  Standing: BREACHED — Landlord OF "Ms Ng" is in breach: MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) was due by 8; seen at 9, when Deliver OF (Landlord OF "Ms Ng") happened instead.
+  Standing: BREACHED — Landlord OF "Ms Ng" is in breach: MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) was due by 8; seen at 9, when Deliver OF (Landlord OF "Ms Ng") happened instead; the breach names, in order: Landlord OF "Ms Ng" (MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount), due by 8), Tenant OF "Bob", Tenant OF "Carol".
 
   Steps, in order:
     at 3: Tenant OF "Alice" does Pay OF …, …, … at 3; Tenant OF "Alice" MUST (member 1 of 3) — done; on to what follows (member 1 of 3: their own next step begins)
@@ -168,13 +159,13 @@ receipts — after 2 events, the clock stands at 9 (the #TRACE on line 85)
     at 3: Tenant OF "Alice" does Pay OF …, …, … at 3; Tenant OF "Carol" MUST (member 3 of 3) — not this party's event; passed over
     at 3: Landlord OF "Ms Ng" does something at 9; Tenant OF "Carol" MUST (member 3 of 3) — deadline 7 passed without the act; on to the fallback (member 3 of 3: their own next step begins)
     at —: BREACH declared by Tenant OF "Carol"
-    at —: both parts together: breached by Tenant OF "Bob" (decided by the first part, by the tie-break rule)
-    at —: both parts together: breached by Landlord OF "Ms Ng" (decided by the first part, by the tie-break rule)
+    at —: both parts together: breached by Tenant OF "Bob" (decided by the first part, by the tie-break rule); names, in order: Tenant OF …, Tenant OF …
+    at —: both parts together: breached by Landlord OF "Ms Ng" (decided by the first part, by the tie-break rule); names, in order: Landlord OF … (MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount), due 8), Tenant OF …, Tenant OF …
 
 receipts — after 2 events, the clock stands at 8 (the #TRACE on line 91)
     PARTY alice DOES Pay OF alice, theLandlord, 100 AT 3
     PARTY theLandlord DOES Receipt OF theLandlord, alice, 100 AT 8
-  Standing: BREACHED — Tenant OF "Bob" is in breach.
+  Standing: BREACHED — Tenant OF "Bob" is in breach; the breach names, in order: Tenant OF "Bob", Tenant OF "Carol".
 
   Steps, in order:
     at 3: Tenant OF "Alice" does Pay OF …, …, … at 3; Tenant OF "Alice" MUST (member 1 of 3) — done; on to what follows (member 1 of 3: their own next step begins)
@@ -185,8 +176,8 @@ receipts — after 2 events, the clock stands at 8 (the #TRACE on line 91)
     at 3: Tenant OF "Alice" does Pay OF …, …, … at 3; Tenant OF "Carol" MUST (member 3 of 3) — not this party's event; passed over
     at 3: Landlord OF "Ms Ng" does Receipt OF …, …, … at 8; Tenant OF "Carol" MUST (member 3 of 3) — deadline 7 passed without the act; on to the fallback (member 3 of 3: their own next step begins)
     at —: BREACH declared by Tenant OF "Carol"
-    at —: both parts together: breached by Tenant OF "Bob" (decided by the first part, by the tie-break rule)
-    at —: both parts together: breached by Tenant OF "Bob" (decided by the second part)
+    at —: both parts together: breached by Tenant OF "Bob" (decided by the first part, by the tie-break rule); names, in order: Tenant OF …, Tenant OF …
+    at —: both parts together: breached by Tenant OF "Bob" (decided by the second part); names, in order: Tenant OF …, Tenant OF …
 
 receipts — after 6 events, the clock stands at 6 (the #TRACE on line 96)
     PARTY alice DOES Pay OF alice, theLandlord, 100 AT 1

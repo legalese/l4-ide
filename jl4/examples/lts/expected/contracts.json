@@ -466,7 +466,8 @@
         "norm": {
           "activation": 1,
           "modal": "MUST",
-          "party": null
+          "party": null,
+          "partyAsWritten": "B"
         },
         "outcome": {
           "what": "waiting"
