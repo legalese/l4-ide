@@ -36,20 +36,73 @@ Pass `--browser=chromium` to use Playwright's own build instead, after
 `SimulationSupport` test helper, and exposes `window.harness`. `run.mjs` opens
 `index.html` from `file://`, and for each fixture plays:
 
-| scenario    | steps                                                                                                                                                                                                                          | screenshot                       |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
-| `started`   | switch simulation on; put a pause point on every activity (so a token stops where the obligation is instead of running through, see below); fire the start event; wait 1.5 s; then wait a further 3 s and read the state again | `out/<fixture>.png`              |
-| `breach`    | fresh start; continue activities until the simulator offers a boundary-event trigger; fire it. If an exclusive gateway is in the way, its arms are tried in document order until one reaches a boundary                        | `out/<fixture>.breach.png`       |
-| `happy[-k]` | fresh start; keep firing "continue" on every waiting activity until nothing waits or 12 steps; one run per arm `k` of the first exclusive gateway (the simulator's own default is arm 0)                                       | `out/<fixture>.happy[-armk].png` |
+| scenario    | steps                                                                                                                                                                                                                                                                                                                 | screenshot                       |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| `started`   | switch simulation on; put a pause point on every task (so a token stops where the obligation is instead of running through, see below); fire `Start_0`; wait 1.5 s; then wait a further 3 s and read the state again                                                                                                  | `out/<fixture>.png`              |
+| `breach`    | fresh start; continue tasks until the simulator offers an **interrupting** boundary-event trigger — a deadline or condition on the act itself, never the fork shape's escalation relay (see below); fire it. If an exclusive gateway is in the way, its arms are tried in document order until one reaches a boundary | `out/<fixture>.breach.png`       |
+| `happy[-k]` | fresh start; keep firing "continue" on every waiting task until nothing waits or 12 steps; one run per arm `k` of the first exclusive gateway (the simulator's own default is arm 0)                                                                                                                                  | `out/<fixture>.happy[-armk].png` |
 
 Everything the simulator reports is written to `out/<fixture>.json`: the
 element census bpmn-js imported (for a multi-instance activity, whether it
 carries a `loopCardinality`, a `loopDataInputRef` or a `completionCondition`,
-the last as its text), import warnings, the elements the simulator
+the last as its text; for every node, the `subProcess` it is drawn inside, or
+`null` at the top level), import warnings, the elements the simulator
 flags unsupported, the live scopes (token positions and their subscriptions),
 the trigger pads offered, the history, the end events reached and the text of
 the simulator's own log panel. `out/run-meta.json` records the run's
 provenance — see **Provenance** below.
+
+**The fork shape.** A FORK rule (`EVERY … UPON EACH`; `tenancy-fork`,
+`tenancy-fork-beside-party`, `modals-*-fork`) is emitted as a multi-instance
+`<bpmn:subProcess>` (`Scope_<n>`): the member's act, its deadline and its
+continuation sit inside the box, which ends at `EndScope_<n>` (this member is
+done) or throws an escalation at `EscScope_<n>` (this member breached); a
+non-interrupting escalation boundary on the box (`BoundaryEsc_<n>`) relays
+that to a top-level `EndBreach_<n>`, and the box itself flows to `EndGroup_<n>`
+("every run has ended"). Four things in the harness follow from that, each
+measured on `tenancy-fork.bpmn` (2026-09-19):
+
+- **End events are found by type**, not by an `End_` prefix: every
+  `bpmn:EndEvent` in the census counts, and two further fields say where each
+  sits — `endEventsReachedTopLevel` and `endEventsReachedInside` (keyed by the
+  enclosing box) — so "the group ended" (`EndGroup_0`, top level) reads apart
+  from "one member's scope ended" (`EndScope_0` inside `Scope_0`).
+  `endEventsReached` keeps its old shape (every end, a sorted multiset).
+- **No pause point on the box.** The simulator would honour one, but then the
+  token parks on the box ("each Tenant started"), the only trigger offered is
+  the box itself and the task inside is not yet enterable — a state that says
+  nothing about the rule. Left un-paused, the token runs into the box and
+  stops on `Task_0` with the member's timer (`Boundary_0`) and the box's
+  escalation catcher (`BoundaryEsc_0`) both subscribed, the same picture the
+  barrier fixtures give; the box's own pad then only ever offers "Add pause
+  point". So the happy path continues the tasks inside, and the tasks
+  continued are exactly the elements paused (`pausePoints`), one list.
+- **The breach scenario fires an interrupting boundary only.** From the
+  moment the box is entered the simulator offers `BoundaryEsc_0` as a trigger,
+  and firing it cold runs `Scope_0 → BoundaryEsc_0 → EndBreach_0` with
+  `Task_0` never entered and the box still live — a breach with no cause. Every
+  `Boundary_n` in the corpus is `cancelActivity="true"`; the relay is the only
+  non-interrupting one, and it is exercised anyway, by the escalation the
+  member's own deadline throws (`breach.history` on `tenancy-fork`:
+  `Task_0, Boundary_0, …, EscScope_0, BoundaryEsc_0, …, EndBreach_0, EndGroup_0`).
+- **Sub-process scopes are token holders** and stay in `tokensOn`
+  (`["Scope_0", "Task_0"]` at `started`); `instances` counts the live scopes
+  per box (`{"Scope_0": 1}`), and `snapshot.scopes[].parentElement` names the
+  element each scope's parent sits on.
+
+**What the simulator cannot show about a fork.** `bpmn-js-token-simulation`
+0.40.0 has no multi-instance behaviour at all (`grep -ri multiinstance lib/`
+finds nothing; `SubProcessBehavior` starts the box's start event once), so the
+box runs as **one** instance: `instances` is `1` for every fork fixture, the
+happy path is one member's path, and `EndGroup_n` fires the moment that one
+instance ends — on the breach path too, where `EndBreach_0` and `EndGroup_0`
+arrive together. The n-member picture the rule describes — other members still
+bound after one breaches, the group ending only when the last does — is not one
+this tool can draw. That is a result about the tool, recorded in the JSON, and
+the report reads it as such. `Start_0` is the top-level start in all sixteen
+fixtures (the fork ones also carry a `StartScope_n` inside the box, which the
+simulator signals itself); `run.mjs` checks this at load and fails loudly if a
+fixture's start moved.
 
 **Why pause points.** In this simulator an activity does not wait by itself —
 `ActivityBehavior.enter` exits immediately unless a pause point is set
@@ -69,12 +122,15 @@ each in the code with a comment saying so:
 - **Sorted** — every array that reports _which_ element ids, not in what order,
   which the simulator hands back in arrival order (for concurrent tokens, in
   timing order): `tokensOn`, `triggers`, `boundarySubscriptions`,
-  `endEventsReached` (in `started`, `started.afterWaiting3s`, `breach` and
-  every `happy[k]`), and `steps[].tokensOn`. Sorted with JavaScript's default
-  string sort. All but one are sets; `endEventsReached` is a **multiset** — one
-  entry per token that exited an end event, so two tokens reaching `End_3`
-  list it twice (`handover`, `offering`), and the report reads that count.
-  The order those exits fired in is in `history`.
+  `endEventsReached`, `endEventsReachedTopLevel` and each list in
+  `endEventsReachedInside` (in `started`, `started.afterWaiting3s`, `breach`
+  and every `happy[k]`), and `steps[].tokensOn`. Sorted with JavaScript's
+  default string sort; the objects keyed by element id (`instances`,
+  `endEventsReachedInside`) have their keys sorted the same way. All but the
+  end-event lists are sets; `endEventsReached` and its two placed variants are
+  **multisets** — one entry per token that exited an end event, so two tokens
+  reaching `End_3` list it twice (`handover`, `offering`), and the report reads
+  that count. The order those exits fired in is in `history`.
 - **Left in fired order**, because the order is the meaning: `history` (the
   simulator's own path, `SimulationSupport.getHistory`), `continued`,
   `continuedFirst` and `steps[].continued`. Also untouched: `elements`,
@@ -123,7 +179,10 @@ macOS): the full fourteen twice in a row, `diff -r` of the fourteen JSONs
 **empty**; `run-meta.json` differs in its fifteen `runAt` lines and nothing
 else; **46 of 46 screenshots byte-identical**. Before the seeded palette, the
 same test had the JSONs empty and 0 of 46 screenshots identical, every
-difference inside the scope-coloured badges. **What is claimed and what is
+difference inside the scope-coloured badges. After the fork shape landed
+(sixteen fixtures), the same test over the five fork fixtures plus
+`handover`, `offering`, `regcf-reporting` and `consultation`, twice: nine JSONs
+identical, 29 of 29 screenshots byte-identical. **What is claimed and what is
 not:** the JSONs are deterministic by construction. The screenshots were
 byte-identical on one machine; they are rendered by the machine's Chrome and
 its fonts, and no claim is made that another machine, Chrome or OS produces

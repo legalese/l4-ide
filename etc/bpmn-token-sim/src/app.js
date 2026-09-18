@@ -164,10 +164,23 @@ function describeElement(element) {
       : null,
     cancelActivity: b.cancelActivity === undefined ? null : !!b.cancelActivity,
     attachedTo: b.attachedToRef ? b.attachedToRef.id : null,
+    // The sub-process this node is drawn inside, or null at the top level.
+    // bpmn-js parents a node to its enclosing shape — the sub-process box, or
+    // the participant/process for a top-level node (lanes are not parents) —
+    // so this is the static answer to "is this end event the group's or one
+    // member's", read from the diagram rather than from a run.
+    subProcess:
+      element.parent && isSubProcess(bo(element.parent).$type)
+        ? element.parent.id
+        : null,
     gatewayDirection: b.gatewayDirection || null,
     outgoing: (element.outgoing || []).map((f) => f.id),
     incoming: (element.incoming || []).map((f) => f.id),
   };
+}
+
+function isSubProcess(type) {
+  return /^bpmn:(SubProcess|AdHocSubProcess|Transaction)$/.test(type);
 }
 
 function isFlowNode(element) {
@@ -191,6 +204,11 @@ function snapshot() {
       element: s.element.id,
       elementType: bo(s.element).$type,
       parent: s.parent ? s.parent.id : null,
+      // The element the parent scope sits on (a sub-process box, or the
+      // participant/process), so a reader of the snapshot can group live
+      // scopes by the box they are instances of. `parent` above is a scope id
+      // and is never written out; this one is an element id and is.
+      parentElement: s.parent ? s.parent.element.id : null,
       completed: !!s.completed,
       failed: !!s.failed,
       running: !!s.running,
@@ -292,9 +310,19 @@ window.harness = {
     return { unsupported: unsupported() };
   },
 
-  // Put a pause point on every activity so a token that reaches one stops
-  // there instead of running through. Without this, ActivityBehavior.enter
-  // exits immediately (lib/simulator/behaviors/ActivityBehavior.js).
+  // Put a pause point on every task so a token that reaches one stops there
+  // instead of running through. Without this, ActivityBehavior.enter exits
+  // immediately (lib/simulator/behaviors/ActivityBehavior.js).
+  //
+  // Not on a sub-process. The simulator would honour one (SubProcessBehavior
+  // .enter checks waitAtElement first), but measured on tenancy-fork.bpmn it
+  // parks the token on the box — "each Tenant started", the only trigger
+  // offered is the box itself and the member's task inside is not yet
+  // enterable — which is a state that says nothing about the rule: the
+  // obligation, and the deadline the reader is meant to see, sit on the task
+  // inside. Left un-paused, the token runs into the box and stops on that
+  // task, with the member's timer and the box's escalation catcher both
+  // subscribed, which is the same picture the barrier fixtures give.
   pauseAtActivities() {
     const simulator = get("simulator");
     const registry = get("elementRegistry");
@@ -302,7 +330,7 @@ window.harness = {
     registry.forEach((el) => {
       const t = bo(el).$type;
       if (
-        /^bpmn:(Task|UserTask|BusinessRuleTask|ManualTask|ServiceTask|ScriptTask|CallActivity|SubProcess)$/.test(
+        /^bpmn:(Task|UserTask|BusinessRuleTask|ManualTask|ServiceTask|ScriptTask|CallActivity)$/.test(
           t,
         ) &&
         !el.labelTarget
