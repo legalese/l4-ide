@@ -196,11 +196,17 @@ and 0 of 46 screenshots identical, every difference inside the scope-coloured
 badges. After the fork shape landed (sixteen fixtures), the same test over the
 five fork fixtures plus `handover`, `offering`, `regcf-reporting` and
 `consultation`, twice: nine JSONs identical, 29 of 29 screenshots
-byte-identical. Then **run 4, the committed `out/`** (2026-09-18 23:23 UTC,
-harness `9cd110c5d`): all sixteen twice, back to back — `diff -r -x '*.png'`
-names one file, `run-meta.json`, in 17 hunks, every one a `runAt` line (the
-top-level one and the sixteen `perFixture` entries); no fixture JSON differs;
-`cmp` on every PNG pair, **52 of 52 byte-identical**. **What is claimed and
+byte-identical. Then **run 4** (2026-09-18 23:23 UTC, harness `9cd110c5d`):
+all sixteen twice, back to back — `diff -r -x '*.png'` names one file,
+`run-meta.json`, in 17 hunks, every one a `runAt` line (the top-level one and
+the sixteen `perFixture` entries); no fixture JSON differs; `cmp` on every
+PNG pair, **52 of 52 byte-identical**. Then **run 5, the committed `out/`**
+(2026-09-19 00:12 UTC, harness `299614dc4`, which changed comments and the
+`harnessCommit` field's meaning and nothing the simulator sees): the same
+twice-run test, the same result — `run-meta.json` only, 17 `runAt` hunks,
+52 of 52 PNGs identical — and against run 4 every fixture JSON and every PNG
+is byte-identical, `run-meta.json` moving in `runAt` and `harnessCommit`
+alone. **What is claimed and
 what is not:** the JSONs are deterministic by construction. The screenshots were
 byte-identical on one machine; they are rendered by the machine's Chrome and
 its fonts, and no claim is made that another machine, Chrome or OS produces
