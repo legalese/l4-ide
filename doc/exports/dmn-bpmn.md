@@ -101,36 +101,99 @@ the report says so with a blocking `P-DEADLINE` that names the anchor. An anchor
 an `AFTER` is not re-anchored by it, and the `P-WINDOW-OPENING` note on the task says which shape of
 closing edge it met (see [AFTER](../reference/regulative/AFTER.md#what-the-exports-do-with-it)).
 
-A rule written for a group — [`EVERY`](../reference/regulative/EVERY.md) — becomes **one task
-marked multi-instance** (the three parallel bars, in most modelers), not one task per member: who
-is in the group is only known when the rule runs, so the file says "many, in parallel" and
-declines to say how many. Three notes go with it, and the last two are the ones to read:
+A rule written for a group — [`EVERY`](../reference/regulative/EVERY.md) — is drawn as a
+**multi-instance** activity: one run per member of the group, all live at once, which most modelers
+show as three small parallel bars. Who is in the group is only known when the rule runs, so the file
+says "many, in parallel" and never says how many.
 
-- `P-CAST` (advisory): the activity carries no cardinality and no collection. An engine cannot run
-  it until you supply one; the note names the list the L4 draws the group from.
-- `P-FORK` (lossy): the rule's join line is `UPON EACH`, so what follows fires **once per member**
-  in L4 — and once, after all of them, in the diagram. BPMN can only say once-per-member with a
-  subprocess this export does not draw. A `MUST` whose join line is `ONCE ALL HAVE` gets no such
-  note, because "once, after all of them" is exactly what it means. A `SHANT` gets
-  `P-PROHIBITION-FIRST` instead: its activity completes on the _first_ member's act, since one
-  act is the breach. A `MAY`'s timer routes to the fulfilled end, not into what follows — a
-  resolution that did not pass creates no duty to publish it, and under `UPON EACH` what follows
-  arises only from a member's act (measured 2026-09-16,
-  `jl4/examples/ok/every/run-modals.l4` §7: nobody approves, the chair publishes late, and the
-  run is `FULFILLED`). That holds for a single `PARTY … MAY` as well as under either join: a
-  permission with a `WITHIN` gets an ordinary boundary timer whose arm ends the rule fulfilled.
-  (Before 2026-09-17 the single-party case had no such arm in the state graph, and this exporter
-  synthesised one and sent it wherever `HENCE` went — which drew a duty on somebody else arising
-  from a permission nobody exercised. `jl4/examples/bpmn/option.l4` is the witness.)
-- `P-FORK-CANCEL` (lossy): the timer on a fork's activity cancels every member at once, so a
-  follow-on that a member had already earned is not drawn as arising at all. This is the fork's
-  largest loss, and the note is written as "the diagram says…; the rule says…" because you have
-  to disbelieve the drawing here, not fill it in.
+**Which activity is multi-instance depends on the join line, and the two are different diagrams.**
+
+- `ONCE ALL HAVE` — a **barrier** — marks the _task_. A multi-instance task takes its outgoing flow
+  once, after the last instance finishes, which is exactly what the barrier means. Everything after
+  the task is drawn once, for the group, because that is what the rule says.
+- `UPON EACH` — a **fork** — draws a **sub-process**: a box around the member's act, its deadline,
+  and everything that follows it, with the multi-instance marker on the box. Each member gets their
+  own copy of the whole thing. That is what makes "once per member" drawable at all; marked on a
+  task, the continuation sits outside and can only fire once.
+
+An empty group is worth knowing about, because the two answers differ and both are right. A
+multi-instance activity over an empty list finishes immediately and its outgoing flow **is** taken.
+For a barrier that is correct — "all zero of them have acted" is vacuously true, so what follows
+happens. For a fork the continuation is inside the box, so with nobody in the group nothing runs,
+and the rule simply ends. Before this export drew the sub-process, a fork with an empty group drew
+an obligation that nobody owed.
+
+**The group's list.** The activity loops over a process variable the file declares and names
+`<rule>_<member>_cast`. An engine or a modeler has to put the actual members in it before the diagram can
+run, and the `P-CAST` note says so. Read that note before you fill it in: **the list the rule draws
+from is not the group.** `EVERY Tenant t IN everyone` means "every tenant among `everyone`", so if
+`everyone` also holds the landlord, seeding the variable with `everyone` starts one run too many —
+a run for somebody the rule does not bind. The variable is named for the rule rather than for the
+list precisely so that it does not invite that.
+
+The notes that go with a quantified rule:
+
+- `P-CAST` (advisory): the file cannot say how many members there are, only that there are many.
+  The note names the list the L4 draws from, and what narrows it — the group word, the `WHO`
+  condition, or both.
+- `P-FORK-JOIN` (lossy): a sub-process finishes when every member's run has finished, and only then
+  is its outgoing flow taken. The rule has no such moment — under `UPON EACH` each member runs
+  independently and the group never regroups. It makes no difference while each member's
+  continuation ends inside their own copy, which is what this export draws; it starts to matter if
+  a fork's continuation ever feeds flow shared with something outside the box.
+- `P-FORK-LANES` (advisory): the parties inside the box are not drawn as lane bands, because a lane
+  can only name the elements of the diagram it sits in and these are one level down. Each element
+  inside still names its party in its own documentation.
 - `P-JOIN-DEADLINE` (lossy): the join line had a `WITHIN` of its own beside the act's, and only the
   act's is drawn as a timer.
+- `P-PROHIBITION-FIRST` (advisory): a `SHANT` **barrier** completes on the **first** member's act,
+  since one act is the breach. Without that, "completes when every director has sublet" would
+  exonerate the first one. It is not filed on a `SHANT` fork, whose activity is the box and which
+  carries no such condition — each member offends severally, and completing the box on the first
+  act would cancel the rest.
+- `P-PROHIBITION-EMPTY` (lossy): the same condition inverts on an **empty** group. A multi-instance
+  activity over an empty list completes at once, and for a prohibition that completion is the
+  breach arm — so the diagram ends breached with nobody having done anything, where the rule says
+  an empty group is fulfilled because nobody is bound. Reachable rather than theoretical: jBPM runs
+  the file that way if you supply no list.
 
-Until 2026-09-15 the export could not tell the two join lines apart at all, and said nothing
-about it. If you have a `.bpmn` of a quantified rule from before that date, re-export it.
+**A breach by one member does not end the others**, and getting that right takes two things, not
+one. Inside the box a breach is an _escalation_ thrown out to a non-interrupting event on the
+boundary, because BPMN's error events always interrupt and an error thrown inside one member's run
+would cancel every other member's. And the end event that escalation reaches is a **plain** end,
+not an error end — for the same reason one step further out. An error end event does not consume
+one token and leave the rest running: it ends every active thread in the process, which includes
+the members still going. So a breach that had correctly escaped one instance without interrupting
+its siblings would have killed them one flow later, and a duty another member had already earned
+would have vanished from the diagram. What the boundary cannot tell you is _which_ member
+breached; it says only that one did.
+
+The cost of that plain end is declared as `P-FORK-BREACH-UNMARKED` (advisory): the end is still
+named Breach and is still reached only by a member's breach, but it no longer carries the
+machine-readable error marking a single-party rule's breach does.
+
+**The rule's own verdict is not drawn, and that is deliberate** (`P-FORK-VERDICT`, lossy). Each
+member's run ends inside the box, at that member's own Fulfilled or Breach, and the rule is
+fulfilled only if every member's is. BPMN can take the box's outgoing flow when every instance has
+ended — which is what the file draws, and why that end event is named "every run has ended" rather
+than "Fulfilled" — but it cannot make that terminal depend on _how_ they ended without a variable
+this export does not invent. Declining to draw an aggregation it cannot compute is the same choice
+made for `loopCardinality` and for an unprovable gateway.
+
+**A permission's timer ends the rule fulfilled**, rather than leading into what follows: a
+resolution that did not pass creates no duty to publish it, and under `UPON EACH` what follows
+arises only from a member's act (measured 2026-09-16, `jl4/examples/ok/every/run-modals.l4` §7 —
+nobody approves, the chair publishes late, and the run is `FULFILLED`). The same holds for a plain
+`PARTY … MAY`: a permission with a `WITHIN` gets an ordinary boundary timer whose arm ends the rule
+fulfilled. (Before 2026-09-17 the single-party case had no such arm in the state graph, and this
+exporter synthesised one and sent it wherever `HENCE` went — which drew a duty on somebody else
+arising from a permission nobody exercised. `jl4/examples/bpmn/option.l4` is the witness.)
+
+Until 2026-09-15 the export could not tell the two join lines apart at all, and said nothing about
+it; until 2026-09-19 it drew a fork as a marked task, reporting the difference as `P-FORK` and
+`P-FORK-CANCEL` rather than drawing it. **If you have a `.bpmn` of a quantified rule from before
+those dates, re-export it** — the newer file is a different diagram, not a relabelled one, and it
+is the one an engine will accept.
 
 A rule that hands over to another rule by name — ``HENCE `the receipt` `` — is drawn through into
 that rule since 2026-09-16 (before, the flow stopped at a dangling end, and the report said

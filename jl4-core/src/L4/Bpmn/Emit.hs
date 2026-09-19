@@ -20,6 +20,7 @@ module L4.Bpmn.Emit
   ) where
 
 import Base
+import qualified Base.Set as Set
 import qualified Base.Text as Text
 
 import L4.Bpmn.IR
@@ -31,6 +32,8 @@ renderBpmn bx =
     ["<?xml version=\"1.0\" encoding=\"UTF-8\"?>"]
       <> definitionsOpen bx
       <> errorDecl bx
+      <> escalationDecl bx
+      <> itemDefinitionLines bx.bxProcess
       <> collaborationLines bx
       <> processLines bx
       <> diagramLines bx
@@ -42,6 +45,11 @@ renderBpmn bx =
 
 sharedErrorId :: Text
 sharedErrorId = "Error_breach"
+
+-- | The shared @\<escalation\>@ a 'EscalationEnd' throws and a 'CatchEscalation'
+-- boundary catches. One per file, for the same reason as 'sharedErrorId'.
+sharedEscalationId :: Text
+sharedEscalationId = "Escalation_breach"
 
 definitionsOpen :: BpmnExport -> [Text]
 definitionsOpen bx =
@@ -66,6 +74,22 @@ errorDecl bx
           1
           "bpmn:error"
           [("id", sharedErrorId), ("name", "Breach"), ("errorCode", "BREACH")]
+      ]
+  | otherwise = []
+
+-- | One shared @\<escalation\>@ for every breach raised from inside a
+-- multi-instance instance. A throw whose @escalationRef@ resolves to nothing is
+-- malformed, so this is declared whenever one is emitted and never otherwise.
+escalationDecl :: BpmnExport -> [Text]
+escalationDecl bx
+  | bx.bxHasEscalation =
+      [ selfClose
+          1
+          "bpmn:escalation"
+          [ ("id", sharedEscalationId)
+          , ("name", "Breach")
+          , ("escalationCode", "BREACH")
+          ]
       ]
   | otherwise = []
 
@@ -98,9 +122,10 @@ processLines bx =
       , ("isExecutable", "false")
       ]
   ]
+    <> propertyLines p
     <> laneSetLines p
-    <> concatMap (nodeLines 2) p.procNodes
-    <> concatMap (flowLines 2) p.procFlows
+    <> concatMap (nodeLines p 2) [n | n <- p.procNodes, isNothing n.nodeParent]
+    <> concatMap (flowLines 2) (topLevelFlows p)
     <> [closeTag 1 "bpmn:process"]
  where
   p = bx.bxProcess
@@ -118,32 +143,82 @@ laneSetLines p
       <> [textEl 4 "bpmn:flowNodeRef" [] nid | nid <- lane.laneNodes]
       <> [closeTag 3 "bpmn:lane"]
 
-nodeLines :: Int -> FlowNode -> [Text]
-nodeLines depth node = case node.nodeKind of
-  StartEvent -> element "bpmn:startEvent" [] []
-  EndEvent isError ->
-    element
-      "bpmn:endEvent"
-      []
-      [ selfClose
-          (depth + 1)
-          "bpmn:errorEventDefinition"
-          [("id", "ErrorDef_" <> node.nodeId), ("errorRef", sharedErrorId)]
-      | isError
+-- | The nodes drawn inside a 'MultiInstanceScope'.
+childrenOf :: BpmnProcess -> Text -> [FlowNode]
+childrenOf p sid = [n | n <- p.procNodes, n.nodeParent == Just sid]
+
+-- | The sequence flows drawn inside a scope: both endpoints among its children.
+--
+-- Both, not either. A flow with exactly one endpoint inside would be a flow
+-- crossing the scope\'s border, which BPMN has no way to draw — the scope
+-- connects to the rest of the process by its OWN id, and its interior connects
+-- to its own start and end events. So \"both\" is not a conservative choice
+-- here; it is the only well-formed one, and a flow that fails it belongs to
+-- neither list and would silently vanish. 'topLevelFlows' is written as the
+-- complement for exactly that reason: every flow is emitted exactly once.
+flowsInside :: BpmnProcess -> Text -> [SequenceFlow]
+flowsInside p sid = [f | f <- p.procFlows, inside f.flowFrom, inside f.flowTo]
+ where
+  ids = Set.fromList [n.nodeId | n <- childrenOf p sid]
+  inside x = Set.member x ids
+
+-- | Every flow that is not inside some scope. The complement of 'flowsInside'
+-- over all scopes, so that the two partitions of 'procFlows' cover it.
+topLevelFlows :: BpmnProcess -> [SequenceFlow]
+topLevelFlows p = [f | f <- p.procFlows, not (Set.member f.flowId nested)]
+ where
+  nested =
+    Set.fromList
+      [ f.flowId
+      | n <- p.procNodes
+      , MultiInstanceScope <- [n.nodeKind]
+      , f <- flowsInside p n.nodeId
       ]
-  Task -> element "bpmn:task" [] (multiInstanceLines (depth + 1) node)
+
+nodeLines :: BpmnProcess -> Int -> FlowNode -> [Text]
+nodeLines p depth node = case node.nodeKind of
+  StartEvent -> element "bpmn:startEvent" [] []
+  EndEvent endKind ->
+    element "bpmn:endEvent" [] $ case endKind of
+      PlainEnd -> []
+      ErrorEnd ->
+        [ selfClose
+            (depth + 1)
+            "bpmn:errorEventDefinition"
+            [("id", "ErrorDef_" <> node.nodeId), ("errorRef", sharedErrorId)]
+        ]
+      EscalationEnd ->
+        [ selfClose
+            (depth + 1)
+            "bpmn:escalationEventDefinition"
+            [("id", "EscDef_" <> node.nodeId), ("escalationRef", sharedEscalationId)]
+        ]
+  Task -> element "bpmn:task" [] (activityDataLines (depth + 1) node)
   Gateway kind flow ->
     element (gatewayTag kind) [("gatewayDirection", flowDirection flow)] []
   Boundary host trigger ->
     element
       "bpmn:boundaryEvent"
-      [("attachedToRef", host), ("cancelActivity", "true")]
+      [ ("attachedToRef", host)
+      , ("cancelActivity", if boundaryInterrupts trigger then "true" else "false")
+      ]
       (triggerLines (depth + 1) node.nodeId trigger)
   BusinessRule call ->
     element
       "bpmn:businessRuleTask"
       [("implementation", droolsDmnLanguage)]
       (dmnCallLines (depth + 1) node.nodeId call)
+  MultiInstanceScope ->
+    -- XSD order for @tSubProcess@: @tActivity@\'s particles (ending in the loop
+    -- characteristics) come before the ones @tSubProcess@ itself adds (the
+    -- flow elements), because an extension\'s content follows its base\'s.
+    element
+      "bpmn:subProcess"
+      [("triggeredByEvent", "false")]
+      ( activityDataLines (depth + 1) node
+          <> concatMap (nodeLines p (depth + 1)) (childrenOf p node.nodeId)
+          <> concatMap (flowLines (depth + 1)) (flowsInside p node.nodeId)
+      )
  where
   element tag extra children =
     let as = [("id", node.nodeId)] <> nameAttr <> extra
@@ -153,26 +228,167 @@ nodeLines depth node = case node.nodeKind of
           else [openTag depth tag as] <> body <> [closeTag depth tag]
   nameAttr = [("name", node.nodeName) | not (Text.null node.nodeName)]
 
--- | The loop characteristics of an @EVERY@'s task — see 'MultiInstance' for
--- why it carries neither a cardinality nor a collection. Emitted after the
--- @\<documentation\>@, which is the order the schema gives an activity's
--- children.
-multiInstanceLines :: Int -> FlowNode -> [Text]
-multiInstanceLines depth node = case node.nodeMultiInstance of
-  Nothing -> []
-  Just CompleteWhenAll ->
-    [selfClose depth "bpmn:multiInstanceLoopCharacteristics" attrs]
-  Just CompleteOnFirst ->
-    [ openTag depth "bpmn:multiInstanceLoopCharacteristics" attrs
-    , textEl
+-- | The collection a multi-instance activity loops over, as the three things
+-- BPMN needs to resolve it.
+--
+-- __@loopDataInputRef@ is an IDREF, not a name.__ Emitting the variable name
+-- into it directly reads correctly and does not resolve: bpmn-moddle answers
+-- @unresolved reference@, because the element it points at has to exist. So an
+-- activity with a collection declares:
+--
+-- * an @\<ioSpecification\>@ with a @\<dataInput\>@ the loop can point at;
+-- * a @\<dataInputAssociation\>@ joining that input to the process-level
+--   property ('propertyLines'), which is where the list actually lives.
+--
+-- The property is what an engine or a modeller binds; the data input is the
+-- activity's own end of the wire. Both carry the same name — @\<rule\>_cast@ —
+-- so a reader sees one variable rather than the plumbing.
+--
+-- @isCollection="true"@ on both says the thing is a list. It is the one claim
+-- here that is about CONTENTS rather than about wiring, and it is safe because
+-- it follows from being an @EVERY@'s cast at all, not from any guess at who is
+-- in it.
+activityDataLines :: Int -> FlowNode -> [Text]
+activityDataLines depth node = case node.nodeLoopCollection of
+  Nothing -> multiInstanceLines depth node
+  Just c ->
+    [ openTag depth "bpmn:ioSpecification" [("id", "IoSpec_" <> node.nodeId)]
+    , selfClose
         (depth + 1)
-        "bpmn:completionCondition"
-        [("xsi:type", "bpmn:tFormalExpression")]
-        "nrOfCompletedInstances >= 1"
-    , closeTag depth "bpmn:multiInstanceLoopCharacteristics"
+        "bpmn:dataInput"
+        [ ("id", dataInputId node)
+        , ("name", c.loopVariable)
+        , ("itemSubjectRef", listItemId c.loopVariable)
+        , ("isCollection", "true")
+        ]
+    , openTag (depth + 1) "bpmn:inputSet" [("id", "InputSet_" <> node.nodeId)]
+    , textEl (depth + 2) "bpmn:dataInputRefs" [] (dataInputId node)
+    , closeTag (depth + 1) "bpmn:inputSet"
+    , selfClose (depth + 1) "bpmn:outputSet" [("id", "OutputSet_" <> node.nodeId)]
+    , closeTag depth "bpmn:ioSpecification"
+    , openTag
+        depth
+        "bpmn:dataInputAssociation"
+        [("id", "DataInputAssoc_" <> node.nodeId)]
+    , textEl (depth + 1) "bpmn:sourceRef" [] c.loopVariable
+    , textEl (depth + 1) "bpmn:targetRef" [] (dataInputId node)
+    , closeTag depth "bpmn:dataInputAssociation"
     ]
+      <> multiInstanceLines depth node
+
+dataInputId :: FlowNode -> Text
+dataInputId node = "DataInput_" <> node.nodeId
+
+-- | The item definitions a collection needs: one for the list, one for a member
+-- of it.
+--
+-- __Neither names an L4 type, and that is deliberate.__ @structureRef@ is a
+-- hint at the runtime representation, and the only two things this exporter
+-- knows are that a roll is a list and that its members are values. Writing the
+-- party type here would be a claim about the target's type system that the
+-- source cannot support — @Tenant@ is a /constructor/ under the value-actor
+-- encoding, not a type, and it is not a Java class in any case.
+itemDefinitionLines :: BpmnProcess -> [Text]
+itemDefinitionLines p =
+  concat
+    [ [ selfClose 1 "bpmn:itemDefinition" [("id", listItemId v), ("structureRef", "java.util.List")]
+      , selfClose 1 "bpmn:itemDefinition" [("id", memberItemId v), ("structureRef", "java.lang.Object")]
+      ]
+    | v <- collectionNames p
+    ]
+
+listItemId, memberItemId :: Text -> Text
+listItemId v = "Item_" <> v
+memberItemId v = "Item_" <> v <> "_member"
+
+-- | One @\<property\>@ per distinct collection: the process variable an engine
+-- is asked to supply.
+--
+-- __Measured, not chosen by taste (2026-09-19).__ The first cut emitted
+-- @\<dataObject\>@ plus @\<dataObjectReference\>@, which is the vanilla BPMN 2.0
+-- spelling and which bpmn-moddle accepts without complaint. jbpm-bpmn2 7.74.1
+-- REJECTS it outright — @\<dataObject\> is after an invalid element@, at parse
+-- time, so nothing in the file is executed. A @\<property\>@ carrying an
+-- @itemSubjectRef@ is accepted by both, and the same shape compiles AND runs a
+-- multi-instance sub-process end to end under jBPM.
+--
+-- It is also the more honest of the two: @loopDataInputRef@ wants a process
+-- VARIABLE, which is what a property is. A data object is a document drawn on
+-- the diagram, and the cast is not one.
+--
+-- A property is declared on the PROCESS even when the only activity that reads
+-- it is inside a sub-process. Declaring it inside the scope would give each
+-- instance its own copy of the list it is supposed to be iterating over.
+--
+-- Deduplicated by name, because two rules in one file can draw from one cast —
+-- and because a repeated @id@ is the kind of malformedness no schema validator
+-- reports.
+--
+-- @tProcess@\'s XSD order puts @property@ BEFORE @laneSet@, which is why this is
+-- emitted where it is rather than beside the flow elements.
+propertyLines :: BpmnProcess -> [Text]
+propertyLines p =
+  [ selfClose
+      2
+      "bpmn:property"
+      [("id", v), ("name", v), ("itemSubjectRef", listItemId v)]
+  | v <- collectionNames p
+  ]
+
+collectionNames :: BpmnProcess -> [Text]
+collectionNames p =
+  Set.toAscList (Set.fromList [c.loopVariable | n <- p.procNodes, Just c <- [n.nodeLoopCollection]])
+
+-- | The loop characteristics of an @EVERY@'s activity — a multi-instance task
+-- or a 'MultiInstanceScope'. Emitted after the @\<documentation\>@, which is the
+-- order the schema gives an activity's children.
+--
+-- Still no @loopCardinality@: L4 fixes the cast only when the rule runs
+-- (EVERY-EACH-QUANTIFIER-SPEC R-T6), so a count would be invented. A
+-- @loopDataInputRef@ is different — it names a variable an engine must supply,
+-- which is a request and not a claim — and is emitted when the rule gives
+-- something to name it after. See 'LoopCollection'.
+multiInstanceLines :: Int -> FlowNode -> [Text]
+multiInstanceLines depth node = case (node.nodeKind, node.nodeMultiInstance) of
+  -- A scope is multi-instance by being one, and always completes when every
+  -- instance does; 'MultiInstance' cannot reach it.
+  (MultiInstanceScope, _) -> wrap []
+  (_, Nothing) -> []
+  (_, Just CompleteWhenAll) -> wrap []
+  (_, Just CompleteOnFirst) ->
+    wrap
+      [ textEl
+          (depth + 1)
+          "bpmn:completionCondition"
+          [("xsi:type", "bpmn:tFormalExpression")]
+          "nrOfCompletedInstances >= 1"
+      ]
  where
   attrs = [("id", "MultiInstance_" <> node.nodeId), ("isSequential", "false")]
+
+  -- @tMultiInstanceLoopCharacteristics@ in XSD order: the data inputs before
+  -- the completion condition.
+  wrap extra
+    | null body = [selfClose depth "bpmn:multiInstanceLoopCharacteristics" attrs]
+    | otherwise =
+        [openTag depth "bpmn:multiInstanceLoopCharacteristics" attrs]
+          <> body
+          <> [closeTag depth "bpmn:multiInstanceLoopCharacteristics"]
+   where
+    body = collectionLines <> extra
+
+  collectionLines = case node.nodeLoopCollection of
+    Nothing -> []
+    Just c ->
+      [ textEl (depth + 1) "bpmn:loopDataInputRef" [] (dataInputId node)
+      , selfClose
+          (depth + 1)
+          "bpmn:inputDataItem"
+          [ ("id", "DataItem_" <> node.nodeId)
+          , ("name", c.loopItem)
+          , ("itemSubjectRef", memberItemId c.loopVariable)
+          ]
+      ]
 
 gatewayTag :: GatewayKind -> Text
 gatewayTag = \case
@@ -197,6 +413,12 @@ triggerLines depth nid = \case
     [ openTag depth "bpmn:conditionalEventDefinition" [("id", "Cond_" <> nid)]
     , textEl (depth + 1) "bpmn:condition" [("xsi:type", "bpmn:tFormalExpression")] cond
     , closeTag depth "bpmn:conditionalEventDefinition"
+    ]
+  CatchEscalation ->
+    [ selfClose
+        depth
+        "bpmn:escalationEventDefinition"
+        [("id", "EscDef_" <> nid), ("escalationRef", sharedEscalationId)]
     ]
 
 -- | How a @\<businessRuleTask\>@ names the decision it calls.
@@ -303,6 +525,12 @@ diagramLines bx =
     PlainShape -> []
     PoolShape -> [("isHorizontal", "true")]
     LaneShape -> [("isHorizontal", "true")]
+    -- A sub-process shape says whether it is drawn as a box containing its
+    -- children or collapsed to a marker. Ours are always drawn open: the
+    -- children are emitted as siblings in this same plane, and with
+    -- @isExpanded="false"@ a renderer would place them and then hide the box
+    -- they belong to.
+    ExpandedShape -> [("isExpanded", "true")]
 
   edgeLines e =
     [openTag 3 "bpmndi:BPMNEdge" [("id", e.edgeId), ("bpmnElement", e.edgeOf)]]

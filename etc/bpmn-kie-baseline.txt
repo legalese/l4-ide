@@ -13,8 +13,6 @@
 # executed; the errors= count is the size of that refusal. It is NOT a
 # liveness defect. See jl4/examples/bpmn/unsound/README.md for which axes
 # are flavor differences and which are real gaps.
-# Per-file classes, re-measured 2026-08-02 after the BPMN->DMN wiring landed
-# (jbpm-bpmn2 7.74.1.Final, JDK 17.0.20); the owning record is
 # specs/todo/lexipedia-superset/PROCESS-TRACK.md 8.1.
 # HAND-MAINTAINED BLOCK: --update rewrites this file without it, so re-add it
 # (against the owning record) after regenerating.
@@ -53,80 +51,119 @@
 #                      that would satisfy jBPM stays an option, not built.
 #   regcf-resale       as regcf-advertising: (b) narrowed to the boundary event,
 #                      (c) new on the wired guard.
+# ADDED 2026-09-15 — two goldens for the quantified obligation (EVERY), one per
+# join, as the witness that a barrier and a fork no longer export
+# byte-identically. Six more for the other modal x join cells followed the same
+# day (jl4/examples/bpmn/modals.l4), and one for a single-party permission on
+# 2026-09-17 (option.l4, clean from the start). All eight EVERY rows were
+# class (d): REJECTED with "ForEach has no variable name" / "has no collection
+# expression", RESULT 4 -> 12.
 #
-# ADDED 2026-09-15 — two goldens for the quantified obligation (EVERY), one
-# per join, as the witness that a barrier and a fork no longer export
-# byte-identically (RESULT 4 -> 6 for that reason and no other; the six
-# earlier rows did not move):
+# CLASS (d) IS CLOSED, 2026-09-19. RESULT 12 -> 4, and every one of the eight
+# EVERY rows is now errors=0 COMPLETED. The previous note here ended "a future
+# data-object emission would close (d)"; this is that, and it is worth saying
+# what it took, because the obvious spelling does not work:
 #
-#   tenancy-barrier    class (d) NEW: REJECTED on the multi-instance activity —
-#   tenancy-fork       "ForEach has no variable name" / "has no collection
-#                      expression". The exporter draws an EVERY as a parallel
-#                      <multiInstanceLoopCharacteristics> with neither a
-#                      loopCardinality nor a loopDataInputRef, because the cast
-#                      is a run-time fact (R-T6) and inventing either would be a
-#                      claim the source does not make; P-CAST says exactly this,
-#                      and names the roll an engine would need. jBPM asking for
-#                      the collection is the gap the note predicts, measured.
-#                      Our own token-play gate (check-bpmn-soundness.mjs) and
-#                      bpmn-moddle both accept both files. Execution is a
-#                      NON-GOAL; a future data-object emission would close (d).
+#   * The exporter now emits a collection for any EVERY with an IN roll — a
+#     <loopDataInputRef> into an <ioSpecification>'s <dataInput>, fed by a
+#     process-level <property> through a <dataInputAssociation>.
+#   * NOT a <dataObject>/<dataObjectReference>, which is the vanilla BPMN 2.0
+#     spelling and which bpmn-moddle accepts silently. jBPM rejects it AT PARSE
+#     TIME — "<dataObject> is after an invalid element" — so nothing in the file
+#     runs. Measured 2026-09-19, both spellings, same file. A <property> with an
+#     itemSubjectRef is accepted by both.
+#   * There is still no loopCardinality, and there should not be: the cast is a
+#     run-time fact (R-T6). P-CAST remains, narrowed to say what to seed the
+#     variable with, and warning that THE ROLL IS NOT THE CAST.
 #
-# ADDED 2026-09-15, later the same day, after the concurrency review — six
-# goldens for the other modal x join cells (jl4/examples/bpmn/modals.l4),
-# RESULT 6 -> 12 for the class-(d) reason above and one other:
+# WHAT "COMPLETED" MEANS ON THESE EIGHT ROWS, AND IT IS LESS THAN IT LOOKS.
+# This harness never seeds the variable, so the collection is empty, the
+# ForEachNode completes at once, and the instance body NEVER RUNS. Census on
+# tenancy-fork.bpmn: StartNode 1x, ForEachNode 1x, EndNode 1x, and nothing else.
+# That is a real and useful result for the FORK rows — it is the empty cast
+# executing correctly on an independent engine, which is the case the flat
+# drawing got silently wrong — but it is not evidence that a member's obligation
+# runs. Do not read it as one.
 #
-#   modals-shant-barrier   class (d), as tenancy-*. (The completionCondition
-#   modals-shant-fork      on a prohibition is not what jBPM objects to; it
-#   modals-must-barrier-   never gets past the missing collection.)
-#     both-deadlines
-#   modals-must-fork-
-#     join-deadline
-#   modals-may-barrier     class (d), as above.
-#   modals-may-fork        class (d), as above — SINCE 2026-09-16. For one day
-#                          it sat on class (a') ("cannot have more than one
-#                          incoming connection"): the fork's lapse timer flowed
-#                          into the chair's task beside the activity's own
-#                          completion. That routing was wrong against the
-#                          runtime (a lapsed member spawns no continuation;
-#                          measured, run-modals.golden), the lapse now lands on
-#                          Fulfilled, Task_1 has one incoming flow, and jBPM
-#                          gets as far as the collection objection like its
-#                          siblings. errors 1 -> 2 on that row for that reason;
-#                          RESULT unchanged at 12.
+# AND IT IS NOT TRUE OF EVERY ROW. modals-shant-barrier.bpmn is errors=0
+# verdict=ABORTED, and the abort is the empty cast running INCORRECTLY: a SHANT
+# barrier completes on the first instance (completionCondition
+# nrOfCompletedInstances >= 1, which is right — one act is the breach), that
+# completion IS the LEST arm, and a multi-instance activity over an empty
+# collection completes at once. So the engine reaches the breach end with nobody
+# having done anything, where L4 says an empty cast is FULFILLED (startBarrier
+# joins at its arming; ok/every/run-roll.l4's 'nobody' and run-in.l4's empty roll
+# both golden FULFILLED).
 #
-# ADDED 2026-09-17 — one golden for a single-party permission whose HENCE is
-# another party's obligation (jl4/examples/bpmn/option.l4). RESULT UNCHANGED at
-# 12: the new row is CLEAN.
+# The DRAWING defect predates this branch. Its REACHABILITY does not: before the
+# collection landed, jBPM refused the file and never executed it. So this branch
+# turned a latent inversion into one an engine demonstrates, which is a reason to
+# declare it rather than leave the row looking like a pass. P-PROHIBITION-EMPTY
+# (lossy) now says it on the activity, and this note exists so that the ABORTED
+# verdict in the table below is not read as "the rule breached".
 #
-#   option             errors=0, COMPLETED — the second file in this corpus to
-#                      compile and run under jBPM without an objection, beside
-#                      consultation. It is here as the witness for the lapse
-#                      arm: L4.StateGraph now draws a bare MAY's expiry as a
-#                      real LEST edge to Fulfilled, so L4.Bpmn.Lower no longer
-#                      synthesises a timer and routes it "wherever HENCE
-#                      lands" — which in this shape is the seller's obligation,
-#                      i.e. the diagram said a buyer who let the option expire
-#                      obliged the seller to transfer anyway. No other row
-#                      moved: handover's four permissions all route to the same
-#                      Fulfilled end event either way, so its errors=4 REJECTED
-#                      stands unchanged (its Lapse_n ids became Boundary_n).
+# The body was measured separately, on a scratchpad copy of the harness patched
+# only at its startProcess line to seed receipts_cast with three members (repo
+# untouched; the technique is in PROCESS-TRACK.md 8.1). Census, tenancy-fork:
+#
+#   1x  each Tenant [ForEachNode]        the scope itself
+#   3x  (unnamed)   [StartNode]          one instance per member
+#   3x  MUST Pay ... [HumanTaskNode]
+#   3x  MUST Receipt ... [HumanTaskNode] <- the continuation, ONCE PER MEMBER
+#   3x  Fulfilled   [EndNode]            each member ends their own instance
+#   1x  Fulfilled   [EndNode]            the group, after the last one
+#
+# Three tenants pay and three receipts are issued. That is UPON EACH, executed.
+# Under the flat drawing this branch replaced, MUST Receipt fired once.
+#
+# OWED, AND NOT A DEFECT IN THE FILE: that seeded run also trips this harness's
+# DUPLICATION rule on all four inner nodes, because the rule is "in an acyclic
+# process, firing twice means a merge passed tokens through where a join should
+# have synchronised". Inside a multi-instance scope, firing once per instance is
+# the POINT. The rule already excludes Join nodes and knows nothing about
+# ForEachNode scopes. It cannot fire in CI, because CI never seeds — which is
+# precisely why it is written down here instead of being left to be rediscovered
+# by whoever next patches a harness to seed one.
+#
+# ALSO FIXED IN THE HARNESS, 2026-09-19: A2 (fanOutEndEvents) appended its clone
+# of a multi-incoming end event to the PROCESS, even when the original lived
+# inside a <subProcess>. The interior flow then pointed outside its own
+# container and jBPM said "Could not find target node for connection", which
+# reads as a defect in the file under test and is not one. The clone now goes
+# beside its original. No golden's verdict depended on this before the fork
+# shape existed, because no file had a multi-incoming end event inside a scope.
+#
+# ADDED 2026-09-19 — tenancy-fork-beside-party.bpmn, a fork beside a PARTY
+# obligation in a RAND, both LEST BREACH. RESULT UNCHANGED at 4: the new row is
+# errors=0 COMPLETED like the other quantified ones.
+#
+# It is here as a WITNESS, not for coverage. A fork's breach end must not be an
+# error end — an error end ends every active thread in the process, so one
+# member's breach would cancel the members who had not breached. The first fix
+# demoted the SHARED breach terminal in place, guarded by "only where the fork
+# is its sole feeder", which holds on every other fixture in expected/ and
+# fails the moment anything else can breach. On this shape the guard did not
+# fire and the file kept 409 markings that could complete only by terminating.
+# The fork now emits its own EndGroup_<n>/EndBreach_<n>, so this file's shared
+# End_3 correctly KEEPS its error end for the landlord's breach (under RAND one
+# operand's breach is the whole contract's) while the fork's is plain.
 
 
 consultation.bpmn                        errors=0 warnings=0 verdict=COMPLETED
 handover.bpmn                            errors=4 warnings=0 verdict=REJECTED
-modals-may-barrier.bpmn                  errors=2 warnings=0 verdict=REJECTED
-modals-may-fork.bpmn                     errors=2 warnings=0 verdict=REJECTED
-modals-must-barrier-both-deadlines.bpmn  errors=2 warnings=0 verdict=REJECTED
-modals-must-fork-join-deadline.bpmn      errors=2 warnings=0 verdict=REJECTED
-modals-shant-barrier.bpmn                errors=2 warnings=0 verdict=REJECTED
-modals-shant-fork.bpmn                   errors=2 warnings=0 verdict=REJECTED
+modals-may-barrier.bpmn                  errors=0 warnings=0 verdict=COMPLETED
+modals-may-fork.bpmn                     errors=0 warnings=0 verdict=COMPLETED
+modals-must-barrier-both-deadlines.bpmn  errors=0 warnings=0 verdict=COMPLETED
+modals-must-fork-join-deadline.bpmn      errors=0 warnings=0 verdict=COMPLETED
+modals-shant-barrier.bpmn                errors=0 warnings=0 verdict=ABORTED
+modals-shant-fork.bpmn                   errors=0 warnings=0 verdict=COMPLETED
 offering.bpmn                            errors=0 warnings=0 verdict=ABORTED
 option.bpmn                              errors=0 warnings=0 verdict=COMPLETED
 regcf-advertising.bpmn                   errors=4 warnings=0 verdict=REJECTED
 regcf-reporting.bpmn                     errors=1 warnings=0 verdict=REJECTED
 regcf-resale.bpmn                        errors=6 warnings=0 verdict=REJECTED
-tenancy-barrier.bpmn                     errors=2 warnings=0 verdict=REJECTED
-tenancy-fork.bpmn                        errors=2 warnings=0 verdict=REJECTED
+tenancy-barrier.bpmn                     errors=0 warnings=0 verdict=COMPLETED
+tenancy-fork-beside-party.bpmn           errors=0 warnings=0 verdict=COMPLETED
+tenancy-fork.bpmn                        errors=0 warnings=0 verdict=COMPLETED
 
-RESULT 12
+RESULT 4

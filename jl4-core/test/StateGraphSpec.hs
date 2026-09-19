@@ -19,6 +19,7 @@ import Test.Hspec
 import Data.Text (Text)
 import qualified Data.Text as Text
 
+import Data.Maybe (isJust)
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
 
 import L4.API.VirtualFS (checkWithImports, emptyVFS)
@@ -246,6 +247,27 @@ noJoinSrc =
   , "    WITHIN 3"
   ]
 
+-- | An @EVERY@ whose cast is narrowed twice over, so that the roll, the cast
+-- word and the filter are three different things in one rule.
+--
+-- Modelled on @jl4\/examples\/ok\/every\/run-fork.l4@, which puts the landlord
+-- in the roll on purpose so the cast word @Tenant@ is doing visible work. Here
+-- the filter narrows again, to one member of a roll of three.
+castAndFilterSrc :: [Text]
+castAndFilterSrc =
+  [ "DECLARE Actor IS ONE OF"
+  , "    Landlord HAS name IS A STRING"
+  , "    Tenant   HAS name IS A STRING"
+  , "everyone MEANS LIST (Tenant OF \"Alice\"), (Tenant OF \"Bob\"), (Landlord OF \"Ms Ng\")"
+  , "GIVETH DEONTIC Actor Action"
+  , "`group` MEANS"
+  , "  EVERY Tenant t IN everyone WHO t EQUALS Tenant OF \"Alice\""
+  , "    MUST pay"
+  , "    WITHIN 3"
+  , "    UPON EACH"
+  , "    HENCE FULFILLED"
+  ]
+
 -- | Two obligations and a @#TRACE@ that discharges both, so the evaluator
 -- logs a step for each. The chain's shape is @DeonticStepSpec@'s first
 -- fixture; what is tested here is the join between that log and this graph.
@@ -435,11 +457,13 @@ spec = do
   describe "the join line of an EVERY" $ do
     it "carries the barrier on the HENCE edge, structurally" $
       quantifiers barrierSrc
-        `shouldBe` Right [Just (MkQuantifier "p" Nothing (Just (MkJoinLabel (Barrier "ALL HAVE") Nothing)))]
+        `shouldBe` Right
+          [Just (MkQuantifier "p" Nothing Nothing Nothing (Just (MkJoinLabel (Barrier "ALL HAVE") Nothing)))]
 
     it "carries the fork on the HENCE edge, structurally" $
       quantifiers forkSrc
-        `shouldBe` Right [Just (MkQuantifier "p" Nothing (Just (MkJoinLabel Fork Nothing)))]
+        `shouldBe` Right
+          [Just (MkQuantifier "p" Nothing Nothing Nothing (Just (MkJoinLabel Fork Nothing)))]
 
     it "gives the barrier and the fork different graphs" $ do
       length (filter id (zipWith (/=) barrierSrc forkSrc)) `shouldBe` 1
@@ -449,7 +473,23 @@ spec = do
       quantifiers linearSrc `shouldBe` Right [Nothing, Nothing]
 
     it "records an EVERY with no continuation as quantified but unjoined" $
-      quantifiers noJoinSrc `shouldBe` Right [Just (MkQuantifier "p" Nothing Nothing)]
+      quantifiers noJoinSrc
+        `shouldBe` Right [Just (MkQuantifier "p" Nothing Nothing Nothing Nothing)]
+
+    it "carries the cast word and the WHO filter, because the roll is not the cast" $
+      -- The three narrowings are three different fields, and a projection that
+      -- reads only the roll would declare an instance per member of a roll of
+      -- three for a rule L4 arms once. Before these fields existed the
+      -- extractor discarded the cast word and the filter, so no consumer could
+      -- tell this rule from `EVERY t IN everyone`, which is a different rule.
+      case quantifiers castAndFilterSrc of
+        Left errs -> expectationFailure (show errs)
+        Right [Just q] -> do
+          q.quantVar    `shouldBe` "t"
+          q.quantCast   `shouldBe` Just "Tenant"
+          q.quantRoll   `shouldBe` Just "everyone"
+          q.quantFilter `shouldSatisfy` isJust
+        Right other -> expectationFailure ("expected one quantified edge, got " <> show other)
 
     it "keeps the join line's WITHIN apart from the act's" $
       theHenceEdge bothDeadlinesSrc \t -> do

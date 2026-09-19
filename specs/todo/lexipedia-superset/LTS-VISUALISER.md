@@ -2332,6 +2332,117 @@ sniffing user-visible strings. P2b's `DeonticStep` has to carry the join, or the
 
 The measurement behind that correction originated on `lts/p2a-remeasure` as `11199a16` (the two `#TRACE`s on `jl4/examples/ok/every/run-modals.l4` §7, goldened in `ok/every/tests/run-modals.golden`, and P2A-TOKEN-SIM-BASELINE.md §3.7) and was folded into legalese/l4-ide#395 as `d544ed22`, which also emits `P-FORK-CANCEL` on the `MAY` fork.
 
+#### LANDED 2026-09-19: the fork is a multi-instance sub-process, and E is no longer isomorphic
+
+The reviewer's finding on E — that a barrier and a fork were "isomorphic automata with different
+labels, not different automata", so nothing reasoning over structure could tell them apart — is
+**now false, deliberately.** The BPMN exporter encloses a fork's obligation, its deadline and its
+whole continuation in a `<subProcess>` carrying the multi-instance marker, where a barrier keeps
+the marker on the task. One copy outside the join versus _n_ copies inside it: the distinction is
+structural in the emitted artifact, which is the first place in this arc that it is.
+
+What that discharges, and what it does not:
+
+- **`P-FORK` and `P-FORK-CANCEL` are discharged.** They now exist only as a refusal: `addForkScope`
+  files `P-FORK`, naming which check failed, when it declines to enclose a continuation it cannot
+  (shared with a path outside the fork, leaving for a third destination, or more than one entry).
+  A fidelity note has to describe the file that was emitted, so they moved out of `quantifierNotes`
+  and into the pass that knows which of the two shapes was drawn.
+- **The empty cast, which none of the earlier notes reached.** `P-FORK`'s wording was an n≥1
+  framing. At n=0 the loss ran the other way: a multi-instance activity over an empty collection
+  completes at once and its outgoing flow IS taken, which is right for a barrier and MANUFACTURED
+  an obligation for a flat fork. With the continuation inside, there is no instance to run it.
+  `etc/check-bpmn-soundness.mjs` plays the emitted goldens at n ∈ {0, 2} and both are SOUND.
+- **New in their place:** `P-FORK-JOIN` (a sub-process regroups at its end and a fork does not —
+  immaterial while each continuation ends inside its own instance, material the moment one feeds
+  shared downstream flow) and `P-FORK-LANES`.
+- **Class (d) in `etc/bpmn-kie-baseline.txt` is closed**, RESULT 12 → 4. The exporter now emits the
+  collection, and jBPM accepts all eight quantified goldens. Two measurements worth keeping: a
+  `<dataObject>` is the vanilla BPMN 2.0 spelling and jBPM refuses to PARSE it (bpmn-moddle accepts
+  it silently), where a process `<property>` is accepted by both; and an unseeded `COMPLETED` on
+  these rows means the empty cast ran, not that a member's obligation did — seeded with three
+  members, `MUST Receipt` fires three times where the flat drawing fired once.
+- **The second half is still gated where it was.** Nothing here touches `barrierFinish`: the
+  residual still does not carry the join line, so `markingOf` still cannot build the join place.
+  P2h's second half remains owed, and remains a runtime change rather than a drawing rule.
+
+**The first cut of this relocated `P-FORK-CANCEL` instead of discharging it, and the review caught
+it.** The escalation left the instance without interrupting its siblings, correctly — and then
+reached the top-level ERROR end, which ends every active thread in the process, including the
+instances still running. A duty another member had already earned vanished one flow later.
+`run-fork.golden` keeps exactly that duty on the matching trace, so the loss was verbatim the old
+note's: "every continuation spawned before the timer fired". Worse, the emitted file asserted the
+opposite in its own `<documentation>` on the boundary — "every other member remains bound" — and
+this spec, `EVERY.md` and the fixture README all said "discharged" in four places.
+
+**The first fix for it was also wrong, and in a more instructive way.** It demoted the two shared
+terminals in place — the breach end losing its `errorEventDefinition`, the fulfilled end losing the
+name `Fulfilled` — guarded by "only where the fork is their sole feeder". That is correct on every
+golden in the corpus, and wrong the moment anything else breaches. Probed deliberately, because the
+guard was the part I distrusted: a `RAND` of a fork beside a `PARTY` obligation, both `LEST BREACH`,
+which is `ok/every/rand.l4`'s shape with one token changed. The guard did not fire and the file kept
+**409** markings that could complete only by terminating. A correctness cliff hidden behind a
+condition that happens to hold everywhere you have looked is worse than the bug it patches, because
+the goldens report it fixed.
+
+So the fork gets **its own** top-level terminals — `EndGroup_<n>` ("every run has ended") and
+`EndBreach_<n>` — and the shared ones are dropped when nothing else feeds them. There is no
+condition left to get wrong. On the probe the fork's contribution goes to zero and 113 remain,
+which are the landlord's own breach terminating under `RAND`. That is pre-existing and **already
+declared** — `offering.fidelity.txt`'s `P-NOJOIN` says a branch reaching BREACH "abandons its
+siblings rather than waiting for them" — but it is a declared LOSS, not a faithful drawing, and the
+difference matters because the first draft of this section called it faithful. L4 does not abandon
+the sibling conjunct: `ok/every/run-blame.l4` §8 is a `RAND` whose left operand breaches at once and
+whose right is still evaluated to its deadline and named separately in the verdict
+(`run-blame.l4:16`: "when both sides are lost, both sides' failures are named, left first"). So the
+113 are real loss, correctly attributed to `P-NOJOIN` and correctly out of scope here. One wording
+gap worth knowing: `P-NOJOIN`'s "siblings" reads as the other `RAND` branches, and nothing in it
+extends to _every instance of a multi-instance scope inside one of them_, which is what it now also
+covers.
+
+Measured, and the numbers separate the defect from the faithful case cleanly — markings that can
+complete ONLY by terminating, at two instances:
+
+| golden                           | before | after |
+| -------------------------------- | ------ | ----- |
+| `tenancy-fork`                   | 121    | 0     |
+| `modals-may-fork`                | 108    | 0     |
+| `modals-shant-fork`              | 78     | 0     |
+| `modals-must-fork-join-deadline` | 78     | 0     |
+| `tenancy-fork-beside-party`      | 409    | 113   |
+| the four barrier goldens         | 1–2    | 1–2   |
+
+A barrier failing as a group and ending everything is `ONCE ALL HAVE`, so 1–2 is right there and
+unchanged.
+
+**The fifth row does not go to zero, and belongs in the table for exactly that reason.** It is the
+`RAND` shape, so its remaining 113 are the landlord's own error end, which is `P-NOJOIN`'s declared
+loss and not this branch's to fix. Listing only the four that reach zero would have read as "every
+fork goes to zero", which is the kind of table that makes a later reader think a regression has
+appeared when they meet the fifth. There are **five** fork-bearing goldens, not four. Two notes come out of the demotion: `P-FORK-BREACH-UNMARKED` (advisory) and
+`P-FORK-VERDICT` (lossy — the rule's verdict is the fold over members, which BPMN cannot express
+without inventing data, so it is declined rather than drawn wrongly; the terminal is named "every
+run has ended").
+
+**What is worth keeping about how this was found.** Not by the gate. The gate reported the number
+on every single run, under `info`:
+
+> `info  121 marking(s) can reach completion ONLY by terminating`
+
+and scored the file SOUND, which it was, because terminating is a legitimate way to complete. The
+line was printed, read, and not connected — by me, in this session, twice. It took an adversarial
+reader asked specifically about concurrency semantics. A gate that tells you the truth in a
+severity class nobody triages is a gate you have not finished building.
+
+One finding of the checker's own, recorded because it is the shape §5's gate arguments are about:
+teaching `check-bpmn-soundness.mjs` to expand scopes made its synthetic join wait for one token per
+(instance × arrival flow) rather than one per instance, so any interior with two ways to reach its
+end deadlocked **in the model** while the file was correct. It was found by the exporter's own
+`modals-may-fork` golden coming back UNSOUND, not by inspection, and the checker looked like it was
+working while it did — it produced a deadlock witness naming real flows. Fixed with one XOR
+"instance finished" gateway per copy; pinned by `jl4/examples/bpmn/sound/mi-subprocess-two-ways-to-done.bpmn`,
+which was verified by reverting the fix and watching it fail.
+
 #### What follows for P2
 
 **This is P2's problem before it is P1's.** §5.1's division of labour gives P1 the shape and P2 the
@@ -2550,6 +2661,25 @@ leads with.
 >    `MAY`, a `SHANT` and a `businessRuleTask`; on `offering` and both `regcf-*` prohibitions,
 >    "continue" on the `SHANT` task **is** the breach, and its timer is the compliance exit — the
 >    inverse of every `MUST` beside it, with no notational difference.
+>    **MEASURED 2026-09-19 by `lts-diagrams-2`, and it bounds this whole track: the token simulator
+>    cannot show multi-instance at all.** `bpmn-js-token-simulation` 0.40.0 has zero occurrences of
+>    `multiInstance` or `loopCharacteristics` anywhere in `lib/`, so a multi-instance sub-process plays
+>    as ONE instance and `EndGroup_<n>` fires the moment that instance ends — on a breach path
+>    `EndBreach_<n>` and `EndGroup_<n>` arrive together. **So `etc/check-bpmn-soundness.mjs` is the only
+>    thing in this repository that plays n > 1**, and any claim about what a reader would SEE of the
+>    per-member picture has to come from the gate rather than from the animation.
+
+What the animation does now show of the join, which the flat drawing did not, is structural: a box,
+the escalation relay, and two terminals of the fork's own. That is a real improvement on the
+identical-in-every-field result recorded below — but it is a difference in the PICTURE, not a
+difference in the play, and the two were worth separating before someone cited the wrong one.
+
+Two further facts from the same run, worth having where the emitter is discussed:
+`BoundaryEsc_<n>` is the **only non-interrupting boundary in the whole corpus** — every other
+`Boundary_<n>` across all sixteen goldens is interrupting — and firing that relay cold, before the
+member's task is entered, produces an `EndBreach_<n>` with a breach that has no cause, which is why
+a simulator driving boundaries must fire only the interrupting ones.
+
 > 2. **The barrier and the fork animate identically.** `tenancy-barrier` and `tenancy-fork` give
 >    the same scopes, triggers, history and end events (JSONs differ only in label text); the
 >    multi-instance task is one token and one click, never `n`, so `ONCE ALL HAVE` waits for nothing

@@ -9,10 +9,13 @@
                   exporter="jl4 (L4.Bpmn)"
                   exporterVersion="1">
   <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
+  <bpmn:itemDefinition id="Item_the_tenancy_t_cast" structureRef="java.util.List" />
+  <bpmn:itemDefinition id="Item_the_tenancy_t_cast_member" structureRef="java.lang.Object" />
   <bpmn:collaboration id="Collaboration_the_tenancy">
     <bpmn:participant id="Participant_the_tenancy" name="the tenancy" processRef="Process_the_tenancy" />
   </bpmn:collaboration>
   <bpmn:process id="Process_the_tenancy" name="the tenancy" isExecutable="false">
+    <bpmn:property id="the_tenancy_t_cast" name="the_tenancy_t_cast" itemSubjectRef="Item_the_tenancy_t_cast" />
     <bpmn:laneSet id="LaneSet_1">
       <bpmn:lane id="Lane_1_EVERY_Tenant_t_IN_tenants" name="EVERY Tenant t IN tenants">
         <bpmn:flowNodeRef>Task_0</bpmn:flowNodeRef>
@@ -31,7 +34,21 @@
     <bpmn:startEvent id="Start_0" />
     <bpmn:task id="Task_0" name="MUST Sign ...">
       <bpmn:documentation>EVERY Tenant t IN tenants MUST Sign ... WITHIN 14 ONCE ALL HAVE — one instance per member of the cast, each bound to ‘t’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). ONCE ALL HAVE: the outgoing flow fires once, when every instance has completed — which is what a parallel multi-instance activity&apos;s completion means, so this barrier is drawn faithfully.</bpmn:documentation>
-      <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Task_0" isSequential="false" />
+      <bpmn:ioSpecification id="IoSpec_Task_0">
+        <bpmn:dataInput id="DataInput_Task_0" name="the_tenancy_t_cast" itemSubjectRef="Item_the_tenancy_t_cast" isCollection="true" />
+        <bpmn:inputSet id="InputSet_Task_0">
+          <bpmn:dataInputRefs>DataInput_Task_0</bpmn:dataInputRefs>
+        </bpmn:inputSet>
+        <bpmn:outputSet id="OutputSet_Task_0" />
+      </bpmn:ioSpecification>
+      <bpmn:dataInputAssociation id="DataInputAssoc_Task_0">
+        <bpmn:sourceRef>the_tenancy_t_cast</bpmn:sourceRef>
+        <bpmn:targetRef>DataInput_Task_0</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Task_0" isSequential="false">
+        <bpmn:loopDataInputRef>DataInput_Task_0</bpmn:loopDataInputRef>
+        <bpmn:inputDataItem id="DataItem_Task_0" name="t" itemSubjectRef="Item_the_tenancy_t_cast_member" />
+      </bpmn:multiInstanceLoopCharacteristics>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_0" name="after P14D" attachedToRef="Task_0" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within 14</bpmn:documentation>

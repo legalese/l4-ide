@@ -8,12 +8,22 @@
 -- Until 2026-09-15 these two lowered to byte-identical BPMN and a
 -- byte-identical fidelity report: L4.StateGraph.extractDeonton never read
 -- Deonton.join, so the exporter could not tell them apart and the report that
--- exists to list the losses did not list this one. Now the task is a parallel
--- multi-instance activity (P-CAST says its cardinality is a run-time fact),
--- the barrier is that activity's own completion, and the fork — which BPMN
--- can only draw with a multi-instance subProcess this exporter does not emit
--- — is reported as P-FORK. The two goldens are the witness that the pair
--- stays distinguishable.
+-- exists to list the losses did not list this one. The barrier is now a
+-- multi-instance TASK, whose own completion is the barrier; the fork is a
+-- multi-instance SUB-PROCESS enclosing the member's whole continuation, which
+-- is what makes once-per-member drawable. The goldens are the witness that the
+-- pair stays distinguishable.
+--
+-- `receipts and delivery` is the third one, and it exists because of a defect
+-- it would have caught. The fork's breach end must NOT be an error end — an
+-- error end ends every active thread in the process, so one tenant's breach
+-- would cancel the tenants who had not breached. The first fix demoted the
+-- SHARED breach terminal in place, guarded by "only where the fork is its sole
+-- feeder", which is true of every other fixture here and false as soon as
+-- anything else can breach. This rule is that case: a fork beside a PARTY
+-- obligation, both LEST BREACH, so the landlord's breach keeps the shared
+-- error end (under RAND one operand's breach is the whole contract's) while
+-- the fork gets its own plain one.
 
 DECLARE Actor IS ONE OF
     Landlord HAS name IS A STRING
@@ -50,3 +60,18 @@ GIVETH A DEONTIC Actor Action
                     MUST   Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)
                     WITHIN 5)
         LEST   BREACH BY t
+
+GIVETH A DEONTIC Actor Action
+`receipts and delivery` MEANS
+    (EVERY Tenant t IN tenants
+        MUST   Pay (EXACTLY t) (EXACTLY theLandlord) amount
+        WITHIN 7
+        UPON   EACH
+        HENCE  FULFILLED
+        LEST   BREACH BY t)
+    RAND
+    (PARTY theLandlord
+        MUST   Deliver (EXACTLY theLandlord)
+        WITHIN 14
+        HENCE  FULFILLED
+        LEST   BREACH)
