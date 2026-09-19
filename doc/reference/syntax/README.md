@@ -216,6 +216,40 @@ neither, because picking one would silently throw away a sentence you wrote.
 A clash in one language does not affect the others — two `@nlg:he` and one
 `@nlg:en` leaves the English rendering working.
 
+#### Declaring the module's language: `@lang he`
+
+Tagging every herald gets repetitive the moment a whole module is in one
+language. Say it once instead, at the top of the file:
+
+```l4
+@lang he
+
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg %amount% עולה על הסף
+                  @nlg:en the claim of %amount% exceeds the threshold
+  IF amount GREATER THAN 100
+```
+
+**`@lang he` means "every untagged `@nlg` in this module is Hebrew".** It is
+not a separate mechanism with its own precedence — it is exactly equivalent to
+writing `:he` on each of those heralds, and you can mix the two freely. A
+herald that names its own language keeps it, which is how the English
+rendering above survives in a Hebrew module.
+
+**A module that declares nothing is `en`.** That is a default, not a
+detection: L4 cannot tell what language you are writing in, so a Hebrew module
+with no `@lang` is _labelled_ English while still _rendering_ Hebrew. The
+label costs nothing today and will matter when tooling starts reporting which
+rules are missing a translation — so declare it if your module is not English.
+
+**It applies to the whole file, wherever you write it**, including annotations
+above the declaration. Convention is the top; nothing breaks if it is not.
+
+**Two renderings in the module's own language still collide.** `@lang he`
+together with an explicit `@nlg:he` on the same rule is two Hebrew renderings,
+and is reported as such.
+
 **Where you put the annotation decides what it describes, and getting it wrong
 is quiet.** An annotation attaches to the name it follows. On its own line
 _above_ `DECIDE` it follows the `GIVETH` type, so it describes that type and

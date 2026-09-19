@@ -96,9 +96,11 @@ spec = describe "two @nlg renderings on one name, partitioned by language" $ do
     selectedFor "is large" (Just "fr") m `shouldBe` Just "the amount is large"
     selectedFor "is large" Nothing m `shouldBe` Just "the amount is large"
 
-  -- Which one is the DEFAULT. An untagged rendering declined to name a
-  -- language, so it is what a caller who did not name one should get —
-  -- whichever side of the tagged one it was written on.
+  -- Which one is the DEFAULT. An untagged rendering carries the MODULE's
+  -- language — its `@lang`, or `en` when it declares none (R-M2) — so in a
+  -- module with no declaration the untagged one is the `en` one, and that is
+  -- what a caller who named no language gets, whichever side of the tagged
+  -- one it was written on.
   describe "the untagged rendering is the default wherever it is written" $ do
     it "when it comes first" $ do
       (m, ws) <- parsed
@@ -107,8 +109,10 @@ spec = describe "two @nlg renderings on one name, partitioned by language" $ do
         \DECIDE `is large` @nlg the plain wording\n\
         \                  @nlg:he ha-sechum gadol\n\
         \  IF amount > 100\n"
+      -- "en", not "-": the untagged annotation was stamped with the
+      -- module's language, which is `en` here because nothing declared one.
       renderingsOf "is large" m
-        `shouldBe` [("-", "the plain wording"), ("he", "ha-sechum gadol")]
+        `shouldBe` [("en", "the plain wording"), ("he", "ha-sechum gadol")]
       ambiguities ws `shouldBe` []
 
     it "when it comes second" $ do
@@ -118,8 +122,10 @@ spec = describe "two @nlg renderings on one name, partitioned by language" $ do
         \DECIDE `is large` @nlg:he ha-sechum gadol\n\
         \                  @nlg the plain wording\n\
         \  IF amount > 100\n"
+      -- "en", not "-": the untagged annotation was stamped with the
+      -- module's language, which is `en` here because nothing declared one.
       renderingsOf "is large" m
-        `shouldBe` [("-", "the plain wording"), ("he", "ha-sechum gadol")]
+        `shouldBe` [("en", "the plain wording"), ("he", "ha-sechum gadol")]
       ambiguities ws `shouldBe` []
 
   -- The behaviour that must NOT change, and the reason the tag is not simply
@@ -134,7 +140,10 @@ spec = describe "two @nlg renderings on one name, partitioned by language" $ do
         \                  @nlg another wording\n\
         \  IF amount > 100\n"
       renderingsOf "is large" m `shouldBe` []
-      ambiguities ws `shouldBe` [Nothing]
+      -- Reported against `en`, because that is what an untagged annotation
+      -- means in a module that declares no `@lang`. Two untagged annotations
+      -- are two `en` ones, which is why they still collide.
+      ambiguities ws `shouldBe` [Just "en"]
 
     it "two annotations sharing a tag" $ do
       (m, ws) <- parsed
@@ -184,3 +193,90 @@ spec = describe "two @nlg renderings on one name, partitioned by language" $ do
       \  IF amount > 100\n"
     renderingsOf "is large" m `shouldBe` [("en", "the amount is large")]
     renderingsOf "BOOLEAN" m `shouldBe` [("he", "ha-sechum gadol")]
+
+  ----------------------------------------------------------------------------
+  -- `@lang he` — the module's own language (R-M2, Meng 2026-09-17).
+  --
+  -- The rule it encodes is "an untagged @nlg in this module is written in
+  -- THIS language", so `@lang he` means exactly what tagging every herald
+  -- `:he` would mean. Meng's stated preference is one declaration per module
+  -- over a tag per herald, which only holds if the two are genuinely the same
+  -- thing — so that equivalence is what these test, rather than the
+  -- declaration merely being recorded somewhere.
+  ----------------------------------------------------------------------------
+  describe "@lang declares what an untagged @nlg means" $ do
+    it "makes an untagged rendering the module's language" $ do
+      (m, ws) <- parsed
+        "@lang he\n\
+        \GIVEN amount IS A NUMBER\n\
+        \GIVETH A BOOLEAN\n\
+        \DECIDE `is large` @nlg ha-sechum gadol\n\
+        \  IF amount GREATER THAN 100\n"
+      renderingsOf "is large" m `shouldBe` [("he", "ha-sechum gadol")]
+      selectedFor "is large" (Just "he") m `shouldBe` Just "ha-sechum gadol"
+      ambiguities ws `shouldBe` []
+
+    it "is equivalent to tagging the herald" $ do
+      -- The claim that justifies preferring one declaration to 56 tags.
+      (declared, _) <- parsed
+        "@lang he\n\
+        \GIVEN amount IS A NUMBER\n\
+        \GIVETH A BOOLEAN\n\
+        \DECIDE `is large` @nlg ha-sechum gadol\n\
+        \  IF amount GREATER THAN 100\n"
+      (tagged, _) <- parsed
+        "GIVEN amount IS A NUMBER\n\
+        \GIVETH A BOOLEAN\n\
+        \DECIDE `is large` @nlg:he ha-sechum gadol\n\
+        \  IF amount GREATER THAN 100\n"
+      renderingsOf "is large" declared `shouldBe` renderingsOf "is large" tagged
+
+    it "lets an explicitly tagged herald differ, and that herald wins for its language" $ do
+      (m, ws) <- parsed
+        "@lang he\n\
+        \GIVEN amount IS A NUMBER\n\
+        \GIVETH A BOOLEAN\n\
+        \DECIDE `is large` @nlg ha-sechum gadol\n\
+        \                  @nlg:en the amount is large\n\
+        \  IF amount GREATER THAN 100\n"
+      ambiguities ws `shouldBe` []
+      selectedFor "is large" (Just "en") m `shouldBe` Just "the amount is large"
+      selectedFor "is large" (Just "he") m `shouldBe` Just "ha-sechum gadol"
+      -- The default is the MODULE's language, not the first line.
+      selectedFor "is large" Nothing m `shouldBe` Just "ha-sechum gadol"
+
+    it "applies to annotations written ABOVE the declaration" $ do
+      -- Order-independence is a design choice, not an accident: the stamping
+      -- happens after parsing, over the whole module, so a declaration at the
+      -- bottom of a long file still governs the top of it. A parse-time
+      -- implementation would silently leave earlier annotations untagged.
+      (m, _) <- parsed
+        "GIVEN amount IS A NUMBER\n\
+        \GIVETH A BOOLEAN\n\
+        \DECIDE `is large` @nlg ha-sechum gadol\n\
+        \  IF amount GREATER THAN 100\n\
+        \@lang he\n"
+      renderingsOf "is large" m `shouldBe` [("he", "ha-sechum gadol")]
+
+    it "defaults to en when the module declares nothing" $ do
+      (m, _) <- parsed
+        "GIVEN amount IS A NUMBER\n\
+        \GIVETH A BOOLEAN\n\
+        \DECIDE `is large` @nlg the amount is large\n\
+        \  IF amount GREATER THAN 100\n"
+      renderingsOf "is large" m `shouldBe` [("en", "the amount is large")]
+
+    it "collides when a herald repeats the module's own language" $ do
+      -- `@lang he` plus an explicit `@nlg:he` on the same name is two Hebrew
+      -- renderings, which is the ambiguity the per-language rule exists to
+      -- keep catching. Nothing about the declaration should smuggle a second
+      -- one past it.
+      (m, ws) <- parsed
+        "@lang he\n\
+        \GIVEN amount IS A NUMBER\n\
+        \GIVETH A BOOLEAN\n\
+        \DECIDE `is large` @nlg ha-sechum gadol\n\
+        \                  @nlg:he nusach acher\n\
+        \  IF amount GREATER THAN 100\n"
+      renderingsOf "is large" m `shouldBe` []
+      ambiguities ws `shouldBe` [Just "he"]

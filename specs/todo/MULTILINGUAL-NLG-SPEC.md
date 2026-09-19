@@ -666,7 +666,34 @@ fallback comes back monolingual. `l4 format` is byte-exact and loses nothing, so
 path is safe; it is the re-render path that is lossy. Commissioning `[@he …]` closes it.
 Measured 2026-09-19: no `.l4` file in the tree contains `[@`, so the spelling is free.
 
-**R-M2 — there is no `@lang`, and untagged means "unlabelled" rather than "`en`".** The ruling
+**R-M2 — SHIPPED 2026-09-19, superseding the paragraph below.** `@lang he` exists: a
+module-level declaration, lexed with the same `isLangTagChar` subtag grammar as `@nlg:he`, and
+meaning exactly "every untagged `@nlg` in this module is `he`". Absent declaration means `en`,
+as ruled. Implemented by STAMPING untagged annotations with the module's language after
+parsing and before attachment, which has three consequences worth knowing:
+
+- it is order-independent — a declaration at the foot of the file governs the head of it,
+  because the stamp runs over a complete `PState`;
+- `@lang he` and tagging every herald `:he` are the same thing by construction rather than by
+  care, which is the equivalence that justifies Meng's preference for one declaration over 56
+  tags (`specs` §8a.2 records the test that asserts it);
+- the "untagged wins as the default" rule became "the MODULE's language wins", which is the
+  same rule stated for a world where nothing is untagged any more.
+
+Two knock-on effects. A module with `@lang he` and an explicit `@nlg:he` on one name now has
+two Hebrew renderings and is reported as ambiguous — correct, and new. And the ambiguity
+diagnostic can no longer distinguish "untagged" from "tagged", because by the time it runs
+nothing is untagged; it says so in one sentence instead of guessing.
+
+**The residual wrinkle, recorded rather than fixed:** absent-means-`en` labels a monolingual
+Hebrew module as English. That is the Penal Law pilot's exact shape, and R-M2's "required in
+any module that uses a tag" does not reach it, because such a module uses no tags. Nothing
+observable is wrong today — it renders Hebrew either way — and it becomes wrong when §5's
+fidelity channel starts asking which rules lack a translation. The cheap fix is to declare
+`@lang he`, which the documentation now tells Hebrew authors to do.
+
+**Superseded, kept because it is the reasoning that preceded the change:** there is no `@lang`,
+and untagged means "unlabelled" rather than "`en`". The ruling
 is that a module-level `@lang` is required in any module that uses a tag, and that its absence
 means `en`. What shipped instead: the DEFAULT rendering is the untagged annotation if there is
 one and otherwise the first in source order, and `--lang xx` falls back to it.
@@ -751,7 +778,9 @@ have no counterpart to consult, so their English is ours alone and should be mar
    schema goldens are the literal string `No @export annotations found in file`. So the ordering
    constraint is real for the Hebrew encoding and absent for the language tag.
 
-3. **Language tag (R-M1, R-M2 — both now ruled, §3).** `@nlg:he` on the heralded form only;
+3. **Language tag (R-M1, R-M2 — both now ruled, §3). DONE 2026-09-19**, across #423 (the tag),
+   #427 + #429 (multiplicity, selection, `prettyLayout`), and the `@lang` work in §8a.2.
+   R-M1's bare-form spelling remains deliberately unbuilt; see §6.2. `@nlg:he` on the heralded form only;
    absent `@lang` means `en`. Lexer, `L4.Nlg` selection, check error on duplicates, goldens.
    Untagged behaviour must be provably unchanged — assert against **every heralded annotation in
    the tree, counted at the commit under test**, not against a number quoted from here. The count
@@ -857,6 +886,27 @@ FORWARD**, to the declaration that follows it, and `RefAnnotationSpec` pins that
 backward to the nearest preceding type name is the asymmetry. Changing it is a semantics ruling
 that moves goldens, so it is **not** taken here; it is offered to Meng as **MISTLETOE** — the
 annotation kisses whoever happens to be standing next to it.
+
+### 8a.2 `@lang` — shipped 2026-09-19
+
+Meng fired PASSPORT on 2026-09-19 ("Re labeling the heralds we should make use of `@lang` if it
+has arrived"), after a Hebrew re-voiced Ofek encoding was tagged per herald — 56 `@nlg:he`
+lines — because `@lang` did not exist. It does now, and those collapse to one line.
+
+What landed: a `TLang` token keeping the raw remainder verbatim so exactprint re-emits the
+declaration byte for byte; collection through the same annotation channel as `@desc`, so its
+tokens ride in the same hidden cluster; the stamp described in §6.2; and `pickDefault` restated
+in terms of the module's language.
+
+Six unit tests and one corpus file (`ok/nlg-module-lang.l4`, whose `.nlg.golden` renders
+**Hebrew** by default, which is the first `.nlg.golden` in the tree that witnesses a language
+choice rather than a bare name). The test that matters most is the equivalence one: a module
+with `@lang he` and an untagged herald produces the identical attachment to a module with
+`@nlg:he` and no declaration. Everything else follows from that being true.
+
+**Not done, and not asked for** (PASSPORT scoped it out): the bare inline `[…]` form stays
+untaggable (R-M1), no Arabic, no projection locale, and no change to the Ofek encodings — GM
+owns collapsing the 56 tags now that `@lang` exists.
 
 ## 9. Reproducing the measurements
 

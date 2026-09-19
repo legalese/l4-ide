@@ -283,6 +283,19 @@ to get right; the second language cannot drift away from the logic, because
 there is no second logic for it to drift from. That is the whole argument for
 doing it this way rather than maintaining two documents.
 
+### Say the language once, not on every rule
+
+A whole module in one language does not need a tag per rule. Declare it:
+
+```l4
+@lang he
+```
+
+Every untagged `@nlg` below then means Hebrew — the declaration is exactly
+equivalent to writing `:he` on each herald, so you can still tag individual
+rules where you want a second language. A module that declares nothing means
+English, which is why everything above this section worked without one.
+
 ### Ask for each one
 
 ```console

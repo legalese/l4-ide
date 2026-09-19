@@ -134,13 +134,14 @@ data WithSpan a = WithSpan
 --
 -- Note, the 'Program Name's exactprint annotations are not modified,
 -- we merely add structured data to the ast node's respective 'Anno'.
-addNlgCommentsToAst :: HasNlg a => [Nlg] -> a -> (a, NlgS)
-addNlgCommentsToAst nlgs p = do
+addNlgCommentsToAst :: HasNlg a => LangTag -> [Nlg] -> a -> (a, NlgS)
+addNlgCommentsToAst moduleLang nlgs p = do
   let
     (nlgWithSpan, unfindable) = preprocessNlgs nlgs
 
     initialNlgS = NlgS
-      { nlgs = nlgWithSpan
+      { moduleLang = moduleLang
+      , nlgs = nlgWithSpan
       , warnings = fmap UnknownLocation unfindable
       }
 
@@ -432,7 +433,8 @@ attachNlgsByLanguage a ann nlgs = do
     case grp of
       (_ : _ : _) -> addWarning $ Ambiguous a tag grp
       _           -> pure ()
-  pure $ case pickDefault unique of
+  lang <- use #moduleLang
+  pure $ case pickDefault lang unique of
     Nothing         -> ann
     Just (d, alts)  -> setNlgs d.payload (fmap (.payload) alts) ann
 
@@ -453,9 +455,17 @@ groupByLanguage ns0 =
   tagsInOrder = List.foldl' (\ seen n -> if lang n `elem` seen then seen else seen <> [lang n]) [] ns
 
 -- | Split the unambiguous renderings into the default one and the rest.
-pickDefault :: [(Maybe LangTag, NlgWithSpan)] -> Maybe (NlgWithSpan, [NlgWithSpan])
-pickDefault xs = case break (isNothing . fst) xs of
-  (before, (_, untagged) : after) -> Just (untagged, fmap snd before <> fmap snd after)
+--
+-- The default is the rendering in the MODULE's own language, and otherwise the
+-- first in source order. Before @\@lang@ existed this read "the untagged one,
+-- else the first", which is the same rule: an untagged annotation is stamped
+-- with the module's language ('withDefaultLang') before it ever reaches here,
+-- so "untagged" and "in the module's language" are now the same set. Saying it
+-- this way is what makes @\@lang he@ behave as "tag every herald @:he@"
+-- rather than as a separate mechanism with its own precedence.
+pickDefault :: LangTag -> [(Maybe LangTag, NlgWithSpan)] -> Maybe (NlgWithSpan, [NlgWithSpan])
+pickDefault lang xs = case break ((== Just lang) . fst) xs of
+  (before, (_, native) : after) -> Just (native, fmap snd before <> fmap snd after)
   (_, []) -> case xs of
     []              -> Nothing
     ((_, d) : rest) -> Just (d, fmap snd rest)
@@ -1766,7 +1776,11 @@ newtype NlgM a = MkNlgM {runNlgM :: LocRange -> (State NlgS) a}
   deriving (Functor, Applicative, Monad, MonadState NlgS, MonadReader LocRange) via (ReaderT LocRange (State NlgS))
 
 data NlgS = NlgS
-  { nlgs :: ![NlgWithSpan]
+  { moduleLang :: !LangTag
+    -- ^ The module's declared @\@lang@, or 'defaultModuleLang'. Read by
+    -- 'pickDefault' to decide which of several renderings is the one a caller
+    -- who named no language should get.
+  , nlgs :: ![NlgWithSpan]
     -- ^ Nlg annotations that haven't been assigned to a specific 'Name' or
     -- other abstract syntax node.
   , warnings :: [Warning]
