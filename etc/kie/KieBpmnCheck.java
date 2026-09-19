@@ -380,7 +380,14 @@ public class KieBpmnCheck {
         // Child ids (an errorEventDefinition, say) must stay unique too.
         for (Element sub : descendants(clone))
           if (!sub.getAttribute("id").isEmpty()) sub.setAttribute("id", sub.getAttribute("id") + "__" + i);
-        proc.appendChild(clone);
+        // Beside the original, NOT at the top of the process. An end event
+        // inside a <subProcess> belongs to that scope, and a clone appended to
+        // the process would leave the interior flow pointing outside its own
+        // container — jBPM says "Could not find target node for connection",
+        // which reads as a defect in the file under test and is not one.
+        // Measured 2026-09-19 on the exporter's first fork golden, whose
+        // escalation end is reached by two boundary events inside the scope.
+        end.getParentNode().appendChild(clone);
         inc.get(i).setAttribute("targetRef", nid);
         cloned++;
         // Keep the lane complete so the pool still lists every node.

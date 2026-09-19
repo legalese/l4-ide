@@ -68,6 +68,10 @@ const EXERCISES = {
   "deadlock-ror-in-rand.bpmn": "FAIL  S2 no deadlock",
   "unsafe-xor-join-after-rand.bpmn": "FAIL  S4 safe (1-bounded)",
   "historical-handover-edge-counted-join.bpmn": "FAIL  S2 no deadlock",
+  // Caught at 2 instances and invisible at 0, which is the point: a
+  // multi-instance scope is played once per instance count and the verdict is
+  // read across them. Before the expansion this file was NOT CHECKED at all.
+  "deadlock-inside-mi-subprocess.bpmn": "FAIL  S2 no deadlock",
   "mislabelled-gateway-direction.bpmn":
     'STRUCTURE  exclusiveGateway Split_0 declares gatewayDirection="Diverging" ' +
     "but has 2 incoming and 2 outgoing sequence flow(s)",
