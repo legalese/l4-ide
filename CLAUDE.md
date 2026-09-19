@@ -52,9 +52,24 @@ and regeneration itself is unavailable to anyone without that branch. **Landing
 `etc/build-plugin-bundle.mjs` is the fix**; until then, say in the porting PR that it was
 hand-copied and will be superseded.
 
-Two things make a hand-port survivable meanwhile: the copies are **byte-identical**, so verify with
-`diff` rather than by eye, and the relative links inside `references/` resolve in both because the
-layout matches. One thing does not port: prose asserting something is "verifiable in situ" is false
+One thing makes a hand-port survivable meanwhile: the relative links inside `references/` resolve
+in both, because the layout matches.
+
+**This paragraph used to claim a second thing — that the copies are byte-identical — and that is
+false.** Measured 2026-09-19 with `cmp`, on `origin/unstable` @ `ae74ae717`: `SKILL.md` is 799
+lines here and 796 there, differing on 21 lines, and `references/source-patterns/11-when-the-
+encoding-cannot-answer.md` and `specs/todo/IMPLICIT-PROPS-DESIGN.md` differ too. The bundle is
+BEHIND rather than divergent — its two most recent commits are `docs(skill): re-sync — ditto's
+positive case` and `docs(skill): re-sync — cite canon NOTES.md §9.2`, i.e. the hand-port stopgap
+this section warns about, actually happening, one file at a time.
+
+So `diff` is still the right instrument, but read it as **"how far behind is the bundle"** and not
+as "this should be empty". A non-empty diff is the NORMAL state until `etc/build-plugin-bundle.mjs`
+lands, and a reader who expects emptiness will conclude someone edited the bundle by hand when
+nobody has. What IS worth checking is whether a specific claim you are porting matches: the ofek
+citations, for instance, are identical in both trees even though the files around them are not
+(`etc/check-canon-citations.mjs --dir <l4-plugin>/skills <l4-plugin>/specs` checks exactly that,
+and both trees resolve 7 of 7). One thing does not port: prose asserting something is "verifiable in situ" is false
 in the packaged bundle, which ships the skill **without** `jl4-core/src` beside it. Say which tree a
 check needs. Note also that the README points at `.claude/skills/writing-l4-rules/`, which is the
 symlink; the tracked path is `skills/writing-l4-rules/` (see the skill-path symlink hazard).
