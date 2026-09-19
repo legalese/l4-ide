@@ -429,6 +429,45 @@ tutorial page above.
 > leading; and nothing has been ruled about what a leading annotation below a field should mean.
 > Check `#433` before deleting any of this.
 
+### `@nlg:xx` — one rendering per name, tagged by language
+
+`@nlg` takes an optional language subtag: `@nlg:he`, `@nlg:en`, `@nlg:pt-BR`. Landed in
+`legalese/l4-ide#423`. Measured 2026-09-19 on a binary at `ae74ae717`:
+
+```l4
+DECIDE `שכר כולל` @nlg:he השכר הכולל
+            `בסיס` @nlg:he שכר הבסיס
+            `תוספת` @nlg:he התוספת
+    IS (`בסיס` PLUS `תוספת`)
+```
+
+`l4 nlg` prints `השכר הכולל with 9172 and 1500` — the tag names the rendering and **does not
+leak into the prose**, and `l4 format` round-trips the file byte-identically.
+
+Three limits, all measured on that binary, each with the thing that would retire it:
+
+- **One rendering per name.** Two `@nlg` on one name attach **neither**. So a file carries one
+  language today; you cannot ship `@nlg:he` and `@nlg:en` side by side. Multiplicity is
+  `#429`, open, and stacked on `#427`, also open.
+- **Nothing selects on the tag.** There is no `l4 nlg --lang` — read `l4 nlg --help` rather
+  than assuming, because this one has been reported as landed more than once. Until selection
+  exists, a tag is documentation of intent, not a switch.
+- **The frame stays English.** Look again at the output above: `with` and `and` are the
+  linearizer's own connectives, not yours. A tag names the _rendering_; it does not localise
+  the sentence built around it. Module-level `@lang` is `#431`, **open** — and on today's
+  binary `@lang he` is not an unknown-annotation warning but a **lexer error**, `unexpected
+'@'`, exit 1. Do not write it yet.
+
+**Non-Latin identifiers themselves are fine** and need no annotation: L4 takes Hebrew, and by
+the same rule any `Lo`-category script, in every name position — bare and backticked names,
+types, constructors, record fields, mixfix operators, `§` titles. The genitive `'s` works after
+one. The single hard limit is that **bidi control characters** (U+200E, U+200F, U+202A–U+202E,
+U+2066–U+2069) are a lex error inside backticks: a right-to-left file relies on the viewer's
+bidi algorithm, and mixed-direction lines that look wrong in an editor are usually right in the
+file. Do not "fix" one by inserting a mark. Combining marks are legal but keep them out of
+identifiers — L4 counts source columns in codepoints, so niqqud makes a column count disagree
+with a table formatter's, and the symptom is a mis-aligned ditto caret, which is silent.
+
 ---
 
 ## NLG and reference annotations
