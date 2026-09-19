@@ -387,6 +387,11 @@ not, and that exception is the subject of the next section. Read it before writi
 
 ### `@nlg` placement, and the one place it still renders nothing
 
+Fuller treatment of what to put IN a herald — `%param%` slots, when a sentence replaces the
+implementation, and the three levers before you reach for one — is in
+[`doc/tutorials/natural-language-functions/optimising-natural-language-generation.md`](../../../doc/tutorials/natural-language-functions/optimising-natural-language-generation.md).
+This section is only about WHERE it goes and what it will not do.
+
 **Both placements work.** Trailing the construct's own line, or on the line immediately above
 it — either reaches the rule. Measured 2026-09-19 on a binary at `ae0c2593a`:
 
