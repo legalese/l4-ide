@@ -34,6 +34,8 @@ import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
 import L4.Export.Document
+import L4.Lexer (LangTag (..))
+import qualified L4.Nlg as Nlg
 import L4.Export.Render (RenderConfig(..), renderAkn, renderHtml, renderText)
 import L4.Syntax
 
@@ -54,6 +56,7 @@ data RenderOptions = RenderOptions
   , renderNumberSections :: Bool
   , renderNumberClauses  :: Bool
   , renderToc            :: Bool
+  , renderLang           :: Maybe LangTag
   , renderFixedNow       :: FixedNowOpt
   }
 
@@ -102,6 +105,13 @@ renderOptionsParser = RenderOptions
         ( long "toc"
        <> help "Prepend a linked table of contents (HTML only)"
         )
+  <*> optional
+        ( MkLangTag <$> strOption
+            ( long "lang"
+           <> metavar "SUBTAG"
+           <> help "Render using the @nlg:SUBTAG annotations, e.g. --lang he. A rule with no rendering in that language falls back to its default one, so a partial translation still produces a whole document."
+            )
+        )
   <*> fixedNowParser
 
 ----------------------------------------------------------------------------
@@ -133,10 +143,26 @@ renderCmd opts = do
                    , numberClauses  = opts.renderNumberClauses
                    , toc            = opts.renderToc
                    }
-          doc = buildDocument cfg tc.module' (dedupModules (transitiveDeps tc))
+          -- Choose the language BEFORE building the document, not inside it.
+          -- 'selectLanguage' moves the requested rendering into the slot
+          -- 'L4.Export.Document' already reads, so every format below becomes
+          -- language-aware without one of them being touched — which is the
+          -- whole reason selection was built as a rewrite rather than as a
+          -- parameter threaded through the exporters.
+          --
+          -- Applied to the DEPENDENCIES too: a rule rendered here can come
+          -- from an imported module, and a document half in one language
+          -- because its imports were missed is worse than one in either.
+          --
+          -- 'selectLanguage' 'Nothing' is the identity, so with no --lang the
+          -- output is byte-for-byte what it was.
+          localise = Nlg.selectLanguage opts.renderLang
+          mainModule = localise tc.module'
+          depModules = map localise (dedupModules (transitiveDeps tc))
+          doc = buildDocument cfg mainModule depModules
       case opts.renderFormat of
         FmtJson -> emitBytes opts (Aeson.encode doc)
-        FmtPlan -> emitBytes opts (Aeson.encode (buildPlan cfg tc.module' (dedupModules (transitiveDeps tc))))
+        FmtPlan -> emitBytes opts (Aeson.encode (buildPlan cfg mainModule depModules))
         FmtText -> emitText opts (renderText rcfg doc)
         FmtHtml -> emitText opts (renderHtml rcfg doc)
         FmtAkn  -> emitText opts (renderAkn doc)

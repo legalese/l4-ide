@@ -1,0 +1,19 @@
+-- One encoding, two renderings. `l4 nlg --lang he` and `l4 render --lang he`
+-- select the Hebrew one; with no flag, or for a language this file does not
+-- carry, the default rendering is used.
+--
+-- `is small` deliberately has ONLY an English rendering, so that asking for
+-- Hebrew exercises the fall-back rather than producing a hole.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the claim of %amount% exceeds the threshold
+                  @nlg:he %amount% עולה על הסף
+  IF amount GREATER THAN 100
+
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is small` @nlg:en the claim of %amount% is under the threshold
+  IF amount LESS THAN 10
+
+#EVAL `is large` 150
+#EVAL `is small` 5

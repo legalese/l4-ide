@@ -191,8 +191,11 @@ Then ask for one:
 
 ```console
 $ l4 nlg --lang he mymodule.l4
-$ l4 nlg --lang en mymodule.l4
+$ l4 render --format html --lang he mymodule.l4 -o mymodule.he.html
 ```
+
+`l4 nlg` gives the linearized prose; `l4 render` gives the formatted document,
+in any of its formats. Both take `--lang`.
 
 Two runs of the same command over the same source produce the two documents.
 Nothing about the rule is duplicated — only its wording.
