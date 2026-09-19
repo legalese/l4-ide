@@ -52,3 +52,15 @@ DECIDE `is a large amount` @nlg:en the amount %amount% is large
   IF amount GREATER THAN 100
 
 #EVAL `is a large amount` 150
+
+-- Two renderings of ONE rule, told apart by their tags. `l4 nlg --lang he`
+-- prints the Hebrew, `--lang en` the English, and a language with no rendering
+-- here falls back to the default — which is the untagged annotation when there
+-- is one, and otherwise the first in the file.
+GIVEN claim IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is a large claim` @nlg:en the claim of %claim% exceeds the threshold
+                          @nlg:he %claim% עולה על הסף
+  IF claim GREATER THAN 100
+
+#EVAL `is a large claim` 150

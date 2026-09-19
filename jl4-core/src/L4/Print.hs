@@ -1219,8 +1219,8 @@ instance LayoutPrinterWithName a => LayoutPrinter (Pattern a) where
 instance LayoutPrinter Nlg where
   printWithLayout = \ case
     MkInvalidNlg _ -> "Invalid Nlg"
-    MkParsedNlg _ frags -> prettyNlgs frags
-    MkResolvedNlg _ frags -> prettyNlgs frags
+    MkParsedNlg _ _ frags -> prettyNlgs frags
+    MkResolvedNlg _ _ frags -> prettyNlgs frags
     where
       prettyNlgs [] = mempty
       prettyNlgs [x@MkNlgRef{}] = printWithLayout x
@@ -1284,8 +1284,8 @@ printInlineNlg = \ case
   -- the placeholder @Invalid Nlg@, which is the right thing in a hover and the
   -- wrong thing here, where it would land in the file as prose.
   MkInvalidNlg _        -> mempty
-  MkParsedNlg _ frags   -> foldMap inlineNlgFragment frags
-  MkResolvedNlg _ frags -> foldMap inlineNlgFragment frags
+  MkParsedNlg _ _ frags   -> foldMap inlineNlgFragment frags
+  MkResolvedNlg _ _ frags -> foldMap inlineNlgFragment frags
 
 inlineNlgFragment :: (LayoutPrinter a, HasName a) => NlgFragment a -> Doc ann
 inlineNlgFragment = \ case

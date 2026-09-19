@@ -1,5 +1,6 @@
 module L4.Nlg (
   simpleLinearizer,
+  selectLanguage,
   Linearize (..),
   lin,
   unescapeNlgText,
@@ -9,7 +10,7 @@ import Base
 import qualified Base.Text as Text
 
 import L4.Annotation
-import L4.Lexer (PosToken, isNlgEscapable)
+import L4.Lexer (LangTag, PosToken, isNlgEscapable)
 import L4.Syntax
 import L4.Utils.Ratio (prettyRatio)
 import L4.Desugar
@@ -71,6 +72,33 @@ simpleLinearizer a =
     case tree.tokens of
       [] -> ""
       (x:xs) -> Text.stripStart (prettyLinTok x) <> mconcat (fmap prettyLinTok xs)
+
+-- | Render in a particular language, by promoting each node's rendering for
+-- that language into the slot every reader already looks at.
+--
+-- __A rewrite rather than a parameter on 'Linearize', deliberately.__ Every
+-- consumer of an annotation reads 'annNlg' and nothing else — this linearizer,
+-- LSP hover, the docassemble and Blawx exporters, the relational lowering.
+-- Threading a language through all of them means changing all of them, and
+-- 'Linearize' has nowhere to put it. Moving the requested rendering into
+-- 'annNlg' first makes every one of them language-aware without any of them
+-- being touched, and it is exactly what makes a bilingual document SET
+-- producible: run the same pipeline twice, once per language.
+--
+-- @'selectLanguage' 'Nothing'@ is the identity, so every existing caller — the
+-- @.nlg.golden@ producer included — is byte-for-byte unaffected.
+--
+-- It only rewrites 'Name' nodes because those are the only nodes an @\@nlg@
+-- annotation ever attaches to (measured 2026-09-19; even an annotation written
+-- under an expression lands on the last 'Name' in that expression's range).
+selectLanguage :: Maybe LangTag -> Module Resolved -> Module Resolved
+selectLanguage Nothing  m = m
+selectLanguage mlang    m = over (gplate @Name) promote m
+ where
+  promote :: Name -> Name
+  promote n = case nlgFor mlang (getAnno n) of
+    Nothing -> n
+    Just r  -> n & annoOf %~ setNlg r
 
 -- | Translate an 'a' to something that can be linearized.
 class Linearize a where
@@ -425,8 +453,8 @@ instance Linearize Resolved where
 instance Linearize Nlg where
   linearize = \ case
     MkInvalidNlg _ -> text "(internal error)"
-    MkParsedNlg _ frags -> foldMap linParsedFragment frags
-    MkResolvedNlg _ frags -> foldMap linResolvedFragment frags
+    MkParsedNlg _ _ frags -> foldMap linParsedFragment frags
+    MkResolvedNlg _ _ frags -> foldMap linResolvedFragment frags
    where
     linParsedFragment :: NlgFragment Name -> LinTree
     linParsedFragment = \ case

@@ -1,16 +1,20 @@
 # Multilingual L4 — language-tagged `@nlg`, and the trilingual Penal Law
 
-_Status: **proposed, not landed — with two exceptions.** §4 (the `%` and `]` escapes) is
-**implemented and adversarially reviewed** on branch `fix/nlg-escapes` (PR #415), and
-§4.1(a)'s `\>` escape for `@ref` is implemented on `lang/ref-escape` (PR #418), which is
-**stacked on #415 and merges after it**. Neither is merged; everything else here is a proposal
-and no part of it is implemented. Every measurement in §2 was executed on 2026-09-17 against `unstable` @
+_Status: **§§3–4 are IMPLEMENTED AND MERGED; §5 and the pilot are still proposals.**
+Updated 2026-09-19. §4 (the `%` and `]` escapes) merged as PR #415, §4.1(a)'s `\>` escape for
+`@ref` as PR #418, this spec's own revisions as #416, the `#962` schema-golden fix as #419, and
+the language tag itself as **#423** — verified in `unstable` by feature presence
+(`MkLangTag`, `NlgLangTagSpec`), not by report. Multiplicity, selection and
+`prettyLayout`'s annotation loss are on `fix/prettylayout-nlg` and `lang/nlg-multiplicity`.
+**A bilingual document set is producible today**: two `@nlg:xx` renderings on one name, and
+`l4 nlg --lang he` / `--lang en` over one encoding. §8a records what was built, what was
+deliberately not, and the one live defect found on the way._ Every measurement in §2 was executed on 2026-09-17 against `unstable` @
 `cab6988d0` and canon `mengwong/drafts` @ `61a4755`. Seven measurement errors in earlier drafts
 of this file have been corrected in place, each re-measured rather than taken on report —
 §2.3's gap count, §2.4's annotation census and its bare-inline count, a line citation, three
 dangling cross-references, `L4.Nlg`'s size, and §4's claim about where decoding happens; §2.4 and §4.1 carry
 the corrections rather than hiding them. Written on branch `spec/multilingual-nlg`; §4.1 and
-R-M7 by the `nlg-locale` session._
+R-M7 by the `nlg-locale` session.\_
 
 **One-line summary.** L4 can already be _written_ in any language — Hebrew identifiers work
 today, verified — but it can only be _read back_ in one, because `@nlg` carries a single
@@ -646,6 +650,42 @@ carries `lang="en"`).
 | **R-M7** | Confirm the Hebrew-binds / Arabic-special-status claim against primary sources                  | **ANSWERED 2026-09-17**, §1 point 3: Interpretation Law 5741-1981 §24 and Basic Law: Nation-State §4, both read in the primary text. The rule is language-of-enactment rather than "Hebrew always"; it reaches Hebrew here by application. Verified by the `nlg-locale` session                                                                         |
 | **R-M8** | Where do Arabic renderings come from, given no Arabic statute text exists?                      | **ANSWERED 2026-09-17 (Meng): drop the Arabic output.** Basic Law §4(b) makes Arabic a reader aid, so nothing operational depends on it, and there is no Arabic reviewer — note the Hebrew encoding has had no Hebrew-language review either, only mechanical verification. Pilot ships `he` canonical + `@nlg:en`; revisit `ar` when a reviewer exists |
 
+#### 6.2 Implementation status of R-M1 and R-M2, recorded 2026-09-19
+
+Both were ANSWERED in 2026-09-17. Neither is fully built, and the gap in each is worth stating
+where the ruling is, rather than leaving a reader to infer from the code that the ruling moved.
+
+**R-M1 — the bare `[…]` form is still untaggable, by instruction.** §8 step 3 says in terms:
+_"Do not build the bare form's `[@he …]` spelling: pre-approved, not commissioned."_ That was
+followed. **The need it was pre-approved against has now appeared**, and it is worth naming
+precisely rather than leaving as a preference: `L4.Print.prettyLayout` must emit an annotation
+in the bracket form, because the heralded form runs to end of line and would swallow the rest
+of a printed `DECIDE`. With no bracket spelling for a tag, `prettyLayout` keeps only a name's
+DEFAULT rendering — so a bilingual module through `l4 batch`, the REPL, or the DMN exporter's
+fallback comes back monolingual. `l4 format` is byte-exact and loses nothing, so the authoring
+path is safe; it is the re-render path that is lossy. Commissioning `[@he …]` closes it.
+Measured 2026-09-19: no `.l4` file in the tree contains `[@`, so the spelling is free.
+
+**R-M2 — there is no `@lang`, and untagged means "unlabelled" rather than "`en`".** The ruling
+is that a module-level `@lang` is required in any module that uses a tag, and that its absence
+means `en`. What shipped instead: the DEFAULT rendering is the untagged annotation if there is
+one and otherwise the first in source order, and `--lang xx` falls back to it.
+
+The two coincide on everything observable today, which is why this was not treated as blocking:
+for a module whose untagged annotations are English, `--lang en` reaches them by fallback and
+`--lang he` reaches the `@nlg:he` ones directly, exactly as `@lang en` would give. **Where they
+stop coinciding is fidelity reporting.** Under fallback you cannot distinguish "this rule has a
+real Hebrew rendering" from "this rule fell back", because both return a rendering; with
+`@lang he` declared, the untagged ones are known to BE Hebrew and the question has an answer.
+That is precisely what §5's fidelity channel needs, so `@lang` is owed before §5, not before a
+bilingual set.
+
+**A third, smaller deviation.** §3.1.1 step 1 says a duplicate tag should be _"a check error"_.
+It is a WARNING, as two untagged annotations on one name already were. Escalating would turn
+existing modules red for a condition the compiler has always tolerated, and the diagnostic is
+the same either way; the warning now names the colliding language. Revisit with R-M2, since a
+declared `@lang` is what would make "duplicate" unambiguous enough to be fatal.
+
 ### 6.1 The ICJ text as a Rosetta Stone, not a source
 
 The provenance problem in R-M6 is a **redistribution** problem, not a **reading** problem. We do
@@ -754,6 +794,69 @@ have no counterpart to consult, so their English is ours alone and should be mar
 5. **Penal Law pilot.** One chapter, Hebrew-canonical, with `@nlg:en` informed by the ICJ text
    — **consulted, never deposited** (R-M6) — to exercise the whole path before committing to
    644 sections. **No `@nlg:ar`** (R-M8).
+
+## 8a. What was built, 2026-09-19
+
+Two branches, stacked, both on `unstable` after #423.
+
+**`fix/prettylayout-nlg` — `prettyLayout` stopped dropping every annotation**
+(smucclaw/l4-ide#966). The hook is the NAME printer, and that is a measurement rather than a
+plan: an `@nlg` attaches to a `Name` node and to nothing else, including one written under an
+expression, which lands on the last `Name` in that expression's range. Emission is the bracket
+form, which is forced — the heralded form would swallow the rest of a printed line. A close
+bracket is escaped on the way out, and so is a LONE TRAILING BACKSLASH: a line annotation may
+end in one, and copied through it escapes the `]` the printer appends, so the printed module
+swallowed five following lines and stopped parsing. **The corpus round-trip suite found that,
+not the unit tests**, which had the bare-`]` case and not this one; it is the clearest argument
+this spec has for why the whole-corpus property earns its twelve minutes.
+
+Also `\[` now decodes (Meng, 2026-09-19). It protects nothing — a bare `[` is ordinary text in
+both forms — but an author escaping a citation's closing bracket escapes the opening one in the
+same keystroke, and `[see note \[3\] here]` rendered as `see note \[3] here`: half the pair
+decoded and a backslash nobody wrote reached the prose, silently.
+
+**`lang/nlg-multiplicity` — several renderings per name, and a way to ask for one.** The
+collision became per-LANGUAGE instead of per-name; the default rule is untagged-else-first,
+which is what keeps all ~28 existing readers of `annNlg` correct without being touched;
+selection is a rewrite (`L4.Nlg.selectLanguage`) that promotes the requested rendering into the
+slot every consumer already reads, rather than a parameter threaded through `Linearize` and its
+six consumers. `selectLanguage Nothing` is the identity, so the `.nlg.golden` producer is
+byte-identical by construction. `l4 nlg --lang he` is the CLI surface.
+
+**One narrowing, decided on evidence: a TYPE never carries an annotation into print.** A
+`Type'` is printed in places that are not source — an evaluation result, a diagnostic, an LSP
+hover — and an annotation re-emitted there is noise. The witness arrived as a moved golden:
+`ok/nlg-percent.l4`'s `#CHECK` answered `BOOLEAN [5% with %amount%]`. Two further leak sites
+turned up behind it, and the order they were found in is the lesson — the `Type'` instance
+first, then the value printer (`ValAssumed` / `ValUnappliedConstructor` / `ValConstructor`,
+where a legitimately annotated `ASSUME`d name would have leaked too), and finally
+`goDisplayTy`, a **hand-written mirror of the `Type'` instance** which is the copy a `#CHECK`
+actually goes through. Fixing the instance moved no golden; fixing the mirror did. Whoever
+touches type printing should know the two exist and are not kept in step by anything.
+
+### 8a.1 A live defect found on the way — annotation placement is silently wrong
+
+**Measured 2026-09-19.** An annotation attaches to the name it FOLLOWS. Two consequences nobody
+had written down:
+
+- `GIVEN a IS A STRING @nlg the amount` — the trailing form — attaches to **`STRING`**, not to
+  the parameter `a`.
+- An `@nlg` on its own line above a `DECIDE` attaches to the **`GIVETH` type name**, not to the
+  rule.
+
+Both then render nothing, and nothing reports it: the annotation DID attach, so there is no
+`NotAttached` warning. The witness is decisive and embarrassing — **`jl4/examples/ok/nlg-percent.l4`
+uses the second shape throughout, and its own `.nlg.golden` shows bare names for all seven of
+its annotations.** The file that exists to test `@nlg` renders none of its own. Across ten
+sampled files, 11 of 116 annotations sit on a builtin type name; `prelude.l4` has 0 of 67, so
+the idiomatic style avoids it by habit rather than by construction.
+
+There is precedent for the fix inside the same pass: a **leading `@ref` already attaches
+FORWARD**, to the declaration that follows it, and `RefAnnotationSpec` pins that specifically
+("attaches a leading `@ref` to the first declaration, not the Module"). `@nlg` attaching
+backward to the nearest preceding type name is the asymmetry. Changing it is a semantics ruling
+that moves goldens, so it is **not** taken here; it is offered to Meng as **MISTLETOE** — the
+annotation kisses whoever happens to be standing next to it.
 
 ## 9. Reproducing the measurements
 
