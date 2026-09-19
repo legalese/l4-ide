@@ -160,7 +160,7 @@ nlgAnnotationP = do
     -- The reconstructed text MUST still carry the tag: it is what gets
     -- re-lexed below, and 'mkPosTokens' seeds the inner tokens' positions by
     -- advancing over it.
-    (nlgLangTag, nlgAnnoTy) = case rawAnno.payload of (m, ty, _) -> (m, ty)
+    (mLangTag, nlgAnnoTy) = case rawAnno.payload of (m, ty, _) -> (m, ty)
     rawText = (\ (_, _, t) -> t) <$> rawAnno
 
     nlgParser :: Parser Nlg
@@ -173,6 +173,13 @@ nlgAnnotationP = do
       attachAnno $
         MkParsedNlg emptyAnno
           <$  annoEpa  (pure (tokenToEpa open))
+          -- The tag field's hole, in FIELD order. It has no surface of its own
+          -- here (the bare form cannot be tagged), but an empty-surface field
+          -- still occupies a holeFit slot in the generic exactprint traversal
+          -- — see the RecallMode note in 'L4.Syntax'. Without it the fragments
+          -- land in the tag's slot and exactprint emits the herald with no
+          -- text after it, silently, on every annotation in the corpus.
+          <*> annoHole (pure mLangTag)
           <*> annoHole (pure a)
           <*  annoEpa  (pure (tokenToEpa close))
 
@@ -181,6 +188,10 @@ nlgAnnotationP = do
       attachAnno $
         MkParsedNlg emptyAnno
           <$  annoLexeme (spacedTokenWsSatisfy isNlgPrefixToken "@nlg annotation herald")
+          -- Field order, as in 'blockNlg' above. The tag's surface — the @:he@
+          -- — is inside the herald token that the lexeme just emitted, so this
+          -- hole is empty and sits exactly where the surface already went.
+          <*> annoHole   (pure mLangTag)
           <*> annoHole   (nlgFragment False)
 
     nlgFragment :: Bool -> Parser [NlgFragment Name]
@@ -201,7 +212,7 @@ nlgAnnotationP = do
             traverse_ registerParseError (bundleErrors err)
             attachAnno $
               MkInvalidNlg emptyAnno
-                <$ annoEpa (pure $ (\ t -> TNlg nlgLangTag t nlgAnnoTy) <$> rawText)
+                <$ annoEpa (pure $ (\ t -> TNlg mLangTag t nlgAnnoTy) <$> rawText)
 
           Right nlg ->
             pure nlg

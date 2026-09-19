@@ -665,7 +665,26 @@ deadline` and a tick AT the deadline reveals nothing); and a listed refusal, whe
   cannot be instantiated — an action pattern that BINDS (`payment price`: "the action binds
   `price`, which the what-if cannot choose"), a `WITHIN` that was never evaluated and is not a
   literal (`deadlineOf`, `:264`). Refusals are listed, not dropped: an enabled set that omitted
-  them would say "nothing else can happen". Each candidate's `LiveNorm` is rendered by
+  them would say "nothing else can happen". **Amended 2026-09-19 (every-each round 2, O2; the
+  proxy's one actionable finding, §7.7):** an action that NAMES a local the residual holds
+  unforced — a member's pattern-bound `amount` read through a fork's `HENCE`
+  (`ok/every/run-fork.l4`); a rule `GIVEN` no event has compared yet — is the same refusal,
+  with the same sentence, and it is made BEFORE any replay (`closedAction`/`openLocals`): the
+  replay evaluates a hypothetical in the module's top-level environment, whose keys `position`
+  now records (`posReplayScope`, from the heap `replay` returns, plus `rigEnv`; builtins by
+  sort), so a `Var` the obligation's environment holds that is neither there nor a builtin can
+  only fail at replay — and until this date it did, surfacing the evaluator's own "Internal
+  error: amount is not in scope" as the `Untried` reason (measured on `run-fork.l4`'s second
+  trace and on `regulative-reference-expressions.l4`'s `projection operand`). A genuinely broken
+  name — one the environment does NOT hold — is deliberately left to the replay, so an
+  unexpected exception still surfaces loudly. Two things came with it: `reifyExpr` now visits
+  every `Var` under any operator (it read only `App` arguments before, so `p` under `p's
+  landlord` stayed unread even when forced, and that witness now discharges rather than
+  refuses); and a candidate carries `cdShape`, the action as far as the residual could read it,
+  so the refused receipt is still named `Receipt OF (Landlord OF "Ms Ng"), (Tenant OF "Alice"),
+  amount` — the member known, the sum open — where a `PatVar` pattern, which has no expression
+  form, is still named as the pattern. Pinned in `LtsWhatIfSpec` cases 10 and 10'. Each
+  candidate's `LiveNorm` is rendered by
   `renderLive` (`Marking.hs:354`) from the very `RawObligation` its act is built from — the
   first cut paired `liveObligations` with the marking's `InEffect` list by `zip`, on the
   unguarded assumption that two walks agree in order; review 2026-09-15 replaced that with one
@@ -729,6 +748,10 @@ Bob's act discharges, the tick past 3 + 5 breaches. A `SHANT` with no `LEST` —
 never states. A `MAY` with a `HENCE` — the act advances, the tick discharges (`LEST` defaulting to
 `FULFILLED`). `contracts.l4`'s `aContract` one event in — `payment price` is listed `Untried`
 naming the binder; the tick past 2 + 3 advances to the `LEST`'s `EXACTLY payment OF fine`. A
+fork's `HENCE` naming the member's open `amount` (`run-fork.l4`) and a rule `GIVEN` at its
+outset — refused before the replay, `ocSteps` empty, no verdict text containing "not in scope";
+the same `GIVEN` once a comparison has forced it — read through a projection and discharging
+(cases 10, 10', added 2026-09-19). A
 barrier of three with nobody acted — each member's act is **`Advancing`** with the `Awaiting` at
 1 of 3, the tick breaches; with two acted — the last member's act is **`Discharging`** (the
 `HENCE` is `FULFILLED`), the tick breaches. A fork — each member's act advances its **own**
@@ -1398,7 +1421,29 @@ Text}` — the sketch left `EventKey` undefined. Party and action are peeked. (S
   (`Machine.hs:1904`) and an `Expired` step is built at `Contract5` but **logged at
   `ResolveParty`** (`:1992`), where the party is known. Measured: an expiry with no `LEST` never
   forces the party; the breach's own party cell is peeked instead, so `PARTY Alice` (a nullary
-  constructor, allocated as a value) is known and a computed party would not be.
+  constructor, allocated as a value) is known and a computed party would not be. **BUILT
+  2026-09-19 (O1, `lts/p2-followups-2`): `NormKey` `+ nkBearerSource :: Maybe Text`** — the party
+  AS WRITTEN, the `prettyLayout` of the `PARTY p` expression's syntax, taken at `armNormKey`.
+  It is source, not value, so recording it forces nothing (peek-never-force stands), and it is
+  what the log has on the one step neither `nkBearer` nor `nkBearerName` can be known: the
+  no-`LEST` breach of a computed party. `Nothing` for an obligation whose party arrived as a
+  value (an `EVERY` member; the roll call forced it and `nkBearer` knows it) and for a join's own
+  key. `List.hs` falls back to it when both value renderings are absent, **marked as the written
+  form**: `ok/every/run-lest.l4`'s trace at :108 now reads
+  `at 10: the event at 18; theLandlord (as written; not yet resolved) MUST — deadline 15 passed
+without the act; that is a breach` where it read `(party not yet known) MUST`; the JSON keeps
+  `party: null` and adds `partyAsWritten: "theLandlord"` beside it (only when `party` is null;
+  no existing field changes meaning, `format` stays 1). `theLandlord` and the Standing line's
+  `Landlord OF "Ms Ng"` are one party under two spellings and do NOT compare by equality, which
+  is what the marker is for. "(party not yet known)" survives for a key with no written form
+  either, i.e. the join's own key, which `renderStep` words as "the group" anyway. **Not done
+  for `FailureSummary`** (`MissedSummary`'s party, `PartyNamed Nothing`): those are read off a
+  `Failure Reference`, which holds the party as a heap reference and nothing else; carrying the
+  syntax there is a change to a wire type (`ValueLazy.Failure`, serialised by `ValueLazyJSON`),
+  not to the log, and the placeholder stays on those two lines. Pinned: `DeonticStepSpec` case
+  21 (the run-lest shape: a `MEANS`-named party, a missed deadline, no `LEST`; asserts the field
+  and the step text on both the breach and a `Waiting` before any event, `Just "Alice"` for a
+  literal, `Nothing` for a member, and that a forced name still wins over the source).
 - `StepOutcome`: the sketch's `Breached !BreachSummary` survives for exactly one site — the
   `BREACH` expression arm (`LEST BREACH`, `BREACH BY p`), where the machine constructs an
   `ExplicitBreach`; it carries no norm (a terminal is not an obligation) and no clock (the
@@ -1682,6 +1727,31 @@ past — is refused by name after a bounded number of stalled hand-offs, not con
 `EVERY-EACH-QUANTIFIER-SPEC.md` §5.2.1, "The termination argument, re-read". An animator must
 model an event scrutinised k+1 times for k expired layers, not at most twice, and a refusal as a
 possible end of the walk.)_
+
+_(The state layer's mark — BUILT 2026-09-19, `lts/p2-followups-2`. This does not answer R6,
+which is §8's question of how the re-offered event is DRAWN, and stays open; what it closes is one
+more gap in the data R6 will draw from, so that `dsScrutiny` is right for every re-look before
+anyone decides the frames. Until then the mark was the act layer's only: a barrier whose
+`ONCE … WITHIN` was missed hands its `LEST` the members' OWN cells from the first event past the
+state deadline (`BarrierTrim`, 2026-09-16), and the `LEST`'s look at the completion that landed
+after the deadline was logged as a fresh `WitnessedOnly`/`Consumed` — EVERY-EACH-QUANTIFIER-SPEC
+§5.2.1's S3 made pairing those looks by stamp, party and action a consumer contract. Now it is a
+mark: `dsScrutiny` reads `Reoffered` for
+a look, anywhere under that hand-off, at a cell one of the barrier's members had looked at, and
+stays fresh for a cell no member reached — including one stamped AT the last completion but
+placed after it, which a "re-offered up to the last completion's stamp" watermark would have
+marked though nobody had seen it (`DeonticStepSpec` cases 18 and 18b pin both). `markReoffered`
+was not borrowed: it marks a copy the act layer allocates and Contract5 reads its stall count from
+it, so putting it on the members' shared cells would have counted a state re-look as a stalled
+hand-off under a `LEST` with a non-positive `WITHIN` (the refusal one layer earlier) and leaked
+to every other scanner of the stream (an `AND` sibling). The state layer's mark
+is the log's own — `dlMemberLooks`, every barrier member's look keyed by join and cell address,
+and `dlRelookScope`, the joins whose state-`LEST` hand-off the machine is inside, entered by
+`barrierStateLest` and left by the `RestoreCurrentParty` frame that hand-off already pushes — read
+beside `ev'reoffered` at Contract1 into `ev'relooked`, which the machine never consults; with the
+log off nothing is written, read or pushed, and the goldens are unchanged. Not marked, and said so
+in `DeonticStep.hs`: a sibling operand's look at the same stream (no hand-off), and the HENCE's
+stream, which starts after the first-in-roll-order completion at the latest stamp.)_
 
 A naive "one event, one animation frame" misrepresents this. `dsScrutiny` is the explicit
 **witness-versus-consume** distinction, and the scrubber must be able to show the same event
@@ -2756,9 +2826,15 @@ plus, for B and C, the position in plain words, and a `truth.json` per contract:
   artifact** (`etc/lts-reader-proxy/tenancy/probes.out:15` and `:11`): with Alice paid at 3, the
   what-if for the landlord's `Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)` is
   refused with the replay's own `Internal error: amount is not in scope` as its reason —
-  `reifyExpr` (`jl4-core/src/L4/Lts/WhatIf.hs:539`) cannot read a member's open pattern
-  variable through the `HENCE`; the verdict (untried) is right, the wording is not the list's.
-  And the tick past 7 prints as `the clock reaches 7.5` — `tickPast` (`WhatIf.hs:278`) going
+  `reifyExpr` (`jl4-core/src/L4/Lts/WhatIf.hs:539`, as of the run's `0139c6c5`) cannot read a
+  member's open pattern variable through the `HENCE`; the verdict (untried) is right, the wording
+  is not the list's.
+  _The first is fixed 2026-09-19 (§2.4, amended; every-each round 2 O2): the refusal is now
+  made before the replay, by `closedAction`, and reads "the action binds `amount`, which the
+  what-if cannot choose", and the receipt is still named with its member; `tenancy/probes.out`
+  is re-cut from that binary, so its line 15 reads the new sentence._
+  And the tick past 7 prints as `the clock reaches 7.5` — `tickPast` (`WhatIf.hs:278`, as of
+  `0139c6c5`) going
   half-way to the next live deadline, as §2.4 says, which a reader is not told.
 
 ### 7.4 The empirical warrant, corrected

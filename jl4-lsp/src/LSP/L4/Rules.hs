@@ -1031,9 +1031,20 @@ prettyNlgResolveWarning = \ case
     , Print.prettyLayout nlg
     , "```"
     ]
-  Resolve.Ambiguous name nlgs -> Text.unlines $
-    [ "More than one NLG annotation attached to: " <> Print.prettyLayout name
-    , "The following annotations would be attached:"
+  Resolve.Ambiguous name mtag nlgs -> Text.unlines $
+    ( case mtag of
+        -- The hint is only right for the untagged case. Two annotations that
+        -- already share a tag are ambiguous in a way a tag cannot fix.
+        Nothing ->
+          [ "More than one untagged NLG annotation attached to: " <> Print.prettyLayout name
+          , "If these are renderings in different languages, tag each one: @nlg:en, @nlg:he."
+          ]
+        Just (Lexer.MkLangTag tag) ->
+          [ "More than one NLG annotation in language `" <> tag <> "` attached to: "
+              <> Print.prettyLayout name
+          ]
+    ) <>
+    [ "The following annotations would be attached:"
     , ""
     ] <> [ "* `" <> Print.prettyLayout n.payload <> "`" | n <- nlgs]
   Resolve.RefUnattached r ->
@@ -1057,7 +1068,7 @@ rangeOfResolveWarning = \ case
     srcSpanToLspRange $ Just nlg.range
   Resolve.UnknownLocation _ ->
     srcSpanToLspRange Nothing
-  Resolve.Ambiguous name _ ->
+  Resolve.Ambiguous name _ _ ->
     srcRangeToLspRange $ rangeOf name
   Resolve.RefUnattached r ->
     srcSpanToLspRange $ Just r.range

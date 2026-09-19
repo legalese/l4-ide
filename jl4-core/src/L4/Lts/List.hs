@@ -59,6 +59,7 @@ import qualified Base.Text as Text
 import Base.Text (textShow)
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
+import Data.Aeson.Types (Pair)
 
 import L4.Annotation (HasSrcRange (..), emptyAnno)
 import L4.Evaluate.ValueLazy (NF (..), RBinOp (..), Value (..))
@@ -147,7 +148,7 @@ reportFrom tr es =
     , rpNext     = listToMaybe (sortOn fst confirmedTicks)
     , rpUnknown  = unknown
     , rpDeadlines = [ (n, d) | (d, ns) <- confirmedTicks, n <- ns ]
-    , rpActions  = [ (n, prettyLayout h.hyAction) | o <- es.esOutcomes, (ActBy n, Right h) <- [(o.ocCandidate.cdKind, o.ocCandidate.cdHypothetical)] ]
+    , rpActions  = [ (n, prettyLayout a) | o <- es.esOutcomes, ActBy n <- [o.ocCandidate.cdKind], Just a <- [o.ocCandidate.cdShape] ]
     , rpSteps    = pos.posSteps
     }
   where
@@ -371,11 +372,14 @@ familyLine f = case f.faJoin of
   Fork         -> "one of " <> textShow f.faTotal <> ", each with a next step of their own"
   Distributive -> "one of " <> textShow f.faTotal
 
--- | The hypothetical, in words: who does what, or time passing.
+-- | The hypothetical, in words: who does what, or time passing. An act the
+-- what-if refused is still named as far as the residual could instantiate
+-- it ('Candidate.cdShape'), and as the pattern only when it could not at
+-- all.
 candidateLine :: Outcome -> Text
 candidateLine o = case (o.ocCandidate.cdKind, o.ocCandidate.cdHypothetical) of
   (ActBy n, Right h)       -> bearerText n.lnBearer <> " does " <> prettyLayout h.hyAction <> " now (at " <> prettyRatio h.hyAt <> ")"
-  (ActBy n, Left _)        -> bearerText n.lnBearer <> " does " <> n.lnAction
+  (ActBy n, Left _)        -> bearerText n.lnBearer <> " does " <> maybe n.lnAction prettyLayout o.ocCandidate.cdShape
   (TickPast d _, Right h)  -> "nothing happens by " <> prettyRatio d <> " (the clock reaches " <> prettyRatio h.hyAt <> ")"
   (TickPast d _, Left _)   -> "nothing happens by " <> prettyRatio d
   (NoTick n, _)            -> "time runs out on " <> normLine [] n
@@ -443,6 +447,18 @@ reasonText r
 -- That is the log's limit, not the reader's business: the reference is
 -- elided to @…@ here, and the member ordinal (@member 2 of 3@) is what
 -- tells the members of a cast apart on such a step.
+--
+-- A party the machine has not looked at AT ALL — no key, no name — is
+-- written as the rule wrote it, marked so ('NormKey.nkBearerSource':
+-- @theLandlord (as written; not yet resolved) MUST@). That is the case of
+-- the no-@LEST@ breach of a computed party (O1, 2026-09-19): the machine
+-- allocates the party as a thunk it never has to force, and the log peeks
+-- and never forces, so the written form is all it has. It is source, not
+-- a resolved party: @theLandlord@ here and @Landlord OF "Ms Ng"@ on the
+-- Standing line beside it are the same party under two spellings, and the
+-- marker is what stops a reader from reading the name as a third person.
+-- "(party not yet known)" remains for a key with no written form either,
+-- which today is only a join's own key (worded "the group" below).
 renderStep :: DeonticStep -> Text
 renderStep s = Text.unwords $ catMaybes
   [ Just (maybe "at —:" (\ c -> "at " <> prettyRatio c <> ":") s.dsClock)
@@ -467,7 +483,7 @@ renderStep s = Text.unwords $ catMaybes
       (_, Just a) | isClockSentinel a -> "the clock runs to " <> prettyRatio e.ekStamp <> " with nothing happening"
       (p, a) -> fromMaybe "someone" (partyText e.ekPartyName p) <> " does " <> maybe "something" elide a <> " at " <> prettyRatio e.ekStamp
     normWords k = Text.unwords $ catMaybes
-      [ Just (fromMaybe "(party not yet known)" (partyText k.nkBearerName k.nkBearer))
+      [ Just (fromMaybe "(party not yet known)" (stepBearerText k))
       , Just (modalWord k.nkModal)
       , (\ m -> "(member " <> textShow m.moIndex <> " of " <> textShow m.moTotal <> ")") <$> k.nkMember
       , Just "—" ]
@@ -497,7 +513,11 @@ renderStep s = Text.unwords $ catMaybes
       JoinBreached b -> "breached" <> maybe "" (" by " <>) (partyText b.bsBlameName b.bsBlame) <> sideWords note <> namedWords b
       JoinPending    -> "still open"
     -- R-T3: a breach that names more than its anchor lists every failure,
-    -- in order, so the log drops none of them
+    -- in order, so the log drops none of them. A failure's party has no
+    -- written form to fall back on: a 'FailureSummary' is read off a
+    -- 'L4.Evaluate.ValueLazy.Failure', which holds the party as a heap
+    -- reference and nothing else (O1 left it: carrying the syntax there is
+    -- a change to a wire type, not to the log).
     namedWords b = case b.bsFailures of
       (_ : _ : _) -> "; names, in order: " <> Text.intercalate ", " (map failureWords b.bsFailures)
       _           -> ""
@@ -527,6 +547,23 @@ renderStep s = Text.unwords $ catMaybes
 -- else its ledger key with the heap references elided, else nothing.
 partyText :: Maybe Text -> Maybe Text -> Maybe Text
 partyText name key = name `mplus` fmap elide key
+
+-- | A norm's bearer as a step names it: 'partyText' over the key's two
+-- renderings of the value, else the party as written, marked as such so
+-- it cannot be mistaken for a resolved party (O1). 'Nothing' only for a
+-- key with no written form either.
+stepBearerText :: NormKey -> Maybe Text
+stepBearerText k =
+  partyText k.nkBearerName k.nkBearer `mplus` fmap (<> " (as written; not yet resolved)") k.nkBearerSource
+
+-- | The bearer as the JSON writes it: the resolved party under @party@
+-- (null when the machine had not looked at it), and, only then, the party
+-- as written under @partyAsWritten@ when the key has it. Adding the second
+-- field changes no existing field's meaning, so @format@ stays at 1.
+bearerJson :: NormKey -> [Pair]
+bearerJson k = case partyText k.nkBearerName k.nkBearer of
+  Just p  -> ["party" .= p]
+  Nothing -> ["party" .= Aeson.Null] <> maybe [] (\ w -> ["partyAsWritten" .= w]) k.nkBearerSource
 
 -- | Elide heap references (@&229\@file.l4@) in a machine-keyed text,
 -- keeping the punctuation around them.
@@ -679,7 +716,7 @@ blameJson b = Aeson.object $ catMaybes
 candidateJson :: Outcome -> Aeson.Value
 candidateJson o = case (o.ocCandidate.cdKind, o.ocCandidate.cdHypothetical) of
   (ActBy n, Right h) -> Aeson.object ["kind" .= ("act" :: Text), "party" .= bearerText n.lnBearer, "action" .= prettyLayout h.hyAction, "at" .= ratio h.hyAt]
-  (ActBy n, Left _) -> Aeson.object ["kind" .= ("act" :: Text), "party" .= bearerText n.lnBearer, "action" .= n.lnAction]
+  (ActBy n, Left _) -> Aeson.object ["kind" .= ("act" :: Text), "party" .= bearerText n.lnBearer, "action" .= maybe n.lnAction prettyLayout o.ocCandidate.cdShape]
   (TickPast d ns, Right h) -> Aeson.object ["kind" .= ("tick" :: Text), "deadline" .= ratio d, "at" .= ratio h.hyAt, "whose" .= map (normJson []) ns]
   (TickPast d ns, Left _) -> Aeson.object ["kind" .= ("tick" :: Text), "deadline" .= ratio d, "whose" .= map (normJson []) ns]
   (NoTick n, _) -> Aeson.object ["kind" .= ("noTick" :: Text), "whose" .= [normJson [] n]]
@@ -698,7 +735,7 @@ stepJson s = Aeson.object $ catMaybes
       | Just a <- e.ekAction, isClockSentinel a = Aeson.object ["at" .= ratio e.ekStamp, "kind" .= ("clock" :: Text)]
       | otherwise = Aeson.object ["at" .= ratio e.ekStamp, "kind" .= ("act" :: Text), "party" .= partyText e.ekPartyName e.ekParty, "action" .= fmap elide e.ekAction]
     normKeyJson k = Aeson.object $
-      [ "party" .= partyText k.nkBearerName k.nkBearer, "modal" .= modalWord k.nkModal, "activation" .= k.nkActivation ]
+      bearerJson k <> [ "modal" .= modalWord k.nkModal, "activation" .= k.nkActivation ]
       <> maybe [] (\ m -> ["member" .= m.moIndex, "of" .= m.moTotal]) k.nkMember
     -- one token per 'StepOutcome' constructor; the sentence is 'outcomeWords'
     outcomeJson = \ case
