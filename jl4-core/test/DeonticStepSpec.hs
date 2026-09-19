@@ -38,12 +38,17 @@
 --  17. a barrier with no LEST whose MUST member misses — JoinFailed ToBreach;
 --  18. a barrier whose last completion comes after the ONCE … WITHIN, and
 --      whose LEST is an obligation — the state layer's LEST looks at the
---      members' own completion again, unmarked;
+--      members' own completion again, marked Reoffered (R6/S3, 2026-09-19);
+--      18b. the same with a fresh event at the completion's own stamp, which
+--      no member reached and which stays unmarked;
 --  19. an act before the window's opening edge (AFTER) — a nullity, logged
 --      as EarlyAct and passed over; then the act in the window;
 --  20. a record-shaped party (@Tenant OF "Alice"@): the key carries the
 --      bearer's rendered NAME from the step where the machine had forced
 --      its fields, and not before;
+--  21. a MEANS-named party that misses its deadline with no LEST: the
+--      machine never forces the party, so the key has neither ledger key
+--      nor name, and carries the party AS WRITTEN instead (O1, 2026-09-19);
 --
 -- plus: the log-off path returns the same results as the log-on path, and
 -- a directive with no regulative content logs nothing.
@@ -62,6 +67,7 @@ import L4.EvaluateLazy
   )
 import L4.EvaluateLazy.DeonticStep
 import L4.EvaluateLazy.Machine (emptyEnvironment)
+import L4.Lts.List (renderStep)
 import L4.Evaluate.ValueLazy (RBinOp (..))
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Syntax (DeonticModal (..))
@@ -143,6 +149,11 @@ bearerName s = (.nkBearerName) =<< s.dsNorm
 
 eventPartyName :: DeonticStep -> Maybe Text.Text
 eventPartyName s = (.ekPartyName) =<< s.dsEvent
+
+-- | The bearer as the rule WROTE it ('nkBearerSource'): the source form of
+-- the @PARTY@ expression, rendered at arming without forcing anything.
+bearerSource :: DeonticStep -> Maybe Text.Text
+bearerSource s = (.nkBearerSource) =<< s.dsNorm
 
 -- | The member's site and membership, for the EVERY shapes, so the tests can
 -- say "one site, two bearers, two ordinals".
@@ -477,7 +488,8 @@ barrierBreachSrc = Text.unlines $ everyPrologue <>
 -- 18. the join-line deadline missed, with a LEST that is an obligation: the
 --     state layer's LEST is handed the members' stream from the first event
 --     past the state deadline on (Machine's BarrierTrim, EVERY-EACH-QUANTIFIER-SPEC
---     §5.2, 2026-09-16), and nothing marks that hand-off
+--     §5.2, 2026-09-16); since 2026-09-19 (R6/S3) the log marks its second
+--     look at a cell a member had looked at
 joinLestSrc :: Text.Text
 joinLestSrc = Text.unlines $ everyPrologue <>
   [ "GIVETH A DEONTIC Actor Action"
@@ -493,6 +505,28 @@ joinLestSrc = Text.unlines $ everyPrologue <>
   , "  PARTY alice DOES Sign alice AT 1"
   , "  PARTY bob   DOES Sign bob   AT 9"
   , "  PARTY theLandlord DOES Deliver theLandlord AT 12"
+  ]
+
+-- 18b. as 18, but the landlord's Deliver lands AT the last completion's
+--      stamp, after it in the trace: no member reached it, so the LEST's
+--      look at it is a first look. This is the corner a stamp watermark
+--      ("re-offered up to the last completion") would get wrong, and why the
+--      mark is by the cell the member looked at rather than by stamp.
+joinLestTieSrc :: Text.Text
+joinLestTieSrc = Text.unlines $ everyPrologue <>
+  [ "GIVETH A DEONTIC Actor Action"
+  , "`sign by day 5` MEANS"
+  , "    EVERY Tenant t IN tenants"
+  , "        MUST   Sign t"
+  , "        WITHIN 14"
+  , "        ONCE   ALL HAVE WITHIN 5"
+  , "        HENCE  FULFILLED"
+  , "        LEST   (PARTY theLandlord MUST Deliver theLandlord WITHIN 10)"
+  , ""
+  , "#TRACE `sign by day 5` AT 0 WITH"
+  , "  PARTY alice DOES Sign alice AT 1"
+  , "  PARTY bob   DOES Sign bob   AT 9"
+  , "  PARTY theLandlord DOES Deliver theLandlord AT 9"
   ]
 
 -- 19. the window's opening edge (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X6):
@@ -519,6 +553,25 @@ earlyActSrc = Text.unlines $ prologue <>
   , "  PARTY Bob DOES deliver AT 16"
   ]
 
+-- 21. a computed party — a MEANS name — that misses its deadline with no
+--     LEST (the shape of ok/every/run-lest.l4's trace at :108). The expiry
+--     is found from the event's stamp alone, before any party comparison,
+--     and with no continuation to run there is no ResolveParty frame to
+--     force the party in: the breach's own party cell is allocated as a
+--     thunk and only peeked. The second trace has no events at all, so
+--     the obligation logs Waiting before anything has looked at the party.
+computedPartyBreachSrc :: Text.Text
+computedPartyBreachSrc = Text.unlines $ everyPrologue <>
+  [ "GIVETH A DEONTIC Actor Action"
+  , "`deliver by day 5` MEANS"
+  , "    PARTY theLandlord MUST Deliver theLandlord WITHIN 5"
+  , ""
+  , "#TRACE `deliver by day 5` AT 0 WITH"
+  , "  PARTY alice DOES Sign alice AT 8"
+  , ""
+  , "#TRACE `deliver by day 5` AT 0 WITH"
+  ]
+
 -- Off-path proof: every fixture, both ways, same rendered result.
 allSrcs :: [(String, Text.Text)]
 allSrcs =
@@ -528,7 +581,8 @@ allSrcs =
   , ("prohibition", prohibitionSrc), ("guard", guardSrc), ("action-mismatch", actionMismatchSrc)
   , ("barrier-fail", barrierFailSrc), ("barrier-stall", barrierStallSrc), ("barrier-breach", barrierBreachSrc)
   , ("join-lest", joinLestSrc), ("early-act", earlyActSrc)
-  , ("barrier-fresh", barrierFreshSrc), ("fork-breach", forkBreachSrc) ]
+  , ("barrier-fresh", barrierFreshSrc), ("fork-breach", forkBreachSrc)
+  , ("computed-party-breach", computedPartyBreachSrc) ]
 
 -- | The 'Breached' step an explicit @BREACH@ with no @BY@ logs.
 bareBreach :: Row
@@ -747,28 +801,46 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
       , Row Nothing 1 (Just DMust) (JoinFailed ToBreach) NoEvent Nothing (Just 20) Nothing
       ]
 
-  it "18. a join-line deadline whose LEST is an obligation: the LEST looks at the last completion again, UNMARKED (§4.4's mark is the act layer's), then takes its own event" $ do
+  it "18. a join-line deadline whose LEST is an obligation: the LEST looks at the last completion again, marked Reoffered (the state layer's mark, R6/S3), then takes its own event" $ do
     rs <- runLogged joinLestSrc
     let ss = stepsOf 0 rs
     -- Bob's Sign at 9 is Consumed by member 2 and then, being the first
     -- event past the state deadline 5, is the head of the stream the LEST
     -- is handed (BarrierTrim): the landlord's obligation logs its look at
-    -- it as a plain PartyMismatch, WitnessedOnly — NOT Reoffered. Two rows
-    -- for one event, paired by stamp, party and action, not by the mark.
-    -- Pinned from the runtime on 2026-09-17 (adversarial round 1 of the
-    -- third rebase, S3); before the trim the LEST was handed the whole
-    -- stream, so alice's Sign at 1 was looked at again too.
+    -- it as a PartyMismatch, and since 2026-09-19 (R6/S3) as Reoffered —
+    -- the same cell a member had looked at, seen again under the barrier's
+    -- state-layer LEST. Two rows for one event, the second marked, as the
+    -- act layer's re-offer is. The landlord's own Deliver at 12 no member
+    -- reached, and it is a fresh Consumed. Row 5 re-pinned from the
+    -- runtime on 2026-09-19; it read WitnessedOnly from 2026-09-17 (S3),
+    -- when the pairing was a consumer contract rather than a mark.
     map row ss `shouldBe`
       [ Row (Just "Tenant OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) (Just (MemberSatisfied 1 2))
       , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
       , Row (Just "Tenant OF ") 2 (Just DMust) (Matched ToHence) Consumed (Just 9) (Just 9) (Just (MemberSatisfied 2 2))
       , Row Nothing 1 (Just DMust) (JoinExpired ToLest 5) NoEvent Nothing (Just 9) Nothing
-      , Row (Just "Landlord OF ") 1 (Just DMust) PartyMismatch WitnessedOnly (Just 9) (Just 9) Nothing
+      , Row (Just "Landlord OF ") 1 (Just DMust) PartyMismatch Reoffered (Just 9) (Just 9) Nothing
       , Row (Just "Landlord OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 12) (Just 12) Nothing
       ]
-    -- the same event, twice, and neither look carries the mark
+    -- the same event, twice, and exactly the second look carries the mark
     length [ s | s <- ss, Just e <- [s.dsEvent], e.ekStamp == 9 ] `shouldBe` 2
-    [ s.dsScrutiny | s <- ss, s.dsScrutiny == Reoffered ] `shouldBe` []
+    [ (.ekStamp) <$> s.dsEvent | s <- ss, s.dsScrutiny == Reoffered ] `shouldBe` [Just 9]
+
+  it "18b. a fresh event at the last completion's own stamp, after it in the trace, is not marked: the mark is the cell a member looked at, not the stamp" $ do
+    rs <- runLogged joinLestTieSrc
+    let ss = stepsOf 0 rs
+    -- Bob's Sign at 9 is looked at again under the LEST (Reoffered); the
+    -- landlord's Deliver, also at 9 but after it, no member reached, and
+    -- the LEST's look at it is its first: Consumed, unmarked.
+    map row ss `shouldBe`
+      [ Row (Just "Tenant OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 1) (Just 1) (Just (MemberSatisfied 1 2))
+      , Row (Just "Tenant OF ") 2 (Just DMust) PartyMismatch WitnessedOnly (Just 1) (Just 1) Nothing
+      , Row (Just "Tenant OF ") 2 (Just DMust) (Matched ToHence) Consumed (Just 9) (Just 9) (Just (MemberSatisfied 2 2))
+      , Row Nothing 1 (Just DMust) (JoinExpired ToLest 5) NoEvent Nothing (Just 9) Nothing
+      , Row (Just "Landlord OF ") 1 (Just DMust) PartyMismatch Reoffered (Just 9) (Just 9) Nothing
+      , Row (Just "Landlord OF ") 1 (Just DMust) (Matched ToHence) Consumed (Just 9) (Just 9) Nothing
+      ]
+    [ keyPrefix <$> ((.ekParty) =<< s.dsEvent) | s <- ss, s.dsScrutiny == Reoffered ] `shouldBe` [Just "Tenant OF "]
 
   it "19. an act before the window opens is EarlyAct, WitnessedOnly, carrying the opening; the obligation stands, and the act in the window matches" $ do
     rs <- runLogged earlyActSrc
@@ -826,6 +898,35 @@ spec = describe "the deontic step log (LTS-VISUALISER §4.3, P2b)" $ do
     rsFork <- runLogged forkBreachSrc
     [ (fmap keyPrefix b.bsBlame, b.bsBlameName) | s <- stepsOf 0 rsFork, Breached b <- [s.dsOutcome] ]
       `shouldBe` [(Just "Tenant OF ", Just "Tenant OF \"Bob\"")]
+
+  it "21. a MEANS-named party that misses with no LEST: no key, no name, the party as written — and the step says so" $ do
+    rs <- runLogged computedPartyBreachSrc
+    -- The breach: one step, Expired ToBreach, at the arming clock, revealed
+    -- by the event at 8. The machine never looked at the party, so the two
+    -- value renderings are Nothing; the written form is what there is.
+    map (\ s -> (s.dsOutcome, rawBearer s, bearerName s, bearerSource s)) (stepsOf 0 rs) `shouldBe`
+      [(Expired ToBreach 5, Nothing, Nothing, Just "theLandlord")]
+    map renderStep (stepsOf 0 rs) `shouldBe`
+      ["at 0: the event at 8; theLandlord (as written; not yet resolved) MUST — deadline 5 passed without the act; that is a breach"]
+    -- No events: Waiting, before anything has looked at the party either.
+    map (\ s -> (s.dsOutcome, rawBearer s, bearerName s, bearerSource s)) (stepsOf 1 rs) `shouldBe`
+      [(Waiting, Nothing, Nothing, Just "theLandlord")]
+    map renderStep (stepsOf 1 rs) `shouldBe`
+      ["at —: theLandlord (as written; not yet resolved) MUST — no more events; still waiting"]
+    -- A literal party is written as its literal; an EVERY member arrives
+    -- as a value and has no written form, its bearer being known already.
+    rs1 <- runLogged matchSrc
+    map bearerSource (stepsOf 0 rs1) `shouldBe` [Just "Alice", Just "Bob"]
+    fresh <- runLogged barrierFreshSrc
+    map bearerSource (stepsOf 0 fresh) `shouldBe` [Nothing, Nothing]
+    -- The written form is not a resolved party: where the machine did
+    -- force it (the landlord's HENCE in fixture 6, matched at 6), the
+    -- name is what the step prints, and the source sits unused beside it.
+    rs6 <- runLogged barrierSrc
+    map (\ s -> (bearerSource s, bearerName s)) (drop 4 (stepsOf 0 rs6)) `shouldBe`
+      [(Just "theLandlord", Just "Landlord OF \"Ms Ng\"")]
+    map renderStep (drop 4 (stepsOf 0 rs6)) `shouldBe`
+      ["at 6: Landlord OF \"Ms Ng\" does Deliver OF … at 6; Landlord OF \"Ms Ng\" MUST — done; on to what follows"]
 
   it "the log-off path is unchanged: every fixture renders the same result both ways" $
     for_ allSrcs \(name, src) -> do

@@ -335,7 +335,7 @@ substituteNlgCalls info = transformOf (gplate @(Expr Resolved)) $ \case
 -- corresponding call argument.
 renderNlgWith :: Map.Map Unique (Expr Resolved) -> Nlg -> Text
 renderNlgWith argMap = \case
-  MkResolvedNlg _ frags -> normalizeWs (Text.concat (map frag frags))
+  MkResolvedNlg _ _ frags -> normalizeWs (Text.concat (map frag frags))
   other                 -> simpleLinearizer other
  where
   -- Escapes decode HERE, not in the lexer: the annotation token carries

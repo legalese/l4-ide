@@ -18,9 +18,11 @@ resolveNlgAnnotation a = do
       resolvedNlg <- case nlgM of
         MkInvalidNlg{} -> pure nlgM
         MkResolvedNlg{} -> pure nlgM
-        MkParsedNlg ann frags -> do
+        -- The tag travels with the annotation through resolution: a
+        -- resolved Hebrew rendering is still a Hebrew rendering.
+        MkParsedNlg ann mtag frags -> do
           resolvedFrags <- traverse resolveNlgFragment frags
-          pure $ MkResolvedNlg ann resolvedFrags
+          pure $ MkResolvedNlg ann mtag resolvedFrags
       setAnnNlg resolvedNlg a
 
 resolveNlgFragment :: NlgFragment Name -> Check (NlgFragment Resolved)

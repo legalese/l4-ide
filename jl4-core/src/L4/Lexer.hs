@@ -553,11 +553,24 @@ nlgString =
 -- backslash changes what an annotation captures without changing what it
 -- renders: the two sides disagree about whether an escape happened. Any other
 -- @\\x@ is two ordinary characters, on both sides alike.
+--
+-- __The open bracket is here even though it never needs escaping__ (ruled
+-- 2026-09-19). A bare @[@ is ordinary text in both annotation forms — it does
+-- not nest and it cannot end an annotation — so @\\[@ protects nothing. It is
+-- accepted because an author who escapes the closing bracket of a citation
+-- will escape its opening bracket in the same keystroke, @[see note \\[3\\]
+-- here]@, and the asymmetric set rendered that as @see note \\[3] here@: the
+-- @\\]@ decoded, the @\\[@ did not, and a backslash the author never meant to
+-- write reached the generated prose. That failure is SILENT — no diagnostic,
+-- no parse error, just a wrong character in the output — which is the kind
+-- worth spending a rule on. Accepting the habit costs nothing, because the two
+-- spellings now decode to the same text.
 isNlgEscapable :: Char -> Bool
 isNlgEscapable c =
   c == '\\'
     || c == nlgExprDelimiterSymbol
     || c == nlgInlineAnnotationCloseChar
+    || c == nlgInlineAnnotationOpenChar
 
 -- | The characters a backslash may escape inside an @\@ref@ annotation.
 --

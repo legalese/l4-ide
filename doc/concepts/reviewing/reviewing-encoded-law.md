@@ -90,7 +90,7 @@ The pipeline’s output lands in [**legalese/canon**](https://github.com/legales
 
 What it is _not_, stated plainly because the tool says so itself: the analysis is propositional. Every leaf is opaque, so `x > 5 AND x < 3` is invisible to it — no numeric, date or string contradiction is in range — and each rule is read on its own without unfolding the rules it calls. **Findings are sound; silence is not a consistency proof.** On the Reg CF corpus it reports zero findings, and three numbers bound what that is worth: 25 of 42 analysed rules have exactly one condition, 111 of 154 are outside the analysis entirely for not returning a boolean, and 7 more are nested where the analysis does not reach. Those are counted and named on the receipt rather than folded into the word “clean”. You will meet this style everywhere here — a green result that tells you what it did not look at.
 
-`l4 nlg FILE` regenerates legislative prose from the encoding. Useful in review: read the generated prose beside the source section and the difference in emphasis often shows you where the encoding has quietly changed the subject.
+`l4 nlg FILE` regenerates legislative prose from the encoding. Useful in review: read the generated prose beside the source section and the difference in emphasis often shows you where the encoding has quietly changed the subject. Where an encoding carries renderings in more than one language, `l4 nlg --lang he FILE` asks for one of them; a rule with no rendering in that language falls back to its default, so a partial translation still reviews as a whole document.
 
 ## 4 · Your two jobs: interpretation & isomorphism
 

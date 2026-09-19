@@ -259,6 +259,83 @@ which is eligible holds"_ instead of exposing the recursion.
 
 ---
 
+## Lever 4 — one encoding, two documents
+
+Everything above produces _a_ document. The same machinery produces a **set** of
+them, one per language, from a single encoding — because a rule can carry more
+than one rendering, and each says which language it is in.
+
+### Write both renderings
+
+A language subtag goes straight after the herald, and the second rendering goes
+on the continuation line under the first:
+
+```l4
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the claim of %amount% exceeds the threshold
+                  @nlg:he %amount% עולה על הסף
+  IF amount GREATER THAN 100
+```
+
+Only the wording is duplicated. There is one rule, one set of tests, one thing
+to get right; the second language cannot drift away from the logic, because
+there is no second logic for it to drift from. That is the whole argument for
+doing it this way rather than maintaining two documents.
+
+### Ask for each one
+
+```console
+$ l4 nlg --lang en contract.l4  > contract.en.txt
+$ l4 nlg --lang he contract.l4  > contract.he.txt
+```
+
+Two runs, one argument apart. That is the bilingual set.
+
+### Translate incrementally
+
+A rule with no rendering in the language you asked for falls back to its default
+one. A half-translated encoding therefore produces a **whole** document with
+some paragraphs still in the original language — which is what you want while
+the translation is in progress, and is very different from a document with
+holes in it. You can ship after the first pass and keep going.
+
+### Then there is the case where you do nothing
+
+Now read the same rule with the tags taken off:
+
+```l4
+DECIDE `is large` @nlg the claim of %amount% exceeds the threshold
+  IF amount GREATER THAN 100
+```
+
+Ask for no language, and you get that sentence. Ask for `--lang he`, and you
+get that sentence too, because there is no Hebrew rendering to prefer and the
+fallback is the default.
+
+**So "L4 documents come out in English" is not a rule — it is the degenerate
+case of the rule above.** What you actually get is _the default rendering_: the
+untagged annotation if there is one, otherwise the first in the file. Our corpus
+is written in English, so its default renderings are English sentences, and the
+output looks like a language setting nobody configured. It is not one. A corpus
+whose annotations are written in Hebrew has always produced Hebrew documents,
+with no tags and no flag, and did so before tags existed at all — see
+[Multilingual L4](../../reference/syntax/README.md#labelling-the-language-nlghe).
+
+The practical consequence: **you never have to start tagging.** Tags earn their
+keep at the moment a second language appears, and not before. An encoding with
+one language wants no tags at all, and adding them changes nothing about what it
+prints.
+
+### One clash to know about
+
+Two renderings in the _same_ language on one rule — two `@nlg:he`, or two
+untagged — is an ambiguity, not a choice. L4 warns and attaches neither, because
+silently keeping one would discard a sentence you wrote. A clash in one language
+leaves the others alone.
+
+---
+
 ## Literal recitals — carrying prose that isn't computed
 
 The levers above get _computed_ logic to read as prose. But parts of a legal

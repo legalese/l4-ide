@@ -244,6 +244,8 @@ test-suite jl4-core-test
     TracePostprocessSpec
     EdgeCrashSpec
     PrintRoundtripSpec
+    PrettyLayoutNlgSpec
+    NlgMultiplicitySpec
     SectionGivenTdnrSpec
     LedgerSubstrateSpec
     LedgerThunkCacheSpec
@@ -279,6 +281,7 @@ test-suite jl4-core-test
     hspec,
     jl4-core,
     megaparsec,
+    optics,
     text,
     time,
     vector

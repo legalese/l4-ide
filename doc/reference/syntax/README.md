@@ -123,11 +123,12 @@ Inside `@nlg`, `%` marks a parameter to fill in — `%age%` is replaced by the
 value of `age` — and `]` ends a bracketed annotation. To write either
 character as itself, put a backslash in front of it.
 
-| you write            | you get           | without the backslash             |
-| -------------------- | ----------------- | --------------------------------- |
-| `10\%and\%20`        | `10%and%20`       | `and` is read as a parameter name |
-| `[rate \] per unit]` | `rate ] per unit` | the annotation ends early         |
-| `\\`                 | `\`               | —                                 |
+| you write               | you get             | without the backslash             |
+| ----------------------- | ------------------- | --------------------------------- |
+| `10\%and\%20`           | `10%and%20`         | `and` is read as a parameter name |
+| `[rate \] per unit]`    | `rate ] per unit`   | the annotation ends early         |
+| `[see note \[3\] here]` | `see note [3] here` | —                                 |
+| `\\`                    | `\`                 | —                                 |
 
 **Most of the time you do not need this.** A percent sign with a space after it
 is already ordinary text, so `a 5% levy on %amount%` works as written and fills
@@ -141,6 +142,14 @@ tells you nothing: if the word between the two percent signs happens to name
 one of your parameters, L4 quietly substitutes that value, and your sentence
 comes out with a number where you wrote a word. Nothing is reported, and the
 rule still runs.
+
+**An opening `[` never needs escaping, and you may escape it anyway.** Only
+the closing bracket ends an annotation, so `[see note [3] here]` is already
+correct as written. But nobody writes half a pair: reach for the backslash on
+the `]` and your hand puts one on the `[` too. `\[` therefore means a literal
+`[`, exactly as the bare character does, and the two spellings come out the
+same. Before that, only half the pair decoded and the leftover backslash
+turned up in the finished sentence with nothing reported.
 
 **What this costs.** A backslash immediately before the closing `]` no longer
 ends the annotation, because `\]` now means a literal `]`. Write `\\` if you
@@ -160,28 +169,62 @@ DECIDE `is large` @nlg:en the amount %amount% is large
   IF amount GREATER THAN 100
 ```
 
-**What this does today, and what it does not.** The tag is recognised, kept
-with the annotation, and written back out unchanged by `l4 format`. **Nothing
-chooses between languages yet.** A name still carries at most one `@nlg`, so
-you cannot yet write an English rendering and a Hebrew rendering of the same
-rule and ask for one of them. Writing `@nlg:he` labels your prose; it does not
-produce a Hebrew document.
-
 **L4 has no idea what language you are writing in.** The renderer prints
 whatever the annotation says, so an annotation written in Hebrew has always
-produced Hebrew output, with or without a tag. The tag records what you wrote.
-It does not translate, and it never has to be present for a non-English
-annotation to work.
+produced Hebrew output, with or without a tag. The tag does not translate
+anything. What it does is let you attach _more than one_ rendering to the same
+rule and say which is which.
 
-**Why label at all, then?** Because the label is what a later reader — a
-person, a tool, or a translator — needs in order to tell two renderings apart.
-It is worth writing now if your encoding is multilingual, so that the
-information is already in the source when selection arrives.
+#### Writing the same rule in two languages
+
+Put the second rendering on the continuation line, under the first:
+
+```l4
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is large` @nlg:en the amount %amount% is large
+                  @nlg:he %amount% עולה על הסף
+  IF amount GREATER THAN 100
+```
+
+Then ask for one:
+
+```console
+$ l4 nlg --lang he mymodule.l4
+$ l4 nlg --lang en mymodule.l4
+```
+
+Two runs of the same command over the same source produce the two documents.
+Nothing about the rule is duplicated — only its wording.
+
+**A rule you have not translated yet still appears.** `--lang he` falls back to
+a rule's default rendering when it has no Hebrew one, so a half-finished
+translation produces a whole document with some of it still in the original
+language, rather than a document with holes in it.
+
+**Which rendering is the default** — the one you get with no `--lang` at all —
+is the untagged annotation if there is one, and otherwise the first in the
+file. So a rule with exactly one annotation behaves exactly as it did before
+tags existed, tagged or not.
+
+**Two renderings in the SAME language is still an error.** Two `@nlg:he` on one
+rule, or two untagged ones, is a genuine ambiguity: L4 warns and attaches
+neither, because picking one would silently throw away a sentence you wrote.
+A clash in one language does not affect the others — two `@nlg:he` and one
+`@nlg:en` leaves the English rendering working.
+
+**Where you put the annotation decides what it describes, and getting it wrong
+is quiet.** An annotation attaches to the name it follows. On its own line
+_above_ `DECIDE` it follows the `GIVETH` type, so it describes that type and
+never appears in the rule's rendered prose — with no warning, because it did
+attach to something. Write it after the rule's name, as above.
 
 **The bare inline form cannot be tagged.** `[…]` has nowhere to put a subtag —
-the annotation is just brackets around prose — so `@nlg:he` is available only
-on the heralded form. If you need a language on an inline gloss, use the
-heralded form for that annotation.
+the annotation is just brackets around prose — so a language is available only
+on the heralded form. Two consequences worth knowing: an inline gloss can only
+ever be the default rendering, and `l4 batch`, which re-renders a module
+through the pretty-printer rather than re-emitting its bytes, keeps only that
+default. Use `l4 format` when you need every rendering preserved verbatim.
 
 **A colon that is not a subtag is ordinary text.** A subtag is letters, digits
 and hyphens, so `@nlg:he` and `@nlg:zh-Hant` are tags, while `@nlg: see below`
@@ -214,10 +257,11 @@ text.
 `\>` now means a literal `>`; write `\\` instead. Any other character after a
 backslash is left alone, so `\q` is still a backslash followed by a `q`.
 
-This is the same idea as the `\%` and `\]` escapes in `@nlg` above, but the
-character set is deliberately different: `%` and `]` are ordinary text in a
-citation, and `>` is ordinary text in an `@nlg` annotation. Each annotation
-escapes only what would otherwise be read as punctuation in that annotation.
+This is the same idea as the `\%`, `\]` and `\[` escapes in `@nlg` above, but
+the character set is deliberately different: `%`, `]` and `[` are ordinary
+text in a citation, and `>` is ordinary text in an `@nlg` annotation. Each
+annotation escapes only what would otherwise be read as punctuation in that
+annotation.
 
 ### @ref-src / @ref-map
 
