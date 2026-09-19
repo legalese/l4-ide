@@ -27,11 +27,16 @@ What was run, on what, with what:
   (`jl4/examples/bpmn/option.l4`, legalese/l4-ide#425, 2026-09-17 — a single `PARTY … MAY` whose
   `HENCE` is another party's duty); and `tenancy-fork-beside-party` (`receipts and delivery` in
   `tenancy.l4`, legalese/l4-ide#430 — a fork `RAND` a `PARTY` obligation), the newcomer of run 4.
-  No Haskell was built; the fixtures are P1's output as committed. Since #430 the five fork
-  goldens (`tenancy-fork`, `tenancy-fork-beside-party`, `modals-may-fork`, `modals-shant-fork`,
-  `modals-must-fork-join-deadline`) are multi-instance **sub-processes**, not multi-instance
-  tasks; what the exporter claims for that shape lives in #430, and this document says only what
-  the simulator shows of it.
+  No Haskell was built; the fixtures are P1's output as committed. **legalese/l4-ide#430 is an
+  open PR, not a landed one** (2026-09-19: state OPEN, base `unstable`, its head `646f58e9c` not
+  an ancestor of `origin/unstable`); this branch carries that head by merge (`b24e19bae`), so
+  every "since #430" below describes the goldens **on this branch**, and the same shape exists on
+  `unstable` only once #430 merges — legalese/l4-ide#426 must land after it or be rebased onto
+  it, or it would carry #430's exporter change unreviewed. With #430's head merged in, the five
+  fork goldens (`tenancy-fork`, `tenancy-fork-beside-party`, `modals-may-fork`,
+  `modals-shant-fork`, `modals-must-fork-join-deadline`) are multi-instance **sub-processes**,
+  not multi-instance tasks; what the exporter claims for that shape lives in #430, and this
+  document says only what the simulator shows of it.
 - **Versions** (`etc/bpmn-token-sim/out/run-meta.json`, run 4, from `npm ls --depth=0`):
 
   ```
@@ -114,7 +119,8 @@ What was run, on what, with what:
   `9cd110c5d` (which taught it the sub-process shape: end events found by type and placed as
   top-level or inside a box, no pause point on the multi-instance box, the breach scenario fires
   interrupting boundaries only — §1), committed as `a3c7bdce3` on the tree with
-  legalese/l4-ide#430 merged in. **The committed `out/` is run 4 in full:** `run-meta.json`'s
+  legalese/l4-ide#430's head `646f58e9c` merged into this branch (`b24e19bae`; #430 itself is
+  open — see Input). **The committed `out/` is run 4 in full:** `run-meta.json`'s
   sixteen `perFixture` entries carry one `runAt`, `2026-09-18T23:23:21.042Z`, and one
   `harnessCommit`, `9cd110c5d` (`jq '.perFixture | map(.runAt) | unique'`: one value); the
   hand-written `perFixture` block and its `_note` from #425 are gone, the block is generated.
@@ -161,9 +167,12 @@ then the closest thing the simulator has to "an obligation in force".
 honour a pause point on the box, but then the token parks on the box, the only triggers offered
 are `Start_0`, the box itself and its escalation relay, and the task inside is not yet enterable
 (`Task_0`'s pad offers only "Remove pause point") — a state that says nothing about the rule, and
-one more click on every happy path. That probe is recorded in `9cd110c5d`'s commit message
-(measured on `tenancy-fork.bpmn` at `646f58e9c`), not in any committed JSON, so it is cited and
-not tagged MEASURED here. The committed run pauses the tasks only, so the token runs into the box
+one more click on every happy path. That probe is not in any committed JSON (the committed run
+never pauses the box), so it is not tagged MEASURED here; it was measured by hand on
+`tenancy-fork.bpmn` on this branch, first for `9cd110c5d` (whose message summarises it as "only
+the box is triggerable", an under-count) and again on 2026-09-19 with a pause point added on
+`Scope_0`, which read the three "Trigger Event" pads named above and "Remove pause point" on
+both tasks. The committed run pauses the tasks only, so the token runs into the box
 and stops on the member's task with the box still live: `started.tokensOn: ["Scope_0","Task_0"]`,
 `started.instances: {"Scope_0": 1}`, `boundarySubscriptions: ["BoundaryEsc_0","Boundary_0"]`
 (`tenancy-fork.json`, MEASURED). The tasks continued are exactly the elements paused, one list
@@ -173,11 +182,11 @@ one-task `modals-*-fork`s — MEASURED).
 
 Three scenarios per fixture, each from a fresh start:
 
-| scenario    | what the harness does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | screenshot                       |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| `started`   | fire the start event; read the state at 1.5 s; read it again at 4.5 s                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `out/<fixture>.png`              |
-| `breach`    | continue activities until the simulator offers an **interrupting** boundary-event trigger — a timer or condition on the act, `cancelActivity="true"`; never the fork's non-interrupting escalation relay `BoundaryEsc_n`, which is offered from the moment the box is entered (`started.triggers`, all five fork JSONs, MEASURED) and, fired cold, reaches `EndBreach_n` with the task never entered (a probe recorded in `9cd110c5d`'s message, not in the JSON) — and fire it (exclusive-gateway arms tried in document order until one reaches a boundary) | `out/<fixture>.breach.png`       |
-| `happy[-k]` | keep clicking "continue" on whatever waits, until nothing waits or 12 steps; once per arm `k` of the first exclusive gateway — arm 0 is the simulator's own default, first flow in document order                                                                                                                                                                                                                                                                                                                                                             | `out/<fixture>.happy[-armk].png` |
+| scenario    | what the harness does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | screenshot                       |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| `started`   | fire the start event; read the state at 1.5 s; read it again at 4.5 s                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | `out/<fixture>.png`              |
+| `breach`    | continue activities until the simulator offers an **interrupting** boundary-event trigger — a timer or condition on the act, `cancelActivity="true"`; never the fork's non-interrupting escalation relay `BoundaryEsc_n`, which is offered from the moment the box is entered (`started.triggers`, all five fork JSONs, MEASURED) and, fired cold in this configuration, reaches `EndBreach_n` with the member's task still live and its deadline still offered — `Task_0` entered, not acted on, `Boundary_0` still a trigger, the box still live (a hand probe on `tenancy-fork.bpmn`, 2026-09-19, not in the JSON; `9cd110c5d`'s message says "`Task_0` never entered", which is the pause-on-box variant) — and fire it (exclusive-gateway arms tried in document order until one reaches a boundary) | `out/<fixture>.breach.png`       |
+| `happy[-k]` | keep clicking "continue" on whatever waits, until nothing waits or 12 steps; once per arm `k` of the first exclusive gateway — arm 0 is the simulator's own default, first flow in document order                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `out/<fixture>.happy[-armk].png` |
 
 The step limit is 12 (`run-meta.json`'s `stepLimit`). Over run 4 the longest acyclic happy path
 is 5 steps (`offering`), the fork fixtures need 1–2, and the only run to hit the limit is

@@ -69,9 +69,13 @@ measured on `tenancy-fork.bpmn` (2026-09-19):
   from "one member's scope ended" (`EndScope_0` inside `Scope_0`).
   `endEventsReached` keeps its old shape (every end, a sorted multiset).
 - **No pause point on the box.** The simulator would honour one, but then the
-  token parks on the box ("each Tenant started"), the only trigger offered is
-  the box itself and the task inside is not yet enterable — a state that says
-  nothing about the rule. Left un-paused, the token runs into the box and
+  token parks on the box ("each Tenant started"), the triggers offered are
+  `Start_0`, the box itself and its escalation relay `BoundaryEsc_0`, and the
+  task inside is not yet enterable (its pad offers only "Remove pause point")
+  — a state that says nothing about the rule. (Measured 2026-09-19 with a
+  pause point added on `Scope_0`; `9cd110c5d`'s message summarised this as
+  "only the box is triggerable", which under-counts.) Left un-paused, the
+  token runs into the box and
   stops on `Task_0` with the member's timer (`Boundary_0`) and the box's
   escalation catcher (`BoundaryEsc_0`) both subscribed, the same picture the
   barrier fixtures give; the box's own pad then only ever offers "Add pause
@@ -79,8 +83,12 @@ measured on `tenancy-fork.bpmn` (2026-09-19):
   continued are exactly the elements paused (`pausePoints`), one list.
 - **The breach scenario fires an interrupting boundary only.** From the
   moment the box is entered the simulator offers `BoundaryEsc_0` as a trigger,
-  and firing it cold runs `Scope_0 → BoundaryEsc_0 → EndBreach_0` with
-  `Task_0` never entered and the box still live — a breach with no cause. Every
+  and firing it cold, in the shipped configuration (tasks paused, box not),
+  runs `BoundaryEsc_0 → EndBreach_0` with the member's task still live and
+  its deadline still offered — `Task_0` entered, not acted on, `Boundary_0`
+  still a trigger, the box still live — a breach with no cause (measured
+  2026-09-19 on `tenancy-fork.bpmn`; only with a pause point on the box is
+  `Task_0` never entered). Every
   `Boundary_n` in the corpus is `cancelActivity="true"`; the relay is the only
   non-interrupting one, and it is exercised anyway, by the escalation the
   member's own deadline throws (`breach.history` on `tenancy-fork`:
@@ -116,8 +124,13 @@ setting them everywhere is the most charitable reading of the tool.
 
 The JSONs are diffable run-to-run: a re-run that changes nothing changes no
 `out/<fixture>.json` (only `run-meta.json`'s `runAt` lines), so a diff after a
-fixture moves shows only the fixtures that moved. Five things make that true,
-each in the code with a comment saying so:
+fixture moves shows only the fixtures that moved. `run-meta.json`'s
+`harnessCommit` is the last commit that touched the harness's own files
+(`run.mjs`, `src/`, `build.mjs`, `index.html`, `package.json`,
+`package-lock.json`), not the repo `HEAD`, so a docs or exporter commit
+elsewhere in the tree does not move it either; it moves when the harness
+does, and carries `-dirty` when the harness is uncommitted. Five things make
+the fixture JSONs diffable, each in the code with a comment saying so:
 
 - **Sorted** — every array that reports _which_ element ids, not in what order,
   which the simulator hands back in arrival order (for concurrent tokens, in

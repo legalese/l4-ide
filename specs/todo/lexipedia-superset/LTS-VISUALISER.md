@@ -2668,9 +2668,11 @@ leads with.
 > as unmeasured. **This block does not decide the gate either.** The staging table row for P2a
 > read "unmeasured" for the `modals-*` goldens when this was written; it was updated at integration.
 >
-> **SUPERSEDED BY RUN 4, 2026-09-18 23:23 UTC (2026-09-19 SGT).** After legalese/l4-ide#430
-> lowered a fork to a multi-instance sub-process, all sixteen goldens were re-run in one diffable
-> run (`a3c7bdce3` on `lts/token-sim-determinism`; report header, §3.1, §3.7): the four
+> **SUPERSEDED BY RUN 4, 2026-09-18 23:23 UTC (2026-09-19 SGT).** With legalese/l4-ide#430's
+> head `646f58e9c` merged into `lts/token-sim-determinism` (`b24e19bae`; #430 lowers a fork to a
+> multi-instance sub-process and is an **open** PR as of 2026-09-19, so this shape reaches
+> `unstable` only when it merges, and #426 must land after it), all sixteen goldens were re-run in
+> one diffable run (`a3c7bdce3`; report header, §3.1, §3.7): the four
 > barrier/fork pairs are now distinguishable in shape — the fork's box, its count of one, its
 > escalation relay and its inner/outer end events — and still not in cardinality, since the
 > simulator has no multi-instance behaviour and runs the box once; point 2 above holds for the

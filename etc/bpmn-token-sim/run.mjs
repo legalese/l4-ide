@@ -30,8 +30,10 @@
 // tasks inside are what get continued, and the escalation relay is never the
 // boundary the breach scenario fires — cold, it reaches EndBreach with no
 // member having acted and no deadline having passed (measured on
-// tenancy-fork: history `Start_0, …, Scope_0, BoundaryEsc_0, …, EndBreach_0`
-// with Task_0 never entered), which is a breach with no cause. What the
+// tenancy-fork with the tasks paused, as shipped: history `Start_0, …,
+// Scope_0, StartScope_0, …, Task_0, BoundaryEsc_0, …, EndBreach_0`, Task_0
+// entered and still live, Boundary_0 still offered), which is a breach with
+// no cause. What the
 // simulator cannot show: bpmn-js-token-simulation 0.40.0 has no
 // multi-instance support at all (`grep -ri multiinstance lib/` is empty), so
 // the box runs as ONE instance — `instances` below is 1 for every fork
@@ -68,7 +70,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 // Measured over the sixteen fixtures (2026-09-19): the longest acyclic happy
 // path is five continues (offering); regcf-reporting's third arm is a cycle
 // and runs into this limit by design, so raising it lengthens that output and
-// nothing else. A fork fixture needs two or three — the simulator runs its
+// nothing else. A fork fixture needs one or two — the simulator runs its
 // multi-instance box as one instance (see the header), so there is no n to
 // multiply by. Left at 12.
 const STEP_LIMIT = 12;
@@ -404,21 +406,24 @@ const installedVersion = (pkg) =>
   JSON.parse(readFileSync(join(here, "node_modules", pkg, "package.json")))
     .version;
 const git = (cmd) => execSync(`git ${cmd}`, { cwd: here }).toString().trim();
-// `-dirty` when the harness's own sources differ from the commit: a run from
-// an uncommitted harness is not reproducible from that commit. The lockfile is
-// on the list because it fixes the transitive tree, which `npm ls --depth=0`
-// below does not show.
-const harnessDirty =
-  git(
-    "status --porcelain -- run.mjs src build.mjs index.html package.json package-lock.json",
-  ) !== "";
+// The harness's own files. `harnessCommit` is the last commit that touched
+// any of them — not `HEAD`, which moves on every docs or exporter commit in
+// the repo and would make an unchanged harness look re-run — and `-dirty`
+// when they differ from that commit: a run from an uncommitted harness is not
+// reproducible from any commit. The lockfile is on the list because it fixes
+// the transitive tree, which `npm ls --depth=0` below does not show.
+const harnessFiles =
+  "run.mjs src build.mjs index.html package.json package-lock.json";
+const harnessDirty = git(`status --porcelain -- ${harnessFiles}`) !== "";
 const provenance = {
   runAt,
   bpmnjs: installedVersion("bpmn-js"),
   tokenSim: installedVersion("bpmn-js-token-simulation"),
   browser: `${browserArg} ${version}`,
   node: process.version,
-  harnessCommit: git("rev-parse --short HEAD") + (harnessDirty ? "-dirty" : ""),
+  harnessCommit:
+    git(`log -1 --format=%h -- ${harnessFiles}`) +
+    (harnessDirty ? "-dirty" : ""),
 };
 // `npm ls` heads its listing with the package's absolute path; the file is
 // committed as evidence, so that line is made repo-relative.

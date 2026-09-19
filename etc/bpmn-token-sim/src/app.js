@@ -316,9 +316,11 @@ window.harness = {
   //
   // Not on a sub-process. The simulator would honour one (SubProcessBehavior
   // .enter checks waitAtElement first), but measured on tenancy-fork.bpmn it
-  // parks the token on the box — "each Tenant started", the only trigger
-  // offered is the box itself and the member's task inside is not yet
-  // enterable — which is a state that says nothing about the rule: the
+  // parks the token on the box — "each Tenant started", the triggers offered
+  // are Start_0, the box itself and its escalation relay BoundaryEsc_0, and
+  // the member's task inside is not yet enterable (its pad offers only
+  // "Remove pause point") — which is a state that says nothing about the
+  // rule: the
   // obligation, and the deadline the reader is meant to see, sit on the task
   // inside. Left un-paused, the token runs into the box and stops on that
   // task, with the member's timer and the box's escalation catcher both
