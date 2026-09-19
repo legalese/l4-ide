@@ -10,6 +10,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Start_0__Split_0"
@@ -24,6 +25,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": "Diverging",
       "outgoing": [
         "Flow_Split_0__Task_1",
@@ -41,6 +43,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_1__Task_2"
@@ -57,6 +60,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_2__Join_0"
@@ -73,6 +77,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -87,6 +92,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_4__Join_0"
@@ -103,6 +109,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": "Converging",
       "outgoing": [
         "Flow_Join_0__End_3"
@@ -122,9 +129,10 @@
   "exclusiveGateways": [],
   "started": {
     "tokensOn": [
-      "Task_4",
-      "Task_1"
+      "Task_1",
+      "Task_4"
     ],
+    "instances": {},
     "boundarySubscriptions": [],
     "triggers": [
       "Start_0",
@@ -137,20 +145,23 @@
       "Split_0",
       "Flow_Split_0__Task_1",
       "Flow_Split_0__Task_4",
-      "Task_4",
-      "Task_1"
+      "Task_1",
+      "Task_4"
     ],
     "endEventsReached": [],
+    "endEventsReachedTopLevel": [],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 06baimw",
-      "Start Event 06baimw",
-      "all of 06baimw"
+      "Process started <scope-1>",
+      "Start Event <scope-1>",
+      "all of <scope-1>"
     ],
     "afterWaiting3s": {
       "tokensOn": [
-        "Task_4",
-        "Task_1"
+        "Task_1",
+        "Task_4"
       ],
+      "instances": {},
       "triggers": [
         "Start_0",
         "Task_1",
@@ -178,21 +189,22 @@
         },
         {
           "tokensOn": [
-            "Task_4",
-            "Task_2"
+            "Task_2",
+            "Task_4"
           ],
           "continued": "Task_2"
         },
         {
           "tokensOn": [
-            "Task_4",
-            "Join_0"
+            "Join_0",
+            "Task_4"
           ],
           "continued": "Task_4"
         }
       ],
       "hitStepLimit": false,
       "tokensOn": [],
+      "instances": {},
       "boundarySubscriptions": [],
       "triggers": [
         "Start_0"
@@ -217,16 +229,20 @@
       "endEventsReached": [
         "End_3"
       ],
+      "endEventsReachedTopLevel": [
+        "End_3"
+      ],
+      "endEventsReachedInside": {},
       "log": [
-        "Process started 0iiqo3j",
-        "Start Event 0iiqo3j",
-        "all of 0iiqo3j",
-        "MAY file written comments 0iiqo3j",
-        "MAY publish the record 0iiqo3j",
-        "MAY file a response 0iiqo3j",
-        "Parallel Gateway 0iiqo3j",
-        "Fulfilled 0iiqo3j",
-        "Process finished 0iiqo3j"
+        "Process started <scope-2>",
+        "Start Event <scope-2>",
+        "all of <scope-2>",
+        "MAY file written comments <scope-2>",
+        "MAY publish the record <scope-2>",
+        "MAY file a response <scope-2>",
+        "Parallel Gateway <scope-2>",
+        "Fulfilled <scope-2>",
+        "Process finished <scope-2>"
       ]
     }
   ],

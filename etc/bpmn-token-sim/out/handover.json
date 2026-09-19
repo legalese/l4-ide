@@ -10,6 +10,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Start_0__Task_0"
@@ -24,6 +25,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_0__Split_1"
@@ -40,6 +42,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": "Diverging",
       "outgoing": [
         "Flow_Split_1__Task_2",
@@ -57,6 +60,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_2__End_3"
@@ -73,6 +77,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -94,6 +99,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_4__End_3"
@@ -110,6 +116,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": "Diverging",
       "outgoing": [
         "Flow_Split_5__Task_6",
@@ -127,6 +134,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_6__End_3"
@@ -143,6 +151,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_7__End_3"
@@ -161,6 +170,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_7",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_7__End_3"
@@ -177,6 +187,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_6",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_6__End_3"
@@ -193,6 +204,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_4",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_4__End_3"
@@ -209,6 +221,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_2",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_2__End_3"
@@ -225,6 +238,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_0",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_0__Split_5"
@@ -253,13 +267,14 @@
     "tokensOn": [
       "Task_0"
     ],
+    "instances": {},
     "boundarySubscriptions": [
       "Boundary_0"
     ],
     "triggers": [
+      "Boundary_0",
       "Start_0",
-      "Task_0",
-      "Boundary_0"
+      "Task_0"
     ],
     "history": [
       "Start_0",
@@ -267,18 +282,21 @@
       "Task_0"
     ],
     "endEventsReached": [],
+    "endEventsReachedTopLevel": [],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 0cz71m1",
-      "Start Event 0cz71m1"
+      "Process started <scope-1>",
+      "Start Event <scope-1>"
     ],
     "afterWaiting3s": {
       "tokensOn": [
         "Task_0"
       ],
+      "instances": {},
       "triggers": [
+        "Boundary_0",
         "Start_0",
-        "Task_0",
-        "Boundary_0"
+        "Task_0"
       ],
       "endEventsReached": []
     }
@@ -290,13 +308,14 @@
     "tokensOn": [
       "Task_6"
     ],
+    "instances": {},
     "boundarySubscriptions": [
       "Boundary_6"
     ],
     "triggers": [
+      "Boundary_6",
       "Start_0",
-      "Task_6",
-      "Boundary_6"
+      "Task_6"
     ],
     "history": [
       "Start_0",
@@ -309,12 +328,14 @@
       "Task_6"
     ],
     "endEventsReached": [],
+    "endEventsReachedTopLevel": [],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 1vxq328",
-      "Start Event 1vxq328",
-      "MUST give vacant possession 1vxq328",
-      "timeout 1vxq328",
-      "one of 1vxq328"
+      "Process started <scope-2>",
+      "Start Event <scope-2>",
+      "MUST give vacant possession <scope-2>",
+      "timeout <scope-2>",
+      "one of <scope-2>"
     ]
   },
   "happy": [
@@ -348,6 +369,7 @@
       ],
       "hitStepLimit": false,
       "tokensOn": [],
+      "instances": {},
       "boundarySubscriptions": [],
       "triggers": [
         "Start_0"
@@ -371,16 +393,21 @@
         "End_3",
         "End_3"
       ],
+      "endEventsReachedTopLevel": [
+        "End_3",
+        "End_3"
+      ],
+      "endEventsReachedInside": {},
       "log": [
-        "Process started 00khxh3",
-        "Start Event 00khxh3",
-        "MUST give vacant possession 00khxh3",
-        "all of 00khxh3",
-        "MAY inspect the premises 00khxh3",
-        "Fulfilled 00khxh3",
-        "MAY photograph the premises 00khxh3",
-        "Fulfilled 00khxh3",
-        "Process finished 00khxh3"
+        "Process started <scope-3>",
+        "Start Event <scope-3>",
+        "MUST give vacant possession <scope-3>",
+        "all of <scope-3>",
+        "MAY inspect the premises <scope-3>",
+        "Fulfilled <scope-3>",
+        "MAY photograph the premises <scope-3>",
+        "Fulfilled <scope-3>",
+        "Process finished <scope-3>"
       ]
     },
     {
@@ -413,6 +440,7 @@
       ],
       "hitStepLimit": false,
       "tokensOn": [],
+      "instances": {},
       "boundarySubscriptions": [],
       "triggers": [
         "Start_0"
@@ -436,16 +464,21 @@
         "End_3",
         "End_3"
       ],
+      "endEventsReachedTopLevel": [
+        "End_3",
+        "End_3"
+      ],
+      "endEventsReachedInside": {},
       "log": [
-        "Process started 1izcgkf",
-        "Start Event 1izcgkf",
-        "MUST give vacant possession 1izcgkf",
-        "all of 1izcgkf",
-        "MAY inspect the premises 1izcgkf",
-        "Fulfilled 1izcgkf",
-        "MAY photograph the premises 1izcgkf",
-        "Fulfilled 1izcgkf",
-        "Process finished 1izcgkf"
+        "Process started <scope-4>",
+        "Start Event <scope-4>",
+        "MUST give vacant possession <scope-4>",
+        "all of <scope-4>",
+        "MAY inspect the premises <scope-4>",
+        "Fulfilled <scope-4>",
+        "MAY photograph the premises <scope-4>",
+        "Fulfilled <scope-4>",
+        "Process finished <scope-4>"
       ]
     }
   ],

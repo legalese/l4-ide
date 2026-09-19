@@ -7,6 +7,12 @@
 import BpmnModeler from "bpmn-js/lib/Modeler";
 import TokenSimulationModule from "bpmn-js-token-simulation";
 import SimulationSupportModule from "bpmn-js-token-simulation/lib/simulation-support";
+import Animation from "bpmn-js-token-simulation/lib/animation/Animation";
+import {
+  ANIMATION_CREATED_EVENT,
+  SCOPE_CREATE_EVENT,
+} from "bpmn-js-token-simulation/lib/util/EventHelper";
+import randomColor from "randomcolor";
 
 import "bpmn-js/dist/assets/diagram-js.css";
 import "bpmn-js/dist/assets/bpmn-js.css";
@@ -15,9 +21,114 @@ import "bpmn-js-token-simulation/assets/css/bpmn-js-token-simulation.css";
 
 const container = document.getElementById("canvas");
 
+// A token's travel along a sequence flow is, in the simulator, a
+// requestAnimationFrame animation (lib/animation/Animation.js) whose `done`
+// fires the flow's exit and the next element's entry. Two tokens released by
+// one parallel split therefore arrive in whichever order their animations
+// complete — and at the 100x speed this harness asks for, both take about one
+// frame, so which finishes first depends on where the frame boundary falls.
+// That is timing, not routing, and it made `history` (a path in fired order)
+// differ between two runs of the same fixture (consultation: `Task_1, Task_4`
+// one run, `Task_4, Task_1` the next). (`config.animation.randomize` is not
+// the fix: TokenAnimation stores it as `this.randomize` and reads
+// `this._randomize`, so the duration was never random to begin with.)
+//
+// This replaces the animation with one that completes each token's travel on
+// a zero-delay timer, in the order the simulator started them — the order of
+// the split's outgoing flows in the document. Same `animation` service
+// contract (animate / pause / play / clearAnimations on scope destroy), no
+// token graphic, so nothing changes in a screenshot taken at rest.
+function InstantAnimation(config, canvas, eventBus, scopeFilter) {
+  Animation.call(this, config, canvas, eventBus, scopeFilter);
+}
+InstantAnimation.prototype = Object.create(Animation.prototype);
+InstantAnimation.prototype.constructor = InstantAnimation;
+InstantAnimation.$inject = Animation.$inject;
+InstantAnimation.prototype.createAnimation = function (
+  connection,
+  scope,
+  done = () => {},
+) {
+  let timer = null;
+  let paused = false;
+  let pending = true;
+  const fire = () => {
+    timer = null;
+    if (!pending) return;
+    pending = false;
+    this._animations.delete(animation);
+    done();
+  };
+  const animation = {
+    scope,
+    element: connection,
+    show() {},
+    hide() {},
+    setSpeed() {},
+    pause() {
+      paused = true;
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+    },
+    play() {
+      paused = false;
+      if (pending && timer === null) timer = setTimeout(fire, 0);
+    },
+    remove() {
+      pending = false;
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+    },
+  };
+  this._animations.add(animation);
+  this._eventBus.fire(ANIMATION_CREATED_EVENT, { animation });
+  if (!paused) animation.play();
+  return animation;
+};
+
+// Each token scope is coloured — its count badge, its "Finished" tag, its log
+// lines — from a palette the simulator draws once per page with an unseeded
+// `randomColor({ count: 60 })` (lib/features/colored-scopes/ColoredScopes.js),
+// so the same run screenshots in different colours every time. This is that
+// service verbatim, with a seed, so a screenshot is a function of the run.
+function SeededColoredScopes(eventBus) {
+  const yiq = (hex) => {
+    const r = parseInt(hex.substr(1, 2), 16);
+    const g = parseInt(hex.substr(3, 2), 16);
+    const b = parseInt(hex.substr(5, 2), 16);
+    return (r * 299 + g * 587 + b * 114) / 1000;
+  };
+  const colors = randomColor({ count: 60, seed: 4 }).filter(
+    (c) => yiq(c) < 200,
+  );
+  let idx = 0;
+  eventBus.on(SCOPE_CREATE_EVENT, 1500, ({ scope }) => {
+    const { element } = scope;
+    if (element && element.type === "bpmn:MessageFlow") {
+      scope.colors = { primary: "#999", auxiliary: "#FFF" };
+    } else if (scope.parent) {
+      scope.colors = scope.parent.colors;
+    } else {
+      const primary = colors[idx++ % colors.length];
+      scope.colors = {
+        primary,
+        auxiliary: yiq(primary) >= 128 ? "#111" : "#fff",
+      };
+    }
+  });
+}
+SeededColoredScopes.$inject = ["eventBus"];
+
 const modeler = new BpmnModeler({
   container,
-  additionalModules: [TokenSimulationModule, SimulationSupportModule],
+  additionalModules: [
+    TokenSimulationModule,
+    SimulationSupportModule,
+    {
+      animation: ["type", InstantAnimation],
+      coloredScopes: ["type", SeededColoredScopes],
+    },
+  ],
 });
 
 function get(name) {
@@ -53,10 +164,23 @@ function describeElement(element) {
       : null,
     cancelActivity: b.cancelActivity === undefined ? null : !!b.cancelActivity,
     attachedTo: b.attachedToRef ? b.attachedToRef.id : null,
+    // The sub-process this node is drawn inside, or null at the top level.
+    // bpmn-js parents a node to its enclosing shape — the sub-process box, or
+    // the participant/process for a top-level node (lanes are not parents) —
+    // so this is the static answer to "is this end event the group's or one
+    // member's", read from the diagram rather than from a run.
+    subProcess:
+      element.parent && isSubProcess(bo(element.parent).$type)
+        ? element.parent.id
+        : null,
     gatewayDirection: b.gatewayDirection || null,
     outgoing: (element.outgoing || []).map((f) => f.id),
     incoming: (element.incoming || []).map((f) => f.id),
   };
+}
+
+function isSubProcess(type) {
+  return /^bpmn:(SubProcess|AdHocSubProcess|Transaction)$/.test(type);
 }
 
 function isFlowNode(element) {
@@ -80,6 +204,11 @@ function snapshot() {
       element: s.element.id,
       elementType: bo(s.element).$type,
       parent: s.parent ? s.parent.id : null,
+      // The element the parent scope sits on (a sub-process box, or the
+      // participant/process), so a reader of the snapshot can group live
+      // scopes by the box they are instances of. `parent` above is a scope id
+      // and is never written out; this one is an element id and is.
+      parentElement: s.parent ? s.parent.element.id : null,
       completed: !!s.completed,
       failed: !!s.failed,
       running: !!s.running,
@@ -127,9 +256,22 @@ function trace() {
     }));
 }
 
+// The log panel, one record per entry. The simulator renders each entry as
+// `<span class="bts-text">…</span><span class="bts-scope" data-scope-id=…>`
+// (lib/features/log/Log.js); the scope id is read from its own span rather
+// than parsed out of the text, so masking it later cannot touch real text.
 function log() {
   const entries = container.querySelectorAll(".bts-log .bts-entry");
-  return [...entries].map((e) => e.textContent.replace(/\s+/g, " ").trim());
+  return [...entries].map((e) => {
+    const text = e.querySelector(".bts-text");
+    const scope = e.querySelector(".bts-scope[data-scope-id]");
+    return {
+      text: (text ? text.textContent : e.textContent)
+        .replace(/\s+/g, " ")
+        .trim(),
+      scope: scope ? scope.getAttribute("data-scope-id") : null,
+    };
+  });
 }
 
 function unsupported() {
@@ -168,9 +310,21 @@ window.harness = {
     return { unsupported: unsupported() };
   },
 
-  // Put a pause point on every activity so a token that reaches one stops
-  // there instead of running through. Without this, ActivityBehavior.enter
-  // exits immediately (lib/simulator/behaviors/ActivityBehavior.js).
+  // Put a pause point on every task so a token that reaches one stops there
+  // instead of running through. Without this, ActivityBehavior.enter exits
+  // immediately (lib/simulator/behaviors/ActivityBehavior.js).
+  //
+  // Not on a sub-process. The simulator would honour one (SubProcessBehavior
+  // .enter checks waitAtElement first), but measured on tenancy-fork.bpmn it
+  // parks the token on the box — "each Tenant started", the triggers offered
+  // are Start_0, the box itself and its escalation relay BoundaryEsc_0, and
+  // the member's task inside is not yet enterable (its pad offers only
+  // "Remove pause point") — which is a state that says nothing about the
+  // rule: the
+  // obligation, and the deadline the reader is meant to see, sit on the task
+  // inside. Left un-paused, the token runs into the box and stops on that
+  // task, with the member's timer and the box's escalation catcher both
+  // subscribed, which is the same picture the barrier fixtures give.
   pauseAtActivities() {
     const simulator = get("simulator");
     const registry = get("elementRegistry");
@@ -178,7 +332,7 @@ window.harness = {
     registry.forEach((el) => {
       const t = bo(el).$type;
       if (
-        /^bpmn:(Task|UserTask|BusinessRuleTask|ManualTask|ServiceTask|ScriptTask|CallActivity|SubProcess)$/.test(
+        /^bpmn:(Task|UserTask|BusinessRuleTask|ManualTask|ServiceTask|ScriptTask|CallActivity)$/.test(
           t,
         ) &&
         !el.labelTarget

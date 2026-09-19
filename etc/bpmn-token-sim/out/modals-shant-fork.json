@@ -10,63 +10,146 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
-        "Flow_Start_0__Task_0"
+        "Flow_Start_0__Scope_0"
       ],
       "incoming": []
+    },
+    {
+      "id": "Scope_0",
+      "type": "bpmn:SubProcess",
+      "name": "each Director",
+      "eventDefinitions": [],
+      "multiInstance": {
+        "type": "bpmn:MultiInstanceLoopCharacteristics",
+        "isSequential": false,
+        "loopCardinality": false,
+        "loopDataInputRef": true,
+        "completionCondition": null
+      },
+      "cancelActivity": null,
+      "attachedTo": null,
+      "subProcess": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_Scope_0__EndGroup_0"
+      ],
+      "incoming": [
+        "Flow_Start_0__Scope_0"
+      ]
     },
     {
       "id": "Task_0",
       "type": "bpmn:Task",
       "name": "SHANT Sublet ...",
       "eventDefinitions": [],
-      "multiInstance": {
-        "type": "bpmn:MultiInstanceLoopCharacteristics",
-        "isSequential": false,
-        "loopCardinality": false,
-        "loopDataInputRef": false,
-        "completionCondition": "nrOfCompletedInstances >= 1"
-      },
+      "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": "Scope_0",
       "gatewayDirection": null,
       "outgoing": [
-        "Flow_Task_0__End_2"
+        "Flow_Task_0__EscScope_0"
       ],
       "incoming": [
-        "Flow_Start_0__Task_0"
+        "Flow_StartScope_0__Task_0"
       ]
     },
     {
-      "id": "End_1",
+      "id": "StartScope_0",
+      "type": "bpmn:StartEvent",
+      "name": null,
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "subProcess": "Scope_0",
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_StartScope_0__Task_0"
+      ],
+      "incoming": []
+    },
+    {
+      "id": "EndScope_0",
       "type": "bpmn:EndEvent",
       "name": "Fulfilled",
       "eventDefinitions": [],
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": "Scope_0",
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
-        "Flow_Boundary_0__End_1"
+        "Flow_Boundary_0__EndScope_0"
       ]
     },
     {
-      "id": "End_2",
+      "id": "EscScope_0",
       "type": "bpmn:EndEvent",
       "name": "Breach",
       "eventDefinitions": [
-        "bpmn:ErrorEventDefinition"
+        "bpmn:EscalationEventDefinition"
       ],
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": "Scope_0",
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
-        "Flow_Task_0__End_2"
+        "Flow_Task_0__EscScope_0"
       ]
+    },
+    {
+      "id": "EndGroup_0",
+      "type": "bpmn:EndEvent",
+      "name": "every run has ended",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "subProcess": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_Scope_0__EndGroup_0"
+      ]
+    },
+    {
+      "id": "EndBreach_0",
+      "type": "bpmn:EndEvent",
+      "name": "Breach",
+      "eventDefinitions": [],
+      "multiInstance": null,
+      "cancelActivity": null,
+      "attachedTo": null,
+      "subProcess": null,
+      "gatewayDirection": null,
+      "outgoing": [],
+      "incoming": [
+        "Flow_BoundaryEsc_0__EndBreach_0"
+      ]
+    },
+    {
+      "id": "BoundaryEsc_0",
+      "type": "bpmn:BoundaryEvent",
+      "name": "a member breached",
+      "eventDefinitions": [
+        "bpmn:EscalationEventDefinition"
+      ],
+      "multiInstance": null,
+      "cancelActivity": false,
+      "attachedTo": "Scope_0",
+      "subProcess": null,
+      "gatewayDirection": null,
+      "outgoing": [
+        "Flow_BoundaryEsc_0__EndBreach_0"
+      ],
+      "incoming": []
     },
     {
       "id": "Boundary_0",
@@ -78,9 +161,10 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_0",
+      "subProcess": "Scope_0",
       "gatewayDirection": null,
       "outgoing": [
-        "Flow_Boundary_0__End_1"
+        "Flow_Boundary_0__EndScope_0"
       ],
       "incoming": []
     }
@@ -92,34 +176,52 @@
   "exclusiveGateways": [],
   "started": {
     "tokensOn": [
+      "Scope_0",
       "Task_0"
     ],
+    "instances": {
+      "Scope_0": 1
+    },
     "boundarySubscriptions": [
+      "BoundaryEsc_0",
       "Boundary_0"
     ],
     "triggers": [
+      "BoundaryEsc_0",
+      "Boundary_0",
       "Start_0",
-      "Task_0",
-      "Boundary_0"
+      "Task_0"
     ],
     "history": [
       "Start_0",
-      "Flow_Start_0__Task_0",
+      "Flow_Start_0__Scope_0",
+      "Scope_0",
+      "StartScope_0",
+      "Flow_StartScope_0__Task_0",
       "Task_0"
     ],
     "endEventsReached": [],
+    "endEventsReachedTopLevel": [],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 1jw897u",
-      "Start Event 1jw897u"
+      "Process started <scope-1>",
+      "Start Event <scope-1>",
+      "each Director started <scope-2>",
+      "Start Event <scope-2>"
     ],
     "afterWaiting3s": {
       "tokensOn": [
+        "Scope_0",
         "Task_0"
       ],
+      "instances": {
+        "Scope_0": 1
+      },
       "triggers": [
+        "BoundaryEsc_0",
+        "Boundary_0",
         "Start_0",
-        "Task_0",
-        "Boundary_0"
+        "Task_0"
       ],
       "endEventsReached": []
     }
@@ -129,28 +231,47 @@
     "continuedFirst": [],
     "fired": "Boundary_0",
     "tokensOn": [],
+    "instances": {},
     "boundarySubscriptions": [],
     "triggers": [
       "Start_0"
     ],
     "history": [
       "Start_0",
-      "Flow_Start_0__Task_0",
+      "Flow_Start_0__Scope_0",
+      "Scope_0",
+      "StartScope_0",
+      "Flow_StartScope_0__Task_0",
       "Task_0",
       "Boundary_0",
-      "Flow_Boundary_0__End_1",
-      "End_1"
+      "Flow_Boundary_0__EndScope_0",
+      "EndScope_0",
+      "Flow_Scope_0__EndGroup_0",
+      "EndGroup_0"
     ],
     "endEventsReached": [
-      "End_1"
+      "EndGroup_0",
+      "EndScope_0"
     ],
+    "endEventsReachedTopLevel": [
+      "EndGroup_0"
+    ],
+    "endEventsReachedInside": {
+      "Scope_0": [
+        "EndScope_0"
+      ]
+    },
     "log": [
-      "Process started 01cunrv",
-      "Start Event 01cunrv",
-      "SHANT Sublet ... 01cunrv",
-      "after P30D, not performed 01cunrv",
-      "Fulfilled 01cunrv",
-      "Process finished 01cunrv"
+      "Process started <scope-3>",
+      "Start Event <scope-3>",
+      "each Director started <scope-4>",
+      "Start Event <scope-4>",
+      "SHANT Sublet ... <scope-4>",
+      "after P30D, not performed <scope-4>",
+      "Fulfilled <scope-4>",
+      "each Director finished <scope-4>",
+      "every run has ended <scope-3>",
+      "Process finished <scope-3>"
     ]
   },
   "happy": [
@@ -162,6 +283,7 @@
       "steps": [
         {
           "tokensOn": [
+            "Scope_0",
             "Task_0"
           ],
           "continued": "Task_0"
@@ -169,26 +291,52 @@
       ],
       "hitStepLimit": false,
       "tokensOn": [],
+      "instances": {},
       "boundarySubscriptions": [],
       "triggers": [
         "Start_0"
       ],
       "history": [
         "Start_0",
-        "Flow_Start_0__Task_0",
+        "Flow_Start_0__Scope_0",
+        "Scope_0",
+        "StartScope_0",
+        "Flow_StartScope_0__Task_0",
         "Task_0",
-        "Flow_Task_0__End_2",
-        "End_2"
+        "Flow_Task_0__EscScope_0",
+        "EscScope_0",
+        "BoundaryEsc_0",
+        "Flow_BoundaryEsc_0__EndBreach_0",
+        "Flow_Scope_0__EndGroup_0",
+        "EndBreach_0",
+        "EndGroup_0"
       ],
       "endEventsReached": [
-        "End_2"
+        "EndBreach_0",
+        "EndGroup_0",
+        "EscScope_0"
       ],
+      "endEventsReachedTopLevel": [
+        "EndBreach_0",
+        "EndGroup_0"
+      ],
+      "endEventsReachedInside": {
+        "Scope_0": [
+          "EscScope_0"
+        ]
+      },
       "log": [
-        "Process started 0njvjh9",
-        "Start Event 0njvjh9",
-        "SHANT Sublet ... 0njvjh9",
-        "Breach 0njvjh9",
-        "Process finished 0njvjh9"
+        "Process started <scope-5>",
+        "Start Event <scope-5>",
+        "each Director started <scope-6>",
+        "Start Event <scope-6>",
+        "SHANT Sublet ... <scope-6>",
+        "Breach <scope-6>",
+        "a member breached <scope-5>",
+        "each Director finished <scope-6>",
+        "Breach <scope-5>",
+        "every run has ended <scope-5>",
+        "Process finished <scope-5>"
       ]
     }
   ],

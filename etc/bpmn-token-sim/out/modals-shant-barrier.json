@@ -10,6 +10,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Start_0__Task_0"
@@ -25,11 +26,12 @@
         "type": "bpmn:MultiInstanceLoopCharacteristics",
         "isSequential": false,
         "loopCardinality": false,
-        "loopDataInputRef": false,
+        "loopDataInputRef": true,
         "completionCondition": "nrOfCompletedInstances >= 1"
       },
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_0__End_2"
@@ -46,6 +48,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -62,6 +65,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -78,6 +82,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_0",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_0__End_1"
@@ -94,13 +99,14 @@
     "tokensOn": [
       "Task_0"
     ],
+    "instances": {},
     "boundarySubscriptions": [
       "Boundary_0"
     ],
     "triggers": [
+      "Boundary_0",
       "Start_0",
-      "Task_0",
-      "Boundary_0"
+      "Task_0"
     ],
     "history": [
       "Start_0",
@@ -108,18 +114,21 @@
       "Task_0"
     ],
     "endEventsReached": [],
+    "endEventsReachedTopLevel": [],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 15f7m7l",
-      "Start Event 15f7m7l"
+      "Process started <scope-1>",
+      "Start Event <scope-1>"
     ],
     "afterWaiting3s": {
       "tokensOn": [
         "Task_0"
       ],
+      "instances": {},
       "triggers": [
+        "Boundary_0",
         "Start_0",
-        "Task_0",
-        "Boundary_0"
+        "Task_0"
       ],
       "endEventsReached": []
     }
@@ -129,6 +138,7 @@
     "continuedFirst": [],
     "fired": "Boundary_0",
     "tokensOn": [],
+    "instances": {},
     "boundarySubscriptions": [],
     "triggers": [
       "Start_0"
@@ -144,13 +154,17 @@
     "endEventsReached": [
       "End_1"
     ],
+    "endEventsReachedTopLevel": [
+      "End_1"
+    ],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 0262o8e",
-      "Start Event 0262o8e",
-      "SHANT Sublet ... 0262o8e",
-      "after P30D, not performed 0262o8e",
-      "Fulfilled 0262o8e",
-      "Process finished 0262o8e"
+      "Process started <scope-2>",
+      "Start Event <scope-2>",
+      "SHANT Sublet ... <scope-2>",
+      "after P30D, not performed <scope-2>",
+      "Fulfilled <scope-2>",
+      "Process finished <scope-2>"
     ]
   },
   "happy": [
@@ -169,6 +183,7 @@
       ],
       "hitStepLimit": false,
       "tokensOn": [],
+      "instances": {},
       "boundarySubscriptions": [],
       "triggers": [
         "Start_0"
@@ -183,12 +198,16 @@
       "endEventsReached": [
         "End_2"
       ],
+      "endEventsReachedTopLevel": [
+        "End_2"
+      ],
+      "endEventsReachedInside": {},
       "log": [
-        "Process started 0ixik3i",
-        "Start Event 0ixik3i",
-        "SHANT Sublet ... 0ixik3i",
-        "Breach 0ixik3i",
-        "Process finished 0ixik3i"
+        "Process started <scope-3>",
+        "Start Event <scope-3>",
+        "SHANT Sublet ... <scope-3>",
+        "Breach <scope-3>",
+        "Process finished <scope-3>"
       ]
     }
   ],

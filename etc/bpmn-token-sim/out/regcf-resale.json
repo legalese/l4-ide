@@ -10,6 +10,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Start_0__Decide_0"
@@ -24,6 +25,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": "Diverging",
       "outgoing": [
         "Flow_Split_0__End_1",
@@ -41,6 +43,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -56,6 +59,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_2__End_3"
@@ -74,6 +78,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -88,6 +93,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Decide_0__Split_0"
@@ -106,6 +112,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_2",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_2__End_1"
@@ -131,10 +138,11 @@
     "tokensOn": [
       "Decide_0"
     ],
+    "instances": {},
     "boundarySubscriptions": [],
     "triggers": [
-      "Start_0",
-      "Decide_0"
+      "Decide_0",
+      "Start_0"
     ],
     "history": [
       "Start_0",
@@ -142,17 +150,20 @@
       "Decide_0"
     ],
     "endEventsReached": [],
+    "endEventsReachedTopLevel": [],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 0am6nbd",
-      "Start Event 0am6nbd"
+      "Process started <scope-1>",
+      "Start Event <scope-1>"
     ],
     "afterWaiting3s": {
       "tokensOn": [
         "Decide_0"
       ],
+      "instances": {},
       "triggers": [
-        "Start_0",
-        "Decide_0"
+        "Decide_0",
+        "Start_0"
       ],
       "endEventsReached": []
     }
@@ -164,6 +175,7 @@
     ],
     "fired": "Boundary_2",
     "tokensOn": [],
+    "instances": {},
     "boundarySubscriptions": [],
     "triggers": [
       "Start_0"
@@ -183,15 +195,19 @@
     "endEventsReached": [
       "End_1"
     ],
+    "endEventsReachedTopLevel": [
+      "End_1"
+    ],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 000ft6m",
-      "Start Event 000ft6m",
-      "transfer falls within an exception in Rule 501(a) 000ft6m",
-      "one of 000ft6m",
-      "SHANT transfer the securities 000ft6m",
-      "deadline passes, not performed 000ft6m",
-      "Fulfilled 000ft6m",
-      "Process finished 000ft6m"
+      "Process started <scope-2>",
+      "Start Event <scope-2>",
+      "transfer falls within an exception in Rule 501(a) <scope-2>",
+      "one of <scope-2>",
+      "SHANT transfer the securities <scope-2>",
+      "deadline passes, not performed <scope-2>",
+      "Fulfilled <scope-2>",
+      "Process finished <scope-2>"
     ]
   },
   "happy": [
@@ -210,6 +226,7 @@
       ],
       "hitStepLimit": false,
       "tokensOn": [],
+      "instances": {},
       "boundarySubscriptions": [],
       "triggers": [
         "Start_0"
@@ -226,13 +243,17 @@
       "endEventsReached": [
         "End_1"
       ],
+      "endEventsReachedTopLevel": [
+        "End_1"
+      ],
+      "endEventsReachedInside": {},
       "log": [
-        "Process started 1dx7pnk",
-        "Start Event 1dx7pnk",
-        "transfer falls within an exception in Rule 501(a) 1dx7pnk",
-        "one of 1dx7pnk",
-        "Fulfilled 1dx7pnk",
-        "Process finished 1dx7pnk"
+        "Process started <scope-3>",
+        "Start Event <scope-3>",
+        "transfer falls within an exception in Rule 501(a) <scope-3>",
+        "one of <scope-3>",
+        "Fulfilled <scope-3>",
+        "Process finished <scope-3>"
       ]
     },
     {
@@ -257,6 +278,7 @@
       ],
       "hitStepLimit": false,
       "tokensOn": [],
+      "instances": {},
       "boundarySubscriptions": [],
       "triggers": [
         "Start_0"
@@ -275,14 +297,18 @@
       "endEventsReached": [
         "End_3"
       ],
+      "endEventsReachedTopLevel": [
+        "End_3"
+      ],
+      "endEventsReachedInside": {},
       "log": [
-        "Process started 04pfnwj",
-        "Start Event 04pfnwj",
-        "transfer falls within an exception in Rule 501(a) 04pfnwj",
-        "one of 04pfnwj",
-        "SHANT transfer the securities 04pfnwj",
-        "Breach 04pfnwj",
-        "Process finished 04pfnwj"
+        "Process started <scope-4>",
+        "Start Event <scope-4>",
+        "transfer falls within an exception in Rule 501(a) <scope-4>",
+        "one of <scope-4>",
+        "SHANT transfer the securities <scope-4>",
+        "Breach <scope-4>",
+        "Process finished <scope-4>"
       ]
     }
   ],

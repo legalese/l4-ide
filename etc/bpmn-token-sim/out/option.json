@@ -10,6 +10,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Start_0__Task_0"
@@ -24,6 +25,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_0__Task_1"
@@ -40,6 +42,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Task_1__End_2"
@@ -56,6 +59,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -73,6 +77,7 @@
       "multiInstance": null,
       "cancelActivity": null,
       "attachedTo": null,
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [],
       "incoming": [
@@ -89,6 +94,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_1",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_1__End_3"
@@ -105,6 +111,7 @@
       "multiInstance": null,
       "cancelActivity": true,
       "attachedTo": "Task_0",
+      "subProcess": null,
       "gatewayDirection": null,
       "outgoing": [
         "Flow_Boundary_0__End_2"
@@ -122,13 +129,14 @@
     "tokensOn": [
       "Task_0"
     ],
+    "instances": {},
     "boundarySubscriptions": [
       "Boundary_0"
     ],
     "triggers": [
+      "Boundary_0",
       "Start_0",
-      "Task_0",
-      "Boundary_0"
+      "Task_0"
     ],
     "history": [
       "Start_0",
@@ -136,18 +144,21 @@
       "Task_0"
     ],
     "endEventsReached": [],
+    "endEventsReachedTopLevel": [],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 0ud0sui",
-      "Start Event 0ud0sui"
+      "Process started <scope-1>",
+      "Start Event <scope-1>"
     ],
     "afterWaiting3s": {
       "tokensOn": [
         "Task_0"
       ],
+      "instances": {},
       "triggers": [
+        "Boundary_0",
         "Start_0",
-        "Task_0",
-        "Boundary_0"
+        "Task_0"
       ],
       "endEventsReached": []
     }
@@ -157,6 +168,7 @@
     "continuedFirst": [],
     "fired": "Boundary_0",
     "tokensOn": [],
+    "instances": {},
     "boundarySubscriptions": [],
     "triggers": [
       "Start_0"
@@ -172,13 +184,17 @@
     "endEventsReached": [
       "End_2"
     ],
+    "endEventsReachedTopLevel": [
+      "End_2"
+    ],
+    "endEventsReachedInside": {},
     "log": [
-      "Process started 05s6y03",
-      "Start Event 05s6y03",
-      "MAY Exercise ... 05s6y03",
-      "after P30D 05s6y03",
-      "Fulfilled 05s6y03",
-      "Process finished 05s6y03"
+      "Process started <scope-2>",
+      "Start Event <scope-2>",
+      "MAY Exercise ... <scope-2>",
+      "after P30D <scope-2>",
+      "Fulfilled <scope-2>",
+      "Process finished <scope-2>"
     ]
   },
   "happy": [
@@ -204,6 +220,7 @@
       ],
       "hitStepLimit": false,
       "tokensOn": [],
+      "instances": {},
       "boundarySubscriptions": [],
       "triggers": [
         "Start_0"
@@ -220,13 +237,17 @@
       "endEventsReached": [
         "End_2"
       ],
+      "endEventsReachedTopLevel": [
+        "End_2"
+      ],
+      "endEventsReachedInside": {},
       "log": [
-        "Process started 1h1exs1",
-        "Start Event 1h1exs1",
-        "MAY Exercise ... 1h1exs1",
-        "MUST Transfer ... 1h1exs1",
-        "Fulfilled 1h1exs1",
-        "Process finished 1h1exs1"
+        "Process started <scope-3>",
+        "Start Event <scope-3>",
+        "MAY Exercise ... <scope-3>",
+        "MUST Transfer ... <scope-3>",
+        "Fulfilled <scope-3>",
+        "Process finished <scope-3>"
       ]
     }
   ],
