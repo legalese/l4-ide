@@ -1,10 +1,10 @@
 {
-  "runAt": "2026-09-18T23:23:21.042Z",
+  "runAt": "2026-09-19T00:12:24.843Z",
   "bpmnjs": "18.28.0",
   "tokenSim": "0.40.0",
   "browser": "chrome 153.0.8010.53",
   "node": "v26.4.0",
-  "harnessCommit": "9cd110c5d",
+  "harnessCommit": "299614dc4",
   "fixtures": [
     "consultation",
     "handover",
@@ -38,132 +38,132 @@
   "stepLimit": 12,
   "perFixture": {
     "consultation": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     },
     "handover": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     },
     "modals-may-barrier": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     },
     "modals-may-fork": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     },
     "modals-must-barrier-both-deadlines": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     },
     "modals-must-fork-join-deadline": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     },
     "modals-shant-barrier": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     },
     "modals-shant-fork": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     },
     "offering": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     },
     "option": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     },
     "regcf-advertising": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     },
     "regcf-reporting": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     },
     "regcf-resale": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     },
     "tenancy-barrier": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     },
     "tenancy-fork": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     },
     "tenancy-fork-beside-party": {
-      "runAt": "2026-09-18T23:23:21.042Z",
+      "runAt": "2026-09-19T00:12:24.843Z",
       "bpmnjs": "18.28.0",
       "tokenSim": "0.40.0",
       "browser": "chrome 153.0.8010.53",
       "node": "v26.4.0",
-      "harnessCommit": "9cd110c5d"
+      "harnessCommit": "299614dc4"
     }
   }
 }
