@@ -179,20 +179,26 @@ spec = describe "two @nlg renderings on one name, partitioned by language" $ do
     selectedFor "is large" Nothing m `shouldBe` Just "ha-sechum gadol"
     ambiguities ws `shouldBe` []
 
-  -- Documented because it surprises: a herald on its own line ABOVE a DECIDE
-  -- does not reach the rule's name. It attaches to the last name before it —
-  -- here the GIVETH's `BOOLEAN` — which is pre-existing range-based
-  -- attachment and not something multiplicity changed. Write the second
-  -- rendering on the continuation line instead, as the fixtures above do.
-  it "a herald above the DECIDE attaches to the preceding name, not the rule" $ do
-    (m, _) <- parsed
+  -- This used to assert the OPPOSITE, and the change is the point. A herald on
+  -- its own line above a DECIDE went to the last name before it — the GIVETH's
+  -- `BOOLEAN` — so it rendered nowhere at all. With attachment fixed the two
+  -- renderings meet on the rule, and a bilingual pair can be written either
+  -- way round: one above the DECIDE and one trailing its name, or both on
+  -- continuation lines as the fixtures above do.
+  it "a herald above the DECIDE now reaches the rule, and pairs with a trailing one" $ do
+    (m, ws) <- parsed
       "GIVEN amount IS A NUMBER\n\
       \GIVETH A BOOLEAN\n\
       \@nlg:he ha-sechum gadol\n\
       \DECIDE `is large` @nlg:en the amount is large\n\
       \  IF amount > 100\n"
-    renderingsOf "is large" m `shouldBe` [("en", "the amount is large")]
-    renderingsOf "BOOLEAN" m `shouldBe` [("he", "ha-sechum gadol")]
+    -- `en` first because it is the DEFAULT: the module declares no `@lang`, so
+    -- its language is `en` (R-M2) and `pickDefault` prefers the module's own
+    -- language over source order. The `he` rendering is the alternative.
+    renderingsOf "is large" m
+      `shouldBe` [("en", "the amount is large"), ("he", "ha-sechum gadol")]
+    renderingsOf "BOOLEAN" m `shouldBe` []
+    ambiguities ws `shouldBe` []
 
   ----------------------------------------------------------------------------
   -- `@lang he` — the module's own language (R-M2, Meng 2026-09-17).

@@ -1031,6 +1031,10 @@ prettyNlgResolveWarning = \ case
     , Print.prettyLayout nlg
     , "```"
     ]
+  Resolve.EmptyNlg name _ ->
+    "This @nlg annotation has no text, so it is ignored: "
+      <> Print.prettyLayout name
+      <> " would otherwise render as nothing at all, because an annotation replaces what it annotates."
   Resolve.Ambiguous name mtag nlgs -> Text.unlines $
     ( case mtag of
         -- Every parsed annotation carries a language by the time it gets
@@ -1071,6 +1075,8 @@ rangeOfResolveWarning = \ case
     srcSpanToLspRange $ Just nlg.range
   Resolve.UnknownLocation _ ->
     srcSpanToLspRange Nothing
+  Resolve.EmptyNlg _ nlg ->
+    srcSpanToLspRange $ Just nlg.range
   Resolve.Ambiguous name _ _ ->
     srcRangeToLspRange $ rangeOf name
   Resolve.RefUnattached r ->

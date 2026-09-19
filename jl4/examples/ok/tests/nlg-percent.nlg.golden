@@ -1,7 +1,7 @@
-`over threshold` where `amount` is 200
-`scaled amount` with 2 and 50
-`doubled` with 21
-`the levy on` with 100
+5% with `amount` where `amount` is 200
+a 5% rate `amount` with 2 and 50
+`amount` doubled with 21
+a rate between 10%and%20 applied to `n` with 100
 `the duty on` with 50
-`discounted` with 80
+a discount of 50\ with 80
 `note on` with 7

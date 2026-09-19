@@ -246,6 +246,7 @@ test-suite jl4-core-test
     PrintRoundtripSpec
     PrettyLayoutNlgSpec
     NlgMultiplicitySpec
+    NlgAttachmentSpec
     SectionGivenTdnrSpec
     LedgerSubstrateSpec
     LedgerThunkCacheSpec
