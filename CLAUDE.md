@@ -347,8 +347,18 @@ re-type-checks. **There are no exclusions and no known-failure list**; if you ne
 signal to fix the printer instead.
 
 Debugging it: the output is thousands of columns wide, so set `JL4_PRETTY_DUMP_DIR=<dir>` and the
-whole emitted module is written to `<dir>/<name>.l4.pl.l4` — a plain `.l4` file you can run
+emitted module is written to `<dir>/<name>.l4.pl.l4` — a plain `.l4` file you can run
 `l4 check` on.
+
+**That dump is the FILTERED print, and it is the wrong file for an evaluation question.**
+`filterIdeDirectives` has already removed every `#EVAL` and `#ASSERT` from it, so a module with
+six assertions dumps with none. Use it to read the printed SHAPE; never to compare results.
+`JL4_EVALDIFF=1` writes the UNFILTERED print instead, next to the source so its `IMPORT`s still
+resolve (§3.2.1). Measured 2026-09-19: a differential built on the dump reported a corpus module
+dropping from six `Result:` blocks to one, and the drop was the filter, not the printer. Its
+author caught it with a positive control — appending an `#EVAL` to the printed side returned
+FEWER results, which is impossible if the harness measures what it claims — and not by reading
+this paragraph, which until now said "the whole emitted module".
 
 #### 3.2.1 Re-parsing is not re-meaning — run the evaluation differential
 
@@ -405,6 +415,25 @@ printer can only re-emit the head keyword — no definition can be spelled any o
 is `ok/mixfix-garden-path.l4`, whose own comment predicted it: `tax on _ item costing _ as GST in _`
 beside `… as VAT in _`. It fails **loudly** ("multiple definitions for the identifier"), and only
 via the unfiltered print — `l4 batch` strips `#EVAL`, which is where both call sites live.
+
+**Footnote, 2026-09-19: "loudly" is right, but the diagnostic is not always that one, and the
+trigger is narrower than "is mixfix".** Where the colliding definitions are DISTINGUISHABLE —
+sharing a head keyword but not an arity or an argument type vector — resolution reports no
+ambiguity at all. The printed module parses, type-checks, and then fails to TERMINATE:
+`canon/sg/succession/sg-wills.l4` stack-overflows on 4 of its 62 assertions, and the
+round-trip property is green throughout because it asks about parsing, not running
+(smucclaw/l4-ide#967).
+
+The trigger is head-keyword COLLISION, not mixfix density, and that is measured rather than
+supposed: `sg-wills.l4` has 79 mixfix-shaped definition heads and 75 distinct ones — `the will`
+three times, two others twice — while the nine `canon/il/ofek-hadash-2008` modules have 160
+heads, 160 distinct, zero collisions, and a full evaluation differential over them is clean
+(263 `Result:` blocks identical, positive-controlled). So the cheap risk check on a file is
+one line:
+
+```
+grep -oE '^`[^`]+`' <file> | sort | uniq -d
+```
 
 Re-emitting the surface form instead (`` `tax on` c `item costing` p ``) was built and measured and
 **does not work**: definitions print from their restructured AppForm (`DECIDE andop a b c IS …`), so
