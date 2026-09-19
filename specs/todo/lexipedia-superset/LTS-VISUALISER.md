@@ -2339,10 +2339,17 @@ complete ONLY by terminating, at two instances:
 | `modals-may-fork`                | 108    | 0     |
 | `modals-shant-fork`              | 78     | 0     |
 | `modals-must-fork-join-deadline` | 78     | 0     |
+| `tenancy-fork-beside-party`      | 409    | 113   |
 | the four barrier goldens         | 1–2    | 1–2   |
 
 A barrier failing as a group and ending everything is `ONCE ALL HAVE`, so 1–2 is right there and
-unchanged. Two notes come out of the demotion: `P-FORK-BREACH-UNMARKED` (advisory) and
+unchanged.
+
+**The fifth row does not go to zero, and belongs in the table for exactly that reason.** It is the
+`RAND` shape, so its remaining 113 are the landlord's own error end, which is `P-NOJOIN`'s declared
+loss and not this branch's to fix. Listing only the four that reach zero would have read as "every
+fork goes to zero", which is the kind of table that makes a later reader think a regression has
+appeared when they meet the fifth. There are **five** fork-bearing goldens, not four. Two notes come out of the demotion: `P-FORK-BREACH-UNMARKED` (advisory) and
 `P-FORK-VERDICT` (lossy — the rule's verdict is the fold over members, which BPMN cannot express
 without inventing data, so it is declined rather than drawn wrongly; the terminal is named "every
 run has ended").
@@ -2584,6 +2591,25 @@ leads with.
 >    `MAY`, a `SHANT` and a `businessRuleTask`; on `offering` and both `regcf-*` prohibitions,
 >    "continue" on the `SHANT` task **is** the breach, and its timer is the compliance exit — the
 >    inverse of every `MUST` beside it, with no notational difference.
+>    **MEASURED 2026-09-19 by `lts-diagrams-2`, and it bounds this whole track: the token simulator
+>    cannot show multi-instance at all.** `bpmn-js-token-simulation` 0.40.0 has zero occurrences of
+>    `multiInstance` or `loopCharacteristics` anywhere in `lib/`, so a multi-instance sub-process plays
+>    as ONE instance and `EndGroup_<n>` fires the moment that instance ends — on a breach path
+>    `EndBreach_<n>` and `EndGroup_<n>` arrive together. **So `etc/check-bpmn-soundness.mjs` is the only
+>    thing in this repository that plays n > 1**, and any claim about what a reader would SEE of the
+>    per-member picture has to come from the gate rather than from the animation.
+
+What the animation does now show of the join, which the flat drawing did not, is structural: a box,
+the escalation relay, and two terminals of the fork's own. That is a real improvement on the
+identical-in-every-field result recorded below — but it is a difference in the PICTURE, not a
+difference in the play, and the two were worth separating before someone cited the wrong one.
+
+Two further facts from the same run, worth having where the emitter is discussed:
+`BoundaryEsc_<n>` is the **only non-interrupting boundary in the whole corpus** — every other
+`Boundary_<n>` across all sixteen goldens is interrupting — and firing that relay cold, before the
+member's task is entered, produces an `EndBreach_<n>` with a breach that has no cause, which is why
+a simulator driving boundaries must fire only the interrupting ones.
+
 > 2. **The barrier and the fork animate identically.** `tenancy-barrier` and `tenancy-fork` give
 >    the same scopes, triggers, history and end events (JSONs differ only in label text); the
 >    multi-instance task is one token and one click, never `n`, so `ONCE ALL HAVE` waits for nothing
