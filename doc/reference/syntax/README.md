@@ -250,11 +250,30 @@ above the declaration. Convention is the top; nothing breaks if it is not.
 together with an explicit `@nlg:he` on the same rule is two Hebrew renderings,
 and is reported as such.
 
-**Where you put the annotation decides what it describes, and getting it wrong
-is quiet.** An annotation attaches to the name it follows. On its own line
-_above_ `DECIDE` it follows the `GIVETH` type, so it describes that type and
-never appears in the rule's rendered prose — with no warning, because it did
-attach to something. Write it after the rule's name, as above.
+#### Where to put it
+
+An annotation describes the thing it sits with, and there are two places to
+sit:
+
+```l4
+GIVEN amount IS A NUMBER @nlg the claim amount   -- trailing: describes `amount`
+
+GIVETH A BOOLEAN
+@nlg the claim of %amount% is large              -- own line: describes the rule
+DECIDE `is large` IF amount GREATER THAN 100
+```
+
+**Trailing a line, it describes what is on that line. Starting a line of its
+own, it describes what follows.** That is the whole rule, and it holds whether
+the thing is a rule, a parameter, a field or a type declaration.
+
+**An empty `@nlg` is ignored, and says so.** A rendering replaces what it
+annotates, so `@nlg` with nothing after it would erase the name from the
+output rather than leave it alone. L4 drops it and warns instead.
+
+**A record field can carry two.** `head [the first item] IS AN a [an element]`
+glosses the field and its type separately, because each annotation sits with
+the token it follows.
 
 **The bare inline form cannot be tagged.** `[…]` has nowhere to put a subtag —
 the annotation is just brackets around prose — so a language is available only
