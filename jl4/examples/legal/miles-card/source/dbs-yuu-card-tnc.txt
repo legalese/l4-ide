@@ -1,0 +1,397 @@
+Updated on 7 August 2026                                                                         DBS yuu Card
+
+
+
+                                          Terms and Conditions
+                                 DBS yuu Card Programme and Promotions
+
+
+
+GENERAL
+
+1.     Cardmembers consent to the collection, use and disclosure of their personal data by/to DBS in
+       accordance with the DBS Credit Card Agreement and such other terms and conditions, which govern
+       the use and operation of your DBS yuu Visa Card and DBS yuu American Express® Card (each a “DBS
+       yuu Card”) for the purpose of any DBS yuu Card programme and promotions (“DBS yuu Card
+       Promotions”), which will include the sharing of personal data and card transactions under the DBS yuu
+       Card with our partner, Minden Singapore Pte Ltd and such other third party as DBS may reasonably
+       consider necessary and confirm that they agree to be bound by the terms of the DBS Privacy Policy, a
+       copy of which can be found on www.dbs.com/privacy.
+
+2.     DBS yuu Card benefits and/or privileges are applicable to all DBS yuu Card Cardmembers
+       (“Cardmembers”) only unless otherwise stated.
+
+3.     DBS may vary these Terms and Conditions and suspend or terminate the DBS yuu Card Promotions
+       without any notice or liability to any party.
+
+4.     DBS’ decision on all matters relating to the DBS yuu Card Promotions shall be final. No correspondence
+       or claims will be entertained.
+
+5.     These Terms and Conditions shall be read in conjunction with the DBS Credit Card Agreement. In the
+       event of any inconsistency, these Terms and Conditions shall prevail.
+
+
+CASH REBATES (YUU POINTS) AWARDING
+
+6.   The mechanics of the Base Rewards are as illustrated in the table below. For every S$1 spent at the
+     following Spend Categories that is charged and posted to your DBS yuu Card, you will earn the respective
+     Base Rewards.
+
+             Spend Categories            Base Rewards
+             yuu Merchant Spend          1 yuu Point (0.5% cash rebates)
+             SimplyGo                    0.5 yuu Point (0.25% cash rebates)
+             Non-yuu Merchant Spend      0.5 yuu Point (0.25% cash rebates)
+
+       i.    There is no minimum spend required, and no cap to the Base Rewards.
+       ii.   Base Rewards will be credited to Cardmembers’ linked yuu Account in the manner as follows:
+              • yuu Merchant Spend: Within the same day when you scan/link your yuu ID when transacting.
+              • SimplyGo and non-yuu Merchant Spend: Within 60 days after the end of each calendar
+                  month.
+Updated on 7 August 2026                                                                            DBS yuu Card
+
+
+
+7.   The mechanics of the Bonus Rewards are as illustrated in the tables below. Total Bonus Rewards is capped
+     at 28,800 yuu Points (worth up to S$144 cash rebates or 8,000 miles) per calendar month. Bonus Rewards
+     will be credited to qualifying cardmembers’ linked yuu Account within 60 days after the end of each calendar
+     month.
+
+     a) Bonus Rewards (with no minimum spend required)
+
+     No minimum spend required to earn the following Bonus Rewards. For every S$1 spent at the following
+     Spend Categories that is charged and posted to your DBS yuu Card, you will earn the respective Bonus
+     Rewards.
+
+          Spend Categories             Bonus Rewards
+          yuu Merchant Spend           9 yuu Points (4.5% cash rebates)
+          SimplyGo                     9.5 yuu Points (4.75% cash rebates)
+
+     b) Bonus Rewards (with minimum spend required)
+
+     To earn the following Bonus Rewards, Cardmembers must meet these spend requirements each calendar
+     month (“Minimum Spend Requirement”):
+        i. Minimum S$800 worth of Eligible Spend charged and posted to your Card, and
+       ii. Transact at 4 Participating Merchants.
+
+     Cardmembers who have met the Minimum Spend Requirement, will earn the respective Bonus Rewards as
+     tabled below, for every S$1 spent at the following Spend Categories that is charged and posted to your DBS
+     yuu Card.
+
+         Spend Categories             Bonus Rewards
+         yuu Merchant Spend           26 yuu Points (13% cash rebates)
+         SimplyGo                     26 yuu Points (13% cash rebates)
+
+
+
+8.   “Participating Merchants” refer to the following, but excludes products listed in Appendix 1, and subject
+     to changes from time to time.
+
+        Participating Merchants                Defined as transactions made in Singapore at:
+        (each a Participating Merchant)
+
+        Cold Storage                           Cold Storage
+                                               CS Fresh
+                                               Jasons Deli
+        Giant                                  Giant
+                                               Giant Hypermart
+                                               Giant Express
+        Guardian                               Guardian
+        7-Eleven                               7-Eleven
+        foodpanda                              foodpanda food delivery
+                                               panda mart
+                                               panda shops
+        Gojek                                  Gojek Singapore
+        SimplyGo                               Bus and train rides via SimplyGo
+        Charge+                                Charge+ Singapore
+Updated on 7 August 2026                                                                          DBS yuu Card
+
+
+
+        CHAGEE                                 Orders placed via CHAGEE App
+        Singtel                                Singtel Shop
+                                               Singtel Exclusive Retailers
+
+9.   “Eligible Spend” refers to qualified spend charged on your DBS yuu Card but excludes the following
+     types of transactions:
+
+       a) Any transaction that is subsequently cancelled, voided, refunded or reversed (“Refunded
+          Transactions”) for any reason;
+       b) Pre-authorisation transactions on the Card account, e.g. hotel bookings;
+       c) Balance transfers, cash advance, My Preferred Payment Plan (“MP3”) monthly transactions, and any
+          fees and charges (including annual fees, interest charges, cheque processing fees, administrative
+          fees, cash advance fees, finance charges and/or late payment charges and other miscellaneous fees
+          and charges);
+       d) 0% interest-free Instalment Payment Plan (“IPP”) transaction(s);
+       e) All other bill payments via internet banking and fees charged by DBS;
+       f) Any payment made with the following Merchant Category Codes (“MCC”);
+
+                  MCC         Description
+                  4784        Toll and Bridge Fees
+                  4829        Money Transfer
+                  4900        Utilities – Electric, Gas, Water, Sanitary
+                  5047        Dental/Laboratory/Medical/Ophthalmic Hospital Equipment and Supplies*
+                  5199        Non-Durable Goods – Not Elsewhere Classified*
+                  5960        Direct Marketing – Insurance Services*
+                  5993        Cigar Stores and Stands*
+                  6010        Financial Institutions – Manual Cash Disbursements
+                  6011        Financial Institutions – Automated Cash Disbursements
+                  6012        Financial Institutions – Merchandise, Services and Debt Repayment
+                  6050        Quasi Cash – Financial institutions, Merchandise, Services*
+                  6051        Non-Financial Institutions – Foreign Currency, Liquid and Cryptocurrency
+                              Assets, Money Orders (not Money Transfer), Account Funding (not Stored
+                              Value Load), Travelers Cheques, and Debt Repayment
+                  6211        Security Brokers/Dealers
+                  6300        Insurance Sales, Underwriting, and Premiums
+                  6381        Insurance Premiums
+                  6399        Insurance, Not Elsewhere Classified
+                  6513        Real Estate Agents and Managers – Rentals*
+                  6529        Quasi Cash – Remote Stored Value Load – Financial Institute*
+                  6530        Quasi Cash – Remote Stored Value Load – Merchant*
+                  6534        Quasi Cash – Money Transfer – Member Financial Institution*
+                  6540        Non-Financial Institutions – Stored Value Card Purchase/Load
+                  7349        Cleaning and Maintenance, Janitorial Services*
+                  7511        Quasi Cash – Truck Stop Transactions*
+                  7523        Parking Lots, Parking Meters and Garages
+                  7995        Betting including Lottery Tickets, Casino Gaming Chips, Off-track Betting,
+                              Wagers at Race Tracks and games of chance to win prizes of monetary value
+Updated on 7 August 2026                                                                            DBS yuu Card
+
+
+
+                    8062        Hospitals
+                    8211        Elementary and Secondary Schools
+                    8220        Colleges, Universities, Professional Schools, and Junior Colleges
+                    8241        Correspondence Schools
+                    8244        Business and Secretarial Schools
+                    8249        Vocational Schools and Trade Schools
+                    8299        Schools and Educational Services (Not Elsewhere Classified)
+                    8398        Charitable and Social Service Organizations
+                    8651        Political Organizations*
+                    8661        Religious Organizations
+                    8699        Membership Organizations – Not Elsewhere Classified*
+                    8999        Professional Services (Not Elsewhere Classified)*
+                    9211        Court Costs, Including Alimony and Child Support
+                    9222        Fines
+                    9223        Bail and Bond Payments
+                    9311        Tax Payments
+                    9399        Government Services (Not Elsewhere Classified)
+                    9402        Postal Services – Government Only
+                    9405        Intra-Government Purchases – Government Only
+            *With effect from 1 May 2026
+
+              i.    Any transactions matching the terms below:
+                    • AMAZE                       • EZ-LINK                         •   SINGTEL DASH
+                    • AXS (with effect from 1 • PAYPAL AXS PTE LTD                  •   Singapore E-Business
+                        May 2026)                 • RAZERPAY                        •   SHOPEEPAY
+                    • AXS BizPay                  • SAM PAYMENTS                    •   SmoovPay (with effect
+                    • BAGUS                       • SEDAP                               from 1 May 2026)
+                    • CANTINE                     • Sgebiz                          •   TRANSIT 3
+                    • EZLINK                      • SGeBiz                          •   YOUTRIP
+
+
+              ii.   Any other transactions determined by DBS from time to time;
+
+10.    Eligible Spend must be charged to your DBS yuu Card within the calendar month, based on transaction
+       date. The transaction date is determined based on the merchant settlement date between the merchant
+       and their acquirer (subject to merchant or their acquirer’s timezone).
+
+11.    Cardmembers will be awarded in yuu Points to the yuu Account which has been linked to the DBS yuu
+       principal cardmember at the point of transaction.
+
+12.    1 yuu Point is equivalent to 0.5% cash rebate or 0.28 miles or more, depending on the redemption item
+       on the yuu Rewards catalogue.
+
+13.    Only posted transactions will be considered as part of the Eligible Spend.
+
+14.    Posted refunds into the card account will be computed as a negative spend.
+Updated on 7 August 2026                                                                            DBS yuu Card
+
+
+
+15.    DBS shall not be responsible for any failure or delay in posting of sales transactions which may result in
+       Cardmembers being ineligible for the Base or Bonus Rewards.
+
+16.    yuu Points will not be awarded for transactions utilized to qualify for My Preferred Payment Plan (MP3).
+       Any yuu Points which were awarded as such will be reversed.
+
+17.    yuu Points earned on your DBS yuu Card before linking to the yuu App will be credited upon card linkage.
+       These Points will expire within 3 months (or 90 days) from the day of issuance if the card is unlinked.
+
+18.    All spend on supplementary cards will be included in the calculation of principal card’s Bonus Rewards
+       Eligible Spend.
+
+19.    All yuu Points earned on supplementary cards will be awarded to the principal cardmember’s yuu Account.
+
+20.    The yuu Rewards Club Terms and Conditions apply. Full T&Cs can be found on the yuu Rewards App or
+       here: https://yuu.sg/terms-and-conditions, and Frequently Asked Questions can be found here:
+       https://yuu.sg/faq.
+
+21.    Any yuu Rewards Points awarded in respect of reversed transactions will be deducted from the yuu
+       Account accordingly.
+
+22.    For non-Singapore dollar Qualifying Spend charged to the DBS yuu Card, the transaction amount posted
+       in the Cardmember’s registered card account (which is inclusive of the exchange rate conversion and
+       commission, if any) will be considered for the computation of the Eligible Spend. These values are subject
+       to change based on the prevailing exchange rate on the posting date.
+Updated on 7 August 2026                                                                       DBS yuu Card
+
+
+
+                                               Appendix 1
+
+                             DEFINITION OF PARTICIPATING MERCHANTS
+
+
+
+
+ Participating             Includes the          Exclusions
+ Merchants                 following in
+                           Singapore
+
+ Cold Storage              Cold Storage          Applicable to Base Rewards
+
+                           CS Fresh                  •   Plastic bags
+                                                     •   Tobaccos and cigarettes
+                           Jasons Deli
+                                                     •   Delivery charges
+ Giant                     Giant                     •   All services (bonus points only, base points
+                                                         exclusion) including mobile and EZ-Link reload
+                           Giant Hypermart           •   Purchase of cash-like items, e.g. mobile sim
+                                                         card top-up vouchers
+                           Giant Express
+                                                     •   Statutory services and products
+                                                     •   DFI vouchers and magazines
+                                                     •   Gift cards and voucher purchases (however
+                                                         points are earned when a gift card is used)
+                                                     •   Pre-mature and Stage 1 infant milk formula,
+                                                         selected Stage 2 milk formula
+                                                     •   Sushi and sashimi
+
+                                                 Applicable to Base and Bonus Rewards
+
+                                                     •   Bonus yuu Points will not be awarded for
+                                                         transactions made at Cold Storage On The Go
+                                                         (within Esso Stations), only base 0.5 yuu point
+                                                         (equivalent to 0.25% cash rebates) will be
+                                                         awarded. Transactions will be eligible to count
+                                                         towards card’s minimum spend requirement.
+
+ Guardian                  Guardian Health &     Applicable to Base Rewards
+                           Beauty
+                                                     •   Purchases at all stores at Changi Airport
+                                                     •   Plastic bags
+                                                     •   Delivery charges
+                                                     •   All services (bonus points only, base points
+                                                         exclusion) including mobile and EZ-Link reload
+                                                     •   Purchase of cash-like items, e.g. mobile sim
+                                                         card top-up vouchers
+                                                     •   Statutory services and products
+                                                     •   DFI vouchers and magazines
+                                                     •   Gift cards and voucher purchases (however
+                                                         points are earned when a gift card is used)
+                                                     •   Pre-mature and Stage 1 infant milk formula,
+                                                         selected Stage 2 milk formula
+
+ 7-Eleven                  7-Eleven              Applicable to Base Rewards
+
+                                                     •   Purchases at all stores at Changi Airport
+Updated on 7 August 2026                                                                         DBS yuu Card
+
+
+
+                                                      •   Plastic bags
+                                                      •   Tobaccos and cigarettes
+                                                      •   All services (bonus points only, base points
+                                                          exclusion) including mobile and EZ-Link reload
+                                                      •   Purchase of cash-like items, e.g. mobile sim
+                                                          card top-up vouchers
+                                                      •   All lottery products, bill payments, top-up
+                                                          services and Qoo10 online shopping payment
+                                                      •   Statutory services and products
+                                                      •   DFI vouchers and magazines
+                                                      •   Gift cards and voucher purchases (however
+                                                          points are earned when a gift card is used)
+                                                      •   Pre-mature and Stage 1 infant milk formula,
+                                                          selected Stage 2 milk formula
+
+                                                  Applicable to Bonus Rewards
+
+                                                      •   Points will not be awarded for any transactions
+                                                          made with DBS yuu American Express® Card.
+
+                                                  With effect from 13 Aug 2026, American Express®
+                                                  Cards will be accepted at all 7-Eleven outlets islandwide.
+                                                  DBS yuu American Express® Cardmembers can earn
+                                                  bonus rewards on 7-Eleven transactions w.e.f. 13 Aug
+                                                  2026
+
+                                                  Applicable to Base and Bonus Rewards
+
+                                                      •   Purchases at 7-Eleven vending machines (with
+                                                          effect from 1 Dec 2025)
+
+ foodpanda                 foodpanda Singapore    Applicable to Base and Bonus Rewards
+                           (food delivery, pick
+                                                  Points will not be awarded for any transactions with
+                           up, shops and
+                                                  transaction description “PayPal” with effect from 1
+                           pandamart)
+                                                  February 2024.
+
+                                                  Points will not be awarded (but not limited) to the
+                                                  following transactions:
+
+                                                  •   Dine-in orders
+                                                  •   pandago orders
+                                                  •   All orders on corporate accounts
+                                                  •   Top-ups on pandapay wallet
+                                                  •   pandapro subscriptions
+                                                  •   Any discounts and vouchers applied, delivery fee,
+                                                      platform fee and other fees, and rider tips
+
+ Gojek                     Gojek Singapore        Applicable to Base and Bonus Rewards
+
+                                                  Points will not be awarded for any transactions with
+                                                  transaction description “PayPal” with effect from 1
+                                                  February 2024.
+
+ Charge+                   Charge+ Singapore      Applicable to Bonus Rewards
+Updated on 7 August 2026                                                                              DBS yuu Card
+
+
+
+                                                   Points will not be awarded for any transactions made
+                                                   with DBS yuu American Express® Card.
+
+ Singtel                    SingtelShop!           Applicable to Base Rewards
+
+                            Singtel Exclusive      Points will not be awarded for all transactions.
+                            Retailers
+                                                   Applicable to Base and Bonus Rewards
+
+                                                   Points will not be awarded for
+
+                                                   •   Corporate plans/sign up
+                                                   •   Prepaid card top-up
+                                                   •   Recurring bill payment and bill payments
+
+                                                   Please visit yuu App for the full list of exclusions.
+
+ SimplyGo                   SimplyGo               Applicable to Base and Bonus Rewards
+
+                                                   Points will not be awarded for Top-Up transactions.
+
+ CHAGEE                     CHAGEE                 Applicable to Base and Bonus Rewards
+
+                                                   Points will only be awarded for orders placed via the
+                                                   CHAGEE App and applicable for purchases in Singapore
+                                                   only.
+
+
+
+DBS will not award Bonus Rewards on transactions that do not earn Base Rewards from yuu/Participating
+Merchants, unless otherwise stated.
+
+DBS, yuu, and Participating Merchants reserves the right to amend the exclusion list and/or T&Cs from time to
+time without prior notice.
+

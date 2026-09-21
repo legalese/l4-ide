@@ -1,0 +1,50 @@
+IMPORT prelude
+IMPORT `imported-domain`
+
+§ `An exported decision built entirely out of imported declarations`
+
+-- REGRESSION EXHIBIT. Until 2026-09-21 the lowering scanned only the module it
+-- was handed, so a `DECLARE` in an imported file was invisible to it even
+-- though the typechecker had resolved the name perfectly well. The symptom did
+-- not say "imported": it said
+--
+--     in `assess`: type `Assessment` is outside the v1 Catala fragment (§6)
+--
+-- which reads as a language limit rather than a missing scan, and there was no
+-- way to act on it. Three things are pinned here at once:
+--
+--   1. an imported RECORD as a `GIVETH` and as a construction site;
+--   2. an imported ENUMERATION, reached only through that record's field —
+--      so it is emitted because something else that is emitted needs it, not
+--      because anything names it here;
+--   3. an imported HELPER, which R1 lowers to a private toplevel in this
+--      module exactly as it would a local one. (The alternative — refusing an
+--      imported helper and telling the author to inline it — was considered
+--      and declined: a helper is a helper wherever it was written.)
+--
+-- What is NOT emitted matters as much. This file imports the prelude, whose
+-- own `DECLARE`s are now equally visible to the scan; an imported declaration
+-- reaches the artifact only when the emitted code reaches it, so the emitted
+-- module below carries `Assessment` and `Band` and nothing of the stdlib.
+
+@export The assessment for an income: the taxable amount, and the band it falls in.
+GIVEN income IS A NUMBER
+GIVETH AN Assessment
+assess income MEANS
+    Assessment WITH
+        `taxable amount` IS income TIMES 0.9
+        band             IS `band for` income
+
+@export Whether an income is assessed in the upper band.
+GIVEN income IS A NUMBER
+GIVETH A BOOLEAN
+`in the upper band` income MEANS
+    CONSIDER (assess income)'s band
+    WHEN Upper THEN TRUE
+    WHEN Lower THEN FALSE
+
+#EVAL assess 2000
+
+#EVAL `in the upper band` 2000
+
+#EVAL `in the upper band` 500

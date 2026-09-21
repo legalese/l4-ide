@@ -1,0 +1,58 @@
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month below the threshold` and `a groceries run at Cold Storage` 's `points per dollar` is equal to 10
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a groceries run at Cold Storage` 's `points per dollar` is equal to 36
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a groceries run at Cold Storage` 's `miles per dollar` is equal to 10.08
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a groceries run at Cold Storage` 's `status` is equal to `Unconfirmed`
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month below the threshold` and `a groceries run at Cold Storage` 's `status` is equal to `Verified`
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month with the spend but not the merchants` and `a groceries run at Cold Storage` 's `points per dollar` is equal to 10
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month below the threshold` and `a train ride` 's `points per dollar` is equal to 10
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a train ride` 's `points per dollar` is equal to 36
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a meal at a restaurant that is not a yuu merchant` 's `points per dollar` is equal to 0.5
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a meal at a restaurant that is not a yuu merchant` 's `earns the bonus rate` is equal to `FALSE`
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a meal at a restaurant that is not a yuu merchant` 's `cap` 's `capped` is equal to `FALSE`
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a groceries run at Cold Storage` 's `cap` 's `bonus spend per month` is equal to the result of dividing 28800 by 35
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a groceries run at Cold Storage` 's `cap` 's `basis` is equal to `Calendar month`
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a groceries run at Cold Storage` 's `cap` 's `attribution` is equal to `By transaction date`
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month below the threshold` and `a groceries run at Cold Storage` 's `cap` 's `bonus spend per month` is equal to the result of dividing 28800 by 9
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a tax payment` 's `points per dollar` is equal to 0
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a consultancy fee in April 2026` 's `points per dollar` is equal to 0.5
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a consultancy fee in May 2026` 's `points per dollar` is equal to 0
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a YouTrip top-up` 's `points per dollar` is equal to 0
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a supermarket run routed through Amaze` 's `points per dollar` is equal to 0
+`DBS yuu earns on` with `DBS yuu American Express`, `a linked cardholder`, `a month above the threshold` and `a 7-Eleven run before 13 August 2026` 's `points per dollar` is equal to 1
+`DBS yuu earns on` with `DBS yuu American Express`, `a linked cardholder`, `a month above the threshold` and `a 7-Eleven run on 13 August 2026` 's `points per dollar` is equal to 36
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a 7-Eleven run before 13 August 2026` 's `points per dollar` is equal to 36
+`DBS yuu earns on` with `DBS yuu American Express`, `a linked cardholder`, `a month above the threshold` and `a groceries run at Cold Storage before 13 August 2026` 's `points per dollar` is equal to 36
+`DBS yuu earns on` with `DBS yuu American Express`, `a linked cardholder`, `a month above the threshold` and `a car charge` 's `points per dollar` is equal to 1
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a car charge` 's `points per dollar` is equal to 36
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a snack at Cold Storage On The Go` 's `points per dollar` is equal to 0.5
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a foodpanda order` 's `points per dollar` is equal to 36
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a foodpanda order paid through PayPal` 's `points per dollar` is equal to 0
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a SimplyGo top-up the facts cannot distinguish from a ride` 's `points per dollar` is equal to 36
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a phone at the Singtel Shop` 's `points per dollar` is equal to 0
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a phone at the Singtel Shop` 's `status` is equal to `Unconfirmed`
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a CHAGEE order placed outside Singapore` 's `points per dollar` is equal to 0
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a CHAGEE order placed in Singapore` 's `points per dollar` is equal to 36
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a groceries run at Cold Storage abroad` 's `points per dollar` is equal to 0.5
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a groceries run whose indicator is unknown` 's `depends on the merchant indicator` is equal to `FALSE`
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a groceries run whose indicator is unknown` 's `miles per dollar` is equal to 10.08
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a groceries run whose indicator is unknown` 's `miles per dollar if the merchant flags online` is equal to 10.08
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a groceries run whose indicator is unknown` 's `miles per dollar if the merchant flags card-present` is equal to 10.08
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a groceries run whose indicator is unknown` 's `earns the bonus rate` is equal to `TRUE`
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a groceries run whose indicator is unknown` 's `miles per dollar` is greater than 0.28
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a meal at a restaurant that is not a yuu merchant` 's `miles per dollar` is equal to 0.14
+`DBS yuu earns on` with `DBS yuu Visa`, `an unlinked cardholder`, `a month above the threshold` and `a groceries run at Cold Storage` 's `points per dollar` is equal to 36
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a groceries run at Cold Storage` 's `conversion status` is equal to `Verified`
+`miles per yuu Point` is equal to 0.28
+`miles per yuu Point` is at least 0.28
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a refund at Cold Storage` 's `points per dollar` is equal to 0
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a hotel pre-authorisation` 's `points per dollar` is equal to 0
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a balance transfer` 's `points per dollar` is equal to 0
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a cash advance` 's `points per dollar` is equal to 0
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `an instalment plan posting` 's `points per dollar` is equal to 0
+`cl.9(d) excludes the transaction` with `an instalment plan posting`
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `an annual fee` 's `points per dollar` is equal to 0
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `an interest charge` 's `points per dollar` is equal to 0
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a bill paid through internet banking` 's `points per dollar` is equal to 0
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a telephone order at Cold Storage` 's `points per dollar` is equal to 36
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a groceries run at Cold Storage`
+`DBS yuu earns on` with `DBS yuu Visa`, `a linked cardholder`, `a month above the threshold` and `a refund at Cold Storage`

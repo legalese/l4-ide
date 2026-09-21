@@ -46,6 +46,7 @@ export const LEG_ORDER = [
   "p7-tnr",
   "p7-wizard",
   "p7-akn",
+  "p7-catala",
 ];
 
 // Per-leg key schema: r = required (file must exist), o = optional (file must
@@ -80,6 +81,11 @@ const LEG_KEYS = {
   "p7-tnr": { golden: "r", wizard_golden: "o" },
   "p7-wizard": {},
   "p7-akn": {},
+  // No keys: the leg reads the selected encoding's module set and nothing
+  // else. There is no committed .catala_en golden for any subject, so there is
+  // no `golden` key to declare -- the oracle is the external toolchain, not a
+  // differential against a file in the tree.
+  "p7-catala": {},
 };
 
 // GO_S_* names for leg path/string keys, so phase scripts read one flat env.

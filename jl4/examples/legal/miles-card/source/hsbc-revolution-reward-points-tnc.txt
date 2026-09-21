@@ -1,0 +1,339 @@
+Terms and Conditions governing the HSBC Revolution Credit Card Reward Points Programme
+
+
+
+1.   The HSBC Revolution Credit Card Reward points Programme (“Programme”) is offered by HSBC Bank (Singapore) Limited
+     (“HSBC”) to all HSBC customers who hold a valid HSBC Revolution Credit Card (“Card”) issued by HSBC (each, a “Cardholder”).
+
+2.   The Programme period starts from 1 April 2026 until terminated by HSBC.
+
+3.   For the purposes of calculating the Reward points which the Cardholder is entitled to under the Programme, Qualifying
+     Transactions made with the primary and supplementary Card(s) will be combined and consolidated under the primary Card
+     account ("Account").
+
+4.   “Qualifying Transactions” refers to posted retail purchases (in the case of HSBC Spend Instalment, only the total purchase
+     amount will qualify as a Qualifying Transaction in the month of purchase), and shall exclude the following transactions (which shall,
+     where applicable, be determined based on the transaction descriptions reflected in HSBC’s system and the merchant category
+     codes from Visa / Mastercard):
+
+     •      Foreign exchange transactions (including but not limited to Forex.com);
+     •      Donations and payments to charitable, social organisations and religious organisations;
+     •      Quasi-cash transactions (including but not limited to transactions relating to money orders, traveler's checks, gaming related
+            transactions, lottery tickets and gambling);
+     •      Payments made to financial institutions, securities brokerages or dealers (including but not limited to the trading of securities,
+            investments or crypto-currencies of any kind);
+     •      Payments on money payments/transfers (including but not limited to Paypal, SKR skrill.com, CardUp, SmoovPay, iPayMy);
+     •      Payments to any professional services provider (including but not limited to GOOGLE Ads, Facebook Ads, Amazon Web
+            Services, MEDIA TRAFFIC AGENCY INC);
+     •      Top-ups, money transfers or purchase of credits of prepaid cards, stored-value cards or e-wallets (including but not limited to
+            EZ-Link, Transitlink, NETS Flashpay and Youtrip);
+     •      Payments in connection with any government institutions and/or services (including but not limited to court costs, fines, bail and
+            bond payment);
+     •      Any AXS and ATM transactions;
+     •      Tax payments (except HSBC Tax Payment Facility);
+     •      Payments for cleaning, maintenance and janitorial services (including property management fees);
+     •      Payments to insurance companies (including but not limited to sales, underwriting, premiums and insurance services);
+     •      Payments to educational institutions;
+     •      Payments on utilities (Electric, Gas, Water, and Sanitary);
+     •      Balance transfers, fund transfers, cash advances, finance charges, late charges, HSBC’s Cash Instalment Plan, any fees
+            charged by HSBC;
+     •      The monthly instalment amounts under all card instalment plan (including HSBC 0% Card Instalment Payment
+             Plan, HSBC PayLater Instalment Plan and HSBC Spend Instalment);
+     •      Total purchase amount under HSBC 0% Instalment Payment Plan and HSBC PayLater Instalment Plan
+     •      Any unposted, cancelled, disputed and refunded transactions;
+
+     4.1.     A Merchant Category Code (“MCC”) is a four-digit number assigned to a merchant/business by the merchant’s acquiring
+              bank. The acquiring bank provides the credit card payment facilities used by the merchant and it determines and applies
+              (with respect to the account), the MCC which in its view best describes the merchant activity. HSBC does not determine the
+              merchant’s MCC.
+
+     4.2.     For the avoidance of doubt, transactions made at merchants with the following MCCs will not earn Reward Points. The
+              following list of MCCs may be updated by HSBC from time to time without prior notice.
+
+                       Excluded Merchant              Description
+                       Category Code (MCC)
+               1       4829                           Money Transfer
+               2       4900                           Utilities – Electric, Gas, Water and Sanitary
+               3       5199                           Nondurable Good
+               4       5960                           Direct Marketing – Insurance Services
+               5       6010                           Financial Institutions – Manual Cash Disbursements
+               6       6011                           Financial Institutions – Automated Cash Disbursements
+               7       6012                           Financial Institutions – Merchandise, Services, and Debt Repayment
+
+Effective from 1 April 2026
+
+                                                                    PUBLIC
+            8       6050      Quasi Cash—Customer Financial Institution
+            9       6051      Non-Financial Institutions – Foreign Currency, Non-Fiat Currency (for example:
+                              Cryptocurrency), Money Orders (Not Money Transfer), Travelers Cheques, and
+                              Debt Repayment
+            10      6211      Security Brokers / Dealers
+            11      6300      Insurance Sales, Underwriting, and Premiums
+            12      6513      Real Estate Agents & Managers - Rentals
+            13      6529      Remote Stored Value Load – Member
+            14      6530      Remote Stored Value Load – Merchant
+            15      6532      PSP-Member-Payment Transaction
+            16      6533      PSP-Merchant-Payment Transaction
+            17      6534      Money Transfer Member
+            18      6536      Moneysend – Intracountry
+            19      6537      Moneysend – Intercountry
+            20      6538      Moneysend funding
+            21      6540      Non-Financial Institutions – Stored Value Card Purchase/Load
+            22      6555      Mastercard Imitated Rebate
+            23      7299      Other Services–Not Elsewhere Classified
+            24      7399      Business Services (Not Elsewhere Classified
+            25      7349      CLEAN/MAINT/JANITORIAL SERV
+            26      7511      Quasi Cash – Truck Stop Trxns
+            27      7523      Automobile Parking Lots and Garages
+            28      7801      Government Licensed On-Line Casinos (On-Line Gambling) (US Region only)
+
+            29      7995      Betting, including Lottery Tickets, Casino Gaming Chips, Off-Track Betting, and
+                              Wagers at Race Tracks
+            30      8062      Hospitals
+            31      8211      Elementary and Secondary Schools
+            32      8220      Colleges, Universities, Professional Schools, and Junior Colleges
+            33      8241      Correspondence Schools
+            34      8244      Business and Secretarial Schools
+            35      8249      Vocational and Trade Schools
+            36      8299      Schools and Educational Services (Not Elsewhere Classified)
+            37      8398      Charitable Social Service Organizations
+            38      8651      Political Organizations
+            39      8661      Religious Organizations
+            40      8999      Professional Services (Not Elsewhere Classified)
+            41      9211      Court Costs, Including Alimony and Child Support
+            42      9222      Fines
+            43      9223      Bail and Bond Payments
+            44      9311      Tax Payments
+            45      9399      Government Services (Not Elsewhere Classified)
+            46      9402      Postal Services – Government Only
+            47      9405      Intra-Government Purchases – Government Only
+            48      9754      Gambling-Horse Racing Dog Racing State Lotteries
+
+
+Effective from 1 April 2026
+
+                                            PUBLIC
+5.   “Selected Contactless Payments” refers to Qualifying Transactions made via Visa contactless through a contactless terminal
+     mode which includes Visa payWave, Apple Pay, Google Pay and Samsung Pay.
+
+6.   “Selected Online Transactions” refers to Qualifying Transactions made via the internet and processed by the respective
+     merchants/merchant’s acquiring bank as an online transaction type through the Visa Worldwide networks, including credential-on-
+     file payments when the Cardholder stores the Card information with a merchant or payment facilitator to make future purchases.
+     HSBC determines whether a transaction is a Selected Online Transaction based on system indicators which are determined by the
+     merchants and the merchant’s acquiring bank.
+
+7.   “Eligible Transactions” refers to Selected Contactless Payments and Selected Online Transactions that fall within any one of the
+     following MCCs:
+
+                                    Merchant Category
+       Category                                               Description
+                                    Codes (MCC)
+
+       Travel related such    1     3000 to 3350, 4511        Airlines
+       as Airlines, Car       2     3351 to 3500              Car Rental Agencies
+       Rental, Lodging        3     3501 to 3999, 7011        Lodging – Hotels, Motels, Resorts
+       and Cruise Lines       4     4411                      Cruise Lines
+       Department Stores      5     4816                      Computer Network/Information Services
+       and Retail Stores      6     5045                      Computers, Computer Peripheral Equipment, Software
+                              7     5262                      Marketplaces
+                              8     5309                      Duty Free Stores
+                              9     5310                      Discount Stores
+                              10    5311                      Department Stores
+                              11    5331                      Variety Stores
+                              12    5399                      Miscellaneous General Merchandise Stores
+                              13    5611                      Men’s and Boys’ Clothing and Accessories Stores
+                              14    5621                      Women’s Ready to Wear Stores
+                              15    5631                      Women’s Accessory and Specialty Stores
+                              16    5641                      Children’s and Infants’ Wear Stores
+                              17    5651                      Family Clothing Stores
+                              18    5655                      Sports Apparel, and Riding Apparel Stores
+                              19    5661                      Shoe Stores
+                              20    5691                      Men’s and Women’s Clothing Stores
+                              21    5699                      Accessory and Apparel Stores–Miscellaneous
+                              22    5732                      Electronics Sales
+                              23    5733                      Music Stores–Musical Instruments, Pianos and Sheet Music
+                              24    5734                      Computer Software Stores
+                              25    5735                      Record Shops
+                              26    5912                      Drug Stores and Pharmacies
+                              27    5942                      Book Stores
+                              28    5944                      Clock, Jewelry, Watch and Silverware Stores
+                              29    5945                      Game, Toy and Hobby Shops
+                              30    5946                      Camera and Photographic Supply Stores
+                              31    5947                      Card, Gift, Novelty and Souvenir Shops
+                              32    5948                      Leather Goods and Luggage Stores
+                              33    5949                      Fabric, Needlework, Piece Goods and Sewing Stores
+                              34    5964                      Direct Marketing–Catalog Merchants
+                              35    5965                      Direct Marketing–Combination Catalog and Retail Merchant
+                              36    5966                      Direct Marketing–Outbound Telemarketing Merchants
+                              37    5967                      Direct Marketing–Inbound Telemarketing Merchants
+                              38    5968                      Direct Marketing–Continuity/Subscription Merchants
+
+
+Effective from 1 April 2026
+
+                                                               PUBLIC
+                               39     5969                      Direct Marketing–Other Direct Marketers–Not Elsewhere Classified
+                               40     5970                      Artist Supply Stores, Craft Shops
+                               41     5992                      Florists
+                               42     5999                      Miscellaneous and Specialty Retail Stores
+       Dining excluding        43     5441                      Candy, Nut and Confectionery Stores
+       hotel dining            44     5462                      Bakeries
+                               45     5811                      Caterers
+                               46     5812                      Eating Places and Restaurants
+                                                                Bars, Cocktail Lounges, Discotheques, Nightclubs and Taverns–
+                               47     5813
+                                                                Drinking Places (Alcoholic Beverages)
+       Others such as          48     4121                      Taxicabs and Limousines
+       Transportation and
+                                                                Clubs–Country Clubs, Membership (Athletic, Recreation, Sports),
+       Membership Clubs        49     7997
+                                                                Private Golf Courses
+
+
+     7.1.    The Reward points will be awarded as follows:
+
+            (i)     1 Reward point (“Base Points”) for every SGD1 of the Eligible Transaction; and
+
+            (ii)    (a) 9 Reward points (“Bonus Points”) for every SGD1 of the Eligible Transaction; or
+
+                    (b) 19 Bonus Points for every SGD1 of the Eligible Transaction if the Cardholder maintains a Deposits ADB of at least
+                    SGD50,000 in the Eligible EGA Account for the calendar month in which the Eligible Transaction was posted.
+
+                    “Eligible EGA Account” refers to a sole HSBC Everyday Global Account (Singapore dollars SGD account) held by
+                    the Cardholder with HSBC.
+
+                    “Deposits ADB” means the average daily balance for the calendar month, taking into account only the deposits in the
+                    Cardholder’s Eligible EGA Account for that calendar month. Deposits ADB is the sum of the daily balances of the
+                    Eligible EGA Account for that calendar month, divided by the total number of days in that calendar month. For the
+                    avoidance of doubt, deposits in joint accounts are not taken into account for the purposes of computing Deposits ADB.
+
+     7.2.    Reward points shall be calculated based on the total amount of Eligible Transactions posted into HSBC’s credit card system
+             within each qualifying calendar month, rounded down to the nearest SGD1.
+
+             Bonus Points are subject to a cap of:
+
+             (i)      9,000 Bonus Points per calendar month; or
+
+             (ii)     22,800 Bonus Points per calendar month if the Cardholder maintains a Deposits ADB of at least SGD50,000 in the
+                      Eligible EGA Account with HSBC for that calendar month.
+
+             Base Points are not subject to any cap.
+
+8.   Cardholders are entitled to earn 1 Reward point for every SGD1 charged on all other Qualifying Transactions that are not Eligible
+     Transactions.
+
+9.   For avoidance of doubt, the maximum total Reward points that may be awarded for every SGD1 of an Eligible Transaction is 20
+     Reward points, as illustrated below:
+
+                                                         Base Points          Bonus Points        Total Reward
+                                                                                                                    Bonus Points Cap
+                                                           earned               earned            points earned
+
+      Cardholders with Deposits ADB of                                                                             Subject to a cap of
+      ≥SGD50,000 for the calendar month in              1 Reward point       19 Reward points    20 Reward points 22,800 Bonus Points
+      which the Eligible Transaction was posted                                                                    per calendar month
+
+                                                                                                                  Subject to a cap of
+      All other Cardholders                             1 Reward point       9 Reward points     10 Reward points 9,000 Bonus Points
+                                                                                                                  per calendar month
+
+
+Effective from 1 April 2026
+
+                                                                  PUBLIC
+10. For the purpose of crediting the Reward points, the Base Points will be computed and credited into the Account based on the
+    Cardholder’s statement cycle. The Bonus Points will be credited into the Account by the last day of the following calendar month
+    and will be reflected in the Cardholder’s statement no later than the last day of the second calendar month from the date of the
+    relevant Eligible Transaction. HSBC accepts no liability for any late submission of purchases by merchants.
+
+11. In the event that any Eligible Transaction and/or Qualifying Transaction is voided, cancelled, disputed and/or reversed, any Reward
+    points (including the Bonus Points) awarded will be cancelled (“Cancelled Points”) and reversed. In the event that the Cancelled
+    Points have been redeemed, HSBC reserves the right to charge their equivalent cash value to the Account. The cash value of each
+    Reward point shall be equivalent to the dollar amount required to purchase such Reward point under the HSBC's Rewards
+    Programme terms and conditions.
+
+12. The Reward points awarded to any given Account cannot be transferred to another Card / Account.
+
+13. The calculation, use and redemption of the Reward points are subject to the HSBC’s Rewards Programme terms and conditions
+    which are available at www.hsbc.com.sg/rewards.
+
+14. Only Accounts that are maintained in good standing and conducted in a proper and satisfactory manner as determined by HSBC at
+    the time of crediting the Reward points will be eligible for the Programme. If the relevant Account is delinquent, voluntarily or
+    involuntarily closed or terminated or suspended for any reasons whatsoever before the Reward points are credited into the said
+    Account, HSBC reserves the right to forfeit the Reward points. HSBC reserves the right to cancel and void any Reward points
+    awarded to an Account at any time if it determines that the relevant Cardholder has not fulfilled the terms and conditions of the
+    Programme.
+
+15. Changes to these terms
+
+    15.1. We live in a rapidly changing world. Sometimes this means we need to update these terms and conditions. These updates
+          include amendments to:
+
+           (i)      fees and charges (if any); and
+
+           (ii)     the terms, durations and features of the Programme.
+
+    15.2. We may amend or supplement these terms and conditions, if it is reasonably necessary to:
+
+           (i)      reflect changes to our operational costs, business operations or systems and processes, or our arrangements with
+                    third parties;
+
+           (ii)     give effect to:
+
+                    (a)       applicable law, rule, regulation;
+
+                    (b)       a change, recommendation, order, requirement, notice, direction, code, circular or guidance issued by any
+                              regulatory, supervisory, governmental, statutory authority, stock exchange, self-regulatory, or resolution
+                              body having jurisdiction over us or a court of competent jurisdiction;
+
+           (iii)    reflect changes to industry or market conditions or practice;
+
+           (iv)     align with standards or expectations including in respect of:
+
+                    (a)       banking and financial services practices;
+
+                    (b)       environmental, social and governance practices;
+
+                    (c)       consumer and investor protection practices;
+
+                    (d)       cyber, digital, technology (including financial technology (FinTech)) practices e.g., those relating to crypto-
+                              assets, digital assets, virtual assets, asset tokenisation and artificial intelligence (including generative
+                              artificial intelligence and machine learning);
+
+                    (e)       operational resilience and data management practices; or
+
+                    (f)       taxation and transfer pricing practices; or
+
+                    (g)       otherwise protect our legitimate interests.
+
+
+Effective from 1 April 2026
+
+                                                                     PUBLIC
+    15.3. To the extent reasonably practicable, we'll give you reasonable notice of any changes to these terms and conditions before
+          such terms and conditions take effect.
+
+    15.4. We can choose how to give this notice to you. This may include:
+
+           (i)       contacting you directly (through mail, email, post or via mobile);
+
+           (ii)      placing signs or notices at our branches;
+
+           (iii)     publishing the change on our website; and/or
+
+           (iv)      using any other method we think is reasonably appropriate.
+
+    15.5. If you don't agree with a change, you can cancel your existing credit card, after paying all amounts you may owe us.
+
+16. These terms and conditions are governed by the laws of the Republic of Singapore and the parties submit to the non-exclusive
+    jurisdiction of the courts of Singapore.
+
+17. All information is correct at the time of publishing or posting online.
+
+
+
+
+Effective from 1 April 2026
+
+                                                                   PUBLIC
+

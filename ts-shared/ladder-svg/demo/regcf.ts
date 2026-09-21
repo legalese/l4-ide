@@ -71,6 +71,18 @@ const REPO = resolve(HERE, "../../..");
 const CORPUS = resolve(REPO, "jl4/examples/legal/regcf/regcf.l4");
 const OUT = resolve(REPO, "jl4/examples/legal/regcf/figures");
 const LSP_PORT = Number(process.env.JL4_LSP_PORT || 5019);
+/**
+ * Opt-in second variant (`LADDER_HEAD_AS_SINK=1`): the same figures with the decision's
+ * own name boxed as the RIGHTMOST node, written to `<slug>-head.{svg,txt}` beside the
+ * originals. This is the Layman Allen reading — subject at the left margin, consequent
+ * at the right (Woon, *Essential Criminal Law* ch 8) — and it is a second variant rather
+ * than a replacement so the existing figures, and anything citing them, do not move.
+ *
+ * Only `.svg` and `.txt` get a `-head` twin. `.mmd` and `.sentences` are emitted from
+ * the `FunDecl`, never from the `Scene`, so `headAsSink` cannot reach them; a twin that
+ * was identical to its original would be a claim that the option had applied.
+ */
+const HEAD_AS_SINK = process.env.LADDER_HEAD_AS_SINK === "1";
 
 /**
  * The subjects, and why each is here. `slug` names the files; `decision` must
@@ -313,6 +325,24 @@ async function main() {
 
     const asciiScene = layout(decoded.fn, vs, monoMetrics(), ASCII_GEOMETRY);
     writeFileSync(`${OUT}/${s.slug}.txt`, sceneToAscii(asciiScene) + "\n");
+
+    if (HEAD_AS_SINK) {
+      const headVs = defaultViewSpec({
+        valuation: decoded.valuation,
+        provenance: decoded.provenance,
+        headAsSink: true,
+      });
+      writeFileSync(
+        `${OUT}/${s.slug}-head.svg`,
+        sceneToSvg(layout(decoded.fn, headVs, estimateMetrics), "ink"),
+      );
+      writeFileSync(
+        `${OUT}/${s.slug}-head.txt`,
+        sceneToAscii(
+          layout(decoded.fn, headVs, monoMetrics(), ASCII_GEOMETRY),
+        ) + "\n",
+      );
+    }
 
     writeFileSync(
       `${OUT}/${s.slug}.mmd`,

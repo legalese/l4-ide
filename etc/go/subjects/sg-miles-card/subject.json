@@ -1,0 +1,104 @@
+{
+  "_comment": [
+    "The sg-miles-card subject sidecar. Everything the pipeline needs to know about",
+    "THIS subject lives here; everything about the pipeline itself lives in etc/go/.",
+    "Validated by etc/go/lib/subject.mjs, which refuses unknown keys and missing",
+    "files. Free-prose idiosyncrasies live in NOTES.md, which no script reads.",
+    "",
+    "THE SOURCE IS CONTRACT, NOT LAW, AND NOTHING HERE IS ADVICE. 'display_name',",
+    "'citation' and 'source_url' name the reward-programme terms and conditions",
+    "of eight Singapore consumer cards as the issuers published them, retrieved",
+    "2026-09-21 and mirrored under jl4/examples/legal/miles-card/source/. The",
+    "issuers say in every document that they may vary the terms without notice.",
+    "Nothing produced from this subject says what any card will actually pay.",
+    "",
+    "'encoding.modules' is IN DEPENDENCY ORDER: the domain module declares the",
+    "types; classify and categorize are layer 1 (strings in, enumerations out);",
+    "the seven issuer modules are layer 2; miles-card composes them; the cases",
+    "module exercises the composition; miles-card-disputed carries the",
+    "cheat-sheet claims the primary text does not support, as #ASSERT NOT.",
+    "",
+    "'checks.min_dated_arms' is 0 ON PURPOSE: no module carries a RULES EFFECTIVE",
+    "DATE axis (each states the document as at its own dated line). A 0 floor",
+    "makes p3-check report the temporal-closure sub-check NOT CHECKED rather than",
+    "vacuously green.",
+    "",
+    "'checks.min_assertions' is MEASURED with etc/go/lib/assert-report.mjs over",
+    "`l4 run --json` across the module set at the commit that declares it; the",
+    "figure and its per-module breakdown are in NOTES.md. Raise it when the corpus",
+    "grows; never lower it to make a run pass.",
+    "",
+    "'encodings.cheatsheet-2026-06' is the ACCEPTANCE TEST (spec section 1): the",
+    "household cheat sheet's waterfall rows as assertions over the T&C model,",
+    "written by an agent shown the cheat sheet and the domain module only. Its",
+    "p6-tests receipt is EXPECTED to be DEGRADED, and the assert report naming the",
+    "failing rows is the deliverable. Its min_assertions is the measured count of",
+    "its #ASSERT directives. It may not name a committed module and does not.",
+    "",
+    "WHICH LEGS ARE DECLARED, AND WHY THE REST ARE NOT. The driver declares a",
+    "projection leg iff it appears here.",
+    "  p7-catala declared: spec section 2 makes `catala typecheck` the gate.",
+    "  p7-akn    declared: `l4 render --format akn` works on any module that",
+    "            typechecks; well-formedness only, cannot raise the verdict.",
+    "  p7-mcp    declared: the composer carries one @export; deployable surface.",
+    "  p7-tnr    declared: the NLG golden exists at",
+    "            jl4/examples/legal/miles-card/tests/miles-card.nlg.golden and `l4 nlg`",
+    "            regenerates it, so the leg is a real differential oracle.",
+    "  p7-bpmn and p7-lts NOT declared: every module is constitutive (no",
+    "            MUST/MAY/SHANT anywhere; pins.json regulative_rules is []).",
+    "  p7-wizard NOT declared: no wizard module. p7-dmn, p7-dmn-md, p7-ladder NOT",
+    "            declared: no committed goldens or demo entry for them."
+  ],
+  "id": "sg-miles-card",
+  "display_name": "Singapore miles-card reward programmes — eight issuers' T&Cs",
+  "citation": "Issuer terms and conditions for eight Singapore consumer credit/debit card reward programmes (DBS yuu, DBS Woman's World, UOB Lady's Solitaire, HSBC Revolution, Citi Rewards, POSB PAssion, UOB PRVI Miles, Citi PremierMiles), as published by the issuers and retrieved 2026-09-21. Private contract terms, not law.",
+  "source_url": "https://www.dbs.com.sg/iwov-resources/media/pdf/cards/promotions/dbs-yuu-cards/dbs-yuu-card-promotion-tncs.pdf",
+  "encoding": {
+    "state": "written",
+    "main": "jl4/examples/legal/miles-card/miles-card.l4",
+    "modules": [
+      "jl4/examples/legal/miles-card/miles-card-domain.l4",
+      "jl4/examples/legal/miles-card/classify.l4",
+      "jl4/examples/legal/miles-card/categorize.l4",
+      "jl4/examples/legal/miles-card/dbs-yuu.l4",
+      "jl4/examples/legal/miles-card/dbs-womans-world.l4",
+      "jl4/examples/legal/miles-card/citi-rewards.l4",
+      "jl4/examples/legal/miles-card/hsbc-revolution.l4",
+      "jl4/examples/legal/miles-card/uob-ladys-solitaire.l4",
+      "jl4/examples/legal/miles-card/posb-passion.l4",
+      "jl4/examples/legal/miles-card/flat-cards.l4",
+      "jl4/examples/legal/miles-card/miles-card.l4",
+      "jl4/examples/legal/miles-card/miles-card-cases.l4",
+      "jl4/examples/legal/miles-card/miles-card-disputed.l4"
+    ]
+  },
+  "checks": {
+    "min_dated_arms": 0,
+    "min_assertions": 848
+  },
+  "legs": {
+    "p7-catala": {},
+    "p7-akn": {},
+    "p7-mcp": {},
+    "p7-tnr": {
+      "golden": "jl4/examples/legal/miles-card/tests/miles-card.nlg.golden"
+    }
+  },
+  "natlang_sources": {
+    "bundle": "jl4/examples/legal/miles-card/source/source-bundle.json",
+    "register": "jl4/examples/legal/miles-card/source/external-modifications.json"
+  },
+  "comparison": {
+    "fork_register": "jl4/examples/legal/miles-card/source/fork-register.json",
+    "surface_map": "jl4/examples/legal/miles-card/source/surface-map.json"
+  },
+  "encodings": {
+    "cheatsheet-2026-06": {
+      "modules": ["jl4/examples/legal/miles-card/cheatsheet-claims.l4"],
+      "checks": {
+        "min_dated_arms": 0,
+        "min_assertions": 184
+      }
+    }
+  }
+}

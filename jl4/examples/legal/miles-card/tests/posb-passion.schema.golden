@@ -1,0 +1,26 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "What one transaction earns on a PAssion POSB Debit Card under POSB's 18X yuu Points promotion, in yuu Points per dollar, with the clauses relied on — and the fact that the promotion's own Promotion Period ended on 30 September 2025.",
+    "properties": {
+        "card": {
+            "$ref": "#/$defs/Card"
+        },
+        "cardholder": {
+            "$ref": "#/$defs/Cardholder"
+        },
+        "month": {
+            "$ref": "#/$defs/Month position"
+        },
+        "txn": {
+            "$ref": "#/$defs/Transaction"
+        }
+    },
+    "required": [
+        "card",
+        "cardholder",
+        "month",
+        "txn"
+    ],
+    "title": "POSB PAssion earns on",
+    "type": "object"
+}

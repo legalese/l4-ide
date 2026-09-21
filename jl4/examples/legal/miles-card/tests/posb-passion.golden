@@ -1,0 +1,149 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+posb-passion.l4:820:1-190:
+  assertion satisfied
+posb-passion.l4:828:1-67:
+  assertion satisfied
+posb-passion.l4:829:1-67:
+  assertion satisfied
+posb-passion.l4:830:1-65:
+  assertion satisfied
+posb-passion.l4:837:1-207:
+  assertion satisfied
+posb-passion.l4:840:1-171:
+  assertion satisfied
+posb-passion.l4:843:1-184:
+  assertion satisfied
+posb-passion.l4:844:1-187:
+  assertion satisfied
+posb-passion.l4:847:1-177:
+  assertion satisfied
+posb-passion.l4:853:1-190:
+  assertion satisfied
+posb-passion.l4:854:1-190:
+  assertion satisfied
+posb-passion.l4:855:1-185:
+  assertion satisfied
+posb-passion.l4:859:1-196:
+  assertion satisfied
+posb-passion.l4:862:1-179:
+  assertion satisfied
+posb-passion.l4:866:1-189:
+  assertion satisfied
+posb-passion.l4:867:1-176:
+  assertion satisfied
+posb-passion.l4:874:1-181:
+  assertion satisfied
+posb-passion.l4:875:1-176:
+  assertion satisfied
+posb-passion.l4:878:1-174:
+  assertion satisfied
+posb-passion.l4:881:1-191:
+  assertion satisfied
+posb-passion.l4:882:1-199:
+  assertion satisfied
+posb-passion.l4:886:1-188:
+  assertion satisfied
+posb-passion.l4:889:1-168:
+  assertion satisfied
+posb-passion.l4:897:1-395:
+  assertion satisfied
+posb-passion.l4:898:1-189:
+  assertion satisfied
+posb-passion.l4:901:1-172:
+  assertion satisfied
+posb-passion.l4:902:1-166:
+  assertion satisfied
+posb-passion.l4:903:1-170:
+  assertion satisfied
+posb-passion.l4:913:1-182:
+  assertion satisfied
+posb-passion.l4:914:1-189:
+  assertion satisfied
+posb-passion.l4:915:1-189:
+  assertion satisfied
+posb-passion.l4:916:1-188:
+  assertion satisfied
+posb-passion.l4:917:1-199:
+  assertion satisfied
+posb-passion.l4:921:1-165:
+  assertion satisfied
+posb-passion.l4:922:1-171:
+  assertion satisfied
+posb-passion.l4:925:1-103:
+  assertion satisfied
+posb-passion.l4:926:1-94:
+  assertion satisfied
+posb-passion.l4:927:1-71:
+  assertion satisfied
+posb-passion.l4:931:1-202:
+  assertion satisfied
+posb-passion.l4:938:1-206:
+  assertion satisfied
+posb-passion.l4:939:1-206:
+  assertion satisfied
+posb-passion.l4:943:1-42:
+  assertion satisfied
+posb-passion.l4:944:1-179:
+  assertion satisfied
+posb-passion.l4:948:1-66:
+  assertion satisfied
+posb-passion.l4:953:1-81:
+  assertion satisfied
+posb-passion.l4:954:1-81:
+  assertion satisfied
+posb-passion.l4:955:1-82:
+  assertion satisfied
+posb-passion.l4:956:1-82:
+  assertion satisfied
+posb-passion.l4:963:1-102:
+  assertion satisfied
+posb-passion.l4:964:1-110:
+  assertion satisfied
+posb-passion.l4:965:1-113:
+  assertion satisfied
+posb-passion.l4:966:1-114:
+  assertion satisfied
+posb-passion.l4:967:1-115:
+  assertion satisfied
+posb-passion.l4:968:1-113:
+  assertion satisfied
+posb-passion.l4:969:1-114:
+  assertion satisfied
+posb-passion.l4:970:1-121:
+  assertion satisfied
+posb-passion.l4:971:1-105:
+  assertion satisfied
+posb-passion.l4:972:1-106:
+  assertion satisfied
+posb-passion.l4:976:1-190:
+  assertion satisfied
+posb-passion.l4:977:1-190:
+  assertion satisfied
+posb-passion.l4:978:1-190:
+  assertion satisfied
+posb-passion.l4:979:1-190:
+  assertion satisfied
+posb-passion.l4:980:1-190:
+  assertion satisfied
+posb-passion.l4:985:1-190:
+  assertion satisfied
+posb-passion.l4:992:1-192:
+  assertion satisfied
+posb-passion.l4:993:1-192:
+  assertion satisfied
+posb-passion.l4:994:1-192:
+  assertion satisfied
+posb-passion.l4:995:1-191:
+  assertion satisfied
+posb-passion.l4:996:1-206:
+  assertion satisfied
+posb-passion.l4:999:1-182:
+  assertion satisfied
+posb-passion.l4:1000:1-182:
+  assertion satisfied
+posb-passion.l4:1007:1-143:
+  `Rate answer` OF 18, 0.28, Unconfirmed, 5.04, 5.04, 5.04, FALSE, TRUE, (Cap OF "PAssion 15X bonus (calendar month)", TRUE, 333.3333333333333, `Calendar month`, `By posting date`), (LIST "Clause 3 fixes a Promotion Period of 1 October 2023 to 30 September 2025. That period has ended and no document in this corpus renews it, so treat every figure below as a record of what the Promotion did, not as what the card pays today.", "Both clause 8(a) thresholds are met this Qualifying Month: at least S$300 at Participating Stores and at least S$400 at non-Participating Stores. The rate is 3X base plus 15X POSB bonus, the 18X of the promotion's title.", "The bonus is capped at 5,000 yuu Points — S$25 of cash rebate — per Qualifying Month, which is S$333.33 of bonus-earning spend. The 3X base limb is not capped (clause 7(c)).", "Of the 3X base, 1X is credited by the merchant at the point of transaction and 2X by POSB once the transaction posts (clause 7(b)). The 15X bonus is credited by the Fulfilment Date for the month, which clause 8(e) sets one to two months later.", "Only posted transactions count as Qualified Spend (clause 11); a posted refund counts as negative spend in the same month.", "The Card account and the linked yuu Account must be in good standing at the moment the yuu Points are credited, not merely when the purchase is made (clauses 2, 12 and 13).", "Qualified Spend must be charged to Mastercard (clause 4); this encoding cannot see the card network on a transaction and does not test it.", "Appendix 1 withholds points for named products and situations a statement line does not show — plastic bags, tobacco, delivery charges, all services including mobile and EZ-Link reloads, cash-like items, gift card purchases, infant formula, sushi and sashimi, dim sum, cut fruit, set meals, bundle deals, bill discounts and third-party voucher redemptions — so the credit may be smaller than this rate."), (LIST Provenance OF "posb-passion-yuu-tnc", "6", "Updated as of 30 May 2025", (DATE OF 30, 5, 2025), "Promotion comprises of the following: Awarding type Accelerator; Base Points 1.5% cash rebates (3X yuu Points); POSB Bonus Points 7.5% cash rebates (15X yuu Points)", Provenance OF "posb-passion-yuu-tnc", "7a", "Updated as of 30 May 2025", (DATE OF 30, 5, 2025), "Cardmember can earn 3X yuu points on every S$1 Qualified Spend made at Participating Stores charged to a PAssion Card.", Provenance OF "posb-passion-yuu-tnc", "7b", "Updated as of 30 May 2025", (DATE OF 30, 5, 2025), "3X yuu Points comprise of: i 1X yuu Point from Participating Merchants (subject to Excluded Product listed in Appendix 1), which will be credited to Cardmembers’ yuu Account at point of transaction, and ii 2X yuu Points from POSB, which will be credited to Cardmembers’ yuu Account when transaction has been successfully posted to Cardmembers’ Card Account", Provenance OF "posb-passion-yuu-tnc", "8a", "Updated as of 30 May 2025", (DATE OF 30, 5, 2025), "Cardmember can earn 15X yuu Points when Cardmember meets all the following Qualified Spend criteria within each Qualifying month i. At least S$300 total spend at Participating Stores ii. At least S$400 total spend at non-Participating Stores", Provenance OF "posb-passion-yuu-tnc", "8b", "Updated as of 30 May 2025", (DATE OF 30, 5, 2025), "Capped at a maximum of S$25 cash rebate (5,000 yuu Points) to be awarded per Cardmember per Qualifying Month, which will be credited to Cardmember’s yuu Account by the Fulfilment Date for each Qualifying Month as defined in Clause 8e.", Provenance OF "posb-passion-yuu-tnc", "8e", "Updated as of 30 May 2025", (DATE OF 30, 5, 2025), "Qualifying Month and Fulfilment Date are defined as follow: Qualifying Month / Fulfilment Date; 1 to 30 Sep 2024 / 1 to 31 Oct 2024; 1 to 31 Oct 2024 / 1 to 31 Dec 2024; ... 1 to 31 Aug 2025 / 1 to 31 Oct 2025; 1 to 30 Sep 2025 / 1 to 30 Nov 2025", Provenance OF "posb-passion-yuu-tnc", "11", "Updated as of 30 May 2025", (DATE OF 30, 5, 2025), "Only posted transactions will be considered as Qualified Spend. Posted refunds into the Card Account will be computed as a negative spend.", Provenance OF "posb-passion-yuu-tnc", "Appendix 1", "Updated as of 30 May 2025", (DATE OF 30, 5, 2025), "The following Exclusion List is applicable for Qualified Spend under clause 7bi, and is subject to changes from time to time without prior notice.", Provenance OF "dbs-yuu-card-tnc", "12", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "1 yuu Point is equivalent to 0.5% cash rebate or 0.28 miles or more, depending on the redemption item."), `Source expired`
+posb-passion.l4:1008:1-142:
+  `Rate answer` OF 0, 0.28, Unconfirmed, 0, 0, 0, FALSE, FALSE, (Cap OF "PAssion 15X bonus (calendar month)", FALSE, 0, `Calendar month`, `By posting date`), (LIST "Clause 3 fixes a Promotion Period of 1 October 2023 to 30 September 2025. That period has ended and no document in this corpus renews it, so treat every figure below as a record of what the Promotion did, not as what the card pays today.", "Clause 4 admits only retail transactions successfully posted to the Card account, and clause 11 counts only posted ones. An annual fee or bank charge, interest, an instalment plan, a balance or funds transfer, a cash advance, a bill payment made through internet banking and a pre-authorisation that has not yet posted are all outside Qualified Spend.", "A posted refund earns nothing and is computed as a negative spend in the same month (clause 11), which lowers the month's totals for the clause 8(a) thresholds."), (LIST Provenance OF "posb-passion-yuu-tnc", "4", "Updated as of 30 May 2025", (DATE OF 30, 5, 2025), "“Qualified Spend” refers to retail transactions charged to the PAssion Card within the Promotion Period, and posted into the Card account at the point of computation of yuu Points. It includes only retail transactions as defined in clause 7a and clause 8a, that are in local currency, charged to Mastercard, and successfully posted to the Card account.", Provenance OF "posb-passion-yuu-tnc", "7a", "Updated as of 30 May 2025", (DATE OF 30, 5, 2025), "Cardmember can earn 3X yuu points on every S$1 Qualified Spend made at Participating Stores charged to a PAssion Card.", Provenance OF "posb-passion-yuu-tnc", "8a", "Updated as of 30 May 2025", (DATE OF 30, 5, 2025), "Cardmember can earn 15X yuu Points when Cardmember meets all the following Qualified Spend criteria within each Qualifying month i. At least S$300 total spend at Participating Stores ii. At least S$400 total spend at non-Participating Stores", Provenance OF "posb-passion-yuu-tnc", "11", "Updated as of 30 May 2025", (DATE OF 30, 5, 2025), "Only posted transactions will be considered as Qualified Spend. Posted refunds into the Card Account will be computed as a negative spend."), `Source expired`

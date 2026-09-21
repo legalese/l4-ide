@@ -1,0 +1,33 @@
+{
+  "_comment": [
+    "The CLI surface the stage table reads, and nothing else. Same design as the",
+    "regcf, sg-succession and chubb sidecars' pins: deliberately NOT a hash of",
+    "`l4 --help`, because any unrelated CLI change would fire a BROKEN verdict on",
+    "an otherwise fine run. These four enumerations and the module's regulative",
+    "rule names are the only CLI facts etc/go/phases/*.sh depend on.",
+    "",
+    "MEASURED 2026-09-21 with `node etc/go/lib/discover.mjs enums",
+    "jl4/examples/legal/miles-card/miles-card.l4`, against the binary built in",
+    "l4wt/miles-card from origin/unstable 7af775364",
+    "(dist-newstyle/build/aarch64-osx/ghc-9.10.3/jl4-0.1/x/l4/build/l4/l4, sha256",
+    "fc23a49bff77b0ca...), JL4_LIBRARY_PATH at that worktree's jl4-core/libraries.",
+    "The four enumerations came back identical to the ones chubb pinned on",
+    "2026-08-31, which is the expected result and is recorded rather than",
+    "assumed.",
+    "",
+    "regulative_rules is EMPTY and 0 is the measured population: every module in",
+    "this corpus is constitutive (reward-programme eligibility and rates); there",
+    "is no MUST/MAY/SHANT anywhere, so p7-bpmn and p7-lts are not declared and",
+    "the bpmn discovery call would enumerate nothing."
+  ],
+  "measured_on": "2026-09-21",
+  "measured_against": "jl4/examples/legal/miles-card/miles-card.l4",
+  "enums": {
+    "export_to": ["dmn", "dmn-md", "bpmn"],
+    "export_flavor": ["camunda", "kie"],
+    "export_fail_on": ["none", "blocking", "lossy", "advisory"],
+    "render_format": ["json", "plan", "text", "html", "akn"]
+  },
+  "regulative_rules": [],
+  "checkers_that_must_exist": ["etc/check-not-precedence.mjs"]
+}

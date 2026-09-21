@@ -1,0 +1,2002 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `miles-card-domain`
+
+§ `Citi Rewards Card – 10X Rewards Promotion Terms and Conditions`
+
+-- ===========================================================================
+-- SOURCE DOCUMENTS. Two, both held, both quoted verbatim below.
+--
+--   citi-rewards-10x-tnc          "Effective 1 April 2024"
+--     The promotion's own terms. Clauses are numbered 1-19 as the issuer
+--     numbers them.
+--   citi-rewards-exclusion-list   "Updated November 2024. With effect from
+--                                  16 December 2024."
+--     The list clause 5(xii) points at (www.citibank.com.sg/rwdexcl).
+--     Paragraphs 1-6; its MCC table is paragraph 2 and its merchant-
+--     description list is paragraph 3.
+--
+-- A third file, citi-rewards-10x-faq, is held but is NOT relied on for any
+-- rule: it is the issuer's gloss on the same promotion and it differs from
+-- the T&C in two places (see the AMBIGUITIES block at the foot). Where the
+-- two disagree the T&C governs, and the FAQ supplies illustrations only.
+--
+-- WHAT THIS MODULE ANSWERS. For one charge on a Citi Rewards Visa Signature
+-- or Citi Rewards World Mastercard: how many ThankYou Points it earns, what
+-- that is worth in miles, whether it earns the 10X bonus rate, and what cap
+-- and citations attach to that answer.
+--
+-- THE SHAPE OF THE ANSWER, AND WHY IT IS THE POINT. Clause 6 defines the
+-- bonus-earning transaction as a DISJUNCTION of two limbs, and the mobile-
+-- wallet exclusion is attached to ONE of them:
+--
+--   limb (i)  -- an MCC test. Department stores and apparel. It says nothing
+--                about wallets, nothing about the channel, and nothing about
+--                the merchant's system indicator.
+--   limb (ii) -- an online test. It excludes mobile wallet transactions and
+--                travel-related transactions expressly.
+--
+-- So a phone tap at a department store still earns 10X, because it satisfies
+-- limb (i), which has no wallet language to defeat. The same phone used on a
+-- website that is not an apparel merchant earns the base rate, because it can
+-- only reach limb (ii), and limb (ii) excludes the wallet. The two limbs are
+-- therefore encoded as two separate helpers and the disjunction is written
+-- out, so that a reviewer can see which limb the wallet defeats.
+--
+-- WHAT THIS MODULE DELIBERATELY DOES NOT MODEL.
+--   cl.9-11, 14-17  Points validity, redemption, the ThankYou Rewards Program
+--                   terms, third-party liability. They govern what a Point is
+--                   worth once earned, not whether this charge earns one.
+--   cl.18 first and last sentences  Citibank's discretion to reverse wrongly
+--                   credited Points, and the netting of reversals against new
+--                   10X transactions. Both need a transaction HISTORY, which
+--                   this module is not given; cl.18's middle sentence is read
+--                   only for the cap's attribution axis. See §§ 18.
+--   cl.19           The issuer's right to amend. Not operative on a charge.
+--
+-- PARAMETERS READ AND IGNORED. The composing module passes four parameters
+-- uniformly. This module reads only `txn`. It ignores `card` (the composer
+-- dispatches on the card, and both Eligible Cards under cl.3 earn alike),
+-- `cardholder` (no standing fact in this T&C conditions the rate -- contrast
+-- yuu's linked account or HSBC's account balance) and `month` (see §§ 13: the
+-- cap is stated, but how much of it remains is the allocation problem and is
+-- out of scope).
+--
+-- FIELDS OF THE TRANSACTION READ, AND NOT READ. Read: `merchant category
+-- code`, `description patterns`, `charge kind`, `merchant`, `credential`,
+-- `merchant indicator`, `amount`, `transaction date`. NOT read: `payment
+-- channel`, because cl.6(ii) makes the merchant's system indicator decisive
+-- over what the cardholder did ("These indicators are decided by the relevant
+-- merchant and/or their acquirer and are not determined by Citibank");
+-- `merchant name` and `transaction description`, because a rule in this
+-- corpus never compares a STRING -- layer 1 (`classify.l4`) reads those two
+-- printed fields and reports `merchant` and `description patterns`, and the
+-- rules read only the enumerations; `made in Singapore`, `currency` and
+-- `posted in a foreign currency`, because cl.6(i) says "any store" and
+-- neither Citi document imposes a geography or a currency condition.
+--
+-- WHAT THE SECOND PASS ADDED. The first pass of this module could not test
+-- cl.5(i) to (iii) at all -- the kind of posting was not a fact the domain
+-- carried -- and matched the exclusion list's twenty merchant descriptions
+-- by exact string equality, which let the document's own footnote-2 example
+-- through. Both are fixed: `charge kind` encodes the three limbs, and
+-- `description patterns` carries the substring matching that footnote 2
+-- describes. Two caveats the first pass printed on every answer are gone
+-- because they became false.
+-- ===========================================================================
+
+
+§§ `Citations`
+
+-- One Provenance per clause relied on. `quote` is verbatim from the
+-- pdftotext of the committed PDF, trimmed to the operative words.
+--
+-- TWO CITE HELPERS, ONE PER DOCUMENT. Each bakes in the document's id, its
+-- own dating line, and that line again as a DATE, and takes the clause and
+-- the quote. The DATE is not decoration. `document`, `clause`, `dated` and
+-- `quote` are all STRING; Catala has no string type, so each is elided, and
+-- a record with nothing left in it cannot be emitted at all. `document date`
+-- is the same fact as `dated` in a form that survives, which is what lets a
+-- citation be carried into the lowered rules at all -- and it is separately
+-- useful, because two citations can be compared for currency.
+--
+-- What survives the lowering is therefore the DATE alone: every citation
+-- from one document collapses to that document's date. The clause number and
+-- the operative words stay in L4, which is where a reader checks them.
+
+GIVEN clause IS A STRING
+      quote  IS A STRING
+GIVETH A Provenance
+`the 10X terms at` clause `saying` quote MEANS
+    Provenance WITH
+        `document`      IS "citi-rewards-10x-tnc"
+        `clause`        IS clause
+        `dated`         IS "Effective 1 April 2024"
+        `document date` IS `the date the 10X promotion terms took effect`
+        `quote`         IS quote
+
+GIVEN clause IS A STRING
+      quote  IS A STRING
+GIVETH A Provenance
+`the exclusion list at` clause `saying` quote MEANS
+    Provenance WITH
+        `document`      IS "citi-rewards-exclusion-list"
+        `clause`        IS clause
+        `dated`         IS "Updated November 2024. With effect from 16 December 2024."
+        `document date` IS `the date the exclusion list took effect`
+        `quote`         IS quote
+
+GIVETH A Provenance
+`the clause 5 citation` MEANS
+    `the 10X terms at` "5" `saying`
+        "“Qualifying Charge” means a charge made to an Eligible Card which does not arise from any: (i) annual fees, interest charges, late payment charges, GST, cash advances, instalment/easy/extended/equal payment plans, preferred payment plans, balance transfers, cash advances, quasi-cash transactions, all fees charged by Citibank or third party, miscellaneous charges imposed by Citibank"
+
+GIVETH A Provenance
+`the clause 5(xii) citation` MEANS
+    `the 10X terms at` "5(xii)" `saying`
+        "transactions performed at establishments/businesses/merchants that fall within an excluded Merchant Category or a merchant that has been excluded by the bank, as set out in www.citibank.com.sg/rwdexcl"
+
+GIVETH A Provenance
+`the clause 6(i) citation` MEANS
+    `the 10X terms at` "6(i)" `saying`
+        "a Qualifying Charge made at any store that sells shoes and bags and clothes as its main business activity, determined by the following Merchant Category Codes (MCC)"
+
+GIVETH A Provenance
+`the clause 6(ii) citation` MEANS
+    `the 10X terms at` "6(ii)" `saying`
+        "a Qualifying Charge made at an online retail merchant, excluding mobile wallet and travel-related transactions*. These refer to Qualifying Charges made via the internet or mobile applications, which is determined by system indicators reflecting that it is an online transaction ... These indicators are decided by the relevant merchant and/or their acquirer and are not determined by Citibank."
+
+GIVETH A Provenance
+`the clause 6 travel footnote citation` MEANS
+    `the 10X terms at` "6, footnote *" `saying`
+        "For clarity, travel-related transactions refer to transactions which are either wholly or partially related to any form of travel, whether local or overseas and include but are not limited to transactions that fall within the following MCCs (i.e. any transactions at merchants with the following MCCs will not be a 10X Points Eligible Transaction)"
+
+GIVETH A Provenance
+`the clause 12 citation` MEANS
+    `the 10X terms at` "12" `saying`
+        "Eligible Cardholders will earn 1 Base Point for every S$1 of Qualifying Charges (which are not 10X Points Eligible Transactions) made to the Eligible Card. Points shall be calculated on the amount of each Qualifying Charge, rounded down to the nearest S$1."
+
+GIVETH A Provenance
+`the clause 13 citation` MEANS
+    `the 10X terms at` "13" `saying`
+        "For every 10X Points Eligible Transaction charged to the Eligible Card, an Eligible Cardholder will be awarded: (i) 1 Base Point for every S$1 of a 10X Points Eligible Transaction (“Base Points”); and (ii) 9 Bonus Points for every S$1 of a 10X Points Eligible Transaction (“Bonus Points”). ... Base Points are not subject to any cap. However, Bonus Points are subject to a cap of 9,000 Bonus Points per statement month."
+
+GIVETH A Provenance
+`the clause 18 citation` MEANS
+    `the 10X terms at` "18" `saying`
+        "Points reversal will be applied in the statement cycle when the reversal/refunded transaction is posted which may differ from the statement cycle of corresponding Qualifying Charge"
+
+GIVETH A Provenance
+`the exclusion list MCC table citation` MEANS
+    `the exclusion list at` "2" `saying`
+        "ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate will not be awarded to the above Cards with transactions made in the following Merchant Category Codes (“MCC”)"
+
+-- The superscripts on "merchants1" and "descriptions2" are the document's own
+-- footnote markers, run together by pdftotext; they are kept rather than
+-- tidied, because the footnotes they point at are operative (footnote 2 is
+-- the substring rule, which layer 1 now applies).
+GIVETH A Provenance
+`the exclusion list merchant description citation` MEANS
+    `the exclusion list at` "3" `saying`
+        "In addition, transactions with the following merchants1 and/or bearing the following merchant descriptions2 will not earn ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate, including but not limited to: ... i. AXS ii. AMAZE* AXS ... iv. BUS/MRT^ ... vi. EZ-link ... xi. SIMPLYGO* ... xvii. TRANSIT ... xx. Youtrip Singapore SG"
+
+
+§§ `When each held document took effect`
+
+-- The foot of the 10X T&C: "Effective 1 April 2024".
+GIVETH A DATE
+`the date the 10X promotion terms took effect` MEANS YMD 2024 4 1
+
+-- The footer on every page of the exclusion list: "Updated November 2024.
+-- With effect from 16 December 2024." A charge made before that date was
+-- governed by an earlier revision of the list, which is not held.
+GIVETH A DATE
+`the date the exclusion list took effect` MEANS YMD 2024 12 16
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`the 10X promotion terms were in force` txn MEANS
+    txn's `transaction date` AT LEAST `the date the 10X promotion terms took effect`
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`this revision of the exclusion list was in force` txn MEANS
+    txn's `transaction date` AT LEAST `the date the exclusion list took effect`
+
+-- Every answer this module gives is read out of a held document with a clause
+-- cited, EXCEPT where the charge predates the terms that were read. There the
+-- earlier revision is not held and the answer is Unconfirmed, not wrong.
+GIVEN txn IS A Transaction
+GIVETH A Status
+`the status of the earning rule for` txn MEANS
+    IF   `the 10X promotion terms were in force` txn
+    THEN Verified
+    ELSE Unconfirmed
+
+
+§ `5. Qualifying Charge`
+
+-- ===========================================================================
+-- cl.5: "“Qualifying Charge” means a charge made to an Eligible Card which
+-- does not arise from any: (i) ... (xii) ...". Twelve exclusion limbs, read
+-- disjunctively: a charge arising from ANY of them is not a Qualifying
+-- Charge, and a charge that is not a Qualifying Charge earns nothing at all
+-- -- not even the 1 Base Point of cl.12, which is predicated on a Qualifying
+-- Charge.
+--
+-- ALL TWELVE LIMBS ARE NOW REACHED, BY TWO DIFFERENT ROUTES, and the routes
+-- are worth telling apart because they bite with different confidence.
+--
+--   (i) to (iii) name a KIND of posting -- an annual fee, an interest
+--       charge, an instalment plan, a balance or funds transfer, a cash
+--       advance, a bill payment. None of these is visible in an MCC or in a
+--       merchant name: they are attributes of the posting, which is why the
+--       first pass of this module could only caveat them. The shared domain
+--       now carries `charge kind`, a fact a statement shows and a witness can
+--       depose to, and the three limbs are encoded against it below.
+--   (iv) to (xi) name a PAYEE CLASS -- educational institutions, government,
+--       insurers, financial institutions, non-profits, betting, prepaid
+--       top-ups, transit. The T&C gives no list for any of them; the
+--       exclusion list at cl.5(xii) restates them as MCCs, so they are
+--       reached THROUGH cl.5(xii) rather than by their own words.
+--   (xii) is the exclusion list itself: an MCC table and a merchant-
+--       description list, both read below.
+--
+-- WHAT STILL ESCAPES, precisely, and it is two things rather than a whole
+-- clause. cl.5(i) also excludes "GST", which is not a kind of posting but a
+-- tax riding on one, and the domain has no constructor for it. cl.5(iii)
+-- excludes bill payments "including via Citibank Online or via ANY OTHER
+-- CHANNEL OR AGENT", and the domain's constructor is named for the internet-
+-- banking channel only, so a bill paid at an agent's counter is not caught.
+-- Both are carried as a condition string on every answer that does not
+-- already refuse.
+-- ===========================================================================
+
+
+§§ `5(i) to 5(iii) — the kinds of posting that are not Qualifying Charges`
+
+-- Three limbs, one fact. The domain's `Charge kind` is the statement's own
+-- account of what a posting IS, and cl.5(i) to (iii) are a list of kinds.
+--
+-- ONE CONSTRUCTOR SERVES TWO LIMBS, and the overlap is the document's, not
+-- the encoding's. cl.5(i) excludes "balance transfers"; cl.5(ii) excludes
+-- "funds transfers using the card as source of funds". The domain carries
+-- both as `Balance or funds transfer`, so limb (i) and limb (ii) test the
+-- same constructor and a charge of that kind is excluded twice over. Nothing
+-- turns on which limb catches it.
+
+-- cl.5(i): "annual fees, interest charges, late payment charges, GST, cash
+-- advances, instalment/easy/extended/equal payment plans, preferred payment
+-- plans, balance transfers, cash advances, quasi-cash transactions, all fees
+-- charged by Citibank or third party, miscellaneous charges imposed by
+-- Citibank".
+--
+-- Written as an exhaustive CONSIDER rather than an OR-chain of equalities, so
+-- that every constructor the domain carries has to be answered for on the
+-- page. If the shared domain gains a kind, this rule stops compiling, which
+-- is the right way to find out.
+GIVEN kind IS A `Charge kind`
+GIVETH A BOOLEAN
+`a clause 5(i) kind of charge` kind MEANS
+    CONSIDER kind
+    WHEN `Retail purchase`                   THEN FALSE
+    WHEN `Annual fee or bank charge`         THEN TRUE   -- "annual fees ... all fees charged by Citibank or third party"
+    WHEN `Interest or finance charge`        THEN TRUE   -- "interest charges, late payment charges"
+    WHEN `Instalment plan transaction`       THEN TRUE   -- "instalment/easy/extended/equal payment plans, preferred payment plans"
+    WHEN `Balance or funds transfer`         THEN TRUE   -- "balance transfers"; also limb (ii)
+    WHEN `Cash advance or quasi-cash`        THEN TRUE   -- "cash advances ... quasi-cash transactions"
+    WHEN `Bill payment via internet banking` THEN FALSE  -- limb (iii) reaches this one
+    WHEN `Telephone or mail order`           THEN FALSE  -- not a limb of cl.5 at all
+    WHEN `Pre-authorisation`                 THEN FALSE  -- not a limb of cl.5 at all
+    WHEN `Refund or reversal`                THEN FALSE  -- cl.18's netting rule, not cl.5; see § 18
+
+-- cl.5(ii): "funds transfers using the card as source of funds".
+GIVEN kind IS A `Charge kind`
+GIVETH A BOOLEAN
+`a clause 5(ii) kind of charge` kind MEANS
+    kind EQUALS `Balance or funds transfer`
+
+-- cl.5(iii): "bill payments (including via Citibank Online or via any other
+-- channel or agent)". The domain names the internet-banking channel, which is
+-- the one the clause names first and the one a statement line shows; the
+-- clause's "any other channel or agent" has no constructor and is carried as
+-- a condition string.
+GIVEN kind IS A `Charge kind`
+GIVETH A BOOLEAN
+`a clause 5(iii) kind of charge` kind MEANS
+    kind EQUALS `Bill payment via internet banking`
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`clauses 5(i) to 5(iii) exclude this charge` txn MEANS
+       `a clause 5(i) kind of charge`   (txn's `charge kind`)
+    OR `a clause 5(ii) kind of charge`  (txn's `charge kind`)
+    OR `a clause 5(iii) kind of charge` (txn's `charge kind`)
+
+
+§§ `5(xii) — the excluded Merchant Categories`
+
+-- The exclusion list's paragraph 2 is a two-column table. The LEFT column
+-- states a category and a RANGE ("Quasi Cash / Financial Services (MCC
+-- 6529-6540), such as but not limited to:"); the RIGHT column lists MCCs as
+-- examples. The two do not nest: several listed codes fall OUTSIDE the range
+-- of the heading they sit under (7349 and 6012 under the 6529-6540 heading;
+-- 8398 under the 8211-8299 heading). So the operative set is the UNION of the
+-- four stated ranges and every individually listed code, and it is encoded
+-- that way -- ranges as comparisons, codes as equalities.
+--
+-- "such as but not limited to" makes even that union a floor rather than a
+-- ceiling. Paragraph 4 says so outright: "the above excluded Merchant
+-- Category Codes ... is not exhaustive and may be updated from time to time".
+-- This encoding is therefore UNDER-INCLUSIVE by construction, which is the
+-- safe direction for a rate estimate: it can promise 10X where the issuer
+-- would refuse it, and the condition strings say so.
+
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`an excluded Merchant Category heading covers` mcc MEANS
+    -- "Quasi Cash / Financial Services (MCC 6529-6540)"
+       (mcc AT LEAST 6529 AND mcc AT MOST 6540)
+    -- "Education Institutions (MCC 8211-8299)"
+    OR (mcc AT LEAST 8211 AND mcc AT MOST 8299)
+    -- "Professional Services and Membership Organizations (MCC 8062,
+    --  8651-8661)"
+    OR (mcc AT LEAST 8651 AND mcc AT MOST 8661)
+    -- "Government Services (MCC 9000-9999)"
+    OR (mcc AT LEAST 9000 AND mcc AT MOST 9999)
+
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`the exclusion list names the Merchant Category` mcc MEANS
+    -- Codes listed individually in the right-hand column. Codes already
+    -- inside a heading range above are not repeated here; these are the ones
+    -- that would otherwise be missed.
+       mcc EQUALS 4829   -- Wire Transfer Money Orders (WTMOs)
+    OR mcc EQUALS 4900   -- Utilities – Electric, Gas, Water, and Sanitary
+    OR mcc EQUALS 5199   -- Nondurable Goods (Not Elsewhere Classified)
+    OR mcc EQUALS 5960   -- Direct Marketing – Insurance Services
+    OR mcc EQUALS 5993   -- Cigar Stores and Stands
+    OR mcc EQUALS 6012   -- Financial Institutions – Merchandise, Services
+    OR mcc EQUALS 6050   -- Quasi Cash – Financial institutions
+    OR mcc EQUALS 6051   -- Non-Financial Institutions – Foreign Currency
+    OR mcc EQUALS 6211   -- Securities – Brokers and Dealers
+    OR mcc EQUALS 6300   -- Insurance Sales, Underwriting and Premiums
+    OR mcc EQUALS 6513   -- Real Estate Agents and Managers – Rentals
+    OR mcc EQUALS 7349   -- Cleaning and Maintenance, Janitorial Services
+    OR mcc EQUALS 7511   -- Quasi Cash – Truck Stop Transactions
+    OR mcc EQUALS 7523   -- Parking Lots, Parking Meters and Garages
+    OR mcc EQUALS 7800   -- Government-Owned Lotteries (US Region only)
+    OR mcc EQUALS 7995   -- Betting, including Lottery Tickets
+    OR mcc EQUALS 8062   -- Hospitals
+    OR mcc EQUALS 8398   -- Charitable and Social Service Organizations
+
+-- The 4900 footnote ("*Not applicable for Citi Business Visa Card / Citi
+-- Corporate Visa Card, Citi Purchasing Visa Card, Citi Travel Account Visa
+-- Card") and the 8062 footnote ("**Not applicable for Citi ULTIMA Card") each
+-- disapply one code for cards that are not this one. The Citi Rewards Card is
+-- paragraph 1(f) of the list, so both codes bite here and neither footnote is
+-- encoded.
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`the exclusion list excludes MCC` mcc MEANS
+       `an excluded Merchant Category heading covers` mcc
+    OR `the exclusion list names the Merchant Category` mcc
+
+
+§§ `5(xii) — the excluded merchants and merchant descriptions`
+
+-- The exclusion list's paragraph 3 names twenty merchants "and/or ... merchant
+-- descriptions". Footnote 2 extends it to "any combination, permutation or
+-- derivation of the abovementioned merchant descriptions, whether in whole or
+-- in part", giving "[Company Name]*AXS" as its example.
+--
+-- THE PARAGRAPH HAS TWO LEGS, AND THE SECOND ONE NOW REACHES EXACTLY ONE ROW.
+-- Footnote 1 attaches to "merchants": "Transactions made at the abovementioned
+-- merchants will be excluded from rewards earn, REGARDLESS of how the merchant
+-- is described in your credit card statement." That leg turns on WHO the
+-- merchant is rather than on what the statement prints, so it needs a merchant
+-- identity, which the shared domain now carries as the `Merchant` enumeration.
+--
+-- Of the twenty rows, exactly one names a merchant the enumeration has a
+-- constructor for: SimplyGo, row xi, which is in the domain because DBS yuu
+-- cl.8 names it too. The other nineteen -- AXS, SAM, OANDA, Saxo, BANC DE
+-- BINARY, SKYFX, EZ-link, Transit Link and the rest -- have no constructor,
+-- because no other issuer in this corpus names them as merchants either, and
+-- inventing one here would be a card module writing vocabulary that belongs to
+-- the shared domain. So a charge at AXS that posts under some other
+-- description is excluded by the document and is NOT excluded here.
+--
+-- Under-inclusive in the same direction as everything else in this section,
+-- nineteen twentieths of the way rather than the whole way, and the remainder
+-- is a domain gap with a name rather than an unnamed one.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`the exclusion list names this merchant` txn MEANS
+    txn's `merchant` EQUALS SimplyGo   -- row xi, on footnote 1's identity leg
+--
+-- ENCODED AS A TEST OVER DESCRIPTION FAMILIES, AND FOOTNOTE 2 COMES WITH IT.
+-- The twenty rows are statement-line text, and matching statement-line text
+-- is layer 1's job (`classify.l4`): it reads the printed description by
+-- case-insensitive substring and reports which `Description pattern` families
+-- the line carries. A rule then tests `elem`. That is not a workaround for
+-- Catala's lack of strings -- it is what footnote 2 asks for. "[Company
+-- Name]*AXS" carries AXS, so the derivation the footnote gives as its own
+-- example is now caught, which the first pass's exact match missed.
+--
+-- HOW THE TWENTY ROWS MAP ONTO EIGHT FAMILIES. Each row below is accounted
+-- for, and the row numbers are the document's own roman numerals.
+--
+--   AXS                     i. AXS, ii. AMAZE* AXS
+--   BUS/MRT                 iv. BUS/MRT^, v. AMAZE* BUS/MRT
+--   EZ-Link                 vi. EZ-link, vii. AMAZE* EZ-link
+--   SAM                     ix. SAM -- but see the SAM note below: the family
+--                           exists and the rule tests it, and layer 1 does
+--                           not report it for the bare word the list prints
+--   SimplyGo description    xi. SIMPLYGO*
+--   TRANSIT                 xvii. TRANSIT, xviii. AMAZE* TRANSIT, xix. Transit Link
+--   YouTrip                 xx. Youtrip Singapore SG
+--   Forex or CFD platform   iii. BANC DE BINARY, viii. OANDA ASIA PAC,
+--                           x. Saxo Cap Mkts Pte Ltd, xv. SKYFX.COM
+--
+-- Row xi is also reachable on footnote 1's identity leg, which is tested
+-- first and separately; see the note above `the exclusion list names this
+-- merchant`.
+--
+-- THREE THINGS THE MAPPING IS NOT EXACT ABOUT, all of them stated rather than
+-- hidden, and two of them run in opposite directions.
+--
+--   WIDER than the document: `Forex or CFD platform` is a shared family built
+--   across this corpus, and it also covers IG MARKETS, PLUS500, CITY INDEX,
+--   XTRADE and TOROPTION, which Citi's paragraph 3 does not name. A charge at
+--   one of those is refused here and would not be refused by this document
+--   alone. That is the first place in this module where the encoding is
+--   over-inclusive rather than under-inclusive, and it is the price of using
+--   one shared vocabulary for eight issuers.
+--
+--   NARROWER than the document, in TWO different ways, and the difference
+--   matters to whoever fixes them.
+--
+--     No family at all: rows xii, xiii, xiv (SPL AUTO*, SPL ATU*, SPL
+--     ONLINE*) and row xvi (TL-ABT) have no `Description pattern` in the
+--     shared domain, because no other issuer's list names them. Nothing here
+--     tests for them and a charge bearing one is not refused. The fix is four
+--     constructors and four `classify.l4` clauses -- shared-domain work, not
+--     this module's, which owns no vocabulary.
+--
+--     A family whose RECOGNISER does not match the printed row: row ix, SAM.
+--     The family exists, the rule below tests it, and layer 1 reports it for
+--     "SAM PAYMENTS", "SINGPOST-SAM" and "SAM -" but NOT for the bare word
+--     "SAM", which is exactly how paragraph 3 prints the row. Measured
+--     2026-09-21 against `classify.l4` itself, not assumed: bare "SAM"
+--     classifies to EMPTY. The narrowing is deliberate there and defensible
+--     -- an unguarded "SAM" would refuse "SAMSUNG ELECTRONICS" -- so this is
+--     not a bug to file against layer 1 but a real residue of it, and it is
+--     stated rather than papered over. The rule stays as it is: if layer 1
+--     ever reports SAM, this charge is refused.
+--
+--   NOT A TRIGGER AT ALL: `AMAZE`. Four rows carry it, and every one of them
+--   is a COMBINATION -- AMAZE* AXS, AMAZE* BUS/MRT, AMAZE* EZ-link, AMAZE*
+--   TRANSIT -- whose other half is itself listed and is tested above. The
+--   document nowhere lists a bare "AMAZE", so testing `elem AMAZE` would
+--   refuse every Amaze charge at every merchant on earth, which paragraph 3
+--   does not say. See ambiguity 2: that reading is one line away, and the
+--   assertion that would flip is named there.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`paragraph 3 of the exclusion list reaches this charge` txn MEANS
+    -- Footnote 1's identity leg first: it is expressly indifferent to the
+    -- description, so it answers before any of the families are consulted.
+       `the exclusion list names this merchant` txn
+
+    OR elem AXS                     (txn's `description patterns`)
+    OR elem `BUS/MRT`               (txn's `description patterns`)
+    OR elem `EZ-Link`               (txn's `description patterns`)
+    OR elem SAM                     (txn's `description patterns`)
+    OR elem `SimplyGo description`  (txn's `description patterns`)
+    OR elem TRANSIT                 (txn's `description patterns`)
+    OR elem YouTrip                 (txn's `description patterns`)
+    OR elem `Forex or CFD platform` (txn's `description patterns`)
+
+-- cl.5(xii) incorporates the list by reference; the list carries its own
+-- commencement. Both must hold.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`clause 5(xii) excludes this charge` txn MEANS
+        `this revision of the exclusion list was in force` txn
+    AND (   `the exclusion list excludes MCC` (txn's `merchant category code`)
+         OR `paragraph 3 of the exclusion list reaches this charge` txn)
+
+
+§§ `5(xi) — transit-related transactions`
+
+-- cl.5(xi) is one word long -- "transit-related transactions" -- and the T&C
+-- defines it nowhere. Its only content in a held document is the exclusion
+-- list's paragraph 3, which names BUS/MRT, EZ-link, SIMPLYGO*, TRANSIT,
+-- Transit Link, TL-ABT and their AMAZE* forms, and whose footnote ^ ties
+-- BUS/MRT to MCC 4111. Rather than invent an MCC list for it, this limb is
+-- discharged by `clause 5(xii) excludes this charge` above, and the residue
+-- -- a transit charge at a merchant the list does not name, before 16
+-- December 2024 -- is recorded as a gap. The description leg now matches by
+-- substring through layer 1, so "TRANSIT 3" and "AMAZE*EZ-LINK" are caught
+-- where the first pass's exact match let them through. It is NOT encoded as MCC 4111,
+-- because 4111 is a travel MCC under cl.6's footnote and doing so would
+-- conflate two different exclusions that bite at different strengths: a
+-- cl.5(xi) exclusion kills the base point too, a cl.6 footnote exclusion
+-- kills only the bonus.
+
+
+§§ `5 — the Qualifying Charge test`
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`a Qualifying Charge` txn MEANS
+    NOT (`clause 5 excludes this charge` txn)
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`clause 5 excludes this charge` txn MEANS
+    -- Limbs (i) to (iii) turn on the kind of posting; limbs (iv) to (xi) are
+    -- reached through the excluded Merchant Categories and merchant
+    -- descriptions that limb (xii) points at.
+       `clauses 5(i) to 5(iii) exclude this charge` txn
+    OR `clause 5(xii) excludes this charge` txn
+
+
+§ `6. 10X Points Eligible Transaction`
+
+§§ `6(i) — the Merchant Category limb`
+
+-- "a Qualifying Charge made at any store that sells shoes and bags and
+-- clothes as its main business activity, determined by the following Merchant
+-- Category Codes (MCC)". Eleven codes, quoted in the document's own order.
+--
+-- READ THIS LIMB FOR WHAT IT DOES NOT SAY. It does not mention a mobile
+-- wallet. It does not mention a channel, a terminal, or a system indicator.
+-- It does not mention travel. Its only conditions are: a Qualifying Charge,
+-- and one of eleven MCCs. That is the whole asymmetry this module exists to
+-- show.
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`a clause 6(i) Merchant Category` mcc MEANS
+       mcc EQUALS 5311   -- Department Stores
+    OR mcc EQUALS 5611   -- Men’s and Boy’s Clothing and Accessories Stores
+    OR mcc EQUALS 5621   -- Women’s Ready to Wear Stores
+    OR mcc EQUALS 5631   -- Women’s Accessory and Specialty Stores
+    OR mcc EQUALS 5641   -- Children’s and Infant’s Wear Stores
+    OR mcc EQUALS 5651   -- Family Clothing Stores
+    OR mcc EQUALS 5655   -- Sports and Riding Apparel Stores
+    OR mcc EQUALS 5661   -- Shoe Stores
+    OR mcc EQUALS 5691   -- Men's and Women's Clothing Stores
+    OR mcc EQUALS 5699   -- Miscellaneous Apparel and Accessory Shops
+    OR mcc EQUALS 5948   -- Luggage and Leather Goods Stores
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`clause 6(i) — the Merchant Category limb` txn MEANS
+        `a Qualifying Charge` txn
+    AND `a clause 6(i) Merchant Category` (txn's `merchant category code`)
+
+
+§§ `6, footnote * — travel-related transactions`
+
+-- "travel-related transactions refer to transactions which are either wholly
+-- or partially related to any form of travel ... and include but are not
+-- limited to transactions that fall within the following MCCs". Ten rows,
+-- three of them ranges, transcribed in the document's order.
+--
+-- The footnote's parenthetical reaches wider than the limb it hangs off:
+-- "any transactions at merchants with the following MCCs will not be a 10X
+-- Points Eligible Transaction" -- a statement about the whole of clause 6,
+-- not just about limb (ii) where the asterisk sits. It makes no practical
+-- difference here, because none of the travel MCCs is one of the eleven
+-- apparel MCCs in limb (i), so the two sets are disjoint and the wider
+-- reading changes no answer. Recorded because a future revision of either
+-- list could make them overlap.
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`a travel-related Merchant Category` mcc MEANS
+       (mcc AT LEAST 3000 AND mcc AT MOST 3350)  -- Airlines, Air Carriers
+    OR (mcc AT LEAST 3351 AND mcc AT MOST 3500)  -- Car Rental Agencies
+    OR (mcc AT LEAST 3501 AND mcc AT MOST 3999)  -- Lodging – Hotels, Motels
+    OR mcc EQUALS 4111  -- Passenger Transport and Railways
+    OR mcc EQUALS 4112  -- Passenger Transport and Railways
+    OR mcc EQUALS 4789  -- Passenger Transport and Railways
+    OR mcc EQUALS 4411  -- Cruise Lines
+    OR mcc EQUALS 4511  -- Airlines, Air Carriers (Not Elsewhere Classified)
+    OR mcc EQUALS 4722  -- Travel Agencies and Tour Operators
+    OR mcc EQUALS 4723  -- Travel Agencies and Tour Operators
+    OR mcc EQUALS 5962  -- Direct Marketing – Travel-Related Arrangement
+    OR mcc EQUALS 7011  -- Lodging – Hotels, Motels, Resorts (NEC)
+    OR mcc EQUALS 7012  -- Lodging – Hotels, Motels, Resorts (NEC)
+    OR mcc EQUALS 7512  -- Car Rental Agencies (Not Elsewhere Classified)
+
+
+§§ `6(ii) — the online limb`
+
+-- "a Qualifying Charge made at an online retail merchant, excluding mobile
+-- wallet and travel-related transactions*."
+--
+-- "ONLINE" IS THE MERCHANT'S FACT, NOT THE CARDHOLDER'S. The clause defines
+-- its own term: "These refer to Qualifying Charges made via the internet or
+-- mobile applications, which is determined by system indicators reflecting
+-- that it is an online transaction and which are processed by the respective
+-- merchants/acquirers as an online transaction through Visa/Mastercard
+-- networks. These indicators are decided by the relevant merchant and/or
+-- their acquirer and are not determined by Citibank." So the test reads
+-- `merchant indicator`, never `payment channel`: what the cardholder did at
+-- the terminal does not settle it, and the cardholder may not know what the
+-- indicator will be.
+--
+-- "RETAIL" IS NOT TESTABLE AND IS NOT TESTED. The clause says "online retail
+-- merchant" and then defines the whole phrase by the system indicator alone.
+-- Nothing in the document distinguishes a retail merchant from any other, and
+-- the domain carries no such fact, so the encoding follows the definition the
+-- clause gives itself. Recorded as an ambiguity.
+
+-- The limb, with the indicator question set aside: everything cl.6(ii)
+-- requires EXCEPT the indicator being `Flags online`. Split out because the
+-- top-level rule must answer conditionally when the indicator is Unknown, and
+-- that answer is exactly "this, on the assumption the merchant flags online".
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`clause 6(ii) but for the indicator` txn MEANS
+        `a Qualifying Charge` txn
+    AND NOT (txn's `credential` EQUALS `A mobile wallet token`)
+    AND NOT (`a travel-related Merchant Category` (txn's `merchant category code`))
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`clause 6(ii) — the online limb` txn MEANS
+        txn's `merchant indicator` EQUALS `Flags online`
+    AND `clause 6(ii) but for the indicator` txn
+
+
+§§ `6 and 7 — the disjunction`
+
+-- cl.6 joins its two limbs with "; or", and cl.7 makes the disjunction the
+-- whole of the bonus test: "Only card transactions made under the 10X Points
+-- Eligible Transactions as defined in clause 6 above will qualify for 10X
+-- Rewards."
+--
+-- Written out as an explicit OR of two named limbs so that the asymmetry is
+-- on the page: the wallet defeats the second disjunct and has no purchase on
+-- the first.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`a 10X Points Eligible Transaction` txn MEANS
+       `clause 6(i) — the Merchant Category limb` txn
+    OR `clause 6(ii) — the online limb` txn
+
+-- The same disjunction with the indicator question set aside. TRUE means "10X
+-- either way"; it is what lets the Unknown branch tell an unconditional
+-- answer from a conditional one.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`a 10X Points Eligible Transaction but for the indicator` txn MEANS
+       `clause 6(i) — the Merchant Category limb` txn
+    OR `clause 6(ii) but for the indicator` txn
+
+
+§ `12 and 13. What a charge earns`
+
+§§ `12 — the base rate`
+
+-- "Eligible Cardholders will earn 1 Base Point for every S$1 of Qualifying
+-- Charges (which are not 10X Points Eligible Transactions) ... rounded down
+-- to the nearest S$1."
+GIVETH A NUMBER
+`the Base Points per dollar` MEANS 1
+
+-- THE ROUNDING IS NOT IN THIS HELPER, AND THAT IS A TARGET-LANGUAGE LIMIT
+-- RATHER THAN A READING OF THE CLAUSE. cl.12 says "rounded down to the
+-- nearest S$1", which is `TRUNC amount 0`; `TRUNC` is outside the v1 Catala
+-- fragment and Catala 1.2 has `round` (to nearest) but no floor, so a
+-- definition that used it would refuse the whole module. The helper therefore
+-- takes the WHOLE DOLLARS as its input and the rounding is applied at the
+-- call site. It is still checked -- the assertions below transcribe clause
+-- 13's own worked example and apply `TRUNC` there, where an unlowerable
+-- operator costs an untranslated test rather than a refusal.
+--
+-- Nothing downstream loses by this: the exported `Rate answer` carries RATES
+-- per dollar, not point totals, so no lowered rule calls either helper.
+GIVEN dollars IS A NUMBER
+GIVETH A NUMBER
+`the Base Points on whole dollars of` dollars MEANS
+    dollars TIMES `the Base Points per dollar`
+
+
+§§ `13 — the bonus rate and its cap`
+
+-- "(i) 1 Base Point for every S$1 of a 10X Points Eligible Transaction
+-- (“Base Points”); and (ii) 9 Bonus Points for every S$1 of a 10X Points
+-- Eligible Transaction (“Bonus Points”)." Ten points per dollar in total, of
+-- which nine are the capped part.
+GIVETH A NUMBER
+`the Bonus Points per dollar` MEANS 9
+
+GIVETH A NUMBER
+`the total Points per dollar on a 10X transaction` MEANS
+    `the Base Points per dollar` PLUS `the Bonus Points per dollar`
+
+-- Same shape, same reason: see `the Base Points on whole dollars of`.
+GIVEN dollars IS A NUMBER
+GIVETH A NUMBER
+`the Bonus Points on whole dollars of` dollars MEANS
+    dollars TIMES `the Bonus Points per dollar`
+
+-- "Base Points are not subject to any cap. However, Bonus Points are subject
+-- to a cap of 9,000 Bonus Points per statement month."
+GIVETH A NUMBER
+`the cap on Bonus Points per statement month` MEANS 9_000
+
+GIVEN `bonus points` IS A NUMBER
+GIVETH A NUMBER
+`the Bonus Points awarded on` `bonus points` MEANS
+    min `bonus points` `the cap on Bonus Points per statement month`
+
+-- The cap expressed in the dollars of bonus-earning spend it admits: 9,000
+-- Bonus Points at 9 Bonus Points per S$1 is S$1,000 of 10X transactions in
+-- the statement month. Base Points continue beyond it, so spend above S$1,000
+-- falls from 4 miles per dollar to 0.4, it does not stop earning.
+GIVETH A NUMBER
+`the dollars of 10X spend the bonus cap admits` MEANS
+    `the cap on Bonus Points per statement month` DIVIDED BY `the Bonus Points per dollar`
+
+
+§§ `18 — which statement month a charge counts against`
+
+-- THE CAP'S TWO AXES, AND WHAT THE DOCUMENT SETTLES.
+--
+-- BASIS is settled outright and is unusual: cl.13 says "per statement month",
+-- not per calendar month. Every other card in this corpus runs 1st to 1st;
+-- this one refills on the cardholder's statement date. `Statement month`.
+--
+-- ATTRIBUTION is settled by cl.18, but only just, and the reasoning is worth
+-- writing down because the clause is about reversals rather than about
+-- charges. Its middle sentence is the document's ONLY rule for locating a
+-- transaction in a statement cycle: "Points reversal will be applied in the
+-- statement cycle when the reversal/refunded transaction is posted which may
+-- differ from the statement cycle of corresponding Qualifying Charge (for
+-- example: the Qualifying Charge could have been made in January 2020 but the
+-- reversal/refund of such transaction ... could be in March 2020)." Two
+-- things follow. First, the operator the document reaches for when it has to
+-- place a transaction in a cycle is POSTING, not the transaction date.
+-- Second, the contrast it draws presupposes that a Qualifying Charge has a
+-- statement cycle of its own, and a statement cycle is the period a charge is
+-- billed in -- which is to say, the cycle it posts in. `By posting date`.
+--
+-- WHAT WOULD UNSETTLE IT. The parenthetical says the charge "could have been
+-- made in January 2020", and "made" is a transaction-date word. If the
+-- example is read as locating the charge by when it was made rather than by
+-- when it posted, the attribution axis is unstated and the honest value is
+-- `Unconfirmed attribution`. This encoding takes the express rule over the
+-- example's verb, and the choice is recorded in the AMBIGUITIES block.
+
+-- One pot, named. cl.13 states a single cap of 9,000 Bonus Points per
+-- statement month over all 10X Points Eligible Transactions; there is no
+-- per-category pot on this card, and nothing in either document splits the
+-- cap between limb (i) and limb (ii).
+GIVETH A Cap
+`the Citi Rewards bonus cap` MEANS
+    Cap WITH
+        `pool`                  IS "Citi Rewards 10X bonus (statement month)"
+        `capped`                IS TRUE
+        `bonus spend per month` IS `the dollars of 10X spend the bonus cap admits`
+        `basis`                 IS `Statement month`
+        `attribution`           IS `By posting date`
+
+-- cl.13: "Base Points are not subject to any cap." The dollar figure is
+-- meaningless when `capped` is FALSE; the basis and attribution are still the
+-- programme's own and are carried so a reader is not told the axes are
+-- unknown when they are known.
+GIVETH A Cap
+`no cap on the base rate` MEANS
+    Cap WITH
+        `pool`                  IS "Citi Rewards 10X bonus (statement month)"
+        `capped`                IS FALSE
+        `bonus spend per month` IS 0
+        `basis`                 IS `Statement month`
+        `attribution`           IS `By posting date`
+
+
+§ `The conversion to miles`
+
+-- ThankYou Points convert to airline miles under the Citi ThankYou Rewards
+-- Program terms, which cl.16 points at
+-- (www.citibank.com.sg/citirewards) and which THIS CORPUS DOES NOT HOLD.
+-- Neither held document states a conversion. 0.4 miles per ThankYou Point is
+-- the figure the market uses (10 Points per S$1 quoted as "4 miles per
+-- dollar"), and it is carried as Unconfirmed: a real value that propagates,
+-- with its epistemic status attached, rather than a silent default.
+GIVETH A NUMBER
+`miles per ThankYou Point` MEANS 0.4
+
+GIVETH A Status
+`the status of the conversion to miles` MEANS Unconfirmed
+
+GIVETH A NUMBER
+`the base rate in miles per dollar` MEANS
+    `the Base Points per dollar` TIMES `miles per ThankYou Point`
+
+GIVETH A NUMBER
+`the 10X rate in miles per dollar` MEANS
+    `the total Points per dollar on a 10X transaction` TIMES `miles per ThankYou Point`
+
+-- `earns the bonus rate` IS DERIVED FROM THE HEADLINE, NEVER SET BESIDE IT.
+-- Each answer below passes the SAME expression to this helper that it puts in
+-- `miles per dollar`, so the flag cannot disagree with the figure it is
+-- supposed to describe.
+--
+-- The branch this protects is the Unknown-indicator one. There the headline
+-- deliberately carries the LOWER of the two conditional rates, so that a
+-- projection can never overstate what is known; a flag written by hand next
+-- to it can easily be given the value of the OTHER branch -- TRUE, because
+-- 10X is available if the merchant flags online -- and then the answer says
+-- "earns the bonus rate" while reporting 0.4 miles per dollar. Nothing would
+-- catch that: both fields are plausible on their own and only their
+-- conjunction is wrong.
+--
+-- A charge at 0 miles per dollar is below the base rate rather than above it,
+-- so both refusal answers get FALSE from the same rule.
+GIVEN `the headline rate` IS A NUMBER
+GIVETH A BOOLEAN
+`that headline rate is a bonus rate` `the headline rate` MEANS
+    `the headline rate` GREATER THAN `the base rate in miles per dollar`
+
+
+§ `The answer`
+
+§§ `Conditions the app should print`
+
+-- Three residues survive the encoding and are said out loud on every answer
+-- that does not already refuse: cl.5's GST and non-internet-banking bill
+-- payments (see § 5), the exclusion list's own admission that it is not
+-- exhaustive (its paragraph 4), and the four of its descriptions that layer 1
+-- does not yet recognise (see §§ `5(xii) — the excluded merchants and
+-- merchant descriptions`). A fourth is added only to a charge that predates
+-- the terms.
+--
+-- ONE CAVEAT THE FIRST PASS CARRIED IS GONE. It said that only exact matches
+-- on the twenty descriptions were checked, so "[Company Name]*AXS" would slip
+-- through. Layer 1 now matches by substring, which is what footnote 2
+-- describes, so the caveat would be false and has been deleted rather than
+-- reworded.
+--
+-- WRITTEN INLINE, NOT AS NAMED CONSTANTS. These strings used to be four
+-- `GIVETH A STRING` helpers and a `GIVETH A LIST OF STRING` combinator. A
+-- helper whose RESULT is a string cannot be lowered to Catala at all, while a
+-- string written inline inside a record construction is simply elided with
+-- the field that holds it. So each answer below spells its own conditions
+-- out, twice: once for a charge the terms reach, once for one they do not.
+-- The repetition is the price of the lowering, and it is cheaper than a
+-- module that does not lower.
+
+
+§§ `The five answers`
+
+-- TWO WAYS TO EARN NOTHING, AND THEY DESERVE DIFFERENT ANSWERS. Both routes
+-- end at the same numbers -- clause 12's Base Point is predicated on a
+-- Qualifying Charge, so an excluded charge falls outside both clause 12 and
+-- clause 13 -- but they are decided by different text and a reader should be
+-- told which. A charge refused because of WHAT IT IS (an annual fee, a
+-- transfer, a cash advance, a bill payment) is decided by clause 5(i) to
+-- (iii) and by nothing else; citing the exclusion list's MCC table at it
+-- would be citing a paragraph that had no part in the decision.
+--
+-- The first pass had one refusal answer because it had one route. Adding the
+-- charge-kind guards added the second route, and splitting the answer is the
+-- other half of that change rather than a nicety.
+
+-- A charge clause 5(i) to (iii) excludes, on the kind of posting it is.
+GIVEN txn IS A Transaction
+GIVETH A `Rate answer`
+`the answer for a charge of a kind clause 5 excludes` txn MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS 0
+        `miles per point`                                     IS `miles per ThankYou Point`
+        `conversion status`                                   IS `the status of the conversion to miles`
+        `miles per dollar`                                    IS 0
+        `miles per dollar if the merchant flags online`       IS 0
+        `miles per dollar if the merchant flags card-present` IS 0
+        `depends on the merchant indicator`                   IS FALSE
+        `earns the bonus rate`                                IS `that headline rate is a bonus rate` 0
+        `cap`                                                 IS `no cap on the base rate`
+        `conditions`                                          IS
+            IF   `the 10X promotion terms were in force` txn
+            THEN LIST "this posting is a fee, an interest charge, an instalment plan, a transfer, a cash advance or a bill payment, so clause 5 makes it a non-qualifying charge and it earns no ThankYou Points at all"
+            ELSE LIST "this posting is a fee, an interest charge, an instalment plan, a transfer, a cash advance or a bill payment, so clause 5 makes it a non-qualifying charge and it earns no ThankYou Points at all"
+                    , "this charge predates the 1 April 2024 effective date of the held terms; the revision that governed it is not held"
+        `sources`                                             IS
+            LIST `the clause 5 citation`
+        `status`                                              IS `the status of the earning rule for` txn
+
+-- A charge the exclusion list at clause 5(xii) excludes, on its Merchant
+-- Category or on the description its statement line bears.
+GIVEN txn IS A Transaction
+GIVETH A `Rate answer`
+`the answer for a charge clause 5 excludes` txn MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS 0
+        `miles per point`                                     IS `miles per ThankYou Point`
+        `conversion status`                                   IS `the status of the conversion to miles`
+        `miles per dollar`                                    IS 0
+        `miles per dollar if the merchant flags online`       IS 0
+        `miles per dollar if the merchant flags card-present` IS 0
+        `depends on the merchant indicator`                   IS FALSE
+        `earns the bonus rate`                                IS `that headline rate is a bonus rate` 0
+        `cap`                                                 IS `no cap on the base rate`
+        `conditions`                                          IS
+            IF   `the 10X promotion terms were in force` txn
+            THEN LIST "this charge is on Citibank's excluded list and earns no ThankYou Points"
+                    , "the excluded merchant and Merchant Category lists are not exhaustive and Citibank may update them at any time"
+            ELSE LIST "this charge is on Citibank's excluded list and earns no ThankYou Points"
+                    , "the excluded merchant and Merchant Category lists are not exhaustive and Citibank may update them at any time"
+                    , "this charge predates the 1 April 2024 effective date of the held terms; the revision that governed it is not held"
+        `sources`                                             IS
+            LIST `the clause 5 citation`
+               , `the clause 5(xii) citation`
+               , `the exclusion list MCC table citation`
+               , `the exclusion list merchant description citation`
+        `status`                                              IS `the status of the earning rule for` txn
+
+-- A Qualifying Charge that is not a 10X Points Eligible Transaction: cl.12.
+GIVEN txn IS A Transaction
+GIVETH A `Rate answer`
+`the answer at the base rate for` txn MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS `the Base Points per dollar`
+        `miles per point`                                     IS `miles per ThankYou Point`
+        `conversion status`                                   IS `the status of the conversion to miles`
+        `miles per dollar`                                    IS `the base rate in miles per dollar`
+        `miles per dollar if the merchant flags online`       IS `the base rate in miles per dollar`
+        `miles per dollar if the merchant flags card-present` IS `the base rate in miles per dollar`
+        `depends on the merchant indicator`                   IS FALSE
+        `earns the bonus rate`                                IS `that headline rate is a bonus rate` `the base rate in miles per dollar`
+        `cap`                                                 IS `no cap on the base rate`
+        `conditions`                                          IS
+            IF   `the 10X promotion terms were in force` txn
+            THEN LIST "1 ThankYou Point per S$1, rounded down to the nearest S$1"
+                    , "clause 5 also excludes GST, and bill payments made through a channel or agent other than internet banking; the statement line does not distinguish either"
+                    , "five descriptions on Citibank's list — SAM, SPL AUTO*, SPL ATU*, SPL ONLINE* and TL-ABT — are not recognised by the statement-line classifier as it prints them, so a charge bearing one of them is not caught here"
+            ELSE LIST "1 ThankYou Point per S$1, rounded down to the nearest S$1"
+                    , "clause 5 also excludes GST, and bill payments made through a channel or agent other than internet banking; the statement line does not distinguish either"
+                    , "five descriptions on Citibank's list — SAM, SPL AUTO*, SPL ATU*, SPL ONLINE* and TL-ABT — are not recognised by the statement-line classifier as it prints them, so a charge bearing one of them is not caught here"
+                    , "this charge predates the 1 April 2024 effective date of the held terms; the revision that governed it is not held"
+        `sources`                                             IS
+            LIST `the clause 5 citation`
+               , `the clause 12 citation`
+        `status`                                              IS `the status of the earning rule for` txn
+
+-- A 10X Points Eligible Transaction, on an indicator that settles it either
+-- way: both conditional rates equal the headline rate and the flag is FALSE.
+GIVEN txn IS A Transaction
+GIVETH A `Rate answer`
+`the answer at the 10X rate for` txn MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS `the total Points per dollar on a 10X transaction`
+        `miles per point`                                     IS `miles per ThankYou Point`
+        `conversion status`                                   IS `the status of the conversion to miles`
+        `miles per dollar`                                    IS `the 10X rate in miles per dollar`
+        `miles per dollar if the merchant flags online`       IS `the 10X rate in miles per dollar`
+        `miles per dollar if the merchant flags card-present` IS `the 10X rate in miles per dollar`
+        `depends on the merchant indicator`                   IS FALSE
+        `earns the bonus rate`                                IS `that headline rate is a bonus rate` `the 10X rate in miles per dollar`
+        `cap`                                                 IS `the Citi Rewards bonus cap`
+        `conditions`                                          IS
+            IF   `the 10X promotion terms were in force` txn
+            THEN LIST "the 9 bonus points per S$1 stop after 9,000 Bonus Points in the statement month, about S$1,000 of 10X spend"
+                    , "clause 5 also excludes GST, and bill payments made through a channel or agent other than internet banking; the statement line does not distinguish either"
+                    , "five descriptions on Citibank's list — SAM, SPL AUTO*, SPL ATU*, SPL ONLINE* and TL-ABT — are not recognised by the statement-line classifier as it prints them, so a charge bearing one of them is not caught here"
+            ELSE LIST "the 9 bonus points per S$1 stop after 9,000 Bonus Points in the statement month, about S$1,000 of 10X spend"
+                    , "clause 5 also excludes GST, and bill payments made through a channel or agent other than internet banking; the statement line does not distinguish either"
+                    , "five descriptions on Citibank's list — SAM, SPL AUTO*, SPL ATU*, SPL ONLINE* and TL-ABT — are not recognised by the statement-line classifier as it prints them, so a charge bearing one of them is not caught here"
+                    , "this charge predates the 1 April 2024 effective date of the held terms; the revision that governed it is not held"
+        `sources`                                             IS
+            LIST `the clause 6(i) citation`
+               , `the clause 6(ii) citation`
+               , `the clause 6 travel footnote citation`
+               , `the clause 13 citation`
+               , `the clause 18 citation`
+        `status`                                              IS `the status of the earning rule for` txn
+
+-- The indicator is Unknown and the answer turns on it: 10X if the merchant's
+-- acquirer flags the charge online, the base rate if it flags card-present.
+-- Both branches are filled, `depends on the merchant indicator` is TRUE, and
+-- the HEADLINE figure is the LOWER of the two, so a projection can never
+-- overstate what is actually known. `points per dollar` follows the headline
+-- for the same reason, and so does `earns the bonus rate`, which is derived
+-- from the headline rather than written beside it -- see the note on `that
+-- headline rate is a bonus rate`.
+GIVEN txn IS A Transaction
+GIVETH A `Rate answer`
+`the answer that turns on the merchant indicator for` txn MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS `the Base Points per dollar`
+        `miles per point`                                     IS `miles per ThankYou Point`
+        `conversion status`                                   IS `the status of the conversion to miles`
+        `miles per dollar`                                    IS `the base rate in miles per dollar`
+        `miles per dollar if the merchant flags online`       IS `the 10X rate in miles per dollar`
+        `miles per dollar if the merchant flags card-present` IS `the base rate in miles per dollar`
+        `depends on the merchant indicator`                   IS TRUE
+        -- The SAME expression as the headline two lines up, not the online
+        -- branch's. This is the answer the derivation exists for.
+        `earns the bonus rate`                                IS `that headline rate is a bonus rate` `the base rate in miles per dollar`
+        `cap`                                                 IS `the Citi Rewards bonus cap`
+        `conditions`                                          IS
+            IF   `the 10X promotion terms were in force` txn
+            THEN LIST "10X only if the merchant's acquirer flags this as an online transaction; that indicator is decided by the merchant and is not determined by Citibank"
+                    , "the 9 bonus points per S$1 stop after 9,000 Bonus Points in the statement month, about S$1,000 of 10X spend"
+                    , "clause 5 also excludes GST, and bill payments made through a channel or agent other than internet banking; the statement line does not distinguish either"
+                    , "five descriptions on Citibank's list — SAM, SPL AUTO*, SPL ATU*, SPL ONLINE* and TL-ABT — are not recognised by the statement-line classifier as it prints them, so a charge bearing one of them is not caught here"
+            ELSE LIST "10X only if the merchant's acquirer flags this as an online transaction; that indicator is decided by the merchant and is not determined by Citibank"
+                    , "the 9 bonus points per S$1 stop after 9,000 Bonus Points in the statement month, about S$1,000 of 10X spend"
+                    , "clause 5 also excludes GST, and bill payments made through a channel or agent other than internet banking; the statement line does not distinguish either"
+                    , "five descriptions on Citibank's list — SAM, SPL AUTO*, SPL ATU*, SPL ONLINE* and TL-ABT — are not recognised by the statement-line classifier as it prints them, so a charge bearing one of them is not caught here"
+                    , "this charge predates the 1 April 2024 effective date of the held terms; the revision that governed it is not held"
+        `sources`                                             IS
+            LIST `the clause 6(ii) citation`
+               , `the clause 13 citation`
+               , `the clause 18 citation`
+        `status`                                              IS `the status of the earning rule for` txn
+
+
+§§ `The rule the composer calls`
+
+-- The cascade is ordered the way the document is: clause 5 first, because a
+-- charge that is not a Qualifying Charge never reaches clause 6; then clause
+-- 6's two limbs; then the conditional answer; then clause 12's residue.
+--
+-- Clause 5 is tried in two steps, and the order between them is presentation
+-- rather than law. Both arms refuse and both produce the same numbers; the
+-- split exists so that a charge refused on its KIND is cited to clause 5 and
+-- a charge refused by the LIST is cited to the list. A posting that is both
+-- -- a bill payment at an excluded Merchant Category -- is reported as the
+-- kind, because that is the fact the cardholder can see.
+--
+-- The Unknown arm is placed AFTER both limbs deliberately. A charge that
+-- satisfies limb (i) is 10X whatever the indicator turns out to be, so it
+-- must not be answered conditionally; only a charge whose sole route to the
+-- bonus is limb (ii) depends on the indicator.
+@export Whether a charge on the Citi Rewards Card earns the 10X bonus rate or the base rate, with the clause that decides it: clause 6's Merchant Category limb ignores mobile wallets, clause 6's online limb excludes them.
+GIVEN card       IS A Card
+      cardholder IS A Cardholder
+      month      IS A `Month position`
+      txn        IS A Transaction
+GIVETH A `Rate answer`
+`Citi Rewards earns on` card cardholder month txn MEANS
+    BRANCH
+        IF   `clauses 5(i) to 5(iii) exclude this charge` txn
+        THEN `the answer for a charge of a kind clause 5 excludes` txn
+        IF   NOT (`a Qualifying Charge` txn)
+        THEN `the answer for a charge clause 5 excludes` txn
+        IF   `a 10X Points Eligible Transaction` txn
+        THEN `the answer at the 10X rate for` txn
+        IF        txn's `merchant indicator` EQUALS Unknown
+              AND `a 10X Points Eligible Transaction but for the indicator` txn
+        THEN `the answer that turns on the merchant indicator for` txn
+        OTHERWISE
+             `the answer at the base rate for` txn
+
+
+§§ `Citi Rewards — illustrations`
+
+-- Fixtures. The module never reads `merchant name`, `merchant`, `currency`,
+-- `posted in a foreign currency`, `made in Singapore` or `payment channel`,
+-- but a Transaction must carry them, so the builder takes the fields the
+-- rules DO read and fills the rest with plausible values. `payment channel`
+-- is taken as a parameter rather than fixed, because a fixture that said
+-- "tapped at a terminal" for a website purchase would be a false fact even
+-- though no rule reads it. `merchant` is `Another merchant` throughout:
+-- nothing in either Citi document names a merchant by identity (see
+-- ambiguity 3a), so no fixture here has an identity to give.
+--
+-- THE CLASSIFIED FIELDS ARE SET DIRECTLY, NOT COMPUTED. `description
+-- patterns` is what layer 1 (`classify.l4`) would read off the statement
+-- line, and every fixture below sets it to the value that module would
+-- return. It is not IMPORTed and called: `classify.l4` uses CONTAINS and
+-- TOUPPER, which are string builtins and outside the Catala fragment, and
+-- importing it would drag them into this module's lowering. The cost is that
+-- a fixture could disagree with the classifier and nothing in either module
+-- would notice, so the agreement was CHECKED MECHANICALLY rather than by
+-- eye: every distinct statement line below was run through `the description
+-- patterns of` and compared with the value set here. Seventeen lines,
+-- seventeen agreements, 2026-09-21. It found two disagreements before it
+-- found none -- see the notes on `a deposit to a forex platform Citi does
+-- not name` and on row ix -- which is the whole argument for running it.
+-- Nothing re-runs it; a future editor who adds a fixture should.
+--
+--                 amount, MCC, statement description, description patterns,
+--                 charge kind, credential, indicator, channel
+GIVEN amount      IS A NUMBER
+      mcc         IS A NUMBER
+      description IS A STRING
+      patterns    IS A LIST OF `Description pattern`
+      kind        IS A `Charge kind`
+      credential  IS A Credential
+      indicator   IS A `Merchant indicator`
+      channel     IS A `Payment channel`
+GIVETH A Transaction
+`a posting of` amount mcc description patterns kind credential indicator channel MEANS
+    Transaction WITH
+        `merchant name`                IS description
+        `merchant`                     IS `Another merchant`
+        `merchant category code`       IS mcc
+        `transaction description`      IS description
+        `description patterns`         IS patterns
+        `charge kind`                  IS kind
+        `amount`                       IS amount
+        `currency`                     IS "SGD"
+        `posted in a foreign currency` IS FALSE
+        `transaction date`             IS YMD 2026 9 1
+        `posting date`                 IS YMD 2026 9 3
+        `payment channel`              IS channel
+        `credential`                   IS credential
+        `merchant indicator`           IS indicator
+        `made in Singapore`            IS TRUE
+
+-- The ordinary case: a retail purchase whose statement line carries none of
+-- the excluded description families. Twelve of the fixtures below want this,
+-- so it gets a name of its own rather than two more columns each.
+GIVEN amount      IS A NUMBER
+      mcc         IS A NUMBER
+      description IS A STRING
+      credential  IS A Credential
+      indicator   IS A `Merchant indicator`
+      channel     IS A `Payment channel`
+GIVETH A Transaction
+`a charge of` amount mcc description credential indicator channel MEANS
+    `a posting of` amount mcc description EMPTY `Retail purchase` credential indicator channel
+
+-- The composer's other three parameters, which this module ignores.
+GIVETH A Card
+`any card` MEANS `Citi Rewards`
+
+GIVETH A Cardholder
+`any cardholder` MEANS
+    Cardholder WITH
+        `Solitaire preferred rewards categories`               IS EMPTY
+        `yuu account linked to the card`                       IS FALSE
+        `HSBC Everyday Global Account deposits ADB this month`  IS 0
+        `PAssion membership registered and card linked in yuu`  IS FALSE
+
+GIVETH A `Month position`
+`any month` MEANS
+    `Month position` WITH
+        `yuu eligible spend so far this calendar month`                     IS 0
+        `yuu participating merchants transacted so far this calendar month` IS 0
+        `PAssion spend at Participating Stores so far this month`           IS 0
+        `PAssion spend at non-Participating Stores so far this month`       IS 0
+
+-- THERE IS NO ONE-ARGUMENT WRAPPER, AND THE REASON IS THE LOWERING. The
+-- obvious convenience here is `Citi Rewards earns on` `any card` `any cardholder` `any month` txn MEANS
+-- `Citi Rewards earns on` `any card` `any cardholder` `any month` txn, and
+-- this module had one. It cannot survive: `Citi Rewards earns on` is
+-- @export'd, so it becomes a Catala SCOPE, and Catala allows a scope call
+-- only from inside another scope. A non-exported wrapper becomes a toplevel
+-- definition, so its call lands outside any scope and `catala typecheck`
+-- rejects it. Exporting the wrapper too would fix the lowering by putting a
+-- test convenience into the module's public surface, which is the wrong
+-- trade. The assertions below therefore name all four arguments.
+
+
+§§§ `Clause 13's own illustration`
+
+-- The document's worked example, transcribed. Transaction #1: Department
+-- Stores, S$800.99. Transaction #2: Shoe Stores, S$550.24. "800 * 1 = 800"
+-- and "800 * 9 = 7,200"; "550 * 1 = 550" and "550 * 9 = 4,950"; totals 1,350
+-- Base Points and 12,150 Bonus Points, of which 9,000 are awarded; "Eligible
+-- Cardholder will be awarded a total of 10,350 Points".
+-- The rounding down of cl.12 is applied HERE, with `TRUNC`, because a
+-- directive that cannot be lowered costs one skipped Catala test while a
+-- DEFINITION that cannot be lowered refuses the module. The first two
+-- assertions are the rounding on its own, so the step the document performs
+-- silently -- 800.99 to 800 -- is on the page and checked.
+#ASSERT (TRUNC 800.99 0) EQUALS 800
+#ASSERT (TRUNC 550.24 0) EQUALS 550
+#ASSERT `the Base Points on whole dollars of` (TRUNC 800.99 0) EQUALS 800
+#ASSERT `the Bonus Points on whole dollars of` (TRUNC 800.99 0) EQUALS 7_200
+#ASSERT `the Base Points on whole dollars of` (TRUNC 550.24 0) EQUALS 550
+#ASSERT `the Bonus Points on whole dollars of` (TRUNC 550.24 0) EQUALS 4_950
+#ASSERT (`the Base Points on whole dollars of` (TRUNC 800.99 0)) PLUS (`the Base Points on whole dollars of` (TRUNC 550.24 0)) EQUALS 1_350
+#ASSERT (`the Bonus Points on whole dollars of` (TRUNC 800.99 0)) PLUS (`the Bonus Points on whole dollars of` (TRUNC 550.24 0)) EQUALS 12_150
+#ASSERT `the Bonus Points awarded on` 12_150 EQUALS 9_000
+#ASSERT (1_350 PLUS (`the Bonus Points awarded on` 12_150)) EQUALS 10_350
+
+-- The cap restated in dollars, which is what the answer carries.
+#ASSERT `the dollars of 10X spend the bonus cap admits` EQUALS 1_000
+
+
+§§§ `The two limbs, and the wallet`
+
+-- THE CARD THIS MODULE IS ABOUT. A phone tap at a department store: MCC 5311,
+-- a mobile wallet token, and an acquirer that flags the charge card-present.
+-- It satisfies clause 6(i), which says nothing about wallets, so it earns
+-- 10X. The cheat-sheet rule "never Apple Pay on Citi Rewards" is stricter
+-- than the terms.
+GIVETH A Transaction
+`a phone tap at a department store` MEANS
+    `a charge of` 100 5311 "METRO PASIR RIS" `A mobile wallet token` `Flags card-present` `Tapped at a terminal`
+
+#ASSERT `clause 6(i) — the Merchant Category limb` `a phone tap at a department store`
+#ASSERT `a 10X Points Eligible Transaction` `a phone tap at a department store`
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone tap at a department store`)'s `miles per dollar` EQUALS 4
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone tap at a department store`)'s `earns the bonus rate`
+
+-- The same phone, on a website that is not an apparel merchant: MCC 5812,
+-- flagged online. Its only route to the bonus was clause 6(ii), and clause
+-- 6(ii) excludes the mobile wallet. Base rate.
+GIVETH A Transaction
+`a phone payment on a restaurant website` MEANS
+    `a charge of` 100 5812 "SOME RESTAURANT" `A mobile wallet token` `Flags online` `Paid in a website or app`
+
+#ASSERT NOT (`clause 6(i) — the Merchant Category limb` `a phone payment on a restaurant website`)
+#ASSERT NOT (`clause 6(ii) — the online limb` `a phone payment on a restaurant website`)
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone payment on a restaurant website`)'s `miles per dollar` EQUALS 0.4
+#ASSERT NOT ((`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone payment on a restaurant website`)'s `earns the bonus rate`)
+
+-- The physical card on the same restaurant website: clause 6(ii) is
+-- satisfied, so 10X. The wallet was the only thing defeating it.
+GIVETH A Transaction
+`the plastic card on a restaurant website` MEANS
+    `a charge of` 100 5812 "SOME RESTAURANT" `The physical card` `Flags online` `Paid in a website or app`
+
+#ASSERT `clause 6(ii) — the online limb` `the plastic card on a restaurant website`
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `the plastic card on a restaurant website`)'s `miles per dollar` EQUALS 4
+
+-- An apparel purchase made online with the physical card reaches BOTH limbs.
+GIVETH A Transaction
+`the plastic card on a clothing website` MEANS
+    `a charge of` 100 5651 "A CLOTHING SITE" `The physical card` `Flags online` `Paid in a website or app`
+
+#ASSERT `clause 6(i) — the Merchant Category limb` `the plastic card on a clothing website`
+#ASSERT `clause 6(ii) — the online limb` `the plastic card on a clothing website`
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `the plastic card on a clothing website`)'s `miles per dollar` EQUALS 4
+
+
+§§§ `The travel footnote`
+
+-- An airline ticket bought online with the physical card: MCC 4511 is a
+-- travel-related Merchant Category, so clause 6(ii) is defeated by its own
+-- exclusion and the charge earns the base rate. It is still a Qualifying
+-- Charge -- travel is excluded from the BONUS, not from earning.
+GIVETH A Transaction
+`an airline ticket bought online` MEANS
+    `a charge of` 500 4511 "SOME AIRLINE" `The physical card` `Flags online` `Paid in a website or app`
+
+#ASSERT `a Qualifying Charge` `an airline ticket bought online`
+#ASSERT `a travel-related Merchant Category` 4511
+#ASSERT NOT (`clause 6(ii) — the online limb` `an airline ticket bought online`)
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `an airline ticket bought online`)'s `miles per dollar` EQUALS 0.4
+
+-- A hotel inside the 3501-3999 range, to exercise a range rather than an
+-- equality.
+#ASSERT `a travel-related Merchant Category` 3750
+#ASSERT NOT (`a travel-related Merchant Category` 4000)
+
+
+§§§ `The Unknown indicator`
+
+-- A cardholder who has not seen this merchant post before. The charge is a
+-- Qualifying Charge at a non-apparel merchant on the physical card, so its
+-- only route to the bonus is clause 6(ii), and clause 6(ii) turns on a fact
+-- the cardholder does not have. Both branches are filled, the headline is the
+-- lower one, and the flag is set.
+GIVETH A Transaction
+`a charge at a merchant whose indicator is unknown` MEANS
+    `a charge of` 100 5812 "SOME RESTAURANT" `The physical card` Unknown `Paid in a website or app`
+
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a charge at a merchant whose indicator is unknown`)'s `depends on the merchant indicator`
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a charge at a merchant whose indicator is unknown`)'s `miles per dollar if the merchant flags online` EQUALS 4
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a charge at a merchant whose indicator is unknown`)'s `miles per dollar if the merchant flags card-present` EQUALS 0.4
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a charge at a merchant whose indicator is unknown`)'s `miles per dollar` EQUALS 0.4
+
+-- An UNKNOWN indicator at an APPAREL merchant does NOT depend on the
+-- indicator, because clause 6(i) answers it either way. This is the arm that
+-- the ordering of the cascade exists to protect.
+GIVETH A Transaction
+`an apparel charge whose indicator is unknown` MEANS
+    `a charge of` 100 5661 "A SHOE SHOP" `The physical card` Unknown `Inserted or swiped at a terminal`
+
+#ASSERT NOT ((`Citi Rewards earns on` `any card` `any cardholder` `any month` `an apparel charge whose indicator is unknown`)'s `depends on the merchant indicator`)
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `an apparel charge whose indicator is unknown`)'s `miles per dollar` EQUALS 4
+
+-- An unknown indicator on a WALLET charge at a non-apparel merchant does not
+-- depend on the indicator either: clause 6(ii) is already defeated by the
+-- wallet, so both branches are the base rate.
+GIVETH A Transaction
+`a wallet charge whose indicator is unknown` MEANS
+    `a charge of` 100 5812 "SOME RESTAURANT" `A mobile wallet token` Unknown `Paid in a website or app`
+
+#ASSERT NOT ((`Citi Rewards earns on` `any card` `any cardholder` `any month` `a wallet charge whose indicator is unknown`)'s `depends on the merchant indicator`)
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a wallet charge whose indicator is unknown`)'s `miles per dollar` EQUALS 0.4
+
+
+§§§ `The base-rate residue, and Amaze`
+
+-- The OTHERWISE arm with nothing unusual about it: a Qualifying Charge on the
+-- physical card at a non-apparel merchant that the acquirer flags
+-- card-present. Neither limb of clause 6 reaches it, so clause 12 does.
+GIVETH A Transaction
+`the plastic card at a restaurant` MEANS
+    `a charge of` 60 5812 "SOME RESTAURANT" `The physical card` `Flags card-present` `Inserted or swiped at a terminal`
+
+#ASSERT `a Qualifying Charge` `the plastic card at a restaurant`
+#ASSERT NOT (`a 10X Points Eligible Transaction` `the plastic card at a restaurant`)
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `the plastic card at a restaurant`)'s `miles per dollar` EQUALS 0.4
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `the plastic card at a restaurant`)'s `points per dollar` EQUALS 1
+
+-- AMBIGUITY 2, ASSERTED. An Instarem Amaze charge at a merchant the exclusion
+-- list does not name. Under this encoding Amaze is a card, not a "mobile
+-- wallet", so clause 6(ii) is not defeated by the credential; and the
+-- statement line is not one of the twenty the list spells out, so clause
+-- 5(xii) does not reach it either. It earns 10X. A reading on which "mobile
+-- wallet" covers any third-party proxy, or on which footnote 2's substring
+-- rule bites, would answer 0.4 instead -- so this assertion is the place to
+-- look if that reading is preferred.
+GIVETH A Transaction
+`an Amaze charge at an unlisted merchant` MEANS
+    `a posting of` 100 5812 "AMAZE* SOME RESTAURANT" (LIST AMAZE) `Retail purchase`
+        `Via Amaze` `Flags online` `Paid in a website or app`
+
+#ASSERT `a Qualifying Charge` `an Amaze charge at an unlisted merchant`
+#ASSERT `clause 6(ii) — the online limb` `an Amaze charge at an unlisted merchant`
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `an Amaze charge at an unlisted merchant`)'s `miles per dollar` EQUALS 4
+
+-- The AMAZE* forms the list DOES name are caught, now on the family its
+-- other half belongs to rather than on the exact printed string. The two
+-- statement lines here are the ones layer 1's own illustrations use, so a
+-- reader can check the classification as well as the rule.
+GIVETH A Transaction
+`an Amaze top-up of an EZ-link card` MEANS
+    `a posting of` 20 4111 "AMAZE*EZ-LINK" (LIST AMAZE, `EZ-Link`) `Retail purchase`
+        `Via Amaze` `Flags card-present` `Tapped at a terminal`
+
+GIVETH A Transaction
+`a bus ride billed through SimplyGo` MEANS
+    `a posting of` 2 4111 "SIMPLYGO* BUS/MRT" (LIST `SimplyGo description`, `BUS/MRT`) `Retail purchase`
+        `The physical card` `Flags card-present` `Tapped at a terminal`
+
+#ASSERT `paragraph 3 of the exclusion list reaches this charge` `an Amaze top-up of an EZ-link card`
+#ASSERT `paragraph 3 of the exclusion list reaches this charge` `a bus ride billed through SimplyGo`
+#ASSERT NOT (`a Qualifying Charge` `an Amaze top-up of an EZ-link card`)
+#ASSERT NOT (`paragraph 3 of the exclusion list reaches this charge` `an Amaze charge at an unlisted merchant`)
+
+-- FOOTNOTE 2, WHICH THE FIRST PASS COULD NOT REACH. "[Company Name]*AXS" is
+-- the document's own example of a derivation, and an exact match on the
+-- twenty rows let it through. Layer 1 reads the line by substring, so the
+-- family is present and the charge is refused.
+GIVETH A Transaction
+`a company-branded AXS line` MEANS
+    `a posting of` 30 4900 "ACME PTE LTD*AXS" (LIST AXS) `Retail purchase`
+        `The physical card` `Flags card-present` `Paid in a website or app`
+
+#ASSERT `paragraph 3 of the exclusion list reaches this charge` `a company-branded AXS line`
+#ASSERT NOT (`a Qualifying Charge` `a company-branded AXS line`)
+
+-- THE OVER-REACH, ASSERTED SO IT IS NOT A SURPRISE. `Forex or CFD platform`
+-- is a shared family; OANDA is on Citi's list and Plus500 is not, and both
+-- are refused here. This assertion is the place to look if the family is ever
+-- split per issuer.
+--
+-- The statement line is one layer 1 really does classify. That is not a
+-- detail: "IG MARKETS SG" was the first line written here, and `classify.l4`
+-- returns EMPTY for it, because its recogniser matches "IGMARKETS" without
+-- the space while the shared domain's own comment lists the family as "IG
+-- MARKETS". A fixture that set the family by hand would have asserted an
+-- over-reach that does not happen, on a line that does not trigger it.
+-- Checked against the classifier rather than by eye, 2026-09-21.
+GIVETH A Transaction
+`a deposit to a forex platform Citi does not name` MEANS
+    `a posting of` 500 6211 "PLUS500CY LTD" (LIST `Forex or CFD platform`) `Retail purchase`
+        `The physical card` `Flags online` `Paid in a website or app`
+
+#ASSERT `paragraph 3 of the exclusion list reaches this charge` `a deposit to a forex platform Citi does not name`
+
+-- ROW ix, SAM, AND WHY IT IS NOT REFUSED. The rule tests the SAM family and
+-- would refuse a charge that carried it; layer 1 does not report it for the
+-- bare word paragraph 3 prints. Both halves are asserted, so a later change
+-- to either one shows up here rather than in an answer.
+GIVETH A Transaction
+`a charge described as SAM` MEANS
+    `a posting of` 40 5999 "SAM" EMPTY `Retail purchase`
+        `The physical card` `Flags card-present` `Paid in a website or app`
+
+GIVETH A Transaction
+`a charge described as SAM PAYMENTS` MEANS
+    `a posting of` 40 5999 "SAM PAYMENTS" (LIST SAM) `Retail purchase`
+        `The physical card` `Flags card-present` `Paid in a website or app`
+
+#ASSERT NOT (`the exclusion list excludes MCC` 5999)
+#ASSERT NOT (`paragraph 3 of the exclusion list reaches this charge` `a charge described as SAM`)
+#ASSERT `a Qualifying Charge` `a charge described as SAM`
+#ASSERT `paragraph 3 of the exclusion list reaches this charge` `a charge described as SAM PAYMENTS`
+#ASSERT NOT (`a Qualifying Charge` `a charge described as SAM PAYMENTS`)
+
+-- The layer 1 gap is printed on every answer that does not refuse, so a
+-- reader of the bare-SAM answer is told why it may be wrong.
+#ASSERT elem "five descriptions on Citibank's list — SAM, SPL AUTO*, SPL ATU*, SPL ONLINE* and TL-ABT — are not recognised by the statement-line classifier as it prints them, so a charge bearing one of them is not caught here" ((`Citi Rewards earns on` `any card` `any cardholder` `any month` `a charge described as SAM`)'s `conditions`)
+
+-- THE LAYER 1 GAP, ASSERTED THE SAME WAY. TL-ABT is row xvi of the list and
+-- has no `Description pattern` family, so nothing recognises it and the
+-- charge is told it earns. The condition string on every answer says so.
+GIVETH A Transaction
+`a charge described as TL-ABT` MEANS
+    `a posting of` 15 4111 "TL-ABT" EMPTY `Retail purchase`
+        `The physical card` `Flags card-present` `Tapped at a terminal`
+
+#ASSERT NOT (`paragraph 3 of the exclusion list reaches this charge` `a charge described as TL-ABT`)
+#ASSERT `a Qualifying Charge` `a charge described as TL-ABT`
+
+-- FOOTNOTE 1'S IDENTITY LEG, on the one row that has a merchant constructor.
+-- The statement line here says nothing a description family would catch, and
+-- the MCC is an ordinary one, so the description leg and the MCC table both
+-- answer no. The merchant answers yes, which is precisely what footnote 1
+-- says it should: "regardless of how the merchant is described in your credit
+-- card statement".
+GIVETH A Transaction
+`a SimplyGo ride posting under some other description` MEANS
+    Transaction WITH
+        `merchant name`                IS "PUBLIC TRANSPORT SG"
+        `merchant`                     IS SimplyGo
+        `merchant category code`       IS 5812
+        `transaction description`      IS "PUBLIC TRANSPORT SG"
+        `description patterns`         IS EMPTY
+        `charge kind`                  IS `Retail purchase`
+        `amount`                       IS 2.50
+        `currency`                     IS "SGD"
+        `posted in a foreign currency` IS FALSE
+        `transaction date`             IS YMD 2026 9 1
+        `posting date`                 IS YMD 2026 9 3
+        `payment channel`              IS `Tapped at a terminal`
+        `credential`                   IS `The physical card`
+        `merchant indicator`           IS `Flags card-present`
+        `made in Singapore`            IS TRUE
+
+#ASSERT NOT (`the exclusion list excludes MCC` 5812)
+#ASSERT `the exclusion list names this merchant` `a SimplyGo ride posting under some other description`
+#ASSERT `paragraph 3 of the exclusion list reaches this charge` `a SimplyGo ride posting under some other description`
+#ASSERT NOT (`a Qualifying Charge` `a SimplyGo ride posting under some other description`)
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a SimplyGo ride posting under some other description`)'s `miles per dollar` EQUALS 0
+
+-- The nineteen rows with no constructor answer no on the identity leg, which
+-- is the gap stated above rather than a defect. AXS is the clearest case: the
+-- statement line is what catches it, and a line that did not say "AXS" would
+-- not be caught at all.
+#ASSERT NOT (`the exclusion list names this merchant` `a top-up through AXS`)
+#ASSERT `paragraph 3 of the exclusion list reaches this charge` `a top-up through AXS`
+
+
+§§§ `Clause 5 and the exclusion list`
+
+-- A statement line the exclusion list names. It earns nothing: not a
+-- Qualifying Charge, so clause 12's base point does not reach it either.
+GIVETH A Transaction
+`a top-up through AXS` MEANS
+    `a posting of` 50 4900 "AXS" (LIST AXS) `Retail purchase`
+        `The physical card` `Flags card-present` `Paid in a website or app`
+
+#ASSERT NOT (`a Qualifying Charge` `a top-up through AXS`)
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a top-up through AXS`)'s `miles per dollar` EQUALS 0
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a top-up through AXS`)'s `points per dollar` EQUALS 0
+
+-- A tax payment: MCC 9311, inside the Government Services range the table's
+-- left column states. The range is what excludes it; 9311 is also listed.
+GIVETH A Transaction
+`a tax payment` MEANS
+    `a charge of` 2_000 9311 "IRAS" `The physical card` `Flags online` `Paid in a website or app`
+
+#ASSERT `the exclusion list excludes MCC` 9311
+#ASSERT NOT (`a Qualifying Charge` `a tax payment`)
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a tax payment`)'s `miles per dollar` EQUALS 0
+
+-- The four heading ranges, each exercised at a code the right-hand column
+-- does NOT list, to show that the range is doing the work.
+#ASSERT `the exclusion list excludes MCC` 6535   -- inside 6529-6540, unlisted
+#ASSERT `the exclusion list excludes MCC` 8250   -- inside 8211-8299, unlisted
+#ASSERT `the exclusion list excludes MCC` 8655   -- inside 8651-8661, unlisted
+#ASSERT `the exclusion list excludes MCC` 9000   -- inside 9000-9999, unlisted
+#ASSERT NOT (`the exclusion list excludes MCC` 5311)
+#ASSERT NOT (`the exclusion list excludes MCC` 5812)
+
+-- A charge dated before the exclusion list's own commencement is not reached
+-- by it, because the revision that governed it is not held. The T&C's clause
+-- 5(xii) points at a list "as set out in www.citibank.com.sg/rwdexcl", and
+-- what that URL said in 2024 is not in the corpus.
+GIVETH A Transaction
+`an AXS charge before the list commenced` MEANS
+    Transaction WITH
+        `merchant name`                IS "AXS"
+        `merchant`                     IS `Another merchant`
+        `merchant category code`       IS 4900
+        `transaction description`      IS "AXS"
+        `description patterns`         IS LIST AXS
+        `charge kind`                  IS `Retail purchase`
+        `amount`                       IS 50
+        `currency`                     IS "SGD"
+        `posted in a foreign currency` IS FALSE
+        `transaction date`             IS YMD 2024 10 1
+        `posting date`                 IS YMD 2024 10 3
+        `payment channel`              IS `Paid in a website or app`
+        `credential`                   IS `The physical card`
+        `merchant indicator`           IS `Flags card-present`
+        `made in Singapore`            IS TRUE
+
+#ASSERT NOT (`this revision of the exclusion list was in force` `an AXS charge before the list commenced`)
+#ASSERT `a Qualifying Charge` `an AXS charge before the list commenced`
+
+
+§§§ `Before the terms took effect`
+
+-- A charge that predates "Effective 1 April 2024". The rate is still computed
+-- -- the module has no better rule to offer -- but its status is Unconfirmed
+-- rather than Verified, because the terms that governed it are not held.
+GIVETH A Transaction
+`a department store charge in 2023` MEANS
+    Transaction WITH
+        `merchant name`                IS "METRO PASIR RIS"
+        `merchant`                     IS `Another merchant`
+        `merchant category code`       IS 5311
+        `transaction description`      IS "METRO PASIR RIS"
+        `description patterns`         IS EMPTY
+        `charge kind`                  IS `Retail purchase`
+        `amount`                       IS 100
+        `currency`                     IS "SGD"
+        `posted in a foreign currency` IS FALSE
+        `transaction date`             IS YMD 2023 11 1
+        `posting date`                 IS YMD 2023 11 3
+        `payment channel`              IS `Tapped at a terminal`
+        `credential`                   IS `The physical card`
+        `merchant indicator`           IS `Flags card-present`
+        `made in Singapore`            IS TRUE
+
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a department store charge in 2023`)'s `status` EQUALS Unconfirmed
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone tap at a department store`)'s `status` EQUALS Verified
+
+-- The commencement caveat is printed for the reader only where it bites.
+#ASSERT elem "this charge predates the 1 April 2024 effective date of the held terms; the revision that governed it is not held" ((`Citi Rewards earns on` `any card` `any cardholder` `any month` `a department store charge in 2023`)'s `conditions`)
+#ASSERT NOT (elem "this charge predates the 1 April 2024 effective date of the held terms; the revision that governed it is not held" ((`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone tap at a department store`)'s `conditions`))
+#ASSERT count ((`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone tap at a department store`)'s `sources`) EQUALS 5
+#ASSERT count ((`Citi Rewards earns on` `any card` `any cardholder` `any month` `a top-up through AXS`)'s `sources`) EQUALS 4
+
+
+§§§ `Clause 5(i) to (iii) — the kinds of posting that earn nothing`
+
+-- Every fixture here is at MCC 5311, a department store, on the physical
+-- card, flagged card-present. On the retail-purchase kind that charge is the
+-- module's headline case and earns 10X through clause 6(i). Holding the MCC
+-- fixed isolates the charge kind as the only thing doing the work: whatever
+-- changes below, changes because of clause 5(i) to (iii) and nothing else.
+GIVEN kind IS A `Charge kind`
+GIVETH A Transaction
+`a department store posting booked as` kind MEANS
+    `a posting of` 100 5311 "METRO PASIR RIS" EMPTY kind
+        `The physical card` `Flags card-present` `Tapped at a terminal`
+
+-- The control. Same MCC, same card, same terminal: 10X.
+#ASSERT `a Qualifying Charge` (`a department store posting booked as` `Retail purchase`)
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` (`a department store posting booked as` `Retail purchase`))'s `miles per dollar` EQUALS 4
+
+-- cl.5(i), one assertion per limb of the clause that has a constructor.
+#ASSERT NOT (`a Qualifying Charge` (`a department store posting booked as` `Annual fee or bank charge`))
+#ASSERT NOT (`a Qualifying Charge` (`a department store posting booked as` `Interest or finance charge`))
+#ASSERT NOT (`a Qualifying Charge` (`a department store posting booked as` `Instalment plan transaction`))
+#ASSERT NOT (`a Qualifying Charge` (`a department store posting booked as` `Cash advance or quasi-cash`))
+
+-- cl.5(ii), which shares its constructor with cl.5(i)'s "balance transfers".
+#ASSERT NOT (`a Qualifying Charge` (`a department store posting booked as` `Balance or funds transfer`))
+#ASSERT `a clause 5(i) kind of charge` `Balance or funds transfer`
+#ASSERT `a clause 5(ii) kind of charge` `Balance or funds transfer`
+
+-- cl.5(iii).
+#ASSERT NOT (`a Qualifying Charge` (`a department store posting booked as` `Bill payment via internet banking`))
+#ASSERT `a clause 5(iii) kind of charge` `Bill payment via internet banking`
+
+-- AN EXCLUDED KIND EARNS NOTHING AT ALL, not merely the base rate: clause
+-- 12's Base Point is predicated on a Qualifying Charge, and an annual fee is
+-- not one. The MCC would otherwise have carried it to 10X.
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` (`a department store posting booked as` `Annual fee or bank charge`))'s `miles per dollar` EQUALS 0
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` (`a department store posting booked as` `Annual fee or bank charge`))'s `points per dollar` EQUALS 0
+
+-- AND IT IS CITED TO CLAUSE 5, NOT TO THE EXCLUSION LIST. One source, the
+-- clause that decided it. Contrast the AXS charge below, which carries four.
+#ASSERT count ((`Citi Rewards earns on` `any card` `any cardholder` `any month` (`a department store posting booked as` `Annual fee or bank charge`))'s `sources`) EQUALS 1
+#ASSERT count ((`Citi Rewards earns on` `any card` `any cardholder` `any month` (`a department store posting booked as` `Annual fee or bank charge`))'s `conditions`) EQUALS 1
+
+-- THE THREE KINDS CLAUSE 5 DOES NOT NAME still earn. A pre-authorisation, a
+-- telephone or mail order, and a refund are all kinds the shared domain
+-- carries because some OTHER issuer excludes them; Citibank's clause 5 does
+-- not, so this module must not. These are the FALSE arms of the CONSIDER
+-- above, asserted so that a later edit cannot quietly turn them TRUE.
+#ASSERT `a Qualifying Charge` (`a department store posting booked as` `Pre-authorisation`)
+#ASSERT `a Qualifying Charge` (`a department store posting booked as` `Telephone or mail order`)
+#ASSERT `a Qualifying Charge` (`a department store posting booked as` `Refund or reversal`)
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` (`a department store posting booked as` `Pre-authorisation`))'s `miles per dollar` EQUALS 4
+
+-- THE RESIDUE IS PRINTED, not silently dropped: GST and bill payments made
+-- through some channel other than internet banking have no constructor, and
+-- every answer that does not refuse says so.
+#ASSERT elem "clause 5 also excludes GST, and bill payments made through a channel or agent other than internet banking; the statement line does not distinguish either" ((`Citi Rewards earns on` `any card` `any cardholder` `any month` `the plastic card at a restaurant`)'s `conditions`)
+
+
+§§§ `The cap and the conversion, as every answer carries them`
+
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone tap at a department store`)'s `cap`'s `basis` EQUALS `Statement month`
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone tap at a department store`)'s `cap`'s `attribution` EQUALS `By posting date`
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone tap at a department store`)'s `cap`'s `capped`
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone tap at a department store`)'s `cap`'s `bonus spend per month` EQUALS 1_000
+#ASSERT NOT ((`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone payment on a restaurant website`)'s `cap`'s `capped`)
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone tap at a department store`)'s `conversion status` EQUALS Unconfirmed
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone tap at a department store`)'s `points per dollar` EQUALS 10
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone tap at a department store`)'s `cap`'s `pool` EQUALS "Citi Rewards 10X bonus (statement month)"
+
+
+§§§ `The bonus flag never disagrees with the headline`
+
+-- `earns the bonus rate` is derived from `miles per dollar` (see `that
+-- headline rate is a bonus rate`), and these assertions hold the derivation
+-- to its meaning on every arm of the cascade rather than trusting that it
+-- was wired up. The pattern is the same each time: the flag is TRUE exactly
+-- when the headline exceeds the base rate.
+--
+-- THE UNKNOWN-INDICATOR ARM IS THE POINT. Its headline is deliberately the
+-- LOWER of two rates it has both of, so it is the one answer where a flag
+-- written by hand could plausibly be given the other branch's value and look
+-- right. The last two assertions below pin it from both sides: the flag is
+-- FALSE, AND the online branch really would have earned the bonus, so the
+-- FALSE is a choice about which figure the headline carries and not an
+-- accident of there being no bonus available.
+
+-- 10X, headline 4, flag TRUE.
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone tap at a department store`)'s `earns the bonus rate`
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a phone tap at a department store`)'s `miles per dollar` GREATER THAN `the base rate in miles per dollar`
+
+-- Base rate, headline 0.4, flag FALSE.
+#ASSERT NOT ((`Citi Rewards earns on` `any card` `any cardholder` `any month` `the plastic card at a restaurant`)'s `earns the bonus rate`)
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `the plastic card at a restaurant`)'s `miles per dollar` EQUALS `the base rate in miles per dollar`
+
+-- Refused on the exclusion list, headline 0, flag FALSE. Zero is BELOW the
+-- base rate, not above it, which is why one derivation serves both refusals.
+#ASSERT NOT ((`Citi Rewards earns on` `any card` `any cardholder` `any month` `a top-up through AXS`)'s `earns the bonus rate`)
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a top-up through AXS`)'s `miles per dollar` EQUALS 0
+
+-- Refused on the kind of posting, headline 0, flag FALSE.
+#ASSERT NOT ((`Citi Rewards earns on` `any card` `any cardholder` `any month` (`a department store posting booked as` `Annual fee or bank charge`))'s `earns the bonus rate`)
+
+-- THE UNKNOWN ARM. Flag FALSE, headline is the LOWER branch, and the upper
+-- branch would have cleared the base rate.
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a charge at a merchant whose indicator is unknown`)'s `depends on the merchant indicator`
+#ASSERT NOT ((`Citi Rewards earns on` `any card` `any cardholder` `any month` `a charge at a merchant whose indicator is unknown`)'s `earns the bonus rate`)
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a charge at a merchant whose indicator is unknown`)'s `miles per dollar` EQUALS (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a charge at a merchant whose indicator is unknown`)'s `miles per dollar if the merchant flags card-present`
+#ASSERT NOT ((`Citi Rewards earns on` `any card` `any cardholder` `any month` `a charge at a merchant whose indicator is unknown`)'s `miles per dollar` GREATER THAN `the base rate in miles per dollar`)
+#ASSERT (`Citi Rewards earns on` `any card` `any cardholder` `any month` `a charge at a merchant whose indicator is unknown`)'s `miles per dollar if the merchant flags online` GREATER THAN `the base rate in miles per dollar`
+
+
+§§§ `The whole answer, printed`
+
+-- Two direct calls on the exported rule, with every argument written out.
+-- They print the full `Rate answer` record rather than one field of it, so a
+-- reader sees what the composer actually receives, and a reader who wants to
+-- know what a Citi Rewards answer looks like has it on one screen without
+-- chasing four fixtures.
+--
+-- FIRST: the phone tap at a department store. Clause 6(i), 10X, no
+-- dependence on the indicator, and the cap named.
+#EVAL `Citi Rewards earns on` `Citi Rewards`
+        (Cardholder WITH
+            `Solitaire preferred rewards categories`                IS EMPTY
+            `yuu account linked to the card`                        IS FALSE
+            `HSBC Everyday Global Account deposits ADB this month`  IS 0
+            `PAssion membership registered and card linked in yuu`  IS FALSE)
+        (`Month position` WITH
+            `yuu eligible spend so far this calendar month`                     IS 0
+            `yuu participating merchants transacted so far this calendar month` IS 0
+            `PAssion spend at Participating Stores so far this month`           IS 0
+            `PAssion spend at non-Participating Stores so far this month`       IS 0)
+        (Transaction WITH
+            `merchant name`                IS "METRO PASIR RIS"
+            `merchant`                     IS `Another merchant`
+            `merchant category code`       IS 5311
+            `transaction description`      IS "METRO PASIR RIS"
+            `description patterns`         IS EMPTY
+            `charge kind`                  IS `Retail purchase`
+            `amount`                       IS 100
+            `currency`                     IS "SGD"
+            `posted in a foreign currency` IS FALSE
+            `transaction date`             IS YMD 2026 9 1
+            `posting date`                 IS YMD 2026 9 3
+            `payment channel`              IS `Tapped at a terminal`
+            `credential`                   IS `A mobile wallet token`
+            `merchant indicator`           IS `Flags card-present`
+            `made in Singapore`            IS TRUE)
+
+-- SECOND: an annual fee at the same department store. Clause 5(i) refuses
+-- it, so the two conditional rates and the headline are all 0 and the cap is
+-- the uncapped one. This is the limb the first pass could only caveat.
+#EVAL `Citi Rewards earns on` `Citi Rewards`
+        (Cardholder WITH
+            `Solitaire preferred rewards categories`                IS EMPTY
+            `yuu account linked to the card`                        IS FALSE
+            `HSBC Everyday Global Account deposits ADB this month`  IS 0
+            `PAssion membership registered and card linked in yuu`  IS FALSE)
+        (`Month position` WITH
+            `yuu eligible spend so far this calendar month`                     IS 0
+            `yuu participating merchants transacted so far this calendar month` IS 0
+            `PAssion spend at Participating Stores so far this month`           IS 0
+            `PAssion spend at non-Participating Stores so far this month`       IS 0)
+        (Transaction WITH
+            `merchant name`                IS "CITIBANK ANNUAL FEE"
+            `merchant`                     IS `Another merchant`
+            `merchant category code`       IS 5311
+            `transaction description`      IS "CITIBANK ANNUAL FEE"
+            `description patterns`         IS EMPTY
+            `charge kind`                  IS `Annual fee or bank charge`
+            `amount`                       IS 196.20
+            `currency`                     IS "SGD"
+            `posted in a foreign currency` IS FALSE
+            `transaction date`             IS YMD 2026 9 1
+            `posting date`                 IS YMD 2026 9 3
+            `payment channel`              IS `Card on file or recurring billing`
+            `credential`                   IS `The physical card`
+            `merchant indicator`           IS `Flags card-present`
+            `made in Singapore`            IS TRUE)
+
+
+-- ===========================================================================
+-- AMBIGUITIES AND SILENCES IN THE TEXT, AND WHAT THIS ENCODING CHOSE
+--
+-- 1. cl.6(ii) "online RETAIL merchant". The clause names a kind of merchant
+--    and then defines the whole phrase by the system indicator alone. Nothing
+--    in either held document distinguishes retail from non-retail, and the
+--    domain carries no such fact. CHOSE: the indicator test, which is the
+--    definition the clause gives itself. A stricter reading would exclude,
+--    say, an online insurer -- but cl.5(vi) and the exclusion list's MCC 6300
+--    already exclude that merchant on other grounds.
+--
+-- 2. "mobile wallet" is not defined. The domain separates a wallet token
+--    (Apple, Google, Samsung Pay) from `Via Amaze`, a third-party proxy card.
+--    CHOSE: the token only. Amaze is a card in its own right, not a wallet
+--    holding this card's credential. The consequence is visible: an Amaze
+--    charge at a merchant the exclusion list does not name is a Qualifying
+--    Charge here and can reach clause 6(ii).
+--
+--    THE ONE-LINE FLIP, now that the domain carries description families.
+--    Paragraph 3 lists four AMAZE* rows and every one of them is a
+--    combination -- AMAZE* AXS, AMAZE* BUS/MRT, AMAZE* EZ-link, AMAZE*
+--    TRANSIT -- whose other half is itself listed. Adding `elem AMAZE` to
+--    `paragraph 3 of the exclusion list reaches this charge` would refuse
+--    every Amaze charge at every merchant, which is the reading on which
+--    "mobile wallet" covers any third-party proxy and footnote 2's "in part"
+--    is taken literally. It is not done, because paragraph 3 nowhere lists a
+--    bare "AMAZE". The assertion that would flip is `an Amaze charge at an
+--    unlisted merchant`, and it is the only one.
+--
+-- 3. The exclusion list's footnote 2 substring rule. "any combination,
+--    permutation or derivation ... whether in whole or in part". CHOSE, and
+--    CHANGED IN THE SECOND PASS: it is now APPLIED, by layer 1, which matches
+--    the statement line by case-insensitive substring. "[Company Name]*AXS",
+--    the footnote's own example, carries the AXS family and is refused; the
+--    first pass matched the twenty rows by exact string equality and let it
+--    through. The caveat the first pass printed on every answer to say so has
+--    been deleted rather than reworded, because it became false.
+--
+--    WHAT THE LITERAL READING WOULD STILL ADD, and why it is not taken: "in
+--    part" would make "AMAZE* STARBUCKS" a derivation of "AMAZE* AXS", and
+--    would refuse any line containing "SAM" -- "SAMSUNG", "SAM'S KITCHEN".
+--    Layer 1 guards the second case by matching "SAM PAYMENTS",
+--    "SINGPOST-SAM" and "SAM -" rather than bare "SAM"; the first is
+--    ambiguity 2 above. Both are decisions about the statement line, so both
+--    now live in `classify.l4` and not here.
+--
+-- 3a. The exclusion list's footnote 1 -- the merchant-identity leg, "excluded
+--    ... REGARDLESS of how the merchant is described in your credit card
+--    statement". CHOSE, and PART-CHANGED IN THE SECOND PASS: the domain now
+--    carries a `Merchant` enumeration, and exactly one of the twenty rows has
+--    a constructor in it -- SimplyGo, row xi, which is there because DBS yuu
+--    cl.8 names it too. That row is now encoded on the identity leg and is
+--    refused however the statement describes it. The other nineteen have no
+--    constructor and are still reached only through the description leg, so a
+--    charge at AXS that posts under some other description is excluded by the
+--    document and is not excluded here. Minting nineteen constructors would
+--    be a card module writing vocabulary that belongs to the shared domain.
+--    See the note in §§ `5(xii) — the excluded merchants and merchant
+--    descriptions`.
+--
+-- 3b. Whether `Forex or CFD platform` is the right family for four of the
+--    rows. The shared domain's family covers nine platforms; Citi's paragraph
+--    3 names four of them (BANC DE BINARY, OANDA ASIA PAC, Saxo Cap Mkts,
+--    SKYFX.COM) and does not name IG Markets, Plus500, City Index, XTrade or
+--    TorOption. CHOSE the shared family, so this module refuses a charge at
+--    the other five that Citibank's list alone would not. This is the ONE
+--    place where the encoding is over-inclusive rather than under-inclusive,
+--    and it is the price of one vocabulary for eight issuers: the alternative
+--    is either a per-issuer family, or dropping the four rows Citi does name.
+--    Asserted at `a deposit to a forex platform Citi does not name`.
+--
+-- 4. cl.18 and the attribution axis. Decided `By posting date`; the full
+--    reasoning and the reading that would unsettle it are in §§ 18.
+--
+-- 5. The FAQ disagrees with the T&C twice, and the T&C governs both times.
+--    (a) FAQ 1(i) describes limb (i) as "any department store, or retail
+--        store worldwide, or SHOPPING WEBSITE that sells clothes, shoes and
+--        bags as its main business activity"; the T&C says "any store". The
+--        FAQ's wording would make limb (i) explicitly channel-agnostic, which
+--        is how this module reads the T&C anyway, so the two agree in effect.
+--    (b) The FAQ's travel footnote says transactions at those MCCs "will not
+--        be a QUALIFYING CHARGE"; the T&C's says they "will not be a 10X
+--        POINTS ELIGIBLE TRANSACTION". These differ materially: on the FAQ's
+--        wording an airline ticket earns NOTHING, on the T&C's it earns the
+--        base rate. CHOSE the T&C: an airline ticket is a Qualifying Charge
+--        earning 0.4 miles per dollar. Asserted in §§§ `The travel footnote`.
+--
+-- 6. The exclusion list's paragraph 1 is self-contradictory as printed: the
+--    named cards "will be excluded from ThankYou Points / ... / Cash Rebate
+--    EXCLUSION for transactions listed in Paragraph 2 below". Read literally
+--    it excludes the cards from the exclusion. CHOSE the only coherent
+--    reading, which paragraph 2 confirms in terms: "will not be awarded to
+--    the above Cards with transactions made in the following Merchant
+--    Category Codes".
+--
+-- 7. Whether the cl.6 travel footnote reaches limb (i). Its parenthetical is
+--    written about clause 6 as a whole. Moot on the present lists, which are
+--    disjoint; noted in §§ `6, footnote *`.
+-- ===========================================================================
+
+
+-- ===========================================================================
+-- FACTS THE SHARED DOMAIN DOES NOT CARRY
+--
+-- A. RESOLVED IN THE SECOND PASS, and left here as the record of what the
+--    fix bought. The first pass asked for a `charge kind` enumeration on
+--    Transaction, on the ground that cl.5(i) to (iii) turn on what a posting
+--    IS and no MCC or merchant name shows it. The shared domain now carries
+--    one, and the three limbs are encoded at §§ `5(i) to 5(iii)` with
+--    eighteen assertions behind them. Two residues remain and are the only
+--    part of cl.5 still carried as a string:
+--      - GST. cl.5(i) names it, and it is not a kind of posting but a tax
+--        riding on one; no constructor covers it.
+--      - The CHANNEL of a bill payment. cl.5(iii) excludes bill payments
+--        "including via Citibank Online or via any other channel or agent",
+--        and the constructor is `Bill payment via internet banking`. A bill
+--        paid at an agent's counter is not caught.
+--    Both are printed on every answer that does not refuse.
+--
+-- A2. A DESCRIPTION FAMILY for four rows of the exclusion list. Rows xii to
+--    xiv (SPL AUTO*, SPL ATU*, SPL ONLINE*) and row xvi (TL-ABT) have no
+--    `Description pattern` constructor, because no other issuer in this
+--    corpus names them, so layer 1 cannot report them and no rule here can
+--    test for them. This is a LAYER 1 gap, not a rule-level one: the fix is
+--    four constructors and four `classify.l4` clauses, which is the shared
+--    domain's call and not this module's. Printed on every non-refusing
+--    answer and asserted at `a charge described as TL-ABT`.
+--
+-- B. The STATEMENT CYCLE. cl.13 caps per statement month, and the domain's
+--    `Month position` is expressly about the calendar month (its four fields
+--    are yuu's and PAssion's calendar-month counters). Nothing in the domain
+--    says when this cardholder's statement closes, so this module cannot tell
+--    whether two charges fall in the same capped period. It states the cap
+--    and its basis and stops, which is the boundary § 6 of the spec draws
+--    around the allocation problem -- but the boundary is drawn in a place
+--    that happens to hide the one card whose period is unusual.
+--
+-- C. The HISTORY of charges. Narrower than the first pass stated it: the
+--    domain now carries `Refund or reversal` as a charge kind, so whether
+--    THIS posting is a reversal is a fact the module has, and it is answered
+--    on the page -- clause 5 does not list reversals, so a reversal is a
+--    Qualifying Charge here, asserted. What is still out of reach is cl.18's
+--    NETTING rule: "Bonus Points ... will be awarded only if cumulative value
+--    of new 10X Points Eligible Transactions in the respective spend category
+--    is higher than the value of transactions reversed/refunded". That
+--    quantifies over a history of charges, not over one, so it is out of
+--    reach of a per-transaction answer regardless of what the domain carries.
+--    Recorded so that nobody reads its absence as an oversight.
+--
+-- D. MERCHANT IDENTITY for nineteen of the exclusion list's twenty rows. See
+--    ambiguity 3a. The domain carries `Merchant`, and one row is now reached
+--    through it; the rest would need constructors the shared domain does not
+--    have, and this module does not mint them.
+-- ===========================================================================
+
+
+-- ===========================================================================
+-- DEFEASIBILITY SITES (spec section 4.5). Where a native DESPITE / SUBJECT TO /
+-- exception construct would have collapsed several guards into one rule.
+-- One entry per site: the clause, the shape in the text (general rule +
+-- exception list), the L4 shape used instead, and what a native construct
+-- would have bought.
+-- ===========================================================================
+--
+-- SITE 1 -- cl.5, the Qualifying Charge.
+--   SHAPE IN THE TEXT: a general rule stated as a NEGATIVE definition. "A
+--     charge ... which does not arise from any: (i) ... (xii)". The rule is
+--     "every charge qualifies"; the twelve limbs are the exception list, and
+--     the draftsman has already done the defeasibility by hand, folding the
+--     exceptions into the definition.
+--   L4 SHAPE USED: `a Qualifying Charge` txn MEANS NOT (`clause 5 excludes
+--     this charge` txn), with the exclusions as a separate OR-chain rule over
+--     two families -- a CONSIDER on the kind of posting for limbs (i) to
+--     (iii), and the exclusion list's two tables for limbs (iv) to (xii).
+--   WHAT A NATIVE CONSTRUCT WOULD BUY: little here, and the site is recorded
+--     for the opposite reason to the others. The text is ALREADY in the shape
+--     a defeasible construct produces, so the double negation is faithful.
+--   WHAT THE SECOND PASS CHANGED ABOUT THIS ENTRY, and it is worth writing
+--     down because it shrank a want rather than satisfying it. The first pass
+--     said this site wanted a three-valued answer -- a way to state limbs (i)
+--     to (iii) as exceptions KNOWN TO EXIST BUT NOT TESTABLE, rather than as
+--     a condition string. Most of that want turned out to be a missing FACT,
+--     not a missing CONSTRUCT: once the domain carried `charge kind`, the
+--     three limbs became ordinary testable guards and the three-valued
+--     apparatus was not needed for them at all. What survives is much
+--     smaller and much more specific -- GST, and the channel a bill payment
+--     was made through. A feature request that a new field discharges was
+--     never a language requirement; noticing which is which is the point of
+--     keeping these entries across passes.
+--
+-- SITE 2 -- cl.6(ii) against its own two exclusions.
+--   SHAPE IN THE TEXT: a general rule with two exceptions inline. "a
+--     Qualifying Charge made at an online retail merchant, EXCLUDING mobile
+--     wallet and travel-related transactions".
+--   L4 SHAPE USED: one rule with three conjuncts, two of them negated --
+--     `clause 6(ii) but for the indicator`, which ANDs the Qualifying Charge
+--     test with NOT wallet and NOT travel.
+--   WHAT A NATIVE CONSTRUCT WOULD BUY: the priority ordering is currently
+--     invisible. Written as `online earns 10X` DESPITE `a mobile wallet does
+--     not` DESPITE `travel does not`, a reader sees the general rule and its
+--     defeaters as separate statements with a stated precedence, and a
+--     reviewer checking the encoding against the clause compares three
+--     sentences to three sentences. As conjuncts, the general rule and its
+--     exceptions have the same syntactic weight, which is exactly what the
+--     source does not say.
+--
+-- SITE 3 -- cl.6(i) against cl.6(ii), and the wallet.
+--   SHAPE IN THE TEXT: a disjunction where one disjunct carries an exception
+--     that the other does not. This is the site that motivates the whole
+--     module.
+--   L4 SHAPE USED: two named limbs and an explicit OR, plus a cascade in the
+--     top-level BRANCH that tries limb (i) first.
+--   WHAT A NATIVE CONSTRUCT WOULD BUY: today the ASYMMETRY is carried by a
+--     comment. A reader has to notice that `clause 6(i) — the Merchant
+--     Category limb` does not mention the credential, and noticing an ABSENCE
+--     is the hardest kind of review. With scoped defeaters -- the wallet
+--     exception attached to limb (ii) and visibly not to limb (i) -- the
+--     scope would be a thing on the page that a checker could report, rather
+--     than a thing a reviewer must fail to find.
+--
+-- SITE 4 -- cl.5(xii) and the exclusion list's own commencement.
+--   SHAPE IN THE TEXT: a rule that incorporates a second document by
+--     reference, where the second document carries its own effective date and
+--     says of itself that it "may be updated from time to time".
+--   L4 SHAPE USED: an AND of a date guard with the list tests, inside
+--     `clause 5(xii) excludes this charge`.
+--   WHAT A NATIVE CONSTRUCT WOULD BUY: temporal defeasance. The list is not
+--     one rule but a SERIES of revisions, each defeating its predecessor from
+--     a stated date. Encoded by hand, holding two revisions means two guarded
+--     copies of a forty-line table; a native construct would let the revision
+--     be a dimension of the rule rather than a copy of it. The l4-ide repo
+--     already has `EVAL UNDER RULES EFFECTIVE AT` for the rule-version axis,
+--     which is the near neighbour of this and worth comparing.
+--
+-- SITE 5 -- the non-exhaustive list.
+--   SHAPE IN THE TEXT: "such as but not limited to", and paragraph 4's "the
+--     above excluded Merchant Category Codes ... is not exhaustive". An
+--     exception list that admits it is incomplete.
+--   L4 SHAPE USED: the listed members only, with a condition string saying
+--     the list is open.
+--   WHAT A NATIVE CONSTRUCT WOULD BUY: nothing syntactic -- no construct can
+--     enumerate an open set -- but it marks the boundary between the two
+--     reasons this module can answer FALSE to `clause 5 excludes this
+--     charge`: because the charge is outside the list, or because the list is
+--     admittedly incomplete. A defeasible framework that distinguishes "no
+--     applicable defeater" from "no KNOWN applicable defeater" would let the
+--     answer carry that difference instead of a string.
+--   THIS SITE DID NOT SHRINK THE WAY SITE 1 DID, and the contrast is the
+--     useful part. Site 1 wanted a three-valued answer for a reason a new
+--     FACT could discharge, and a new fact discharged most of it. Site 5's
+--     openness is in the DOCUMENT -- "such as but not limited to", "is not
+--     exhaustive and may be updated from time to time" -- so no fact can ever
+--     close it. It is the residual case, and it is now joined by a second
+--     kind of unknowing that is ours rather than the issuer's: four rows of
+--     the list that this corpus holds but cannot classify (see FACTS ... A2).
+--     An answer that could say "not excluded, and I checked everything" apart
+--     from one that says "not excluded, as far as I can tell" would separate
+--     those two, and today both are strings.
+-- ===========================================================================

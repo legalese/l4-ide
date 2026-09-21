@@ -49,6 +49,7 @@ export const PHASE_CLASS = {
   "p6-tests": "test",
   "p7-akn": "projection",
   "p7-bpmn": "projection",
+  "p7-catala": "projection",
   "p7-dmn": "projection",
   "p7-dmn-md": "projection",
   "p7-ladder": "projection",

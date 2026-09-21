@@ -224,6 +224,22 @@ for (const [stage, pkg] of moddleLegs) {
   }
 }
 
+if (declared("p7-catala") && !probes.catala?.present) {
+  // A FINDING, not a note: without the toolchain the leg emits Catala and then
+  // checks nothing, and reports SKIPPED saying so. That is the honest status —
+  // R9 of specs/todo/CATALA-EXPORT-SPEC.md makes Catala optional when present
+  // and never a build dependency — but it is worth knowing before the run
+  // rather than from a receipt afterwards, because the emission on its own
+  // proves nothing: `l4 catala` exits 0 on modules `catala typecheck` rejects.
+  const missing = (probes.catala?.missing ?? ["catala", "clerk"]).join(" and ");
+  findings.push({
+    stage: "p7-catala",
+    what: `will emit but check nothing, and report SKIPPED — ${missing} not found on PATH, in CATALA_EXE/CLERK_EXE, or in the opam switch \`${env.CATALA_OPAM_SWITCH ?? "catala"}\``,
+    remedy:
+      "install Catala 1.2.1 into an opam switch named 'catala' (build recipe: R9 of specs/todo/CATALA-EXPORT-SPEC.md — upstream ships Linux amd64 .deb only, so macOS builds from source), or point CATALA_EXE and CLERK_EXE at an existing pair, or set CATALA_OPAM_SWITCH to the switch that has them",
+  });
+}
+
 if (declared("p7-lts") && !probes.dot?.present) {
   notes.push(
     "p7-lts: graphviz absent — DOT still emitted and checked, SVG rendering skipped (named on the receipt; not a stage skip)",

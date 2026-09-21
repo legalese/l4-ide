@@ -1,0 +1,1743 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `miles-card-domain`
+
+§ `DBS yuu Card — Terms and Conditions, DBS yuu Card Programme and Promotions`
+
+-- ===========================================================================
+-- DOCUMENT. source/dbs-yuu-card-tnc.txt, document id `dbs-yuu-card-tnc`,
+-- running head "Updated on 7 August 2026". Private contract text, not law.
+-- Nothing here is advice about anyone's card.
+--
+-- WHAT THIS MODULE ANSWERS. For one transaction on a DBS yuu Visa or a DBS
+-- yuu American Express Card: how many yuu Points per S$1 it earns, what that
+-- is worth in miles, which monthly cap it runs against, and on what clauses.
+-- `DBS yuu earns on` is the only exported rule; everything else is a helper
+-- for one clause of the document.
+--
+-- THE SHAPE OF THE EARNING RULE (spec section 4.6). The intuitive reading --
+-- "I scanned my yuu ID and I spent at a yuu merchant, so both are required"
+-- -- is wrong. cl.6 states ONE condition plus a category test: S$1 spent at
+-- a listed Spend Category "that is charged and posted to your DBS yuu Card".
+-- Scanning appears ONLY in cl.6(ii), which is about when Base Rewards are
+-- CREDITED, not whether they are earned. So the scan is NOT a conjunct of
+-- the earning condition, and this module does not encode it as one. Likewise
+-- cl.11 and cl.17 make yuu-account linkage govern CREDITING: cl.17 credits
+-- points earned BEFORE linkage upon linkage. Both appear here as `conditions`
+-- strings on the answer, never as guards on the rate.
+--
+-- THE REAL CONJUNCTION is cl.7(b)'s Minimum Spend Requirement -- S$800 of
+-- Eligible Spend AND 4 Participating Merchants -- which is a WHOLE-OF-MONTH
+-- qualification, not a per-transaction act. This module reads it as a
+-- per-transaction FACT ("has the month met it so far"), off the two
+-- `Month position` fields the domain supplies. A transaction early in the
+-- month therefore answers differently from the same transaction late in the
+-- month, which is faithful to a threshold the cardholder crosses once.
+--
+-- WHAT IS DELIBERATELY NOT MODELLED.
+--   * Allocation of the 28,800-point cap across a month's transactions
+--     (spec section 6). The answer states the cap; it does not spend it.
+--   * cl.14, cl.21 (refunds computed as negative spend, points clawed back),
+--     cl.16 (MP3 reversal), cl.18, cl.19 (supplementary cards roll up to the
+--     principal). These adjust a month's ledger after the fact; they do not
+--     change what a given transaction earns.
+--   * cl.22 (foreign-currency amounts taken at the posted SGD value). The
+--     answer is a RATE per dollar, so the conversion does not enter it.
+--   * cl.1-cl.5, cl.15, cl.20 (data consent, variation, DBS's discretion,
+--     posting delays, the yuu Rewards Club T&C). No operative effect on rate.
+--
+-- THE MERCHANT INDICATOR IS NOT READ. Three issuers in this corpus key a
+-- rate off the acquirer's online/card-present indicator; DBS yuu does not.
+-- No clause of this document distinguishes them. So on every answer
+-- `depends on the merchant indicator` is FALSE and the two conditional
+-- figures both equal `miles per dollar` -- including when the transaction
+-- carries `Unknown`, because an Unknown indicator cannot change a rate that
+-- never consulted it.
+--
+-- THE `cardholder` PARAMETER IS READ FOR CREDITING ONLY. The composer passes
+-- all four parameters uniformly. This module reads `card`, `month` and `txn`
+-- for the rate; of `cardholder` it reads only `yuu account linked to the
+-- card`, and only to attach a cl.17 crediting warning. It never reads the
+-- Solitaire, HSBC or PAssion fields.
+--
+-- WHAT `status` COVERS. `status` describes the EARNING RATE only. A question
+-- about CREDITING -- when the point lands, whether it expires -- is carried
+-- in `conditions` and leaves the status alone, because it does not change
+-- the number. `Unconfirmed` appears on exactly two branches, each flagged at
+-- its site: the additive reading of cl.7(a)+cl.7(b), and the Singtel
+-- base/bonus contradiction.
+--
+-- NO RULE HERE COMPARES A STRING. Catala has no string type, so a corpus that
+-- must lower to it cannot key a rate off a printed merchant name or statement
+-- line. The reading of those strings is done once, in layer 1
+-- (`classify.l4`), which turns the printed line into the domain's `Merchant`
+-- and `Description pattern` enumerations; every rule below reads those
+-- enumerations. cl.8 is now a test on `merchant`, cl.9(i) a membership test
+-- over `description patterns`, and cl.9(a)-(e) tests on `charge kind`.
+--
+-- The strings that remain are all INERT: the `document`, `clause`, `dated`
+-- and `quote` of a citation, the `pool` label on a cap, and the `conditions`
+-- sentences. Nothing branches on any of them, and the lowering elides them
+-- with a note. The printed `merchant name` and `transaction description` are
+-- still carried on the transaction, for display and for layer 1 -- but no
+-- rule in this module reads either.
+--
+-- ONE PLACE THAT COST RESOLUTION. cl.9(i) date-stamps bare "AXS" from 1 May
+-- 2026 while listing "AXS BizPay" and "PAYPAL AXS PTE LTD" without a date.
+-- The domain has one AXS family covering all three, so one of the two dates
+-- had to go; the at-all-times reading was kept. Stated in full at the rule.
+-- ===========================================================================
+
+
+§§ `The document`
+
+-- Every citation from this document, built by one helper. The document id is
+-- the key in source/source-bundle.json; the dating line is the running head
+-- printed on every page; `document date` is that same line as a DATE, so two
+-- citations from two issuers can be compared for currency.
+--
+-- The id and the dating line are written INLINE here rather than as named
+-- STRING constants. A constant whose result type is STRING has no Catala
+-- counterpart and is refused outright, while a STRING parameter or field is
+-- simply elided -- so the shape that survives the lowering is the one that
+-- keeps its strings inside the record construction.
+GIVEN clause IS A STRING
+      quote  IS A STRING
+GIVETH A Provenance
+`yuu clause` clause quote MEANS
+    Provenance WITH
+        `document`      IS "dbs-yuu-card-tnc"
+        `clause`        IS clause
+        `dated`         IS "Updated on 7 August 2026"
+        `document date` IS YMD 2026 8 7
+        `quote`         IS quote
+
+GIVETH A Provenance
+`S6 base rewards` MEANS
+    `yuu clause` "6"
+        "For every S$1 spent at the following Spend Categories that is charged and posted to your DBS yuu Card, you will earn the respective Base Rewards. | yuu Merchant Spend 1 yuu Point (0.5% cash rebates) | SimplyGo 0.5 yuu Point (0.25% cash rebates) | Non-yuu Merchant Spend 0.5 yuu Point (0.25% cash rebates)"
+
+GIVETH A Provenance
+`S6i no cap on base` MEANS
+    `yuu clause` "6(i)"
+        "There is no minimum spend required, and no cap to the Base Rewards."
+
+GIVETH A Provenance
+`S6ii crediting` MEANS
+    `yuu clause` "6(ii)"
+        "Base Rewards will be credited to Cardmembers’ linked yuu Account in the manner as follows: • yuu Merchant Spend: Within the same day when you scan/link your yuu ID when transacting. • SimplyGo and non-yuu Merchant Spend: Within 60 days after the end of each calendar month."
+
+GIVETH A Provenance
+`S7 cap` MEANS
+    `yuu clause` "7"
+        "Total Bonus Rewards is capped at 28,800 yuu Points (worth up to S$144 cash rebates or 8,000 miles) per calendar month."
+
+GIVETH A Provenance
+`S7a bonus no minimum` MEANS
+    `yuu clause` "7(a)"
+        "No minimum spend required to earn the following Bonus Rewards. For every S$1 spent at the following Spend Categories that is charged and posted to your DBS yuu Card, you will earn the respective Bonus Rewards. | yuu Merchant Spend 9 yuu Points (4.5% cash rebates) | SimplyGo 9.5 yuu Points (4.75% cash rebates)"
+
+GIVETH A Provenance
+`S7b bonus minimum spend` MEANS
+    `yuu clause` "7(b)"
+        "To earn the following Bonus Rewards, Cardmembers must meet these spend requirements each calendar month (“Minimum Spend Requirement”): i. Minimum S$800 worth of Eligible Spend charged and posted to your Card, and ii. Transact at 4 Participating Merchants. | yuu Merchant Spend 26 yuu Points (13% cash rebates) | SimplyGo 26 yuu Points (13% cash rebates)"
+
+GIVETH A Provenance
+`S8 participating merchants` MEANS
+    `yuu clause` "8"
+        "“Participating Merchants” refer to the following, but excludes products listed in Appendix 1, and subject to changes from time to time. | Defined as transactions made in Singapore at: Cold Storage, CS Fresh, Jasons Deli | Giant, Giant Hypermart, Giant Express | Guardian | 7-Eleven | foodpanda food delivery, panda mart, panda shops | Gojek Singapore | Bus and train rides via SimplyGo | Charge+ Singapore | Orders placed via CHAGEE App | Singtel Shop, Singtel Exclusive Retailers"
+
+GIVETH A Provenance
+`S9 eligible spend` MEANS
+    `yuu clause` "9"
+        "“Eligible Spend” refers to qualified spend charged on your DBS yuu Card but excludes the following types of transactions:"
+
+GIVETH A Provenance
+`S9a refunded` MEANS
+    `yuu clause` "9(a)"
+        "Any transaction that is subsequently cancelled, voided, refunded or reversed (“Refunded Transactions”) for any reason;"
+
+GIVETH A Provenance
+`S9b pre-authorisation` MEANS
+    `yuu clause` "9(b)"
+        "Pre-authorisation transactions on the Card account, e.g. hotel bookings;"
+
+GIVETH A Provenance
+`S9c transfers fees and charges` MEANS
+    `yuu clause` "9(c)"
+        "Balance transfers, cash advance, My Preferred Payment Plan (“MP3”) monthly transactions, and any fees and charges (including annual fees, interest charges, cheque processing fees, administrative fees, cash advance fees, finance charges and/or late payment charges and other miscellaneous fees and charges);"
+
+GIVETH A Provenance
+`S9d instalment payment plan` MEANS
+    `yuu clause` "9(d)"
+        "0% interest-free Instalment Payment Plan (“IPP”) transaction(s);"
+
+GIVETH A Provenance
+`S9e internet banking bill payments` MEANS
+    `yuu clause` "9(e)"
+        "All other bill payments via internet banking and fees charged by DBS;"
+
+GIVETH A Provenance
+`S9f excluded MCCs` MEANS
+    `yuu clause` "9(f)"
+        "Any payment made with the following Merchant Category Codes (“MCC”); ... *With effect from 1 May 2026"
+
+GIVETH A Provenance
+`S9i excluded descriptions` MEANS
+    `yuu clause` "9(i)"
+        "Any transactions matching the terms below: • AMAZE • AXS (with effect from 1 May 2026) • AXS BizPay • BAGUS • CANTINE • EZLINK • EZ-LINK • PAYPAL AXS PTE LTD • RAZERPAY • SAM PAYMENTS • SEDAP • Sgebiz • SGeBiz • SINGTEL DASH • Singapore E-Business • SHOPEEPAY • SmoovPay (with effect from 1 May 2026) • TRANSIT 3 • YOUTRIP"
+
+GIVETH A Provenance
+`S9ii DBS discretion` MEANS
+    `yuu clause` "9(ii)"
+        "Any other transactions determined by DBS from time to time;"
+
+GIVETH A Provenance
+`S10 calendar month` MEANS
+    `yuu clause` "10"
+        "Eligible Spend must be charged to your DBS yuu Card within the calendar month, based on transaction date. The transaction date is determined based on the merchant settlement date between the merchant and their acquirer (subject to merchant or their acquirer’s timezone)."
+
+GIVETH A Provenance
+`S11 linkage at point of transaction` MEANS
+    `yuu clause` "11"
+        "Cardmembers will be awarded in yuu Points to the yuu Account which has been linked to the DBS yuu principal cardmember at the point of transaction."
+
+GIVETH A Provenance
+`S12 conversion` MEANS
+    `yuu clause` "12"
+        "1 yuu Point is equivalent to 0.5% cash rebate or 0.28 miles or more, depending on the redemption item on the yuu Rewards catalogue."
+
+GIVETH A Provenance
+`S17 crediting on linkage` MEANS
+    `yuu clause` "17"
+        "yuu Points earned on your DBS yuu Card before linking to the yuu App will be credited upon card linkage. These Points will expire within 3 months (or 90 days) from the day of issuance if the card is unlinked."
+
+GIVETH A Provenance
+`A1 seven eleven amex` MEANS
+    `yuu clause` "Appendix 1 — 7-Eleven"
+        "Applicable to Bonus Rewards • Points will not be awarded for any transactions made with DBS yuu American Express® Card. With effect from 13 Aug 2026, American Express® Cards will be accepted at all 7-Eleven outlets islandwide. DBS yuu American Express® Cardmembers can earn bonus rewards on 7-Eleven transactions w.e.f. 13 Aug 2026"
+
+GIVETH A Provenance
+`A1 charge plus amex` MEANS
+    `yuu clause` "Appendix 1 — Charge+"
+        "Applicable to Bonus Rewards Points will not be awarded for any transactions made with DBS yuu American Express® Card."
+
+GIVETH A Provenance
+`A1 singtel base` MEANS
+    `yuu clause` "Appendix 1 — Singtel"
+        "Applicable to Base Rewards Points will not be awarded for all transactions."
+
+GIVETH A Provenance
+`A1 cold storage on the go` MEANS
+    `yuu clause` "Appendix 1 — Giant/Cold Storage"
+        "Bonus yuu Points will not be awarded for transactions made at Cold Storage On The Go (within Esso Stations), only base 0.5 yuu point (equivalent to 0.25% cash rebates) will be awarded. Transactions will be eligible to count towards card’s minimum spend requirement."
+
+GIVETH A Provenance
+`A1 paypal description` MEANS
+    `yuu clause` "Appendix 1 — foodpanda, Gojek"
+        "Points will not be awarded for any transactions with transaction description “PayPal” with effect from 1 February 2024."
+
+GIVETH A Provenance
+`A1 simplygo top up` MEANS
+    `yuu clause` "Appendix 1 — SimplyGo"
+        "Applicable to Base and Bonus Rewards Points will not be awarded for Top-Up transactions."
+
+GIVETH A Provenance
+`A1 chagee app only` MEANS
+    `yuu clause` "Appendix 1 — CHAGEE"
+        "Applicable to Base and Bonus Rewards Points will only be awarded for orders placed via the CHAGEE App and applicable for purchases in Singapore only."
+
+GIVETH A Provenance
+`A1 closing sentence` MEANS
+    `yuu clause` "Appendix 1 — closing sentence"
+        "DBS will not award Bonus Rewards on transactions that do not earn Base Rewards from yuu/Participating Merchants, unless otherwise stated."
+
+
+§§ `The categories this card's own rules run on`
+
+-- cl.6's table has three rows, and they are the card's spend categories.
+-- Note that SimplyGo appears BOTH as its own row here and as an entry in
+-- cl.8's Participating Merchants table -- so a SimplyGo ride earns at the
+-- SimplyGo rate AND counts towards cl.7(b)'s "4 Participating Merchants".
+-- Those are two different jobs for one name, and collapsing them would lose
+-- one of them. That is also why the row is `SimplyGo spend` and not plain
+-- `SimplyGo`: the domain's `Merchant` enumeration already has a `SimplyGo`,
+-- and Catala puts every constructor of every enumeration in ONE namespace, so
+-- two constructors spelled alike in two enumerations do not survive the
+-- lowering. Where two names must differ, the one that moves is the one whose
+-- meaning is narrower.
+DECLARE `yuu Spend Category` IS ONE OF
+    `yuu Merchant Spend`
+    `SimplyGo spend`
+    `Non-yuu Merchant Spend`
+
+
+§§ `8 — Participating Merchants`
+
+-- cl.8's LEFT column -- "Participating Merchants (each a Participating
+-- Merchant)" -- IS THE DOMAIN'S `Merchant` ENUMERATION, filtered to the eleven
+-- rows this document lists. It used to be a second enumeration declared here,
+-- one constructor per row. That is now duplication and nothing else: the
+-- domain groups Cold Storage / CS Fresh / Jasons Deli under one constructor
+-- and Giant / Giant Hypermart / Giant Express under another, for the same
+-- reason cl.8 groups them -- the left column is the unit cl.7(b)(ii) counts --
+-- so the two enumerations agreed row for row. They also COLLIDED: Catala
+-- flattens every constructor of every enumeration into one namespace, and two
+-- `Cold Storage`s cannot both be emitted. The local enumeration is gone and
+-- this predicate takes its place.
+--
+-- The string work -- "COLD STORAGE #123 SINGAPORE" is Cold Storage, "CS FRESH
+-- TANGLIN" is the same Participating Merchant -- is done once in layer 1
+-- (`classify.l4`), so no rule here compares a string and the substring
+-- question is layer 1's.
+--
+-- cl.8's right column heading is operative: "Defined as transactions made in
+-- Singapore at:". A Cold Storage in Kuala Lumpur is not a Participating
+-- Merchant, so the same merchant abroad falls to Non-yuu Merchant Spend. Both
+-- predicates below carry that gate, which is why they take the transaction
+-- rather than the merchant.
+GIVEN txn      IS A Transaction
+      merchant IS A Merchant
+GIVETH A BOOLEAN
+`the transaction is at` txn merchant MEANS
+        txn's `made in Singapore`
+    AND txn's `merchant` EQUALS merchant
+
+-- The eleven rows of cl.8, and nothing else. The domain enumeration also
+-- carries merchants no yuu clause names (BreadTalk, Toast Box, Mandai and the
+-- rest of the PAssion list); they are Participating Merchants of a DIFFERENT
+-- programme and are not Participating Merchants here, which is what cl.8 says
+-- of them by not listing them.
+--
+-- `Cold Storage On The Go` is a row of its own because Appendix 1 gives it a
+-- rate of its own: base only, at the NON-yuu base figure, and no bonus --
+-- while still counting towards cl.7(b)(ii), which is why it is listed here.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`the transaction is at a Participating Merchant` txn MEANS
+        txn's `made in Singapore`
+    AND (CONSIDER txn's `merchant`
+         WHEN `Cold Storage`           THEN TRUE
+         WHEN `Cold Storage On The Go` THEN TRUE
+         WHEN Giant                    THEN TRUE
+         WHEN Guardian                 THEN TRUE
+         WHEN `7-Eleven`               THEN TRUE
+         WHEN foodpanda                THEN TRUE
+         WHEN Gojek                    THEN TRUE
+         WHEN SimplyGo                 THEN TRUE
+         WHEN `Charge+`                THEN TRUE
+         WHEN CHAGEE                   THEN TRUE
+         WHEN Singtel                  THEN TRUE
+         OTHERWISE                          FALSE)
+
+-- cl.6's three rows. SimplyGo is its own row; every other Participating
+-- Merchant is yuu Merchant Spend; everything else is Non-yuu Merchant Spend.
+GIVEN txn IS A Transaction
+GIVETH A `yuu Spend Category`
+`the spend category for` txn MEANS
+    BRANCH
+        IF  `the transaction is at` txn SimplyGo               THEN `SimplyGo spend`
+        IF  `the transaction is at a Participating Merchant` txn THEN `yuu Merchant Spend`
+        OTHERWISE                                                    `Non-yuu Merchant Spend`
+
+
+§§ `9 — Eligible Spend`
+
+-- cl.9(f)'s MCC table. The MCCs carrying an asterisk in the printed table
+-- were added "*With effect from 1 May 2026", so they exclude a transaction
+-- only from that date; the unasterisked ones have no stated start date and
+-- exclude throughout. Each row carries its printed description so a reviewer
+-- can check the pair against the table rather than the number alone.
+GIVETH A DATE
+`the date the asterisked MCCs take effect` MEANS YMD 2026 5 1
+
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`cl.9(f) excludes the MCC at all times` mcc MEANS
+        mcc EQUALS 4784   -- Toll and Bridge Fees
+    OR  mcc EQUALS 4829   -- Money Transfer
+    OR  mcc EQUALS 4900   -- Utilities – Electric, Gas, Water, Sanitary
+    OR  mcc EQUALS 6010   -- Financial Institutions – Manual Cash Disbursements
+    OR  mcc EQUALS 6011   -- Financial Institutions – Automated Cash Disbursements
+    OR  mcc EQUALS 6012   -- Financial Institutions – Merchandise, Services and Debt Repayment
+    OR  mcc EQUALS 6051   -- Non-Financial Institutions – Foreign Currency, Liquid and Cryptocurrency Assets, Money Orders, Account Funding, Travelers Cheques, and Debt Repayment
+    OR  mcc EQUALS 6211   -- Security Brokers/Dealers
+    OR  mcc EQUALS 6300   -- Insurance Sales, Underwriting, and Premiums
+    OR  mcc EQUALS 6381   -- Insurance Premiums
+    OR  mcc EQUALS 6399   -- Insurance, Not Elsewhere Classified
+    OR  mcc EQUALS 6540   -- Non-Financial Institutions – Stored Value Card Purchase/Load
+    OR  mcc EQUALS 7523   -- Parking Lots, Parking Meters and Garages
+    OR  mcc EQUALS 7995   -- Betting including Lottery Tickets, Casino Gaming Chips, Off-track Betting, Wagers at Race Tracks
+    OR  mcc EQUALS 8062   -- Hospitals
+    OR  mcc EQUALS 8211   -- Elementary and Secondary Schools
+    OR  mcc EQUALS 8220   -- Colleges, Universities, Professional Schools, and Junior Colleges
+    OR  mcc EQUALS 8241   -- Correspondence Schools
+    OR  mcc EQUALS 8244   -- Business and Secretarial Schools
+    OR  mcc EQUALS 8249   -- Vocational Schools and Trade Schools
+    OR  mcc EQUALS 8299   -- Schools and Educational Services (Not Elsewhere Classified)
+    OR  mcc EQUALS 8398   -- Charitable and Social Service Organizations
+    OR  mcc EQUALS 8661   -- Religious Organizations
+    OR  mcc EQUALS 9211   -- Court Costs, Including Alimony and Child Support
+    OR  mcc EQUALS 9222   -- Fines
+    OR  mcc EQUALS 9223   -- Bail and Bond Payments
+    OR  mcc EQUALS 9311   -- Tax Payments
+    OR  mcc EQUALS 9399   -- Government Services (Not Elsewhere Classified)
+    OR  mcc EQUALS 9402   -- Postal Services – Government Only
+    OR  mcc EQUALS 9405   -- Intra-Government Purchases – Government Only
+
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`cl.9(f) excludes the MCC from 1 May 2026` mcc MEANS
+        mcc EQUALS 5047   -- Dental/Laboratory/Medical/Ophthalmic Hospital Equipment and Supplies*
+    OR  mcc EQUALS 5199   -- Non-Durable Goods – Not Elsewhere Classified*
+    OR  mcc EQUALS 5960   -- Direct Marketing – Insurance Services*
+    OR  mcc EQUALS 5993   -- Cigar Stores and Stands*
+    OR  mcc EQUALS 6050   -- Quasi Cash – Financial institutions, Merchandise, Services*
+    OR  mcc EQUALS 6513   -- Real Estate Agents and Managers – Rentals*
+    OR  mcc EQUALS 6529   -- Quasi Cash – Remote Stored Value Load – Financial Institute*
+    OR  mcc EQUALS 6530   -- Quasi Cash – Remote Stored Value Load – Merchant*
+    OR  mcc EQUALS 6534   -- Quasi Cash – Money Transfer – Member Financial Institution*
+    OR  mcc EQUALS 7349   -- Cleaning and Maintenance, Janitorial Services*
+    OR  mcc EQUALS 7511   -- Quasi Cash – Truck Stop Transactions*
+    OR  mcc EQUALS 8651   -- Political Organizations*
+    OR  mcc EQUALS 8699   -- Membership Organizations – Not Elsewhere Classified*
+    OR  mcc EQUALS 8999   -- Professional Services (Not Elsewhere Classified)*
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.9(f) excludes the transaction` txn MEANS
+        `cl.9(f) excludes the MCC at all times` (txn's `merchant category code`)
+    OR  (    `cl.9(f) excludes the MCC from 1 May 2026` (txn's `merchant category code`)
+         AND txn's `transaction date` AT LEAST `the date the asterisked MCCs take effect`)
+
+-- cl.9(i): "Any transactions matching the terms below". "Matching the terms"
+-- is a test on the statement's transaction description, and MATCHING rather
+-- than equalling -- a line reading "AMAZE*NTUC FP" carries the term without
+-- equalling it, and the document catches it. That substring test is layer 1's
+-- work (`classify.l4`), which turns the printed line into the list of
+-- `Description pattern` families it carries; this rule tests membership of
+-- that list and compares no strings.
+--
+-- Each printed term is mapped to the family that covers it, cited below. The
+-- nineteen terms collapse to eleven families because the domain groups the
+-- spellings the issuers use: EZLINK and EZ-LINK are one family, and BAGUS,
+-- CANTINE, SEDAP, Sgebiz, SGeBiz and Singapore E-Business are the six names
+-- of the `Payment platform` family.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.9(i) lists a pattern the transaction carries at all times` txn MEANS
+        elem AMAZE            (txn's `description patterns`)   -- • AMAZE
+    OR  elem AXS              (txn's `description patterns`)   -- • AXS BizPay  • PAYPAL AXS PTE LTD
+    OR  elem `Payment platform` (txn's `description patterns`) -- • BAGUS • CANTINE • SEDAP • Sgebiz • SGeBiz • Singapore E-Business
+    OR  elem `EZ-Link`        (txn's `description patterns`)   -- • EZLINK  • EZ-LINK
+    OR  elem RazerPay         (txn's `description patterns`)   -- • RAZERPAY
+    OR  elem SAM              (txn's `description patterns`)   -- • SAM PAYMENTS
+    OR  elem `Singtel Dash`   (txn's `description patterns`)   -- • SINGTEL DASH
+    OR  elem ShopeePay        (txn's `description patterns`)   -- • SHOPEEPAY
+    OR  elem TRANSIT          (txn's `description patterns`)   -- • TRANSIT 3
+    OR  elem YouTrip          (txn's `description patterns`)   -- • YOUTRIP
+
+-- The two entries the printed list date-stamps: "AXS (with effect from 1 May
+-- 2026)" and "SmoovPay (with effect from 1 May 2026)".
+--
+-- ONE OF THE TWO DATE STAMPS CANNOT SURVIVE THE FAMILIES, and this is where
+-- it goes. The printed list carries THREE AXS terms on two different dates:
+-- "AXS BizPay" and "PAYPAL AXS PTE LTD" with no date, and bare "AXS" from
+-- 1 May 2026. The domain has ONE `AXS` family covering all of them, so the
+-- two dates cannot both be represented. AXS is put in the at-all-times list
+-- above, because that keeps the two UNDATED terms excluded as the document
+-- states them without qualification, and because it is the lower answer. The
+-- cost is that a bare "AXS PTE LTD" line dated before 1 May 2026 is excluded
+-- here and is not excluded by the document. SmoovPay has no undated sibling
+-- in the family, so its date stamp survives intact and stays here.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.9(i) lists a pattern the transaction carries from 1 May 2026` txn MEANS
+    elem SmoovPay (txn's `description patterns`)               -- • SmoovPay (with effect from 1 May 2026)
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.9(i) excludes the transaction` txn MEANS
+        `cl.9(i) lists a pattern the transaction carries at all times` txn
+    OR  (    `cl.9(i) lists a pattern the transaction carries from 1 May 2026` txn
+         AND txn's `transaction date` AT LEAST `the date the asterisked MCCs take effect`)
+
+-- cl.9(a)-(e) turn on WHAT KIND OF POSTING this is, which is the domain's
+-- `charge kind`: the statement shows it, and a cardholder can depose to it
+-- without reading any T&C. Each limb is its own rule so that each can be
+-- cited on its own and checked against its own printed words.
+--
+-- cl.9(a): "Any transaction that is subsequently cancelled, voided, refunded
+-- or reversed ... for any reason". The domain's `Refund or reversal` is the
+-- posting the bank makes when that happens.
+--
+-- THE TENSE IS NOT REPRESENTED, AND IT MATTERS. "Subsequently" makes this a
+-- fact about the FUTURE of the charge: a purchase that earns today and is
+-- refunded next week was never Eligible Spend. This rule tests the posting in
+-- front of it, so it catches the reversal itself and not the original charge
+-- it undoes. cl.14 and cl.21 are the clauses that claw the original back, and
+-- they are month-ledger adjustments this module does not compute.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.9(a) excludes the transaction` txn MEANS
+    txn's `charge kind` EQUALS `Refund or reversal`
+
+-- cl.9(b): "Pre-authorisation transactions on the Card account, e.g. hotel
+-- bookings".
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.9(b) excludes the transaction` txn MEANS
+    txn's `charge kind` EQUALS `Pre-authorisation`
+
+-- cl.9(c): "Balance transfers, cash advance, My Preferred Payment Plan
+-- ("MP3") monthly transactions, and any fees and charges (including annual
+-- fees, interest charges, cheque processing fees, administrative fees, cash
+-- advance fees, finance charges and/or late payment charges and other
+-- miscellaneous fees and charges)". Five of the domain's charge kinds, one
+-- per named limb; the long parenthetical is all fees and charges, which the
+-- domain splits into the bank's own charges and the interest it levies.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.9(c) excludes the transaction` txn MEANS
+    CONSIDER txn's `charge kind`
+    WHEN `Balance or funds transfer`          THEN TRUE   -- balance transfers
+    WHEN `Cash advance or quasi-cash`         THEN TRUE   -- cash advance
+    WHEN `Instalment plan transaction`        THEN TRUE   -- MP3 monthly transactions
+    WHEN `Annual fee or bank charge`          THEN TRUE   -- annual fees, cheque processing, administrative, cash advance fees
+    WHEN `Interest or finance charge`         THEN TRUE   -- interest charges, finance charges, late payment charges
+    OTHERWISE                                      FALSE
+
+-- cl.9(d): "0% interest-free Instalment Payment Plan ("IPP") transaction(s)".
+-- The domain has ONE instalment constructor, so cl.9(d)'s IPP and cl.9(c)'s
+-- MP3 land on the same fact and this rule is subsumed by cl.9(c) above. It is
+-- written out anyway, because the document states them as two limbs and a
+-- reader checking cl.9(d) against the encoding should find cl.9(d).
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.9(d) excludes the transaction` txn MEANS
+    txn's `charge kind` EQUALS `Instalment plan transaction`
+
+-- cl.9(e): "All other bill payments via internet banking and fees charged by
+-- DBS". Two limbs: the domain's `Bill payment via internet banking`, and
+-- DBS's own fees, which are the same `Annual fee or bank charge` cl.9(c)
+-- already reaches.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.9(e) excludes the transaction` txn MEANS
+        txn's `charge kind` EQUALS `Bill payment via internet banking`
+    OR  txn's `charge kind` EQUALS `Annual fee or bank charge`
+
+-- cl.9(ii) -- "Any other transactions determined by DBS from time to time" --
+-- is DBS's open discretion, and is not encodable in principle: there is no
+-- fact to test. It is the ONE limb of cl.9 that still reaches the caller as a
+-- `conditions` string instead of a guard.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`the transaction is Eligible Spend` txn MEANS
+        NOT (`cl.9(a) excludes the transaction` txn)
+    AND NOT (`cl.9(b) excludes the transaction` txn)
+    AND NOT (`cl.9(c) excludes the transaction` txn)
+    AND NOT (`cl.9(d) excludes the transaction` txn)
+    AND NOT (`cl.9(e) excludes the transaction` txn)
+    AND NOT (`cl.9(f) excludes the transaction` txn)
+    AND NOT (`cl.9(i) excludes the transaction` txn)
+
+
+§§ `Appendix 1 — merchant-specific exclusions`
+
+GIVETH A DATE
+`the date American Express earns bonus at 7-Eleven` MEANS YMD 2026 8 13
+
+GIVEN card IS A Card
+GIVETH A BOOLEAN
+`the card is the American Express` card MEANS
+    CONSIDER card
+    WHEN `DBS yuu American Express` THEN TRUE
+    OTHERWISE                            FALSE
+
+-- Appendix 1's product-level exclusions -- plastic bags, tobacco, delivery
+-- charges, services, cash-like items, statutory products, DFI vouchers and
+-- magazines, gift cards, infant formula, sushi and sashimi, purchases at
+-- Changi Airport stores, 7-Eleven vending machines, foodpanda dine-in,
+-- pandago, corporate accounts, pandapay top-ups, pandapro subscriptions,
+-- fees and rider tips, Singtel corporate plans, prepaid top-ups and
+-- recurring bill payments -- all turn on WHAT WAS IN THE BASKET. The domain
+-- Transaction carries no basket, so none of them is testable here. They
+-- reach the caller as a `conditions` string.
+--
+-- What IS testable from the facts on hand: the two American Express rows,
+-- the Singtel blanket base exclusion, Cold Storage On The Go, the "PayPal"
+-- description at foodpanda and Gojek, and CHAGEE's App-only and
+-- Singapore-only limits.
+--
+-- APPENDIX 1's SimplyGo ROW IS NO LONGER ENCODED, and the reason is worth
+-- stating rather than burying. "Points will not be awarded for Top-Up
+-- transactions" turns on a fact -- that the posting is a stored-value top-up
+-- rather than a ride -- which the domain's `Transaction` does not carry: it
+-- is neither a `Merchant`, nor a `Description pattern` family (a top-up line
+-- and a ride line both read SIMPLYGO), nor a `Charge kind`. The nearest
+-- charge kind is `Cash advance or quasi-cash`, which is what the card
+-- networks and yuu's own MCC table (6529, 6530, 6540, "Quasi Cash — Remote
+-- Stored Value Load") call a stored-value load -- but cl.9(c) ALREADY
+-- excludes every quasi-cash posting everywhere, so keying this row on it
+-- would produce a rule with no work to do, dressed as coverage. A vacuous
+-- rule is worse than a stated gap. So the row is recorded as a domain gap
+-- and reaches the caller as a `conditions` string.
+--
+-- What partly covers it in the meantime: a top-up posting at MCC 6540 is
+-- already excluded by cl.9(f) at all times, and one posting as quasi-cash by
+-- cl.9(c). Only a top-up posted as a retail purchase at MCC 4111 escapes.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`the transaction description is PayPal` txn MEANS
+    elem PayPal (txn's `description patterns`)
+
+-- CHAGEE is the one Participating Merchant whose row is a POSITIVE
+-- condition rather than an exclusion: "Points will only be awarded for orders
+-- placed via the CHAGEE App and applicable for purchases in Singapore only."
+-- cl.8's own right column says the same ("Orders placed via CHAGEE App"), so
+-- a CHAGEE transaction that was not an App order never reaches the CHAGEE
+-- constructor in the first place. This rule catches the residual case: the
+-- merchant is CHAGEE, but the purchase was not in Singapore.
+--
+-- IT MUST READ `merchant` DIRECTLY, NOT THROUGH THE PARTICIPATING-MERCHANT
+-- TEST. That test already requires `made in Singapore`, so a rule written as
+-- "at CHAGEE as a Participating Merchant, and not in Singapore" is a
+-- contradiction that can never fire. This rule was written that way in the
+-- first pass and did no work at all; the module's answers were right anyway,
+-- because a CHAGEE purchase abroad falls out of cl.8 and is Non-yuu Merchant
+-- Spend, but it earned 0.5 base where Appendix 1 awards none. Fixed here, and
+-- the new answer is 0.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`Appendix 1 denies points at CHAGEE` txn MEANS
+        txn's `merchant` EQUALS CHAGEE
+    AND NOT (txn's `made in Singapore`)
+
+GIVEN card IS A Card
+      txn  IS A Transaction
+GIVETH A BOOLEAN
+`Appendix 1 denies Base Rewards` card txn MEANS
+    -- Singtel, "Applicable to Base Rewards": "Points will not be awarded for
+    -- all transactions." Read literally this is a blanket denial of Base
+    -- Rewards at a merchant cl.8 nevertheless lists as Participating. See
+    -- `the status for` below for what that collides with.
+        `the transaction is at` txn Singtel
+    -- foodpanda and Gojek, "Applicable to Base and Bonus Rewards".
+    OR  (    (   `the transaction is at` txn foodpanda
+              OR `the transaction is at` txn Gojek)
+         AND `the transaction description is PayPal` txn)
+    -- SimplyGo, "Applicable to Base and Bonus Rewards: Points will not be
+    -- awarded for Top-Up transactions." NOT ENCODED -- the domain carries no
+    -- top-up fact, and the nearest one is already spent by cl.9(c). See the
+    -- note above this section.
+    OR  `Appendix 1 denies points at CHAGEE` txn
+
+GIVEN card IS A Card
+      txn  IS A Transaction
+GIVETH A BOOLEAN
+`Appendix 1 denies Bonus Rewards` card txn MEANS
+    -- 7-Eleven: bonus denied on the American Express until 13 Aug 2026, and
+    -- expressly restored on that date.
+        (    `the transaction is at` txn `7-Eleven`
+         AND `the card is the American Express` card
+         AND txn's `transaction date` LESS THAN `the date American Express earns bonus at 7-Eleven`)
+    -- Charge+: bonus denied on the American Express, with no end date stated.
+    OR  (    `the transaction is at` txn `Charge+`
+         AND `the card is the American Express` card)
+    -- Cold Storage On The Go: "Bonus yuu Points will not be awarded".
+    OR  `the transaction is at` txn `Cold Storage On The Go`
+    -- Everything that already denies Base also denies Bonus, either because
+    -- the row says "Base and Bonus" or through the closing sentence below.
+    OR  `Appendix 1 denies Base Rewards` card txn
+
+
+§§ `6 — Base Rewards`
+
+-- cl.9 defines "Eligible Spend", and cl.7(b)(i) is the only clause that uses
+-- the defined term for a threshold. cl.6 and cl.7(a) condition earning on
+-- spend "charged and posted to your DBS yuu Card" and do NOT repeat the
+-- defined term -- so on the narrowest reading a tax payment at MCC 9311 would
+-- still earn 0.5 Base Points and merely not count towards the S$800.
+--
+-- THIS MODULE TAKES THE WIDER READING: cl.9's exclusions deny earning, not
+-- merely threshold credit. Two reasons, both from the text. cl.9's preamble
+-- calls the excluded list "qualified spend", which is the document's general
+-- notion of spend that counts; and the list itself excludes annual fees,
+-- interest charges and late payment charges (cl.9(c)), which no reading of
+-- cl.6 would award Base Rewards on. The narrow reading is recorded as an
+-- open question and the wider reading is also the LOWER answer, so it does
+-- not overstate. See the defeasibility sites at the end.
+GIVEN card IS A Card
+      txn  IS A Transaction
+GIVETH A NUMBER
+`the Base Rewards points per dollar` card txn MEANS
+    BRANCH
+        IF  NOT (`the transaction is Eligible Spend` txn)   THEN 0
+        IF  `Appendix 1 denies Base Rewards` card txn       THEN 0
+        -- Appendix 1: at Cold Storage On The Go "only base 0.5 yuu point
+        -- (equivalent to 0.25% cash rebates) will be awarded" -- the non-yuu
+        -- figure, at a merchant that is otherwise yuu Merchant Spend.
+        IF  `the transaction is at` txn `Cold Storage On The Go` THEN 0.5
+        OTHERWISE
+            CONSIDER `the spend category for` txn
+            WHEN `yuu Merchant Spend`     THEN 1
+            WHEN `SimplyGo spend`         THEN 0.5
+            WHEN `Non-yuu Merchant Spend` THEN 0.5
+
+
+§§ `7 — Bonus Rewards`
+
+-- cl.7(b)'s Minimum Spend Requirement is a whole-of-MONTH qualification, and
+-- this rule reads it as a fact about the month SO FAR: the two figures come
+-- off `Month position`, which the statement shows. So the same transaction
+-- answers differently before and after the month's 4th Participating
+-- Merchant, which is what a threshold crossed once in a month does.
+--
+-- Note the asymmetry the text creates and this rule preserves: the S$800 limb
+-- is measured in ELIGIBLE Spend (cl.9's defined term), while the 4-merchant
+-- limb is measured in Participating Merchants "transacted at" (cl.8's defined
+-- term). They are counted over different populations.
+GIVEN month IS A `Month position`
+GIVETH A BOOLEAN
+`the Minimum Spend Requirement is met` month MEANS
+        month's `yuu eligible spend so far this calendar month` AT LEAST 800
+    AND month's `yuu participating merchants transacted so far this calendar month` AT LEAST 4
+
+-- ADDITIVE, AND THE TEXT SAYS NEITHER. cl.7(a) awards 9 points at a yuu
+-- merchant with no minimum spend; cl.7(b) awards 26 at the same merchant once
+-- the Minimum Spend Requirement is met. Nothing in the document says whether
+-- 7(b) ADDS to 7(a) or REPLACES it. This module adds them, on the spec's
+-- arithmetic (section 4.6): additive gives 1 + 9 + 26 = 36 points per S$1 and
+-- a cap of 28,800 / 35 bonus points = S$822.86 of bonus-earning spend, which
+-- is the figure the secondary source states. The replacement reading gives 26
+-- bonus points and S$1,108, which corresponds to nothing. That is evidence,
+-- not proof -- so every answer that actually depends on the sum carries
+-- `status` Unconfirmed, and the ambiguity travels with it as a `conditions`
+-- sentence.
+--
+-- ONE OF THE TWO SUPPORTS HAS BEEN WITHDRAWN, so the argument above is
+-- weaker than the first pass recorded it.
+--
+-- THE MILES FIGURE NO LONGER CORROBORATES ANYTHING. At cl.12's 0.28 miles
+-- per yuu Point -- the ruling, see `miles per yuu Point` -- 36 points give
+-- 10.08 miles per dollar, which is round in nothing and says nothing about
+-- how cl.7(a) and cl.7(b) combine.
+--
+--   WITHDRAWN, recorded so the retraction is findable: the first pass read
+--   cl.7's parenthesis as the conversion, 8,000 / 28,800, under which the
+--   same 36 points give exactly 10.0, and offered that roundness as the
+--   second of "two independent figures landing on the additive reading".
+--   The conversion was wrong, so the roundness was an artefact of it. Do not
+--   reinstate this figure without reopening FORK 1 at the end of the module.
+--
+-- The CAP figure survives untouched, because it is stated in POINTS: 28,800 /
+-- 35 needs 35 = 9 + 26, which is the additive reading and nothing else, and
+-- no conversion enters it. So the additive reading now rests on one
+-- corroborating figure rather than two. It is still the reading taken, and
+-- the branch that depends on it was already Unconfirmed.
+-- cl.7(b)'s table awards 26 at BOTH yuu Merchant Spend and SimplyGo, so the
+-- figure does not vary by category. Kept as a module-level helper rather than
+-- a WHERE binding: a WHERE or LET binding that takes parameters is a local
+-- function, and Catala has no local function definitions.
+GIVEN m IS A `Month position`
+GIVETH A NUMBER
+`the cl.7(b) points for` m MEANS
+    IF   `the Minimum Spend Requirement is met` m
+    THEN 26
+    ELSE 0
+
+GIVEN card  IS A Card
+      month IS A `Month position`
+      txn   IS A Transaction
+GIVETH A NUMBER
+`the Bonus Rewards points per dollar` card month txn MEANS
+    BRANCH
+        -- Appendix 1's closing sentence: "DBS will not award Bonus Rewards on
+        -- transactions that do not earn Base Rewards from yuu/Participating
+        -- Merchants, unless otherwise stated." A zero base is therefore a
+        -- gate on the bonus, whatever the cause of the zero.
+        IF  `the Base Rewards points per dollar` card txn EQUALS 0   THEN 0
+        IF  `Appendix 1 denies Bonus Rewards` card txn               THEN 0
+        OTHERWISE
+            CONSIDER `the spend category for` txn
+            WHEN `yuu Merchant Spend`     THEN 9   PLUS `the cl.7(b) points for` month
+            WHEN `SimplyGo spend`         THEN 9.5 PLUS `the cl.7(b) points for` month
+            WHEN `Non-yuu Merchant Spend` THEN 0
+
+-- TRUE exactly where the answer depends on cl.7(a) and cl.7(b) BOTH
+-- contributing, which is the one place the unsettled additive reading changes
+-- the number. Where only cl.7(a) applies, or only the base, nothing
+-- unsettled was applied and the answer is Verified.
+GIVEN card  IS A Card
+      month IS A `Month position`
+      txn   IS A Transaction
+GIVETH A BOOLEAN
+`the answer depends on the additive reading` card month txn MEANS
+        `the Bonus Rewards points per dollar` card month txn GREATER THAN 0
+    AND `the Minimum Spend Requirement is met` month
+
+
+§§ `7 and 12 — the cap and the conversion to miles`
+
+-- cl.7: "Total Bonus Rewards is capped at 28,800 yuu Points ... per calendar
+-- month". The cap is on BONUS points only; cl.6(i) states in terms that the
+-- Base Rewards are uncapped.
+GIVETH A NUMBER
+`the Bonus Rewards cap in yuu Points per calendar month` MEANS 28_800
+
+-- THE CONVERSION IS cl.12's 0.28, AND THE FIRST PASS HAD IT WRONG. cl.12
+-- states "1 yuu Point is equivalent to 0.5% cash rebate or 0.28 miles or
+-- more, depending on the redemption item on the yuu Rewards catalogue". That
+-- is the operative sentence: it is the clause that states the conversion, it
+-- states one figure, and it is held.
+--
+-- The first pass instead derived 8,000 / 28,800 = 0.2777... from cl.7's
+-- parenthesis, "28,800 yuu Points (worth up to S$144 cash rebates or 8,000
+-- miles)", on the ground that the pair was exact and sat "just below cl.12's
+-- 0.28, consistent with 'or more'". BOTH HALVES OF THAT FAIL.
+--
+--   * The pair is not exact. 28,800 x 0.005 is exactly S$144, so the cash
+--     limb checks out; 28,800 x 0.28 is 8,064, not 8,000. The mile figure is
+--     rounded and the cash figure is not, which is what "up to" signals.
+--   * A figure BELOW a floor is not consistent with the floor. cl.12 says
+--     "0.28 or more"; 0.2777 is less. The first pass had the inequality
+--     backwards, and a cross-module case asserting AT LEAST 0.28 fails on it.
+--
+-- So: 0.28, cited to cl.12, `conversion status` Verified. cl.7 stays in
+-- `sources` because the cap it states is relied on and because a reader
+-- meeting its "8,000 miles" should be able to find the clause that settles
+-- it. The two readings are recorded as a fork at the end of this module.
+--
+-- The consequence at the headline rate: a yuu merchant with the Minimum
+-- Spend Requirement met earns 36 points per S$1, which is 36 x 0.28 = 10.08
+-- miles per dollar, not the round 10.0 the first pass reported. The cap is
+-- untouched, because it is stated in POINTS and divided by points per
+-- dollar: 28,800 / 35 = S$822.86 either way.
+GIVETH A NUMBER
+`miles per yuu Point` MEANS 0.28
+
+-- The domain asks for the cap in DOLLARS of bonus-earning spend, which is the
+-- point cap divided by the bonus points earned per dollar at the rate being
+-- returned. At a yuu merchant with the Minimum Spend Requirement met that is
+-- 28,800 / 35 = S$822.86; with only cl.7(a), 28,800 / 9 = S$3,200.
+--
+-- Where no bonus is earned the answer is governed by cl.6(i) -- "no cap to
+-- the Base Rewards" -- so `capped` is FALSE and the dollar figure is
+-- meaningless, as the domain specifies. cl.10 supplies both other axes for
+-- every branch: calendar month, attributed by transaction date.
+-- ONE POOL, NOT SEVERAL. cl.7 states a single figure -- "Total Bonus
+-- Rewards is capped at 28,800 yuu Points ... per calendar month" -- over
+-- every Bonus Reward the document awards, at a yuu merchant and at SimplyGo
+-- alike. So both branches name the same pot, and a cardholder cannot spend
+-- one merchant's cap and still have another's.
+GIVEN `bonus points per dollar` IS A NUMBER
+GIVETH A Cap
+`the cap for` `bonus points per dollar` MEANS
+    IF   `bonus points per dollar` GREATER THAN 0
+    THEN Cap WITH
+             `pool`                  IS "Total Bonus Rewards"
+             `capped`                IS TRUE
+             `bonus spend per month` IS `the Bonus Rewards cap in yuu Points per calendar month`
+                                          DIVIDED BY `bonus points per dollar`
+             `basis`                 IS `Calendar month`
+             `attribution`           IS `By transaction date`
+    ELSE Cap WITH
+             `pool`                  IS "Total Bonus Rewards"
+             `capped`                IS FALSE
+             `bonus spend per month` IS 0
+             `basis`                 IS `Calendar month`
+             `attribution`           IS `By transaction date`
+
+
+§§ `The conditions, the citations and the status`
+
+-- THE `conditions` LIST IS BUILT INLINE, in the answer itself. It used to be
+-- a helper here. A definition whose RESULT type is a string, or a list of
+-- them, has no Catala counterpart and is refused outright, while a string
+-- FIELD of a record is simply elided along with its value expression -- so
+-- the conditions have to be written where they are stored. The cost is a
+-- longer export; the benefit is that the module lowers.
+
+-- A citation is carried only where the clause it names actually did work in
+-- THIS answer, so this one-liner appears throughout the assembly below.
+GIVEN `the clause applied` IS A BOOLEAN
+      cite                 IS A Provenance
+GIVETH A LIST OF Provenance
+`cited if` `the clause applied` cite MEANS
+    IF `the clause applied` THEN LIST cite ELSE EMPTY
+
+-- One Provenance per clause actually relied on for THIS answer.
+--
+-- `concat` is not one of the prelude combinators the Catala lowering absorbs;
+-- `append` is. So the citations are assembled from two-argument appends. The
+-- groups are named in a WHERE and the appends are balanced rather than
+-- right-nested, which keeps the deepest expression two levels rather than
+-- eight and keeps every line readable. A WHERE binding that takes NO
+-- parameters is an ordinary local value; one that takes parameters would be a
+-- local function, which has no Catala counterpart, which is why `cited if` is
+-- a module-level helper and these are not.
+GIVEN card  IS A Card
+      month IS A `Month position`
+      txn   IS A Transaction
+GIVETH A LIST OF Provenance
+`the sources for` card month txn MEANS
+    append `the clauses every answer rests on`
+           (append `the cl.9 clauses that bit`
+                   (append `the cl.6 and cl.7 clauses that applied`
+                           `the Appendix 1 rows that applied`))
+    WHERE
+        `the clauses every answer rests on` MEANS
+            LIST `S6 base rewards`, `S8 participating merchants`, `S10 calendar month`, `S12 conversion`, `S7 cap`
+
+        -- One citation per limb of cl.9 that actually bit, so a reader who
+        -- asks why a transaction earned nothing is pointed at the sentence
+        -- that says so rather than at the whole of cl.9. Where nothing bit,
+        -- cl.9(ii) is cited instead: DBS's open discretion is the one limb
+        -- that could still bite and that nothing here can test.
+        `the cl.9 clauses that bit` MEANS
+            IF   `the transaction is Eligible Spend` txn
+            THEN LIST `S9ii DBS discretion`
+            ELSE append (LIST `S9 eligible spend`)
+                        (append `the cl.9 limbs about the kind of posting`
+                                `the cl.9 limbs about the code and the description`)
+
+        -- cl.9(a) to cl.9(e), every one of them a test on `charge kind`.
+        `the cl.9 limbs about the kind of posting` MEANS
+            append (append (`cited if` (`cl.9(a) excludes the transaction` txn) `S9a refunded`)
+                           (`cited if` (`cl.9(b) excludes the transaction` txn) `S9b pre-authorisation`))
+                   (append (`cited if` (`cl.9(c) excludes the transaction` txn) `S9c transfers fees and charges`)
+                           (append (`cited if` (`cl.9(d) excludes the transaction` txn) `S9d instalment payment plan`)
+                                   (`cited if` (`cl.9(e) excludes the transaction` txn) `S9e internet banking bill payments`)))
+
+        -- cl.9(f)'s MCC table and cl.9(i)'s description list.
+        `the cl.9 limbs about the code and the description` MEANS
+            append (`cited if` (`cl.9(f) excludes the transaction` txn) `S9f excluded MCCs`)
+                   (`cited if` (`cl.9(i) excludes the transaction` txn) `S9i excluded descriptions`)
+
+        `the cl.6 and cl.7 clauses that applied` MEANS
+            append (IF   `the Bonus Rewards points per dollar` card month txn GREATER THAN 0
+                    THEN LIST `S7a bonus no minimum`
+                    ELSE LIST `A1 closing sentence`, `S6i no cap on base`)
+                   (append (`cited if` (`the Minimum Spend Requirement is met` month) `S7b bonus minimum spend`)
+                           (IF   `the spend category for` txn EQUALS `yuu Merchant Spend`
+                            THEN LIST `S6ii crediting`, `S11 linkage at point of transaction`, `S17 crediting on linkage`
+                            ELSE EMPTY))
+
+        `the Appendix 1 rows that applied` MEANS
+            append `the Appendix 1 rows that turn on the American Express`
+                   `the Appendix 1 rows that turn on the merchant alone`
+
+        -- The two rows whose denial is keyed to the network the card runs on.
+        `the Appendix 1 rows that turn on the American Express` MEANS
+            append (`cited if` `this is a 7-Eleven run on the American Express` `A1 seven eleven amex`)
+                   (`cited if` `this is a Charge+ transaction on the American Express` `A1 charge plus amex`)
+
+        `this is a 7-Eleven run on the American Express` MEANS
+                `the transaction is at` txn `7-Eleven`
+            AND `the card is the American Express` card
+
+        `this is a Charge+ transaction on the American Express` MEANS
+                `the transaction is at` txn `Charge+`
+            AND `the card is the American Express` card
+
+        `the Appendix 1 rows that turn on the merchant alone` MEANS
+            append (append (`cited if` (`the transaction is at` txn `Cold Storage On The Go`) `A1 cold storage on the go`)
+                           (`cited if` (`the transaction is at` txn Singtel) `A1 singtel base`))
+                   (append (`cited if` (`the transaction is at` txn CHAGEE) `A1 chagee app only`)
+                           (append (`cited if` (`the transaction is at` txn SimplyGo) `A1 simplygo top up`)
+                                   (`cited if` `this is a foodpanda or Gojek transaction` `A1 paypal description`)))
+
+        `this is a foodpanda or Gojek transaction` MEANS
+                `the transaction is at` txn foodpanda
+            OR  `the transaction is at` txn Gojek
+
+-- Two branches are Unconfirmed, and nothing else is. Both are places where
+-- the held document does not settle a question that changes the NUMBER; a
+-- question that changes only when a point is credited leaves the status
+-- alone and travels in `conditions`.
+GIVEN card  IS A Card
+      month IS A `Month position`
+      txn   IS A Transaction
+GIVETH A Status
+`the status for` card month txn MEANS
+    BRANCH
+        -- Appendix 1 denies Base Rewards on "all transactions" at Singtel,
+        -- while cl.8 lists Singtel as a Participating Merchant and Appendix 1
+        -- also gives Singtel a "Base and Bonus" exclusion list -- which would
+        -- be empty of effect if no base were ever earned. Read with the
+        -- closing sentence ("no Bonus Rewards on transactions that do not
+        -- earn Base Rewards ... unless otherwise stated") the literal
+        -- reading earns nothing at all at Singtel. This module returns that
+        -- zero, and marks it Unconfirmed rather than presenting a
+        -- self-contradicting document as settled.
+        IF  `the transaction is at` txn Singtel               THEN Unconfirmed
+        -- The additive reading of cl.7(a) + cl.7(b).
+        IF  `the answer depends on the additive reading` card month txn       THEN Unconfirmed
+        OTHERWISE                                                                  Verified
+
+
+§§ `The answer`
+
+@export What a single transaction earns on a DBS yuu Visa or DBS yuu American Express Card, in yuu Points and miles per dollar, with the monthly bonus cap, the conditions still attached, and the clause of the DBS yuu Card T&C each figure comes from.
+GIVEN card       IS A Card        @desc The card the charge was made on. Use `DBS yuu Visa` or `DBS yuu American Express`; Appendix 1 treats the two differently at 7-Eleven and Charge+.
+      cardholder IS A Cardholder  @desc The cardholder's standing facts. Only `yuu account linked to the card` is read, and only to warn about crediting.
+      month      IS A `Month position` @desc Where this calendar month stands so far, for cl.7(b)'s S$800 of Eligible Spend and 4 Participating Merchants.
+      txn        IS A Transaction @desc The one charge being asked about, as the statement shows it.
+GIVETH A `Rate answer`
+`DBS yuu earns on` card cardholder month txn MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS `the points`
+        `miles per point`                                     IS `miles per yuu Point`
+        `conversion status`                                   IS Verified
+        `miles per dollar`                                    IS `the miles`
+        -- This card's rules never read the acquirer's indicator, so the two
+        -- conditional figures are the same figure and the flag is FALSE even
+        -- when the transaction carries `Unknown`.
+        `miles per dollar if the merchant flags online`       IS `the miles`
+        `miles per dollar if the merchant flags card-present` IS `the miles`
+        `depends on the merchant indicator`                   IS FALSE
+        -- DERIVED FROM THE HEADLINE FIGURE, never computed beside it. The
+        -- flag answers "is the rate I am being shown a bonus rate", so it has
+        -- to be read off the rate that IS shown: `miles per dollar` above the
+        -- base-only rate. Computing it from the bonus points instead lets the
+        -- two disagree on a card whose headline carries the LOWER of two
+        -- indicator-conditional figures -- the flag would say TRUE of a bonus
+        -- the headline does not contain. This card never reads the indicator,
+        -- so the two agree here today; the point of deriving it is that they
+        -- cannot come apart if that changes.
+        `earns the bonus rate`                                IS `the miles` GREATER THAN `the base miles`
+        `cap`                                                 IS `the cap for` `the bonus`
+        -- Short sentences the consumer app prints beside the rate, each
+        -- attached only where it bites, so a Non-yuu purchase does not carry
+        -- the yuu merchant advice and vice versa. Written here rather than in
+        -- a helper: see the note above `the sources for`.
+        `conditions`                                          IS
+            concat (LIST
+                -- cl.6(ii), and spec section 4.6's first open question.
+                -- Scanning is a CREDITING term, not an earning term; but the
+                -- document does not say what becomes of the Base Reward if
+                -- you never scan.
+                (IF       `the spend category for` txn EQUALS `yuu Merchant Spend`
+                      AND `the Base Rewards points per dollar` card txn GREATER THAN 0
+                 THEN LIST "scan or link your yuu ID at the till and the Base Reward is credited the same day (cl.6(ii)); the T&C does not say what happens to it if you never scan"
+                 ELSE EMPTY)
+                -- cl.7(b), stated as what the cardholder still has to do.
+                (IF   NOT (`the Minimum Spend Requirement is met` month)
+                 THEN LIST "the 26-point bonus needs S$800 of Eligible Spend and 4 Participating Merchants in this calendar month, and the month has not met it yet (cl.7(b))"
+                 ELSE LIST "this month has met the Minimum Spend Requirement: S$800 of Eligible Spend and 4 Participating Merchants (cl.7(b))")
+                -- The additive reading, carried wherever it is load-bearing.
+                (IF   `the answer depends on the additive reading` card month txn
+                 THEN LIST "this rate adds cl.7(a)'s bonus (9 points, or 9.5 at SimplyGo) to cl.7(b)'s 26; the T&C says neither that they add nor that cl.7(b) replaces cl.7(a)"
+                 ELSE EMPTY)
+                -- cl.11 and cl.17: linkage governs crediting, never earning.
+                (IF   NOT (cardholder's `yuu account linked to the card`)
+                 THEN LIST "this card is not linked to a yuu account: points are still earned, but cl.17 credits them only on linkage and they expire 90 days from issuance while the card stays unlinked"
+                 ELSE EMPTY)
+                -- cl.9(ii): the ONE limb of cl.9 with no fact to test. Limbs
+                -- (a) to (f) and (i) are now guards on the rate above.
+                (IF   `the transaction is Eligible Spend` txn
+                 THEN LIST "DBS may exclude any other transaction from Eligible Spend from time to time (cl.9(ii)), which is a discretion with no stated test"
+                 ELSE EMPTY)
+                -- Appendix 1's SimplyGo row, which the domain cannot test.
+                (IF   `the transaction is at` txn SimplyGo
+                 THEN LIST "not checked here: Appendix 1 awards no points on SimplyGo Top-Up transactions, and the statement facts held do not distinguish a top-up from a ride"
+                 ELSE EMPTY)
+                -- Appendix 1's basket-level exclusions, where they bite.
+                (IF       NOT (`the spend category for` txn EQUALS `Non-yuu Merchant Spend`)
+                      AND `the Base Rewards points per dollar` card txn GREATER THAN 0
+                 THEN LIST "not checked here: Appendix 1 excludes named products at this merchant, such as plastic bags, tobacco, delivery charges, services, gift cards and cash-like items"
+                 ELSE EMPTY)
+                -- cl.10, said plainly.
+                (LIST "counts towards this calendar month by transaction date, which is the merchant's settlement date with its acquirer (cl.10)")
+                -- Singtel: see `the status for`.
+                (IF   `the transaction is at` txn Singtel
+                 THEN LIST "Appendix 1 denies Base Rewards on all Singtel transactions, yet cl.8 lists Singtel as a Participating Merchant and Appendix 1 gives it a bonus exclusion list; read with the closing sentence this earns nothing, but the document contradicts itself here"
+                 ELSE EMPTY))
+        `sources`                                             IS `the sources for` card month txn
+        `status`                                              IS `the status for` card month txn
+    WHERE
+        `the base`       MEANS `the Base Rewards points per dollar` card txn
+        `the bonus`      MEANS `the Bonus Rewards points per dollar` card month txn
+        `the points`     MEANS `the base` PLUS `the bonus`
+        `the miles`      MEANS `the points` TIMES `miles per yuu Point`
+        `the base miles` MEANS `the base` TIMES `miles per yuu Point`
+
+
+§§ `6, 7, 8, 9 and Appendix 1 — illustrations`
+
+-- The fixtures below are built from the document's own tables (cl.6, cl.7(a),
+-- cl.7(b), cl.8) and from Appendix 1's named rows. They are not taken from
+-- any secondary source.
+
+GIVETH A Cardholder
+`a linked cardholder` MEANS
+    Cardholder WITH
+        `Solitaire preferred rewards categories`               IS EMPTY
+        `yuu account linked to the card`                       IS TRUE
+        `HSBC Everyday Global Account deposits ADB this month` IS 0
+        `PAssion membership registered and card linked in yuu` IS FALSE
+
+GIVETH A Cardholder
+`an unlinked cardholder` MEANS
+    Cardholder WITH
+        `Solitaire preferred rewards categories`               IS EMPTY
+        `yuu account linked to the card`                       IS FALSE
+        `HSBC Everyday Global Account deposits ADB this month` IS 0
+        `PAssion membership registered and card linked in yuu` IS FALSE
+
+-- Early in the month: neither limb of cl.7(b) met.
+GIVETH A `Month position`
+`a month below the threshold` MEANS
+    `Month position` WITH
+        `yuu eligible spend so far this calendar month`                     IS 120
+        `yuu participating merchants transacted so far this calendar month` IS 2
+        `PAssion spend at Participating Stores so far this month`           IS 0
+        `PAssion spend at non-Participating Stores so far this month`       IS 0
+
+-- Both limbs of cl.7(b) met.
+GIVETH A `Month position`
+`a month above the threshold` MEANS
+    `Month position` WITH
+        `yuu eligible spend so far this calendar month`                     IS 950
+        `yuu participating merchants transacted so far this calendar month` IS 4
+        `PAssion spend at Participating Stores so far this month`           IS 0
+        `PAssion spend at non-Participating Stores so far this month`       IS 0
+
+-- cl.7(b) is a conjunction: S$800 AND 4 merchants. This month has the money
+-- and not the merchants.
+GIVETH A `Month position`
+`a month with the spend but not the merchants` MEANS
+    `Month position` WITH
+        `yuu eligible spend so far this calendar month`                     IS 2_000
+        `yuu participating merchants transacted so far this calendar month` IS 3
+        `PAssion spend at Participating Stores so far this month`           IS 0
+        `PAssion spend at non-Participating Stores so far this month`       IS 0
+
+-- A fixture carries BOTH the printed strings and their classification. The
+-- strings are what a statement shows and what the projections display; the
+-- `merchant` and `description patterns` enumerations are what the rules read.
+-- Layer 1 (`classify.l4`) is what relates the two in production; these
+-- fixtures set both sides directly, so a reader can check the pair by eye and
+-- so this module needs no import of the string layer.
+--
+-- `charge kind` defaults to `Retail purchase`, which is what every fixture
+-- built here is. The cl.9(a)-(e) illustrations re-post the same purchase
+-- under another kind with `the same purchase posted as`.
+GIVEN name        IS A STRING
+      merchant    IS A Merchant
+      mcc         IS A NUMBER
+      description IS A STRING
+      patterns    IS A LIST OF `Description pattern`
+      `on`        IS A DATE
+GIVETH A Transaction
+`a purchase at` name merchant mcc description patterns `on` MEANS
+    Transaction WITH
+        `merchant name`           IS name
+        `merchant`                IS merchant
+        `merchant category code`  IS mcc
+        `transaction description` IS description
+        `description patterns`    IS patterns
+        `charge kind`             IS `Retail purchase`
+        `amount`                  IS 100
+        `currency`                IS "SGD"
+        -- cl.22 takes foreign spend at the posted SGD amount and states no
+        -- different rate for it, so no rule in this module reads this field.
+        `posted in a foreign currency` IS FALSE
+        `transaction date`        IS `on`
+        `posting date`            IS `on`
+        `payment channel`         IS `Tapped at a terminal`
+        `credential`              IS `The physical card`
+        `merchant indicator`      IS `Flags card-present`
+        `made in Singapore`       IS TRUE
+
+-- The same charge, posted as something other than a retail purchase. This is
+-- the one fact cl.9(a) to cl.9(e) turn on, so it is the one fact the
+-- illustrations of those clauses vary.
+GIVEN txn  IS A Transaction
+      kind IS A `Charge kind`
+GIVETH A Transaction
+`the same purchase posted as` txn kind MEANS
+    Transaction WITH
+        `merchant name`           IS txn's `merchant name`
+        `merchant`                IS txn's `merchant`
+        `merchant category code`  IS txn's `merchant category code`
+        `transaction description` IS txn's `transaction description`
+        `description patterns`    IS txn's `description patterns`
+        `charge kind`             IS kind
+        `amount`                  IS txn's `amount`
+        `currency`                IS txn's `currency`
+        `posted in a foreign currency` IS txn's `posted in a foreign currency`
+        `transaction date`        IS txn's `transaction date`
+        `posting date`            IS txn's `posting date`
+        `payment channel`         IS txn's `payment channel`
+        `credential`              IS txn's `credential`
+        `merchant indicator`      IS txn's `merchant indicator`
+        `made in Singapore`       IS txn's `made in Singapore`
+
+GIVETH A DATE
+`a day in September 2026` MEANS YMD 2026 9 15
+
+GIVETH A Transaction
+`a groceries run at Cold Storage` MEANS
+    `a purchase at` "Cold Storage Great World" `Cold Storage` 5411 "COLD STORAGE GREAT WORLD" EMPTY `a day in September 2026`
+
+GIVETH A Transaction
+`a train ride` MEANS
+    `a purchase at` "SimplyGo" SimplyGo 4111 "SIMPLYGO*BUS/MRT" (LIST `SimplyGo description`) `a day in September 2026`
+
+GIVETH A Transaction
+`a meal at a restaurant that is not a yuu merchant` MEANS
+    `a purchase at` "Tiong Bahru Bakery" `Another merchant` 5812 "TIONG BAHRU BAKERY" EMPTY `a day in September 2026`
+
+-- cl.6 table, row 1: yuu Merchant Spend earns 1 Base Point. cl.7(a): 9 more.
+-- The month is below cl.7(b)'s threshold, so 26 does not apply.
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month below the threshold` `a groceries run at Cold Storage`)'s `points per dollar` EQUALS 10
+
+-- cl.7(b) met: 1 + 9 + 26 = 36 points, which is exactly 10 miles per dollar.
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a groceries run at Cold Storage`)'s `points per dollar` EQUALS 36
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a groceries run at Cold Storage`)'s `miles per dollar` EQUALS 10.08
+
+-- And that branch is the one the document does not settle.
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a groceries run at Cold Storage`)'s `status` EQUALS Unconfirmed
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month below the threshold` `a groceries run at Cold Storage`)'s `status` EQUALS Verified
+
+-- cl.7(b) is a conjunction. S$2,000 spent at only 3 Participating Merchants
+-- does not qualify.
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month with the spend but not the merchants` `a groceries run at Cold Storage`)'s `points per dollar` EQUALS 10
+
+-- cl.6 table, row 2 and cl.7(a): SimplyGo earns 0.5 + 9.5, which is the same
+-- 10 points as a yuu merchant before the threshold -- and 36 after it,
+-- because cl.7(b) awards 26 at both.
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month below the threshold` `a train ride`)'s `points per dollar` EQUALS 10
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a train ride`)'s `points per dollar` EQUALS 36
+
+-- cl.6 table, row 3: Non-yuu Merchant Spend earns 0.5 and no bonus, even in
+-- a month that has met cl.7(b).
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a meal at a restaurant that is not a yuu merchant`)'s `points per dollar` EQUALS 0.5
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a meal at a restaurant that is not a yuu merchant`)'s `earns the bonus rate` EQUALS FALSE
+
+-- cl.6(i): the Base Rewards are uncapped, so an answer carrying no bonus
+-- carries no cap.
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a meal at a restaurant that is not a yuu merchant`)'s `cap`'s `capped` EQUALS FALSE
+
+-- cl.7 with cl.7(a) and cl.7(b): 28,800 bonus points at 35 bonus points per
+-- dollar is S$822.86 of bonus-earning spend, on a calendar month attributed
+-- by transaction date (cl.10).
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a groceries run at Cold Storage`)'s `cap`'s `bonus spend per month` EQUALS (28_800 DIVIDED BY 35)
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a groceries run at Cold Storage`)'s `cap`'s `basis` EQUALS `Calendar month`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a groceries run at Cold Storage`)'s `cap`'s `attribution` EQUALS `By transaction date`
+
+-- cl.7(a) alone: 28,800 / 9 = S$3,200.
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month below the threshold` `a groceries run at Cold Storage`)'s `cap`'s `bonus spend per month` EQUALS (28_800 DIVIDED BY 9)
+
+-- cl.9(f), an unasterisked MCC: a tax payment earns nothing.
+GIVETH A Transaction
+`a tax payment` MEANS
+    `a purchase at` "IRAS" `Another merchant` 9311 "IRAS INCOME TAX" EMPTY `a day in September 2026`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a tax payment`)'s `points per dollar` EQUALS 0
+
+-- cl.9(f), an asterisked MCC: excluded only "With effect from 1 May 2026".
+-- The same purchase at MCC 8999 earns on 30 April 2026 and not on 1 May.
+GIVETH A Transaction
+`a consultancy fee in April 2026` MEANS
+    `a purchase at` "A Consultancy" `Another merchant` 8999 "A CONSULTANCY" EMPTY (YMD 2026 4 30)
+GIVETH A Transaction
+`a consultancy fee in May 2026` MEANS
+    `a purchase at` "A Consultancy" `Another merchant` 8999 "A CONSULTANCY" EMPTY (YMD 2026 5 1)
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a consultancy fee in April 2026`)'s `points per dollar` EQUALS 0.5
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a consultancy fee in May 2026`)'s `points per dollar` EQUALS 0
+
+-- cl.9(i): a listed transaction description earns nothing.
+GIVETH A Transaction
+`a YouTrip top-up` MEANS
+    `a purchase at` "YouTrip" `Another merchant` 6540 "YOUTRIP" (LIST YouTrip) `a day in September 2026`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a YouTrip top-up`)'s `points per dollar` EQUALS 0
+
+-- cl.9(i) again, and the reason the description list is now read as families
+-- rather than as strings. "Any transactions matching the terms below" catches
+-- a statement line that CARRIES a listed term: "AMAZE*NTUC FP" carries AMAZE
+-- without equalling it. Layer 1 reports the AMAZE family on that line, this
+-- rule tests membership, and the transaction earns nothing. An exact-string
+-- encoding would have awarded 0.5 here, which the document does not.
+GIVETH A Transaction
+`a supermarket run routed through Amaze` MEANS
+    `a purchase at` "NTUC FairPrice" `Another merchant` 5411 "AMAZE*NTUC FP" (LIST AMAZE) `a day in September 2026`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a supermarket run routed through Amaze`)'s `points per dollar` EQUALS 0
+
+-- Appendix 1, 7-Eleven: on the American Express, bonus is denied before
+-- 13 Aug 2026 and restored on it. Base Rewards are untouched either way, so
+-- the answer moves from 1 point to 1 + 9 + 26.
+GIVETH A Transaction
+`a 7-Eleven run before 13 August 2026` MEANS
+    `a purchase at` "7-ELEVEN TANJONG PAGAR" `7-Eleven` 5411 "7-ELEVEN TANJONG PAGAR" EMPTY (YMD 2026 8 12)
+GIVETH A Transaction
+`a 7-Eleven run on 13 August 2026` MEANS
+    `a purchase at` "7-ELEVEN TANJONG PAGAR" `7-Eleven` 5411 "7-ELEVEN TANJONG PAGAR" EMPTY (YMD 2026 8 13)
+#ASSERT (`DBS yuu earns on` `DBS yuu American Express` `a linked cardholder` `a month above the threshold` `a 7-Eleven run before 13 August 2026`)'s `points per dollar` EQUALS 1
+#ASSERT (`DBS yuu earns on` `DBS yuu American Express` `a linked cardholder` `a month above the threshold` `a 7-Eleven run on 13 August 2026`)'s `points per dollar` EQUALS 36
+-- The Visa is unaffected on both dates.
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a 7-Eleven run before 13 August 2026`)'s `points per dollar` EQUALS 36
+
+-- THE AMERICAN EXPRESS IS DENIED AT 7-ELEVEN AND AT Charge+, NOT EVERYWHERE.
+-- An Amex purchase at another yuu merchant, dated before 13 Aug 2026 so that
+-- the 7-Eleven date limb is live, still earns the full 36. This is the
+-- witness that the merchant conjuncts of `Appendix 1 denies Bonus Rewards` do
+-- work: drop `the transaction is at txn 7-Eleven` from that rule's first arm,
+-- or `the transaction is at txn Charge+` from its second, and this assertion
+-- falls to 1. `l4 verify` reports both of those conjuncts as vacuous guards;
+-- they are not, and this line is the executable form of that argument. See
+-- the note under the defeasibility sites for why the report is an artefact of
+-- the checker's conjunctive normal form.
+GIVETH A Transaction
+`a groceries run at Cold Storage before 13 August 2026` MEANS
+    `a purchase at` "Cold Storage Great World" `Cold Storage` 5411 "COLD STORAGE GREAT WORLD" EMPTY (YMD 2026 8 12)
+#ASSERT (`DBS yuu earns on` `DBS yuu American Express` `a linked cardholder` `a month above the threshold` `a groceries run at Cold Storage before 13 August 2026`)'s `points per dollar` EQUALS 36
+
+-- Appendix 1, Charge+: bonus denied on the American Express with no end date.
+GIVETH A Transaction
+`a car charge` MEANS
+    `a purchase at` "Charge+ Singapore" `Charge+` 5552 "CHARGE+ SG" EMPTY `a day in September 2026`
+#ASSERT (`DBS yuu earns on` `DBS yuu American Express` `a linked cardholder` `a month above the threshold` `a car charge`)'s `points per dollar` EQUALS 1
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a car charge`)'s `points per dollar` EQUALS 36
+
+-- Appendix 1, Cold Storage On The Go: base 0.5 and no bonus, at a merchant
+-- that is otherwise yuu Merchant Spend.
+GIVETH A Transaction
+`a snack at Cold Storage On The Go` MEANS
+    `a purchase at` "Cold Storage On The Go Esso Bukit Timah" `Cold Storage On The Go` 5411 "CS ON THE GO ESSO" EMPTY `a day in September 2026`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a snack at Cold Storage On The Go`)'s `points per dollar` EQUALS 0.5
+
+-- Appendix 1, foodpanda: a "PayPal" description earns nothing, base or bonus.
+GIVETH A Transaction
+`a foodpanda order` MEANS
+    `a purchase at` "foodpanda food delivery" foodpanda 5812 "FOODPANDA SG" EMPTY `a day in September 2026`
+GIVETH A Transaction
+`a foodpanda order paid through PayPal` MEANS
+    `a purchase at` "foodpanda food delivery" foodpanda 5812 "PAYPAL *FOODPANDA" (LIST PayPal) `a day in September 2026`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a foodpanda order`)'s `points per dollar` EQUALS 36
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a foodpanda order paid through PayPal`)'s `points per dollar` EQUALS 0
+
+-- Appendix 1, SimplyGo: "Points will not be awarded for Top-Up transactions."
+-- THIS ASSERTION PINS A KNOWN DIVERGENCE FROM THE DOCUMENT, deliberately. A
+-- top-up and a ride reach this module as the same facts -- same merchant,
+-- same description family, same charge kind -- so the rules cannot tell them
+-- apart and the top-up earns the ride's 36 points. The document says 0. The
+-- assertion records the wrong answer rather than hiding it, so that the day
+-- the domain gains a top-up fact this line fails and points at the clause.
+-- See the note above `the transaction description is PayPal` for why the
+-- nearest available fact was rejected as vacuous.
+GIVETH A Transaction
+`a SimplyGo top-up the facts cannot distinguish from a ride` MEANS
+    `a purchase at` "SimplyGo" SimplyGo 4111 "SIMPLYGO*TOPUP" (LIST `SimplyGo description`) `a day in September 2026`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a SimplyGo top-up the facts cannot distinguish from a ride`)'s `points per dollar` EQUALS 36
+
+-- Appendix 1, Singtel: "Points will not be awarded for all transactions"
+-- under Base Rewards, and the closing sentence then denies the bonus. The
+-- document contradicts itself, so the zero is Unconfirmed, not Verified.
+GIVETH A Transaction
+`a phone at the Singtel Shop` MEANS
+    `a purchase at` "Singtel Shop Comcentre" Singtel 4812 "SINGTEL SHOP" EMPTY `a day in September 2026`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a phone at the Singtel Shop`)'s `points per dollar` EQUALS 0
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a phone at the Singtel Shop`)'s `status` EQUALS Unconfirmed
+
+-- Appendix 1, CHAGEE: "Points will only be awarded for orders placed via the
+-- CHAGEE App and applicable for purchases in Singapore only." A CHAGEE
+-- purchase abroad earns NOTHING, not the 0.5 that cl.6's Non-yuu row would
+-- otherwise give it. This is the assertion the first pass did not have, and
+-- the absence is why the contradictory guard went unnoticed.
+GIVETH A Transaction
+`a CHAGEE order placed outside Singapore` MEANS
+    Transaction WITH
+        `merchant name`           IS "CHAGEE Kuala Lumpur"
+        `merchant`                IS CHAGEE
+        `merchant category code`  IS 5814
+        `transaction description` IS "CHAGEE MY"
+        `description patterns`    IS EMPTY
+        `charge kind`             IS `Retail purchase`
+        `amount`                  IS 100
+        `currency`                IS "MYR"
+        `posted in a foreign currency` IS TRUE
+        `transaction date`        IS `a day in September 2026`
+        `posting date`            IS `a day in September 2026`
+        `payment channel`         IS `Tapped at a terminal`
+        `credential`              IS `The physical card`
+        `merchant indicator`      IS `Flags card-present`
+        `made in Singapore`       IS FALSE
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a CHAGEE order placed outside Singapore`)'s `points per dollar` EQUALS 0
+-- And a CHAGEE order in Singapore earns the full rate, so the guard is not
+-- simply denying everything at CHAGEE.
+GIVETH A Transaction
+`a CHAGEE order placed in Singapore` MEANS
+    `a purchase at` "CHAGEE Jewel" CHAGEE 5814 "CHAGEE APP ORDER" EMPTY `a day in September 2026`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a CHAGEE order placed in Singapore`)'s `points per dollar` EQUALS 36
+
+-- cl.8: "Defined as transactions made in Singapore at:". The same merchant
+-- name abroad is Non-yuu Merchant Spend.
+GIVETH A Transaction
+`a groceries run at Cold Storage abroad` MEANS
+    Transaction WITH
+        `merchant name`           IS "Cold Storage Bangsar"
+        `merchant`                IS `Cold Storage`
+        `merchant category code`  IS 5411
+        `transaction description` IS "COLD STORAGE KL"
+        `description patterns`    IS EMPTY
+        `charge kind`             IS `Retail purchase`
+        `amount`                  IS 100
+        `currency`                IS "MYR"
+        `posted in a foreign currency` IS TRUE
+        `transaction date`        IS `a day in September 2026`
+        `posting date`            IS `a day in September 2026`
+        `payment channel`         IS `Tapped at a terminal`
+        `credential`              IS `The physical card`
+        `merchant indicator`      IS `Flags card-present`
+        `made in Singapore`       IS FALSE
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a groceries run at Cold Storage abroad`)'s `points per dollar` EQUALS 0.5
+
+-- The Unknown-indicator branch. No clause of this document reads the
+-- acquirer's indicator, so an Unknown one changes nothing: the rate is the
+-- same, the two conditional figures agree with it, and the flag is FALSE.
+GIVETH A Transaction
+`a groceries run whose indicator is unknown` MEANS
+    Transaction WITH
+        `merchant name`           IS "Cold Storage Great World"
+        `merchant`                IS `Cold Storage`
+        `merchant category code`  IS 5411
+        `transaction description` IS "COLD STORAGE GREAT WORLD"
+        `description patterns`    IS EMPTY
+        `charge kind`             IS `Retail purchase`
+        `amount`                  IS 100
+        `currency`                IS "SGD"
+        `posted in a foreign currency` IS FALSE
+        `transaction date`        IS `a day in September 2026`
+        `posting date`            IS `a day in September 2026`
+        `payment channel`         IS `Paid in a website or app`
+        `credential`              IS `A mobile wallet token`
+        `merchant indicator`      IS Unknown
+        `made in Singapore`       IS TRUE
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a groceries run whose indicator is unknown`)'s `depends on the merchant indicator` EQUALS FALSE
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a groceries run whose indicator is unknown`)'s `miles per dollar` EQUALS 10.08
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a groceries run whose indicator is unknown`)'s `miles per dollar if the merchant flags online` EQUALS 10.08
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a groceries run whose indicator is unknown`)'s `miles per dollar if the merchant flags card-present` EQUALS 10.08
+
+-- AND THE FLAG AGREES WITH THE HEADLINE ON THIS BRANCH. `earns the bonus
+-- rate` is derived from `miles per dollar`, not computed beside it, so it
+-- cannot report a bonus the headline figure does not contain. That is the
+-- defect this assertion exists to catch: on a card whose headline carries the
+-- LOWER of two indicator-conditional figures, a separately computed flag can
+-- read TRUE while the shown rate is the base rate. Asserted on the Unknown
+-- branch, where such a card's two figures would diverge.
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a groceries run whose indicator is unknown`)'s `earns the bonus rate` EQUALS TRUE
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a groceries run whose indicator is unknown`)'s `miles per dollar` GREATER THAN 0.28
+-- The same on a transaction that earns no bonus: the flag is FALSE and the
+-- headline is exactly the base rate, 0.5 points at 0.28 miles.
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a meal at a restaurant that is not a yuu merchant`)'s `miles per dollar` EQUALS 0.14
+
+-- cl.11 and cl.17: linkage is a CREDITING term. An unlinked card earns the
+-- same rate and carries a crediting warning instead.
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `an unlinked cardholder` `a month above the threshold` `a groceries run at Cold Storage`)'s `points per dollar` EQUALS 36
+
+-- cl.12 states the conversion and this module takes it at its word: 0.28
+-- miles per yuu Point, Verified. The cross-module cases file asserts a floor
+-- of 0.28, which this meets exactly; cl.7's rounded "8,000 miles" would have
+-- sat below it. See the fork recorded at the end of this module.
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a groceries run at Cold Storage`)'s `conversion status` EQUALS Verified
+#ASSERT `miles per yuu Point` EQUALS 0.28
+#ASSERT `miles per yuu Point` AT LEAST 0.28
+
+
+-- cl.9(a) to cl.9(e): the same Cold Storage purchase, posted as each of the
+-- kinds cl.9 excludes. Every one of them earns nothing -- base and bonus
+-- alike, because Appendix 1's closing sentence carries a zero base into the
+-- bonus. The control is the retail purchase above, which earns 36.
+--
+-- cl.9(a): "cancelled, voided, refunded or reversed".
+GIVETH A Transaction
+`a refund at Cold Storage` MEANS
+    `the same purchase posted as` `a groceries run at Cold Storage` `Refund or reversal`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a refund at Cold Storage`)'s `points per dollar` EQUALS 0
+
+-- cl.9(b): "Pre-authorisation transactions on the Card account, e.g. hotel
+-- bookings".
+GIVETH A Transaction
+`a hotel pre-authorisation` MEANS
+    `the same purchase posted as` `a groceries run at Cold Storage` `Pre-authorisation`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a hotel pre-authorisation`)'s `points per dollar` EQUALS 0
+
+-- cl.9(c), first limb: "Balance transfers".
+GIVETH A Transaction
+`a balance transfer` MEANS
+    `the same purchase posted as` `a groceries run at Cold Storage` `Balance or funds transfer`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a balance transfer`)'s `points per dollar` EQUALS 0
+
+-- cl.9(c), second limb: "cash advance".
+GIVETH A Transaction
+`a cash advance` MEANS
+    `the same purchase posted as` `a groceries run at Cold Storage` `Cash advance or quasi-cash`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a cash advance`)'s `points per dollar` EQUALS 0
+
+-- cl.9(c), third limb, and cl.9(d): "My Preferred Payment Plan ("MP3")
+-- monthly transactions" and "0% interest-free Instalment Payment Plan
+-- ("IPP") transaction(s)" land on the same domain fact.
+GIVETH A Transaction
+`an instalment plan posting` MEANS
+    `the same purchase posted as` `a groceries run at Cold Storage` `Instalment plan transaction`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `an instalment plan posting`)'s `points per dollar` EQUALS 0
+#ASSERT `cl.9(d) excludes the transaction` `an instalment plan posting`
+
+-- cl.9(c), the parenthetical: "any fees and charges (including annual fees
+-- ...)", and cl.9(e)'s "fees charged by DBS".
+GIVETH A Transaction
+`an annual fee` MEANS
+    `the same purchase posted as` `a groceries run at Cold Storage` `Annual fee or bank charge`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `an annual fee`)'s `points per dollar` EQUALS 0
+
+-- cl.9(c), the rest of the parenthetical: "interest charges ... finance
+-- charges and/or late payment charges".
+GIVETH A Transaction
+`an interest charge` MEANS
+    `the same purchase posted as` `a groceries run at Cold Storage` `Interest or finance charge`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `an interest charge`)'s `points per dollar` EQUALS 0
+
+-- cl.9(e): "All other bill payments via internet banking".
+GIVETH A Transaction
+`a bill paid through internet banking` MEANS
+    `the same purchase posted as` `a groceries run at Cold Storage` `Bill payment via internet banking`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a bill paid through internet banking`)'s `points per dollar` EQUALS 0
+
+-- The control, and the one charge kind cl.9 does NOT name. A telephone or
+-- mail order is an ordinary purchase for this document, so it earns.
+GIVETH A Transaction
+`a telephone order at Cold Storage` MEANS
+    `the same purchase posted as` `a groceries run at Cold Storage` `Telephone or mail order`
+#ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a telephone order at Cold Storage`)'s `points per dollar` EQUALS 36
+
+-- The whole answer, for a reader: the headline case, and the same purchase
+-- posted as a refund so the two can be read side by side.
+#EVAL `DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a groceries run at Cold Storage`
+#EVAL `DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a refund at Cold Storage`
+
+
+-- ===========================================================================
+-- DEFEASIBILITY SITES (spec section 4.5). Where a native DESPITE / SUBJECT TO /
+-- exception construct would have collapsed several guards into one rule.
+-- One entry per site: the clause, the shape in the text (general rule +
+-- exception list), the L4 shape used instead, and what a native construct
+-- would have bought.
+-- ===========================================================================
+--
+-- SITE 1 — cl.6 general rule, defeated by cl.9's Eligible Spend exclusions.
+--   In the text: cl.6 awards Base Rewards on every S$1 at a listed Spend
+--   Category. cl.9 then carves out six classes (a)-(f) plus a description
+--   list (i) plus DBS's open discretion (ii).
+--   Here: `the Base Rewards points per dollar` opens with a guard
+--   `IF NOT (the transaction is Eligible Spend) THEN 0`, so the exception is
+--   evaluated BEFORE the rule it defeats and the general rule is written as
+--   the OTHERWISE arm. The reader meets the exceptions first and the rule
+--   last, which is the reverse of the document's order. The conjunction of
+--   seven negations is also flatter than the text, which reads as one
+--   definition with a list hanging off it.
+--   A native construct would buy: cl.6 stated once as itself, with cl.9
+--   attached as a defeater, preserving the document's order and letting the
+--   two be cited separately.
+--
+-- SITE 2 — cl.9(f) and cl.9(i), general exclusion defeated by a start date.
+--   In the text: one MCC table, in which fourteen rows carry an asterisk
+--   meaning "*With effect from 1 May 2026"; and one description list in which
+--   two of nineteen entries are date-stamped the same way.
+--   Here: each list is SPLIT IN TWO -- `... at all times` and
+--   `... from 1 May 2026` -- and the caller ORs them with a date comparison.
+--   The document's single table becomes two rules that must be kept in step
+--   by hand, and a row moved between them is a silent error.
+--   A native construct would buy: one table, one row per MCC, with the
+--   effective date as an attribute of the row rather than as its address.
+--   AND IT WOULD RECOVER SOMETHING ACTUALLY LOST HERE. Splitting by date
+--   forces the split to be the list's address, so an entry cannot sit in both
+--   halves. cl.9(i) needs exactly that: its AXS family holds two undated
+--   terms and one dated one. With the date as an attribute of the row, both
+--   would be stated; with the date as the address, one had to be dropped.
+--
+-- SITE 2a — cl.9(c) and cl.9(d) overlap, and the encoding cannot say so.
+--   In the text: cl.9(c) excludes "My Preferred Payment Plan ("MP3") monthly
+--   transactions" and cl.9(d) excludes "0% interest-free Instalment Payment
+--   Plan ("IPP") transaction(s)" -- two named products, two limbs.
+--   Here: both are `Instalment plan transaction`, one domain constructor, so
+--   cl.9(d)'s rule is a strict subset of cl.9(c)'s and fires on exactly the
+--   same transactions. The module writes both anyway, because a reader
+--   checking cl.9(d) should find a rule called cl.9(d); the cost is that the
+--   citation cannot say WHICH limb excluded a given posting, and the answer
+--   cites cl.9(c) and cl.9(d) together whenever either applies.
+--   A native construct would buy: nothing here -- this is a domain question
+--   rather than a defeasibility one. Two constructors would fix it, at the
+--   price of asking a cardholder to know whether their instalment plan was
+--   MP3 or IPP, which is a distinction the statement may not show.
+--
+-- SITE 3 — cl.8 Participating Merchants, defeated by Appendix 1 per merchant.
+--   In the text: cl.8 lists eleven Participating Merchants and says in terms
+--   that it "excludes products listed in Appendix 1"; Appendix 1 then gives
+--   each merchant its own exclusion block, separately headed for Base, for
+--   Bonus, and for both.
+--   Here: two hand-written predicates, `Appendix 1 denies Base Rewards` and
+--   `Appendix 1 denies Bonus Rewards`, each an OR-chain of merchant-specific
+--   conditions, each consulted as an early guard. The per-merchant structure
+--   of the Appendix is flattened into two lists keyed by which reward the
+--   exclusion bites, and a reader checking one merchant against the document
+--   must visit both predicates.
+--   A native construct would buy: one block per merchant, mirroring the
+--   Appendix's own layout, each defeating cl.8 for that merchant only.
+--   THIS SITE HAS ALREADY COST ONE DEFECT. The CHAGEE row is a positive
+--   condition among exclusions, and its rule was written to run off the
+--   cl.8 test -- which carries cl.8's own "made in Singapore" gate, so the
+--   rule read "at CHAGEE as a Participating Merchant, and not in Singapore"
+--   and could never fire. Nothing detected it, because the flattening puts
+--   cl.8's gate and Appendix 1's condition in one expression where the
+--   contradiction does not read as one. Found and fixed in the second pass,
+--   and the illustration that would have caught it is now in place.
+--
+-- SITE 3a — Appendix 1's SimplyGo row, unencodable on the facts held.
+--   In the text: "Applicable to Base and Bonus Rewards: Points will not be
+--   awarded for Top-Up transactions."
+--   Here: NOTHING. A top-up and a ride arrive as the same merchant, the same
+--   description family and the same charge kind, so no rule can separate
+--   them, and the nearest charge kind that would (`Cash advance or
+--   quasi-cash`) is already spent by cl.9(c) and would make the rule vacuous.
+--   The row reaches the caller as a `conditions` sentence, and an assertion
+--   pins the divergence so that it fails the day the fact arrives.
+--   A native construct would buy: nothing -- this is a missing fact, not a
+--   missing construct, and the honest fix is in the domain.
+--
+-- SITE 4 — Appendix 1's 7-Eleven row, an exception defeated in turn by a date.
+--   In the text: bonus is denied on the American Express, and then restored
+--   "With effect from 13 Aug 2026" by the next sentence of the same cell.
+--   Here: a three-way conjunction inside one OR-arm of
+--   `Appendix 1 denies Bonus Rewards` -- merchant AND card AND date-before.
+--   The restoration is encoded only as the negation of the denial's date
+--   limb; there is no rule anywhere that says "Amex earns at 7-Eleven from
+--   13 Aug 2026", though that is what the document says.
+--   A native construct would buy: a two-level defeat -- cl.7(a) defeated by
+--   the Amex exclusion, itself defeated by the 13 Aug 2026 restoration --
+--   with each level citable, which is how the cell reads.
+--
+-- SITE 5 — Appendix 1's closing sentence, a cross-cutting defeater.
+--   In the text: "DBS will not award Bonus Rewards on transactions that do
+--   not earn Base Rewards from yuu/Participating Merchants, unless otherwise
+--   stated." One sentence that conditions EVERY bonus rule in the document on
+--   the outcome of every base rule, and then reopens itself with "unless
+--   otherwise stated".
+--   Here: the first guard of `the Bonus Rewards points per dollar` re-invokes
+--   `the Base Rewards points per dollar` and tests it for zero. The bonus
+--   computation therefore depends on the base computation as a value, which
+--   is an implementation of the sentence rather than a statement of it, and
+--   the "unless otherwise stated" escape is not represented at all -- it is
+--   exactly the tension recorded at Singtel.
+--   A native construct would buy: the sentence written once, at module
+--   scope, as a defeater over the whole bonus layer -- and somewhere to hang
+--   its own exception.
+--
+-- SITE 6 — Appendix 1's Singtel row against cl.8, a contradiction rather than
+--   an exception.
+--   In the text: cl.8 lists Singtel as a Participating Merchant; Appendix 1
+--   denies Base Rewards on "all transactions" at it; and the same Appendix
+--   cell then lists three categories excluded from "Base and Bonus", which
+--   have no work to do if no base is ever earned.
+--   Here: the denial wins, the closing sentence carries it into the bonus,
+--   and the answer is marked Unconfirmed with the contradiction spelled out
+--   in `conditions`. The encoding must PICK, and picks the lower answer.
+--   A native construct would buy: the ability to record that two provisions
+--   of one document are in conflict and let the conflict SURFACE -- which is
+--   the property spec section 2 wants from Catala's default calculus -- rather
+--   than resolving it by fiat inside a BRANCH and reporting the fact in prose.
+-- ===========================================================================
+
+--
+-- A NOTE ON `l4 verify`, WHICH REPORTS THREE VACUOUS GUARDS ON
+-- `Appendix 1 denies Bonus Rewards`. They are an artefact of the checker's
+-- normal form, not a defect in the rule, and nothing was changed for them.
+-- Written down here because the next reader will meet the same three findings
+-- and should not spend the afternoon on them that this one did.
+--
+--   WHAT IT SAYS. Three `vacuous-guard` findings at `body.and[1]`, `and[2]`
+--   and `and[5]`: "this condition is already entailed by the ones it is
+--   conjoined with, so it excludes nothing."
+--
+--   WHAT IS ACTUALLY REDUNDANT. The rule is a four-arm disjunction:
+--     (at 7-Eleven AND is Amex AND before 13 Aug) OR (at Charge+ AND is Amex)
+--     OR at Cold Storage On The Go OR denies Base.
+--   The checker distributes that into a CONJUNCTIVE normal form -- its own
+--   footer says so, "reaching it MANUFACTURES clauses the draftsman never
+--   wrote" -- which gives six clauses. Because `is Amex` appears in BOTH
+--   conjunctive arms, one manufactured clause is (isAmex OR atCSOTG OR
+--   deniesBase), and that clause is a SUBSET of three others, so it subsumes
+--   them. The three subsumed clauses are exactly the three reported. The
+--   finding is true OF THE CNF; the site label `body.and[i]` names a clause
+--   of the checker's normal form, not a guard anyone wrote.
+--
+--   WHY IT IS NOT A REAL REDUNDANCY. Drop any reported conjunct and the rule
+--   changes meaning. Drop `at 7-Eleven` from the first arm and every American
+--   Express transaction before 13 Aug 2026 loses its bonus at every merchant;
+--   drop `at Charge+` from the second and it loses it on every date. There is
+--   an executable witness for both: the assertion on a Cold Storage purchase
+--   on the Amex dated 12 Aug 2026, which earns 36 and would earn 1.
+--
+--   MEASURED, NOT ARGUED. A three-shape probe outside the corpus settles it.
+--   Two conjunctive arms sharing a conjunct, plus two bare arms, reproduces
+--   the yuu rule's counts exactly -- 6 atoms from 24 occurrences, 31 ladder
+--   nodes, 3 findings. The SAME shape with no shared conjunct: 0 findings.
+--   The shape WITH the shared conjunct but WITHOUT the `denies Base` arm:
+--   still 3 findings. So the cause is the shared `is Amex` conjunct, and the
+--   closing-sentence arm is not implicated at all.
+--
+--   NOT COALESCING. The checker had not merged the three merchants into one
+--   atom: the findings list `at 7-Eleven`, `at Charge+` and `at Cold Storage
+--   On The Go` as three separate atoms.
+--
+--   THE ONE REAL REDUNDANCY IS ELSEWHERE, AND IS KEPT ON PURPOSE. The
+--   `OR denies Base` arm cannot fire through `the Bonus Rewards points per
+--   dollar`, because that rule tests the base for zero FIRST and a denied
+--   base is zero. It is belt and braces at that call site. It stays because
+--   `Appendix 1 denies Bonus Rewards` also has to be right read on its own:
+--   the foodpanda and SimplyGo rows are headed "Base and Bonus", so they deny
+--   the bonus in their own right and not only through the closing sentence.
+--   Removing the arm would make the predicate quietly wrong for any future
+--   caller that asks it directly.
+
+
+-- ===========================================================================
+-- FORKS. Places where the held document admits two readings, the encoding
+-- takes one, and the other is a real candidate rather than a pedantry. One
+-- entry per fork: the clauses in tension, the two readings, what each gives,
+-- which is taken and on what ground, and what a decision would turn on. The
+-- fork register carries these across the corpus.
+-- ===========================================================================
+--
+-- FORK 1 — cl.12 against cl.7: what is a yuu Point worth in miles?
+--   READING A (taken, ruled 2026-09-21). cl.12: "1 yuu Point is equivalent to
+--     0.5% cash rebate or 0.28 miles or more, depending on the redemption
+--     item on the yuu Rewards catalogue." 0.28 miles per point. This is the
+--     clause that states the conversion; it states one figure; it is held.
+--     A yuu merchant with the threshold met earns 36 x 0.28 = 10.08 miles per
+--     dollar.
+--   READING B (rejected; was taken by the first pass). cl.7: "Total Bonus
+--     Rewards is capped at 28,800 yuu Points (worth up to S$144 cash rebates
+--     or 8,000 miles) per calendar month." Read as an exact pair, that gives
+--     8,000 / 28,800 = 0.2777... miles per point and a round 10.0 miles per
+--     dollar at the same 36 points.
+--   WHY A. Two reasons, both arithmetic rather than interpretive. First,
+--     cl.7's pair is not exact: 28,800 x 0.005 is exactly S$144, so the cash
+--     limb checks out, but 28,800 x 0.28 is 8,064, not 8,000 -- the mile
+--     figure is rounded and the cash figure is not, which is what "up to"
+--     signals. Second, 0.2777 is BELOW cl.12's stated floor of 0.28, and a
+--     figure below a floor cannot be "consistent with 'or more'"; the first
+--     pass had that inequality backwards.
+--   WHAT WOULD DECIDE IT. The yuu Rewards catalogue, which cl.12 makes
+--     operative ("depending on the redemption item") and which this corpus
+--     does not hold. It would give the actual per-item rates, of which 0.28
+--     is the floor. Until then `conversion status` is Verified on cl.12 --
+--     the clause is held and says what it says -- while the headline rate
+--     remains the floor rather than an expected value.
+--   COLLATERAL. Reading B's round 10.0 was one of the two figures the first
+--     pass offered in support of the ADDITIVE reading of cl.7(a) + cl.7(b).
+--     Withdrawing B withdraws that support; the cap figure S$822.86, stated
+--     in points and so independent of any conversion, still stands. See the
+--     comment on `the cl.7(b) points for`.
+-- ===========================================================================

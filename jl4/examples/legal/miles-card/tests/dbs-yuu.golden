@@ -1,0 +1,119 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+dbs-yuu.l4:1195:1-162:
+  assertion satisfied
+dbs-yuu.l4:1198:1-162:
+  assertion satisfied
+dbs-yuu.l4:1199:1-164:
+  assertion satisfied
+dbs-yuu.l4:1202:1-160:
+  assertion satisfied
+dbs-yuu.l4:1203:1-157:
+  assertion satisfied
+dbs-yuu.l4:1207:1-179:
+  assertion satisfied
+dbs-yuu.l4:1212:1-143:
+  assertion satisfied
+dbs-yuu.l4:1213:1-143:
+  assertion satisfied
+dbs-yuu.l4:1217:1-181:
+  assertion satisfied
+dbs-yuu.l4:1218:1-186:
+  assertion satisfied
+dbs-yuu.l4:1222:1-180:
+  assertion satisfied
+dbs-yuu.l4:1227:1-194:
+  assertion satisfied
+dbs-yuu.l4:1228:1-172:
+  assertion satisfied
+dbs-yuu.l4:1229:1-183:
+  assertion satisfied
+dbs-yuu.l4:1232:1-193:
+  assertion satisfied
+dbs-yuu.l4:1238:1-143:
+  assertion satisfied
+dbs-yuu.l4:1248:1-163:
+  assertion satisfied
+dbs-yuu.l4:1249:1-159:
+  assertion satisfied
+dbs-yuu.l4:1255:1-146:
+  assertion satisfied
+dbs-yuu.l4:1266:1-168:
+  assertion satisfied
+dbs-yuu.l4:1277:1-178:
+  assertion satisfied
+dbs-yuu.l4:1278:1-175:
+  assertion satisfied
+dbs-yuu.l4:1280:1-167:
+  assertion satisfied
+dbs-yuu.l4:1295:1-196:
+  assertion satisfied
+dbs-yuu.l4:1301:1-154:
+  assertion satisfied
+dbs-yuu.l4:1302:1-143:
+  assertion satisfied
+dbs-yuu.l4:1309:1-165:
+  assertion satisfied
+dbs-yuu.l4:1318:1-148:
+  assertion satisfied
+dbs-yuu.l4:1319:1-167:
+  assertion satisfied
+dbs-yuu.l4:1333:1-189:
+  assertion satisfied
+dbs-yuu.l4:1341:1-157:
+  assertion satisfied
+dbs-yuu.l4:1342:1-156:
+  assertion satisfied
+dbs-yuu.l4:1367:1-169:
+  assertion satisfied
+dbs-yuu.l4:1373:1-165:
+  assertion satisfied
+dbs-yuu.l4:1395:1-170:
+  assertion satisfied
+dbs-yuu.l4:1418:1-192:
+  assertion satisfied
+dbs-yuu.l4:1419:1-175:
+  assertion satisfied
+dbs-yuu.l4:1420:1-204:
+  assertion satisfied
+dbs-yuu.l4:1421:1-210:
+  assertion satisfied
+dbs-yuu.l4:1430:1-178:
+  assertion satisfied
+dbs-yuu.l4:1431:1-180:
+  assertion satisfied
+dbs-yuu.l4:1434:1-181:
+  assertion satisfied
+dbs-yuu.l4:1438:1-165:
+  assertion satisfied
+dbs-yuu.l4:1444:1-168:
+  assertion satisfied
+dbs-yuu.l4:1445:1-42:
+  assertion satisfied
+dbs-yuu.l4:1446:1-44:
+  assertion satisfied
+dbs-yuu.l4:1458:1-154:
+  assertion satisfied
+dbs-yuu.l4:1465:1-155:
+  assertion satisfied
+dbs-yuu.l4:1471:1-148:
+  assertion satisfied
+dbs-yuu.l4:1477:1-144:
+  assertion satisfied
+dbs-yuu.l4:1485:1-156:
+  assertion satisfied
+dbs-yuu.l4:1486:1-72:
+  assertion satisfied
+dbs-yuu.l4:1493:1-143:
+  assertion satisfied
+dbs-yuu.l4:1500:1-148:
+  assertion satisfied
+dbs-yuu.l4:1506:1-166:
+  assertion satisfied
+dbs-yuu.l4:1513:1-164:
+  assertion satisfied
+dbs-yuu.l4:1517:1-126:
+  `Rate answer` OF 36, 0.28, Verified, 10.08, 10.08, 10.08, FALSE, TRUE, (Cap OF "Total Bonus Rewards", TRUE, 822.8571428571429, `Calendar month`, `By transaction date`), (LIST "scan or link your yuu ID at the till and the Base Reward is credited the same day (cl.6(ii)); the T&C does not say what happens to it if you never scan", "this month has met the Minimum Spend Requirement: S$800 of Eligible Spend and 4 Participating Merchants (cl.7(b))", "this rate adds cl.7(a)'s bonus (9 points, or 9.5 at SimplyGo) to cl.7(b)'s 26; the T&C says neither that they add nor that cl.7(b) replaces cl.7(a)", "DBS may exclude any other transaction from Eligible Spend from time to time (cl.9(ii)), which is a discretion with no stated test", "not checked here: Appendix 1 excludes named products at this merchant, such as plastic bags, tobacco, delivery charges, services, gift cards and cash-like items", "counts towards this calendar month by transaction date, which is the merchant's settlement date with its acquirer (cl.10)"), (LIST Provenance OF "dbs-yuu-card-tnc", "6", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "For every S$1 spent at the following Spend Categories that is charged and posted to your DBS yuu Card, you will earn the respective Base Rewards. | yuu Merchant Spend 1 yuu Point (0.5% cash rebates) | SimplyGo 0.5 yuu Point (0.25% cash rebates) | Non-yuu Merchant Spend 0.5 yuu Point (0.25% cash rebates)", Provenance OF "dbs-yuu-card-tnc", "8", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "“Participating Merchants” refer to the following, but excludes products listed in Appendix 1, and subject to changes from time to time. | Defined as transactions made in Singapore at: Cold Storage, CS Fresh, Jasons Deli | Giant, Giant Hypermart, Giant Express | Guardian | 7-Eleven | foodpanda food delivery, panda mart, panda shops | Gojek Singapore | Bus and train rides via SimplyGo | Charge+ Singapore | Orders placed via CHAGEE App | Singtel Shop, Singtel Exclusive Retailers", Provenance OF "dbs-yuu-card-tnc", "10", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "Eligible Spend must be charged to your DBS yuu Card within the calendar month, based on transaction date. The transaction date is determined based on the merchant settlement date between the merchant and their acquirer (subject to merchant or their acquirer’s timezone).", Provenance OF "dbs-yuu-card-tnc", "12", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "1 yuu Point is equivalent to 0.5% cash rebate or 0.28 miles or more, depending on the redemption item on the yuu Rewards catalogue.", Provenance OF "dbs-yuu-card-tnc", "7", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "Total Bonus Rewards is capped at 28,800 yuu Points (worth up to S$144 cash rebates or 8,000 miles) per calendar month.", Provenance OF "dbs-yuu-card-tnc", "9(ii)", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "Any other transactions determined by DBS from time to time;", Provenance OF "dbs-yuu-card-tnc", "7(a)", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "No minimum spend required to earn the following Bonus Rewards. For every S$1 spent at the following Spend Categories that is charged and posted to your DBS yuu Card, you will earn the respective Bonus Rewards. | yuu Merchant Spend 9 yuu Points (4.5% cash rebates) | SimplyGo 9.5 yuu Points (4.75% cash rebates)", Provenance OF "dbs-yuu-card-tnc", "7(b)", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "To earn the following Bonus Rewards, Cardmembers must meet these spend requirements each calendar month (“Minimum Spend Requirement”): i. Minimum S$800 worth of Eligible Spend charged and posted to your Card, and ii. Transact at 4 Participating Merchants. | yuu Merchant Spend 26 yuu Points (13% cash rebates) | SimplyGo 26 yuu Points (13% cash rebates)", Provenance OF "dbs-yuu-card-tnc", "6(ii)", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "Base Rewards will be credited to Cardmembers’ linked yuu Account in the manner as follows: • yuu Merchant Spend: Within the same day when you scan/link your yuu ID when transacting. • SimplyGo and non-yuu Merchant Spend: Within 60 days after the end of each calendar month.", Provenance OF "dbs-yuu-card-tnc", "11", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "Cardmembers will be awarded in yuu Points to the yuu Account which has been linked to the DBS yuu principal cardmember at the point of transaction.", Provenance OF "dbs-yuu-card-tnc", "17", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "yuu Points earned on your DBS yuu Card before linking to the yuu App will be credited upon card linkage. These Points will expire within 3 months (or 90 days) from the day of issuance if the card is unlinked."), Unconfirmed
+dbs-yuu.l4:1518:1-119:
+  `Rate answer` OF 0, 0.28, Verified, 0, 0, 0, FALSE, FALSE, (Cap OF "Total Bonus Rewards", FALSE, 0, `Calendar month`, `By transaction date`), (LIST "this month has met the Minimum Spend Requirement: S$800 of Eligible Spend and 4 Participating Merchants (cl.7(b))", "counts towards this calendar month by transaction date, which is the merchant's settlement date with its acquirer (cl.10)"), (LIST Provenance OF "dbs-yuu-card-tnc", "6", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "For every S$1 spent at the following Spend Categories that is charged and posted to your DBS yuu Card, you will earn the respective Base Rewards. | yuu Merchant Spend 1 yuu Point (0.5% cash rebates) | SimplyGo 0.5 yuu Point (0.25% cash rebates) | Non-yuu Merchant Spend 0.5 yuu Point (0.25% cash rebates)", Provenance OF "dbs-yuu-card-tnc", "8", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "“Participating Merchants” refer to the following, but excludes products listed in Appendix 1, and subject to changes from time to time. | Defined as transactions made in Singapore at: Cold Storage, CS Fresh, Jasons Deli | Giant, Giant Hypermart, Giant Express | Guardian | 7-Eleven | foodpanda food delivery, panda mart, panda shops | Gojek Singapore | Bus and train rides via SimplyGo | Charge+ Singapore | Orders placed via CHAGEE App | Singtel Shop, Singtel Exclusive Retailers", Provenance OF "dbs-yuu-card-tnc", "10", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "Eligible Spend must be charged to your DBS yuu Card within the calendar month, based on transaction date. The transaction date is determined based on the merchant settlement date between the merchant and their acquirer (subject to merchant or their acquirer’s timezone).", Provenance OF "dbs-yuu-card-tnc", "12", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "1 yuu Point is equivalent to 0.5% cash rebate or 0.28 miles or more, depending on the redemption item on the yuu Rewards catalogue.", Provenance OF "dbs-yuu-card-tnc", "7", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "Total Bonus Rewards is capped at 28,800 yuu Points (worth up to S$144 cash rebates or 8,000 miles) per calendar month.", Provenance OF "dbs-yuu-card-tnc", "9", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "“Eligible Spend” refers to qualified spend charged on your DBS yuu Card but excludes the following types of transactions:", Provenance OF "dbs-yuu-card-tnc", "9(a)", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "Any transaction that is subsequently cancelled, voided, refunded or reversed (“Refunded Transactions”) for any reason;", Provenance OF "dbs-yuu-card-tnc", "Appendix 1 — closing sentence", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "DBS will not award Bonus Rewards on transactions that do not earn Base Rewards from yuu/Participating Merchants, unless otherwise stated.", Provenance OF "dbs-yuu-card-tnc", "6(i)", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "There is no minimum spend required, and no cap to the Base Rewards.", Provenance OF "dbs-yuu-card-tnc", "7(b)", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "To earn the following Bonus Rewards, Cardmembers must meet these spend requirements each calendar month (“Minimum Spend Requirement”): i. Minimum S$800 worth of Eligible Spend charged and posted to your Card, and ii. Transact at 4 Participating Merchants. | yuu Merchant Spend 26 yuu Points (13% cash rebates) | SimplyGo 26 yuu Points (13% cash rebates)", Provenance OF "dbs-yuu-card-tnc", "6(ii)", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "Base Rewards will be credited to Cardmembers’ linked yuu Account in the manner as follows: • yuu Merchant Spend: Within the same day when you scan/link your yuu ID when transacting. • SimplyGo and non-yuu Merchant Spend: Within 60 days after the end of each calendar month.", Provenance OF "dbs-yuu-card-tnc", "11", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "Cardmembers will be awarded in yuu Points to the yuu Account which has been linked to the DBS yuu principal cardmember at the point of transaction.", Provenance OF "dbs-yuu-card-tnc", "17", "Updated on 7 August 2026", (DATE OF 7, 8, 2026), "yuu Points earned on your DBS yuu Card before linking to the yuu App will be credited upon card linkage. These Points will expire within 3 months (or 90 days) from the day of issuance if the card is unlinked."), Verified

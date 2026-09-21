@@ -96,7 +96,9 @@ space-separated `GO_S_ENCODING_MODULES`, and it is what the g1 `GO_MODULES` and 
 resolve to. Omitting it means exactly what it always meant — main plus the wizard when declared.
 The single-artifact projection legs (`p7-dmn`, `p7-dmn-md`, `p7-akn`, `p7-lts`, `p7-bpmn`,
 `p7-ladder`) and the per-module golden pairs of `p7-tnr`/`p7-mcp` still read `GO_S_ENCODING` alone;
-widening those is a separate ruling and has not happened. To add a subject, copy an existing sidecar and re-measure
+widening those is a separate ruling and has not happened. `p7-catala` (added 2026-09-21) reads the
+whole set via `GO_MODULES`, as `p7-dmn`'s emit-only arm does — it is a new leg rather than a widening
+of an existing one, so it needed no such ruling. To add a subject, copy an existing sidecar and re-measure
 every value in it against the new corpus — the pins and floors are measurements, not defaults.
 
 ## Exit codes

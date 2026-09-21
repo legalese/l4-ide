@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Answer what one transaction earns on the DBS Woman's World Card: DBS Points and miles per dollar, whether the 10X online-spend bonus or the 3X overseas bonus applies, the S$1,000 monthly online-spend cap, and whether the answer turns on the merchant's online indicator. Reads the DBS Woman's Card Promotions and Programmes T&C, updated 27 Jul 2026, clauses 11 to 19.",
+    "properties": {
+        "card": {
+            "$ref": "#/$defs/Card",
+            "description": "The card the transaction was charged to. Not read: these mechanics are stated for the DBS Woman's World Card only (cl.15), and the composer dispatches on the card before calling."
+        },
+        "cardholder": {
+            "$ref": "#/$defs/Cardholder",
+            "description": "Standing facts about the cardholder. Not read by this card: this T&C conditions nothing on them."
+        },
+        "month": {
+            "$ref": "#/$defs/Month position",
+            "description": "Where the month's thresholds stand. Not read by this card: the only monthly quantity in this T&C is the S$1,000 online cap, which is reported rather than applied."
+        },
+        "txn": {
+            "$ref": "#/$defs/Transaction",
+            "description": "The one transaction to price. Only its MCC, statement description, currency and the merchant's online indicator are read."
+        }
+    },
+    "required": [
+        "card",
+        "cardholder",
+        "month",
+        "txn"
+    ],
+    "title": "DBS Woman's World earns on",
+    "type": "object"
+}
