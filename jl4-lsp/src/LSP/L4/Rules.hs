@@ -353,6 +353,42 @@ candidateDisplayCanonical c = case c of
     real <- either (\(_ :: SomeException) -> p) id <$> tryAny (canonicalizePath p)
     pure $ candidateDisplay c <> if real == p then "" else " -> " <> Text.pack real
 
+-- | A @file:@ URI that reads back as the path it was built from.
+--
+-- Every candidate URI the resolver hands downstream is turned back into a
+-- FilePath before anything is read: 'GetLexTokens' falls back to
+-- @uriToNormalizedFilePath@ plus 'Shake.addVirtualFileFromFS'. So a URI that
+-- does not round-trip names a file that does not exist -- and the resulting
+-- failure is SILENT at the IMPORT, because the import counted as resolved and
+-- the load failure lands on the bogus URI instead (smucclaw/l4-ide#971).
+--
+-- The trap is that a RELATIVE path cannot be spelled in a @file:@ URI at all.
+-- 'filePathToUri' emits @file://<escaped path>@ with no leading slash, so the
+-- escaped path lands in the URI's /authority/; and lsp-types' @uriToFilePath@
+-- prepends the authority WITHOUT un-escaping it
+-- (@Language.LSP.Protocol.Types.Uri.platformAdjustFromUriPath@, lsp-types
+-- 2.3.0.1). Every percent-escape therefore survives literally: a module whose
+-- basename is written in Hebrew letters goes out as @file://%D7%A7...@ and
+-- comes back as a filename that begins with a literal percent sign, which
+-- nothing can open. An ASCII basename escapes to itself, which is why this
+-- stayed invisible for as long as every module name in the corpus was ASCII --
+-- and it is not only a non-ASCII problem, since a space or a literal @%@ in a
+-- basename is lost the same way.
+--
+-- An ABSOLUTE path has a leading slash, so it lands in the URI's /path/, which
+-- @uriToFilePath@ does un-escape. Hence: keep the relative spelling whenever it
+-- does round-trip -- so the resolution logs the golden suite captures verbatim
+-- do not move -- and fall back to the absolute one only for a path that would
+-- otherwise be lost.
+roundTrippingFileUri :: FilePath -> IO NormalizedUri
+roundTrippingFileUri fp
+  | readsBack = pure asGiven
+  | otherwise = toNormalizedUri . filePathToUri <$> makeAbsolute fp
+  where
+    asGiven = toNormalizedUri (filePathToUri fp)
+    readsBack =
+      (fromNormalizedFilePath <$> uriToNormalizedFilePath asGiven) == Just (normalise fp)
+
 -- | What one import resolved to, plus everything that was tried (for the
 -- not-found diagnostic).
 data ImportOutcome = ImportOutcome
@@ -431,12 +467,17 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
       -- are then ranked by 'resolveLibrary' alone (project root above embedded,
       -- per Option B′), the same ranking every other importer gets: one module
       -- name stays bound to one source across the whole build.
-      relativeUri = do
+      relativePath = do
         nfp <- uriToNormalizedFilePath importerUri
         let dir = takeDirectory $ fromNormalizedFilePath nfp
-        pure $ toNormalizedUri $ filePathToUri $ dir </> modName <.> "l4"
-      rootUri = toNormalizedUri $ filePathToUri $ rootDirectory </> modName <.> "l4"
-      vfsUris = [projectUri] <> Maybe.maybeToList relativeUri <> [rootUri]
+        pure $ dir </> modName <.> "l4"
+      rootPath = rootDirectory </> modName <.> "l4"
+  -- 'roundTrippingFileUri', not a bare 'filePathToUri': a relative candidate
+  -- path whose basename needs percent-escaping does not survive the URI round
+  -- trip, so the VFS key it produces cannot be read back (#971).
+  vfsFileUris <- liftIO $ traverse roundTrippingFileUri $
+    Maybe.maybeToList relativePath <> [rootPath]
+  let vfsUris = projectUri : vfsFileUris
 
   logWith recorder Debug $ LogImportResolution $
     "Checking VFS URIs: " <> Text.intercalate ", " (map ((.getUri) . fromNormalizedUri) vfsUris)
@@ -505,7 +546,11 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
                      <> Text.pack (show (length res.candidates)) <> "): " <> Text.pack fp
                      <> (if real == fp then "" else " -> " <> Text.pack real)
           logWith recorder Info $ LogImportResolution msg
-          pure $ outcome $ Just $ toNormalizedUri $ filePathToUri fp
+          -- See 'roundTrippingFileUri': a relative @fp@ whose basename needs
+          -- percent-escaping would otherwise be handed on as a URI that reads
+          -- back as a different, nonexistent file.
+          resolvedUri <- liftIO $ roundTrippingFileUri fp
+          pure $ outcome $ Just resolvedUri
         Just (ix, EmbeddedCandidate) -> do
           logWith recorder Info $ LogImportResolution $
             "Found in embedded libraries (candidate " <> Text.pack (show ix) <> " of "
@@ -648,9 +693,17 @@ jl4Rules evalConfig rootDirectory recorder = do
           outcome <- resolveImport uri modName
           pure (rangeOf a, modName, outcome)
 
+        -- 'Nothing' for an import that did not resolve: it contributes its
+        -- diagnostic and no 'ImportResult' at all. Until #971 this handed back
+        -- the IMPORTING module's own URI, which made the module appear to
+        -- import itself: every unresolvable import also produced "Your module
+        -- depends on itself", and in a CLI run that message was printed more
+        -- often than the one that says what is actually wrong. Dropping the
+        -- entry leaves the downstream rules with nothing to load, which is the
+        -- truth; the error is already reported here.
         mkImportUri (range, modName, outcome) = case outcome.importUri of
           Just u ->
-            pure ([], range, u)
+            pure ([], Just u)
           Nothing ->
             -- nub: the CLI sets the project root to the importing file's own
             -- directory, so the root and importer-relative tiers coincide and
@@ -664,23 +717,25 @@ jl4Rules evalConfig rootDirectory recorder = do
                     (fromNormalizedUri uri).getUri
                     (Text.unlines
                       [ "I could not find a module with this name: " <> Text.pack modName
+                      , "So nothing it defines is in scope here: any name you expected from it is reported separately as undefined."
                       , "I have tried the following locations:"
                       , Text.intercalate ",\n" allPaths
                       ])
                     (fromSrcRange <$> range)
-             in pure ([diag], range, uri)
+             in pure ([diag], Nothing)
 
-        mkDiagsAndImports :: TopDecl Name -> Ap Action [([FileDiagnostic], ImportResult)]
+        mkDiagsAndImports :: TopDecl Name -> Ap Action [([FileDiagnostic], Maybe ImportResult)]
         mkDiagsAndImports = \ case
           Import _a i@(MkImport _ n _) -> Ap do
-            (diag, r, u) <- mkImportUri =<< mkImportPath i
-            pure [(diag, MkImportResult n r u)]
+            (r, modName, outcome) <- mkImportPath i
+            (diag, mu) <- mkImportUri (r, modName, outcome)
+            pure [(diag, MkImportResult n r <$> mu)]
           _ -> pure []
 
 
     prog <- use_ GetParsedAst uri
     (diags, imports) <- fmap unzip $ getAp $ foldTopDecls mkDiagsAndImports prog
-    pure (concat diags, Just imports)
+    pure (concat diags, Just (Maybe.catMaybes imports))
 
   defineWithCallStack shakeRecorder $ \GetTypeCheckDependencies cs uri -> do
     imports <- use_  GetImports uri
@@ -1066,7 +1121,10 @@ prettyNlgResolveWarning = \ case
 listL4Files :: FilePath -> IO [NormalizedUri]
 listL4Files dir = do
   files <- filterM doesFileExist . map (dir </>) =<< listDirectory dir
-  pure $ toNormalizedUri . filePathToUri <$> filter ((== ".l4") . takeExtension) files
+  -- 'roundTrippingFileUri' rather than 'filePathToUri': @dir@ is the CLI's root
+  -- directory, which is @"."@ when the entry file is named relatively, so a
+  -- non-ASCII filename here would be listed under a URI nothing can read back.
+  traverse roundTrippingFileUri $ filter ((== ".l4") . takeExtension) files
 
 
 rangeOfResolveWarning :: Resolve.Warning -> LSP.Range
