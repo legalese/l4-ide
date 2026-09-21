@@ -1,0 +1,90 @@
+`Table 1 of clause 11 lists the MCC` with 763
+`Table 1 of clause 11 lists the MCC` with 9405
+`Table 1 of clause 11 lists the MCC` with 6051
+`Table 1 of clause 11 lists the MCC` with 6050
+`Table 1 of clause 11 lists the MCC` with 6381
+not `Table 1 of clause 11 lists the MCC` with 5812
+not `Table 1 of clause 11 lists the MCC` with 5411
+`Table 2 of clause 11 matches the description` with `an Amaze purchase the merchant flags online`
+`the statement line carries` with `an Amaze purchase the merchant flags online` and `AMAZE`
+`Table 2 of clause 11 matches the description` with `a CardUp payment the merchant flags online`
+`Table 2 of clause 11 matches the description` with `a YouTrip top-up the merchant flags online`
+`Table 2 of clause 11 matches the description` with `a ShopeePay top-up the merchant flags online`
+not `Table 2 of clause 11 matches the description` with `a local purchase the merchant flags online`
+not `Table 2 of clause 11 matches the description` with `a wallet tap the merchant flags card-present`
+not `the transaction is overseas spend` with `a local purchase the merchant flags online`
+`the transaction is overseas spend` with `an overseas purchase the merchant flags online`
+`the Woman's World mechanics apply to` with `DBS Woman's World`
+not `the Woman's World mechanics apply to` with `HSBC Revolution`
+not `the Woman's World mechanics apply to` with `DBS yuu Visa`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags online` 's `miles per dollar` is equal to 4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags online` 's `points per dollar` is equal to 2
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags online` 's `earns the bonus rate`
+not `DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags online` 's `depends on the merchant indicator`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags online` 's `miles per dollar if the merchant flags online` is equal to 4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags online` 's `miles per dollar if the merchant flags card-present` is equal to 4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags online` 's `cap` 's `capped`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags online` 's `cap` 's `bonus spend per month` is equal to 1000
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags online` 's `cap` 's `basis` is equal to `Calendar month`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags online` 's `cap` 's `attribution` is equal to `By transaction date`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags online` 's `status` is equal to `Verified`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags online` 's `conversion status` is equal to `Unconfirmed`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags online` 's `miles per point` is equal to 2
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags card-present` 's `miles per dollar` is equal to 0.4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags card-present` 's `points per dollar` is equal to 0.2
+not `DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags card-present` 's `earns the bonus rate`
+not `DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags card-present` 's `depends on the merchant indicator`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags card-present` 's `miles per dollar if the merchant flags online` is equal to 0.4
+not `DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase the merchant flags card-present` 's `cap` 's `capped`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase whose indicator is unknown` 's `miles per dollar` is equal to 0.4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase whose indicator is unknown` 's `miles per dollar if the merchant flags online` is equal to 4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase whose indicator is unknown` 's `miles per dollar if the merchant flags card-present` is equal to 0.4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase whose indicator is unknown` 's `depends on the merchant indicator`
+not `DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase whose indicator is unknown` 's `earns the bonus rate`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase whose indicator is unknown` 's `cap` 's `capped`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an overseas purchase the merchant flags card-present` 's `miles per dollar` is equal to 1.2
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an overseas purchase the merchant flags card-present` 's `points per dollar` is equal to 0.6
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an overseas purchase the merchant flags card-present` 's `earns the bonus rate`
+not `DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an overseas purchase the merchant flags card-present` 's `cap` 's `capped`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an overseas purchase the merchant flags online` 's `miles per dollar` is equal to 4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an overseas purchase the merchant flags online` 's `cap` 's `capped`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an overseas purchase whose indicator is unknown` 's `miles per dollar` is equal to 1.2
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an overseas purchase whose indicator is unknown` 's `miles per dollar if the merchant flags online` is equal to 4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an overseas purchase whose indicator is unknown` 's `miles per dollar if the merchant flags card-present` is equal to 1.2
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an overseas purchase whose indicator is unknown` 's `depends on the merchant indicator`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase whose indicator is unknown` 's `earns the bonus rate` is equal to `DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase whose indicator is unknown` 's `miles per dollar` is greater than 0.4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an overseas purchase whose indicator is unknown` 's `earns the bonus rate` is equal to `DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an overseas purchase whose indicator is unknown` 's `miles per dollar` is greater than 0.4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an overseas purchase whose indicator is unknown` 's `earns the bonus rate`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an insurance premium the merchant flags online` 's `miles per dollar` is equal to 0.4
+not `DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an insurance premium the merchant flags online` 's `cap` 's `capped`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an Amaze purchase the merchant flags online` 's `miles per dollar` is equal to 0.4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a CardUp payment the merchant flags online` 's `miles per dollar` is equal to 0.4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an overseas insurance premium the merchant flags online` 's `miles per dollar` is equal to 1.2
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an Amaze purchase whose indicator is unknown` 's `miles per dollar` is equal to 0.4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an Amaze purchase whose indicator is unknown` 's `miles per dollar if the merchant flags online` is equal to 0.4
+not `DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an Amaze purchase whose indicator is unknown` 's `depends on the merchant indicator`
+not `DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an Amaze purchase whose indicator is unknown` 's `cap` 's `capped`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a wallet tap the merchant flags card-present` 's `miles per dollar` is equal to 0.4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a wallet payment the merchant flags online` 's `miles per dollar` is equal to 4
+`clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` with `an interest charge`
+`clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` with `a cash advance`
+`clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` with `a balance transfer`
+`clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` with `an annual fee`
+`clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` with `an AXS payment the merchant flags online`
+`clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` with `a SAM bill payment the merchant flags online`
+not `clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` with `a local purchase the merchant flags online`
+`Table 2 of clause 11 matches the description` with `an Amaze AXS payment the merchant flags online`
+not `Table 2 of clause 11 matches the description` with `a levy the merchant flags online`
+`clause 11 iii, the payment was made via online banking` with `a bill payment via internet banking the merchant flags online`
+not `clause 11 iii, the payment was made via online banking` with `a local purchase the merchant flags online`
+`clause 11 iv, the payment was made via telephone or mail order` with `a telephone order the merchant flags online`
+not `clause 11 iv, the payment was made via telephone or mail order` with `a local purchase the merchant flags online`
+`clause 11 v, the transaction is a posted instalment payment plan monthly transaction` with `an instalment posting the merchant flags online`
+`clause 11 vi, the transaction is a posted My Preferred Payment Plan monthly transaction` with `an instalment posting the merchant flags online`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a bill payment via internet banking the merchant flags online` 's `miles per dollar` is equal to 0.4
+not `DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a bill payment via internet banking the merchant flags online` 's `cap` 's `capped`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a telephone order the merchant flags online` 's `miles per dollar` is equal to 0.4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an instalment posting the merchant flags online` 's `miles per dollar` is equal to 0.4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a levy the merchant flags online` 's `miles per dollar` is equal to 4
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `a local purchase whose indicator is unknown`
+`DBS Woman's World earns on` with `DBS Woman's World`, `a cardholder`, `a month` and `an overseas purchase the merchant flags online`

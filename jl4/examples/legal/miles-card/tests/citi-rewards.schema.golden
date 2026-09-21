@@ -1,0 +1,26 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Whether a charge on the Citi Rewards Card earns the 10X bonus rate or the base rate, with the clause that decides it: clause 6's Merchant Category limb ignores mobile wallets, clause 6's online limb excludes them.",
+    "properties": {
+        "card": {
+            "$ref": "#/$defs/Card"
+        },
+        "cardholder": {
+            "$ref": "#/$defs/Cardholder"
+        },
+        "month": {
+            "$ref": "#/$defs/Month position"
+        },
+        "txn": {
+            "$ref": "#/$defs/Transaction"
+        }
+    },
+    "required": [
+        "card",
+        "cardholder",
+        "month",
+        "txn"
+    ],
+    "title": "Citi Rewards earns on",
+    "type": "object"
+}

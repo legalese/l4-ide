@@ -1,0 +1,1214 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `miles-card-domain`
+
+§ `Terms and Conditions Governing the DBS Woman's Card Promotions and Programmes`
+
+-- ===========================================================================
+-- DOCUMENT. Source-bundle id `dbs-womans-card-tnc`; the document's own dating
+-- line, on every page, is "Updated 27 Jul 2026". Six pages, clauses 1 to 23.
+-- Private contract text, not law. Nothing here is advice about anyone's card.
+--
+-- WHAT THIS MODULE ANSWERS. For ONE transaction on the DBS Woman's World
+-- Card: how many DBS Points per S$5 it earns, what that is in miles per
+-- dollar, whether the answer turns on a fact only the merchant's acquirer
+-- holds, and what monthly cap applies. It answers from clauses 11 to 19.
+--
+-- NO RULE HERE COMPARES A STRING. Catala has no string type, and this corpus
+-- must lower to Catala (spec section 2), so the string work is done once in
+-- layer 1 (`classify.l4`) and every rule below reads a closed enumeration:
+-- `Description pattern` for cl.11's Table 2, `Charge kind` for cl.11(iii) to
+-- cl.11(vii), `posted in a foreign currency` for cl.12. The printed strings
+-- are still on the `Transaction` and still on every citation, for a reader;
+-- they are simply never inspected.
+--
+-- That is the SECOND PASS. The first encoded Table 2 as 90 `CONTAINS` calls
+-- over the statement description, cl.11(v) to (vii) as description proxies,
+-- and cl.11(iii) and (iv) as limbs that could not be decided at all. Two of
+-- those three are strictly better now: the charge kinds decide (iii) to (vii)
+-- on the fact the clause is about, rather than on a word DBS happens to print.
+-- Table 2 is a lateral move with one loss recorded at its rule -- the mapping
+-- from 90 printed terms to 19 families is a judgement, and the file can no
+-- longer be checked against the printed table by string comparison alone.
+--
+-- WHAT IT DELIBERATELY DOES NOT MODEL.
+--
+--   cl.20 to cl.23 -- the plain DBS WOMAN'S CARD (base 1X, bonus 4X on online
+--     spend, same S$1,000 monthly cap). OUT OF SCOPE, because cl.15 confines
+--     cl.16 to cl.19 to the Woman's WORLD Card and the two are different
+--     products. The shared domain's Card enumeration carries no constructor
+--     for the plain Woman's Card, so it cannot be asked for here either.
+--     cl.15 is encoded as a predicate and asserted, but it is NOT applied as
+--     a guard on the exported rule: see the note at that rule.
+--   cl.3 (DBS may vary or terminate at will), cl.5 (DBS's decision is final)
+--     and cl.7 (DBS may postpone awarding) -- discretions with no stated
+--     trigger. They defeat any answer this module gives, which is a property
+--     of the instrument and is recorded as a defeasibility site, not encoded.
+--   cl.4 (personal data consent) -- not operative on what a transaction earns.
+--   cl.8 (principal and supplementary spending consolidates) and cl.9 (points
+--     on a reversed transaction are clawed back) -- operative on the ACCOUNT
+--     over time, not on the rate this transaction earns. Out of scope with
+--     the allocation problem (spec section 6).
+--   cl.6 -- the DBS Rewards Programme Terms and Conditions, incorporated by
+--     reference and NOT HELD in this corpus. They are the document that would
+--     settle which transactions are "eligible" at all. Every answer carries
+--     that as a condition string rather than as a silent assumption.
+--
+-- THE ONE DESIGN DECISION WORTH READING BEFORE THE RULES. Whether a
+-- transaction is "online spend" is a fact about the MERCHANT, not about how
+-- the cardholder paid. cl.13: "DBS determines an online transaction based on
+-- system indicators. These indicators are decided by the merchant and their
+-- banker, and passed to DBS when the transaction is posted to the Card." So a
+-- mobile-wallet tap at a physical terminal earns the online bonus IF AND ONLY
+-- IF the merchant's acquirer flags it online -- the wallet is irrelevant, and
+-- so is the payment channel the cardholder saw. `credential` and `payment
+-- channel` are read NOWHERE in this module, and that absence is the encoding
+-- of cl.13. The illustrations at the end assert it in both directions.
+--
+-- cl.11's own words point the other way -- "made via the Internet" is a fact
+-- about the cardholder's act -- and cl.13 is what DBS actually applies. That
+-- tension is recorded as an interpretation fork, not silently resolved.
+--
+-- IGNORED PARAMETERS. The composing module passes (card, cardholder, month,
+-- txn) to every card uniformly. This card reads ONLY `txn`.
+-- It reads NEITHER `cardholder` NOR `month`: this T&C conditions nothing on a
+-- standing cardholder fact, and the only monthly quantity it names is the
+-- S$1,000 online-spend cap, which is reported as a cap rather than applied
+-- (how much of a cap remains is the allocation problem, out of scope).
+-- It no longer reads `card` either: cl.15 is encoded as a predicate and
+-- asserted, but the guard that applied it used REFUSE, which is outside the
+-- v1 Catala fragment. See the note at the exported rule.
+--
+-- RATES, NOT AMOUNTS. cl.10, cl.17(b), cl.18(b) and cl.19(d) all round the
+-- awarded points DOWN to a whole number, and cl.19(d) rounds the online bonus
+-- on the month's ACCUMULATED online spend, not per transaction. A `Rate
+-- answer` carries a marginal rate and has nowhere to put either rounding, so
+-- the figures here are exact rates before rounding, and every answer says so.
+-- ===========================================================================
+
+
+§§ `11. Definitions and Exclusion, Online spend`
+
+-- cl.11: "Online spend" refers to retail transaction for goods and services
+-- made via the Internet and processed by the respective merchants/acquirers
+-- as an online transaction through Mastercard Worldwide networks, excluding
+-- the following transactions: (i) ... (viii).
+--
+-- The "through Mastercard Worldwide networks" conjunct is satisfied by the
+-- card's identity: the DBS Woman's World Card is a World Mastercard, and the
+-- shared domain gives it one constructor with no network axis (unlike DBS yuu,
+-- which the domain splits Visa / American Express because its own T&C does).
+-- So the network is not a fact this module tests; cl.15 carries it.
+
+-- Table 1 of cl.11, all 57 codes, in the order the document prints them.
+-- Read from the committed pdftotext extraction and emitted by a script, so
+-- the ditto columns cannot drift; the description beside each code is the
+-- document's own, for a reviewer checking a row against the printed table.
+-- NOTE the document prints 6051 BEFORE 6050 -- that transposition is the
+-- document's and is preserved here rather than tidied.
+-- NOTE the first code is printed "0763"; L4 has one number for it, 763.
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`Table 1 of clause 11 lists the MCC` mcc MEANS
+       mcc EQUALS  763   -- Agricultural Co-operatives
+   OR  ^   ^      4784   -- Toll and Bridge Fees
+   OR  ^   ^      4829   -- Money Transfer
+   OR  ^   ^      4900   -- Utilities – Electric, Gas, Water, Sanitary
+   OR  ^   ^      5047   -- Dental/Laboratory/Medical/Ophthalmic Hospital Equipment and Supplies
+   OR  ^   ^      5199   -- Non-Durable Goods – Not Elsewhere Classified
+   OR  ^   ^      5960   -- Direct Marketing – Insurance Services
+   OR  ^   ^      5993   -- Cigar Stores and Stands
+   OR  ^   ^      6010   -- Financial Institutions – Manual Cash Disbursements
+   OR  ^   ^      6011   -- Financial Institutions – Automated Cash Disbursements
+   OR  ^   ^      6012   -- Financial Institutions – Merchandise, Services and Debt Repayment
+   OR  ^   ^      6051   -- Non-Financial Institutions – Foreign Currency, Liquid and Cryptocurrency Assets, Money Orders (not Money Transfer), Account Funding (not Stored Value Load), Travelers Cheques, and Debt Repayment
+   OR  ^   ^      6050   -- Quasi Cash – Financial institutions, Merchandise, Services
+   OR  ^   ^      6211   -- Security Brokers/Dealers
+   OR  ^   ^      6300   -- Insurance Sales, Underwriting, and Premiums
+   OR  ^   ^      6381   -- Insurance Premiums
+   OR  ^   ^      6399   -- Insurance, Not Elsewhere Classified
+   OR  ^   ^      6513   -- Real Estate Agents and Managers – Rentals
+   OR  ^   ^      6529   -- Quasi Cash – Remote Stored Value Load – Financial Institute
+   OR  ^   ^      6530   -- Quasi Cash – Remote Stored Value Load – Merchant
+   OR  ^   ^      6534   -- Quasi Cash – Money Transfer – Member Financial Institution
+   OR  ^   ^      6540   -- Non-Financial Institutions – Stored Value Card Purchase/Load
+   OR  ^   ^      7261   -- Funeral Service and Crematories
+   OR  ^   ^      7276   -- Tax Preparation Service
+   OR  ^   ^      7311   -- Advertising Services
+   OR  ^   ^      7322   -- Collection Agencies
+   OR  ^   ^      7339   -- Stenographic and Secretarial Support
+   OR  ^   ^      7349   -- Cleaning and Maintenance, Janitorial Services
+   OR  ^   ^      7372   -- Computer Programming, Data Processing, and Integrated Systems Design Services
+   OR  ^   ^      7375   -- Information Retrieval Services
+   OR  ^   ^      7393   -- Detective Agencies, Protective Services and Security Services Including Armored Cars and Guard Dogs
+   OR  ^   ^      7399   -- Business Services (Not Elsewhere Classified)
+   OR  ^   ^      7511   -- Quasi Cash – Truck Stop Transactions
+   OR  ^   ^      7523   -- Parking Lots, Parking Meters and Garages
+   OR  ^   ^      7995   -- Betting including Lottery Tickets, Casino Gaming Chips, Off-track Betting, Wagers at Race Tracks and games of chance to win prizes of monetary value
+   OR  ^   ^      8062   -- Hospitals
+   OR  ^   ^      8111   -- Legal Services and Attorneys
+   OR  ^   ^      8211   -- Elementary and Secondary Schools
+   OR  ^   ^      8220   -- Colleges, Universities, Professional Schools, and Junior Colleges
+   OR  ^   ^      8241   -- Correspondence Schools
+   OR  ^   ^      8244   -- Business and Secretarial Schools
+   OR  ^   ^      8249   -- Vocational Schools and Trade Schools
+   OR  ^   ^      8299   -- Schools and Educational Services (Not Elsewhere Classified)
+   OR  ^   ^      8398   -- Charitable and Social Service Organizations
+   OR  ^   ^      8651   -- Political Organizations
+   OR  ^   ^      8661   -- Religious Organizations
+   OR  ^   ^      8699   -- Membership Organizations – Not Elsewhere Classified
+   OR  ^   ^      8911   -- Architectural, Engineering, and Surveying Services
+   OR  ^   ^      8931   -- Accounting, Auditing, and Bookkeeping Services
+   OR  ^   ^      8999   -- Professional Services (Not Elsewhere Defined)
+   OR  ^   ^      9211   -- Court Costs, Including Alimony and Child Support
+   OR  ^   ^      9222   -- Fines
+   OR  ^   ^      9223   -- Bail and Bond Payments
+   OR  ^   ^      9311   -- Tax Payments
+   OR  ^   ^      9399   -- Government Services (Not Elsewhere Classified)
+   OR  ^   ^      9402   -- Postal Services – Government Only
+   OR  ^   ^      9405   -- Intra-Government Purchases – Government Only
+
+-- Table 2 of cl.11, all 90 printed terms, read as the DESCRIPTION-PATTERN
+-- FAMILIES the shared domain declares. The document lists TRANSACTION TERMS,
+-- not merchant names, and a statement line carries the term with a suffix
+-- ("AMAZE*NTUC FAIRPRICE"), so the match is by substring and without regard to
+-- case -- the document itself lists "Sgebiz" and "SGeBiz" as two separate
+-- entries, which is the issuer's own evidence on the second point.
+--
+-- THAT STRING WORK IS LAYER 1's (`classify.l4`), and so is the over-matching
+-- it admits: an "AMAZED BOOKS" line carries AMAZE, and a "TRANSITION GYM" line
+-- carries TRANSIT. The direction is deliberate wherever it is decided --
+-- Table 2 is an EXCLUSION list, so an over-match understates the reward and
+-- can never overstate it -- but it is decided THERE, not here. This rule reads
+-- only the closed enumeration.
+--
+-- THE MAPPING of the 90 printed terms onto 19 families, so a reviewer can
+-- check the table against this rule without leaving the file. The counts sum
+-- to exactly 90.
+--
+--   AXS                     (3)  AXS · AXS BizPay · AXS PTE LTD
+--   AMAZE                   (1)  AMAZE
+--   EZ-Link                 (2)  EZLINK · EZ-LINK
+--   TRANSIT                 (2)  TRANSIT · TRANSIT 3
+--   FlashPay                (1)  FLASHPAY ATU
+--   YouTrip                 (1)  YOUTRIP
+--   CardUp                  (1)  CARDUP
+--   iPaymy                  (1)  IPAYMY
+--   FavePay                 (2)  FAVEPAY · FAVE ECARD
+--   ShopeePay               (1)  SHOPEEPAY
+--   SAM                     (2)  SAM PAYMENTS · "SAM –" (printed truncated,
+--                                with a trailing en-dash and nothing after it;
+--                                confirmed in both extractions of the PDF)
+--   RazerPay                (1)  RAZERPAY
+--   SmoovPay                (3)  SmoovPay · SMOOVPAY (EC) · SMOOV PTE LTD
+--   Singtel Dash            (1)  SINGTEL DASH
+--   PayPal                  (8)  PAYPAL AXS PTE LTD · PAYPAL BIZCONSULTA ·
+--                                PAYPAL CAPITALROYA · PAYPAL CMD BITCOIN ·
+--                                PAYPAL COINJOLT · PAYPAL OANDAASIAPA ·
+--                                PAYPAL WMCCOIN · PAYPAL XCOINS
+--   Skrill or Moneybookers  (2)  SKR*SKRILL.COM · MB MONEYBOOKERS.COM
+--   Forex or CFD platform   (6)  OANDA ASIA PAC · OANDAASIAPA ·
+--                                SAXO CAP MKTS PTS LTD · www.igmarkets.com.sg ·
+--                                TOROPTION · XTRADE
+--   Cryptocurrency platform (43) 123bitcoin.dk:7310 through ZEUS-CRYPTO.COM,
+--                                including the five SIMPLEX_ lines and
+--                                PAYEER.COM
+--   Payment platform        (9)  BAGUS · CANTINE · SEDAP · Sgebiz · SGeBiz ·
+--                                Singapore E-Business · KASHMI ·
+--                                MATCHMOVE PAY · IPLMILESLIFE.COM
+--
+-- Two notes a reviewer will want. "PAYPAL AXS PTE LTD" is counted once, under
+-- PayPal, but layer 1 returns BOTH families for it, which is why the AXS
+-- family's own comment in the domain names it too. And three families the
+-- domain declares are absent from Woman's Table 2 and are deliberately NOT
+-- tested below: `BUS/MRT` and `SimplyGo description` (Citi's list) and
+-- `Government levy` (UOB cl.35).
+
+GIVEN txn IS A Transaction
+      p   IS A `Description pattern`
+GIVETH A BOOLEAN
+`the statement line carries` txn p MEANS
+    elem p (txn's `description patterns`)
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`Table 2 of clause 11 matches the description` txn MEANS
+       `the statement line carries` txn AXS
+   OR  `the statement line carries` txn AMAZE
+   OR  `the statement line carries` txn `EZ-Link`
+   OR  `the statement line carries` txn TRANSIT
+   OR  `the statement line carries` txn FlashPay
+   OR  `the statement line carries` txn YouTrip
+   OR  `the statement line carries` txn CardUp
+   OR  `the statement line carries` txn iPaymy
+   OR  `the statement line carries` txn FavePay
+   OR  `the statement line carries` txn ShopeePay
+   OR  `the statement line carries` txn SAM
+   OR  `the statement line carries` txn RazerPay
+   OR  `the statement line carries` txn SmoovPay
+   OR  `the statement line carries` txn `Singtel Dash`
+   OR  `the statement line carries` txn PayPal
+   OR  `the statement line carries` txn `Skrill or Moneybookers`
+   OR  `the statement line carries` txn `Forex or CFD platform`
+   OR  `the statement line carries` txn `Cryptocurrency platform`
+   OR  `the statement line carries` txn `Payment platform`
+
+-- cl.11(iii): "payments made via online banking".
+-- DECIDABLE, on the posting's KIND. The shared domain's `Charge kind` carries
+-- `Bill payment via internet banking`, which is this limb's fact exactly.
+--
+-- The first pass encoded this limb as one that returned FALSE, and said so,
+-- because the only channel fact the domain then carried was `Payment channel`
+-- -- what the CARDHOLDER saw -- which cannot separate a bill paid inside a
+-- bank's own app from a purchase in a shop's app. `Charge kind` is the
+-- acquirer-side fact and settles it. The condition string that warned the
+-- reader this limb could not be checked has gone with it.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`clause 11 iii, the payment was made via online banking` txn MEANS
+    txn's `charge kind` EQUALS `Bill payment via internet banking`
+
+-- cl.11(iv): "payments made via telephone or mail order".
+-- DECIDABLE for the same reason: mail order / telephone order is a distinct
+-- acquirer routing, and the domain declares `Telephone or mail order` for it.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`clause 11 iv, the payment was made via telephone or mail order` txn MEANS
+    txn's `charge kind` EQUALS `Telephone or mail order`
+
+-- cl.11(v): "posted 0% Interest Instalment Payment Plan monthly transactions".
+-- cl.11(vi): "posted My Preferred Payment Plan monthly transactions".
+-- Both read the posting's kind: an instalment of a plan is a fact about the
+-- posting, which is what the first pass had to proxy by matching each plan's
+-- own name in the statement description.
+--
+-- ONE LOSS OF RESOLUTION, recorded because it is real. The domain declares
+-- ONE constructor, `Instalment plan transaction`, for both named plans, so
+-- (v) and (vi) test the SAME fact and nothing in this encoding can say which
+-- of the two plans a posting belongs to. Operationally that costs nothing --
+-- the two limbs sit in the same cascade and either excludes -- but a reviewer
+-- asking "which limb caught this?" is told both. The description proxy could
+-- tell them apart, and could equally be defeated by any relabelling DBS chose;
+-- the kind cannot.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`clause 11 v, the transaction is a posted instalment payment plan monthly transaction` txn MEANS
+    txn's `charge kind` EQUALS `Instalment plan transaction`
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`clause 11 vi, the transaction is a posted My Preferred Payment Plan monthly transaction` txn MEANS
+    txn's `charge kind` EQUALS `Instalment plan transaction`
+
+-- cl.11(vii): "interest, finance charges, cash advances, cash withdrawal,
+-- balance transfer, smart cash, AXS payments, SAM online bill payments, bill
+-- payments via internet banking, and all fees charged by DBS".
+--
+-- Nine named instruments. The domain's `Charge kind` carries five of them and
+-- its `Description pattern` the other two:
+--
+--   interest, finance charges           -> `Interest or finance charge`
+--   cash advances, cash withdrawal      -> `Cash advance or quasi-cash`
+--   balance transfer                    -> `Balance or funds transfer`
+--   smart cash                          -> `Cash advance or quasi-cash`
+--        (DBS's own name for a cash facility drawn against the card limit;
+--        the domain's constructor says "quasi-cash" for exactly this family)
+--   all fees charged by DBS             -> `Annual fee or bank charge`
+--   bill payments via internet banking  -> the same fact as limb (iii)
+--   AXS payments                        -> the AXS description family
+--   SAM online bill payments            -> the SAM description family
+--
+-- The last two are ALREADY caught by Table 2, which lists both. They are
+-- repeated here because cl.11(vii) names them, and a reviewer auditing this
+-- file against the clause should find every instrument the clause names.
+--
+-- What this replaces is worth recording. The first pass matched these words
+-- against the statement description, and had to pad the description with a
+-- space at each end and match each term WITH its boundaries, because
+-- "INTEREST" is inside "PINTEREST" and a bare substring test scored
+-- "PINTEREST ADS" and "WINTERESTATE CAFE" as interest charges (both measured).
+-- Reading the kind removes the whole hazard rather than working around it.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` txn MEANS
+       txn's `charge kind` EQUALS `Interest or finance charge`
+   OR  txn's `charge kind` EQUALS `Cash advance or quasi-cash`
+   OR  txn's `charge kind` EQUALS `Balance or funds transfer`
+   OR  txn's `charge kind` EQUALS `Annual fee or bank charge`
+   OR  txn's `charge kind` EQUALS `Bill payment via internet banking`
+   OR  `the statement line carries` txn AXS
+   OR  `the statement line carries` txn SAM
+
+-- cl.11(viii): "any other transactions determined by DBS from time to time".
+-- An unbounded discretion with no stated trigger, exercisable after the fact.
+-- It cannot be encoded at all: there is no fact about a transaction that
+-- decides it. It does not bite here, and every answer that grants the online
+-- bonus says that DBS may still withdraw it.
+--
+-- `l4 verify` FLAGS THIS RULE, AND IS RIGHT TO. It is the module's only
+-- propositional finding:
+--
+--   `clause 11 viii, DBS has otherwise determined the transaction to be
+--   excluded`  (0 atoms, 1 ladder nodes) -- 1 finding(s)
+--       [unsat] at body
+--         the decision is TRUE for no assignment of its atoms: as drafting,
+--         a requirement nobody can meet.
+--         atoms: (none)
+--
+-- THE FALSE IS DELIBERATE, and the finding is not a defect in the encoding.
+-- What the verifier has found is a property of the CLAUSE. cl.11(viii) is
+-- satisfied by DBS's say-so and by nothing else, so there is no fact about a
+-- transaction that can meet it -- which is exactly what "TRUE for no
+-- assignment of its atoms, zero atoms" says. The encoding is faithful, and
+-- the unsatisfiability is the text's.
+--
+-- WHY A NAMED RULE AT ALL, rather than just leaving the limb out. The eight
+-- limbs of cl.11 are the document's own list, and a reader auditing this file
+-- against the clause should find all eight. A limb that is present and inert
+-- says "we read this and it decides nothing"; a limb that is absent says
+-- nothing at all, and cannot be told from an oversight.
+--
+-- WHERE THE DISCRETION ACTUALLY TRAVELS. Not here -- it rides on every answer
+-- that grants the online bonus, as the condition string "DBS may exclude any
+-- other transaction from online spend from time to time (cl.11(viii))", and
+-- it is defeasibility SITE 3 in the block at the end of this file, together
+-- with cl.3, cl.5 and cl.7. A defeasibility construct would let the answer
+-- carry "defeasible by cl.11(viii)" in its TYPE instead, and that rule would
+-- then have atoms and would not be unsat.
+--
+-- A NOTE FOR THE NEXT VERIFY RUN. This is the only rule of this shape left.
+-- The first pass had three -- cl.11(iii) and cl.11(iv) were `MEANS FALSE` too,
+-- because the facts then recorded could not decide them. Both now read the
+-- posting's `charge kind` and have atoms. If a future run reports more than
+-- one unsat here, something regressed; one is the expected count.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`clause 11 viii, DBS has otherwise determined the transaction to be excluded` txn MEANS FALSE
+
+-- The exclusion cascade, in the document's own order, first match wins.
+-- This is the blacklist: a transaction the merchant flags online is online
+-- spend UNLESS one of these eight limbs catches it.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`clause 11 excludes the transaction from online spend` txn MEANS
+    BRANCH IF `Table 1 of clause 11 lists the MCC` (txn's `merchant category code`)                     THEN TRUE
+           IF `Table 2 of clause 11 matches the description` txn                                        THEN TRUE
+           IF `clause 11 iii, the payment was made via online banking` txn                              THEN TRUE
+           IF `clause 11 iv, the payment was made via telephone or mail order` txn                      THEN TRUE
+           IF `clause 11 v, the transaction is a posted instalment payment plan monthly transaction` txn THEN TRUE
+           IF `clause 11 vi, the transaction is a posted My Preferred Payment Plan monthly transaction` txn THEN TRUE
+           IF `clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` txn     THEN TRUE
+           IF `clause 11 viii, DBS has otherwise determined the transaction to be excluded` txn         THEN TRUE
+           OTHERWISE                                                                                     FALSE
+
+-- Online spend, as cl.11 defines it and cl.13 determines it. The second
+-- input is the merchant's indicator, supplied by the caller rather than read
+-- here, because when the indicator is Unknown the top-level answer is
+-- computed under BOTH values and neither is assumed.
+GIVEN txn IS A Transaction
+      `the merchant flags the transaction online` IS A BOOLEAN
+GIVETH A BOOLEAN
+`the transaction is online spend` txn `the merchant flags the transaction online` MEANS
+        `the merchant flags the transaction online`
+    AND NOT (`clause 11 excludes the transaction from online spend` txn)
+
+
+§§ `12. Definitions and Exclusion, Overseas spend`
+
+-- cl.12: "Overseas spend" refers to retail transactions for goods and
+-- services posted in FOREIGN CURRENCIES (other than Singapore dollars).
+--
+-- Note what the test is and is not. It is the posting CURRENCY, not where the
+-- cardholder was. The shared domain carries `made in Singapore` as a separate
+-- boolean; this clause does not read it, and a Singapore-dollar purchase made
+-- abroad is NOT overseas spend under cl.12 while a foreign-currency purchase
+-- made from a sofa in Singapore is. Two axes, and this clause reads one of
+-- them: `posted in a foreign currency`.
+--
+-- cl.12's own exclusion is by reference to the DBS Rewards Programme Terms
+-- and Conditions, which this corpus does NOT hold. So the 2X overseas bonus
+-- below is granted on a definition whose exception list cannot be read. That
+-- travels on every overseas answer as a condition string.
+--
+-- The fact read is the domain's `posted in a foreign currency`, not the
+-- `currency` string. A rule may not compare a string (Catala has none), and
+-- the first pass's `NOT (TOUPPER currency EQUALS "SGD")` carried a second
+-- defect besides: the domain fixes no representation for `currency`, so the
+-- test also had to assume ISO 4217 and case-fold. The boolean is the fact
+-- cl.12 actually states, and `currency` stays on the record for display.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`the transaction is overseas spend` txn MEANS
+    txn's `posted in a foreign currency`
+
+
+§§ `13 and 14. How DBS determines an online transaction, and the transaction date`
+
+-- cl.13 is encoded as an ABSENCE: no rule in this module reads `credential`
+-- or `payment channel`, because DBS reads neither. See the header.
+--
+-- cl.14: "The transaction date is determined based on the merchant settlement
+-- date between the merchant and their acquirer". So the domain's `transaction
+-- date` IS the merchant settlement date for this card, and cl.19(c)'s cap
+-- attribution runs on it. That is why every cap below is reported
+-- `By transaction date` and not `By posting date`, even though cl.17(a) and
+-- cl.18(a) credit the base and overseas points when the transaction POSTS.
+-- Crediting date and attribution date are different axes; this document
+-- settles both, differently.
+
+
+§§ `15 to 19. DBS Woman's World Card, 10X Rewards on Online Spend and 3X Rewards on Overseas Spend`
+
+-- cl.15: "This is only applicable to DBS Woman's World Card."
+GIVEN card IS A Card
+GIVETH A BOOLEAN
+`the Woman's World mechanics apply to` card MEANS
+    card EQUALS `DBS Woman's World`
+
+-- cl.16's table and cl.17 to cl.19, as one schedule. Every figure is "for
+-- every S$5 spend", which is the unit cl.16's table is written in.
+--
+--   cl.17(a)  Base Rewards, all spend            1X
+--   cl.18(a)  Bonus Rewards, overseas spend     +2X
+--   cl.19(a)  Bonus Rewards, online spend       +9X local, +7X overseas
+--
+-- The two bonuses stack, and the document says so by writing both as
+-- "Additional" in cl.16's table and by giving the online bonus a separate
+-- overseas figure (7X) that only makes sense on top of the overseas 2X.
+-- Overseas online and local online therefore both reach 10X.
+GIVEN txn IS A Transaction
+      `the online bonus applies` IS A BOOLEAN
+GIVETH A NUMBER
+`the DBS Points awarded per S$5 on` txn `the online bonus applies` MEANS
+    BRANCH IF `the transaction is overseas spend` txn AND `the online bonus applies` THEN 10  -- 1X + 2X + 7X
+           IF `the transaction is overseas spend` txn                                THEN 3   -- 1X + 2X
+           IF `the online bonus applies`                                             THEN 10  -- 1X + 9X
+           OTHERWISE                                                                 1        -- 1X
+
+-- The points-to-miles conversion. THE DOCUMENT DOES NOT STATE IT. It names
+-- DBS Points throughout and never says what a DBS Point is worth in miles;
+-- cl.6 points at the DBS Rewards Programme Terms and Conditions, which this
+-- corpus does not hold. 2 miles per DBS Point is the figure carried here, and
+-- every answer marks `conversion status` Unconfirmed so the number can be
+-- traced back to the fact that no held document supports it.
+GIVETH A NUMBER
+`the miles per DBS Point` MEANS 2
+
+GIVEN p IS A NUMBER
+GIVETH A NUMBER
+`the miles per dollar earned at` p MEANS
+    (p DIVIDED BY 5) TIMES `the miles per DBS Point`
+
+-- cl.19(b): "capped at the first S$1,000 of online spend per calendar month",
+-- read with cl.19(c): "based on transaction date". The cap is stated in
+-- DOLLARS OF ONLINE SPEND, so it goes straight into `bonus spend per month`
+-- with no division. It bites only on the online bonus: cl.17 and cl.18 state
+-- no cap on base or overseas points.
+GIVEN `the online bonus is in play` IS A BOOLEAN
+GIVETH A Cap
+`the cap stated by clause 19 b when` `the online bonus is in play` MEANS
+    Cap WITH
+        `pool`                  IS "Woman's World online"
+        `capped`                IS `the online bonus is in play`
+        `bonus spend per month` IS (IF `the online bonus is in play` THEN 1000 ELSE 0)
+        `basis`                 IS `Calendar month`
+        `attribution`           IS `By transaction date`
+
+
+§§ `The provenance of every figure above`
+
+-- ONE CITE HELPER for the whole document, because the document id and its own
+-- dating line are the same on every citation and only the clause and the
+-- operative words move. `document date` is that dating line as a DATE -- the
+-- document says "Updated 27 Jul 2026" on all six pages -- so that two
+-- citations from two issuers can be compared for currency without parsing
+-- prose. The string fields stay: a reader wants the words, and a Catala
+-- lowering elides them.
+GIVEN clause IS A STRING
+      quote  IS A STRING
+GIVETH A Provenance
+`the Woman's Card T&C at clause` clause quote MEANS Provenance WITH
+    `document`      IS "dbs-womans-card-tnc"
+    `clause`        IS clause
+    `dated`         IS "Updated 27 Jul 2026"
+    `document date` IS (YMD 2026 7 27)
+    `quote`         IS quote
+
+GIVETH A Provenance
+`clause 11 as provenance` MEANS
+    `the Woman's Card T&C at clause` "11"
+        "refers to retail transaction for goods and services made via the Internet and processed by the respective merchants/acquirers as an online transaction through Mastercard Worldwide networks, excluding the following transactions"
+
+GIVETH A Provenance
+`clause 12 as provenance` MEANS
+    `the Woman's Card T&C at clause` "12"
+        "refers to retail transactions for goods and services posted in foreign currencies (other than Singapore dollars), excluding transactions which are excluded from the awarding of DBS Points as set out in the DBS Rewards Programme Terms and Conditions."
+
+GIVETH A Provenance
+`clause 13 as provenance` MEANS
+    `the Woman's Card T&C at clause` "13"
+        "DBS determines an online transaction based on system indicators. These indicators are decided by the merchant and their banker, and passed to DBS when the transaction is posted to the Card."
+
+GIVETH A Provenance
+`clause 14 as provenance` MEANS
+    `the Woman's Card T&C at clause` "14"
+        "The transaction date is determined based on the merchant settlement date between the merchant and their acquirer"
+
+GIVETH A Provenance
+`clause 15 as provenance` MEANS
+    `the Woman's Card T&C at clause` "15"
+        "This is only applicable to DBS Woman's World Card."
+
+GIVETH A Provenance
+`clause 17 as provenance` MEANS
+    `the Woman's Card T&C at clause` "17(a)"
+        "Base 1X DBS Point will be awarded for every S$5 of retail spend, awarded on the next working day when transaction is posted to the Card."
+
+GIVETH A Provenance
+`clause 18 as provenance` MEANS
+    `the Woman's Card T&C at clause` "18(a)"
+        "Bonus 2X DBS Points will be awarded for every S$5 equivalent in overseas spend, awarded on the next working day when transaction is posted to the Card."
+
+GIVETH A Provenance
+`clause 19 a as provenance` MEANS
+    `the Woman's Card T&C at clause` "19(a)"
+        "Bonus 9X DBS Points (for local online spend) or 7X DBS Points (for overseas online spend) will be awarded for every S$5 of online spend, credited by the end of the following calendar month."
+
+GIVETH A Provenance
+`clause 19 b as provenance` MEANS
+    `the Woman's Card T&C at clause` "19(b)"
+        "Online spend will be accumulated for the month and awarded bonus points in the following calendar month, capped at the first S$1,000 of online spend per calendar month."
+
+GIVETH A Provenance
+`clause 19 c as provenance` MEANS
+    `the Woman's Card T&C at clause` "19(c)"
+        "Online spend must be charged to your card within the calendar month, based on transaction date and successfully posted to the Card Account at the time of points computation."
+
+-- Four clauses answer every call: cl.11 (what online spend is), cl.13 (who
+-- decides it), cl.15 (which card these mechanics are for) and cl.17 (the base
+-- rate, which every transaction earns). The rest attach when they bear.
+GIVEN txn IS A Transaction
+      `the online bonus is in play` IS A BOOLEAN
+GIVETH A LIST OF Provenance
+`the Woman's World sources for` txn `the online bonus is in play` MEANS
+    append (LIST `clause 11 as provenance`, `clause 13 as provenance`, `clause 15 as provenance`, `clause 17 as provenance`)
+      (append (IF `the transaction is overseas spend` txn THEN LIST `clause 12 as provenance`, `clause 18 as provenance` ELSE EMPTY)
+              (IF `the online bonus is in play` THEN LIST `clause 19 a as provenance`, `clause 19 b as provenance`, `clause 19 c as provenance`, `clause 14 as provenance` ELSE EMPTY))
+
+
+-- THE CONDITIONS AN APP MUST PRINT BESIDE THE FIGURE are built INLINE in the
+-- `Rate answer` below, not by helpers here. A helper whose result type is
+-- `LIST OF STRING` cannot be lowered to Catala -- Catala has no string type --
+-- while the same text written inline inside the record construction is fine,
+-- because the field itself is elided and its value expression is never
+-- lowered (measured 2026-09-21). The first pass had six such helpers; they are
+-- gone, and their content now sits at the single place it was used.
+--
+-- One condition string has gone with them rather than moving: the first pass
+-- warned that "payment via online banking (cl.11(iii)) and telephone or mail
+-- order (cl.11(iv))" could not be checked from the recorded facts. Both are
+-- now checked, on the posting's `charge kind`, so the warning would be false.
+
+
+§§ `The answer`
+
+-- One shape for all three indicator cases. `the online bonus applies on the
+-- headline branch` is FALSE whenever the indicator is Unknown, because the
+-- headline figure must never overstate; the two conditional fields carry both
+-- outcomes, and `depends on the merchant indicator` is TRUE only when they
+-- actually differ. They do NOT differ when cl.11 has excluded the
+-- transaction, which is the point of computing them rather than copying the
+-- indicator into the flag.
+GIVEN txn IS A Transaction
+      `the online bonus applies` IS A BOOLEAN
+      `the indicator is unknown` IS A BOOLEAN
+GIVETH A `Rate answer`
+`the Woman's World rate answer for` txn `the online bonus applies` `the indicator is unknown` MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS (`the headline points per S$5` DIVIDED BY 5)
+        `miles per point`                                     IS `the miles per DBS Point`
+        `conversion status`                                   IS Unconfirmed
+        `miles per dollar`                                    IS `the headline miles`
+        `miles per dollar if the merchant flags online`       IS `the miles if the merchant flags online`
+        `miles per dollar if the merchant flags card-present` IS `the miles if the merchant flags card-present`
+        `depends on the merchant indicator`                   IS `the answer turns on the indicator`
+        `earns the bonus rate`                                IS (`the headline points per S$5` GREATER THAN 1)
+        `cap`                                                 IS (`the cap stated by clause 19 b when` `the online bonus is in play`)
+        -- WRITTEN OUT HERE, not built by a helper. A helper whose result
+        -- type is `LIST OF STRING` cannot be lowered to Catala; the same text
+        -- inline inside the record construction can, because the field is
+        -- elided and its value expression is never lowered. The lines are long
+        -- because L4's layout wants each continuation indented deeper than the
+        -- operator it continues, and `append` here starts far to the right.
+        `conditions` IS
+            (append (LIST "DBS rounds the points it awards DOWN to a whole number (cl.10, cl.17(b)); this is the rate before rounding.", "The DBS Rewards Programme Terms and Conditions also apply (cl.6) and are not held here; they may exclude this transaction from earning at all.", "DBS may vary or terminate these programmes at any time without notice (cl.3), and its decision is final (cl.5).")
+                    (append (IF `the online bonus is in play` THEN LIST "Whether this is online spend is decided by the merchant and their banker, not by DBS (cl.13).", "The bonus is capped at the first S$1,000 of online spend per calendar month, by transaction date (cl.19(b), cl.19(c)).", "Bonus points on online spend are credited only by the end of the following calendar month (cl.19(a)).", "DBS may exclude any other transaction from online spend from time to time (cl.11(viii))." ELSE EMPTY)
+                            (append (IF `the transaction is overseas spend` txn THEN LIST "Overseas spend is decided by the currency the transaction posted in, not by where you were (cl.12).", "cl.12 excludes whatever the DBS Rewards Programme Terms and Conditions exclude, and those are not held here." ELSE EMPTY)
+                                    (append (IF `the indicator is unknown` THEN LIST "The merchant's online indicator is not known, so both outcomes are shown and the headline figure is the lower one." ELSE EMPTY)
+                                            (IF `clause 11 excludes the transaction from online spend` txn THEN LIST "Clause 11 excludes this transaction from online spend, so it earns the base rate even if the merchant flags it online." ELSE EMPTY)))))
+        `sources`                                             IS (`the Woman's World sources for` txn `the online bonus is in play`)
+        `status`                                              IS Verified
+    WHERE
+        `the headline points per S$5` MEANS `the DBS Points awarded per S$5 on` txn `the online bonus applies`
+        `the headline miles` MEANS `the miles per dollar earned at` `the headline points per S$5`
+        -- The two conditional fields are live ONLY when the indicator is
+        -- unknown; when it is known they echo the headline, so a reader of
+        -- the answer never has to work out which of the three figures is
+        -- the operative one. They can be EQUAL while the indicator is
+        -- unknown: if cl.11 has excluded the transaction, flagging it online
+        -- changes nothing, and `depends on the merchant indicator` is then
+        -- correctly FALSE.
+        `the miles if the merchant flags online` MEANS
+            IF `the indicator is unknown`
+            THEN `the miles per dollar earned at` (`the DBS Points awarded per S$5 on` txn (`the transaction is online spend` txn TRUE))
+            ELSE `the headline miles`
+        `the miles if the merchant flags card-present` MEANS
+            IF `the indicator is unknown`
+            THEN `the miles per dollar earned at` (`the DBS Points awarded per S$5 on` txn (`the transaction is online spend` txn FALSE))
+            ELSE `the headline miles`
+        -- The answer turns on the indicator exactly when the indicator is
+        -- unknown AND cl.11 has not already excluded the transaction. That is
+        -- the same condition as "the two figures above differ", which is how
+        -- the first pass wrote it -- but writing it that way compared two
+        -- computed FLOATS for equality, which is a fragile way to ask a
+        -- question about the rules, and the Catala lowering refuses it for a
+        -- second reason besides (`EQUALS` over a structure this module
+        -- narrows under R11 can answer TRUE where L4 answers FALSE). The
+        -- equivalence is exact: flagging a transaction online changes the
+        -- points if and only if cl.11 lets the flag through, because the
+        -- card-present branch's bonus is FALSE unconditionally.
+        `the answer turns on the indicator` MEANS
+                `the indicator is unknown`
+            AND `the transaction is online spend` txn TRUE
+        `the online bonus is in play` MEANS `the online bonus applies` OR `the answer turns on the indicator`
+
+@export Answer what one transaction earns on the DBS Woman's World Card: DBS Points and miles per dollar, whether the 10X online-spend bonus or the 3X overseas bonus applies, the S$1,000 monthly online-spend cap, and whether the answer turns on the merchant's online indicator. Reads the DBS Woman's Card Promotions and Programmes T&C, updated 27 Jul 2026, clauses 11 to 19.
+GIVEN card       IS A Card       @desc The card the transaction was charged to. Not read: these mechanics are stated for the DBS Woman's World Card only (cl.15), and the composer dispatches on the card before calling.
+      cardholder IS A Cardholder @desc Standing facts about the cardholder. Not read by this card: this T&C conditions nothing on them.
+      month      IS A `Month position` @desc Where the month's thresholds stand. Not read by this card: the only monthly quantity in this T&C is the S$1,000 online cap, which is reported rather than applied.
+      txn        IS A Transaction @desc The one transaction to price. Only its MCC, statement description, currency and the merchant's online indicator are read.
+GIVETH A `Rate answer`
+`DBS Woman's World earns on` card cardholder month txn MEANS
+    -- WHERE THE cl.15 SCOPE GUARD WAS. The first pass opened this rule with
+    -- `IF NOT (the Woman's World mechanics apply to card) THEN REFUSE ...`, so
+    -- that a composer dispatching the wrong card here would be loud rather
+    -- than quietly priced. REFUSE is outside the v1 Catala fragment, and the
+    -- guard is removed for that reason alone: the composing module dispatches
+    -- on the card and never calls this rule with another one.
+    --
+    -- cl.15 IS STILL ENCODED AND STILL TESTED. `the Woman's World mechanics
+    -- apply to` is unchanged above and is asserted directly for two other
+    -- cards in the illustrations. What is gone is its APPLICATION here, and
+    -- with it the only defence this module had against a dispatch bug. `card`
+    -- is now read nowhere in this module.
+    CONSIDER txn's `merchant indicator`
+    WHEN `Flags online`       THEN `the Woman's World rate answer for` txn (`the transaction is online spend` txn TRUE) FALSE
+    WHEN `Flags card-present` THEN `the Woman's World rate answer for` txn FALSE FALSE
+    WHEN Unknown              THEN `the Woman's World rate answer for` txn FALSE TRUE
+
+
+§§ `20 to 23. DBS Woman's Card, 5X Rewards on Online Spend, OUT OF SCOPE`
+
+-- cl.20: "This is only applicable to DBS Woman's Card." cl.21 to cl.23 give
+-- that card base 1X plus a bonus 4X on online spend, on the same S$1,000
+-- per-calendar-month cap and the same cl.11 definition of online spend.
+-- Not encoded: cl.15 confines this module to the Woman's WORLD Card, and the
+-- shared domain declares no constructor for the plain Woman's Card, so no
+-- caller can ask for it. If one is added, cl.11 to cl.14 above are already
+-- the shared half and only the multiplier and cl.18's absence differ.
+
+
+§§ `15 to 19, illustrations`
+
+-- THIS DOCUMENT STATES NO WORKED EXAMPLE. cl.16's table gives the
+-- multipliers and computes nothing from them, and cl.17(b), cl.18(b) and
+-- cl.19(d) state the arithmetic in words without an instance. So every
+-- assertion below is a BRANCH OF THE RULES ABOVE checked against the clause
+-- it comes from, not a figure copied out of the text. Nothing here is taken
+-- from any secondary source.
+--
+-- The arithmetic, once, so the numbers below can be read without rerunning
+-- it. cl.16's unit is DBS Points per S$5, and `the miles per DBS Point` is 2
+-- (UNCONFIRMED -- no held document states it; see the note on that rule):
+--
+--   1X  per S$5  =  0.2 points per S$1  =  0.4 miles per S$1
+--   3X  per S$5  =  0.6 points per S$1  =  1.2 miles per S$1
+--   10X per S$5  =  2   points per S$1  =  4   miles per S$1
+
+GIVETH A Cardholder
+`a cardholder` MEANS Cardholder WITH
+    `Solitaire preferred rewards categories`               IS EMPTY
+    `yuu account linked to the card`                       IS FALSE
+    `HSBC Everyday Global Account deposits ADB this month` IS 0
+    `PAssion membership registered and card linked in yuu` IS FALSE
+
+GIVETH A `Month position`
+`a month` MEANS `Month position` WITH
+    `yuu eligible spend so far this calendar month`                     IS 0
+    `yuu participating merchants transacted so far this calendar month` IS 0
+    `PAssion spend at Participating Stores so far this month`           IS 0
+    `PAssion spend at non-Participating Stores so far this month`       IS 0
+
+-- THE ONE CONSTRUCTOR every fixture is built from. Note what it does NOT
+-- take: a currency to compare. cl.12's fact is `posted in a foreign currency`,
+-- a boolean, and `currency` is set inline for display only -- no rule may read
+-- it. `description patterns` and `charge kind` are set DIRECTLY here rather
+-- than run through layer 1's classifier, because the classifier's job is to
+-- turn a real statement line into these values and a fixture already knows
+-- what it means to be; the classifier has its own illustrations in
+-- `classify.l4`.
+GIVEN mcc     IS A NUMBER
+      desc    IS A STRING
+      pats    IS A LIST OF `Description pattern`
+      kind    IS A `Charge kind`
+      foreign IS A BOOLEAN
+      cred    IS A Credential
+      chan    IS A `Payment channel`
+      ind     IS A `Merchant indicator`
+GIVETH A Transaction
+`a transaction at MCC` mcc desc pats kind foreign cred chan ind MEANS
+    Transaction WITH
+        `merchant name`                IS desc
+        -- Read NOWHERE in this module: DBS Woman's cl.11 keys its exclusions
+        -- on the MCC and on the statement description, never on who the
+        -- merchant is. The field is the domain's, for the cards that do.
+        `merchant`                     IS `Another merchant`
+        `merchant category code`       IS mcc
+        `transaction description`      IS desc
+        `description patterns`         IS pats
+        `charge kind`                  IS kind
+        `amount`                       IS 100
+        `currency`                     IS (IF foreign THEN "USD" ELSE "SGD")
+        `posted in a foreign currency` IS foreign
+        `transaction date`             IS (YMD 2026 9 15)
+        `posting date`                 IS (YMD 2026 9 17)
+        `payment channel`              IS chan
+        `credential`                   IS cred
+        `merchant indicator`           IS ind
+        -- Also read nowhere, and deliberately TRUE on the overseas fixtures
+        -- too. cl.12 tests the posting currency, not geography, and the two
+        -- axes are independent: setting this from `foreign` would quietly
+        -- conflate them and make the fixtures agree with a reading of cl.12
+        -- that the clause does not bear.
+        `made in Singapore`            IS TRUE
+
+-- The common case: an ordinary retail purchase carrying no exclusion pattern.
+GIVEN mcc     IS A NUMBER
+      desc    IS A STRING
+      foreign IS A BOOLEAN
+      cred    IS A Credential
+      chan    IS A `Payment channel`
+      ind     IS A `Merchant indicator`
+GIVETH A Transaction
+`a purchase at MCC` mcc desc foreign cred chan ind MEANS
+    `a transaction at MCC` mcc desc EMPTY `Retail purchase` foreign cred chan ind
+
+-- An ordinary restaurant charge. MCC 5812 is in neither table.
+GIVETH A Transaction
+`a local purchase the merchant flags online` MEANS
+    `a purchase at MCC` 5812 "SHOPSG PTE LTD" FALSE `The physical card` `Paid in a website or app` `Flags online`
+GIVETH A Transaction
+`a local purchase the merchant flags card-present` MEANS
+    `a purchase at MCC` 5812 "SHOPSG PTE LTD" FALSE `The physical card` `Inserted or swiped at a terminal` `Flags card-present`
+GIVETH A Transaction
+`a local purchase whose indicator is unknown` MEANS
+    `a purchase at MCC` 5812 "SHOPSG PTE LTD" FALSE `The physical card` `Paid in a website or app` Unknown
+
+-- The same charge posted in US dollars, which is what cl.12 tests.
+GIVETH A Transaction
+`an overseas purchase the merchant flags online` MEANS
+    `a purchase at MCC` 5812 "SHOPUS INC" TRUE `The physical card` `Paid in a website or app` `Flags online`
+GIVETH A Transaction
+`an overseas purchase the merchant flags card-present` MEANS
+    `a purchase at MCC` 5812 "SHOPUS INC" TRUE `The physical card` `Inserted or swiped at a terminal` `Flags card-present`
+GIVETH A Transaction
+`an overseas purchase whose indicator is unknown` MEANS
+    `a purchase at MCC` 5812 "SHOPUS INC" TRUE `The physical card` `Paid in a website or app` Unknown
+
+-- Table 1: MCC 6381, Insurance Premiums.
+GIVETH A Transaction
+`an insurance premium the merchant flags online` MEANS
+    `a purchase at MCC` 6381 "GREAT EASTERN LIFE" FALSE `The physical card` `Paid in a website or app` `Flags online`
+GIVETH A Transaction
+`an overseas insurance premium the merchant flags online` MEANS
+    `a purchase at MCC` 6381 "ALLIANZ TRAVEL" TRUE `The physical card` `Paid in a website or app` `Flags online`
+
+-- Table 2: the statement line carries the term with a suffix.
+GIVETH A Transaction
+`an Amaze purchase the merchant flags online` MEANS
+    `a transaction at MCC` 5411 "AMAZE*NTUC FAIRPRICE" (LIST AMAZE) `Retail purchase` FALSE `Via Amaze` `Paid in a website or app` `Flags online`
+GIVETH A Transaction
+`an Amaze purchase whose indicator is unknown` MEANS
+    `a transaction at MCC` 5411 "AMAZE*NTUC FAIRPRICE" (LIST AMAZE) `Retail purchase` FALSE `Via Amaze` `Paid in a website or app` Unknown
+GIVETH A Transaction
+`a CardUp payment the merchant flags online` MEANS
+    `a transaction at MCC` 5999 "CARDUP*LANDLORD RENT" (LIST CardUp) `Retail purchase` FALSE `The physical card` `Paid in a website or app` `Flags online`
+
+-- WHY THE ASSERTIONS BELOW CALL THE EXPORTED RULE IN FULL, EVERY TIME.
+-- They used to go through seventeen one-line helpers (`the answer on a local
+-- online purchase` and its siblings), which read far better. Those helpers
+-- cannot exist: `DBS Woman's World earns on` is @export'd, so it lowers to a
+-- Catala SCOPE, and Catala allows a scope call only from inside another
+-- scope. A helper is a toplevel definition, not a scope, so every one of them
+-- was refused with "Scope calls are not allowed outside of a scope" (R1,
+-- §8.1). The refusal offers two fixes; marking seventeen test fixtures
+-- @export would put them in the module's public API, so the call is inlined
+-- instead. An `#ASSERT` becomes a scope, so it may make the call.
+-- The transaction fixture is still named, and it is the part that carries the
+-- meaning; the four words before it are the same on every line.
+
+-- The two facts cl.13 says DBS does NOT read. A wallet tap at a terminal the
+-- merchant flags card-present, and a wallet payment in an app the merchant
+-- flags online. Same credential; opposite answers.
+GIVETH A Transaction
+`a wallet tap the merchant flags card-present` MEANS
+    `a purchase at MCC` 5812 "KOPITIAM NTU" FALSE `A mobile wallet token` `Tapped at a terminal` `Flags card-present`
+GIVETH A Transaction
+`a wallet payment the merchant flags online` MEANS
+    `a purchase at MCC` 4121 "KRISPLUS SG" FALSE `A mobile wallet token` `Paid in a website or app` `Flags online`
+
+-- Three more Table 2 families, so the rule is exercised beyond AMAZE and
+-- CardUp, and one family the domain declares that Woman's Table 2 does NOT
+-- list. The last is the interesting one: `Government levy` is UOB cl.35's,
+-- and a transaction carrying only it must NOT be excluded here.
+--
+-- EVERY FIXTURE FROM HERE DOWN CARRIES AN MCC THAT TABLE 1 DOES NOT LIST, so
+-- that whatever is under test is the only thing that can exclude it. That is
+-- a rule about fixtures, not about the world, and it costs some realism: the
+-- MCC a YouTrip top-up or a SingPost SAM payment or an AXS bill really
+-- carries -- 6540 stored-value load, 9402 postal, 4900 utilities -- is itself
+-- in Table 1. The document excludes several of these twice over, by MCC and
+-- by description, which is worth knowing and is not what these fixtures are
+-- for. 5999, Miscellaneous Retail, is the neutral code used throughout.
+GIVETH A Transaction
+`a YouTrip top-up the merchant flags online` MEANS
+    `a transaction at MCC` 5999 "YOUTRIP SGD 42.00" (LIST YouTrip) `Retail purchase` FALSE `The physical card` `Paid in a website or app` `Flags online`
+GIVETH A Transaction
+`a ShopeePay top-up the merchant flags online` MEANS
+    `a transaction at MCC` 5999 "SHOPEEPAY TOPUP" (LIST ShopeePay) `Retail purchase` FALSE `The physical card` `Paid in a website or app` `Flags online`
+GIVETH A Transaction
+`an Amaze AXS payment the merchant flags online` MEANS
+    `a transaction at MCC` 5999 "AMAZE*AXS PTE LTD" (LIST AXS, AMAZE) `Retail purchase` FALSE `Via Amaze` `Paid in a website or app` `Flags online`
+GIVETH A Transaction
+`a levy the merchant flags online` MEANS
+    `a transaction at MCC` 7011 "RWS-LEVY" (LIST `Government levy`) `Retail purchase` FALSE `The physical card` `Paid in a website or app` `Flags online`
+
+-- THE CHARGE KINDS cl.11(iii) to cl.11(vii) turn on. Each carries no Table 2
+-- family and, per the rule above, an MCC outside Table 1, so the limb under
+-- test is the ONLY thing that can exclude it. Every one is flagged ONLINE by
+-- the merchant, so a limb that failed to bite would show up as a 4 mpd answer
+-- rather than as a silent pass.
+GIVETH A Transaction
+`a bill payment via internet banking the merchant flags online` MEANS
+    `a transaction at MCC` 4814 "SINGTEL BILL" EMPTY `Bill payment via internet banking` FALSE `The physical card` `Paid in a website or app` `Flags online`
+GIVETH A Transaction
+`a telephone order the merchant flags online` MEANS
+    `a transaction at MCC` 5812 "PIZZA HOTLINE" EMPTY `Telephone or mail order` FALSE `The physical card` `Card on file or recurring billing` `Flags online`
+GIVETH A Transaction
+`an instalment posting the merchant flags online` MEANS
+    `a transaction at MCC` 5732 "COURTS IPP MTH 3/12" EMPTY `Instalment plan transaction` FALSE `The physical card` `Paid in a website or app` `Flags online`
+GIVETH A Transaction
+`an interest charge` MEANS
+    `a transaction at MCC` 5999 "INTEREST CHARGE" EMPTY `Interest or finance charge` FALSE `The physical card` `Card on file or recurring billing` `Flags online`
+GIVETH A Transaction
+`a cash advance` MEANS
+    `a transaction at MCC` 5999 "CASH ADVANCE" EMPTY `Cash advance or quasi-cash` FALSE `The physical card` `Inserted or swiped at a terminal` `Flags online`
+GIVETH A Transaction
+`a balance transfer` MEANS
+    `a transaction at MCC` 5999 "BALANCE TRANSFER 12MTH" EMPTY `Balance or funds transfer` FALSE `The physical card` `Card on file or recurring billing` `Flags online`
+GIVETH A Transaction
+`an annual fee` MEANS
+    `a transaction at MCC` 5999 "ANNUAL FEE" EMPTY `Annual fee or bank charge` FALSE `The physical card` `Card on file or recurring billing` `Flags online`
+
+-- The two instruments cl.11(vii) names that are patterns rather than kinds.
+-- Both are posted as ORDINARY RETAIL PURCHASES here on purpose: if the limb
+-- caught them by their kind the test would prove nothing about the pattern.
+GIVETH A Transaction
+`an AXS payment the merchant flags online` MEANS
+    `a transaction at MCC` 5999 "AXS PTE LTD" (LIST AXS) `Retail purchase` FALSE `The physical card` `Paid in a website or app` `Flags online`
+GIVETH A Transaction
+`a SAM bill payment the merchant flags online` MEANS
+    `a transaction at MCC` 5999 "SINGPOST-SAM PAYMENTS" (LIST SAM) `Retail purchase` FALSE `The physical card` `Paid in a website or app` `Flags online`
+
+
+-- Table 1, the two ends of the printed list, the transposed pair the document
+-- prints out of order, and a code that is not listed.
+#ASSERT `Table 1 of clause 11 lists the MCC` 763
+#ASSERT `Table 1 of clause 11 lists the MCC` 9405
+#ASSERT `Table 1 of clause 11 lists the MCC` 6051
+#ASSERT `Table 1 of clause 11 lists the MCC` 6050
+#ASSERT `Table 1 of clause 11 lists the MCC` 6381
+#ASSERT NOT (`Table 1 of clause 11 lists the MCC` 5812)
+#ASSERT NOT (`Table 1 of clause 11 lists the MCC` 5411)
+
+-- Table 2 matches on the DESCRIPTION-PATTERN FAMILIES layer 1 returns. The
+-- substring and case-folding behaviour these lines used to assert is layer 1's
+-- and is asserted there (`classify.l4`); what is asserted here is the mapping
+-- from a family to cl.11's exclusion.
+#ASSERT `Table 2 of clause 11 matches the description` `an Amaze purchase the merchant flags online`
+#ASSERT `the statement line carries` `an Amaze purchase the merchant flags online` AMAZE
+#ASSERT `Table 2 of clause 11 matches the description` `a CardUp payment the merchant flags online`
+#ASSERT `Table 2 of clause 11 matches the description` `a YouTrip top-up the merchant flags online`
+#ASSERT `Table 2 of clause 11 matches the description` `a ShopeePay top-up the merchant flags online`
+#ASSERT NOT (`Table 2 of clause 11 matches the description` `a local purchase the merchant flags online`)
+#ASSERT NOT (`Table 2 of clause 11 matches the description` `a wallet tap the merchant flags card-present`)
+
+-- cl.12 reads `posted in a foreign currency` and nothing else.
+#ASSERT NOT (`the transaction is overseas spend` `a local purchase the merchant flags online`)
+#ASSERT `the transaction is overseas spend` `an overseas purchase the merchant flags online`
+
+-- cl.15, ENCODED BUT NO LONGER APPLIED. The first pass asserted
+-- `#ASSERT REFUSED (...)` for two other cards; REFUSE is outside the v1 Catala
+-- fragment and the guard has gone with it, so what is asserted now is the
+-- predicate itself, in both directions. See the note at the exported rule.
+#ASSERT `the Woman's World mechanics apply to` `DBS Woman's World`
+#ASSERT NOT (`the Woman's World mechanics apply to` `HSBC Revolution`)
+#ASSERT NOT (`the Woman's World mechanics apply to` `DBS yuu Visa`)
+
+-- BRANCH 1, local and the merchant flags online. 1X + 9X = 10X per S$5.
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags online`)'s `miles per dollar` EQUALS 4
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags online`)'s `points per dollar` EQUALS 2
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags online`)'s `earns the bonus rate`
+#ASSERT NOT ((`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags online`)'s `depends on the merchant indicator`)
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags online`)'s `miles per dollar if the merchant flags online` EQUALS 4
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags online`)'s `miles per dollar if the merchant flags card-present` EQUALS 4
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags online`)'s `cap`'s `capped`
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags online`)'s `cap`'s `bonus spend per month` EQUALS 1000
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags online`)'s `cap`'s `basis` EQUALS `Calendar month`
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags online`)'s `cap`'s `attribution` EQUALS `By transaction date`
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags online`)'s `status` EQUALS Verified
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags online`)'s `conversion status` EQUALS Unconfirmed
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags online`)'s `miles per point` EQUALS 2
+
+-- BRANCH 2, local and the merchant flags card-present. Base 1X only.
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags card-present`)'s `miles per dollar` EQUALS 0.4
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags card-present`)'s `points per dollar` EQUALS 0.2
+#ASSERT NOT ((`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags card-present`)'s `earns the bonus rate`)
+#ASSERT NOT ((`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags card-present`)'s `depends on the merchant indicator`)
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags card-present`)'s `miles per dollar if the merchant flags online` EQUALS 0.4
+#ASSERT NOT ((`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase the merchant flags card-present`)'s `cap`'s `capped`)
+
+-- BRANCH 3, local and the indicator is UNKNOWN. Both outcomes are carried,
+-- the headline is the LOWER, and the flag says the answer is conditional.
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase whose indicator is unknown`)'s `miles per dollar` EQUALS 0.4
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase whose indicator is unknown`)'s `miles per dollar if the merchant flags online` EQUALS 4
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase whose indicator is unknown`)'s `miles per dollar if the merchant flags card-present` EQUALS 0.4
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase whose indicator is unknown`)'s `depends on the merchant indicator`
+#ASSERT NOT ((`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase whose indicator is unknown`)'s `earns the bonus rate`)
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase whose indicator is unknown`)'s `cap`'s `capped`
+
+-- cl.18, overseas. 1X + 2X = 3X card-present; 1X + 2X + 7X = 10X online.
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an overseas purchase the merchant flags card-present`)'s `miles per dollar` EQUALS 1.2
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an overseas purchase the merchant flags card-present`)'s `points per dollar` EQUALS 0.6
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an overseas purchase the merchant flags card-present`)'s `earns the bonus rate`
+#ASSERT NOT ((`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an overseas purchase the merchant flags card-present`)'s `cap`'s `capped`)
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an overseas purchase the merchant flags online`)'s `miles per dollar` EQUALS 4
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an overseas purchase the merchant flags online`)'s `cap`'s `capped`
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an overseas purchase whose indicator is unknown`)'s `miles per dollar` EQUALS 1.2
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an overseas purchase whose indicator is unknown`)'s `miles per dollar if the merchant flags online` EQUALS 4
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an overseas purchase whose indicator is unknown`)'s `miles per dollar if the merchant flags card-present` EQUALS 1.2
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an overseas purchase whose indicator is unknown`)'s `depends on the merchant indicator`
+
+-- THE FLAG AND THE HEADLINE MUST AGREE, and the Unknown-indicator branch is
+-- where they could come apart. The headline carries the LOWER of the two
+-- conditional figures, while `the online bonus is in play` is TRUE on that
+-- branch (it is what puts the cap on the answer). A flag computed from THAT
+-- would read "earns the bonus rate" beside a headline of 0.4 miles per
+-- dollar. It is computed instead from `the headline points per S$5`, the same
+-- quantity `miles per dollar` is computed from, so the two cannot disagree by
+-- construction -- 1X per S$5 is 0.4 mpd, so "more than 1X" and "more than 0.4
+-- mpd" are one test written twice.
+-- Asserted on BOTH Unknown branches, because they fall on opposite sides of
+-- the base rate: the local one sits at 0.4 and the overseas one at 1.2.
+#ASSERT ((`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase whose indicator is unknown`)'s `earns the bonus rate`) EQUALS ((`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase whose indicator is unknown`)'s `miles per dollar` GREATER THAN 0.4)
+#ASSERT ((`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an overseas purchase whose indicator is unknown`)'s `earns the bonus rate`) EQUALS ((`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an overseas purchase whose indicator is unknown`)'s `miles per dollar` GREATER THAN 0.4)
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an overseas purchase whose indicator is unknown`)'s `earns the bonus rate`
+
+-- THE BLACKLIST. A Table 1 MCC and a Table 2 description are NOT online
+-- spend even though the merchant flags them online, so they fall back to the
+-- base rate and the cap is not engaged.
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an insurance premium the merchant flags online`)'s `miles per dollar` EQUALS 0.4
+#ASSERT NOT ((`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an insurance premium the merchant flags online`)'s `cap`'s `capped`)
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an Amaze purchase the merchant flags online`)'s `miles per dollar` EQUALS 0.4
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a CardUp payment the merchant flags online`)'s `miles per dollar` EQUALS 0.4
+
+-- And the exclusion is from ONLINE spend only. cl.12's overseas bonus is
+-- defined separately and survives a Table 1 hit: 1X + 2X, not 1X.
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an overseas insurance premium the merchant flags online`)'s `miles per dollar` EQUALS 1.2
+
+-- An excluded transaction whose indicator is UNKNOWN does not depend on the
+-- indicator at all: cl.11 has already decided it, so both branches agree.
+-- This is why the flag is computed from the two figures rather than copied
+-- from the indicator.
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an Amaze purchase whose indicator is unknown`)'s `miles per dollar` EQUALS 0.4
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an Amaze purchase whose indicator is unknown`)'s `miles per dollar if the merchant flags online` EQUALS 0.4
+#ASSERT NOT ((`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an Amaze purchase whose indicator is unknown`)'s `depends on the merchant indicator`)
+#ASSERT NOT ((`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an Amaze purchase whose indicator is unknown`)'s `cap`'s `capped`)
+
+-- cl.13, BOTH DIRECTIONS. The same mobile-wallet credential earns 0.4 at a
+-- merchant that flags card-present and 4 at a merchant that flags online.
+-- The credential and the payment channel decide nothing; the merchant's
+-- indicator decides everything. A secondary source that says an in-store
+-- wallet tap "counts as online" and therefore earns 4 is refuted by the
+-- first of these two lines, on the text of cl.11 and cl.13.
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a wallet tap the merchant flags card-present`)'s `miles per dollar` EQUALS 0.4
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a wallet payment the merchant flags online`)'s `miles per dollar` EQUALS 4
+
+-- cl.11(vii), on the posting's KIND for five of the nine instruments the
+-- clause names and on the description family for two more. The last line is
+-- the one that used to need a word-boundary trick: an ordinary retail purchase
+-- is not an interest charge, and nothing about the words in its description
+-- can make it one now.
+#ASSERT `clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` `an interest charge`
+#ASSERT `clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` `a cash advance`
+#ASSERT `clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` `a balance transfer`
+#ASSERT `clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` `an annual fee`
+#ASSERT `clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` `an AXS payment the merchant flags online`
+#ASSERT `clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` `a SAM bill payment the merchant flags online`
+#ASSERT NOT (`clause 11 vii, the transaction is interest, a fee, a cash item or a bill payment` `a local purchase the merchant flags online`)
+
+-- A statement line may carry SEVERAL families ("AMAZE*AXS PTE LTD" carries
+-- two) and Table 2 excludes on any of them. And a family the domain declares
+-- that Woman's Table 2 does NOT list -- `Government levy` is UOB cl.35's --
+-- must not exclude here. That second line is what keeps the 19 families in
+-- this rule from quietly becoming all 22.
+#ASSERT `Table 2 of clause 11 matches the description` `an Amaze AXS payment the merchant flags online`
+#ASSERT NOT (`Table 2 of clause 11 matches the description` `a levy the merchant flags online`)
+
+-- cl.11(iii) TO cl.11(vi), which the first pass could not decide at all. Each
+-- limb reads the posting's `charge kind`, and each is checked in both
+-- directions at the limb and again end to end: every one of these fixtures is
+-- flagged ONLINE by the merchant, so a limb that failed to bite would report
+-- 4 miles per dollar rather than 0.4.
+#ASSERT `clause 11 iii, the payment was made via online banking` `a bill payment via internet banking the merchant flags online`
+#ASSERT NOT (`clause 11 iii, the payment was made via online banking` `a local purchase the merchant flags online`)
+#ASSERT `clause 11 iv, the payment was made via telephone or mail order` `a telephone order the merchant flags online`
+#ASSERT NOT (`clause 11 iv, the payment was made via telephone or mail order` `a local purchase the merchant flags online`)
+#ASSERT `clause 11 v, the transaction is a posted instalment payment plan monthly transaction` `an instalment posting the merchant flags online`
+#ASSERT `clause 11 vi, the transaction is a posted My Preferred Payment Plan monthly transaction` `an instalment posting the merchant flags online`
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a bill payment via internet banking the merchant flags online`)'s `miles per dollar` EQUALS 0.4
+#ASSERT NOT ((`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a bill payment via internet banking the merchant flags online`)'s `cap`'s `capped`)
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a telephone order the merchant flags online`)'s `miles per dollar` EQUALS 0.4
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an instalment posting the merchant flags online`)'s `miles per dollar` EQUALS 0.4
+
+-- And the levy, which nothing in cl.11 excludes: it earns the online bonus.
+-- The counterweight to the ten lines above -- the new limbs must bite on what
+-- the clause names and on nothing else.
+#ASSERT (`DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a levy the merchant flags online`)'s `miles per dollar` EQUALS 4
+
+-- Two direct calls of the exported rule, printed in full.
+#EVAL `DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `a local purchase whose indicator is unknown`
+#EVAL `DBS Woman's World earns on` `DBS Woman's World` `a cardholder` `a month` `an overseas purchase the merchant flags online`
+
+
+-- ===========================================================================
+-- DEFEASIBILITY SITES (spec section 4.5). Where a native DESPITE / SUBJECT TO /
+-- exception construct would have collapsed several guards into one rule.
+-- One entry per site: the clause, the shape in the text (general rule +
+-- exception list), the L4 shape used instead, and what a native construct
+-- would have bought.
+-- ===========================================================================
+--
+-- SITE 1 -- cl.11, the eight-limb exclusion list.
+--   TEXT: a general rule ("Online spend refers to retail transaction ... made
+--     via the Internet ...") immediately qualified by "excluding the following
+--     transactions: (i) ... (viii)". One general norm, eight defeaters, and
+--     limb (viii) is open-ended.
+--   L4 SHAPE: `clause 11 excludes the transaction from online spend`, a
+--     BRANCH of eight arms each delegating to a named limb rule, consumed by
+--     `the transaction is online spend` as `flagged AND NOT (excluded)`. The
+--     general rule and its defeaters are TWO rules that must be read
+--     together, and the reader has to hold the polarity inversion (NOT of a
+--     cascade of TRUEs) in their head.
+--   A NATIVE CONSTRUCT WOULD HAVE BOUGHT: one rule stating the general norm
+--     with eight SUBJECT TO limbs attached at the point of statement, in the
+--     document's order, with no hand-written negation and no second rule to
+--     keep in step. The priority order is currently carried only by BRANCH's
+--     first-match semantics, which is an implementation detail standing in
+--     for a legal one.
+--
+-- SITE 2 -- cl.11 Table 1 and Table 2, the two enumerated defeaters.
+--   TEXT: 57 MCCs and 90 transaction terms, revised by the issuer at will.
+--   L4 SHAPE: the two tables are now encoded DIFFERENTLY, which is itself
+--     worth recording. Table 1 is an OR chain of 57 numeric disjuncts,
+--     generated from the source text by a script, and must be regenerated
+--     whenever DBS republishes. Table 2 is 19 `elem` tests over the shared
+--     domain's `Description pattern` enumeration: the 90 printed terms were
+--     read once into 19 families, the families are the domain's, and the
+--     string matching that decides which families a statement line carries
+--     happens in layer 1 rather than here.
+--     Encoding the COMPLEMENT of these lists is what spec section 4.5 warns
+--     against, and it is what a whitelist encoding would have required; the
+--     blacklist shape avoids that.
+--   A NATIVE CONSTRUCT WOULD HAVE BOUGHT: for Table 1, an exception declared
+--     over a SET literal rather than a disjunction, so that the list is data
+--     the rule cites rather than logic the rule is made of, and so that two
+--     lists from two issuers could be compared. Table 2 has most of that
+--     already, at a different cost: the mapping from 90 printed terms to 19
+--     families is a judgement made once, recorded in a comment beside the
+--     rule, and checkable only by reading it.
+--
+-- SITE 3 -- cl.11(viii), "any other transactions determined by DBS from time
+--     to time", read with cl.3 (DBS may vary or terminate the programmes at
+--     any time without notice), cl.5 (DBS's decision is final) and cl.7 (DBS
+--     may postpone awarding).
+--   TEXT: four open-ended issuer discretions that defeat any answer, none of
+--     them with a stated trigger, one of them (cl.5) purporting to defeat the
+--     REVIEW of the answer rather than the answer.
+--   L4 SHAPE: `clause 11 viii, DBS has otherwise determined the transaction
+--     to be excluded` returns FALSE, plus condition strings on the answer.
+--     The discretion is visible in the rule list but has no effect, which is
+--     the most honest thing a total function can do with it.
+--     `l4 verify` reports that rule `[unsat]` -- "a requirement nobody can
+--     meet" -- and it is the module's only finding. That is the clause's
+--     property, not the encoding's, and the reasoning is written out in full
+--     at the rule itself.
+--   A NATIVE CONSTRUCT WOULD HAVE BOUGHT: a defeater that is DECLARED and
+--     UNDISCHARGED -- an answer stamped "defeasible by cl.11(viii), cl.3,
+--     cl.5, cl.7" as a first-class part of its type, rather than as prose in
+--     a list of strings that nothing checks.
+--
+-- SITE 4 -- cl.12, overseas spend, excluding by reference to a document this
+--     corpus does not hold.
+--   TEXT: "excluding transactions which are excluded from the awarding of DBS
+--     Points as set out in the DBS Rewards Programme Terms and Conditions."
+--   L4 SHAPE: the exception is not encoded at all -- it CANNOT be, the text
+--     that states it is not held -- and a condition string says so. cl.6 does
+--     the same thing for the whole document.
+--   A NATIVE CONSTRUCT WOULD HAVE BOUGHT: an exception site that can be named
+--     and left OPEN, so that "this rule has a known unenumerated defeater"
+--     is a fact the type system carries rather than a sentence in a list.
+--     This is the incorporation-by-reference case, and it is the one where
+--     the difference between "no exception applies" and "the exception
+--     cannot be read" is worth money.
+--
+-- SITE 5 -- cl.11's definition against cl.13's determination.
+--   TEXT: cl.11 defines online spend by the CARDHOLDER'S act ("made via the
+--     Internet") and cl.13 says DBS determines it by the MERCHANT'S indicator.
+--     Neither is stated as an exception to the other; cl.13 simply displaces
+--     cl.11 in operation.
+--   L4 SHAPE: cl.13 wins, by construction -- no rule in this module reads
+--     `payment channel` or `credential`. The displacement is recorded in a
+--     comment and in the illustrations, and it is invisible in the rules.
+--   A NATIVE CONSTRUCT WOULD HAVE BOUGHT: the ability to write cl.11 as
+--     drafted and then let cl.13 OVERRIDE it, so that the encoding contains
+--     both clauses and states which governs, instead of containing one clause
+--     and a comment about the other. A reader auditing this file against the
+--     document currently finds cl.11's "via the Internet" nowhere in the code.
+--
+-- SITE 6 -- cl.15 and cl.20, the two products in one document.
+--   TEXT: cl.15 confines cl.16-19 to the Woman's World Card and cl.20
+--     confines cl.21-23 to the Woman's Card. cl.1-14 govern both. This is
+--     scoping by exception rather than by structure.
+--   L4 SHAPE: cl.15 as a predicate, `the Woman's World mechanics apply to`,
+--     asserted in both directions but NOT applied; cl.20-23 simply absent.
+--     The first pass applied it as a guard on the exported rule that REFUSEd
+--     any other card. REFUSE is outside the v1 Catala fragment, so the guard
+--     went and the predicate stayed -- which means the encoding now states
+--     the scope without enforcing it, and relies on the composer to dispatch.
+--   A NATIVE CONSTRUCT WOULD HAVE BOUGHT: more than it would have before.
+--     A scope stated as a TYPE -- a rule that can only be applied to the card
+--     it is scoped to -- would survive a lowering that has no notion of
+--     refusal, because it would never need to run to refuse. That is the
+--     shape this site now wants, and it is not the shape a DESPITE or
+--     SUBJECT TO would give it.

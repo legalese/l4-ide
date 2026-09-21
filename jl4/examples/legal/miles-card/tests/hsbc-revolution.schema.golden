@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Given one transaction on an HSBC Revolution Credit Card, decide how many HSBC Reward points and how many miles per dollar it earns under the Reward Points Programme effective 1 April 2026, with the monthly Bonus Points cap, the conditions attached, and the clauses relied on. Answers conditionally when the rate turns on a merchant indicator the cardholder cannot see.",
+    "properties": {
+        "card": {
+            "$ref": "#/$defs/Card",
+            "description": "Which card the transaction was made on. Passed for uniformity across the card modules; this rule does not read it, because the caller has already chosen the HSBC Revolution rules."
+        },
+        "cardholder": {
+            "$ref": "#/$defs/Cardholder",
+            "description": "Standing facts about the cardholder. This rule reads only the HSBC Everyday Global Account deposits ADB for the calendar month, which selects 9 or 19 Bonus Points per SGD1."
+        },
+        "month": {
+            "$ref": "#/$defs/Month position",
+            "description": "Where the cardholder's month stands. This rule does not read it: HSBC states no monthly spend threshold, and every field of this record is a DBS or POSB threshold."
+        },
+        "txn": {
+            "$ref": "#/$defs/Transaction",
+            "description": "The one charge being asked about, as the cardholder and the statement describe it."
+        }
+    },
+    "required": [
+        "card",
+        "cardholder",
+        "month",
+        "txn"
+    ],
+    "title": "HSBC Revolution earns on",
+    "type": "object"
+}

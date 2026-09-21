@@ -1,0 +1,623 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `miles-card-domain`
+IMPORT `miles-card`
+IMPORT `cheatsheet-claims`
+
+§ `Cheat-sheet claims the primary text does not support`
+
+-- ===========================================================================
+-- WHAT THIS FILE IS. The household cheat sheet ([S5], June 2026, a secondary
+-- source, not committed) makes claims about what each card earns. Those
+-- claims are deposited as the additional encoding `cheatsheet-2026-06`
+-- (cheatsheet-claims.l4) and run through the pipeline's p6-tests stage as
+-- the corpus's acceptance test (spec section 1). Every claim that stage
+-- proved unsupported by the issuer's own text is restated HERE as an
+-- `#ASSERT NOT (...)`, with the cheat-sheet cell and the clause that
+-- contradicts it, so that the committed corpus is green while the
+-- discrepancy stays on the record and a rule change that quietly made the
+-- cheat sheet right again would trip it.
+--
+-- FILLED FROM THE FORMAL ACCEPTANCE RUN, NOT FROM A HAND READING. Run
+-- `2026-09-21-2e987f68-001`, p6-tests DEGRADED, receipt
+-- `sha256:8894658530171acc57ac6e2f2e461f865db8afd1fccbd0af39b2340139639557`:
+-- 184 assertions over `cheatsheet-2026-06`, 129 satisfied, 55 failed. All 55
+-- are triaged below. The pre-pass snapshot, and the two pre-registered
+-- discrepancies this run had to surface without being told where to look,
+-- are in etc/go/subjects/sg-miles-card/NOTES.md section 5.
+--
+-- HOW EACH ROW IS WRITTEN. Every failure carries the [S5] cell verbatim, the
+-- line of cheatsheet-claims.l4 it failed at, a classification letter, and
+-- the clause of the held document that settles it, quoted. Then the cheat
+-- sheet's own claim, negated; and, where the encoding answers a specific
+-- other value, that value asserted positively, so this file records what the
+-- text DOES say and not only what it does not.
+--
+-- THE FOUR CLASSIFICATIONS, and what each one licenses.
+--   (a) THE CHEAT SHEET IS WRONG ON THE TEXT. A clause of a held document
+--       contradicts the cell. The household is routing spend on a figure the
+--       issuer does not owe. 9 failures.
+--   (b) THE ENCODING IS WRONG. The cheat sheet is right and a card module
+--       misreads its own document. NONE FOUND, and this file would be the
+--       wrong place for one: a category (b) finding is a bug against the
+--       module, not a disputed cheat-sheet claim, and writing it here would
+--       freeze the defect as the expected answer. The triage report,
+--       `ACCEPTANCE-TRIAGE.md` beside this file, records what was checked.
+--   (c) GENUINELY CONDITIONAL. The answer turns on the merchant's system
+--       indicator, which three issuers say in terms they do not determine
+--       (DBS Woman's cl.13, Citi cl.6(ii), HSBC cl.6). The cardholder cannot
+--       observe it at the moment of paying, so every fixture carries
+--       `Unknown` and the headline `miles per dollar` is the LOWER branch.
+--       The cheat sheet's cell is the UPPER branch, stated as though the
+--       indicator were settled. Neither party is wrong about a rate; they
+--       are answering different questions. 18 failures.
+--   (d) THE FIGURE RESTS ON A DOCUMENT THIS CORPUS DOES NOT HOLD, OR ON ONE
+--       THAT HAS EXPIRED, OR ON ROUNDING. 28 failures.
+--
+-- WHY NO CELL IS "CORRECTED". A claim edited to match the answer destroys
+-- the only evidence the comparison produces. The expressions below are
+-- copied from cheatsheet-claims.l4 unchanged, negated in place, and the
+-- fixtures are that file's own -- imported, never redefined, so a change to
+-- a fixture moves both files together or neither.
+-- ===========================================================================
+
+
+§§ `UOB Lady's Solitaire -- the sheet's 6 is the T&C's 4, plus an uplift no held document states`
+
+-- The cheat sheet prints "Solitaire (6, S$750)" on ten rows and explains the
+-- figure once, as "4 card + 2 savings". The card half is exactly what the
+-- held T&C states; the savings half is an uplift for holding a UOB Lady's
+-- Savings Account, and no document in source/ says it exists, let alone what
+-- it pays. So the sheet is not wrong about the CARD -- it is quoting a total
+-- this corpus cannot check, and the module answers the card's own figure and
+-- says so in a condition ("A Lady's Savings Account uplift above 4 miles per
+-- S$1 is NOT in this document and is unconfirmed here").
+--
+-- The document states the 4 twice, by two routes, which is why this is a
+-- clean (d) and not an argument:
+--   [uob-ladys-cards-tnc heading A] "A. Preferred Rewards Category(ies)
+--     Spending - 10X UNI$ per S$5 spent (equivalent to 4 miles per S$1 spent)"
+--   [uob-ladys-cards-tnc cl.2(b)] "Base UNI$" means the reward of UNI$1 for
+--     every S$5.00 spent (equivalent to 0.4 miles per S$1 spent)
+--   [uob-ladys-cards-tnc cl.2(c)] "Bonus UNI$" means the bonus reward of 9X
+--     UNI$ per S$5 spent (equivalent to 3.6 miles per S$1 ...) -- 0.4 + 3.6 = 4
+--
+-- The cap the same cells print, S$750, is NOT disputed: cl.6(b) states it and
+-- every cap assertion on these rows passed. Only the rate is here.
+
+-- [S5] "Dining out (restaurants, MCC 5811/5812) | Lady's Solitaire -- Dining (6, S$750)"
+-- (d) cheatsheet-claims.l4:349 claims 6; the text answers 4.
+-- [uob-ladys-cards-tnc heading A] "10X UNI$ per S$5 spent (equivalent to 4 miles per S$1 spent)"
+#ASSERT NOT ((`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 dining out`)'s `miles per dollar` EQUALS 6)
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 dining out`)'s `miles per dollar` EQUALS 4
+
+-- [S5] "Cafes / coffee shops / bubble tea (indie; MCC 5812/5814) | Solitaire -- Dining (6, S$750)"
+-- (d) cheatsheet-claims.l4:364 claims 6; the text answers 4.
+-- [uob-ladys-cards-tnc heading A] "10X UNI$ per S$5 spent (equivalent to 4 miles per S$1 spent)"
+#ASSERT NOT ((`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 a cafe`)'s `miles per dollar` EQUALS 6)
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 a cafe`)'s `miles per dollar` EQUALS 4
+
+-- [S5] "Solitaire -- Family (6, S$750)"
+-- (d) cheatsheet-claims.l4:383 claims 6; the text answers 4.
+-- [uob-ladys-cards-tnc heading A] "10X UNI$ per S$5 spent (equivalent to 4 miles per S$1 spent)"
+#ASSERT NOT ((`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `miles per dollar` EQUALS 6)
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `miles per dollar` EQUALS 4
+
+-- [S5] "FairPrice / Sheng Siong / Prime (MCC 5411, not yuu) | Solitaire -- Family (6, S$750)"
+-- (d) cheatsheet-claims.l4:399 claims 6; the text answers 4.
+-- [uob-ladys-cards-tnc heading A] "10X UNI$ per S$5 spent (equivalent to 4 miles per S$1 spent)"
+#ASSERT NOT ((`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 fairprice in store`)'s `miles per dollar` EQUALS 6)
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 fairprice in store`)'s `miles per dollar` EQUALS 4
+
+-- [S5] "Little Farms / premium grocers (MCC 5411 *or* 5499) | Solitaire -- Family **or** Dining (6, S$750 each)"
+-- (d) cheatsheet-claims.l4:417 claims 6; the text answers 4.
+-- [uob-ladys-cards-tnc heading A] "10X UNI$ per S$5 spent (equivalent to 4 miles per S$1 spent)"
+#ASSERT NOT ((`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 little farms as groceries`)'s `miles per dollar` EQUALS 6)
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 little farms as groceries`)'s `miles per dollar` EQUALS 4
+
+-- [S5] "Little Farms / premium grocers (MCC 5411 *or* 5499) | Solitaire -- Family **or** Dining (6, S$750 each)"
+-- (d) cheatsheet-claims.l4:419 claims 6; the text answers 4.
+-- [uob-ladys-cards-tnc heading A] "10X UNI$ per S$5 spent (equivalent to 4 miles per S$1 spent)"
+#ASSERT NOT ((`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 little farms as misc food`)'s `miles per dollar` EQUALS 6)
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 little farms as misc food`)'s `miles per dollar` EQUALS 4
+
+-- [S5] "Solitaire -- Dining (6, S$750, if cap room)"
+-- (d) cheatsheet-claims.l4:442 claims 6; the text answers 4.
+-- [uob-ladys-cards-tnc heading A] "10X UNI$ per S$5 spent (equivalent to 4 miles per S$1 spent)"
+#ASSERT NOT ((`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `miles per dollar` EQUALS 6)
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `miles per dollar` EQUALS 4
+
+-- [S5] "Fast food (McD's, Starbucks, KFC -- MCC 5814) | Solitaire -- Dining (6, S$750, if cap room)"
+-- (d) cheatsheet-claims.l4:458 claims 6; the text answers 4.
+-- [uob-ladys-cards-tnc heading A] "10X UNI$ per S$5 spent (equivalent to 4 miles per S$1 spent)"
+#ASSERT NOT ((`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 fast food`)'s `miles per dollar` EQUALS 6)
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 fast food`)'s `miles per dollar` EQUALS 4
+
+-- [S5] "Kids' / infants' wear (MCC 5641) | Solitaire -- Family (6, S$750)"
+-- (d) cheatsheet-claims.l4:470 claims 6; the text answers 4.
+-- [uob-ladys-cards-tnc heading A] "10X UNI$ per S$5 spent (equivalent to 4 miles per S$1 spent)"
+#ASSERT NOT ((`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 kids wear in store`)'s `miles per dollar` EQUALS 6)
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 kids wear in store`)'s `miles per dollar` EQUALS 4
+
+-- [S5] "Cheers / FairPrice Xpress (NOT yuu; MCC 5411) | Solitaire -- Family (6, S$750)"
+-- (d) cheatsheet-claims.l4:533 claims 6; the text answers 4.
+-- [uob-ladys-cards-tnc heading A] "10X UNI$ per S$5 spent (equivalent to 4 miles per S$1 spent)"
+#ASSERT NOT ((`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 cheers`)'s `miles per dollar` EQUALS 6)
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 cheers`)'s `miles per dollar` EQUALS 4
+
+
+§§ `DBS yuu -- 10 is 10.08 and ~S$822 is S$822.86: the sheet rounds`
+
+-- Both figures are the sheet compressing, and both compress in the direction
+-- that understates. A yuu Merchant purchase in a month above the threshold
+-- earns cl.6's 1 Base Point plus cl.7(a)'s 9 and cl.7(b)'s 26 = 36 yuu Points
+-- per S$1, and cl.12 values a point at 0.28 miles: 36 x 0.28 = 10.08.
+--   [dbs-yuu-card-tnc cl.12] "1 yuu Point is equivalent to 0.5% cash rebate
+--     or 0.28 miles or more, depending on the redemption item on the yuu
+--     Rewards catalogue."
+-- The cap is stated in POINTS, so it needs no conversion, and the sheet's own
+-- "~S$822" is that cap divided by the 35 BONUS points per S$1:
+--   [dbs-yuu-card-tnc cl.7] "Total Bonus Rewards is capped at 28,800 yuu
+--     Points (worth up to S$144 cash rebates or 8,000 miles) per calendar
+--     month."   28,800 / 35 = S$822.857...
+--
+-- THE ADDITIVE READING IS A LIVE FORK, not a settled figure: fork-register
+-- entry `F-yuu-bonus-additive` records that no clause says the two Bonus
+-- Rewards tables add, which is why the module marks these answers
+-- `Unconfirmed`. It does not change the classification -- on the rejected
+-- `replacement` reading the rate would be 7.56, further from the sheet's 10,
+-- not nearer.
+
+-- [S5] "Cold Storage / CS Fresh / Giant (yuu, MCC 5411) | DBS yuu (10, S$822)"
+-- (d) cheatsheet-claims.l4:380 claims 10; the text answers 10.08.
+-- [dbs-yuu-card-tnc cl.12] "1 yuu Point is equivalent to ... 0.28 miles or more" -- 36 points x 0.28 = 10.08
+#ASSERT NOT ((`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `miles per dollar` EQUALS 10)
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `miles per dollar` EQUALS 10.08
+
+-- [S5] "Cold Storage / CS Fresh / Giant (yuu, MCC 5411) | DBS yuu (10, S$822)"
+-- (d) cheatsheet-claims.l4:381 claims 822; the text answers 28800 / 35.
+-- [dbs-yuu-card-tnc cl.7] "Total Bonus Rewards is capped at 28,800 yuu Points ... per calendar month" -- 28,800 / 35
+#ASSERT NOT ((`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `bonus spend per month` EQUALS 822)
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `bonus spend per month` EQUALS 28800 / 35
+
+-- [S5] "foodpanda / food delivery (MCC 5814) | DBS yuu (10, S$822)"
+-- (d) cheatsheet-claims.l4:439 claims 10; the text answers 10.08.
+-- [dbs-yuu-card-tnc cl.12] "1 yuu Point is equivalent to ... 0.28 miles or more" -- 36 points x 0.28 = 10.08
+#ASSERT NOT ((`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `miles per dollar` EQUALS 10)
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `miles per dollar` EQUALS 10.08
+
+-- [S5] "foodpanda / food delivery (MCC 5814) | DBS yuu (10, S$822)"
+-- (d) cheatsheet-claims.l4:440 claims 822; the text answers 28800 / 35.
+-- [dbs-yuu-card-tnc cl.7] "Total Bonus Rewards is capped at 28,800 yuu Points ... per calendar month" -- 28,800 / 35
+#ASSERT NOT ((`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `cap`'s `bonus spend per month` EQUALS 822)
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `cap`'s `bonus spend per month` EQUALS 28800 / 35
+
+-- [S5] "Guardian (yuu merchant; MCC 5912) | DBS yuu (10, S$822)"
+-- (d) cheatsheet-claims.l4:487 claims 10; the text answers 10.08.
+-- [dbs-yuu-card-tnc cl.12] "1 yuu Point is equivalent to ... 0.28 miles or more" -- 36 points x 0.28 = 10.08
+#ASSERT NOT ((`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 guardian`)'s `miles per dollar` EQUALS 10)
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 guardian`)'s `miles per dollar` EQUALS 10.08
+
+-- [S5] "Guardian (yuu merchant; MCC 5912) | DBS yuu (10, S$822)"
+-- (d) cheatsheet-claims.l4:488 claims 822; the text answers 28800 / 35.
+-- [dbs-yuu-card-tnc cl.7] "Total Bonus Rewards is capped at 28,800 yuu Points ... per calendar month" -- 28,800 / 35
+#ASSERT NOT ((`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 guardian`)'s `cap`'s `bonus spend per month` EQUALS 822)
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 guardian`)'s `cap`'s `bonus spend per month` EQUALS 28800 / 35
+
+-- [S5] "7-Eleven (yuu merchant, Visa; MCC 5411/5499) | DBS yuu (10, S$822)"
+-- (d) cheatsheet-claims.l4:519 claims 10; the text answers 10.08.
+-- [dbs-yuu-card-tnc cl.12] "1 yuu Point is equivalent to ... 0.28 miles or more" -- 36 points x 0.28 = 10.08
+#ASSERT NOT ((`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 seven eleven`)'s `miles per dollar` EQUALS 10)
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 seven eleven`)'s `miles per dollar` EQUALS 10.08
+
+-- [S5] "7-Eleven (yuu merchant, Visa; MCC 5411/5499) | DBS yuu (10, S$822)"
+-- (d) cheatsheet-claims.l4:520 claims 822; the text answers 28800 / 35.
+-- [dbs-yuu-card-tnc cl.7] "Total Bonus Rewards is capped at 28,800 yuu Points ... per calendar month" -- 28,800 / 35
+#ASSERT NOT ((`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 seven eleven`)'s `cap`'s `bonus spend per month` EQUALS 822)
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 seven eleven`)'s `cap`'s `bonus spend per month` EQUALS 28800 / 35
+
+-- [S5] "Public transport (SimplyGo) | DBS yuu (10, S$822, also a yuu merchant)"
+-- (d) cheatsheet-claims.l4:634 claims 10; the text answers 10.08.
+-- [dbs-yuu-card-tnc cl.12] "1 yuu Point is equivalent to ... 0.28 miles or more" -- 36 points x 0.28 = 10.08
+#ASSERT NOT ((`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 simplygo`)'s `miles per dollar` EQUALS 10)
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 simplygo`)'s `miles per dollar` EQUALS 10.08
+
+-- [S5] "Tesla at Charge+ stations | DBS yuu (10, S$822, if cap room)"
+-- (d) cheatsheet-claims.l4:656 claims 10; the text answers 10.08.
+-- [dbs-yuu-card-tnc cl.12] "1 yuu Point is equivalent to ... 0.28 miles or more" -- 36 points x 0.28 = 10.08
+#ASSERT NOT ((`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 charge plus`)'s `miles per dollar` EQUALS 10)
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 charge plus`)'s `miles per dollar` EQUALS 10.08
+
+-- [S5] "Tesla at Charge+ stations | DBS yuu (10, S$822, if cap room)"
+-- (d) cheatsheet-claims.l4:657 claims 822; the text answers 28800 / 35.
+-- [dbs-yuu-card-tnc cl.7] "Total Bonus Rewards is capped at 28,800 yuu Points ... per calendar month" -- 28,800 / 35
+#ASSERT NOT ((`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 charge plus`)'s `cap`'s `bonus spend per month` EQUALS 822)
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 charge plus`)'s `cap`'s `bonus spend per month` EQUALS 28800 / 35
+
+
+§§ `DBS yuu at SimplyGo -- the cap admits S$811, not S$822, because SimplyGo has its own row`
+
+-- The one yuu row where the sheet is wrong on the text rather than rounding
+-- it. The sheet annotates SimplyGo "also a yuu merchant" and carries the
+-- S$822 cap figure across. SimplyGo is NOT yuu Merchant Spend in this
+-- document: cl.6's Base Rewards table and cl.7(a)'s Bonus Rewards table each
+-- give it a row of its own, at different numbers.
+--   [dbs-yuu-card-tnc cl.6, Base Rewards table] "SimplyGo  0.5 yuu Point
+--     (0.25% cash rebates)"  -- against "yuu Merchant Spend  1 yuu Point"
+--   [dbs-yuu-card-tnc cl.7(a)] "SimplyGo  9.5 yuu Points (4.75% cash
+--     rebates)"  -- against "yuu Merchant Spend  9 yuu Points"
+-- So the bonus denominator is 9.5 + 26 = 35.5, and cl.7's 28,800-point cap
+-- admits 28,800 / 35.5 = S$811.27 of bonus-earning spend, S$11.59 less than
+-- the sheet's figure. S$822 is not a rounding of S$811.27 in any direction.
+--
+-- The RATE is unaffected and stays in the rounding cluster above: 0.5 + 9.5 +
+-- 26 is the same 36 points per S$1 as a yuu merchant, hence the same 10.08.
+-- That coincidence is why the cap is the only place the row's error shows.
+
+-- [S5] "Public transport (SimplyGo) | DBS yuu (10, S$822, also a yuu merchant)"
+-- (a) cheatsheet-claims.l4:635 claims 822; the text answers 28800 / 35.5.
+-- [dbs-yuu-card-tnc cl.7(a)] "SimplyGo  9.5 yuu Points (4.75% cash rebates)" -- 28,800 / 35.5 = 811.27
+#ASSERT NOT ((`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 simplygo`)'s `cap`'s `bonus spend per month` EQUALS 822)
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 simplygo`)'s `cap`'s `bonus spend per month` EQUALS 28800 / 35.5
+
+
+§§ `POSB PAssion Debit -- the Promotion Period ended on 30 September 2025`
+
+-- Seven failures with one cause. The document that pays the sheet's "5 mpd,
+-- ~S$507" fixes its own life and that life is over; the fixtures are dated
+-- June 2026, nine months outside it.
+--   [posb-passion-yuu-tnc cl.3] "The Promotion is valid from 1 October 2023
+--     to 30 September 2025 ("Promotion Period")."
+--   [posb-passion-yuu-tnc cl.4] ""Qualified Spend" refers to retail
+--     transactions charged to the PAssion Card within the Promotion Period,
+--     and posted into the Card account at the point of computation of yuu
+--     Points."
+-- The document is "Updated as of 30 May 2025" and nothing held renews it, so
+-- the module answers 0 with status `Source expired` rather than guessing that
+-- it rolled over. `capped` goes FALSE with the rate, because no bonus runs
+-- against the pot; the pot is still named on the answer.
+--
+-- TWO INDEPENDENT GROUNDS, recorded so the row is not read as resting only on
+-- the expiry. Measured on this branch by re-dating the same fixtures into the
+-- Promotion Period: the card then answers 5.04 miles per dollar (3X + 15X =
+-- 18 yuu Points at cl.12's 0.28), not the sheet's 5; and a cap of S$333.33
+-- (cl.8(b)'s 5,000 yuu Points over 15 bonus points per S$1), not the sheet's
+-- S$507, which no clause in the bundle produces.
+--   [posb-passion-yuu-tnc cl.8(b)] "Capped at a maximum of S$25 cash rebate
+--     (5,000 yuu Points) to be awarded per Cardmember per Qualifying Month"
+-- The Malaysian Ringgit row fails a third time over, in period or out:
+--   [posb-passion-yuu-tnc cl.8(d)] "Retail transactions made at Participating
+--     Merchants located outside of Singapore and/or charged in foreign
+--     currencies, are not eligible for this Promotion."
+
+-- [S5] "PAssion Debit (5, S$507) -> PRVI (1.4)"
+-- (d) cheatsheet-claims.l4:386 claims 5; the text answers 0.
+-- [posb-passion-yuu-tnc cl.3] "The Promotion is valid from 1 October 2023 to 30 September 2025"
+#ASSERT NOT ((`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `miles per dollar` EQUALS 5)
+#ASSERT (`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `miles per dollar` EQUALS 0
+
+-- [S5] "PAssion Debit (5, S$507) -> PRVI (1.4)"
+-- (d) cheatsheet-claims.l4:387 claims 507; the text answers 0.
+-- [posb-passion-yuu-tnc cl.3] "The Promotion is valid from 1 October 2023 to 30 September 2025"
+#ASSERT NOT ((`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `bonus spend per month` EQUALS 507)
+#ASSERT (`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `bonus spend per month` EQUALS 0
+
+-- [S5] "PAssion Debit (5, S$507) -> WWC/Citi (4)"
+-- (d) cheatsheet-claims.l4:445 claims 5; the text answers 0.
+-- [posb-passion-yuu-tnc cl.3] "The Promotion is valid from 1 October 2023 to 30 September 2025"
+#ASSERT NOT ((`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `miles per dollar` EQUALS 5)
+#ASSERT (`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `miles per dollar` EQUALS 0
+
+-- [S5] "PAssion Debit (5, S$507) -> WWC/Citi (4)"
+-- (d) cheatsheet-claims.l4:446 claims 507; the text answers 0.
+-- [posb-passion-yuu-tnc cl.3] "The Promotion is valid from 1 October 2023 to 30 September 2025"
+#ASSERT NOT ((`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `cap`'s `bonus spend per month` EQUALS 507)
+#ASSERT (`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `cap`'s `bonus spend per month` EQUALS 0
+
+-- [S5] "Malaysian Ringgit (JB runs, MYR online) | PAssion Debit (~4.5, S$507)"
+-- (d) cheatsheet-claims.l4:692 claims 4.5; the text answers 0.
+-- [posb-passion-yuu-tnc cl.3] promotion expired; and cl.8(d) excludes foreign-currency spend in any case
+#ASSERT NOT ((`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 myr online`)'s `miles per dollar` EQUALS 4.5)
+#ASSERT (`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 myr online`)'s `miles per dollar` EQUALS 0
+
+-- [S5] "Malaysian Ringgit (JB runs, MYR online) | PAssion Debit (~4.5, S$507)"
+-- (d) cheatsheet-claims.l4:693 claims 507; the text answers 0.
+-- [posb-passion-yuu-tnc cl.3] promotion expired; and cl.8(d) excludes foreign-currency spend in any case
+#ASSERT NOT ((`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 myr online`)'s `cap`'s `bonus spend per month` EQUALS 507)
+#ASSERT (`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 myr online`)'s `cap`'s `bonus spend per month` EQUALS 0
+
+-- [S5] stack table: "PAssion POSB Debit | 5 mpd | ~S$507 yuu spend (own cap)"
+-- (d) cheatsheet-claims.l4:793 claims TRUE; the text answers FALSE.
+-- [posb-passion-yuu-tnc cl.3] expired, so no bonus runs against cl.8(b)'s 5,000-point pot
+#ASSERT NOT ((`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `capped` EQUALS TRUE)
+#ASSERT (`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `capped` EQUALS FALSE
+
+
+§§ `DBS Woman's World -- the indicator decides, and the sheet assumed it`
+
+-- Eleven failures, all the same shape, and the last of them is one of the two
+-- discrepancies this acceptance test was pre-registered to find.
+--   [dbs-womans-card-tnc cl.13] "DBS determines an online transaction based
+--     on system indicators. These indicators are decided by the merchant and
+--     their banker, and passed to DBS when the transaction is posted to the
+--     Card."
+-- The indicator is attached when the charge is POSTED, by the merchant's
+-- banker, after the cardholder has acted. It is therefore not a fact any
+-- fixture may carry, every fixture in cheatsheet-claims.l4 sets it `Unknown`,
+-- and `miles per dollar` reports the LOWER of the two branches so a headline
+-- never overstates. The sheet's "4" is the module's
+-- `miles per dollar if the merchant flags online`, which is 4 on every row
+-- here; the headline is cl.15's base 1X, 0.4 miles per dollar.
+--
+-- Fork-register entry: `F-womans-online-definition`, readings
+-- `indicatorDecides` (taken) against `viaTheInternetDecides` (rejected). Its
+-- own note names this file's last row: "This is the site a secondary source
+-- is most likely to get wrong: a household cheat sheet that says an in-store
+-- wallet tap 'counts as online' is refuted on cl.11 and cl.13 read together."
+--
+-- PRE-REGISTERED DISCREPANCY 1 of 2 is the wallet-tap row at the end. It is
+-- pinned with a third assertion the other rows do not carry, because the
+-- claim it refutes is about the OUTCOME and not about the rate: the sheet
+-- says a wallet tap in store counts as online, and the module says the
+-- outcome is not determined by how the cardholder paid.
+
+-- [S5] "WWC if ordered online (4, S$1k)"
+-- (c) cheatsheet-claims.l4:402 claims 4; the text answers 0.4.
+-- [dbs-womans-card-tnc cl.13] "DBS determines an online transaction based on system indicators ... decided by the merchant and their banker"
+#ASSERT NOT ((`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 fairprice online`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 fairprice online`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "WWC if online (4, S$1k)"
+-- (c) cheatsheet-claims.l4:422 claims 4; the text answers 0.4.
+-- [dbs-womans-card-tnc cl.13] "DBS determines an online transaction based on system indicators ... decided by the merchant and their banker"
+#ASSERT NOT ((`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 premium grocer online`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 premium grocer online`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "PAssion Debit (5, S$507) -> WWC/Citi (4)"
+-- (c) cheatsheet-claims.l4:447 claims 4; the text answers 0.4.
+-- [dbs-womans-card-tnc cl.13] "DBS determines an online transaction based on system indicators ... decided by the merchant and their banker"
+#ASSERT NOT ((`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "WWC if online (4, S$1k)"
+-- (c) cheatsheet-claims.l4:473 claims 4; the text answers 0.4.
+-- [dbs-womans-card-tnc cl.13] "DBS determines an online transaction based on system indicators ... decided by the merchant and their banker"
+#ASSERT NOT ((`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 kids wear online`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 kids wear online`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "WWC if online (4) -> PRVI (1.4)" -- no cap figure printed in this cell
+-- (c) cheatsheet-claims.l4:493 claims 4; the text answers 0.4.
+-- [dbs-womans-card-tnc cl.13] "DBS determines an online transaction based on system indicators ... decided by the merchant and their banker"
+#ASSERT NOT ((`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 guardian online`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 guardian online`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "WWC if online (4, S$1k)"
+-- (c) cheatsheet-claims.l4:506 claims 4; the text answers 0.4.
+-- [dbs-womans-card-tnc cl.13] "DBS determines an online transaction based on system indicators ... decided by the merchant and their banker"
+#ASSERT NOT ((`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 watsons online`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 watsons online`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "Lazada / RedMart (all -- codes as marketplace, NOT Family) | Woman's World (4, S$1k)"
+-- (c) cheatsheet-claims.l4:561 claims 4; the text answers 0.4.
+-- [dbs-womans-card-tnc cl.13] "DBS determines an online transaction based on system indicators ... decided by the merchant and their banker"
+#ASSERT NOT ((`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "Shopee | Woman's World (4, S$1k)"
+-- (c) cheatsheet-claims.l4:577 claims 4; the text answers 0.4.
+-- [dbs-womans-card-tnc cl.13] "DBS determines an online transaction based on system indicators ... decided by the merchant and their banker"
+#ASSERT NOT ((`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 shopee`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 shopee`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "Other online shopping (incl. Amazon) | Woman's World (4, S$1k)"
+-- (c) cheatsheet-claims.l4:592 claims 4; the text answers 0.4.
+-- [dbs-womans-card-tnc cl.13] "DBS determines an online transaction based on system indicators ... decided by the merchant and their banker"
+#ASSERT NOT ((`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 amazon`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 amazon`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "StarHub bill (via app/site, not AXS) | Woman's World (4, S$1k)"
+-- (c) cheatsheet-claims.l4:609 claims 4; the text answers 0.4.
+-- [dbs-womans-card-tnc cl.13] "DBS determines an online transaction based on system indicators ... decided by the merchant and their banker"
+#ASSERT NOT ((`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 starhub bill`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 starhub bill`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] merchant reference: "*Earns:* any transaction processed as **online** (any MCC), ... and Kris+/mobile-wallet in-store (counts as online)"
+-- (c) cheatsheet-claims.l4:835 claims 4; the text answers 0.4.
+-- [dbs-womans-card-tnc cl.13] "DBS determines an online transaction based on system indicators ... decided by the merchant and their banker"
+#ASSERT NOT ((`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 a wallet tap in a department store`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 a wallet tap in a department store`)'s `miles per dollar` EQUALS 0.4
+
+
+§§ `Citi Rewards online limb -- cl.6(ii) says in terms that Citibank does not decide it`
+
+-- Five failures. Citi's online limb defines itself by the indicator in its own
+-- next sentence, and disclaims deciding it:
+--   [citi-rewards-10x-tnc cl.6(ii)] "a Qualifying Charge made at an online
+--     retail merchant, excluding mobile wallet and travel-related
+--     transactions*. These refer to Qualifying Charges made via the internet
+--     or mobile applications, which is determined by system indicators
+--     reflecting that it is an online transaction ... These indicators are
+--     decided by the relevant merchant and/or their acquirer and are not
+--     determined by Citibank."
+-- None of these five merchants is on cl.6(i)'s MCC list (foodpanda 5814,
+-- Lazada and Shopee 5262, Amazon 5399, StarHub 4814), so cl.6(ii) is the only
+-- limb available and the answer is conditional. The sheet's "4" is the upper
+-- branch; the headline is the base 1X at 0.4.
+--
+-- No fork-register entry disputes the indicator itself -- the clause settles
+-- it. The register's entry at this clause, `F-citi-online-retail`, is about a
+-- different question: whether "retail" adds a test beyond the indicator.
+
+-- [S5] "PAssion Debit (5, S$507) -> WWC/Citi (4)"
+-- (c) cheatsheet-claims.l4:448 claims 4; the text answers 0.4.
+-- [citi-rewards-10x-tnc cl.6(ii)] "These indicators are decided by the relevant merchant and/or their acquirer and are not determined by Citibank."
+#ASSERT NOT ((`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "Citi Rewards (4, S$1k)"
+-- (c) cheatsheet-claims.l4:564 claims 4; the text answers 0.4.
+-- [citi-rewards-10x-tnc cl.6(ii)] "These indicators are decided by the relevant merchant and/or their acquirer and are not determined by Citibank."
+#ASSERT NOT ((`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "Citi Rewards (4, S$1k)"
+-- (c) cheatsheet-claims.l4:580 claims 4; the text answers 0.4.
+-- [citi-rewards-10x-tnc cl.6(ii)] "These indicators are decided by the relevant merchant and/or their acquirer and are not determined by Citibank."
+#ASSERT NOT ((`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 shopee`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 shopee`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "Citi Rewards (4, S$1k)"
+-- (c) cheatsheet-claims.l4:595 claims 4; the text answers 0.4.
+-- [citi-rewards-10x-tnc cl.6(ii)] "These indicators are decided by the relevant merchant and/or their acquirer and are not determined by Citibank."
+#ASSERT NOT ((`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 amazon`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 amazon`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "Citi Rewards (4, S$1k)"
+-- (c) cheatsheet-claims.l4:612 claims 4; the text answers 0.4.
+-- [citi-rewards-10x-tnc cl.6(ii)] "These indicators are decided by the relevant merchant and/or their acquirer and are not determined by Citibank."
+#ASSERT NOT ((`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 starhub bill`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 starhub bill`)'s `miles per dollar` EQUALS 0.4
+
+
+§§ `HSBC Revolution online -- cl.6 puts the same determination with the acquirer`
+
+-- Two failures, the same fork on the third issuer that disclaims it.
+--   [hsbc-revolution-reward-points-tnc cl.6] "HSBC determines whether a
+--     transaction is a Selected Online Transaction based on system indicators
+--     which are determined by the merchants and the merchant's acquiring
+--     bank."
+-- Lazada (MCC 5262) and Amazon (5399) are on cl.7's Eligible Transactions
+-- list, so the upper branch is the sheet's 4; but the fixtures are paid with
+-- the physical card in a website, and if the acquirer flags them
+-- card-present they are not a Selected Contactless Payment under cl.5 either
+-- -- cl.5 requires "Visa contactless through a contactless terminal mode".
+-- So the lower branch is cl.8's base rate and the headline is 0.4.
+--
+-- No fork-register entry covers this: the register's five HSBC entries are
+-- about the FAQ's contactless wording, Amaze, the programme period, the
+-- dining heading and cl.4.2's verb. The indicator is not a fork here because
+-- cl.6 states who decides.
+
+-- [S5] "Revolution online (4, S$1k) -> PRVI (1.4)"
+-- (c) cheatsheet-claims.l4:567 claims 4; the text answers 0.4.
+-- [hsbc-revolution-reward-points-tnc cl.6] "system indicators which are determined by the merchants and the merchant's acquiring bank"
+#ASSERT NOT ((`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "Revolution online (4, S$1k) -> PRVI (1.4)"
+-- (c) cheatsheet-claims.l4:598 claims 4; the text answers 0.4.
+-- [hsbc-revolution-reward-points-tnc cl.6] "system indicators which are determined by the merchants and the merchant's acquiring bank"
+#ASSERT NOT ((`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 amazon`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 amazon`)'s `miles per dollar` EQUALS 0.4
+
+
+§§ `HSBC Revolution at MCC 5411 -- a convenience store is not an Eligible Transaction at all`
+
+-- Four failures, and the sheet is simply wrong on the document. It routes
+-- 7-Eleven and Cheers to "Revolution (4, S$1k, contactless)". Both fixtures
+-- are MCC 5411, on the sheet's own labelling, and the tap is a wallet token
+-- at a terminal -- so cl.5 is satisfied and cl.7 is not:
+--   [hsbc-revolution-reward-points-tnc cl.7] ""Eligible Transactions" refers
+--     to Selected Contactless Payments and Selected Online Transactions that
+--     fall within any one of the following MCCs:"
+-- MCC 5411 is not on that list. Measured 2026-09-21: the string "5411" does
+-- not occur anywhere in hsbc-revolution-reward-points-tnc.txt or in
+-- hsbc-revolution-faq.txt. The list's headings are Department Stores, Dining
+-- excluding hotel dining, Rental and Lodging, Travel related, Transportation
+-- and Membership Clubs, and a run of specialty retail -- no groceries or
+-- convenience limb. A charge that is not an Eligible Transaction falls to:
+--   [hsbc-revolution-reward-points-tnc cl.8] "Cardholders are entitled to earn
+--     1 Reward point for every SGD1 charged on all other Qualifying
+--     Transactions that are not Eligible Transactions."
+-- which is 0.4 miles per dollar, and the S$1,000 bonus pool is never reached,
+-- so `capped` is FALSE and the dollar figure on it is meaningless. Both
+-- halves of the cell fail for the one reason.
+--
+-- The 0.4 conversion is itself `Unconfirmed` in the module -- cl.13 puts the
+-- points-to-miles rate in the HSBC Rewards Programme terms, which this corpus
+-- does not hold -- but that is not what these four assertions turn on: the
+-- sheet's 4 and the module's 0.4 differ by the bonus, not by the conversion.
+
+-- [S5] "Revolution (4, S$1k, contactless)"
+-- (a) cheatsheet-claims.l4:522 claims 4; the text answers 0.4.
+-- [hsbc-revolution-reward-points-tnc cl.7] MCC 5411 is on no Eligible Transactions list; cl.8 gives "1 Reward point for every SGD1"
+#ASSERT NOT ((`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 seven eleven`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 seven eleven`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "Revolution (4, S$1k, contactless)"
+-- (a) cheatsheet-claims.l4:523 claims 1000; the text answers 0.
+-- [hsbc-revolution-reward-points-tnc cl.7] not an Eligible Transaction, so cl.7.2's bonus pool is never reached
+#ASSERT NOT ((`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 seven eleven`)'s `cap`'s `bonus spend per month` EQUALS 1000)
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 seven eleven`)'s `cap`'s `bonus spend per month` EQUALS 0
+
+-- [S5] "Revolution (4, S$1k, contactless)"
+-- (a) cheatsheet-claims.l4:536 claims 4; the text answers 0.4.
+-- [hsbc-revolution-reward-points-tnc cl.7] MCC 5411 is on no Eligible Transactions list; cl.8 gives "1 Reward point for every SGD1"
+#ASSERT NOT ((`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 cheers`)'s `miles per dollar` EQUALS 4)
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 cheers`)'s `miles per dollar` EQUALS 0.4
+
+-- [S5] "Revolution (4, S$1k, contactless)"
+-- (a) cheatsheet-claims.l4:537 claims 1000; the text answers 0.
+-- [hsbc-revolution-reward-points-tnc cl.7] not an Eligible Transaction, so cl.7.2's bonus pool is never reached
+#ASSERT NOT ((`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 cheers`)'s `cap`'s `bonus spend per month` EQUALS 1000)
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 cheers`)'s `cap`'s `bonus spend per month` EQUALS 0
+
+
+§§ `Citi Rewards and the mobile wallet -- the exclusion is on the online limb only`
+
+-- PRE-REGISTERED DISCREPANCY 2 of 2, and four failures. The sheet states the
+-- exclusion without a qualifier: "Does NOT earn: mobile wallet (Apple/Google
+-- Pay) -- pay by card or card-on-file". The T&C attaches it to ONE of cl.6's
+-- two limbs.
+--   [citi-rewards-10x-tnc cl.6(i)] "a Qualifying Charge made at any store that
+--     sells shoes and bags and clothes as its main business activity,
+--     determined by the following Merchant Category Codes (MCC)" -- MCC 5311
+--     Department Stores, 5611, 5621, 5631, 5641 Children's and Infant's Wear
+--     Stores, 5651 Family Clothing Stores. No wallet language anywhere in it.
+--   [citi-rewards-10x-tnc cl.6(ii)] "a Qualifying Charge made at an online
+--     retail merchant, excluding mobile wallet and travel-related
+--     transactions*."
+-- Measured 2026-09-21: "mobile wallet" occurs in the Citi bundle exactly
+-- twice, at cl.6(ii) of the T&C and at the FAQ's restatement of the same
+-- limb. It occurs nowhere in citi-rewards-exclusion-list.txt.
+--
+-- So a wallet tap that lands on cl.6(i) by its MCC still earns 10X. All four
+-- fixtures here do: Mothercare in store and online at 5641, UNIQLO Japan at
+-- 5651, Takashimaya at 5311. The instruction the household is following --
+-- never pay Citi with a wallet -- costs it 3.6 miles per dollar at exactly
+-- the shops the card was chosen for.
+--
+-- These four assert `earns the bonus rate`, which is the field the cell is
+-- about. The rate assertions on the same fixtures passed, which is why they
+-- are not repeated here.
+
+-- [S5] merchant reference: "Does NOT earn: **mobile wallet (Apple/Google Pay) -- pay by card or card-on-file**"
+-- (a) cheatsheet-claims.l4:886 claims FALSE; the text answers TRUE.
+-- [citi-rewards-10x-tnc cl.6(i)] the MCC limb carries no wallet language; cl.6(ii) is where "excluding mobile wallet" sits
+#ASSERT NOT ((`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 kids wear in store`))'s `earns the bonus rate` EQUALS FALSE)
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 kids wear in store`))'s `earns the bonus rate` EQUALS TRUE
+
+-- [S5] merchant reference: "Does NOT earn: **mobile wallet (Apple/Google Pay) -- pay by card or card-on-file**"
+-- (a) cheatsheet-claims.l4:887 claims FALSE; the text answers TRUE.
+-- [citi-rewards-10x-tnc cl.6(i)] the MCC limb carries no wallet language; cl.6(ii) is where "excluding mobile wallet" sits
+#ASSERT NOT ((`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 kids wear online`))'s `earns the bonus rate` EQUALS FALSE)
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 kids wear online`))'s `earns the bonus rate` EQUALS TRUE
+
+-- [S5] merchant reference: "Does NOT earn: **mobile wallet (Apple/Google Pay) -- pay by card or card-on-file**"
+-- (a) cheatsheet-claims.l4:906 claims FALSE; the text answers TRUE.
+-- [citi-rewards-10x-tnc cl.6(i)] the MCC limb carries no wallet language; cl.6(ii) is where "excluding mobile wallet" sits
+#ASSERT NOT ((`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 everything else overseas`))'s `earns the bonus rate` EQUALS FALSE)
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 everything else overseas`))'s `earns the bonus rate` EQUALS TRUE
+
+-- [S5] merchant reference: "Does NOT earn: **mobile wallet (Apple/Google Pay) -- pay by card or card-on-file**"
+-- (a) cheatsheet-claims.l4:907 claims FALSE; the text answers TRUE.
+-- [citi-rewards-10x-tnc cl.6(i)] the MCC limb carries no wallet language; cl.6(ii) is where "excluding mobile wallet" sits
+#ASSERT NOT ((`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 a wallet tap in a department store`))'s `earns the bonus rate` EQUALS FALSE)
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 a wallet tap in a department store`))'s `earns the bonus rate` EQUALS TRUE
+
+-- PRE-REGISTERED DISCREPANCY 1 of 2, pinned on the branch the cell is about.
+-- The sheet's 4 is not a figure the module lacks: it is the module's
+-- `miles per dollar if the merchant flags online`. What the sheet asserts and
+-- the text denies is that a wallet tap in store SETTLES that branch.
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 a wallet tap in a department store`)'s `miles per dollar if the merchant flags online` EQUALS 4
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 a wallet tap in a department store`)'s `depends on the merchant indicator`
