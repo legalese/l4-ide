@@ -272,8 +272,10 @@ Each fixture produces two goldens under `expected/`:
   other interchange backend so the CLI has one shape to render rather than one
   per target. Codes `F1`–`F6` are losses of the notation and cannot be fixed by
   writing more Haskell — `F6`, added 2026-09-21, is the newest: a barrier's breach
-  end event cannot carry the LIST of members the rule blames, and where that end
-  event is shared with another promise's breach the note says that too; codes `P-…`
+  end event cannot carry the LIST of members the rule blames, and where other arms
+  end at that same event the note names them and the lane each sits in — another
+  party's promise, or a second group obligation, in which case it does not even
+  say which group; codes `P-…`
   are this exporter's own doing — an
   approximation it made (`P-DEADLINE-UNIT`), a gateway it declined to invent
   (`P-NOJOIN`), a guard it could only write as opaque text (`P-BRANCHGUARD`), a

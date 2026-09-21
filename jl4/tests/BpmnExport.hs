@@ -212,7 +212,11 @@ mayForkSrc = modalJoinSrc "MAY pay" "UPON EACH"
 --
 -- 'loneBarrierSrc' is the control. It is 'everyBarrierSrc' spelled on one line so
 -- the three read as a family; the only arm to @BREACH@ is the barrier's own.
-twoBarriersSrc, barrierBesidePartySrc, loneBarrierSrc :: [Text]
+-- 'barrierInsideForkSrc' is the third hazard, and the one that shipped a
+-- DANGLING element: a barrier in a fork's @HENCE@ has its breach terminal
+-- absorbed by @addForkScope@, so the terminal the state graph names is not in
+-- the emitted file at all.
+twoBarriersSrc, barrierBesidePartySrc, loneBarrierSrc, barrierInsideForkSrc :: [Text]
 twoBarriersSrc =
   [ "`group` MEANS"
   , "      (EVERY p MUST pay WITHIN 3 ONCE ALL HAVE HENCE FULFILLED LEST BREACH)"
@@ -226,6 +230,14 @@ barrierBesidePartySrc =
 loneBarrierSrc =
   [ "`group` MEANS"
   , "  EVERY p MUST pay WITHIN 3 ONCE ALL HAVE HENCE FULFILLED LEST BREACH"
+  ]
+barrierInsideForkSrc =
+  [ "`group` MEANS"
+  , "  EVERY p MUST pay WITHIN 3"
+  , "    UPON EACH"
+  , "    HENCE (EVERY q MUST deliver WITHIN 5"
+  , "             ONCE ALL HAVE HENCE FULFILLED LEST BREACH)"
+  , "    LEST BREACH"
   ]
 
 -- | A single-party permission whose @HENCE@ is somebody else's OBLIGATION: the
@@ -2142,6 +2154,7 @@ spec = do
       let twoBarriers = exportOf defaultBpmnOptions "group" twoBarriersSrc
           besideParty = exportOf defaultBpmnOptions "group" barrierBesidePartySrc
           lone = exportOf defaultBpmnOptions "group" loneBarrierSrc
+          nestedInFork = exportOf defaultBpmnOptions "group" barrierInsideForkSrc
           endEventsNamed nm bx =
             [ n.nodeId
             | n <- bx.bxProcess.procNodes
@@ -2172,12 +2185,51 @@ spec = do
       -- Under RAND one operand's breach is the whole contract's, so a barrier
       -- beside a PARTY duty sends both breaches to one end event. Measured: the
       -- group's boundary and the party's boundary both flow to it.
-      it "a barrier beside a PARTY duty shares the end event, and the note says so" $ do
+      --
+      -- The note NAMES the other arm and whose lane it is in, in the message and
+      -- in `lost` alike. Review of 2026-09-21: the first version of `lost` said
+      -- the only thing hidden was which members breached, when in this shape it
+      -- is also hidden whether a member breached AT ALL rather than the other
+      -- party — the larger loss, and the one a reader of `lost` alone would have
+      -- missed. Naming the element and the lane is what makes that checkable
+      -- rather than a form of words.
+      it "a barrier beside a PARTY duty shares the end event, and the note names it" $ do
         case findingsFor "F6" besideParty of
           [f] -> do
             f.element `shouldBe` "End_3"
-            f `shouldSatisfy` mentions "other promises in this same rule"
-            f.lost `shouldSatisfy` Text.isInfixOf "another promise's in this rule"
+            f `shouldSatisfy` mentions "Boundary_4 (Bob)"
+            f `shouldSatisfy` mentions "cannot tell that it was the group at all"
+            f.lost `shouldSatisfy` Text.isInfixOf "whether the group breached AT ALL"
+            f.lost `shouldSatisfy` Text.isInfixOf "a shortfall of Bob"
+          other -> expectationFailure ("expected one F6, got " <> show (length other))
+
+      -- Every element the note names has to BE in the emitted file. It is read
+      -- off the flow leaving the LEST arm's own source, so it cannot be a name
+      -- the file does not have; the version before 2026-09-21 derived
+      -- @End_\<state id\>@ instead, which is the terminal's name only outside a
+      -- fork's scope.
+      it "and every element F6 names exists in the diagram it describes" $
+        let ids bx = [n.nodeId | n <- bx.bxProcess.procNodes]
+         in sequence_
+              [ map (.element) (findingsFor "F6" bx)
+                `shouldSatisfy` all (`elem` ids bx)
+              | bx <- [twoBarriers, besideParty, lone, nestedInFork]
+              ]
+
+      -- The shape that broke it: a barrier inside a fork's HENCE. 'addForkScope'
+      -- absorbs the terminal — the arm is re-pointed at the scope's throwing end
+      -- and the terminal is dropped as an orphan — so @End_\<state id\>@ named an
+      -- element that is not in the file, the dangling-reference class
+      -- @etc/check-bpmn-dmn-refs.mjs@ exists for. Measured on the binary at
+      -- 0d79f3b40: the note said @End_3@ and @grep -c End_3@ on the XML was 0.
+      it "a barrier nested inside a fork names the scope's own end, not a dropped terminal" $
+        case findingsFor "F6" nestedInFork of
+          [f] -> do
+            f.element `shouldBe` "EscScope_0"
+            [n.nodeId | n <- nestedInFork.bxProcess.procNodes]
+              `shouldSatisfy` elem "EscScope_0"
+            [n.nodeId | n <- nestedInFork.bxProcess.procNodes]
+              `shouldSatisfy` (not . elem "End_3")
           other -> expectationFailure ("expected one F6, got " <> show (length other))
 
       -- `End_2`, not `End_3`: with no sibling operand this rule has one fewer
@@ -2188,16 +2240,36 @@ spec = do
         case findingsFor "F6" lone of
           [f] -> do
             f.element `shouldBe` "End_2"
-            f `shouldSatisfy` (not . mentions "other promises in this same rule")
-            f.lost `shouldSatisfy` (not . Text.isInfixOf "another promise's in this rule")
+            f `shouldSatisfy` (not . mentions "also ends at this very event")
+            f.lost `shouldSatisfy` (not . Text.isInfixOf "whether the group breached AT ALL")
           other -> expectationFailure ("expected one F6, got " <> show (length other))
 
-      -- The shared/not-shared split must be about the SHARING and not about
-      -- having two barriers: `twoBarriers` shares its end event too, so its note
-      -- carries the same extra sentence.
-      it "two barriers also share, so the two reports agree on that sentence" $
+      -- Two barriers converging is its OWN overclaim, and one note per end event
+      -- is what exposed it: an event two groups reach is not "the whole group's"
+      -- either. The earlier version filed the note twice and said it of both
+      -- copies; the version after that filed it once and still said it. So the
+      -- two shapes must NOT agree — this one hides which GROUP, the one above
+      -- hides whether a group breached at all.
+      it "two barriers hide WHICH group, which is a different sentence" $ do
+        case findingsFor "F6" twoBarriers of
+          [f] -> do
+            f `shouldSatisfy` mentions "It does not even say WHICH group"
+            f `shouldSatisfy` mentions "Boundary_1 (EVERY p) and Boundary_4 (EVERY q)"
+            f.lost `shouldSatisfy` Text.isInfixOf "Nor which GROUP"
+            -- and NOT the other shape's sentence: no non-group arm ends here
+            f `shouldSatisfy` (not . mentions "cannot tell that it was the group at all")
+          other -> expectationFailure ("expected one F6, got " <> show (length other))
         map (.message) (findingsFor "F6" twoBarriers)
-          `shouldBe` map (.message) (findingsFor "F6" besideParty)
+          `shouldNotBe` map (.message) (findingsFor "F6" besideParty)
+
+      -- The control for both: a lone barrier's end event is reached by one arm,
+      -- which is its own, so neither extra sentence appears.
+      it "and a lone barrier says neither" $
+        case findingsFor "F6" lone of
+          [f] -> do
+            f `shouldSatisfy` (not . mentions "It does not even say WHICH group")
+            f `shouldSatisfy` (not . mentions "cannot tell that it was the group at all")
+          other -> expectationFailure ("expected one F6, got " <> show (length other))
 
   -- The same rule for a permission that has no quantifier at all. Until
   -- 2026-09-17 L4.StateGraph drew no LEST arm for a single-party MAY, so this

@@ -167,13 +167,18 @@ The notes that go with a quantified rule:
   member's breach is its own event — what a fork loses is which member reached it, and the boundary
   event it goes through says "a member breached" for exactly that reason.
 
-  **And it says one more thing when the end event is not only the group's.** A breach terminal is
-  shared: a group obligation beside another promise sends both breaches to one end event, and so
-  does a group whose `HENCE` obliges somebody who can then breach in turn. `tenancy-barrier` is the
-  second shape — `End_3` there is reached from the tenants' deadline and from the landlord's — so
-  the note adds that other promises in the same rule end at that event too, and a reader clicking it
-  cannot tell even that it was the group. Without that sentence the note was telling the reader the
-  event was the group's when it was also somebody else's.
+  **And it says more when the end event is not only the group's** — naming the other arms, and whose
+  lane each sits in, rather than saying so in general terms. A breach terminal is shared two ways. A
+  group obligation beside another promise sends both breaches to one end event, and so does a group
+  whose `HENCE` obliges somebody who can then breach in turn: `tenancy-barrier` is the second shape,
+  where `End_3` is reached from the tenants' deadline and from the landlord's, and the note reads
+  "`Boundary_1` (theLandlord) also ends at this very event". Its `lost:` line says what that costs,
+  which is more than the note's first version admitted: not just which member fell short, but
+  **whether a member fell short at all** rather than the landlord.
+
+  Two group obligations can also converge on one end event, and then the note says it does not even
+  say **which group** — naming both arms. That is one note, not two: it is filed once per end event,
+  because an event two groups reach is one loss with two causes.
 
 **A breach by one member does not end the others**, and getting that right takes two things, not
 one. Inside the box a breach is an _escalation_ thrown out to a non-interrupting event on the
