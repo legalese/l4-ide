@@ -21,7 +21,7 @@ import qualified L4.Nlg as Nlg
 import L4.DirectiveFilter (filterIdeDirectives)
 import L4.Parser (execProgramParserWithHintPass)
 import qualified L4.Parser.SrcSpan as JL4
-import L4.Print (prettyLayout)
+import L4.Print (prettyLayout, restoreMixfixPatterns)
 import L4.Syntax
 import qualified L4.TypeCheck as JL4
 
@@ -302,7 +302,10 @@ jl4PrettyLayoutRoundTrip evalConfig inputFile = do
         "typecheck produced no module for " <> inputFile <> ":\n"
           <> Text.unpack (Text.unlines errs)
     Just tc -> do
-      let printed = prettyLayout (filterIdeDirectives tc.module')
+      -- restoreMixfixPatterns first: without it the printer emits only a
+      -- mixfix name's head keyword and two operators sharing one collapse
+      -- together (smucclaw/l4-ide#967).
+      let printed = prettyLayout (filterIdeDirectives (restoreMixfixPatterns tc.mixfixRegistry tc.module'))
           printUri = toNormalizedUri (Uri "file:///pretty-layout-roundtrip")
       -- Debugging affordance: prettyLayout output for a corpus module runs to
       -- thousands of columns, so the inline excerpt below is rarely enough to
@@ -322,7 +325,7 @@ jl4PrettyLayoutRoundTrip evalConfig inputFile = do
       -- the corpus globs and a later run would try to golden them.
       mEvalDiff <- lookupEnv "JL4_EVALDIFF"
       for_ mEvalDiff $ \_ ->
-        Text.writeFile (inputFile <> ".evaldiff.l4") (prettyLayout tc.module')
+        Text.writeFile (inputFile <> ".evaldiff.l4") (prettyLayout (restoreMixfixPatterns tc.mixfixRegistry tc.module'))
       -- No gensym may reach the output. Every inference variable in the
       -- type-checked module is rendered exactly as `seed <> uniq` by the
       -- 'Type'' printer, so we can name the forbidden strings precisely rather

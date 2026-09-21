@@ -527,6 +527,10 @@ batchDataJson    = fixtureDir </> "batch-data.json"
 batchDataCsv     = fixtureDir </> "batch-data.csv"
 batchMixedJson   = fixtureDir </> "batch-mixed.json"
 
+batchMixfixSharedHead, batchMixfixSharedHeadJson :: FilePath
+batchMixfixSharedHead     = fixtureDir </> "batch-mixfix-shared-head.l4"
+batchMixfixSharedHeadJson = fixtureDir </> "batch-mixfix-shared-head.json"
+
 batchCodeFixture, batchExponentCsv, batchMaybeFixture, batchMaybeBadJson :: FilePath
 batchCodeFixture  = fixtureDir </> "batch-code.l4"
 batchExponentCsv  = fixtureDir </> "batch-exponent.csv"
@@ -1669,6 +1673,27 @@ spec bin = do
       sout2 `shouldSatisfy` ("digraph" `notInfixOf`)
 
   describe "l4 batch" $ do
+    -- `batch` re-prints the module through 'prettyLayout' and re-runs it per
+    -- row, so the printer is on the correctness path here, not a cosmetic one.
+    --
+    -- Two mixfix operators sharing a head keyword used to collapse into the
+    -- same printed text, because only the head keyword survived: this rule's
+    -- `P AND NOT Q` became `P AND NOT P`. On unstable's binary this exact
+    -- fixture returns `"status":"error"` with "multiple definitions for the
+    -- identifier `the will`"; measured 2026-09-21.
+    --
+    -- Asserted HERE rather than in a corpus golden because no golden captures
+    -- 'prettyLayout' output at all — which is precisely how the defect
+    -- survived in `canon/sg/succession/sg-wills.l4`, whose printed form
+    -- stack-overflowed while every golden stayed green (smucclaw/l4-ide#967).
+    it "keeps two mixfix operators that share a head keyword apart when it re-prints" $ do
+      Output code sout _ <- runL4 bin
+        ["batch", batchMixfixSharedHead, "--inputs", batchMixfixSharedHeadJson]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\"status\":\"success\"" `isInfixOf`)
+      sout `shouldSatisfy` ("\"result\":true" `isInfixOf`)
+      sout `shouldNotSatisfy` ("multiple definitions" `isInfixOf`)
+
     it "serializes a #TRACE breach with correctly-labeled fields" $ do
       -- exit 0 proves the #TRACE AT/WITH pretty-printer round-trip: batch
       -- re-prints the module and re-parses it once per input row.
