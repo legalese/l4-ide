@@ -9,6 +9,8 @@ module L4.Cli.Common
     FixedNowOpt(..)
   , fixedNowParser
   , parseFixedNowText
+  , langTagReader
+  , langOption
 
     -- * Evaluation config
   , makeEvalConfig
@@ -65,6 +67,7 @@ import LSP.Logger
 import Language.LSP.Protocol.Types (NormalizedFilePath, Diagnostic(..), DiagnosticSeverity(..))
 import Development.IDE.Graph (Action)
 
+import L4.Lexer (LangTag(..), isLangTagChar)
 import L4.EvaluateLazy
   ( EvalConfig
   , EvalDirectiveResult(..)
@@ -109,6 +112,56 @@ fixedNowParser = fmap FixedNowOpt $ optional $
     ( long "fixed-now"
     <> metavar "ISO8601"
     <> help "Pin evaluation clock (e.g. 2025-01-31T15:45:30Z) so NOW/TODAY stay deterministic"
+    )
+
+-- | Read a @--lang@ value into a 'LangTag'.
+--
+-- __Validated, because the value reaches markup.__ @l4 render --format html@
+-- puts it in @\<html lang="…"\>@ and the AKN writer puts it in an FRBR URI, so
+-- an unreadable value is an unreadable document rather than a rendering that
+-- merely falls back. The module-side spelling of the same thing has always been
+-- validated — the lexer restricts @\@lang@ to 'isLangTagChar' — and this closes
+-- the asymmetry the flag had against it.
+--
+-- Two normalisations, both silent because both are BCP 47 saying the same tag:
+--
+--   * __surrounding whitespace is trimmed__. @--lang 'he '@ used to label the
+--     document @he @ and then lose @dir="rtl"@, because the direction lookup
+--     compared @"he "@ against the table and missed — a Hebrew document laid out
+--     left to right, exit 0, no diagnostic. A trailing space out of a shell
+--     variable or a spreadsheet column is how that arrives.
+--   * __the primary subtag is lowercased__, which is its conventional form
+--     (@he-IL@, not @HE-IL@). Nothing else is re-cased: canonicalising the
+--     script and region too would be inventing a tag the user did not type.
+--     This also makes @--lang HE@ SELECT the @\@nlg:he@ renderings, which it did
+--     not before — rendering selection compares tags exactly.
+--
+-- Rejected: empty or all-whitespace, anything outside @[A-Za-z0-9-]@, and a tag
+-- with no primary subtag at all (@-he@).
+langTagReader :: ReadM LangTag
+langTagReader = eitherReader \input ->
+  let tag            = Text.strip (Text.pack input)
+      (primary, rest) = Text.break (== '-') tag
+      bad why        = Left $ "Invalid --lang value " <> show input <> ": " <> why
+                            <> " (expected a BCP 47 language tag, e.g. he, he-IL, az-Arab)"
+  in if Text.null tag
+       then bad "empty"
+     else if not (Text.all isLangTagChar tag)
+       then bad "only letters, digits and '-' are allowed"
+     else if Text.null primary
+       then bad "no language subtag before the first '-'"
+     else Right (MkLangTag (Text.toLower primary <> rest))
+
+-- | The @--lang@ option itself, so that every verb that takes one takes the
+-- same one. @help@ differs between verbs only in what it calls the output.
+langOption :: String -> Options.Parser (Maybe LangTag)
+langOption what = optional $
+  option langTagReader
+    ( long "lang"
+   <> metavar "SUBTAG"
+   <> help ("Render using the @nlg:SUBTAG annotations, e.g. --lang he. A "
+         <> what <> " with no rendering in that language falls back to its "
+         <> "default one, so a partial translation still produces a whole document.")
     )
 
 ----------------------------------------------------------------------------

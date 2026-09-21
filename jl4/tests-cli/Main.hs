@@ -1504,31 +1504,140 @@ spec bin = do
   ----------------------------------------------------------------------------
   describe "l4 render --format html (document language)" $ do
     let langModule = "examples/ok/nlg-module-lang.l4"   -- carries `@lang he`
+        -- The `<html>` wrapper ALONE, not the whole document. Asserting "no
+        -- `dir=` anywhere" would also forbid a per-element `dir="auto"` on a
+        -- prose span, which is the natural remedy for a MIXED document and is
+        -- not what any of these cases is about.
+        htmlTag s = unwords [ l | l <- lines s, "<html" `isPrefixOf` l ]
 
     it "labels a Hebrew rendering he and marks it right-to-left" $ do
       Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "he", langModule]
       code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("<html lang=\"he\" dir=\"rtl\">" `isInfixOf`)
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
 
-    it "labels an English rendering en and emits no dir at all" $ do
+    it "labels the document en when English is asked for, and puts no dir on the wrapper" $ do
+      -- NOT "an English rendering", which is what this case used to be called:
+      -- the fixture's own comment says `is small` has no English herald, so
+      -- asking for English still renders that clause in Hebrew. The document is
+      -- MIXED and the label follows the REQUEST — ruled 2026-09-21 and written
+      -- up on doc/tutorials/natural-language-functions/optimising-natural-language-generation.md.
       Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "en", langModule]
       code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("<html lang=\"en\">" `isInfixOf`)
-      -- The absence is the assertion: `ltr` is the HTML default, so `dir`
-      -- appearing at all is what means "this document runs the other way".
-      sout `shouldNotSatisfy` ("dir=" `isInfixOf`)
+      -- The absence of `dir` is half the assertion: `ltr` is the HTML default,
+      -- so the attribute appearing at all is what means "this runs the other way".
+      htmlTag sout `shouldBe` "<html lang=\"en\">"
+      -- … and this is the mixture the label is being honest about.
+      sout `shouldSatisfy` ("קטן מן הסף" `isInfixOf`)
 
     it "falls back to the module's own @lang when no --lang is given" $ do
       Output code sout _ <- runL4 bin ["render", "--format", "html", langModule]
       code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("<html lang=\"he\" dir=\"rtl\">" `isInfixOf`)
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
 
     it "falls back to en for a module that declares no language" $ do
       -- bilingual.l4 tags its heralds individually and declares no `@lang`.
       Output code sout _ <- runL4 bin ["render", "--format", "html", bilingualFixture]
       code `shouldBe` ExitSuccess
-      sout `shouldSatisfy` ("<html lang=\"en\">" `isInfixOf`)
-      sout `shouldNotSatisfy` ("dir=" `isInfixOf`)
+      htmlTag sout `shouldBe` "<html lang=\"en\">"
+
+    ------------------------------------------------------------------------
+    -- A label the document cannot support.
+    --
+    -- `--lang he` on an all-English encoding used to emit
+    -- `<html lang="he" dir="rtl">`: not merely a wrong label but a layout
+    -- instruction, which moves an English full stop to the left end of its
+    -- line. Measured with fribidi on regcf.l4, which has 0 Hebrew codepoints.
+    -- Ruled 2026-09-21: when NOTHING in the module renders in the asked-for
+    -- language, the document keeps the language it declares and stderr says so.
+    ------------------------------------------------------------------------
+    it "does not relabel a document for a language nothing in it renders" $ do
+      -- clean.l4 carries no @nlg at all and declares no @lang.
+      Output code sout serr <- runL4 bin ["render", "--format", "html", "--lang", "he", cleanFixture]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"en\">"
+      serr `shouldSatisfy` ("no renderings in \"he\"" `isInfixOf`)
+      serr `shouldSatisfy` ("labelled \"en\"" `isInfixOf`)
+
+    it "keeps the module's declared language when the asked-for one is carried by nothing" $ do
+      Output code sout serr <- runL4 bin ["render", "--format", "html", "--lang", "zz", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+      serr `shouldSatisfy` ("no renderings in \"zz\"" `isInfixOf`)
+
+    it "says nothing on stderr for a format that does not label its language" $ do
+      -- `text`, `json` and `plan` carry the chosen WORDINGS and say nothing
+      -- about which language they are, so the note would be noise — and this
+      -- keeps `--format text --lang zz` byte-identical on both streams.
+      Output code _ serr <- runL4 bin ["render", "--format", "text", "--lang", "zz", langModule]
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` ("no renderings" `isInfixOf`)
+
+    ------------------------------------------------------------------------
+    -- The flag's own hygiene. Before this, `--lang` was echoed verbatim into
+    -- the attribute: `--lang 'he '` labelled the document `he ` AND silently
+    -- lost `dir="rtl"`, because the direction lookup compared `"he "` against
+    -- the table and missed. Exit 0, no diagnostic — a trailing space out of a
+    -- shell variable is how it arrives.
+    ------------------------------------------------------------------------
+    it "trims a --lang value, so a trailing space does not cost the direction" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "he ", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+
+    it "lowercases the primary subtag, which also makes --lang HE select the Hebrew heralds" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "HE", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+      sout `shouldSatisfy` ("עולה על הסף" `isInfixOf`)
+
+    it "keeps a region subtag as typed" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "he-IL", langModule]
+      code `shouldBe` ExitSuccess
+      -- `he-IL` is carried by nothing, so the LABEL falls back to the module's
+      -- `he`; what this pins is that the reader did not mangle the tag on the
+      -- way in — the stderr note quotes it back.
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+
+    it "rejects an empty or malformed --lang instead of putting it in the markup" $ do
+      for_ ["", "  ", "-he", "he_IL", "en\"><script>"] \bad -> do
+        Output code _ serr <- runL4 bin ["render", "--format", "html", "--lang", bad, langModule]
+        code `shouldNotBe` ExitSuccess
+        serr `shouldSatisfy` ("Invalid --lang value" `isInfixOf`)
+
+  ----------------------------------------------------------------------------
+  -- The AKN document's own language.
+  --
+  -- Akoma Ntoso identifies an EXPRESSION by `/akn/doc/main/<lang>@<version>`,
+  -- where `<lang>` is an ISO 639-2 code. That literal was `eng` whatever was
+  -- rendered, so a Hebrew act was identified as an English expression — the same
+  -- defect as `<html lang="en">` (smucclaw/l4-ide#970), in the neighbouring
+  -- writer, and equally silent: the XML is well formed either way.
+  ----------------------------------------------------------------------------
+  describe "l4 render --format akn (expression language)" $ do
+    let langModule = "examples/ok/nlg-module-lang.l4"   -- carries `@lang he`
+        frbrOf s = unwords [ l | l <- lines s, "FRBRExpression" `isInfixOf` l ]
+
+    it "identifies a Hebrew expression as heb, from the module's own @lang" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "akn", langModule]
+      code `shouldBe` ExitSuccess
+      frbrOf sout `shouldSatisfy` ("/akn/doc/main/heb@" `isInfixOf`)
+      frbrOf sout `shouldNotSatisfy` ("/akn/doc/main/eng@" `isInfixOf`)
+
+    it "follows --lang, translating the subtag to the ISO 639-2 code" $ do
+      Output _ he _ <- runL4 bin ["render", "--format", "akn", "--lang", "he", langModule]
+      Output _ en _ <- runL4 bin ["render", "--format", "akn", "--lang", "en", langModule]
+      frbrOf he `shouldSatisfy` ("/akn/doc/main/heb@" `isInfixOf`)
+      frbrOf en `shouldSatisfy` ("/akn/doc/main/eng@" `isInfixOf`)
+
+    it "says eng for a module that declares nothing" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "akn", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      frbrOf sout `shouldSatisfy` ("/akn/doc/main/eng@" `isInfixOf`)
+
+    it "puts the same language in the Manifestation URIs" $ do
+      Output _ sout _ <- runL4 bin ["render", "--format", "akn", langModule]
+      sout `shouldSatisfy` ("/akn/doc/main/heb@.xml" `isInfixOf`)
+      sout `shouldNotSatisfy` ("eng@" `isInfixOf`)
 
   describe "l4 ast" $ do
     it "dumps a parsed AST for a clean file" $ do

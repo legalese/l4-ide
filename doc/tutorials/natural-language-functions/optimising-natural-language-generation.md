@@ -329,13 +329,63 @@ The `html` format labels the document itself, not just its sentences.
 `lang` is the language the document was rendered in: the `--lang` you asked for, or the module's own `@lang` when you asked for nothing, or `en` when the module declares nothing either.
 It is what a screen reader picks a voice from, what a browser hyphenates and spell-checks by, and what a translation tool decides to leave alone.
 
-`dir="rtl"` appears only for a right-to-left language — Hebrew, Arabic, Persian, Urdu, Yiddish, Pashto, Central Kurdish, Divehi.
-For everything else there is no `dir` at all, because left-to-right is already HTML's default and the attribute appearing is the signal.
-Without it a browser guesses direction from the characters, which gets a paragraph of Hebrew right and then puts the punctuation at the wrong end of a line that mixes in a number or a Latin name.
-The stylesheet mirrors with it: clause numbers, indents and table alignment move to the other side, because every rule that has a side is written in terms of the start and end of a line rather than of left and right.
+**A language nothing in the module renders does not relabel the document.**
+`--lang he` on an encoding with no Hebrew in it at all would otherwise produce a document labelled Hebrew in which every sentence is the English fallback — and, worse, laid out right to left.
+So when no rule in the module or its imports has a rendering in the language you asked for, the document keeps the language it declares, and `render` says so on stderr:
 
-A subtag the module carries no renderings for still labels the document, because the label records what you asked for.
-`--lang he` on a module with two Hebrew rules out of ten gives you `lang="he"` and eight English paragraphs — which is the same partial-translation story as the section above, told in the wrapper.
+```console
+$ l4 render --format html --lang he english-only.l4 > out.html
+l4 render: no renderings in "he"; document labelled "en" instead.
+```
+
+A **partial** translation is different, and still labels the document by what you asked for: `--lang he` on a module with two Hebrew rules out of ten gives you `lang="he"` and eight English paragraphs, which is the same partial-translation story as the section above, told in the wrapper.
+The line between the two is whether the module renders _anything_ in that language.
+
+The label follows the request in the other direction too.
+`--lang en` on a module that declares `@lang he` gives you `lang="en"`, and the clauses that have an English rendering in English — but a clause with only a Hebrew herald still renders in Hebrew, because that is the fallback.
+That document is genuinely mixed, and `lang` records what was asked for rather than a measurement of what came out.
+
+`dir="rtl"` appears only for a right-to-left language — Hebrew, Arabic, Persian, Dari, Urdu, Yiddish, Pashto, Central Kurdish, Sindhi, Uyghur, Kashmiri, Divehi, Aramaic, Syriac, N'Ko.
+For everything else there is no `dir` at all, because left-to-right is already HTML's default and the attribute appearing is the signal.
+
+**The script subtag wins when the tag has one**, because the script is the part of a language tag that actually decides direction.
+`--lang he-Latn` is Hebrew romanised in Latin letters and gets no `dir`; `--lang az-Arab` is Azerbaijani written in Arabic script and gets `dir="rtl"`, even though neither `he-Latn` nor `az-Arab` could be read off its first subtag.
+A region or a case difference is not a direction: `he-IL`, `HE` and `he` are one answer.
+
+**What `dir` does, exactly**, because it is easy to expect too much of it.
+It sets the document's _base_ direction, and the base direction decides where the neutral characters at the edges of a line go and in which order whole runs of the other direction sit.
+It is not a per-line guess, and without it a browser does not make one either: HTML's default base is left-to-right, full stop.
+So for a clause whose prose is Hebrew, `dir="rtl"` is the difference between a full stop at the end of the sentence and one stranded at the start of it.
+Reproduce it on any Hebrew line with `fribidi`, which resolves the same algorithm a browser does — `fribidi --ltr line.txt` against `fribidi --rtl line.txt`:
+
+```
+base ltr:  ⟨Hebrew clause, laid out right to left⟩ .   <- the full stop at the right-hand end: wrong
+base rtl: . ⟨Hebrew clause, laid out right to left⟩    <- at the left-hand end, where a right-to-left line ends
+```
+
+(The Hebrew is stood in for here because `fribidi` prints _visual_ order, and a visual-order line pasted into a page is re-ordered again by the browser rendering it.)
+
+The corollary is that a line which _begins_ in the other direction is laid out as a line of the base direction containing a foreign run.
+An L4 clause heading is the rule's own name, which is usually an English identifier, so in a Hebrew document `Is large holds if amount עולה על הסף.` is a right-to-left line whose Latin run and full stop sit on the left.
+That is correct for a Hebrew document and looks wrong if you read the line as an English sentence; judging each element on its own characters is what `dir="auto"` is for, and L4 does not emit it on individual clauses today.
+
+The stylesheet mirrors along with `dir`: clause numbers, indents and table alignment move to the other side, because every rule that has a side is written in terms of the start and end of a line rather than of left and right.
+
+**`--lang` is validated before it reaches the markup.**
+Surrounding whitespace is trimmed and the primary subtag is lowercased, so `--lang 'he '` and `--lang HE` are the tag you meant — the first of those used to label the document `he ` and then silently lose `dir="rtl"`.
+An empty value, or one with anything in it but letters, digits and `-`, is refused with a message instead of being pasted into the attribute.
+
+### The Akoma Ntoso document says the same thing, in FRBR
+
+`--format akn` identifies what it emits the way Akoma Ntoso does, as a Work, an Expression of that work in one language, and a Manifestation of that expression as a file:
+
+```xml
+<FRBRExpression><FRBRthis value="/akn/doc/main/heb@"/><FRBRuri value="/akn/doc/heb@"/>…
+```
+
+The `heb` is the document's language — the same choice `<html lang>` reports, translated from the BCP 47 subtag you write (`he`) to the ISO 639-2 code AKN's URIs use (`heb`).
+Where ISO 639-2 has two codes for a language, this is the terminological one: `deu`, not `ger`.
+A subtag with no entry in that table is passed through as it stands, which is honest about which language was meant even though it is not a valid ISO 639-2 code.
 
 ### Translate incrementally
 

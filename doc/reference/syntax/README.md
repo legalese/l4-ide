@@ -199,7 +199,9 @@ in any of its formats. Both take `--lang`.
 
 In the `html` format the document says which language it is in: `<html lang="he" dir="rtl">`.
 `lang` is the `--lang` you asked for, or the module's `@lang` if you asked for nothing, or `en`.
-`dir="rtl"` is added for a right-to-left language and omitted for every other, left-to-right being HTML's own default.
+`dir="rtl"` is added for a right-to-left language — decided from the script subtag when the tag carries one, so `he-Latn` is left-to-right and `az-Arab` is not — and omitted for every other, left-to-right being HTML's own default.
+Asking for a language **nothing** in the module renders does not relabel the document: it keeps the language it declares, and `render` says so on stderr.
+The `akn` format reports the same choice as the language component of its FRBR URIs (`/akn/doc/main/heb@`).
 
 Two runs of the same command over the same source produce the two documents.
 Nothing about the rule is duplicated — only its wording.
@@ -243,9 +245,13 @@ rendering above survives in a Hebrew module.
 
 **A module that declares nothing is `en`.** That is a default, not a
 detection: L4 cannot tell what language you are writing in, so a Hebrew module
-with no `@lang` is _labelled_ English while still _rendering_ Hebrew. The
-label costs nothing today and will matter when tooling starts reporting which
-rules are missing a translation — so declare it if your module is not English.
+with no `@lang` is _labelled_ English while still _rendering_ Hebrew. **That
+label has a visible cost today**: `l4 render --format html` puts it in
+`<html lang="en">` and then emits no `dir`, so the Hebrew renders left-to-right
+with its punctuation at the wrong end of the line, and `--format akn` identifies
+the document as an English expression. Screen readers read it in the wrong voice.
+So declare it if your module is not English — it is one line, and it is the only
+thing that tells a reader of the output which language it is in.
 
 **It applies to the whole file, wherever you write it**, including annotations
 above the declaration. Convention is the top; nothing breaks if it is not.
