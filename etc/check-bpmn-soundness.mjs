@@ -71,6 +71,30 @@
 // properly now, and reported: because completion can then be reached by
 // terminating, the report says how many markings can complete ONLY that way.
 //
+// A TERMINATING END BESIDE CONCURRENCY OWES A FIDELITY NOTE. This is the third
+// class of finding, reported as `FIDELITY`, and it is the mechanised form of a
+// lesson this script learned the hard way. Terminating is a legitimate way to
+// complete, so S1-S4 all pass on a file where one branch's BREACH throws away
+// duties its siblings had already earned — and for four goldens they did, for
+// four days, while this script printed the evidence on every run under `info`:
+//
+//     info  121 marking(s) can reach completion ONLY by terminating
+//
+// A severity class nobody triages is not a gate. So: where a file has at least
+// one terminating end event AND more than one token can be live at once, the
+// discarding is REAL and the file must SAY SO. What it must say it in is the
+// fidelity report beside it (`l4 export --fidelity-report` writes
+// `<stem>.fidelity.txt`), or a `<documentation>` on the terminating end event
+// itself for a hand-written diagram that has no exporter report. See
+// `declaresSiblingLoss` for exactly what counts, and doc/exports/dmn-bpmn.md for
+// the reader-facing statement of the rule.
+//
+// Like a STRUCTURE finding this makes the file UNSOUND and exits 1, and for the
+// same reason: the verdict is "may this ship", and a diagram that silently
+// cancels a duty is not one a reader should be handed. It is NOT a claim that
+// van der Aalst soundness fails — the S1-S4 lines say PASS right above it, which
+// is how a reader tells the two apart.
+//
 // ZERO INSTALL, ZERO DEPENDENCIES. Node only, no network:
 //
 //   node etc/check-bpmn-soundness.mjs jl4/examples/bpmn/expected/*.bpmn
@@ -222,6 +246,19 @@ function readBpmn(xml) {
     ) {
       openEnd.terminating = true;
       openEnd.terminatingVia = name;
+      continue;
+    }
+
+    // The end event's own <documentation>, kept because it is one of the two
+    // places a declared sibling loss may live (see `declaresSiblingLoss`). The
+    // content is plain text with no child elements, so the next '<' after the
+    // open tag is the closing tag.
+    if (openEnd && name === "documentation" && !isLeaf) {
+      const from = m.index + m[0].length;
+      const to = text.indexOf("<", from);
+      openEnd.doc =
+        (openEnd.doc ?? "") +
+        (to === -1 ? text.slice(from) : text.slice(from, to));
       continue;
     }
 
@@ -1166,6 +1203,139 @@ function explainStuck(net, marking) {
 }
 
 // ---------------------------------------------------------------------------
+// FIDELITY: a terminating end beside concurrency has to be declared
+// ---------------------------------------------------------------------------
+
+// The phrases that COUNT as declaring the loss. This list is the contract, not
+// a heuristic: adding to it is a deliberate act, and the reason it can be a
+// short list of fixed shapes is that the thing being declared is one specific
+// fact — reaching this end throws away the tokens still in flight.
+//
+// Every entry was read off text already in the tree rather than invented, and
+// the gloss is what the checker prints when it has to say what it was looking
+// for.
+//
+// Measured 2026-09-21 over every `.fidelity.txt` in jl4/examples/bpmn/expected/
+// and every `<documentation>` in every `.bpmn` under jl4/examples/bpmn/, BEFORE
+// the severity gate is applied: these phrases match in three places, and only
+// the first is a declaration.
+//
+//  * `P-NOJOIN` (`lossy`) on `offering` and on `tenancy-fork-beside-party` —
+//    the two goldens that owe one;
+//  * `P-FORK-BREACH-UNMARKED` (`advisory`) on all four fork goldens, where the
+//    wording is about the errorEventDefinition the end event does NOT carry;
+//  * the escalation boundary's `<documentation>` on all four fork goldens,
+//    which is a true sentence about a DIFFERENT end event.
+//
+// The severity gate excludes the second and the per-element channel excludes the
+// third, which is why both narrowings are in `declaresSiblingLoss` rather than
+// being left to the phrase list to sort out.
+const SIBLING_LOSS_PHRASES = [
+  // P-NOJOIN, jl4-core/src/L4/Bpmn/Lower.hs — the exporter's own wording.
+  [/abandons?\s+(?:its|their)\s+siblings/i, '"abandons its siblings"'],
+  [
+    /without\s+waiting\s+for\s+(?:its|their)\s+siblings/i,
+    '"without waiting for its siblings"',
+  ],
+  // This script's own `info` line, and jl4/examples/bpmn/sound/README.md.
+  [
+    /discards?\s+every\s+(?:remaining|other)\s+token/i,
+    '"discards every remaining token"',
+  ],
+  [
+    /ends?\s+every\s+(?:active\s+)?(?:thread|branch|instance)/i,
+    '"ends every active thread"',
+  ],
+  [
+    /cancel(?:s|led|ling)?\s+the\s+(?:live\s+)?instances/i,
+    '"cancels the live instances"',
+  ],
+];
+
+// One note of a rendered fidelity report, as `L4.Interchange.Fidelity.renderNote`
+// writes it:
+//
+//     "  [P-NOJOIN] lossy — Split_1"
+//     "      <message>"
+//     "      lost: <what>"
+//
+// Read independently of the exporter, on purpose and for the same reason this
+// script does not use bpmn-moddle: if the two disagree about what the report
+// says, that has to show up as a disagreement.
+function readFidelityReport(bpmnPath) {
+  const path = bpmnPath.replace(/\.bpmn$/, ".fidelity.txt");
+  let text;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch {
+    return { path, present: false, notes: [] };
+  }
+  const notes = [];
+  let cur = null;
+  for (const line of text.split("\n")) {
+    const m = /^ {2}\[([^\]]+)\] (blocking|lossy|advisory) — (.*)$/.exec(line);
+    if (m) {
+      cur = { code: m[1], severity: m[2], element: m[3], text: line };
+      notes.push(cur);
+    } else if (cur && /^ {6}\S/.test(line)) {
+      cur.text += "\n" + line;
+    } else {
+      cur = null;
+    }
+  }
+  return { path, present: true, notes };
+}
+
+// Does anything in this file's paperwork declare that reaching `t` throws away
+// the tokens still in flight?
+//
+// TWO channels, and they are not interchangeable:
+//
+//  1. the fidelity report beside the file, where the note must be filed as
+//     `lossy` or `blocking`. The severity is load-bearing, not decoration: a
+//     declared loss IS a loss, and an `advisory` note is by its own definition
+//     one that forfeits nothing. This is what keeps `P-FORK-BREACH-UNMARKED`
+//     from answering the question — measured, it matches two phrases here, and
+//     it is `advisory` because it is describing the errorEventDefinition this
+//     end event does NOT carry. A counterfactual is not a declaration.
+//
+//  2. a `<documentation>` on the terminating end event itself, for a
+//     hand-written diagram with no exporter report. There is no severity to
+//     read, so this channel is narrower in compensation: the ONE element's own
+//     documentation, not any documentation in the file. Measured 2026-09-21,
+//     that matters — the exporter puts "an error end event ends every active
+//     thread in the process" on the escalation boundary of every fork golden,
+//     which is true, and is about an end event that is NOT this one.
+//
+// A note must also NAME the end event, by id or by its name attribute, so that
+// the reader can get from the report to the element. Naming it by `name` is
+// weak on its own — every terminating end in this corpus is called "Breach" —
+// which is the third reason the severity gate is there.
+function declaresSiblingLoss(t, report) {
+  const names = [t.id, t.name].filter(Boolean);
+  const mentions = (s) =>
+    names.some((nm) =>
+      new RegExp(
+        `(?<![\\w-])${nm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w-])`,
+        "i",
+      ).test(s),
+    );
+  const phrase = (s) => SIBLING_LOSS_PHRASES.find(([re]) => re.test(s));
+
+  for (const note of report.notes) {
+    if (note.severity === "advisory") continue;
+    if (!mentions(note.text)) continue;
+    const hit = phrase(note.text);
+    if (hit) return { where: `${report.path} [${note.code}]`, gloss: hit[1] };
+  }
+  if (t.doc) {
+    const hit = phrase(t.doc);
+    if (hit) return { where: `<documentation> on ${t.id}`, gloss: hit[1] };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Driver
 // ---------------------------------------------------------------------------
 
@@ -1180,6 +1350,9 @@ if (files.length === 0) {
 
 let worst = 0;
 for (const file of files) {
+  // The exporter's own fidelity report, if this file has one beside it. Read
+  // once per file: it is a property of the document, not of an instance count.
+  const report = readFidelityReport(file);
   let parsed;
   try {
     parsed = readBpmn(readFileSync(file, "utf8"));
@@ -1297,7 +1470,57 @@ for (const file of files) {
           [...r.unsafePlaces].every((pl) => ex.fanIn.has(pl)),
         ],
       ];
-      const sound = results.every(([, ok]) => ok) && net.problems.length === 0;
+      // THE RULE. More than one token live at once + an end event that
+      // discards them = a loss the file has to declare. `r.peak` counts tokens
+      // anywhere in the net, so peak > 1 is a deliberate OVER-approximation of
+      // "a sibling exists to abandon": it does not ask whether the peak marking
+      // and the terminate are reachable together. At peak 1 there is never
+      // anything in flight for a terminate to throw away, so the rule is silent.
+      //
+      // Measured over the sixteen committed goldens on 2026-09-21: two owe a
+      // declaration (`offering`, `tenancy-fork-beside-party`). Of the fourteen
+      // that do not, eight have a terminating end and peak at one token, and six
+      // peak above one with no terminating end at all — `consultation`,
+      // `handover`, and the four forks, whose breach ends are plain since
+      // fcd7ecb2c.
+      //
+      // Say where the declaration WAS found, too. A rule whose only ever output
+      // is silence is a rule nobody can tell is running — the same argument the
+      // self-test rests on, one level down.
+      const declared =
+        r.peak > 1
+          ? net.terminators
+              .map((t) => [t, declaresSiblingLoss(t, report)])
+              .filter(([, d]) => d)
+              .map(
+                ([t, d]) =>
+                  `${describe(t)} terminates beside up to ${r.peak} live token(s); ` +
+                  `declared in ${d.where} by ${d.gloss}`,
+              )
+          : [];
+
+      const undeclared =
+        r.peak > 1
+          ? net.terminators
+              .filter((t) => !declaresSiblingLoss(t, report))
+              .map(
+                (t) =>
+                  `${describe(t)} discards every remaining token, and up to ` +
+                  `${r.peak} can be live — no fidelity note says so. ` +
+                  (report.present
+                    ? `${report.path} has ${report.notes.length} note(s), none of them a ` +
+                      `lossy or blocking one that names this end event and says what ` +
+                      `becomes of its siblings`
+                    : `there is no ${report.path} beside this file, and ${t.id} carries ` +
+                      `no <documentation> that says it either`) +
+                  `. See doc/exports/dmn-bpmn.md, "a terminating end beside concurrency".`,
+              )
+          : [];
+
+      const sound =
+        results.every(([, ok]) => ok) &&
+        net.problems.length === 0 &&
+        undeclared.length === 0;
 
       console.log(`${label}: ${sound ? "SOUND" : "UNSOUND"}`);
       for (const [name, ok] of results)
@@ -1320,6 +1543,8 @@ for (const file of files) {
       }
 
       for (const p of net.problems) console.log(`  STRUCTURE  ${p}`);
+      for (const d of declared) console.log(`  info  ${d}`);
+      for (const u of undeclared) console.log(`  FIDELITY  ${u}`);
 
       if (r.deadlocks.length) {
         console.log(

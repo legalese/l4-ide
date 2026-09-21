@@ -15,9 +15,38 @@ until it blocked the change that introduced it.
 | --------------------------- | ---------------------------------------------------------------- |
 | `joined-beside-breach.bpmn` | an error end event **terminates the instance**, discarding every remaining token |
 | `mi-subprocess-fork.bpmn` | a multi-instance sub-process is **played by copy-expansion**, and its escalation fan-in is the one place copies are not independent |
+| both of the above | and, since 2026-09-21, that a diagram which discards its siblings **says so on the end event that does it** — see below |
 | `mi-subprocess-two-ways-to-done.bpmn` | an instance is finished by **whichever** of its paths reaches an end, not by all of them |
 | `mi-subprocess-throw-and-finish.bpmn` | an instance that **throws** is also **finished** — the escalation leaves, and the instance has no tokens left |
 | `mi-subprocess-every-instance-throws.bpmn` | the same, in its strongest form — EVERY instance throws and the scope still completes; the one fixture with a **measured engine** answer |
+
+## Two of these now carry a `<documentation>` on their breach end, and why
+
+`etc/check-bpmn-soundness.mjs` gained a third class of finding on 2026-09-21:
+a file with a terminating end event and more than one token live at once must
+declare that reaching that end throws the others away, or it FAILS. The rule and
+its two channels are written up in `../README.md` under "A terminating end beside
+concurrency owes a declaration".
+
+`joined-beside-breach.bpmn` (peak 2) and `mi-subprocess-fork.bpmn` (peak 4 at two
+instances) are both exactly that shape — they exist to pin the terminate reading,
+so of course they are — and neither has an exporter fidelity report beside it,
+being hand-written. So each declares it on the end event itself, in the second
+channel the rule allows: a `<bpmn:documentation>` on `End_Breach` and on `End_3`.
+
+That is the better channel for these two anyway. A `.fidelity.txt` in this
+directory would be a hand-written file in the exporter's own report format, which
+is a thing a later reader could mistake for exporter output; a `<documentation>`
+is what somebody who opens the diagram in Camunda Modeler and clicks the end
+event actually reads. Both files still parse at **0 warnings** under
+`etc/validate-bpmn.mjs` (measured 2026-09-21, after the edit).
+
+`mi-subprocess-fork.bpmn`'s note says one more thing, because it has to: its
+top-level error end is the **pre-`fcd7ecb2c`** shape, the one that cancelled the
+members who had not breached, and the exporter stopped emitting it. The fixture
+keeps it deliberately — what it pins is how the checker plays a scope, not how
+the exporter draws one — and the note says so rather than leaving a reader to
+infer that the current exporter would emit this.
 
 ## `joined-beside-breach.bpmn`
 

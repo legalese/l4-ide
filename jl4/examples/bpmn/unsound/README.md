@@ -1,6 +1,6 @@
 # Deliberately unsound BPMN
 
-Five diagrams that are **wrong in a way no parser can see**, kept so that
+Seven diagrams that are **wrong in a way no parser can see**, kept so that
 `etc/check-bpmn-soundness.mjs` can be shown to fail. They are the negative half
 of `etc/check-bpmn-soundness.selftest.mjs`; the positive halves are
 `../expected/` (exporter goldens) and `../sound/` (hand-written diagrams that
@@ -13,10 +13,13 @@ in `EXERCISES` in the self-test, which refuses to pass on a fixture that is not
 listed there **and** on an `EXERCISES` entry whose fixture has gone missing, so
 coverage cannot silently drift in either direction.
 
-Two kinds of complaint live here, and the `EXERCISES` entries carry the marker
+Three kinds of complaint live here, and the `EXERCISES` entries carry the marker
 so they cannot be confused: `FAIL Sn` is a **token-game** property the diagram
 violates, `STRUCTURE` is a **well-formedness** rule it breaks while playing
-perfectly well.
+perfectly well, and `FIDELITY` is a loss the diagram really has and does not
+declare — every `S` passes, the file is well formed, and it is still not one a
+reader should be handed. See "A terminating end beside concurrency owes a
+declaration" in `../README.md`.
 
 | file                                            | complaint it provokes         | the defect                                   | provenance                     |
 | ----------------------------------------------- | ----------------------------- | -------------------------------------------- | ------------------------------ |
@@ -25,15 +28,19 @@ perfectly well.
 | `deadlock-ror-in-rand.bpmn`                     | **S2** no deadlock            | join starves behind an `ROR`                 | hand-written                   |
 | `unsafe-xor-join-after-rand.bpmn`               | **S4** safe (1-bounded)       | XOR gateway used to merge a `RAND`           | hand-written                   |
 | `mislabelled-gateway-direction.bpmn`            | **STRUCTURE** gatewayDirection | gateway declares `Diverging` with 2 incoming | **shape of real exporter output** |
+| `deadlock-inside-mi-subprocess.bpmn`            | **S2** no deadlock            | a join inside one member's instance starves; invisible at 0 instances | hand-written                   |
+| `historical-fork-undeclared-sibling-loss.bpmn`  | **FIDELITY** undeclared loss  | a member's escalation meets a top-level ERROR end, cancelling the members who did not breach — and nothing says so | **real pre-fix exporter output** |
 
 **Today's exporter cannot emit any of these shapes** — for the four join
 defects, declining to is exactly the fix that `addJoin` in
-`jl4-core/src/L4/Bpmn/Lower.hs` implements; for the fifth it is
+`jl4-core/src/L4/Bpmn/Lower.hs` implements; for the gateway one it is
 `withGatewayDirections`, which computes the attribute from the edges instead of
-guessing it a pass too early. Three of the five are hand-written and must never
-be treated as goldens. The first is byte-for-byte real, and is the reason to
-believe the rest; the fifth is a hand-written minimum of a contradiction that
-really did ship in `../expected/regcf-reporting.bpmn`.
+guessing it a pass too early; and for the undeclared loss it is `addForkScope`,
+which mints the fork its own plain `EndBreach_<n>` rather than routing an
+escalation into a shared error end. Four of the seven are hand-written and must
+never be treated as goldens. Two are byte-for-byte real, and are the reason to
+believe the rest; the gateway one is a hand-written minimum of a contradiction
+that really did ship in `../expected/regcf-reporting.bpmn`.
 
 ## `mislabelled-gateway-direction.bpmn` — the one that plays perfectly
 
@@ -55,6 +62,43 @@ because the exporter chose the direction in a pass that ran before any edge
 existed, and the `HENCE <this rule>` renewal loop then handed that gateway a
 second arrival. Both scripts were green over it, which is the whole argument for
 the fixture.
+
+## `historical-fork-undeclared-sibling-loss.bpmn` — sound, well formed, and silent
+
+Byte-for-byte `../expected/tenancy-fork.bpmn` as the exporter emitted it at
+`fcd7ecb2c^`, with the fidelity report it emitted alongside, renamed to this
+stem so the checker finds the pair. No comment header, for the same reason
+`historical-handover-edge-counted-join.bpmn` has none: the bytes are the point.
+
+The defect is the one `fcd7ecb2c` fixed. A member's breach escalates out of that
+member's own instance — correctly, and without interrupting the siblings — and
+then reaches the **top-level error end**. An error end event does not consume one
+token and leave the rest running; it ends every active thread in the process,
+instances included. So a duty another member had already earned vanished one flow
+later, and the file's own `<documentation>` asserted the opposite.
+
+**Every token-game property passes on this file, and it is well formed.** S1, S2,
+S3 and S4 are green at 0 instances and at 2, `gatewayDirection` is honest
+everywhere, bpmn-moddle reports zero warnings. What it fails is the rule added on
+2026-09-21: it has a terminating end event, up to four tokens can be live at
+once, and not one of the **nine** notes in its report is a `lossy` or `blocking`
+one saying what becomes of the other three.
+
+Measured here, on this file:
+
+| checker                                         | verdict                                                                       |
+| ----------------------------------------------- | ----------------------------------------------------------------------------- |
+| `etc/validate-bpmn.mjs` (bpmn-moddle, a parser) | **OK — 0 warnings**, 11 flow nodes, 8 sequence flows, all drawn                |
+| `etc/check-bpmn-soundness.mjs`                  | SOUND at 0 instances; at 2, **UNSOUND on `FIDELITY`** with S1–S4 all **PASS** |
+| `etc/check-bpmn-kie.sh` (jBPM 7.74.1)           | not run here — the baseline covers `../expected/` only                         |
+
+That second row is the whole fixture. It is the only file in this directory whose
+complaint is not about what the diagram *does*, and the only one where reading
+the `PASS` lines and stopping there would tell you it was fine.
+
+Why it belongs in `unsound/` rather than `sound/`: the piles are named for the
+**verdict the gate must return**, not for the kind of defect. `../README.md`'s
+table says so, and the self-test reads it that way.
 
 ## `historical-handover-edge-counted-join.bpmn` — the measurement, not the argument
 
@@ -190,6 +234,18 @@ state?" verdict says COMPLETED and sees nothing wrong.
 
 Run from the repo root. This is the evidence for adding a soundness check at
 all: the check the repo already had passes **all five** files at zero warnings.
+
+**The table below is the original five, and is left at that scope rather than
+widened by guesswork.** Of the two fixtures added since,
+`historical-fork-undeclared-sibling-loss.bpmn` has its own measured table in the
+section of that name; `deadlock-inside-mi-subprocess.bpmn` has never had a
+section here and its provenance is the comment header inside the file. Measured
+2026-09-21, it is **UNSOUND, S1+S2+S3 fail** at 2 instances with four deadlocked
+markings (and SOUND at 0, which is the point of reading the verdict across the
+counts), and bpmn-moddle reports **16 problems on it, every one of them "has no
+diagram interchange"** — it is a minimal fixture with no `BPMNDiagram` at all,
+which is a fact about the fixture and not about the defect it carries. Neither
+has a jBPM row, because `etc/bpmn-kie-baseline.txt` covers `../expected/` only.
 
 ```sh
 npx --yes --package=bpmn-moddle@10 node etc/validate-bpmn.mjs jl4/examples/bpmn/unsound/*.bpmn

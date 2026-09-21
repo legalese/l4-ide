@@ -213,6 +213,37 @@ that rule since 2026-09-16 (before, the flow stopped at a dangling end, and the 
 
 If you have a `.bpmn` of a rule that hands over by name from before 2026-09-16, re-export it.
 
+## A terminating end beside concurrency has to be declared
+
+One kind of loss is checked mechanically rather than left to the report, because it is the kind a
+reader of the diagram cannot see and will not think to look for.
+
+Some end events **stop the whole run**, not just the path that reached them. An uncaught error end
+is one, and so is a terminate end. If the diagram also has more than one thing happening at once —
+two branches of a `RAND`, or several members of an `EVERY` — then reaching that end throws away
+whatever the others still had to do. A duty one party had already earned disappears from the
+diagram, one flow after it was drawn.
+
+So: **where an exported diagram has an end event that stops the run AND can have more than one
+token live at once, the fidelity report has to say what becomes of the others.** If it does not,
+`etc/check-bpmn-soundness.mjs` fails the file — it is a `FIDELITY` finding, distinct from the four
+liveness properties, and the four will all say PASS above it. The check is happy with either the
+`<name>.fidelity.txt` beside the file (a `lossy` or `blocking` note naming the end event) or a
+`<documentation>` on that end event.
+
+Today the report says it as `P-NOJOIN`, whose wording is the one the rule was written from: a branch
+here can reach BREACH, "whose error end abandons its siblings rather than waiting for them". Of the
+sixteen committed BPMN goldens, two are that shape — `offering` and `tenancy-fork-beside-party`. Of
+the other fourteen, eight have such an end event but only ever one thing happening at a time, so
+there is nothing for it to abandon; the remaining six do run several things at once and have no such
+end event at all.
+
+Why this is a hard check and not another note: the gate had been **printing the evidence on every
+run**, as `121 marking(s) can reach completion ONLY by terminating`, and scoring the file sound —
+correctly, because terminating is a legitimate way to finish. The defect it was describing went
+unnoticed for four days and was found by a reader, not by the gate. A number reported in a severity
+class nobody triages is not a check.
+
 ## When a decision can refuse
 
 [`REFUSE`](../reference/control-flow/REFUSE.md) is how an L4 rule says **"the model does not cover

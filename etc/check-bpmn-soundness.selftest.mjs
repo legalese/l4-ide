@@ -10,8 +10,9 @@
 //   jl4/examples/bpmn/unsound/*.bpmn    MUST be reported UNSOUND (exit 1), AND
 //                                       must produce the SPECIFIC complaint it
 //                                       was written to provoke — a token-game
-//                                       `FAIL  Sn …` or a `STRUCTURE  …`
-//                                       well-formedness line, per EXERCISES below
+//                                       `FAIL  Sn …`, a `STRUCTURE  …`
+//                                       well-formedness line, or a `FIDELITY  …`
+//                                       undeclared-loss line, per EXERCISES below
 //
 // `expected/` is exporter output. `sound/` is hand-written, and exists because
 // a gate is not only wrong when it misses a defect — it is also wrong when it
@@ -58,11 +59,17 @@ const piles = [
 // The line each unsound fixture must produce. Every .bpmn in the unsound pile
 // must appear here; see the header for why.
 //
-// Stored as the literal output line, marker and all, because there are two
+// Stored as the literal output line, marker and all, because there are THREE
 // kinds of defect and they must not be confusable: `FAIL  Sn …` is a token-game
 // property the diagram violates, `STRUCTURE  …` is a well-formedness rule it
-// breaks while playing perfectly well. A bare property name would have made a
+// breaks while playing perfectly well, and `FIDELITY  …` is a loss the file
+// really has and does not declare — every S passes and the diagram is still not
+// one a reader should be handed. A bare property name would have made a
 // STRUCTURE fixture look like it was exercising a token-game property.
+//
+// A FIDELITY entry is stored WITHOUT the trailing sentence that names the
+// sidecar, because that sentence carries the path as it was given on the command
+// line and this self-test passes absolute ones.
 const EXERCISES = {
   "deadlock-boundary-in-rand.bpmn": "FAIL  S2 no deadlock",
   "deadlock-ror-in-rand.bpmn": "FAIL  S2 no deadlock",
@@ -72,6 +79,14 @@ const EXERCISES = {
   // multi-instance scope is played once per instance count and the verdict is
   // read across them. Before the expansion this file was NOT CHECKED at all.
   "deadlock-inside-mi-subprocess.bpmn": "FAIL  S2 no deadlock",
+  // Sound in every token-game sense and silent about the one thing it does:
+  // byte-for-byte the tenancy fork as the exporter emitted it before
+  // fcd7ecb2c, where a member's escalation met a top-level ERROR end and so
+  // cancelled the members who had not breached. Its own fidelity report is
+  // checked in beside it with all nine of the notes it really carried, which is
+  // what makes this a test of the rule rather than of a missing file.
+  "historical-fork-undeclared-sibling-loss.bpmn":
+    'FIDELITY  End_3 "Breach" discards every remaining token, and up to 4 can be live',
   "mislabelled-gateway-direction.bpmn":
     'STRUCTURE  exclusiveGateway Split_0 declares gatewayDirection="Diverging" ' +
     "but has 2 incoming and 2 outgoing sequence flow(s)",
@@ -129,7 +144,7 @@ for (const { dir, verdict, code } of piles) {
           `${want} did not fire — that is what this fixture is for`,
         );
     }
-    if (verdict === "SOUND" && /FAIL|STRUCTURE/.test(out))
+    if (verdict === "SOUND" && /FAIL|STRUCTURE|FIDELITY/.test(out))
       problems.push("a property failed on a fixture expected to be sound");
 
     if (problems.length) {
