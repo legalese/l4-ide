@@ -2711,15 +2711,17 @@ over.
 
 ### 7.2 Staging — two experiments, then a gate, and — 2026-09-21 — no picture
 
-**Both experiments are done and the gate is ruled: NO (§7.3, RULED 2026-09-21).** The heading's
-"then maybe a picture" is now decided in the negative; the P2d and P2e rows below say NOT BUILT
-and keep what they would have been, and §7.3 names the three things that would reopen them.
+**Both experiments are done and the gate was ruled: NO (§7.3, RULED 2026-09-21) — and REOPENED the
+same day** by the rerun that ruling named as its first reopening condition (§7.7a; §7.3's REOPENED
+block). The heading's "then maybe a picture" was decided in the negative and is now back with Meng;
+the P2d and P2e rows below still say NOT BUILT, because a reopened gate is not a built picture, and
+they keep what they would have been.
 
 | ID       | Work                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Depends on                                                                             | Gates M4?      |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | -------------- |
 | **P2b**  | `tellDeonticStep` + the `DeonticStep` type of §4.3. ~6 call sites in `Machine.hs`. **No renderer.** Tested in Haskell alone against `contracts.golden`. **Recommended unconditionally.** **BUILT 2026-09-15** (`lts/p2-stack`, not yet in `unstable`): `L4.EvaluateLazy.DeonticStep`, `tellDeonticStep` optional and off by default (R5 answered), seventeen call sites, `DeonticStepSpec`; §4.3's BUILT block. **Follow-up 2026-09-16** (`lts/p2-followups`): the bearer is recorded where the machine forces it (`nkBearerName`, `ekPartyName`) and the list matches by it; `--steps` prints real party names.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | —                                                                                      | no             |
 | **P2c**  | The enabled set and the discharging/breaching partition, in the **replay** form (`STATEFUL` §6.5 endpoints 22/23/24), per §2.4. Plus `markingOf` (§4.2a) as a library function. **BUILT 2026-09-15** (`lts/p2-stack`): `L4.Lts.Marking` (`markingOf` against `Threshold`, with `Awaiting` for the join — the `markingOf` half of P2h's second half) and `L4.Lts.WhatIf` (the replay form, per candidate); §4.2a and §2.4 LANDED blocks.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | P2b                                                                                    | no             |
-| **P2a′** | **The list baseline, and the primary gate.** Render §4.2a's marking + endpoints 17/19/20 as plain text — CLI first. Put it in front of readers against the same contract drawn by `stateGraphToDot` and P1. **BUILT 2026-09-15** (`lts/p2-stack`): `l4 lts FILE [--steps] [--json] [--contract NAME]`, goldens under `jl4/examples/lts/expected/`, page `doc/reference/regulative/lts-list.md`; §7.6. **The reader experiment itself has not been run**, and still has not been — the list exists, and the human experiment is now one of §7.3's three reopen conditions rather than the open gate. **Proxy run 2026-09-16** (`lts/p2-followups`, §7.7): 48 LLM readers, one artifact each — list 50/80, DOT-as-text 71/80, BPMN-as-text 66/80; on the gate's Q1–Q3 the list is 39/48 vs 41/48 and 42/48. Not the gate — but **the gate is RULED NO, 2026-09-21** (§7.3), on this proxy plus three further grounds recorded there.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | P2c                                                                                    | no             |
+| **P2a′** | **The list baseline, and the primary gate.** Render §4.2a's marking + endpoints 17/19/20 as plain text — CLI first. Put it in front of readers against the same contract drawn by `stateGraphToDot` and P1. **BUILT 2026-09-15** (`lts/p2-stack`): `l4 lts FILE [--steps] [--json] [--contract NAME]`, goldens under `jl4/examples/lts/expected/`, page `doc/reference/regulative/lts-list.md`; §7.6. **The reader experiment itself has not been run**, and still has not been — the list exists, and the human experiment is now one of §7.3's three reopen conditions rather than the open gate. **Proxy run 2026-09-16** (`lts/p2-followups`, §7.7): 48 LLM readers, one artifact each — list 50/80, DOT-as-text 71/80, BPMN-as-text 66/80; on the gate's Q1–Q3 the list is 39/48 vs 41/48 and 42/48. Not the gate — but **the gate was RULED NO, 2026-09-21** (§7.3), on this proxy plus three further grounds recorded there. **RERUN 2026-09-21 against the repaired list** (`lts/whatif-bound-values`, §7.7a): list 54/80, DOT 59/80, BPMN 68/80; Q2 for the list 8/16 → 12/16 and Q4–Q5 11/32 → 22/32, both moved by the repair — but **on the gate's Q1–Q3 the list is now LAST, 32/48 against 36/48 and 41/48**, so §7.3's first reopening condition is met on the numbers and **the NO is back with Meng, not confirmed**. Read with §7.7a's control: four cells were shown byte-identically in both runs and drifted −13 of 80, larger than the whole effect, and `promissory-note`'s key was left stale while its artifact was re-cut.                                                                                                                                                                                                                                                                                                                                                                                                                                                        | P2c                                                                                    | no             |
 | **P2a**  | **The picture baseline.** Point `bpmn-io/bpmn-js-token-simulation` (MIT) at P1's shipped output and write down, case by case, what it cannot say. **MEASURED 2026-09-15** (`lts/p2-stack`): harness `etc/bpmn-token-sim/`, report `P2A-TOKEN-SIM-BASELINE.md`, RESULT block below. Measured over the eight goldens that existed that afternoon; the six `modals-*` goldens `6daf1d9d` added later the same day were unmeasured until the **RE-MEASURED** run of 2026-09-15 17:19 UTC (2026-09-16 SGT) over all fourteen goldens (`lts/p2-followups`; the RE-MEASURED block below), which found the fork-MAY lapse animation contradicting the runtime; `d544ed22` (legalese/l4-ide#395) then moved that lapse to Fulfilled in the state graph, and a third run at 2026-09-15 20:25 UTC over all fourteen (**MEASURED**, the committed `out/`) animates `modals-may-fork` as its barrier twin — the fork-MAY animation now agrees with the runtime. **RUN 4, 2026-09-18 23:23 UTC (2026-09-19 SGT), supersedes the 2026-09-16 re-measure:** all sixteen goldens (`option` from #425, `tenancy-fork-beside-party` from #430) in one run on `lts/token-sim-determinism` (`a3c7bdce3`, harness `9cd110c5d`), the first diffable baseline — two runs back to back differ in `run-meta.json`'s `runAt` lines only, 52/52 screenshots byte-identical. Result for the barrier/fork pairs: since #430 the fork is a multi-instance sub-process and the animation **can tell the pairs apart in shape** (a box holding the task, `instances: {"Scope_0": 1}`, an escalation relay, two end events per exit — `EndScope_0`/`EscScope_0` inside, `EndGroup_0`/`EndBreach_0` outside) but **not in cardinality**: `bpmn-js-token-simulation` 0.40.0 has no multi-instance behaviour, so the box runs once and `EndGroup_0` lands in the same step as the one instance's end; the `MAY` fork's lapse still reaches Fulfilled (`EndScope_0`) and the `SHANT` fork's "continue" is still the breach. Report §3.1, §3.7, §4. | P1 (shipped)                                                                           | no             |
 | **P2f**  | **Unbundled.** `dom_s(J)` by Lengauer–Tarjan over `StateGraph`, answered as a **set of acts** — printable as a list or as an annotation on P1's BPMN. **No new picture required.** **BUILT 2026-09-15** (`lts/p2-stack`): `L4.StateGraph.Dominators`, `l4 state-graph --dominators [--all-states]`, `DominatorsSpec`; §1.1c LANDED block (iterated dominance equations, not Lengauer–Tarjan; same answer by definition). The DOT annotation was not built on that branch; it was **BUILT 2026-09-16** with B1/B2 (`--dominators --dot`, §1.1c's Annotation LANDED block and its correction).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | P0 (shipped)                                                                           | no             |
 | **B1**   | Carry the correlation key (§3.4). Predicted to regenerate the BPMN goldens; in fact none moved. **LANDED 2026-09-16** (`lts/p2-followups`): `TransitionLabel.labelSite` = `rangeOf` the RAction, proved equal to P2b's `nkSite` by test; default DOT and all 14 BPMN goldens byte-identical. §3.4 block.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | P1                                                                                     | no             |
@@ -2876,7 +2878,7 @@ a simulator driving boundaries must fire only the interrupting ones.
 > keeps its one `P10D` timer inside the box. Every number in this block is run 3's; the report is
 > the current reading.
 
-**PROXY RUN 2026-09-16, for P2a′.** An LLM-reader _proxy_ of the P2a′ reader experiment was run
+**PROXY RUN 2026-09-16, for P2a′; RERUN 2026-09-21, see §7.7a.** An LLM-reader _proxy_ of the P2a′ reader experiment was run
 over four contracts — the list, the DOT source and the BPMN XML, each read as text by fresh LLM
 readers with no tools — and is written up in §7.7 and `etc/lts-reader-proxy/RESULTS.md`. Pooled:
 list 50/80, DOT 71/80, BPMN 66/80; on Q1–Q3 the list is 39/48 against 41/48 and 42/48, on Q4–Q5
@@ -2886,9 +2888,10 @@ as of integration; it decides nothing either.
 
 ### 7.3 The gate
 
-**RULED 2026-09-21 (Meng) — NO. P2d and P2e are not built.** The rule quoted below is the rule
-that was applied, and it stays as written; what follows is the decision, the measurement it rests
-on, and what would reopen it.
+**RULED 2026-09-21 (Meng) — NO. P2d and P2e are not built. REOPENED the same day by the rerun the
+ruling itself named: see the REOPENED block at the end of this section.** The rule quoted below is
+the rule that was applied, and it stays as written; what follows is the decision, the measurement it
+rested on, and the measurement that reopened it.
 
 **The measurement.** §7.7's LLM-reader proxy, RUN 2026-09-16 — four contracts, three artifacts
 each (**A** the `l4 lts` list, **B** the `l4 state-graph` DOT, **C** the P1 BPMN), two models,
@@ -2915,6 +2918,10 @@ in a column of sixteen is inside what a rerun could reverse.
    magnitude. It is a repair to the list, not to the run: the 48 readings were taken against the
    old output and no number in §7.7 has moved, so **nothing here is yet evidence that the Q2
    column changes**. What would settle that is the rerun §7.7's cost-order list puts first.
+   _(Run 2026-09-21, §7.7a: the Q2 column does change, 8/16 → 12/16 — but not uniformly. On
+   `contracts` it went 1/4 → 4/4; on `tenancy`, where the repair also landed, it stayed 1/4,
+   three of four readers not using the block the list now prints. So the refusal was a real cause
+   and not the only one.)_
 
 3. **P2a's half of the condition IS met — and more strongly than when this gate was written.**
    Run 4 (2026-09-18 23:23 UTC, 2026-09-19 SGT; harness `etc/bpmn-token-sim`, report
@@ -2941,10 +2948,33 @@ in a column of sixteen is inside what a rerun could reverse.
    the same materials — not to draw it.
 
 **What would reopen it.** Any one of: (a) the repaired list still failing Q1–Q3 when these same 48
-readings are rerun — **planned, not run; no PR carries it yet**, and §7.7's cost-order list has it
-as item (i); (b) a vision run — B and C **rendered** rather than read as text — showing that
-_drawing_, as opposed to content, is what carries the answer; or (c) the human experiment the
-sentence below actually asks for, showing that novices cannot use the repaired list.
+readings are rerun — **RUN 2026-09-21, and MET on the numbers: see the block immediately below**;
+(b) a vision run — B and C **rendered** rather than read as text — showing that _drawing_, as
+opposed to content, is what carries the answer; or (c) the human experiment the sentence below
+actually asks for, showing that novices cannot use the repaired list.
+
+> **REOPENED 2026-09-21 — condition (a) is met, and this ruling is back with Meng.** The rerun is
+> §7.7a. Measured, Q1–Q3 pooled: **A 32/48, B 36/48, C 41/48** — the repaired list is the **worst**
+> of the three on the gate's own three questions, where point 1 above rests on its being _"not
+> beaten"_ at 39/48. Point 1's sharper sub-claim splits: the list is still ahead on **Q1** (12/16
+> against 10/16 and 11/16) and is now **behind both on Q3** (8/16 against 11/16 and 14/16). Point 2
+> half-held — the repair moved Q2 8/16 → 12/16, but not on `tenancy`, where it landed and the
+> column did not move. Point 5's counterweight **weakened**: Q4–Q5 for the list went 11/32 → 22/32,
+> level with the DOT.
+>
+> **And the rerun cannot settle it either way**, which Meng needs alongside the above rather than
+> instead of it. §7.7a's control — four (contract, artifact) cells shown **byte-identically** in
+> both runs — drifted **−13 of 80 answers, 27 of 80 flipped**, and **−5 of 48 inside the Q1–Q3
+> window**, against an A-versus-B gap of four. Seven of A's sixteen Q1–Q3 misses are scored against
+> `promissory-note/truth.json`'s day 739769 while the re-cut `A.txt` prints the tree's 739752, and
+> `tenancy`'s Q3 column fell 4/4 → 0/4 on a one-clause wording change that is **not** the repair.
+> So nothing here shows that _a list_ cannot answer Q3, and nothing here confirms the NO either.
+>
+> **The ruling is not amended by this section** — §7.3 is Meng's. What changes is its status: it
+> stood on a measurement that has now been taken, and the measurement did not come back the way the
+> ruling assumed. The recommended sequence before re-deciding, in §7.7a: fix the note's key and
+> re-cut in one change; fix or re-word the breach-names clause; run a true test-retest so the next
+> comparison has an error bar; then re-run the 48 readings.
 
 > **Build P2d/P2e only if P2a′ shows that readers cannot answer "what do I owe, what discharges
 > it, what breaches it" from the list — and P2a shows the off-the-shelf simulator cannot either.**
@@ -3281,7 +3311,7 @@ recorded there. The human reader experiment is still unrun, and this paragraph s
 changed is that P2d and P2e are not being built while it stays unrun, and running it is one of
 the three things that would reopen them._
 
-### 7.7 The §7.3 gate — an LLM-reader proxy, RUN 2026-09-16
+### 7.7 The §7.3 gate — an LLM-reader proxy, RUN 2026-09-16 and RERUN 2026-09-21
 
 **RUN 2026-09-16, on `lts/p2a-prime-proxy`, as a PROXY. This section decides nothing about the
 gate.** Full write-up, per-reading rationales and the raw scored rows:
@@ -3344,9 +3374,10 @@ loud failure was invited and its size is partly the prompt's (RESULTS.md §3).
    the obligation — `contracts` "B does anything now (at 10) → fulfilled"; `tenancy` each
    tenant's payment "with any `amount`", checked at 0; `promissory-note` "with any
    `Amount Transferred` for which `is money at least equal within error` … (Money OF "USD",
-   2369.2806990603694) holds → fulfilled". **The 48 readings above were taken against the OLD
-   output and none of them has been rerun**, so every number in this section still describes the
-   refusing list. Rerunning them is the first item in the cost-order list below.
+   2369.2806990603694) holds → fulfilled". **RERUN 2026-09-21 — the numbers in this table are
+   run 1's and have NOT been restated; run 2's are in §7.7a below.** Q2 for the list moved
+   8/16 → 12/16, and the move is not uniform: `contracts` 1/4 → 4/4, `promissory-note` 2/4 → 3/4,
+   **`tenancy` 1/4 → 1/4 despite the repair landing on it.**
 3. **On Q4–Q5 the list loses badly (11/32 vs 30/32 and 24/32), in §1.1a's direction — and
    §1.1a's reason is only half right.** All four of the list's Q5 hits are `every-run-example`,
    where the list itself prints the `→ then:` continuation one step deep (§7.6); it printed
@@ -3380,13 +3411,17 @@ questions have opposite answers on this data. (vi) Four contracts, two models, t
 intervals: a one- or two-answer difference in a column of sixteen is within what a rerun could
 reverse. **Nothing here passes or fails §7.3.** The §7.2 P2a′ row records this run and says the same.
 
-_What would move it, in cost order — statuses added 2026-09-21, when §7.3 was ruled:_ **repair
-LANDED 2026-09-21, rerun OPEN** — the open-binder what-if is repaired (point 2 above, §2.4);
-the same 48 readings have NOT been rerun, so no number in this section has moved; **open**
-— equalise the note's calendar conversion across A/B/C; **open** — rerun outside the harness
-with a bare API call and a fixed system prompt; **open** — a vision run with B and C rendered, to
-separate content from drawing; **open** — and then the reader experiment §7.3 actually asks for.
-The first, the fourth and the fifth are also §7.3's three reopen conditions.
+_What would move it, in cost order — statuses as of 2026-09-21, after the rerun:_ **repair LANDED,
+rerun DONE** — the open-binder what-if is repaired (point 2 above, §2.4) and the same 48 readings
+were rerun the same day (§7.7a); **open, and now URGENT** — equalise the note's calendar
+conversion across A/B/C, because the 2026-09-21 re-cut moved `promissory-note/A.txt` to day 739752
+and left `truth.json` at 739769, so that contract's run-2 A columns score the key rather than the
+list (§7.7a, RESULTS.md §6.6); **open, and now the highest-value item** — rerun outside the harness
+with a bare API call and a fixed system prompt, since §7.7a measures a run-to-run drift larger than
+any effect yet found; **open** — a vision run with B and C rendered, to separate content from
+drawing; **open** — and then the reader experiment §7.3 actually asks for. **NEW, and cheapest of
+all** — a true test-retest, the same packets and settings twice, which has never been run. The
+first, the fourth and the fifth are also §7.3's three reopen conditions.
 
 _What review changed (2026-09-16, same day):_ the first version of this section said the model
 ids, prompts and judge were not recorded; a reviewer pointed out that this left `results.json`
@@ -3396,6 +3431,118 @@ claims here and in RESULTS.md: sonnet "reconstructed the `ELSE` branch" (it name
 the branch); "8 of 16" list readers inferred the discharge (4 of 12 on the refused contracts —
 the other four cited `every-run-example`'s printed `→ then:` line); and "all 13" BPMN misses sit
 on documented losses (five do). No number in the table changed.
+
+### 7.7a The rerun — RUN 2, 2026-09-21, and what it does to §7.3
+
+**RERUN 2026-09-21, on `lts/whatif-bound-values`, as a PROXY. Like §7.7 it decides nothing about
+the gate — but it is the measurement §7.3 named as its first reopening condition, so it does bear
+on whether the ruling stands.** Scored rows: `etc/lts-reader-proxy/results-run2.json`; full
+write-up, control, and per-finding account: `etc/lts-reader-proxy/RESULTS.md` §6. Every number here
+is computed from that file.
+
+**Method, and the four differences from run 1.** Same four contracts, same three artifacts, same
+five questions, same two reader models, two repeats — 48 readings, 240 answers, scored 0/1 by one
+`claude-opus-5` judge per contract. Differences: the artifacts were **re-cut on the repaired
+binary**; readers ran **inside a workflow at medium effort** (run 1's were single-turn Claude Code
+subagents at harness default); the packet header was the bare word `Document`, so run 2's readers
+did **not** know which artifact kind they had (run 1's did — _"a diagram … in the GraphViz DOT
+language"_), which makes them **more** blinded, not less; and **both scoring rules were stated
+verbatim to every judge**, where run 1 had one in the prompt and one inferred. The packets are
+committed (`etc/lts-reader-proxy/transcripts-run2/packets/`, rebuildable and verified
+byte-identical); **the readers' answers and the judges' outputs were not captured**, which makes
+run 2 less auditable than run 1 and is recorded as such.
+
+**Accuracy, correct/readings** (a per-contract cell is 2 models × 2 repeats; pooled is 16):
+
+| contract            | artifact   | Q1        | Q2        | Q3        | Q4        | Q5        | all                                  |
+| ------------------- | ---------- | --------- | --------- | --------- | --------- | --------- | ------------------------------------ |
+| `contracts`         | A / B / C  | 4 / 4 / 4 | 4 / 4 / 4 | 4 / 4 / 4 | 2 / 4 / 4 | 2 / 4 / 4 | 16 / 20 / 20 of 20                   |
+| `every-run-example` | A / B / C  | 4 / 3 / 4 | 4 / 4 / 4 | 4 / 2 / 4 | 2 / 4 / 4 | 4 / 3 / 4 | 18 / 16 / 20 of 20                   |
+| `tenancy`           | A / B / C  | 4 / 2 / 3 | 1 / 3 / 4 | 0 / 3 / 4 | 4 / 4 / 4 | 2 / 3 / 4 | 11 / 15 / 19 of 20                   |
+| `promissory-note`   | A / B / C  | 0 / 1 / 0 | 3 / 4 / 4 | 0 / 2 / 2 | 3 / 0 / 0 | 3 / 1 / 3 | 9 / 8 / 9 of 20                      |
+| **pooled**          | **A** list | 12/16     | 12/16     | 8/16      | 11/16     | 11/16     | **54/80** (Q1–Q3 32/48, Q4–Q5 22/32) |
+|                     | **B** DOT  | 10/16     | 15/16     | 11/16     | 12/16     | 11/16     | **59/80** (Q1–Q3 36/48, Q4–Q5 23/32) |
+|                     | **C** BPMN | 11/16     | 16/16     | 14/16     | 12/16     | 15/16     | **68/80** (Q1–Q3 41/48, Q4–Q5 27/32) |
+
+By model: haiku A 23/40, B 30/40, C 32/40; sonnet A 31/40, B 29/40, C 36/40. The two repeats of a
+cell agreed exactly in **14 of 24** cells, against run 1's 16 — slightly noisier, not tighter.
+
+**THE CONTROL, which is the most important number in either run and bounds everything else here.**
+The re-cut moved all four `A.txt`, one of four `B.dot`, three of four `C.bpmn`, and **no
+`truth.json` and no `history.txt`**. So four (contract, artifact) cells —
+`every-run-example/B`, `tenancy/B`, `promissory-note/B`, `promissory-note/C` — were shown to run-2
+readers **byte-identically** to run 1. On those 80 answers:
+
+> **27 of 80 flipped (33.8%), and the total fell 61/80 → 48/80, a drift of −13 on documents that
+> did not change.** Inside the gate's own Q1–Q3 window the control fell 35/48 → 30/48, **−5**. Over
+> the twenty cells whose document _did_ change, the experiment moved **+7 of 160**. The instrument
+> moved further, on nothing, than the experiment moved on everything.
+
+Run 1's limit (vi) — _"a one- or two-answer difference in a column of sixteen is within what a rerun
+could reverse"_ — was right and understated. The caveat cuts both ways: the packet header and the
+effort setting also differ, so this is reader-framing-plus-model-plus-judge variance, not sampling
+variance alone, and a true test-retest has never been run.
+
+**What survives the control, because each is tied to a specific sentence in a specific artifact:**
+
+1. **The repair works, and completely on one contract.** `contracts` A Q2 **1/4 → 4/4**; Q5 on the
+   same contract 0/4 → 2/4 (the `→ then:` block now prints there); that contract's A total 11/20 →
+   16/20. Its B and C cells were 20/20 in both runs, so no drift carries it.
+2. **Printing the answer does not guarantee it is read.** `tenancy` A Q2 **1/4 → 1/4**, although
+   the list now prints all three tenants' payments with their consequences. Two haiku readers said
+   a bare "cannot tell"; one sonnet reader recited the acts and then said the artifact "does not
+   say what event(s) would actually discharge what is owed". The heading differs between the two
+   contracts — `contracts` prints under _"What would discharge it"_ and `tenancy` under _"What
+   would move things along"_, which does not contain the word Q2 asks with. Untested hypothesis,
+   cheap to test.
+3. **A line added for precision cost a whole column.** `tenancy` A Q3 **4/4 → 0/4**. The only
+   change to that part of the artifact is an appended clause — _"; the breach names, in order:
+   Tenant Alice, Tenant Bob, Tenant Carol"_ — which faithfully renders `lts.json`'s `names` beside
+   its `party`, and which all four readers read as collective breach where all four run-1 readers,
+   given the shorter line, did not. **Not the repair's doing**: it is `unstable` drift the re-cut
+   picked up. The fix is a wording change that distinguishes _who is in breach_ from _whose names
+   the breach carries_ — a distinction `lts.json` draws and the sentence does not.
+4. **A measurement defect, and the largest in the run.** `promissory-note/truth.json` still answers
+   with day **739769**, while the re-cut `A.txt` prints **739752** — the tree's number. Eight of
+   A's eleven misses on that contract name the day serial as a stated ground, seven of them inside
+   Q1–Q3, and one rationale says the answer _"would otherwise have passed"_. That contract's run-2
+   A columns measure the key, not the list. `truth.json`'s own `drift` note forbids exactly this
+   split; the re-cut moved the artifact and left the key.
+
+#### Does the §7.3 ruling still stand?
+
+**No — not on this measurement. The ruling's first reopening condition is met, and it goes back to
+Meng.**
+
+§7.3 rules NO on four grounds, of which point 1 is the load-bearing one: _"the gate is conjunctive,
+and on its own three questions the list is not beaten"_ — A 39/48, B 41/48, C 42/48 in run 1, with
+the sharper sub-claim that _"on Q1 and Q3 alone the list is ahead of both pictures"_. Its reopening
+condition (a) is _"the repaired list still failing Q1–Q3 when these same 48 readings are rerun"_.
+
+**Measured, run 2: A 32/48, B 36/48, C 41/48. The repaired list is the worst of the three on the
+gate's own three questions.** On Q1 it is still ahead (12/16 against 10/16 and 11/16); on **Q3 it is
+behind both** (8/16 against 11/16 and 14/16), which is the half of point 1's sub-claim that fails.
+Condition (a) is met on the numbers, and the ruling is not confirmed by the measurement it named.
+
+**Two things must go to Meng with that, and neither is a softening of it.**
+
+_First, the run also undercuts §7.3's own counterweight._ Point 5 of the ruling is that _"on Q4 and
+Q5 the list loses badly — 11/32, against B's 30/32 and C's 24/32"_. In run 2 the list is at
+**22/32**, level with the DOT's 23/32. The repair moved the list on exactly the two questions §1.1a
+says a list cannot answer. So the rerun moves both halves of the ruling, in opposite directions.
+
+_Second, this run cannot bear the weight of either reading._ Nothing in it shows that **a list**
+cannot answer Q3. A's Q3 column fell for two identified, repairable reasons — a stale key (item 4)
+and a one-clause wording change that is not the repair (item 3) — on top of a control drift of −5
+in that same window, against an A-versus-B gap of four. Setting aside only the four Q1 answers whose
+sole stated ground is the stale numeral puts A's Q1–Q3 at 36/48, level with B. **The rows have not
+been re-scored** and that figure is an arithmetic observation, not a result.
+
+**Recommended to the ruling's owner, as a recommendation and not a decision:** correct
+`promissory-note/truth.json` and re-cut its artifacts in one change; fix or re-word the
+breach-names clause; run the test-retest the control calls for, so the next comparison has an error
+bar; then re-run these 48 readings. **Do not build P2d on this run, and do not record the
+2026-09-21 ruling as confirmed.** §7.3 owns the decision and this section does not take it.
 
 ---
 
