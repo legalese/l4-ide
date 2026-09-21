@@ -275,6 +275,28 @@ export interface ViewSpec {
    * actually told us, with nothing filled in from either direction.
    */
   readonly respectDefaults: boolean;
+  /**
+   * Draw the decision's own NAME as a terminal box immediately before the sink,
+   * so the diagram reads the way a Layman Allen normalised diagram does: leftmost
+   * node the subject, rightmost node the consequent (Woon, *Essential Criminal
+   * Law* ch 8 — "Offender" at the left margin, "Commits Robbery" at the right).
+   *
+   * Default **false**, and that is the whole reason this is a knob rather than a
+   * change: every existing figure, golden and test keeps its current geometry.
+   *
+   * TWO LIMITS, both deliberate:
+   *
+   * 1. **An `Implies` body ignores it.** Such a rule already HAS its sinks — the
+   *    two named lamps of §25.4 — and those lamps ARE the consequent. Inserting a
+   *    third terminal in front of them would draw a sink the rule does not have,
+   *    and would have to claim a single verdict where the whole point of the
+   *    changeover is that there are two. Same argument as `twoSinks` in `layout`.
+   * 2. **It is a SCENE property, so it reaches the SVG and the ASCII carriers and
+   *    not the Mermaid one.** `toMermaidRailroad` consumes a `FunDecl`, never a
+   *    `Scene`, so a `.mmd` emitted beside a head-as-sink `.svg` will not show the
+   *    head. Say so wherever both are published together.
+   */
+  readonly headAsSink: boolean;
 }
 
 export function defaultViewSpec(partial: Partial<ViewSpec> = {}): ViewSpec {
@@ -291,6 +313,7 @@ export function defaultViewSpec(partial: Partial<ViewSpec> = {}): ViewSpec {
     showCurrent: partial.showCurrent ?? false,
     grounding: partial.grounding ?? "none",
     respectDefaults: partial.respectDefaults ?? true,
+    headAsSink: partial.headAsSink ?? false,
   };
 }
 
@@ -326,7 +349,19 @@ export type ScenePrim =
       kind: "box";
       id: NodeId;
       rect: Rect;
-      role: "leaf" | "placeholder";
+      /**
+       * `leaf` — an operative atom; `placeholder` — a folded group; `head` — the
+       * DECISION'S OWN NAME, drawn as the terminal node just before the sink
+       * (`ViewSpec.headAsSink`).
+       *
+       * A `head` box carries no `act`: its value is DERIVED from the body, so
+       * offering to cycle it would offer to lie. It is otherwise drawn exactly
+       * like a leaf, which is deliberate — in a Layman Allen normalised diagram
+       * the consequent is an ordinary box, distinguished only by sitting last.
+       * The distinction that matters is semantic, so it lives in the IR (this
+       * field) rather than in the ink.
+       */
+      role: "leaf" | "placeholder" | "head";
       state: State;
       folded?: boolean;
       /** riding a TYPICALLY presumption (DESIGN §22) — render fine-dashed/tentative. */
