@@ -2443,6 +2443,33 @@ working while it did — it produced a deadlock witness naming real flows. Fixed
 "instance finished" gateway per copy; pinned by `jl4/examples/bpmn/sound/mi-subprocess-two-ways-to-done.bpmn`,
 which was verified by reverting the fix and watching it fail.
 
+#### LANDED 2026-09-21: the blame set, declared as `F6`
+
+The dated line `EVERY-EACH-QUANTIFIER-SPEC` §6.1.1 asked this section for, under _"Owed downstream, not done here"_.
+
+**A barrier's breach end event names no member, and now says so.**
+Since R-T3 (built 2026-09-15, §6.1.1) a failed barrier's `LEST` is handed a non-empty LIST of failures rather than one party — one entry per failed obligation, undeduplicated, each entry naming what was failed and not merely who (`Failure`/`Blame`/`ReasonForBreach`, `jl4-core/src/L4/Evaluate/ValueLazy.hs`).
+The diagram has one end event for the whole group, and BPMN has no shape for a set of parties on an end event, so the loss is a loss of the notation: `F6`, `Lossy`, filed on the breach end event by `quantifiedBreachNote` in `jl4-core/src/L4/Bpmn/Lower.hs`.
+
+Measured: it moves **three** of the sixteen BPMN goldens and no others — `tenancy-barrier` (`End_3`), `modals-shant-barrier` (`End_2`) and `modals-must-barrier-both-deadlines` (`End_2`).
+The fourth barrier golden, `modals-may-barrier`, does **not** gain it, and that is the check that the guard discriminates: its `EVERY` is a `MAY` with a `HENCE` and no `LEST`, so the group has no breach terminal at all — the `End_3 "Breach"` in that file belongs to the chair's own `PARTY` obligation.
+`modals-must-barrier-both-deadlines` does gain it despite having no written `LEST`, because a `MUST` whose deadline passes breaches and the state graph builds the arm.
+
+**Repaired twice on the day it landed, after two rounds of review, in THREE places where the note was wrong about its ELEMENT rather than about the loss.**
+All three had the same cause and now have the same answer: the note is built in the findings pass (`barrierBreachFindings`), which reads the emitted file, instead of in the chain pass, which had to predict it.
+
+1. **Filed twice.** Keyed on the terminal and built once per state that reaches it, so two barriers whose `LEST` arms converge on one breach end filed it twice, byte for byte. It is now filed once per END EVENT. (`dedupNotes` also hides an exact repeat and stays as a backstop, but is no longer what makes this single — a dedup that hides a double emission would have gone on hiding it for any two copies that differed in a word.)
+2. **Claimed a shared terminal was the group's.** Under `RAND` one operand's breach is the whole contract's, and a barrier whose `HENCE` obliges somebody who can breach in turn shares the terminal too. That was live in a committed golden — `tenancy-barrier`'s `End_3` is reached from `Boundary_0` (the tenants' deadline) and from `Boundary_1` (the landlord's). The note now NAMES the other arms and the lane each sits in ("`Boundary_1` (theLandlord) also ends at this very event"), counted on the emitted flows rather than on the state graph, and its `lost:` says the larger thing the first repair still left out: not only which member fell short, but whether a member fell short AT ALL rather than the landlord. Two group obligations converging is its own overclaim — an event two groups reach is not "the whole group's" either — and the note says it cannot tell which group, naming both arms.
+3. **Named an element the file does not have.** The id was derived as `End_<state id>`, which is the terminal's name only outside a fork's scope: a barrier nested in a fork's `HENCE` has its terminal absorbed by `addForkScope`, the arm re-pointed to `EscScope_<root>` and the terminal dropped as an orphan. Measured on the binary at `0d79f3b40`: the shipped report said `End_3` and `grep -c End_3` on the emitted XML was **0** — the dangling-reference class `etc/check-bpmn-dmn-refs.mjs` exists for. The element is now read off the emitted flow leaving the `LEST` arm's own source (`raceArms`), so it cannot be a name the file lacks; where that cannot be identified unambiguously, no note is filed rather than a wrong one.
+
+All three are pinned by tests in `jl4/tests/BpmnExport.hs` under "F6, the blame set, on a breach end two things can reach" — eight of them, including the controls that a lone barrier claims neither extra sentence and that every element F6 names is a node of the diagram it describes.
+Three goldens move and no `.bpmn` does: `tenancy-barrier` gains the named arm, and all three carry F6 in a new position, since it is now filed after the per-element notes and before the two process-wide ones.
+
+**Scoped to the barrier, deliberately, and the fork is still owed a ruling.**
+A fork's `LEST` fires per member, so at each firing the blame is a singleton: the loss there is WHICH member, not which set, and filing `F6` on a fork would claim a set-shaped loss the fork does not have.
+That per-member loss is today stated in prose rather than as a note — `escalationCatchName` (`Lower.hs`) captions the boundary "a member breached" precisely because it cannot say which, and its own comment says so.
+Whether it also deserves a note is a ruling nobody has made.
+
 #### What follows for P2
 
 **This is P2's problem before it is P1's.** §5.1's division of labour gives P1 the shape and P2 the

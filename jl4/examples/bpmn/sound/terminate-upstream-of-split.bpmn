@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DELIBERATELY SOUND, and the witness for the one thing the declaration rule in
+  etc/check-bpmn-soundness.mjs must NOT do: fire on concurrency the terminating
+  end event can never meet. See ../README.md, "A terminating end beside
+  concurrency owes a declaration".
+
+  Shape: one ordinary obligation, then a joinable RAND. `End_6 "Breach"` is an
+  error end and so terminates the instance, and the net does reach two
+  concurrent tokens — but the only flow into End_6 comes from `Boundary_0`, which
+  is attached to `Task_0`, STRICTLY UPSTREAM of `Split_1`. The terminate can only
+  fire while the single token still sits on Task_0, so it discards nothing.
+  Before 2026-09-21 the rule read `peak > 1` and failed this file, and no fidelity
+  note could have satisfied it: there is no loss to declare, and the exporter
+  writes no P-NOJOIN because the join WAS drawn.
+
+  Captured exporter output, not hand-written, because that is the load-bearing
+  half: `l4 export` really does emit this from a rule anybody might draft. This
+  comment is the only edit; the XML below is verbatim. Reproduce with the source
+  and the command quoted in ./README.md.
+
+  Its `.fidelity.txt` sidecar is the report that emission really wrote, and it is
+  here on purpose: the rule only reads sidecars, so a file without one is NOT
+  EVALUATED and would prove nothing.
+-->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_the_staged_consultation"
+                  targetNamespace="https://l4.legalese.com/bpmn"
+                  exporter="jl4 (L4.Bpmn)"
+                  exporterVersion="1">
+  <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
+  <bpmn:collaboration id="Collaboration_the_staged_consultation">
+    <bpmn:participant id="Participant_the_staged_consultation" name="the staged consultation" processRef="Process_the_staged_consultation" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_the_staged_consultation" name="the staged consultation" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_1_Registrar" name="Registrar">
+        <bpmn:flowNodeRef>Task_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_3</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_2_Resident" name="Resident">
+        <bpmn:flowNodeRef>Task_2</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_3_Developer" name="Developer">
+        <bpmn:flowNodeRef>Task_5</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_unassigned" name="(unassigned)">
+        <bpmn:flowNodeRef>Start_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Split_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_6</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Join_1</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_0" />
+    <bpmn:task id="Task_0" name="MUST open the consultation">
+      <bpmn:documentation>PARTY Registrar MUST open the consultation WITHIN 5</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:boundaryEvent id="Boundary_0" name="after P5D" attachedToRef="Task_0" cancelActivity="true">
+      <bpmn:documentation>LEST: the obligation is not discharged within 5</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Boundary_0">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P5D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:parallelGateway id="Split_1" name="all of" gatewayDirection="Diverging">
+      <bpmn:documentation>RAND: every branch is entered</bpmn:documentation>
+    </bpmn:parallelGateway>
+    <bpmn:task id="Task_2" name="MAY file written comments">
+      <bpmn:documentation>PARTY Resident MAY file written comments</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:task id="Task_3" name="MAY publish the record">
+      <bpmn:documentation>PARTY Registrar MAY publish the record</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:endEvent id="End_4" name="Fulfilled" />
+    <bpmn:task id="Task_5" name="MAY file a response">
+      <bpmn:documentation>PARTY Developer MAY file a response</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:endEvent id="End_6" name="Breach">
+      <bpmn:errorEventDefinition id="ErrorDef_End_6" errorRef="Error_breach" />
+    </bpmn:endEvent>
+    <bpmn:parallelGateway id="Join_1" gatewayDirection="Converging">
+      <bpmn:documentation>every branch of the RAND must complete; each delivers exactly one token</bpmn:documentation>
+    </bpmn:parallelGateway>
+    <bpmn:sequenceFlow id="Flow_Start_0__Task_0" sourceRef="Start_0" targetRef="Task_0" />
+    <bpmn:sequenceFlow id="Flow_Task_0__Split_1" sourceRef="Task_0" targetRef="Split_1" />
+    <bpmn:sequenceFlow id="Flow_Boundary_0__End_6" sourceRef="Boundary_0" targetRef="End_6" />
+    <bpmn:sequenceFlow id="Flow_Split_1__Task_2" sourceRef="Split_1" targetRef="Task_2" />
+    <bpmn:sequenceFlow id="Flow_Split_1__Task_5" sourceRef="Split_1" targetRef="Task_5" />
+    <bpmn:sequenceFlow id="Flow_Task_2__Task_3" sourceRef="Task_2" targetRef="Task_3" />
+    <bpmn:sequenceFlow id="Flow_Task_3__Join_1" sourceRef="Task_3" targetRef="Join_1" />
+    <bpmn:sequenceFlow id="Flow_Task_5__Join_1" sourceRef="Task_5" targetRef="Join_1" />
+    <bpmn:sequenceFlow id="Flow_Join_1__End_4" sourceRef="Join_1" targetRef="End_4" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_the_staged_consultation">
+      <bpmndi:BPMNShape id="Shape_Participant_the_staged_consultation" bpmnElement="Participant_the_staged_consultation" isHorizontal="true">
+        <dc:Bounds x="130" y="80" width="1310" height="760" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_1_Registrar" bpmnElement="Lane_1_Registrar" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="1280" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_2_Resident" bpmnElement="Lane_2_Resident" isHorizontal="true">
+        <dc:Bounds x="160" y="240" width="1280" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_3_Developer" bpmnElement="Lane_3_Developer" isHorizontal="true">
+        <dc:Bounds x="160" y="400" width="1280" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_unassigned" bpmnElement="Lane_unassigned" isHorizontal="true">
+        <dc:Bounds x="160" y="560" width="1280" height="280" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Start_0" bpmnElement="Start_0">
+        <dc:Bounds x="232" y="602" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_0" bpmnElement="Task_0">
+        <dc:Bounds x="380" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Boundary_0" bpmnElement="Boundary_0">
+        <dc:Bounds x="434" y="162" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Split_1" bpmnElement="Split_1">
+        <dc:Bounds x="585" y="595" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_2" bpmnElement="Task_2">
+        <dc:Bounds x="740" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_3" bpmnElement="Task_3">
+        <dc:Bounds x="920" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_4" bpmnElement="End_4">
+        <dc:Bounds x="1312" y="602" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_5" bpmnElement="Task_5">
+        <dc:Bounds x="740" y="420" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_6" bpmnElement="End_6">
+        <dc:Bounds x="592" y="722" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Join_1" bpmnElement="Join_1">
+        <dc:Bounds x="1125" y="595" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Task_0" bpmnElement="Flow_Start_0__Task_0">
+        <di:waypoint x="268" y="620" />
+        <di:waypoint x="314" y="620" />
+        <di:waypoint x="314" y="140" />
+        <di:waypoint x="380" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_0__Split_1" bpmnElement="Flow_Task_0__Split_1">
+        <di:waypoint x="480" y="140" />
+        <di:waypoint x="494" y="140" />
+        <di:waypoint x="494" y="620" />
+        <di:waypoint x="585" y="620" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_0__End_6" bpmnElement="Flow_Boundary_0__End_6">
+        <di:waypoint x="452" y="198" />
+        <di:waypoint x="546" y="198" />
+        <di:waypoint x="546" y="740" />
+        <di:waypoint x="592" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Split_1__Task_2" bpmnElement="Flow_Split_1__Task_2">
+        <di:waypoint x="635" y="620" />
+        <di:waypoint x="674" y="620" />
+        <di:waypoint x="674" y="300" />
+        <di:waypoint x="740" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Split_1__Task_5" bpmnElement="Flow_Split_1__Task_5">
+        <di:waypoint x="635" y="620" />
+        <di:waypoint x="726" y="620" />
+        <di:waypoint x="726" y="460" />
+        <di:waypoint x="740" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_2__Task_3" bpmnElement="Flow_Task_2__Task_3">
+        <di:waypoint x="840" y="300" />
+        <di:waypoint x="854" y="300" />
+        <di:waypoint x="854" y="140" />
+        <di:waypoint x="920" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_3__Join_1" bpmnElement="Flow_Task_3__Join_1">
+        <di:waypoint x="1020" y="140" />
+        <di:waypoint x="1034" y="140" />
+        <di:waypoint x="1034" y="620" />
+        <di:waypoint x="1125" y="620" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_5__Join_1" bpmnElement="Flow_Task_5__Join_1">
+        <di:waypoint x="840" y="460" />
+        <di:waypoint x="906" y="460" />
+        <di:waypoint x="906" y="520" />
+        <di:waypoint x="1086" y="520" />
+        <di:waypoint x="1086" y="620" />
+        <di:waypoint x="1125" y="620" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Join_1__End_4" bpmnElement="Flow_Join_1__End_4">
+        <di:waypoint x="1175" y="620" />
+        <di:waypoint x="1214" y="620" />
+        <di:waypoint x="1312" y="620" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

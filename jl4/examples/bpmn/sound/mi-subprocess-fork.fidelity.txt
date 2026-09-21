@@ -1,0 +1,31 @@
+fidelity report — BPMN 2.0
+
+HAND-WRITTEN, not exporter output. This diagram is a checker fixture with no .l4
+source, so there is nothing to run `l4 export --fidelity-report` on; the report is
+written here by hand, in the format `L4.Interchange.Fidelity.renderNote` emits, so
+that the declaration rule in etc/check-bpmn-soundness.mjs is RUN over this file
+rather than skipped for want of a sidecar. The note code is local to this fixture:
+the exporter stopped emitting this shape on 2026-09-19 (fcd7ecb2c) and its retired
+note for it, P-FORK-CANCEL, is not emitted anywhere today.
+
+Filed on the END EVENT, and there is nowhere else it could go. What End_3 throws
+away is the run of a member who did not breach, and no element in this file names
+another member's run — the sub-process id names the drawn box, not one of its
+copies. So for a loss that crosses a scope's own multiplicity the rule accepts a
+declaration on the terminating end event only. This file is the hand-written
+witness that the rule CAN be satisfied there; its sibling
+joined-beside-breach.fidelity.txt is the witness for a declaration on a junction.
+
+WHY THIS FILE IS IN sound/ WHILE BEING THE DEFECT SHAPE. It is byte-for-byte the
+arrangement fcd7ecb2c removed from the exporter, and its own <documentation> says
+so. The FIDELITY rule is not about the shape: a diagram may throw sibling work
+away, and what it may not do is throw it away in silence. Declared, the shape is
+sound — and this fixture exists to pin how the checker plays a multi-instance
+scope, which is a separate question from how the exporter draws one. The two red
+fixtures for the undeclared version of the same shape are
+../unsound/historical-fork-undeclared-sibling-loss.bpmn and
+../unsound/refork-beside-party-cross-instance.bpmn.
+
+  [P-TERMINATE-CANCELS] lossy — End_3
+      Reaching this end stops the run for every member, including the members who did nothing wrong: an error end here ends every active thread in the process, so the instances still going are cancelled along with the one that breached. A member's failure is that member's; the others were still bound, and the diagram does not show their duties ending.
+      lost: the duties of every member who had not breached when this end was reached — drawn as begun, not drawn as cancelled
