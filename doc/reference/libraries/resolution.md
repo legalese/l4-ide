@@ -188,10 +188,15 @@ So if you are looking at a screen full of undefined identifiers, read the top of
 **`l4 check` and `l4 run` exit non-zero** — and so does the bare `l4 <file>` form, which is `run`.
 Those two are the commands to gate a build or a pipeline on.
 
-**Every other command that loads the file prints the same error and still exits 0.**
-Measured on this tree, on a module that is otherwise fine: `render`, `nlg`, `trace`, `verify`, `openfisca`, `catala`, `docassemble`, and `export --to=dmn` / `--to=dmn-md` all print it and succeed.
-`l4 format` and `l4 ast` do not typecheck at all, so they neither report it nor fail.
-`l4 lts` and `l4 state-graph` print diagnostics only when the typecheck itself fails, so they say nothing about it.
+**Nine commands print the same error and still exit 0.**
+Measured on this tree, on a module that is otherwise fine: `render`, `nlg`, `trace`, `verify`, `openfisca`, `catala`, `docassemble`, and `export --to=dmn` / `--to=dmn-md`.
+
+**Five do not mention it at all.**
+`l4 format` and `l4 ast` never typecheck.
+`l4 lts` and `l4 state-graph` print diagnostics only when the typecheck itself fails.
+`l4 batch` reports diagnostics per input row, and this one is not among them — it streams results for a module with an unresolved import and exits 0, which is worth knowing if a pipeline reads its output.
+
+Two commands do exit non-zero here, and it is not because of the import: `l4 blawx` and `l4 export --to=bpmn` refuse this module identically with the `IMPORT` line deleted.
 
 The reason is that only `check` and `run` weigh the whole set of diagnostics; every other command takes a successful typecheck as its verdict, and an unresolvable `IMPORT` does not stop a module from typechecking — which is the same blindness the repository's own corpus suite had until it was taught to fail on any structural error (`checkFile` in `jl4/tests/Main.hs`), so a corpus fixture can no longer go green with an unresolvable import.
 
