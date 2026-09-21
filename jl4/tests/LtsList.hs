@@ -230,7 +230,7 @@ spec = do
           -- "What could not be tried:" and named the binder. The set is
           -- the answer; the witness is how it was checked.
           txt `shouldSatisfy` Text.isInfixOf "B does anything now (at 10) → fulfilled"
-          txt `shouldSatisfy` Text.isInfixOf "any act by B counts: the rule binds `return` rather than naming an act"
-          txt `shouldSatisfy` Text.isInfixOf "checked by replaying one act from that set, with `return` = delivery"
+          txt `shouldSatisfy` Text.isInfixOf "this obligation's pattern matches any act by B: the rule binds `return` rather than naming an act"
+          txt `shouldSatisfy` Text.isInfixOf "the verdict above is one act's, not the set's: `return` = delivery was replayed, and another member may end elsewhere"
           txt `shouldNotSatisfy` Text.isInfixOf "What could not be tried:"
         [] -> expectationFailure "no reports"

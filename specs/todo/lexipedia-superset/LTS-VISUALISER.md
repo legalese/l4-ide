@@ -728,6 +728,41 @@ deadline` and a tick AT the deadline reveals nothing); and a listed refusal, whe
     built for. Both keep their own wording; the unforced-local refusal above keeps `cannotChoose`
     unchanged, because there the what-if cannot say even what the set is, and the list's consumers
     key on that sentence.
+    **The two lines the list prints beside the verdict must not let the verdict be read as the
+    SET's — CORRECTED 2026-09-21, after review** (`boundLines`, `List.hs`). The first cut said
+    "any `price` the condition accepts **counts**" under a heading that names an outcome, so the
+    pair asserted that outcome for every member, and the flagship corpus file contradicts that
+    ten lines below its own listing: `ok/contracts.l4`'s `MUST payment price PROVIDED price >= 20
+HENCE (IF price = 20 THEN FULFILLED ELSE PARTY B MUST return WITHIN 10)` is matched by every
+    price of 20 or more and DISCHARGED by exactly one of them — and `guardOther` systematically
+    picks that boundary value, so the line read as the set's answer while being the witness's.
+    The same shape put "any act by B counts" under "What would move things along (neither ends
+    nor breaches it)" while the section immediately above named an act by B that breaches (a
+    `MUST ret` beside a `SHANT bad`), because `reach` consults the candidate's own norm and no
+    other. Repaired by splitting the two claims in the words themselves: the reach line is about
+    MATCHING and about **this obligation** ("this obligation's pattern matches any `price` the
+    condition accepts"), and the second line carries the verdict's scope ("the verdict above is
+    one act's, not the set's: `price` = 20 was replayed, and another member may end elsewhere").
+    `noWitness`'s reach clause took the same "this obligation" narrowing.
+    **The refusal's last clause is the obligation's own question — CORRECTED 2026-09-21**
+    (`outcomeWord`, `baModal`). `witnessPassedOver` said "so what would discharge it is not
+    confirmed here" for every modal, which tells a PROHIBITION's reader the opposite of what the
+    rule does: an act a `SHANT`'s `PROVIDED` accepts is the breach. Live on
+    `doc/reference/regulative/shant-example.l4`'s own `debt restriction` when it was found;
+    `BoundAct` now carries the modal and a `SHANT` reads "what would breach it". Pinned,
+    `LtsWhatIfSpec` case 12''.
+    **The guard route is held to the binder's declared type — CORRECTED 2026-09-21** (`fitsType`).
+    `guardOther` reads the guard's SHAPE, and its `App _ _ [a, b]` case — which the promissory
+    note needs, its guard being `is money at least equal within error` OF … — matches an
+    application whose two argument places are different types, so the operand beside the binder
+    could be a value the binder could never hold. Since the replay does not type-check a
+    hypothetical, that reached the reader two ways: as the evaluator's internal error inside the
+    list (the one text `doc/reference/regulative/lts-list.md` promises the list never shows), and
+    — silently, which is the worse half — as the contract's answer for a value the contract was
+    never given (`amount` = `"hello"` in a `NUMBER` field, reported as discharging). `witnessFor`
+    now checks route 1's value against the type `binderTypes` recorded and falls to route 2 when
+    it does not fit. The check is a head check and ABSTAINS where either side is unreadable, so
+    the note's `Money` witness still comes from the guard. Pinned, `LtsWhatIfSpec` case 12'''.
     **Measured** (the binder's type): a pattern binder reaches NEITHER the module-level
     `EntityInfo` the rig carries (`doCheckProgram` returns the top-level environment, not the
     reader-local scope `inferPatternVar`'s `makeKnown` opens) NOR its own annotation
@@ -2905,8 +2940,9 @@ in a column of sixteen is inside what a rerun could reverse.
    out to matter, the first move is to **make the list say it** — cheap, and re-measurable with
    the same materials — not to draw it.
 
-**What would reopen it.** Any one of: (a) the repaired list still failing Q1–Q3 in the rerun this
-PR carries; (b) a vision run — B and C **rendered** rather than read as text — showing that
+**What would reopen it.** Any one of: (a) the repaired list still failing Q1–Q3 when these same 48
+readings are rerun — **planned, not run; no PR carries it yet**, and §7.7's cost-order list has it
+as item (i); (b) a vision run — B and C **rendered** rather than read as text — showing that
 _drawing_, as opposed to content, is what carries the answer; or (c) the human experiment the
 sentence below actually asks for, showing that novices cannot use the repaired list.
 
@@ -3093,8 +3129,8 @@ aContract — after 3 events, the clock stands at 10 (the #TRACE on line 23)
 
   What would discharge it (the contract ends fulfilled):
     - B does anything now (at 10) → fulfilled
-      any act by B counts: the rule binds `return` rather than naming an act
-      checked by replaying one act from that set, with `return` = delivery
+      this obligation's pattern matches any act by B: the rule binds `return` rather than naming an act
+      the verdict above is one act's, not the set's: `return` = delivery was replayed, and another member may end elsewhere
 
   What would put someone in breach:
     - nothing happens by 14 (the clock reaches 15) → B is in breach: MUST return was due by 14; the clock reached 15 without it

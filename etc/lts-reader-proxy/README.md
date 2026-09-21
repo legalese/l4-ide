@@ -87,6 +87,17 @@ done). It rewrites A/B/C, `lts.json`, `probes.out` and
 `tenancy-barrier` golden. `truth.json` and `history.txt` are hand-written and are **not**
 regenerated: after a rerun, diff `lts.json` and `probes.out` and re-read the answers.
 
+**The promissory note's key is stale for a rerun, and must be corrected in the same change that
+re-cuts its A.txt.** `promissory-note/truth.json` answers with a reparation deadline of day 739769 /
+3 June 2025 / 61 days from the position. That is what `A.txt`, `lts.json`, `probes.out` and
+`history.txt` here print, so the key and the readers' inputs agree and the 2026-09-16 scores stand —
+but the tree has moved. `12055ae73` (2026-09-17, EVERY-EACH-QUANTIFIER-SPEC §5.2), which landed the
+day _after_ this directory was cut, anchors a `LEST` at the missed deadline rather than at the late
+act, so the list now says **739752 (44 from now)** — day 102 after commencement, 17 May 2025; see
+`jl4/examples/legal/promissory-note.l4:202-208`. `truth.json`'s `drift` key spells out the
+substitutions. Correcting the key without re-cutting A, or re-cutting A without correcting the key,
+puts the two on different trees either way.
+
 **A rerun now moves A substantially, on purpose.** On 2026-09-21 the what-if stopped refusing a
 bound pattern variable and began answering for the SET of acts it describes (LTS-VISUALISER.md
 §2.4, the bound-variable block) — which is §7.7 point 2's repair, and which changes the one line
@@ -94,6 +105,11 @@ on three of these four contracts that the proxy traced all eight of the list's Q
 committed `A.txt` files are still the run's: **they are what the readers were shown, and the
 numbers in RESULTS.md describe them.** Re-cutting them without rerunning the 48 readings would
 leave the inputs and the scores describing different artifacts.
+
+**And A has moved again since.** On the same day the bound-variable answers landed, the two lines
+printed beside a bound act were reworded (`L4.Lts.List.boundLines`): the reach line now says what
+the rule's pattern _matches_, scoped to that one obligation, and the second line says the verdict
+above is one act's rather than the set's. The committed `A.txt`s predate both changes.
 
 None of the `.l4` files here is under a goldened glob (`CLAUDE.md` §3.1), so they carry no
 `tests/` goldens; `probes.l4` is type-checked by hand with `l4 check` before committing.

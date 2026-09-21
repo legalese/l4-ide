@@ -264,6 +264,40 @@ payOverSrc = Text.unlines $ prologue <>
   , "#TRACE c AT 0 WITH"
   ]
 
+-- 12''. the same shape under a PROHIBITION. Doing an act the condition
+--       accepts is what BREACHES a SHANT, so the refusal's last clause
+--       cannot be the MUST's ("what would discharge it"); it is the
+--       obligation's own question, which the modal decides ('outcomeWord').
+shantOverSrc :: Text.Text
+shantOverSrc = Text.unlines $ prologue <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS PARTY Alice SHANT pay amount PROVIDED amount GREATER THAN 20 WITHIN 10"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  ]
+
+-- 12'''. a guard whose comparison is an APPLICATION rather than an
+--        operator, and whose two argument places are DIFFERENT types. The
+--        operand beside the binder is a STRING; `amount` is a NUMBER. The
+--        guard route must not hand that back ('fitsType'), because the
+--        replay does not type-check a hypothetical: an unchecked witness
+--        surfaces either as the evaluator's internal error in the reader's
+--        list or, silently, as the contract's answer for a value the
+--        contract could never have been given. The fallback (0) is a
+--        NUMBER, `sized OF 0, "big"` is true, and the act discharges.
+payMistypedSrc :: Text.Text
+payMistypedSrc = Text.unlines $ prologue <>
+  [ "GIVEN n IS A NUMBER"
+  , "      s IS A STRING"
+  , "GIVETH A BOOLEAN"
+  , "sized MEANS s EQUALS \"big\""
+  , ""
+  , "GIVETH DEONTIC Person Action"
+  , "c MEANS PARTY Alice MUST pay amount PROVIDED sized OF amount, \"big\" WITHIN 10"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  ]
+
 -- 9. the window's opening edge: AFTER 5 WITHIN 10 is [5, 15]. Two
 --    positions: before any event (the edges unforced, the WITHIN
 --    re-anchored on the opening — R-X5 as amended) and after an early act
@@ -522,7 +556,7 @@ spec = describe "LTS-VISUALISER §2.4 / P2c: the enabled set by replay" $ do
     case es.esOutcomes of
       (o : _) -> do
         o.ocCandidate.cdHypothetical `shouldBe`
-          Left "the rule binds `whatever`, so any act by this party would match; no witness could be built to check that (this #TRACE writes no act of its own to try), so nothing was replayed"
+          Left "the rule binds `whatever`, so any act by this party would match this obligation; no witness could be built to check that (this #TRACE writes no act of its own to try), so nothing was replayed"
         o.ocSteps `shouldBe` []
       [] -> expectationFailure "no outcomes"
 
@@ -551,6 +585,34 @@ spec = describe "LTS-VISUALISER §2.4 / P2c: the enabled set by replay" $ do
         -- verdict is held back, because one value proves nothing about the rest
         o.ocVerdict `shouldBe`
           Untried "the rule binds `amount`, which the condition amount GREATER THAN 20 tests; the one value tried, `amount` = 20, was passed over, so what would discharge it is not confirmed here"
+      [] -> expectationFailure "no outcomes"
+
+  it "12''. the same guard under a SHANT: the refusal asks what would BREACH it, not what would discharge it" $ do
+    -- Until 2026-09-21 this sentence was the MUST's for every modal, so a
+    -- prohibition's reader was told the opposite of what the rule does:
+    -- an act clearing the threshold breaches this rule, it does not
+    -- discharge it. Live on doc/reference/regulative/shant-example.l4's
+    -- own `debt restriction` when it was found.
+    es <- enabledAt 0 shantOverSrc
+    case es.esOutcomes of
+      (o : _) ->
+        o.ocVerdict `shouldBe`
+          Untried "the rule binds `amount`, which the condition amount GREATER THAN 20 tests; the one value tried, `amount` = 20, was passed over, so what would breach it is not confirmed here"
+      [] -> expectationFailure "no outcomes"
+
+  it "12'''. a guard application whose other argument is a different type: the witness falls to the declared type, not to the guard's string" $ do
+    es <- enabledAt 0 payMistypedSrc
+    map row es.esOutcomes `shouldBe`
+      [ Row (ActOf "Alice" "pay amount" 0) Discharges
+      , Row (TickAt 11 ["Alice"]) (Breaches (Just "Alice")) ]
+    case es.esOutcomes of
+      (o : _) -> case o.ocCandidate.cdBound of
+        Just b -> do
+          -- NOT "big": route 1 read the guard's shape, route 1's value did
+          -- not fit `amount`'s declared NUMBER, so route 2 supplied 0
+          fmap (map (prettyLayout . snd)) b.baWitness `shouldBe` Right ["0"]
+          fmap (prettyLayout . (.hyAction)) o.ocCandidate.cdHypothetical `shouldBe` Right "pay OF 0"
+        Nothing -> expectationFailure "expected a bound act"
       [] -> expectationFailure "no outcomes"
 
   it "5. a barrier of three, nobody acted: each member's act ADVANCES to 1 of 3; the tick breaches" $ do

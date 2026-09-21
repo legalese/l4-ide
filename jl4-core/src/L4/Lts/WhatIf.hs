@@ -282,6 +282,12 @@ data Candidate = MkCandidate
 -- read as the contract's answer for every value.
 data BoundAct = MkBoundAct
   { baScope   :: !BoundScope
+  , baModal   :: !DeonticModal
+    -- ^ the obligation's own modal. An act drawn from the set of a @MUST@
+    -- is being asked what would DISCHARGE it; the same act under a
+    -- @SHANT@ is being asked what would BREACH it, and one sentence for
+    -- both tells a prohibition's reader the opposite of what the rule
+    -- does ('witnessPassedOver')
   , baBinders :: ![Resolved]
     -- ^ the variables the pattern binds, in source order
   , baGuard   :: !(Maybe Text)
@@ -619,13 +625,28 @@ confirmBound mb verdict = case (mb, verdict) of
   _ -> verdict
 
 -- | Why a bound act with a passed-over witness is reported as untried.
+--
+-- The sentence's last clause is the obligation's own question, which the
+-- modal decides: for a @MUST@ the unanswered question is what would
+-- DISCHARGE it, and for a @SHANT@ it is what would BREACH it — doing an
+-- act a prohibition's @PROVIDED@ accepts is the breach, so "discharge"
+-- there names the opposite of what the rule does ('outcomeWord').
 witnessPassedOver :: BoundAct -> [(Resolved, Expr Resolved)] -> Text
 witnessPassedOver b vs = Text.concat
   [ bindsClause b
   , maybe "" (\ g -> ", which the condition " <> g <> " tests") b.baGuard
   , "; the one value tried, " <> valuesText vs
-  , ", was passed over, so what would discharge it is not confirmed here"
+  , ", was passed over, so what would " <> outcomeWord b.baModal
+  , " it is not confirmed here"
   ]
+
+-- | What an act drawn from the set would do to the obligation it is drawn
+-- from: a prohibition is breached by the act its condition accepts, and
+-- every other modal is discharged by it.
+outcomeWord :: DeonticModal -> Text
+outcomeWord = \ case
+  DMustNot -> "breach"
+  _        -> "discharge"
 
 -- | The refusal for a bound variable whose set the what-if can name but
 -- cannot check, because no value of the binder's own type could be built
@@ -646,11 +667,14 @@ noWitness b why = Text.concat
   , "), so nothing was replayed"
   ]
   where
+    -- "match THIS OBLIGATION", never bare "match": the set is read off one
+    -- norm's own pattern and says nothing about the others in force at the
+    -- position, one of which may forbid a member of it
     reach = case (b.baScope, b.baGuard, b.baBinders) of
-      (_, Just _, _)              -> "any values the condition accepts would match"
-      (BoundWholeAction, _, _)    -> "any act by this party would match"
-      (BoundArgument, _, [_])     -> "any value in that place would match"
-      (BoundArgument, _, _)       -> "any values in those places would match"
+      (_, Just _, _)              -> "any values the condition accepts would match this obligation"
+      (BoundWholeAction, _, _)    -> "any act by this party would match this obligation"
+      (BoundArgument, _, [_])     -> "any value in that place would match this obligation"
+      (BoundArgument, _, _)       -> "any values in those places would match this obligation"
 
 -- | @the rule binds `amount`@, the opening both sentences above share.
 bindsClause :: BoundAct -> Text
@@ -819,6 +843,7 @@ boundActOf rig tr env act = case patternBinders act.action of
       fmap (v,) <$> witnessFor rig tr env act.provided (Map.lookup (getUnique v) types) scope v
     pure $ Just MkBoundAct
       { baScope   = if any ((== BoundWholeAction) . fst) bs then BoundWholeAction else BoundArgument
+      , baModal   = act.modal
       , baBinders = map snd bs
       , baGuard   = guardText
       , baWitness = sequence values
@@ -856,13 +881,26 @@ fillBinders vs = Optics.transformOf (Optics.gplate @(Expr Resolved)) subst
 -- Nothing is inferred about the type; the type checker's own record of it
 -- is read, and where it kept none the what-if says so rather than invent a
 -- value.
+--
+-- Route 1's value is held to the binder's declared type ('fitsType') before
+-- it is taken. 'guardOther' reads the guard's SHAPE, and in an application
+-- the two argument places need not be the same type, so the operand beside
+-- the binder can be a value the binder could never hold. The replay does
+-- not type-check a hypothetical, so an unchecked witness reaches the
+-- reader either as the evaluator's internal error — the one text
+-- @doc/reference/regulative/lts-list.md@ promises the list never shows —
+-- or, silently and therefore worse, as the contract's answer for a value
+-- the contract was never given. A value that does not fit falls to route 2
+-- rather than being shipped.
 witnessFor :: Rig -> Trace -> Environment -> Maybe (Expr Resolved) -> Maybe (Type' Resolved) -> BoundScope -> Resolved -> IO (Either Text (Expr Resolved))
 witnessFor rig tr env mprovided mty scope v = do
   fromGuard <- case mprovided >>= guardOther (getUnique v) of
     Nothing -> pure Nothing
     Just e  -> do
       e' <- reifyExpr env e
-      pure (if closedValue rig.rigEntityInfo e' then Just e' else Nothing)
+      let usable = closedValue rig.rigEntityInfo e'
+            && all (\ ty -> fitsType rig.rigEntityInfo ty e') mty
+      pure (if usable then Just e' else Nothing)
   pure case fromGuard of
     Just e  -> Right e
     Nothing -> case mty of
@@ -966,6 +1004,49 @@ binderTypes info = Map.fromList . go
       Forall _ _ t -> funArgs t
       Fun _ args _ -> args
       _            -> []
+
+-- | Does this value sit in that declared type, as far as its SHAPE can
+-- say? Used to hold 'witnessFor''s guard route to the binder's own type.
+--
+-- It is a head check and nothing more: @NUMBER@ wants a numeric literal,
+-- @STRING@ a string literal, and a declared type wants an application of
+-- one of its own constructors — the same three cases 'simplestOfType'
+-- builds, read in the other direction. Where either side is one this
+-- cannot read it ABSTAINS and returns 'True', because refusing on a type
+-- it cannot read would close the guard route for values it has no reason
+-- to doubt (the promissory note's @Money@ witness among them). So a
+-- 'False' here is a mismatch the shape actually showed, never a guess.
+fitsType :: EntityInfo -> Type' Resolved -> Expr Resolved -> Bool
+fitsType info ty e = case ty of
+  TyApp _ r []
+    | getUnique r == TypeCheck.numberUnique -> case e of
+        Lit _ (NumericLit _ _) -> True
+        _                      -> False
+    | getUnique r == TypeCheck.stringUnique -> case e of
+        Lit _ (StringLit _ _) -> True
+        _                     -> False
+    | otherwise -> case headSymbol e of
+        Nothing -> True
+        Just c  -> maybe True ((getUnique r ==) . getUnique) (constructorResult info c)
+  _ -> True
+  where
+    headSymbol = \ case
+      App _ c _ -> Just c
+      Var _ c   -> Just c
+      _         -> Nothing
+
+-- | The type a name builds, when the name is a constructor at all.
+-- 'Nothing' for everything else, which is 'fitsType''s abstain.
+constructorResult :: EntityInfo -> Resolved -> Maybe Resolved
+constructorResult info c = case Map.lookup (getUnique c) info of
+  Just (_, TypeCheck.KnownTerm cty Constructor) -> resultHead cty
+  _                                             -> Nothing
+  where
+    resultHead = \ case
+      Forall _ _ t -> resultHead t
+      Fun _ _ res  -> resultHead res
+      TyApp _ r [] -> Just r
+      _            -> Nothing
 
 -- | The simplest value of a type, from what the module declares. 'Left'
 -- says which part could not be answered, and that sentence reaches the

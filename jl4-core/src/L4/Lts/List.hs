@@ -415,13 +415,30 @@ boundSetText b shape = case b.baScope of
 -- | What the reader is owed beside a bound act's verdict: how far the set
 -- reaches, and that the verdict above came from replaying ONE act drawn
 -- from it. The two are different kinds of claim — the reach is the rule's
--- own text, the verdict is the machine's — and saying so is the only thing
--- that lets the verdict be read as the set's.
+-- own text, the verdict is the machine's — and keeping them apart is the
+-- whole job of these two lines.
+--
+-- Neither line may let the verdict be read as the SET's, and until
+-- 2026-09-21 both did. The reach said a member "counts", under a heading
+-- that names an outcome, so the pair asserted that outcome for every
+-- member — and on the flagship corpus file that is false ten lines below
+-- its own listing: @ok/contracts.l4@'s @price >= 20@ is discharged only by
+-- @price = 20@, because the @HENCE@ reads the binder, and 21 leaves B
+-- owing @return@. The same shape put "any act by B counts" under "neither
+-- ends nor breaches it" while the section above named an act by B that
+-- breaches. So:
+--
+--   * the reach is about MATCHING, and about THIS obligation's pattern —
+--     it says what the rule lets in, never where a member ends, and never
+--     anything about the other norms in force at the position;
+--   * the second line carries the verdict's scope explicitly: it is one
+--     act's, and another member may end elsewhere.
 boundLines :: Outcome -> [Text]
 boundLines o = case (o.ocCandidate.cdKind, o.ocCandidate.cdBound) of
   (ActBy n, Just b) | Right vs <- b.baWitness ->
     [ reach n b
-    , "checked by replaying one act from that set, with " <> valuesText vs
+    , "the verdict above is one act's, not the set's: " <> valuesText vs
+      <> " was replayed, and another member may end elsewhere"
     ]
   -- no witness: the set is named under "could not be tried", with the
   -- what-if's own reason, and nothing was replayed to add to it
@@ -429,12 +446,14 @@ boundLines o = case (o.ocCandidate.cdKind, o.ocCandidate.cdBound) of
   where
     reach n b = case (b.baScope, b.baGuard) of
       (BoundWholeAction, Nothing) ->
-        "any act by " <> bearerText n.lnBearer <> " counts: the rule binds "
-        <> binderNames b <> " rather than naming an act"
+        "this obligation's pattern matches any act by " <> bearerText n.lnBearer
+        <> ": the rule binds " <> binderNames b <> " rather than naming an act"
       (BoundArgument, Nothing) ->
-        "any " <> binderNames b <> " counts: the rule binds it and does not test it"
+        "this obligation's pattern matches any " <> binderNames b
+        <> ": the rule binds it and does not test it"
       (_, Just _) ->
-        "any " <> binderNames b <> " the condition accepts counts: the rule binds it and tests it only through that condition"
+        "this obligation's pattern matches any " <> binderNames b
+        <> " the condition accepts: the rule binds it and tests it only through that condition"
 
 binderNames :: BoundAct -> Text
 binderNames b = Text.intercalate " and " (map binderName b.baBinders)

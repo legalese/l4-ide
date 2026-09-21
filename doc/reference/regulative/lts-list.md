@@ -103,8 +103,8 @@ A rule often does not name the act exactly. `PARTY B MUST return` leaves the who
 ```
   What would discharge it (the contract ends fulfilled):
     - B does anything now (at 10) → fulfilled
-      any act by B counts: the rule binds `return` rather than naming an act
-      checked by replaying one act from that set, with `return` = delivery
+      this obligation's pattern matches any act by B: the rule binds `return` rather than naming an act
+      the verdict above is one act's, not the set's: `return` = delivery was replayed, and another member may end elsewhere
 ```
 
 Three things are being said, and it is worth keeping them apart:
@@ -114,6 +114,13 @@ Three things are being said, and it is worth keeping them apart:
 3. **which act that was** — the last line. The value is never invented: it is the other side of the condition when there is one (`price AT LEAST 20` → 20), else the simplest value of the type the rule declares for that place (`0` for a number, the first choice of a `DECLARE … IS ONE OF`), else, for an act the rule leaves open entirely, an act the file's own `#TRACE` already writes.
 
 If the contract turns out not to take the act the list picked — a `PROVIDED price GREATER THAN 20` is not satisfied by 20 — then nothing has been shown about the rest of the set, and the line moves to **What could not be tried** saying exactly that. The same happens when no value could be built at all.
+
+**The heading above the line is the verdict's, and the verdict is one act's.** This is what the last line means by "not the set's", and it is worth spelling out, because the two most useful cases are ones where the rest of the set goes somewhere else:
+
+- **The continuation reads the value.** `jl4/examples/ok/contracts.l4` writes `MUST payment price PROVIDED price >= 20 … HENCE (IF price = 20 THEN FULFILLED ELSE PARTY B MUST return WITHIN 10)`. Every price of 20 or more matches the rule; only 20 discharges it, and 21 leaves B owing `return`. The list runs 20, so the line sits under **What would discharge it** — truthfully about 20, and about nothing else in the set.
+- **Another rule forbids a member.** A `MUST ret` whose act the rule does not name sits beside a `SHANT bad`; the set "any act by B" contains `bad`, and `bad` breaches. The reach line says _this obligation's_ pattern, because that is the only rule it was read from; the list's other sections are where the rest of the position is.
+
+If you need the set's answer rather than one member's, write the members you care about as `#TRACE`s and read them. That is the same advice as anywhere else in this manual: the list offers acts, and a trace is how you ask about a particular one.
 
 ## Groups: the barrier and the fork
 
@@ -161,8 +168,8 @@ For the fork there is no "held back" line, because nothing waits: each member's 
           · theLandlord MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) — due within 5 from now
           · Tenant OF "Bob" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
           · Tenant OF "Carol" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
-      any `amount` counts: the rule binds it and does not test it
-      checked by replaying one act from that set, with `amount` = 0
+      this obligation's pattern matches any `amount`: the rule binds it and does not test it
+      the verdict above is one act's, not the set's: `amount` = 0 was replayed, and another member may end elsewhere
 ```
 
 The full output for both, taken with `--steps`, is the golden `jl4/examples/lts/expected/tenancy.txt`.
@@ -204,6 +211,7 @@ Two rules make it safe to switch on:
   - `modal`, wherever it appears: `MUST` · `MAY` · `SHANT` · `DO` — the keywords.
   - `owed[].group.join`: `barrier` · `fork` · `none`.
   - A candidate event's `kind`: `act` (with `party`, `action`, and `at` when it could be tried) · `tick` (with `deadline`, `whose`) · `noTick` (a deadline the list could not confirm; `whose`).
+    - **Since 2026-09-21, an act whose rule binds a name carries `bound` and its `action` is the shape the list actually ran.** `bound` holds `binds` (the names, in source order), `scope` (`wholeAction` · `argument`) `witness` (`name`/`value` per binder, null when none could be built — the reason is then on the `untried` entry's `why`), and `constraint` (the `PROVIDED` guard's text, present only when the guard names a binder). `format` is unchanged at `1`, because no key means anything new, but two values a consumer may have keyed on did move: such a candidate's `action` reads as the instantiated shape (`"Pay OF (Tenant OF \"Alice\"), theLandlord, amount"`) where it used to read as the uninstantiated pattern, and it now carries `at`, because it was run rather than refused. Both are visible in `jl4/examples/lts/expected/tenancy.json` and `contracts.json`.
   - `passedOver[].reason`: `guardFalse` · `tooEarly` (with `opensAt`: the act came before the window's [`AFTER`](AFTER.md) opened, and counts for nothing) · `wrongAct` · `wrongParty` · `noTaker`.
   - `steps[].event.kind`: `act` (with `party`, `action`) · `clock` (the contract's own clock running on).
   - `steps[].norm`: `party` (the party as the contract has resolved it; null until it has looked), `modal`, `activation` (the _n_-th entry into that rule's line in this trace), and under an `EVERY` `member` and `of`. When `party` is null and the rule wrote its party as an expression, `partyAsWritten` carries that expression's text (`"theLandlord"`) — the spelling in the rule, which is not the resolved party and does not compare equal to one (added 2026-09-19; `party`'s meaning is unchanged).

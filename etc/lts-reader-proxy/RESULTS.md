@@ -159,7 +159,11 @@ branch reasoning absent"_); on `tenancy` it was credited for "at the start". Hai
 eight readings — "cannot tell" five times, the section name alone twice. On `promissory-note` all four A readers scored
 0: the list names the section and a deadline of `739769` but nothing in it says _the first
 deadline was missed, the April payment did not count, and this is the penalty arm_ — which
-`history.txt` tells B and C readers in plain words. This is the one place where the A readers were
+`history.txt` tells B and C readers in plain words. (`739769` is the number these readers were
+shown and is the number `truth.json` was keyed on, so the scores here stand; the tree now prints
+`739752`, from `12055ae73` on 2026-09-17 — the day after this directory was cut — and both the
+key and the artifacts have to move together at the next re-cut. `promissory-note/truth.json`'s
+`drift` key has the substitutions.) This is the one place where the A readers were
 given strictly less information than B and C (the README says so), and the Q4 column on that
 contract is confounded by it.
 
