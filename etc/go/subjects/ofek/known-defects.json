@@ -1,0 +1,29 @@
+{
+  "_comment": [
+    "Measured defects used as NEGATIVE CONTROLS. House convention: a negative",
+    "control that stops reproducing is itself a finding, so a leg that expects a",
+    "defect and does not find it reports BROKEN telling you to delete the entry,",
+    "rather than quietly turning green. Every entry must have been MEASURED on the",
+    "date it records; nothing here may be predicted.",
+    "",
+    "NOTHING HAS BEEN MEASURED FOR THIS SUBJECT, so this file declares no group at",
+    "all, and that is deliberate. subject.mjs requires the file to EXIST; only",
+    "etc/go/lib/known-defects.mjs reads its groups, and only p7-wizard calls it --",
+    "a leg this subject does not declare, because it has no wizard module. An",
+    "empty-but-present group would be a claim that a leg's controls are vacuous;",
+    "no group at all is the honest statement that no leg here consumes one.",
+    "",
+    "DO NOT CONFUSE THIS FILE WITH THE ENCODING'S FORK REGISTER. The encoding",
+    "carries 13 forks in canon at registers/fork-register.json, and NOTES.md",
+    "records defects in the TOOLCHAIN found while encoding -- among them",
+    "smucclaw/l4-ide#958, `l4 catala` exiting 0 while emitting Catala that the",
+    "Catala compiler rejects. Those are defects in the pipeline's projections and",
+    "would belong here, except that this subject declares no leg that measures",
+    "them: p7-catala does not exist, and the Catala projection is run by the",
+    "encoding's own source/run-catala.sh outside this pipeline. Recording a",
+    "control no leg consumes would be a claim nothing could falsify.",
+    "",
+    "See etc/go/subjects/regcf/known-defects.json for the entry shape and for the",
+    "convention that an empty group states its reason."
+  ]
+}
