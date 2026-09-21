@@ -28,6 +28,7 @@ never the language reference — is recorded under [Positioning](#positioning--w
 | Facet                                          | Source notes                                                                                                                                                                                                   | What it would be                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Who May Change the Rules** _(working title)_ | [`yc-safe/`](../specs/todo/yc-safe/SPEC-NOTES.md) · [`corporate-resolutions/`](../specs/todo/corporate-resolutions/SPEC-NOTES.md) · [`godel-loophole/`](../specs/todo/godel-loophole/SPEC-NOTES.md)            | Self-reference in normative systems, across three worked instruments. **No directory yet, by design.**                                                                                                                                                                                                                                                                                                                             |
+| **The Singularity Needs a Compiler** | [`beyond-superjustice/`](beyond-superjustice/) | A chapter for the Becher/Alarie _Beyond Superjustice_ response volume: their own definition of the singularity read as the type `Facts → Consequences`, which statistical prediction does not inhabit; the obstruction named as non-monotonicity rather than Gödel; and L4's measured boundary markers (quantified obligations type-check but do not evaluate; `SUBJECT TO`/`NOTWITHSTANDING` analysis-only) offered as the first empirical report of where law stops being computable. **Proposal drafted 2026-09-21 and not sent.** |
 | **The L4 Cookbook** _(working title)_          | the skill's phrasebook [`source-patterns.md`](../skills/writing-l4-rules/references/source-patterns.md) (seeded 2026-09-04) · [Encoding Legislation](../doc/tutorials/getting-started/encoding-legislation.md) | Recipes for people, keyed on the phrase in the source text ("in this section X means Y" → …), on the model of the O'Reilly Perl shelf of the 1990s: _Learning_ (the courses), _Programming_ (the reference), the _Cookbook_ (this), _in a Nutshell_ (the cheat sheet). Generated from the same entries as the skill's phrasebook so the two cannot drift. **Backlog (Meng, 2026-09-04); starts after the phrasebook is measured.** |
 
 Three arcs that look unrelated are one problem. The YC SAFE's value depends on the valuation that
@@ -54,6 +55,34 @@ self-amendment literature that long predates the Gödel framing.
 > expect to find. Two of the three arcs currently have no code at all, and one of them — the Gödel
 > case — has **no ground truth by construction**, since Gödel never wrote his contradiction down.
 > This row exists so the facet is not forgotten, not so it can be started.
+
+## Venues and deadlines
+
+Submission windows for the facets above, plus outside venues where a contribution is *invited* rather than submitted.
+Checked 2026-09-21.
+**A blank deadline means none has been published or none has been checked — the Status column says which. It never means there is no deadline.**
+
+| Venue | Facet / piece | **Conference** | Submit by | Status | Source |
+| --- | --- | --- | --- | --- | --- |
+| **ICAIL 2027** | Introduction to L4 | **Vienna, 5–9 Jul 2027** | papers 28 Jan 2027 · workshop/tutorial proposals **11 Dec 2026** | verified 2026-09-21 against the conference site | [CFP](https://icail-vienna-2027.org/call-for-papers/) |
+| **ProLaLa** (POPL workshop) | Formal methods in law | POPL 2027 | — | **not checked.** The POPL *main* track closed 9 Jul 2026; workshop rounds run separately and later | [POPL 2027](https://popl27.sigplan.org/dates) |
+| **JURIX** | Deontics as Domination | — | — | **not checked** | — |
+| **Cambridge CLS** | The determinacy frontier | — | — | **not checked** | — |
+| **CNL workshop** | CNL syntactic affordances | — | — | **not checked** | — |
+| **_Beyond Superjustice_ I** | [`beyond-superjustice/`](beyond-superjustice/) | **City University of Hong Kong, 18–19 Mar 2027** | none published | invited volume, no CFP; route is the editors directly | [events](https://superjustice.com/events) |
+| **_Beyond Superjustice_ II** | [`beyond-superjustice/`](beyond-superjustice/) | **University of Toronto, 25–26 May 2027** | none published | as above; second of the two | [events](https://superjustice.com/events) |
+
+**Read the Conference column first.** An earlier version of this table led with the deadline, which made ICAIL look like a January event. It is not: Vienna, July. The deadlines are the second column on purpose.
+
+**ICAIL 2027, in full** (conference site, checked 2026-09-21): workshop and tutorial proposals 11 Dec 2026 · papers 28 Jan 2027 · rebuttal 18–25 Mar 2027 · notification 19 Apr 2027 · camera-ready 26 Apr 2027.
+Long papers up to 10 pages including references, short papers 5, demonstrations 2; ACM `sigconf`, double-anonymised, at least one author registering and presenting in person.
+**The 11 Dec 2026 proposal deadline is the soonest thing in this table** and is a cheaper way onto the programme than a full paper.
+
+**One outside date worth holding separately, because it is not a submission and it is on our doorstep.**
+**7 May 2027 — National University of Singapore, "Superjustice and the Future of Judicial Work."**
+A workshop on the book's Asia-Pacific circuit, sitting between the two _Beyond Superjustice_ events.
+No participants, co-hosts or registration have been published; the press contact listed is Fortier PR.
+Becher and Alarie in Singapore, on judicial work, is the cheapest available introduction to both editors and the natural occasion to raise a chapter — which makes it a scheduling constraint on [`beyond-superjustice/PROPOSAL.md`](beyond-superjustice/PROPOSAL.md), not merely an event to attend.
 
 ## Case studies
 
