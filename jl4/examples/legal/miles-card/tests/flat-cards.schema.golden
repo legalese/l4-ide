@@ -1,0 +1,26 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "What one transaction is assumed to earn on a UOB PRVI Miles card. NO UOB TERMS AND CONDITIONS ARE HELD: the figure is the household's working assumption, the status is Unconfirmed, and no clause is cited because none has been read.",
+    "properties": {
+        "card": {
+            "$ref": "#/$defs/Card"
+        },
+        "cardholder": {
+            "$ref": "#/$defs/Cardholder"
+        },
+        "month": {
+            "$ref": "#/$defs/Month position"
+        },
+        "txn": {
+            "$ref": "#/$defs/Transaction"
+        }
+    },
+    "required": [
+        "card",
+        "cardholder",
+        "month",
+        "txn"
+    ],
+    "title": "UOB PRVI Miles earns on",
+    "type": "object"
+}

@@ -1,0 +1,1390 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `miles-card-domain`
+IMPORT `miles-card`
+
+§ `The issuers' own worked examples, run through the composer`
+
+-- ===========================================================================
+-- THE CASE SUITE. Every assertion below is taken from a WORKED EXAMPLE the
+-- issuer printed in its own document: an illustration table inside a T&C, or
+-- a numbered answer in that card's FAQ. Nothing here is our arithmetic about
+-- what a clause ought to mean. Where the issuer gave a points TOTAL for an
+-- amount, the assertion is on the PER-DOLLAR RATE that total implies, and the
+-- comment shows the division.
+--
+-- WHY THE EXAMPLES AND NOT THE CLAUSES. The issuer modules encode the
+-- clauses; asserting the clauses back at them would only restate the
+-- encoding. An illustration is different: it is the issuer's own application
+-- of its own rules to a concrete charge, and it is the one part of the
+-- document the drafter had to make come out right. So it is evidence
+-- INDEPENDENT of how we read the operative words, which is what a case suite
+-- is for.
+--
+-- EVERYTHING GOES THROUGH THE COMPOSER. Each assertion calls
+-- `the rate on` card cardholder month txn, never an issuer rule directly, so
+-- the suite also exercises the dispatch in `miles-card.l4` and would catch a
+-- card wired to the wrong module.
+--
+-- HOW TO READ A FAILURE. A failing assertion here is a FINDING, not a bug in
+-- the assertion: either the encoding disagrees with the issuer's own
+-- illustration, or the illustration is not reachable through the fields the
+-- domain carries. Do not edit an assertion to match the answer it got.
+--
+-- THE LAST SECTION IS DELIBERATELY BRITTLE. Two FAQs contradict their own
+-- T&Cs. The assertions there state what the T&C says, because the T&C
+-- governs; they are written so that a later change that follows the FAQ
+-- instead trips a test rather than passing silently.
+--
+-- Document ids are the ones in source/source-bundle.json. Clause numbers are
+-- the issuer's own.
+-- ===========================================================================
+
+
+§§ `The cardholders`
+
+-- A Citi Rewards holder has no field in this domain that its T&C makes
+-- operative: Citi conditions nothing on a standing fact about the customer.
+GIVETH A Cardholder
+`a Citi Rewards cardholder` MEANS Cardholder WITH
+    `Solitaire preferred rewards categories`               IS EMPTY
+    `yuu account linked to the card`                       IS FALSE
+    `HSBC Everyday Global Account deposits ADB this month` IS 0
+    `PAssion membership registered and card linked in yuu` IS FALSE
+
+-- hsbc-revolution-reward-points-tnc cl.7.1(ii)(b) and the cl.9 table split
+-- every HSBC answer on one number: the Deposits ADB in the Eligible EGA
+-- Account for the calendar month. These two cardholders are the table's two
+-- rows.
+GIVETH A Cardholder
+`an HSBC cardholder below the deposits tier` MEANS Cardholder WITH
+    `Solitaire preferred rewards categories`               IS EMPTY
+    `yuu account linked to the card`                       IS FALSE
+    `HSBC Everyday Global Account deposits ADB this month` IS 0
+    `PAssion membership registered and card linked in yuu` IS FALSE
+
+GIVETH A Cardholder
+`an HSBC cardholder at the deposits tier` MEANS Cardholder WITH
+    `Solitaire preferred rewards categories`               IS EMPTY
+    `yuu account linked to the card`                       IS FALSE
+    `HSBC Everyday Global Account deposits ADB this month` IS 50_000
+    `PAssion membership registered and card linked in yuu` IS FALSE
+
+-- uob-ladys-faq Q7 contrasts a Solitaire cardmember who elected two
+-- categories with one who elected only one, and Q10 with one who elected
+-- none. Three cardholders, one per answer.
+GIVETH A Cardholder
+`a Solitaire cardmember electing Dining and Family` MEANS Cardholder WITH
+    `Solitaire preferred rewards categories`               IS LIST Dining, Family
+    `yuu account linked to the card`                       IS FALSE
+    `HSBC Everyday Global Account deposits ADB this month` IS 0
+    `PAssion membership registered and card linked in yuu` IS FALSE
+
+GIVETH A Cardholder
+`a Solitaire cardmember electing Dining only` MEANS Cardholder WITH
+    `Solitaire preferred rewards categories`               IS LIST Dining
+    `yuu account linked to the card`                       IS FALSE
+    `HSBC Everyday Global Account deposits ADB this month` IS 0
+    `PAssion membership registered and card linked in yuu` IS FALSE
+
+GIVETH A Cardholder
+`a Solitaire cardmember who elected nothing` MEANS Cardholder WITH
+    `Solitaire preferred rewards categories`               IS EMPTY
+    `yuu account linked to the card`                       IS FALSE
+    `HSBC Everyday Global Account deposits ADB this month` IS 0
+    `PAssion membership registered and card linked in yuu` IS FALSE
+
+-- dbs-yuu-card-tnc cl.11: points go to the yuu Account "which has been linked
+-- to the DBS yuu principal cardmember at the point of transaction".
+GIVETH A Cardholder
+`a yuu cardmember with the card linked` MEANS Cardholder WITH
+    `Solitaire preferred rewards categories`               IS EMPTY
+    `yuu account linked to the card`                       IS TRUE
+    `HSBC Everyday Global Account deposits ADB this month` IS 0
+    `PAssion membership registered and card linked in yuu` IS FALSE
+
+-- posb-passion-yuu-tnc cl.1: the Promotion is only for a Cardmember with a
+-- PAssion membership, a yuu Account, and the PAssion Card linked in the yuu
+-- App.
+GIVETH A Cardholder
+`a PAssion cardmember, registered and linked` MEANS Cardholder WITH
+    `Solitaire preferred rewards categories`               IS EMPTY
+    `yuu account linked to the card`                       IS TRUE
+    `HSBC Everyday Global Account deposits ADB this month` IS 0
+    `PAssion membership registered and card linked in yuu` IS TRUE
+
+-- dbs-womans-card-tnc conditions nothing on a standing fact either.
+GIVETH A Cardholder
+`a DBS Woman's World cardmember` MEANS Cardholder WITH
+    `Solitaire preferred rewards categories`               IS EMPTY
+    `yuu account linked to the card`                       IS FALSE
+    `HSBC Everyday Global Account deposits ADB this month` IS 0
+    `PAssion membership registered and card linked in yuu` IS FALSE
+
+
+§§ `Where the month stands`
+
+-- The neutral month. Every card whose rate turns on no monthly threshold is
+-- asserted against this one.
+GIVETH A `Month position`
+`a month with nothing spent yet` MEANS `Month position` WITH
+    `yuu eligible spend so far this calendar month`                     IS 0
+    `yuu participating merchants transacted so far this calendar month` IS 0
+    `PAssion spend at Participating Stores so far this month`           IS 0
+    `PAssion spend at non-Participating Stores so far this month`       IS 0
+
+-- dbs-yuu-card-tnc cl.7(b): "i. Minimum S$800 worth of Eligible Spend charged
+-- and posted to your Card, and ii. Transact at 4 Participating Merchants."
+GIVETH A `Month position`
+`a month meeting the yuu Minimum Spend Requirement` MEANS `Month position` WITH
+    `yuu eligible spend so far this calendar month`                     IS 900
+    `yuu participating merchants transacted so far this calendar month` IS 4
+    `PAssion spend at Participating Stores so far this month`           IS 0
+    `PAssion spend at non-Participating Stores so far this month`       IS 0
+
+-- posb-passion-yuu-tnc cl.8(a): "i. At least S$300 total spend at
+-- Participating Stores ii. At least S$400 total spend at non-Participating
+-- Stores".
+GIVETH A `Month position`
+`a month meeting both PAssion thresholds` MEANS `Month position` WITH
+    `yuu eligible spend so far this calendar month`                     IS 0
+    `yuu participating merchants transacted so far this calendar month` IS 0
+    `PAssion spend at Participating Stores so far this month`           IS 350
+    `PAssion spend at non-Participating Stores so far this month`       IS 450
+
+
+§§ `Citi Rewards`
+
+-- ---------------------------------------------------------------------------
+-- citi-rewards-10x-tnc cl.13, "Illustration", row #1, verbatim:
+--
+--   Transaction | Transaction Category | Points Eligible Transaction |
+--   Transaction Amount | Base Points Earned | Bonus Points Earned
+--   #1 | Department Stores | 10X | S$800.99 | 800 * 1 = 800 | 800 * 9 = 7,200
+--
+-- The illustration gives a TOTAL, not a rate. 800 Base + 7,200 Bonus = 8,000
+-- Points on a charge the same clause rounds down to S$800, so the rate it
+-- implies is 8,000 / 800 = 10 Points per S$1 -- which is cl.13(i)'s 1 Base
+-- Point plus cl.13(ii)'s 9 Bonus Points. That per-dollar figure is what is
+-- asserted; the rounding-down of S$800.99 to S$800 is an allocation question
+-- the domain does not carry (miles-card-domain.l4, "Where the month stands").
+--
+-- MCC 5311 (Department Stores) is the first row of cl.6(i)'s table, so the
+-- 10X limb fires on the code alone and the answer does not turn on the
+-- merchant indicator. The illustration does not say whether the charge was
+-- made in the store or on its website, so the indicator is Unknown.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`Citi illustration #1 -- S$800.99 at a department store` MEANS Transaction WITH
+    `merchant name`                IS "A department store"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5311
+    `transaction description`      IS "DEPARTMENT STORE"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 800.99
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Inserted or swiped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `Citi Rewards` `a Citi Rewards cardholder` `a month with nothing spent yet` `Citi illustration #1 -- S$800.99 at a department store`)'s `points per dollar` EQUALS 10
+#ASSERT (`the rate on` `Citi Rewards` `a Citi Rewards cardholder` `a month with nothing spent yet` `Citi illustration #1 -- S$800.99 at a department store`)'s `earns the bonus rate` EQUALS TRUE
+
+-- cl.13, third paragraph: "Base Points are not subject to any cap. However,
+-- Bonus Points are subject to a cap of 9,000 Bonus Points per statement
+-- month." At cl.13(ii)'s 9 Bonus Points per S$1 that is S$1,000 of
+-- bonus-earning spend, and the basis Citi names is the STATEMENT month, not
+-- the calendar month -- the one place in this corpus where the two differ.
+#ASSERT (`the rate on` `Citi Rewards` `a Citi Rewards cardholder` `a month with nothing spent yet` `Citi illustration #1 -- S$800.99 at a department store`)'s cap's capped EQUALS TRUE
+#ASSERT (`the rate on` `Citi Rewards` `a Citi Rewards cardholder` `a month with nothing spent yet` `Citi illustration #1 -- S$800.99 at a department store`)'s cap's `bonus spend per month` EQUALS 1000
+#ASSERT (`the rate on` `Citi Rewards` `a Citi Rewards cardholder` `a month with nothing spent yet` `Citi illustration #1 -- S$800.99 at a department store`)'s cap's basis EQUALS `Statement month`
+
+-- ---------------------------------------------------------------------------
+-- citi-rewards-10x-tnc cl.13, "Illustration", row #2, verbatim:
+--
+--   #2 | Shoe Stores | 10X | S$550.24 | 550 * 1 = 550 | 550 * 9 = 4,950
+--
+-- 550 + 4,950 = 5,500 Points on S$550 rounded down, so 5,500 / 550 = 10
+-- Points per S$1 again. MCC 5661 (Shoe Stores) is in cl.6(i)'s table.
+--
+-- The illustration's Total row and its footnote -- "^As Bonus Points are
+-- capped at 9,000 Bonus Points per statement month, Eligible Cardholder will
+-- only be awarded a maximum of 9,000 Bonus Points even though Bonus Points
+-- for both transactions amounts to a total of 12,150" -- is the ALLOCATION
+-- of one month's cap across two charges, which is out of scope for this
+-- corpus (spec section 6). The cap FIGURE is asserted above; the running
+-- total is not expressible.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`Citi illustration #2 -- S$550.24 at a shoe store` MEANS Transaction WITH
+    `merchant name`                IS "A shoe store"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5661
+    `transaction description`      IS "SHOE STORE"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 550.24
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Inserted or swiped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `Citi Rewards` `a Citi Rewards cardholder` `a month with nothing spent yet` `Citi illustration #2 -- S$550.24 at a shoe store`)'s `points per dollar` EQUALS 10
+#ASSERT (`the rate on` `Citi Rewards` `a Citi Rewards cardholder` `a month with nothing spent yet` `Citi illustration #2 -- S$550.24 at a shoe store`)'s `earns the bonus rate` EQUALS TRUE
+
+-- ---------------------------------------------------------------------------
+-- citi-rewards-10x-faq Q1, answer (ii), verbatim: "a Qualifying Charge made
+-- at any online retail merchants, excluding mobile wallet and travel-related
+-- transactions*".
+--
+-- The T&C's matching limb, cl.6(ii), says what "online" means: "These refer
+-- to Qualifying Charges made via the internet or mobile applications, which
+-- is determined by system indicators reflecting that it is an online
+-- transaction ... These indicators are decided by the relevant merchant
+-- and/or their acquirer and are not determined by Citibank."
+--
+-- So this example DOES state the channel outcome, and the fixture carries
+-- `Flags online` rather than Unknown. MCC 5732 (Electronics Sales) is in NO
+-- cl.6(i) list, so the 10X here is earned by the online limb alone -- which
+-- is what makes this case worth having beside the two MCC cases above.
+--
+-- The credential is the physical card on file, NOT a wallet token: the FAQ
+-- excludes "mobile wallet" from this limb.
+--
+-- citi-rewards-10x-faq Q4 restates the same rate and the same cap as cl.13:
+-- "1 Base Point for every S$1 ... 9 Bonus Points for every S$1 ... Bonus
+-- Points are subject to a cap of 9,000 Bonus Points per statement month."
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`Citi FAQ Q1(ii) -- an online retail merchant` MEANS Transaction WITH
+    `merchant name`                IS "An online electronics retailer"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5732
+    `transaction description`      IS "ONLINE ELECTRONICS"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 200
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Paid in a website or app`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS `Flags online`
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `Citi Rewards` `a Citi Rewards cardholder` `a month with nothing spent yet` `Citi FAQ Q1(ii) -- an online retail merchant`)'s `points per dollar` EQUALS 10
+#ASSERT (`the rate on` `Citi Rewards` `a Citi Rewards cardholder` `a month with nothing spent yet` `Citi FAQ Q1(ii) -- an online retail merchant`)'s `earns the bonus rate` EQUALS TRUE
+#ASSERT (`the rate on` `Citi Rewards` `a Citi Rewards cardholder` `a month with nothing spent yet` `Citi FAQ Q1(ii) -- an online retail merchant`)'s cap's `bonus spend per month` EQUALS 1000
+#ASSERT (`the rate on` `Citi Rewards` `a Citi Rewards cardholder` `a month with nothing spent yet` `Citi FAQ Q1(ii) -- an online retail merchant`)'s cap's basis EQUALS `Statement month`
+
+
+§§ `HSBC Revolution`
+
+-- ---------------------------------------------------------------------------
+-- hsbc-revolution-reward-points-tnc cl.9, verbatim: "For avoidance of doubt,
+-- the maximum total Reward points that may be awarded for every SGD1 of an
+-- Eligible Transaction is 20 Reward points, as illustrated below:"
+--
+--   | Base Points earned | Bonus Points earned | Total Reward points earned | Bonus Points Cap
+--   Cardholders with Deposits ADB of >=SGD50,000 for the calendar month in
+--   which the Eligible Transaction was posted
+--                        | 1 Reward point | 19 Reward points | 20 Reward points
+--                        | Subject to a cap of 22,800 Bonus Points per calendar month
+--   All other Cardholders
+--                        | 1 Reward point |  9 Reward points | 10 Reward points
+--                        | Subject to a cap of  9,000 Bonus Points per calendar month
+--
+-- The cl.9 table states the rate per SGD1 directly, so no division is needed
+-- for the rate. The caps are stated in POINTS and the domain carries dollars:
+-- 22,800 / 19 = S$1,200 and 9,000 / 9 = S$1,000 of bonus-earning spend, on
+-- the CALENDAR month basis cl.7.2 names.
+--
+-- The transaction is an online charge at MCC 5812 (Eating Places and
+-- Restaurants), row 46 of cl.7's table, so it is an Eligible Transaction by
+-- the cl.6 "Selected Online Transactions" limb. cl.6 defines that limb by the
+-- acquirer's indicator -- "HSBC determines whether a transaction is a
+-- Selected Online Transaction based on system indicators which are determined
+-- by the merchants and the merchant's acquiring bank" -- so the fixture
+-- states `Flags online`.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`HSBC cl.9 -- an online dining charge` MEANS Transaction WITH
+    `merchant name`                IS "A restaurant's website"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5812
+    `transaction description`      IS "RESTAURANT ONLINE"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 100
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Paid in a website or app`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS `Flags online`
+    `made in Singapore`            IS TRUE
+
+-- Row 2 of the cl.9 table: "All other Cardholders ... 10 Reward points".
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder below the deposits tier` `a month with nothing spent yet` `HSBC cl.9 -- an online dining charge`)'s `points per dollar` EQUALS 10
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder below the deposits tier` `a month with nothing spent yet` `HSBC cl.9 -- an online dining charge`)'s `earns the bonus rate` EQUALS TRUE
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder below the deposits tier` `a month with nothing spent yet` `HSBC cl.9 -- an online dining charge`)'s cap's capped EQUALS TRUE
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder below the deposits tier` `a month with nothing spent yet` `HSBC cl.9 -- an online dining charge`)'s cap's `bonus spend per month` EQUALS 1000
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder below the deposits tier` `a month with nothing spent yet` `HSBC cl.9 -- an online dining charge`)'s cap's basis EQUALS `Calendar month`
+
+-- Row 1 of the cl.9 table: the same charge, the same month, the same card --
+-- only the Deposits ADB changes, and the rate doubles.
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder at the deposits tier` `a month with nothing spent yet` `HSBC cl.9 -- an online dining charge`)'s `points per dollar` EQUALS 20
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder at the deposits tier` `a month with nothing spent yet` `HSBC cl.9 -- an online dining charge`)'s `earns the bonus rate` EQUALS TRUE
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder at the deposits tier` `a month with nothing spent yet` `HSBC cl.9 -- an online dining charge`)'s cap's `bonus spend per month` EQUALS 1200
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder at the deposits tier` `a month with nothing spent yet` `HSBC cl.9 -- an online dining charge`)'s cap's basis EQUALS `Calendar month`
+
+-- ---------------------------------------------------------------------------
+-- hsbc-revolution-faq Q3, verbatim: "For example, a SGD20 online transaction
+-- is posted on 27 February. Base Points (1X) of 20 Reward Points will
+-- credited by your next statement cycle while the Bonus Points of 180 Reward
+-- Points (9X) will be credited by 31 March."
+--
+-- A TOTAL, not a rate: 20 + 180 = 200 Reward points on SGD20, so 200 / 20 =
+-- 10 Reward points per SGD1, which is the cl.9 table's second row.
+--
+-- The FAQ does not say which merchant, so the MCC is supplied from cl.7's
+-- table (5812, Eating Places and Restaurants) -- the example is about the
+-- arithmetic and the crediting dates, and it only makes sense for a
+-- transaction that is Eligible under cl.7. The two dates are the FAQ's own.
+-- The crediting SCHEDULE the example is really about (cl.10: Base Points on
+-- the statement cycle, Bonus Points by the last day of the following calendar
+-- month) is not expressible: `Rate answer` carries a rate, not a payout date.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`HSBC FAQ Q3 -- SGD20 online, posted 27 February` MEANS Transaction WITH
+    `merchant name`                IS "An online merchant"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5812
+    `transaction description`      IS "ONLINE MERCHANT"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 20
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 2 26
+    `posting date`                 IS YMD 2026 2 27
+    `payment channel`              IS `Paid in a website or app`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS `Flags online`
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder below the deposits tier` `a month with nothing spent yet` `HSBC FAQ Q3 -- SGD20 online, posted 27 February`)'s `points per dollar` EQUALS 10
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder below the deposits tier` `a month with nothing spent yet` `HSBC FAQ Q3 -- SGD20 online, posted 27 February`)'s `earns the bonus rate` EQUALS TRUE
+
+-- ---------------------------------------------------------------------------
+-- hsbc-revolution-faq Q1, verbatim: "Online purchases refer to all posted
+-- qualified retail transactions made via the internet, either done locally or
+-- abroad, for the purchase of goods or services provided by any merchants.
+-- This includes credential-on-file payments that require you to store your
+-- credit card information with a merchant or payment facilitator to make
+-- future purchases."
+--
+-- cl.6 says the same thing in the T&C: "including credential-on-file payments
+-- when the Cardholder stores the Card information with a merchant or payment
+-- facilitator to make future purchases." FAQ and T&C agree here, which is
+-- worth an assertion precisely because the next section shows two places
+-- where they do not.
+--
+-- MCC 5968 (Direct Marketing -- Continuity/Subscription Merchants) is row 38
+-- of cl.7's table: a recurring subscription billed to a card on file.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`HSBC FAQ Q1 -- a credential-on-file subscription` MEANS Transaction WITH
+    `merchant name`                IS "A subscription service"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5968
+    `transaction description`      IS "SUBSCRIPTION"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 30
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Card on file or recurring billing`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS `Flags online`
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder below the deposits tier` `a month with nothing spent yet` `HSBC FAQ Q1 -- a credential-on-file subscription`)'s `points per dollar` EQUALS 10
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder below the deposits tier` `a month with nothing spent yet` `HSBC FAQ Q1 -- a credential-on-file subscription`)'s `earns the bonus rate` EQUALS TRUE
+
+-- ---------------------------------------------------------------------------
+-- hsbc-revolution-faq Q4, verbatim: "Why did I not earn Reward Points on my
+-- purchase? The purchase you made is likely an excluded transaction which
+-- will not earn you any Reward points. Such transactions include donations,
+-- quasi-cash transactions (i.e. cryptocurrency transactions), payments to
+-- education institution, cleaning, maintenance and janitorial services or
+-- insurance companies."
+--
+-- The T&C agrees twice over: cl.4 excludes "Payments to educational
+-- institutions" from Qualifying Transactions, and cl.4.2 lists MCC 8220
+-- (Colleges, Universities, Professional Schools, and Junior Colleges) at row
+-- 32 of the excluded-MCC table. So the answer is NO points at all -- not the
+-- cl.8 fallback of 1 Reward point, which applies only to Qualifying
+-- Transactions that are not Eligible Transactions.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`HSBC FAQ Q4 -- a university fee payment` MEANS Transaction WITH
+    `merchant name`                IS "A university"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 8220
+    `transaction description`      IS "UNIVERSITY FEES"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 4_000
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Paid in a website or app`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS `Flags online`
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder below the deposits tier` `a month with nothing spent yet` `HSBC FAQ Q4 -- a university fee payment`)'s `points per dollar` EQUALS 0
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder below the deposits tier` `a month with nothing spent yet` `HSBC FAQ Q4 -- a university fee payment`)'s `earns the bonus rate` EQUALS FALSE
+
+
+§§ `DBS yuu`
+
+-- ---------------------------------------------------------------------------
+-- dbs-yuu-card-tnc cl.6, verbatim: "The mechanics of the Base Rewards are as
+-- illustrated in the table below. For every S$1 spent at the following Spend
+-- Categories that is charged and posted to your DBS yuu Card, you will earn
+-- the respective Base Rewards.
+--
+--   Spend Categories        | Base Rewards
+--   yuu Merchant Spend      | 1 yuu Point (0.5% cash rebates)
+--   SimplyGo                | 0.5 yuu Point (0.25% cash rebates)
+--   Non-yuu Merchant Spend  | 0.5 yuu Point (0.25% cash rebates)"
+--
+-- and cl.7(a), verbatim: "No minimum spend required to earn the following
+-- Bonus Rewards. ... Spend Categories | Bonus Rewards / yuu Merchant Spend |
+-- 9 yuu Points (4.5% cash rebates) / SimplyGo | 9.5 yuu Points (4.75% cash
+-- rebates)".
+--
+-- With the Minimum Spend Requirement NOT met, a yuu Merchant charge therefore
+-- earns 1 + 9 = 10 yuu Points per S$1, and a SimplyGo ride 0.5 + 9.5 = 10.
+-- The two categories landing on the same figure is the document's own
+-- arithmetic, not ours, and is the check that the tables are read as adding.
+--
+-- cl.12 states the conversion in a held document -- "1 yuu Point is
+-- equivalent to 0.5% cash rebate or 0.28 miles or more" -- so miles are
+-- assertable here, unlike on the HSBC and Citi cards.
+--
+-- READ "OR MORE" AS A FLOOR, NOT AN EQUALITY. cl.12 does not say a yuu Point
+-- is worth 0.28 miles; it says 0.28 OR MORE, "depending on the redemption
+-- item on the yuu Rewards catalogue". So the assertions below are AT LEAST,
+-- which is the sentence the clause actually contains, and 10 x 0.28 = 2.8 is
+-- the floor on the miles this charge earns rather than the figure.
+--
+-- THESE FOUR ASSERTIONS ONCE FAILED, AND THE FAILURE WAS THEIR WHOLE POINT.
+-- cl.7 prices the monthly cap twice inside one parenthesis -- "capped at
+-- 28,800 yuu Points (worth up to S$144 cash rebates or 8,000 miles) per
+-- calendar month" -- and 8,000 / 28,800 = 0.2777... miles per yuu Point. The
+-- first-pass encoding took that ratio as the conversion, reasoning that it
+-- sat just below cl.12's 0.28 and was therefore consistent with "or more".
+-- That reads the inequality backwards: a value BELOW a floor does not satisfy
+-- the floor, it breaches it. Because these assertions were written to state
+-- cl.12's own sentence rather than to adopt whatever figure the module
+-- happened to carry, all four failed, and the gap between the two clauses
+-- surfaced instead of being absorbed into an encoding decision nobody saw.
+--
+-- RULED FOR cl.12 BY THE CONDUCTOR ON 2026-09-21, reversing that first pass.
+-- The fork is recorded as `F-yuu-conversion-floor` in
+-- source/fork-register.json, which keeps the rejected reading beside the
+-- taken one. The argument that settled it is inside cl.7's own parenthesis:
+-- its cash limb is EXACT, because 28,800 at 0.5% is S$144 to the cent, while
+-- its mile limb is not, because 28,800 at 0.28 is 8,064 and the clause prints
+-- 8,000. One limb rounded and the other exact is what tells a rounded
+-- illustration apart from a stated equivalence -- and cl.12 is in any case
+-- the clause whose subject IS the conversion, where cl.7's subject is the
+-- cap. `miles per yuu Point` in dbs-yuu.l4 is now 0.28, and all four
+-- assertions below hold.
+--
+-- THEY ARE KEPT AS WITNESSES, NOT AS TESTS THAT HAPPEN TO PASS. The fork
+-- register names them in exactly that capacity: they are the four places
+-- where a return to cl.7's ratio would show itself, and each would fail again
+-- the moment anyone reinstated it.
+--
+-- LEAVE THEM SPELLED "AT LEAST". An EQUALS here would assert an equality
+-- cl.12 does not state, and it would also begin failing if a redemption item
+-- ever made the conversion richer than its floor -- which is the one thing
+-- cl.12 expressly contemplates.
+--
+-- cl.6(i): "There is no minimum spend required, and no cap to the Base
+-- Rewards." cl.7: "Total Bonus Rewards is capped at 28,800 yuu Points (worth
+-- up to S$144 cash rebates or 8,000 miles) per calendar month." The cap is
+-- stated in POINTS against a rate that itself changes with the threshold, so
+-- the dollars of bonus-earning spend it admits is not a figure the document
+-- gives; only the basis and the fact of a cap are asserted.
+--
+-- cl.10: "Eligible Spend must be charged to your DBS yuu Card within the
+-- calendar month, based on transaction date."
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`yuu cl.6 -- S$100 of groceries at Cold Storage` MEANS Transaction WITH
+    `merchant name`                IS "Cold Storage"
+    `merchant`                     IS `Cold Storage`
+    `merchant category code`       IS 5411
+    `transaction description`      IS "COLD STORAGE"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 100
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Tapped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu cl.6 -- S$100 of groceries at Cold Storage`)'s `points per dollar` EQUALS 10
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu cl.6 -- S$100 of groceries at Cold Storage`)'s `earns the bonus rate` EQUALS TRUE
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu cl.6 -- S$100 of groceries at Cold Storage`)'s `miles per point` AT LEAST 0.28
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu cl.6 -- S$100 of groceries at Cold Storage`)'s `conversion status` EQUALS Verified
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu cl.6 -- S$100 of groceries at Cold Storage`)'s `miles per dollar` AT LEAST 2.8
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu cl.6 -- S$100 of groceries at Cold Storage`)'s cap's capped EQUALS TRUE
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu cl.6 -- S$100 of groceries at Cold Storage`)'s cap's basis EQUALS `Calendar month`
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu cl.6 -- S$100 of groceries at Cold Storage`)'s cap's attribution EQUALS `By transaction date`
+
+-- cl.8's Participating Merchants table, verbatim: "SimplyGo | Bus and train
+-- rides via SimplyGo". cl.6 gives SimplyGo a base of 0.5 and cl.7(a) a bonus
+-- of 9.5, so 10 yuu Points per S$1 -- the same figure the Cold Storage case
+-- reaches from 1 + 9.
+GIVETH A Transaction
+`yuu cl.6 -- a SimplyGo bus ride` MEANS Transaction WITH
+    `merchant name`                IS "SimplyGo"
+    `merchant`                     IS SimplyGo
+    `merchant category code`       IS 4111
+    `transaction description`      IS "SIMPLYGO"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 2.20
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Tapped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu cl.6 -- a SimplyGo bus ride`)'s `points per dollar` EQUALS 10
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu cl.6 -- a SimplyGo bus ride`)'s `earns the bonus rate` EQUALS TRUE
+
+-- cl.6's third row, verbatim: "Non-yuu Merchant Spend | 0.5 yuu Point (0.25%
+-- cash rebates)". cl.7(a) and cl.7(b) list only yuu Merchant Spend and
+-- SimplyGo, so a non-yuu merchant earns the base and nothing else, at any
+-- point in the month. 0.5 x 0.28 = 0.14 miles per S$1, stated as a FLOOR for
+-- the reason set out under the Cold Storage case above, and one of the four
+-- witnesses to `F-yuu-conversion-floor`.
+GIVETH A Transaction
+`yuu cl.6 -- S$100 at a non-yuu merchant` MEANS Transaction WITH
+    `merchant name`                IS "A restaurant"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5812
+    `transaction description`      IS "RESTAURANT"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 100
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Inserted or swiped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu cl.6 -- S$100 at a non-yuu merchant`)'s `points per dollar` EQUALS 0.5
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu cl.6 -- S$100 at a non-yuu merchant`)'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu cl.6 -- S$100 at a non-yuu merchant`)'s `miles per dollar` AT LEAST 0.14
+
+-- ---------------------------------------------------------------------------
+-- dbs-yuu-card-tnc cl.7(b), verbatim: "To earn the following Bonus Rewards,
+-- Cardmembers must meet these spend requirements each calendar month
+-- ('Minimum Spend Requirement'): i. Minimum S$800 worth of Eligible Spend
+-- charged and posted to your Card, and ii. Transact at 4 Participating
+-- Merchants.
+--
+--   Spend Categories    | Bonus Rewards
+--   yuu Merchant Spend  | 26 yuu Points (13% cash rebates)
+--   SimplyGo            | 26 yuu Points (13% cash rebates)"
+--
+-- READING NOTE, AND IT IS A REAL AMBIGUITY IN THE SOURCE. cl.7 opens "Total
+-- Bonus Rewards is capped at 28,800 yuu Points", and prints tables (a) and
+-- (b) as two tables of Bonus Rewards, not as a table and its replacement. On
+-- the ADDING reading a yuu Merchant charge earns 1 + 9 + 26 = 36 yuu Points
+-- per S$1 and a SimplyGo ride 0.5 + 9.5 + 26 = 36 -- the same figure from two
+-- different starting points, which is unlikely to be a coincidence, and 36 x
+-- 0.5% = 18% cash rebates, the headline the sibling PAssion document names in
+-- its own title ("Up to 9% Cash Rebates (18X yuu Points)"). On the REPLACING
+-- reading they are 27 and 26.5, which agree with nothing.
+--
+-- The assertions take the adding reading. If they fail at 27, the encoding
+-- has taken the other one, and that is the finding -- do not change these
+-- numbers to match. 36 x 0.28 = 10.08 miles per S$1, again as cl.12's floor
+-- and again a witness to `F-yuu-conversion-floor`. Note that 10.08 is round
+-- in nothing. Under the rejected ratio 36 points came to exactly 10.0 miles
+-- per dollar, and dbs-yuu.l4's first pass offered that roundness as a second
+-- argument for reading cl.7's tables as adding; the fork register records
+-- that support as withdrawn. It was an artefact of the conversion that was
+-- rejected, and it corroborates nothing now. The additive reading stands on
+-- the two arguments given above, neither of which touches miles at all.
+-- ---------------------------------------------------------------------------
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month meeting the yuu Minimum Spend Requirement` `yuu cl.6 -- S$100 of groceries at Cold Storage`)'s `points per dollar` EQUALS 36
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month meeting the yuu Minimum Spend Requirement` `yuu cl.6 -- S$100 of groceries at Cold Storage`)'s `earns the bonus rate` EQUALS TRUE
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month meeting the yuu Minimum Spend Requirement` `yuu cl.6 -- S$100 of groceries at Cold Storage`)'s `miles per dollar` AT LEAST 10.08
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month meeting the yuu Minimum Spend Requirement` `yuu cl.6 -- a SimplyGo bus ride`)'s `points per dollar` EQUALS 36
+
+-- ---------------------------------------------------------------------------
+-- dbs-yuu-card-tnc Appendix 1, Cold Storage row, verbatim, under "Applicable
+-- to Base and Bonus Rewards": "Bonus yuu Points will not be awarded for
+-- transactions made at Cold Storage On The Go (within Esso Stations), only
+-- base 0.5 yuu point (equivalent to 0.25% cash rebates) will be awarded.
+-- Transactions will be eligible to count towards card's minimum spend
+-- requirement."
+--
+-- The Appendix states the answer as a figure, so this is a worked example and
+-- not merely an exclusion: 0.5 yuu Point per S$1, and 0.5 rather than cl.6's
+-- 1 -- the Appendix drops it to the non-yuu-merchant base. It holds whether
+-- or not the Minimum Spend Requirement is met, which is what the second
+-- assertion checks.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`yuu Appendix 1 -- Cold Storage On The Go, within an Esso station` MEANS Transaction WITH
+    `merchant name`                IS "Cold Storage On The Go"
+    `merchant`                     IS `Cold Storage On The Go`
+    `merchant category code`       IS 5541
+    `transaction description`      IS "COLD STORAGE ON THE GO"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 12
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Tapped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu Appendix 1 -- Cold Storage On The Go, within an Esso station`)'s `points per dollar` EQUALS 0.5
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu Appendix 1 -- Cold Storage On The Go, within an Esso station`)'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month meeting the yuu Minimum Spend Requirement` `yuu Appendix 1 -- Cold Storage On The Go, within an Esso station`)'s `points per dollar` EQUALS 0.5
+
+-- ---------------------------------------------------------------------------
+-- dbs-yuu-card-tnc Appendix 1, Charge+ row, verbatim: "Charge+ | Charge+
+-- Singapore | Applicable to Bonus Rewards ... Points will not be awarded for
+-- any transactions made with DBS yuu American Express Card."
+--
+-- The exclusion sits under the "Applicable to Bonus Rewards" heading, so it
+-- takes away cl.7(a)'s 9 and leaves cl.6's yuu Merchant base of 1. The same
+-- charge on the Visa keeps both: 1 + 9 = 10. This is the one example in the
+-- corpus that turns on the NETWORK rather than on anything about the charge,
+-- which is why the domain makes the network part of the card's identity.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`yuu Appendix 1 -- a Charge+ charging session` MEANS Transaction WITH
+    `merchant name`                IS "Charge+ Singapore"
+    `merchant`                     IS `Charge+`
+    `merchant category code`       IS 5552
+    `transaction description`      IS "CHARGE+ SG"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 25
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Paid in a website or app`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu Appendix 1 -- a Charge+ charging session`)'s `points per dollar` EQUALS 10
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu Appendix 1 -- a Charge+ charging session`)'s `earns the bonus rate` EQUALS TRUE
+#ASSERT (`the rate on` `DBS yuu American Express` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu Appendix 1 -- a Charge+ charging session`)'s `points per dollar` EQUALS 1
+#ASSERT (`the rate on` `DBS yuu American Express` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu Appendix 1 -- a Charge+ charging session`)'s `earns the bonus rate` EQUALS FALSE
+
+-- ---------------------------------------------------------------------------
+-- dbs-yuu-card-tnc Appendix 1, 7-Eleven row, verbatim, under "Applicable to
+-- Bonus Rewards": "Points will not be awarded for any transactions made with
+-- DBS yuu American Express Card. With effect from 13 Aug 2026, American
+-- Express Cards will be accepted at all 7-Eleven outlets islandwide. DBS yuu
+-- American Express Cardmembers can earn bonus rewards on 7-Eleven
+-- transactions w.e.f. 13 Aug 2026".
+--
+-- A DATED example, and the only one in the corpus where the same card, the
+-- same merchant and the same amount give two different answers one day apart.
+-- The Appendix says the bonus arrives WITH EFFECT FROM 13 Aug 2026, so 13 Aug
+-- itself is inside the new rule and 12 Aug is outside. cl.10 attributes by
+-- transaction date, which is the date the boundary is drawn against.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`yuu Appendix 1 -- 7-Eleven on 12 August 2026` MEANS Transaction WITH
+    `merchant name`                IS "7-Eleven"
+    `merchant`                     IS `7-Eleven`
+    `merchant category code`       IS 5499
+    `transaction description`      IS "7-ELEVEN"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 8
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 8 12
+    `posting date`                 IS YMD 2026 8 13
+    `payment channel`              IS `Tapped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+GIVETH A Transaction
+`yuu Appendix 1 -- 7-Eleven on 13 August 2026` MEANS Transaction WITH
+    `merchant name`                IS "7-Eleven"
+    `merchant`                     IS `7-Eleven`
+    `merchant category code`       IS 5499
+    `transaction description`      IS "7-ELEVEN"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 8
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 8 13
+    `posting date`                 IS YMD 2026 8 14
+    `payment channel`              IS `Tapped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `DBS yuu American Express` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu Appendix 1 -- 7-Eleven on 12 August 2026`)'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `DBS yuu American Express` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu Appendix 1 -- 7-Eleven on 12 August 2026`)'s `points per dollar` EQUALS 1
+#ASSERT (`the rate on` `DBS yuu American Express` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu Appendix 1 -- 7-Eleven on 13 August 2026`)'s `earns the bonus rate` EQUALS TRUE
+#ASSERT (`the rate on` `DBS yuu American Express` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu Appendix 1 -- 7-Eleven on 13 August 2026`)'s `points per dollar` EQUALS 10
+#ASSERT (`the rate on` `DBS yuu Visa` `a yuu cardmember with the card linked` `a month with nothing spent yet` `yuu Appendix 1 -- 7-Eleven on 12 August 2026`)'s `points per dollar` EQUALS 10
+
+
+§§ `POSB PAssion Debit`
+
+-- ---------------------------------------------------------------------------
+-- posb-passion-yuu-tnc cl.10, verbatim: "All yuu Points are awarded up to 2
+-- decimal places. Example: S$1.50 spend at yuu merchant = 4.50 yuu points
+-- (based on 3X Base Points)."
+--
+-- A TOTAL: 4.50 / 1.50 = 3 yuu Points per S$1, which is cl.6's Base Points
+-- row ("1.5% cash rebates (3X yuu Points)") and cl.7(a) ("Cardmember can earn
+-- 3X yuu points on every S$1 Qualified Spend made at Participating Stores").
+-- Cold Storage is a Participating Store under cl.5(i) ("DFI Retail Group
+-- (DFG): 7-Eleven, Cold Storage, CS Fresh, Giant, Guardian").
+--
+-- cl.7(c): "There is no minimum spend required, and no cap to the Base Points
+-- awarded" -- so this figure holds in a month that meets nothing.
+--
+-- The transaction is dated inside the Promotion Period, because cl.3 confines
+-- the Promotion to "1 October 2023 to 30 September 2025" and an example
+-- outside it is not an example of this document. The status assertion below
+-- is the separate question of whether the DOCUMENT is still good, which the
+-- domain answers `Source expired` by name.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`PAssion cl.10 -- S$1.50 at a Participating Store` MEANS Transaction WITH
+    `merchant name`                IS "Cold Storage"
+    `merchant`                     IS `Cold Storage`
+    `merchant category code`       IS 5411
+    `transaction description`      IS "COLD STORAGE"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 1.50
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2025 9 15
+    `posting date`                 IS YMD 2025 9 16
+    `payment channel`              IS `Tapped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `POSB PAssion Debit` `a PAssion cardmember, registered and linked` `a month with nothing spent yet` `PAssion cl.10 -- S$1.50 at a Participating Store`)'s `points per dollar` EQUALS 3
+#ASSERT (`the rate on` `POSB PAssion Debit` `a PAssion cardmember, registered and linked` `a month with nothing spent yet` `PAssion cl.10 -- S$1.50 at a Participating Store`)'s `earns the bonus rate` EQUALS FALSE
+
+-- cl.3, verbatim: "The Promotion is valid from 1 October 2023 to 30 September
+-- 2025 ('Promotion Period')." That date is in the past, and the domain names
+-- this document as the `Source expired` case in terms. The assertion is
+-- therefore on the DOCUMENT's currency, not the transaction's: if it fails
+-- because the encoding dates the status to the transaction instead, that is
+-- worth knowing and is a finding, not a reason to relax the assertion.
+#ASSERT (`the rate on` `POSB PAssion Debit` `a PAssion cardmember, registered and linked` `a month with nothing spent yet` `PAssion cl.10 -- S$1.50 at a Participating Store`)'s status EQUALS `Source expired`
+
+-- ---------------------------------------------------------------------------
+-- posb-passion-yuu-tnc cl.6, verbatim:
+--
+--   Awarding type      | Accelerator
+--   Base Points        | 1.5% cash rebates (3X yuu Points)
+--   POSB Bonus Points  | 7.5% cash rebates (15X yuu Points)
+--
+-- with cl.8(a): "Cardmember can earn 15X yuu Points when Cardmember meets all
+-- the following Qualified Spend criteria within each Qualifying month i. At
+-- least S$300 total spend at Participating Stores ii. At least S$400 total
+-- spend at non-Participating Stores".
+--
+-- 3 + 15 = 18 yuu Points per S$1, and 18 x 0.5% = 9% -- which is the figure
+-- in the document's OWN TITLE: "Up to 9% Cash Rebates (18X yuu Points)
+-- Promotion". The title is the worked example here, and it settles for
+-- PAssion the adding-versus-replacing question that dbs-yuu-card-tnc cl.7
+-- leaves open.
+--
+-- cl.8(b): "Capped at a maximum of S$25 cash rebate (5,000 yuu Points) to be
+-- awarded per Cardmember per Qualifying Month". Stated in points against the
+-- 15X bonus rate, so the dollars of bonus-earning spend is not a figure the
+-- document gives. cl.8(e)'s table runs its Qualifying Months from the 1st to
+-- the month end ("1 to 30 Sep 2024", "1 to 31 Oct 2024", ...), which is a
+-- calendar month.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`PAssion cl.8 -- S$50 at a Participating Store` MEANS Transaction WITH
+    `merchant name`                IS "Giant"
+    `merchant`                     IS Giant
+    `merchant category code`       IS 5411
+    `transaction description`      IS "GIANT"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 50
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2025 9 15
+    `posting date`                 IS YMD 2025 9 16
+    `payment channel`              IS `Tapped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `POSB PAssion Debit` `a PAssion cardmember, registered and linked` `a month meeting both PAssion thresholds` `PAssion cl.8 -- S$50 at a Participating Store`)'s `points per dollar` EQUALS 18
+#ASSERT (`the rate on` `POSB PAssion Debit` `a PAssion cardmember, registered and linked` `a month meeting both PAssion thresholds` `PAssion cl.8 -- S$50 at a Participating Store`)'s `earns the bonus rate` EQUALS TRUE
+#ASSERT (`the rate on` `POSB PAssion Debit` `a PAssion cardmember, registered and linked` `a month meeting both PAssion thresholds` `PAssion cl.8 -- S$50 at a Participating Store`)'s cap's capped EQUALS TRUE
+#ASSERT (`the rate on` `POSB PAssion Debit` `a PAssion cardmember, registered and linked` `a month meeting both PAssion thresholds` `PAssion cl.8 -- S$50 at a Participating Store`)'s cap's basis EQUALS `Calendar month`
+#ASSERT (`the rate on` `POSB PAssion Debit` `a PAssion cardmember, registered and linked` `a month with nothing spent yet` `PAssion cl.8 -- S$50 at a Participating Store`)'s `points per dollar` EQUALS 3
+
+-- ---------------------------------------------------------------------------
+-- posb-passion-yuu-tnc cl.7(d) and cl.8(d), verbatim and identical in both:
+-- "Retail transactions made at the Participating Merchants located outside of
+-- Singapore and/or charged in foreign currencies are not eligible for this
+-- Promotion." cl.4 says the same from the other side: Qualified Spend
+-- "includes only retail transactions ... that are in local currency".
+--
+-- Asserted on the bonus only. The clauses also take away the 3X base, but
+-- what such a charge earns INSTEAD is in the DBS Debit Card Agreement, which
+-- this corpus does not hold -- so the residual rate is not something this
+-- document determines and is not asserted.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`PAssion cl.7(d) -- a Participating Store abroad, in foreign currency` MEANS Transaction WITH
+    `merchant name`                IS "Guardian"
+    `merchant`                     IS Guardian
+    `merchant category code`       IS 5912
+    `transaction description`      IS "GUARDIAN MY"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 40
+    `currency`                     IS "MYR"
+    `posted in a foreign currency` IS TRUE
+    `transaction date`             IS YMD 2025 9 15
+    `posting date`                 IS YMD 2025 9 16
+    `payment channel`              IS `Tapped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS FALSE
+
+#ASSERT (`the rate on` `POSB PAssion Debit` `a PAssion cardmember, registered and linked` `a month meeting both PAssion thresholds` `PAssion cl.7(d) -- a Participating Store abroad, in foreign currency`)'s `earns the bonus rate` EQUALS FALSE
+
+
+§§ `UOB Lady's Solitaire`
+
+-- ---------------------------------------------------------------------------
+-- uob-ladys-faq Q9, verbatim: "How do I earn 10X UNI$ per S$5 spent
+-- (equivalent to 4 miles per S$1)? You will earn 10X UNI$ per S$5 spent based
+-- on the preferred rewards category(ies) chosen for the current calendar
+-- quarter."
+--
+-- The FAQ's heading states a RATE and its miles equivalent in one line, and
+-- the T&C derives it: cl.2(b) "Base UNI$ means the reward of UNI$1 for every
+-- S$5.00 spent (equivalent to 0.4 miles per S$1 spent)"; cl.2(c) "Bonus UNI$
+-- means the bonus reward of 9X UNI$ per S$5 spent (equivalent to 3.6 miles
+-- per S$1 spent)"; cl.3 "UNI$ can be converted to KrisFlyer or Asia miles ...
+-- at the conversion rate of UNI$1 = 2 miles".
+--
+-- In the domain's per-DOLLAR unit that is 10 UNI$ / S$5 = 2 UNI$ per S$1, and
+-- 2 x 2 = 4 miles per S$1, which is the figure in the FAQ's own heading. UOB
+-- is one of only two cards in this corpus whose miles conversion is stated in
+-- a document we hold.
+--
+-- uob-ladys-faq Q17's table gives Dining as MCC "5811, 5812, 5814, 5499", so
+-- a restaurant at 5812 is inside a Dining election.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`UOB FAQ Q9 -- S$100 at a restaurant, MCC 5812` MEANS Transaction WITH
+    `merchant name`                IS "A restaurant"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5812
+    `transaction description`      IS "RESTAURANT"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 100
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Inserted or swiped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining and Family` `a month with nothing spent yet` `UOB FAQ Q9 -- S$100 at a restaurant, MCC 5812`)'s `points per dollar` EQUALS 2
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining and Family` `a month with nothing spent yet` `UOB FAQ Q9 -- S$100 at a restaurant, MCC 5812`)'s `miles per point` EQUALS 2
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining and Family` `a month with nothing spent yet` `UOB FAQ Q9 -- S$100 at a restaurant, MCC 5812`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining and Family` `a month with nothing spent yet` `UOB FAQ Q9 -- S$100 at a restaurant, MCC 5812`)'s `earns the bonus rate` EQUALS TRUE
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining and Family` `a month with nothing spent yet` `UOB FAQ Q9 -- S$100 at a restaurant, MCC 5812`)'s `conversion status` EQUALS Verified
+
+-- ---------------------------------------------------------------------------
+-- uob-ladys-cards-tnc cl.6(b), the Note and the illustration beneath it,
+-- verbatim: "With effect from 1 August 2025, if you hold a Lady's Solitaire
+-- Card, 2,700 UNI$ (which is equivalent to S$1,500 spent), with each
+-- Preferred Rewards Category capped at 1,350 UNI$ (which is equivalent to
+-- S$750 spent). ... For illustration purposes, if you have selected only one
+-- Preferred Rewards Category, you can earn up to 1,350 UNI$ per calendar
+-- month on that selected Preferred Rewards Category. If you have selected two
+-- Preferred Rewards Categories, you can earn up to 1,350 UNI$ on each of your
+-- two selected Preferred Rewards Categories."
+--
+-- uob-ladys-faq Q7 says the same thing the other way round: "If you would
+-- prefer to choose only one preferred rewards category ... you will only be
+-- able to earn bonus 9X UNI$ on up to S$750 in spending on that rewards
+-- category per calendar month. If you have selected two preferred rewards
+-- categories, you will be able to earn bonus 9X UNI$ on up to S$750 spent per
+-- preferred rewards category per calendar month."
+--
+-- The illustration's point is that S$750 is PER CATEGORY and does not move
+-- when a cardmember elects one category instead of two -- so the two
+-- assertions differ only in the cardholder, and both expect 750. The
+-- card-level 2,700 UNI$ / S$1,500 figure is the sum of two such pots and is
+-- not what a single transaction runs against.
+--
+-- The document checks its own arithmetic: 1,350 UNI$ at cl.2(c)'s 9 UNI$ per
+-- S$5 = 1.8 UNI$ per S$1 gives 1,350 / 1.8 = S$750.
+--
+-- cl.8: "any Base UNI$ and Bonus UNI$ that may be awarded ... will be
+-- computed based on the date that the transaction is posted on UOB's
+-- systems", and uob-ladys-faq Q11 agrees: "The bonus UNI$ will be calculated
+-- based on the posting date of the qualifying transactions."
+-- ---------------------------------------------------------------------------
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining only` `a month with nothing spent yet` `UOB FAQ Q9 -- S$100 at a restaurant, MCC 5812`)'s cap's `bonus spend per month` EQUALS 750
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining only` `a month with nothing spent yet` `UOB FAQ Q9 -- S$100 at a restaurant, MCC 5812`)'s cap's capped EQUALS TRUE
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining only` `a month with nothing spent yet` `UOB FAQ Q9 -- S$100 at a restaurant, MCC 5812`)'s cap's basis EQUALS `Calendar month`
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining only` `a month with nothing spent yet` `UOB FAQ Q9 -- S$100 at a restaurant, MCC 5812`)'s cap's attribution EQUALS `By posting date`
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining and Family` `a month with nothing spent yet` `UOB FAQ Q9 -- S$100 at a restaurant, MCC 5812`)'s cap's `bonus spend per month` EQUALS 750
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining and Family` `a month with nothing spent yet` `UOB FAQ Q9 -- S$100 at a restaurant, MCC 5812`)'s cap's attribution EQUALS `By posting date`
+
+-- ---------------------------------------------------------------------------
+-- uob-ladys-faq Q10, verbatim: "Will I earn UNI$ if I do not choose my
+-- Preferred Rewards Category(ies) to earn 10X UNI$? You will not earn the
+-- bonus 9X UNI$ on every S$5 spent if you do not choose your preferred
+-- rewards category(ies). However, you can continue to earn a base of UNI$1
+-- for every S$5 spent on your UOB Lady's Card."
+--
+-- UNI$1 per S$5 = 0.2 UNI$ per S$1, and at cl.3's UNI$1 = 2 miles that is 0.4
+-- miles per S$1 -- cl.2(b)'s own parenthesis. Same charge as Q9 above; only
+-- the election changes.
+-- ---------------------------------------------------------------------------
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember who elected nothing` `a month with nothing spent yet` `UOB FAQ Q9 -- S$100 at a restaurant, MCC 5812`)'s `points per dollar` EQUALS 0.2
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember who elected nothing` `a month with nothing spent yet` `UOB FAQ Q9 -- S$100 at a restaurant, MCC 5812`)'s `miles per dollar` EQUALS 0.4
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember who elected nothing` `a month with nothing spent yet` `UOB FAQ Q9 -- S$100 at a restaurant, MCC 5812`)'s `earns the bonus rate` EQUALS FALSE
+
+-- ---------------------------------------------------------------------------
+-- uob-ladys-faq Q17's table, verbatim in the rows used here:
+--
+--   Categories | Merchant Category Codes(MCC)
+--   Family     | 5411, 5641
+--   Fashion    | 5311, 5611, 5621, 5631, 5651, 5661, 5655, 5691, 5699, 5948
+--
+-- and Q18: "any purchase where a merchant uses a category code outside of the
+-- eligible MCCs will not qualify for the bonus UNI$."
+--
+-- Two charges against the same cardmember, who elected Dining and Family. MCC
+-- 5411 is inside Family and earns the full 2 UNI$ per S$1; MCC 5651 is inside
+-- Fashion, which she did not elect, and falls to cl.2(b)'s base of 0.2. The
+-- pair is the FAQ's answer to Q18 made checkable.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`UOB FAQ Q17 -- groceries at MCC 5411, inside Family` MEANS Transaction WITH
+    `merchant name`                IS "Cold Storage"
+    `merchant`                     IS `Cold Storage`
+    `merchant category code`       IS 5411
+    `transaction description`      IS "COLD STORAGE"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 120
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Tapped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+GIVETH A Transaction
+`UOB FAQ Q18 -- a family clothing store at MCC 5651, inside Fashion` MEANS Transaction WITH
+    `merchant name`                IS "A family clothing store"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5651
+    `transaction description`      IS "FAMILY CLOTHING"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 120
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Inserted or swiped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining and Family` `a month with nothing spent yet` `UOB FAQ Q17 -- groceries at MCC 5411, inside Family`)'s `points per dollar` EQUALS 2
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining and Family` `a month with nothing spent yet` `UOB FAQ Q17 -- groceries at MCC 5411, inside Family`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining and Family` `a month with nothing spent yet` `UOB FAQ Q18 -- a family clothing store at MCC 5651, inside Fashion`)'s `points per dollar` EQUALS 0.2
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining and Family` `a month with nothing spent yet` `UOB FAQ Q18 -- a family clothing store at MCC 5651, inside Fashion`)'s `earns the bonus rate` EQUALS FALSE
+
+-- uob-ladys-faq Q12, verbatim: "Is there a minimum spend required to earn 10X
+-- UNI$? No, there is no minimum spend required." A S$5 coffee inside an
+-- elected category earns the same 2 UNI$ per S$1 as the S$100 dinner above.
+GIVETH A Transaction
+`UOB FAQ Q12 -- a S$5 coffee, MCC 5812` MEANS Transaction WITH
+    `merchant name`                IS "A coffee shop"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5812
+    `transaction description`      IS "COFFEE"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 5
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Tapped at a terminal`
+    `credential`                   IS `A mobile wallet token`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining only` `a month with nothing spent yet` `UOB FAQ Q12 -- a S$5 coffee, MCC 5812`)'s `points per dollar` EQUALS 2
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `a Solitaire cardmember electing Dining only` `a month with nothing spent yet` `UOB FAQ Q12 -- a S$5 coffee, MCC 5812`)'s `earns the bonus rate` EQUALS TRUE
+
+
+§§ `DBS Woman's World`
+
+-- ---------------------------------------------------------------------------
+-- dbs-womans-card-tnc cl.16, verbatim: "The mechanics of the awarding and
+-- calculation of DBS Points is illustrated in the table below.
+--
+--   Rewards                          | For every S$5 spend | Points Awarded On
+--   Base Rewards - All Spend         | 1X DBS Point        | Next working day
+--   Bonus Rewards - Overseas Spend   | Additional 2X DBS Points | Next working day
+--   Bonus Rewards - Online Spend     | Additional 9X DBS Points for local spend
+--                                    | Additional 7X DBS Points for overseas spend
+--                                    | Next calendar month"
+--
+-- Four rows, four cases, and the table's own arithmetic makes the four land
+-- on three rates per S$1 (the domain's unit, so each figure is the table's
+-- "per S$5" divided by 5):
+--
+--   local, not online    1X            / 5 = 0.2 DBS Points per S$1
+--   overseas, not online (1 + 2)X      / 5 = 0.6
+--   local, online        (1 + 9)X      / 5 = 2
+--   overseas, online     (1 + 2 + 7)X  / 5 = 2
+--
+-- The last two matching is the reason the table prints 7X for overseas online
+-- and 9X for local: both paths arrive at 10X per S$5.
+--
+-- cl.11 defines online spend as "retail transaction for goods and services
+-- made via the Internet and processed by the respective merchants/acquirers
+-- as an online transaction through Mastercard Worldwide networks", and cl.13
+-- says who decides that: "DBS determines an online transaction based on
+-- system indicators. These indicators are decided by the merchant and their
+-- banker, and passed to DBS when the transaction is posted to the Card." So
+-- the online rows state a channel outcome and the fixtures carry the
+-- indicator the row is about.
+--
+-- cl.12: "'Overseas spend' refers to retail transactions for goods and
+-- services posted in foreign currencies (other than Singapore dollars)" --
+-- which is why the overseas fixtures turn `posted in a foreign currency` on
+-- rather than relying on where the cardmember was standing.
+--
+-- NO MILES ASSERTIONS HERE. This T&C states no conversion from DBS Points to
+-- miles; cl.6 defers to the DBS Rewards Programme Terms and Conditions, which
+-- this corpus does not hold. Asserting a miles figure would be asserting
+-- something no held document says.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`Woman's cl.16 -- a local charge the acquirer flags card-present` MEANS Transaction WITH
+    `merchant name`                IS "A restaurant"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5812
+    `transaction description`      IS "RESTAURANT"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 100
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Inserted or swiped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS `Flags card-present`
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `DBS Woman's World` `a DBS Woman's World cardmember` `a month with nothing spent yet` `Woman's cl.16 -- a local charge the acquirer flags card-present`)'s `points per dollar` EQUALS 0.2
+#ASSERT (`the rate on` `DBS Woman's World` `a DBS Woman's World cardmember` `a month with nothing spent yet` `Woman's cl.16 -- a local charge the acquirer flags card-present`)'s `earns the bonus rate` EQUALS FALSE
+
+GIVETH A Transaction
+`Woman's cl.16 -- a local charge the acquirer flags online` MEANS Transaction WITH
+    `merchant name`                IS "An online retailer"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5732
+    `transaction description`      IS "ONLINE RETAILER"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 100
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Paid in a website or app`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS `Flags online`
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `DBS Woman's World` `a DBS Woman's World cardmember` `a month with nothing spent yet` `Woman's cl.16 -- a local charge the acquirer flags online`)'s `points per dollar` EQUALS 2
+#ASSERT (`the rate on` `DBS Woman's World` `a DBS Woman's World cardmember` `a month with nothing spent yet` `Woman's cl.16 -- a local charge the acquirer flags online`)'s `earns the bonus rate` EQUALS TRUE
+
+-- cl.19(b): "Online spend will be accumulated for the month and awarded bonus
+-- points in the following calendar month, capped at the first S$1,000 of
+-- online spend per calendar month." cl.19(c): "Online spend must be charged to
+-- your card within the calendar month, based on transaction date" -- DBS
+-- attributes by transaction date where UOB attributes by posting date, which
+-- is why the domain keeps them as two independent axes.
+#ASSERT (`the rate on` `DBS Woman's World` `a DBS Woman's World cardmember` `a month with nothing spent yet` `Woman's cl.16 -- a local charge the acquirer flags online`)'s cap's capped EQUALS TRUE
+#ASSERT (`the rate on` `DBS Woman's World` `a DBS Woman's World cardmember` `a month with nothing spent yet` `Woman's cl.16 -- a local charge the acquirer flags online`)'s cap's `bonus spend per month` EQUALS 1000
+#ASSERT (`the rate on` `DBS Woman's World` `a DBS Woman's World cardmember` `a month with nothing spent yet` `Woman's cl.16 -- a local charge the acquirer flags online`)'s cap's basis EQUALS `Calendar month`
+#ASSERT (`the rate on` `DBS Woman's World` `a DBS Woman's World cardmember` `a month with nothing spent yet` `Woman's cl.16 -- a local charge the acquirer flags online`)'s cap's attribution EQUALS `By transaction date`
+
+GIVETH A Transaction
+`Woman's cl.16 -- an overseas charge, not online` MEANS Transaction WITH
+    `merchant name`                IS "A department store in Tokyo"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5311
+    `transaction description`      IS "TOKYO DEPT STORE"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 300
+    `currency`                     IS "JPY"
+    `posted in a foreign currency` IS TRUE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 12
+    `payment channel`              IS `Inserted or swiped at a terminal`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS `Flags card-present`
+    `made in Singapore`            IS FALSE
+
+#ASSERT (`the rate on` `DBS Woman's World` `a DBS Woman's World cardmember` `a month with nothing spent yet` `Woman's cl.16 -- an overseas charge, not online`)'s `points per dollar` EQUALS 0.6
+#ASSERT (`the rate on` `DBS Woman's World` `a DBS Woman's World cardmember` `a month with nothing spent yet` `Woman's cl.16 -- an overseas charge, not online`)'s `earns the bonus rate` EQUALS TRUE
+
+GIVETH A Transaction
+`Woman's cl.16 -- an overseas charge the acquirer flags online` MEANS Transaction WITH
+    `merchant name`                IS "An overseas online retailer"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5732
+    `transaction description`      IS "OVERSEAS ONLINE"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 300
+    `currency`                     IS "USD"
+    `posted in a foreign currency` IS TRUE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 12
+    `payment channel`              IS `Paid in a website or app`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS `Flags online`
+    `made in Singapore`            IS FALSE
+
+#ASSERT (`the rate on` `DBS Woman's World` `a DBS Woman's World cardmember` `a month with nothing spent yet` `Woman's cl.16 -- an overseas charge the acquirer flags online`)'s `points per dollar` EQUALS 2
+#ASSERT (`the rate on` `DBS Woman's World` `a DBS Woman's World cardmember` `a month with nothing spent yet` `Woman's cl.16 -- an overseas charge the acquirer flags online`)'s `earns the bonus rate` EQUALS TRUE
+
+-- cl.13 again, from the cardholder's side: the indicator is the merchant's to
+-- decide and is latent at the moment of payment. The same charge as the two
+-- local rows above, with the indicator not known, must therefore report that
+-- the answer turns on it rather than picking a branch.
+GIVETH A Transaction
+`Woman's cl.13 -- a local charge whose indicator is not known` MEANS Transaction WITH
+    `merchant name`                IS "An online retailer"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5732
+    `transaction description`      IS "ONLINE RETAILER"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 100
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Paid in a website or app`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS Unknown
+    `made in Singapore`            IS TRUE
+
+#ASSERT (`the rate on` `DBS Woman's World` `a DBS Woman's World cardmember` `a month with nothing spent yet` `Woman's cl.13 -- a local charge whose indicator is not known`)'s `depends on the merchant indicator` EQUALS TRUE
+
+
+§§ `Where a FAQ and its own T&C disagree`
+
+-- ===========================================================================
+-- TWO CONFLICTS, AND WHY THEY ARE ASSERTED THE WAY THEY ARE.
+--
+-- Each assertion below states what the T&C says, because the T&C is the
+-- contract and the FAQ is a description of it. Both are written so that an
+-- encoding which later follows the FAQ instead -- by a well-meant edit, or by
+-- a reading of a redrafted clause -- FAILS here rather than passing quietly.
+-- The comment on each says what the FAQ would have given, so a reader who
+-- trips one can see immediately which way the encoding moved.
+-- ===========================================================================
+
+-- ---------------------------------------------------------------------------
+-- CONFLICT 1 -- hsbc-revolution-faq Q2 against hsbc-revolution-reward-points-tnc
+-- cl.5, cl.7 and cl.7.1.
+--
+-- The FAQ, verbatim: "The following transactions that fall within the list of
+-- Merchant Category Codes (MCC) below, qualify for 10x Reward points: ...
+-- transactions made via contactless payments (payWave, Apple Pay and Google
+-- Pay payment methods). With effect from 15 July 2024, contactless payment
+-- transactions will earn 1 HSBC Reward point."
+--
+-- The T&C, verbatim, cl.5: "'Selected Contactless Payments' refers to
+-- Qualifying Transactions made via Visa contactless through a contactless
+-- terminal mode which includes Visa payWave, Apple Pay, Google Pay and
+-- Samsung Pay." cl.7: "'Eligible Transactions' refers to Selected Contactless
+-- Payments and Selected Online Transactions that fall within any one of the
+-- following MCCs". cl.7.1: "(i) 1 Reward point ('Base Points') for every SGD1
+-- of the Eligible Transaction; and (ii)(a) 9 Reward points ('Bonus Points')
+-- for every SGD1 of the Eligible Transaction".
+--
+-- SO: 10 Reward points per SGD1 under the T&C, 1 under the FAQ. The T&C
+-- governs, and it is also the LATER document -- it carries "Effective from 1
+-- April 2026" on every page, where the FAQ's carve-out is dated 15 July 2024.
+-- A contactless tap at an in-list MCC is therefore still a 10X charge.
+--
+-- MCC 5942 (Book Stores) is row 27 of cl.7's table. The credential is an
+-- Apple Pay token, which cl.5 names, and the indicator is `Flags card-present`
+-- because cl.5's subject is a charge taken through a contactless TERMINAL --
+-- the one place in this suite where an example states card-present and the
+-- bonus is earned anyway.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`HSBC conflict -- an Apple Pay tap at a bookshop, MCC 5942` MEANS Transaction WITH
+    `merchant name`                IS "A bookshop"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 5942
+    `transaction description`      IS "BOOKSHOP"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 60
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Tapped at a terminal`
+    `credential`                   IS `A mobile wallet token`
+    `merchant indicator`           IS `Flags card-present`
+    `made in Singapore`            IS TRUE
+
+-- T&C cl.7.1: 1 + 9 = 10. FAQ Q2 would give 1. If this ever reads 1, the
+-- encoding has followed the FAQ over its own contract.
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder below the deposits tier` `a month with nothing spent yet` `HSBC conflict -- an Apple Pay tap at a bookshop, MCC 5942`)'s `points per dollar` EQUALS 10
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder below the deposits tier` `a month with nothing spent yet` `HSBC conflict -- an Apple Pay tap at a bookshop, MCC 5942`)'s `earns the bonus rate` EQUALS TRUE
+
+-- cl.7.1(ii)(b) applies to a contactless Eligible Transaction exactly as it
+-- does to an online one, so the deposits tier doubles this charge too: 20.
+-- Under the FAQ's reading there would be no bonus to raise and the tier would
+-- make no difference at all, so this assertion trips on the same defect from
+-- a second direction.
+#ASSERT (`the rate on` `HSBC Revolution` `an HSBC cardholder at the deposits tier` `a month with nothing spent yet` `HSBC conflict -- an Apple Pay tap at a bookshop, MCC 5942`)'s `points per dollar` EQUALS 20
+
+-- ---------------------------------------------------------------------------
+-- CONFLICT 2 -- citi-rewards-10x-faq Q1's travel footnote against
+-- citi-rewards-10x-tnc cl.6's travel footnote.
+--
+-- The two footnotes are word-for-word identical until their last six words.
+--
+-- The FAQ, Q1, verbatim: "*For clarity, travel-related transactions refer to
+-- transactions which are either wholly or partially related to any form of
+-- travel, whether local or overseas and include but are not limited to
+-- transactions that fall within the following MCCs (i.e. any transactions at
+-- merchants with the following MCCs will not be a QUALIFYING CHARGE)".
+--
+-- The T&C, cl.6, verbatim: "... (i.e. any transactions at merchants with the
+-- following MCCs will not be a 10X POINTS ELIGIBLE TRANSACTION)".
+--
+-- Those are different exclusions and they differ by a whole base point.
+-- "Qualifying Charge" is the T&C's cl.5 term for a charge that earns anything
+-- at all; "10X Points Eligible Transaction" is cl.6's term for one that earns
+-- the bonus. Under the FAQ a hotel booking earns NOTHING. Under the T&C it is
+-- still a Qualifying Charge -- cl.5's own exclusion list does not mention
+-- travel, and neither does citi-rewards-exclusion-list, which cl.5(xii)
+-- incorporates -- so cl.12 applies: "Eligible Cardholders will earn 1 Base
+-- Point for every S$1 of Qualifying Charges (which are not 10X Points
+-- Eligible Transactions)".
+--
+-- SO: 1 Point per S$1 under the T&C, 0 under the FAQ. MCC 7011 (Lodging --
+-- Hotels, Motels, Resorts, Not Elsewhere Classified) is in both footnotes'
+-- tables. The charge is made online, so the cl.6(ii) limb would otherwise
+-- have fired and the footnote is doing real work.
+-- ---------------------------------------------------------------------------
+GIVETH A Transaction
+`Citi conflict -- an online hotel booking, MCC 7011` MEANS Transaction WITH
+    `merchant name`                IS "A hotel"
+    `merchant`                     IS `Another merchant`
+    `merchant category code`       IS 7011
+    `transaction description`      IS "HOTEL BOOKING"
+    `description patterns`         IS EMPTY
+    `charge kind`                  IS `Retail purchase`
+    `amount`                       IS 450
+    `currency`                     IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`             IS YMD 2026 9 10
+    `posting date`                 IS YMD 2026 9 11
+    `payment channel`              IS `Paid in a website or app`
+    `credential`                   IS `The physical card`
+    `merchant indicator`           IS `Flags online`
+    `made in Singapore`            IS TRUE
+
+-- T&C cl.12: 1 Base Point per S$1. FAQ Q1's footnote would give 0. A reading
+-- of 0 here means the encoding has taken the FAQ's wider exclusion.
+#ASSERT (`the rate on` `Citi Rewards` `a Citi Rewards cardholder` `a month with nothing spent yet` `Citi conflict -- an online hotel booking, MCC 7011`)'s `points per dollar` EQUALS 1
+-- And the footnote's actual job, on which FAQ and T&C agree: no 10X.
+#ASSERT (`the rate on` `Citi Rewards` `a Citi Rewards cardholder` `a month with nothing spent yet` `Citi conflict -- an online hotel booking, MCC 7011`)'s `earns the bonus rate` EQUALS FALSE

@@ -1,0 +1,72 @@
+Frequently asked questions for the HSBC Revolution Credit Card
+
+_____________________________________________________________________________________________
+
+    1.   What do online purchases refer to?
+
+         Online purchases refer to all posted qualified retail transactions made via the internet, either done locally or
+         abroad, for the purchase of goods or services provided by any merchants. This includes credential-on-file
+         payments that require you to store your credit card information with a merchant or payment facilitator to
+         make future purchases.
+
+         Terms and conditions apply on qualifying transactions. Click here for more details.
+
+    2.   What are the transactions that will qualify for 10X Reward Points?
+
+         The following transactions that fall within the list of Merchant Category Codes (MCC) below, qualify for 10x
+         Reward points:
+             •    transactions made via online merchant sites processed as online transactions, or
+             •    transactions made via contactless payments (payWave, Apple Pay and Google Pay payment
+                  methods). With effect from 15 July 2024, contactless payment transactions will earn 1 HSBC
+                  Reward point.
+
+         Merchant Category Codes
+
+          Category                                                 Merchant Category Codes (MCC)*
+          Travel related merchants                                 3000 to 3350, 3351 to 3500, 3501 to 3999, 4411,
+                                                                   4511
+          Department stores and retail stores                      4816, 5045, 5262, 5309, 5310, 5311, 5331, 5399,
+                                                                   5611, 5621, 5631, 5641, 5651, 5655, 5661, 5691,
+                                                                   5699, 5732 to 5735, 5912, 5942, 5944 to 5949,
+                                                                   5964 to 5970, 5992, 5999
+
+          Dining excluding hotel dining                            5441, 5462, 5811, 5812, 5813
+
+          Others such as Transportation and Membership             4121, 7997
+          Clubs
+
+
+    3.   When will I get my 10X Reward Points?
+
+         The 10X Reward Points earned from eligible transactions is made up of 2 parts and will be credited
+         separately:
+
+             •    Base Points (1X)
+             •    Bonus Points (9X)
+
+         Base Points (1X) will be credited into your account based on your statement cycle. Bonus Points (9X) will be
+         credited into your account by the last day of the following calendar month from the posted transaction date in
+         your card account. Bonus Points (9X) will be reflected in your statement by the last day of the second
+         calendar month.
+
+         For example, a SGD20 online transaction is posted on 27 February. Base Points (1X) of 20 Reward Points
+         will credited by your next statement cycle while the Bonus Points of 180 Reward Points (9X) will be credited
+         by 31 March.
+
+
+
+
+                                                         PUBLIC
+4.   Why did I not earn Reward Points on my purchase?
+     The purchase you made is likely an excluded transaction which will not earn you any Reward points.
+
+     Such transactions include donations, quasi-cash transactions (i.e. cryptocurrency transactions), payments to
+     education institution, cleaning, maintenance and janitorial services or insurance companies.
+
+     For the full list of excluded transactions, please refer to point 4 in the Terms and Conditions for details.
+
+
+
+
+                                                     PUBLIC
+

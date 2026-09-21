@@ -1,0 +1,25 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `miles-card-domain`
+IMPORT `miles-card`
+
+§ `Cheat-sheet claims the primary text does not support`
+
+-- ===========================================================================
+-- WHAT THIS FILE IS. The household cheat sheet ([S5], June 2026, a secondary
+-- source, not committed) makes claims about what each card earns. Those
+-- claims are deposited as the additional encoding `cheatsheet-2026-06`
+-- (cheatsheet-claims.l4) and run through the pipeline's p6-tests stage as
+-- the corpus's acceptance test (spec section 1). Every claim that stage
+-- proved unsupported by the issuer's own text is restated HERE as an
+-- `#ASSERT NOT (...)`, with the cheat-sheet cell and the clause that
+-- contradicts it, so that the committed corpus is green while the
+-- discrepancy stays on the record and a rule change that quietly made the
+-- cheat sheet right again would trip it.
+--
+-- STATUS: EMPTY UNTIL THE FORMAL ACCEPTANCE RUN. This file is filled from
+-- the p6-tests assert report over cheatsheet-2026-06, never from a hand
+-- reading of the modules, so that what it records is what the pipeline
+-- measured. The pre-pass snapshot is in etc/go/subjects/sg-miles-card/
+-- NOTES.md section 5.
+-- ===========================================================================

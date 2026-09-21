@@ -1,0 +1,1869 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `miles-card-domain`
+
+§ `Terms and Conditions governing the HSBC Revolution Credit Card Reward Points Programme`
+
+-- ===========================================================================
+-- DOCUMENT      hsbc-revolution-reward-points-tnc
+-- DATING LINE   "Effective from 1 April 2026" (printed in the footer of every
+--               page of the source PDF; the Programme period is cl.2)
+--
+-- WHAT THIS MODULE ANSWERS. For one transaction on an HSBC Revolution Credit
+-- Card: how many HSBC Reward points per SGD1 it earns, what that is in miles,
+-- which monthly cap it counts against, and on which clauses that rests. It is
+-- written in the INERT STYLE of the Chubb encoding: every operative clause is
+-- quoted verbatim beside the rule that encodes it, so a reviewer can read the
+-- source and the logic together without leaving the file.
+--
+-- THE SHAPE OF THE DOCUMENT, WHICH IS THE SHAPE OF THIS FILE.
+--   cl.4  defines Qualifying Transactions as posted retail purchases MINUS an
+--         eighteen-bullet exclusion list, operationalised (the clause says so
+--         in terms) by transaction description and MCC. This module reads the
+--         bullets through three facts: the closed `Description pattern` list
+--         layer 1 assigns to the statement line, the posting's `Charge kind`,
+--         and the MCC.
+--   cl.4.2 lists 48 MCCs that earn no Reward points at all.
+--   cl.5  and cl.6 define the two CHANNELS that can qualify -- a contactless
+--         terminal tap, and an online transaction the merchant's acquirer
+--         flags as online.
+--   cl.7  intersects those two channels with a 49-row MCC table to give
+--         Eligible Transactions, which earn 10 or 20 points per SGD1.
+--   cl.8  gives every other Qualifying Transaction 1 point per SGD1.
+-- So the answer is a four-way split: nothing, 1 point, 10 points, 20 points.
+--
+-- REVOLUTION IGNORES THE CREDENTIAL (spec section 4.4). cl.5 names "Visa
+-- payWave, Apple Pay, Google Pay and Samsung Pay" in one breath, so a tap with
+-- the physical card and a tap with a wallet token are the same transaction to
+-- this card. What the card DOES read, on the online limb only, is the system
+-- indicator -- and cl.6 says in terms that HSBC does not set it. So an online
+-- purchase at a merchant the cardholder has not seen post before is answered
+-- under BOTH branches, with the lower figure in `miles per dollar`.
+--
+-- THE HELD FAQ CONTRADICTS THE HELD T&C, AND THE T&C GOVERNS. The FAQ in this
+-- bundle (hsbc-revolution-faq, undated) says at Q2: "With effect from 15 July
+-- 2024, contactless payment transactions will earn 1 HSBC Reward point." The
+-- T&C effective 1 April 2026 says the opposite -- cl.5 makes a contactless tap
+-- a Selected Contactless Payment and cl.7 makes that an Eligible Transaction
+-- at 10 or 20 points. The T&C is the later, operative, dated instrument, so
+-- this module follows it and attaches a condition string to every contactless
+-- answer naming the conflict. `Disputed by source` is the composer's value to
+-- set, not this module's, so the status stays Verified and the conflict is
+-- carried in `conditions`.
+--
+-- WHAT IS DELIBERATELY NOT MODELLED, AND WHY.
+--   cl.3   consolidation of supplementary cards under the primary Account.
+--          An accounting rule about WHERE points land, not whether they are
+--          earned. Not operative on the rate.
+--   cl.7.2 "rounded down to the nearest SGD1" rounds a MONTHLY TOTAL, not a
+--          transaction. This module answers a rate per dollar, so the rounding
+--          has nothing to bite on here; it belongs to the allocation problem,
+--          which the spec puts out of scope (section 6).
+--   cl.10  crediting timing (Base Points on the statement cycle, Bonus Points
+--          by the last day of the following calendar month). Quoted below as
+--          an inert observation because it is what makes the posting-date
+--          attribution legible, but it does not change any rate.
+--   cl.11  reversal of points on a voided, cancelled, disputed or reversed
+--          transaction, and cl.14 forfeiture on a delinquent Account. Both are
+--          about UNDOING a credit; neither changes what a good transaction
+--          earns. See the gap note at cl.4 bullet 18.
+--   cl.12, cl.15, cl.16, cl.17  non-transferability, variation, governing law,
+--          and the correctness disclaimer. None bear on the rate.
+--
+-- NO RULE IN THIS FILE COMPARES A STRING, AND TWO THINGS WERE LOST BY THAT.
+-- The corpus has to lower to Catala, which has no string type, so the string
+-- work is done once in layer 1 (`classify.l4`) and every rule here reads a
+-- closed enumeration. That is a net gain -- the first encoding tested
+-- `description EQUALS "Paypal"`, which a real statement line ("PAYPAL *STEAM
+-- PURCHASE") would have walked straight past -- but it is not free:
+--   cl.4 bullet 6, "Payments to any professional services provider (including
+--     but not limited to GOOGLE Ads, Facebook Ads, Amazon Web Services, MEDIA
+--     TRAFFIC AGENCY INC)", is NOT ENCODED AT ALL. No `Description pattern`
+--     covers any of the four.
+--   cl.4 bullet 10's proviso, "Tax payments (except HSBC Tax Payment
+--     Facility)", is UNREACHABLE. Nothing in the domain names that facility,
+--     so a tax payment made through it is answered zero along with the rest.
+-- Both need a constructor in the shared domain; neither can be repaired from a
+-- card module. Both are recorded at the clause and pinned by an assertion.
+--
+-- THE PARAMETERS THIS RULE IGNORES. The composer passes all four uniformly.
+-- `card` is ignored: the composer has already dispatched on the card's name,
+-- and nothing in this document turns on which HSBC card it is. `month` is
+-- ignored: every field of `Month position` is a DBS yuu or POSB PAssion
+-- monthly threshold, and HSBC states no spend threshold of any kind -- its
+-- only monthly quantity is the Deposits ADB, which is a standing fact about
+-- the cardholder and is read from `cardholder` instead.
+-- ===========================================================================
+
+
+§§ `The clauses this module relies on`
+
+-- One Provenance per clause relied on. `quote` is verbatim from the pdftotext
+-- of the committed PDF, trimmed to the operative words with the punctuation
+-- kept; an ellipsis marks an elision.
+--
+-- `document date` is this document's own dating line as a DATE -- "Effective
+-- from 1 April 2026", printed in the footer of every page -- so that two
+-- citations can be compared for currency without parsing the `dated` string.
+-- It is also the only non-STRING field of Provenance, which is what lets a
+-- citation survive the Catala lowering at all: STRING fields are elided and
+-- their values are never inspected, so a record of nothing but strings has
+-- nothing left to emit.
+
+GIVETH A Provenance
+`cl.2 the Programme period` MEANS Provenance WITH
+    `document` IS "hsbc-revolution-reward-points-tnc"
+    `clause`   IS "2"
+    `dated`    IS "Effective from 1 April 2026"
+    `document date` IS YMD 2026 4 1
+    `quote`    IS "The Programme period starts from 1 April 2026 until terminated by HSBC."
+
+GIVETH A Provenance
+`cl.4 Qualifying Transactions` MEANS Provenance WITH
+    `document` IS "hsbc-revolution-reward-points-tnc"
+    `clause`   IS "4"
+    `dated`    IS "Effective from 1 April 2026"
+    `document date` IS YMD 2026 4 1
+    `quote`    IS "“Qualifying Transactions” refers to posted retail purchases … and shall exclude the following transactions (which shall, where applicable, be determined based on the transaction descriptions reflected in HSBC’s system and the merchant category codes from Visa / Mastercard)"
+
+GIVETH A Provenance
+`cl.4.1 the acquirer assigns the MCC` MEANS Provenance WITH
+    `document` IS "hsbc-revolution-reward-points-tnc"
+    `clause`   IS "4.1"
+    `dated`    IS "Effective from 1 April 2026"
+    `document date` IS YMD 2026 4 1
+    `quote`    IS "A Merchant Category Code (“MCC”) is a four-digit number assigned to a merchant/business by the merchant’s acquiring bank. … HSBC does not determine the merchant’s MCC."
+
+GIVETH A Provenance
+`cl.4.2 the excluded Merchant Category Codes` MEANS Provenance WITH
+    `document` IS "hsbc-revolution-reward-points-tnc"
+    `clause`   IS "4.2"
+    `dated`    IS "Effective from 1 April 2026"
+    `document date` IS YMD 2026 4 1
+    `quote`    IS "For the avoidance of doubt, transactions made at merchants with the following MCCs will not earn Reward Points. The following list of MCCs may be updated by HSBC from time to time without prior notice."
+
+GIVETH A Provenance
+`cl.5 Selected Contactless Payments` MEANS Provenance WITH
+    `document` IS "hsbc-revolution-reward-points-tnc"
+    `clause`   IS "5"
+    `dated`    IS "Effective from 1 April 2026"
+    `document date` IS YMD 2026 4 1
+    `quote`    IS "“Selected Contactless Payments” refers to Qualifying Transactions made via Visa contactless through a contactless terminal mode which includes Visa payWave, Apple Pay, Google Pay and Samsung Pay."
+
+GIVETH A Provenance
+`cl.6 Selected Online Transactions` MEANS Provenance WITH
+    `document` IS "hsbc-revolution-reward-points-tnc"
+    `clause`   IS "6"
+    `dated`    IS "Effective from 1 April 2026"
+    `document date` IS YMD 2026 4 1
+    `quote`    IS "“Selected Online Transactions” refers to Qualifying Transactions made via the internet and processed by the respective merchants/merchant’s acquiring bank as an online transaction type through the Visa Worldwide networks, including credential-on-file payments when the Cardholder stores the Card information with a merchant or payment facilitator to make future purchases. HSBC determines whether a transaction is a Selected Online Transaction based on system indicators which are determined by the merchants and the merchant’s acquiring bank."
+
+GIVETH A Provenance
+`cl.7 Eligible Transactions` MEANS Provenance WITH
+    `document` IS "hsbc-revolution-reward-points-tnc"
+    `clause`   IS "7"
+    `dated`    IS "Effective from 1 April 2026"
+    `document date` IS YMD 2026 4 1
+    `quote`    IS "“Eligible Transactions” refers to Selected Contactless Payments and Selected Online Transactions that fall within any one of the following MCCs:"
+
+GIVETH A Provenance
+`cl.7.1 the Reward points awarded` MEANS Provenance WITH
+    `document` IS "hsbc-revolution-reward-points-tnc"
+    `clause`   IS "7.1"
+    `dated`    IS "Effective from 1 April 2026"
+    `document date` IS YMD 2026 4 1
+    `quote`    IS "(i) 1 Reward point (“Base Points”) for every SGD1 of the Eligible Transaction; and (ii) (a) 9 Reward points (“Bonus Points”) for every SGD1 of the Eligible Transaction; or (b) 19 Bonus Points for every SGD1 of the Eligible Transaction if the Cardholder maintains a Deposits ADB of at least SGD50,000 in the Eligible EGA Account for the calendar month in which the Eligible Transaction was posted."
+
+GIVETH A Provenance
+`cl.7.2 the calculation and the cap` MEANS Provenance WITH
+    `document` IS "hsbc-revolution-reward-points-tnc"
+    `clause`   IS "7.2"
+    `dated`    IS "Effective from 1 April 2026"
+    `document date` IS YMD 2026 4 1
+    `quote`    IS "Reward points shall be calculated based on the total amount of Eligible Transactions posted into HSBC’s credit card system within each qualifying calendar month, rounded down to the nearest SGD1. Bonus Points are subject to a cap of: (i) 9,000 Bonus Points per calendar month; or (ii) 22,800 Bonus Points per calendar month if the Cardholder maintains a Deposits ADB of at least SGD50,000 in the Eligible EGA Account with HSBC for that calendar month. Base Points are not subject to any cap."
+
+GIVETH A Provenance
+`cl.8 all other Qualifying Transactions` MEANS Provenance WITH
+    `document` IS "hsbc-revolution-reward-points-tnc"
+    `clause`   IS "8"
+    `dated`    IS "Effective from 1 April 2026"
+    `document date` IS YMD 2026 4 1
+    `quote`    IS "Cardholders are entitled to earn 1 Reward point for every SGD1 charged on all other Qualifying Transactions that are not Eligible Transactions."
+
+GIVETH A Provenance
+`cl.9 the maximum, as illustrated` MEANS Provenance WITH
+    `document` IS "hsbc-revolution-reward-points-tnc"
+    `clause`   IS "9"
+    `dated`    IS "Effective from 1 April 2026"
+    `document date` IS YMD 2026 4 1
+    `quote`    IS "For avoidance of doubt, the maximum total Reward points that may be awarded for every SGD1 of an Eligible Transaction is 20 Reward points"
+
+GIVETH A Provenance
+`cl.10 crediting` MEANS Provenance WITH
+    `document` IS "hsbc-revolution-reward-points-tnc"
+    `clause`   IS "10"
+    `dated`    IS "Effective from 1 April 2026"
+    `document date` IS YMD 2026 4 1
+    `quote`    IS "the Base Points will be computed and credited into the Account based on the Cardholder’s statement cycle. The Bonus Points will be credited into the Account by the last day of the following calendar month"
+
+GIVETH A Provenance
+`cl.13 the conversion lives in another document` MEANS Provenance WITH
+    `document` IS "hsbc-revolution-reward-points-tnc"
+    `clause`   IS "13"
+    `dated`    IS "Effective from 1 April 2026"
+    `document date` IS YMD 2026 4 1
+    `quote`    IS "The calculation, use and redemption of the Reward points are subject to the HSBC’s Rewards Programme terms and conditions which are available at www.hsbc.com.sg/rewards."
+
+
+§§ `2. The Programme period`
+
+-- cl.2: "The Programme period starts from 1 April 2026 until terminated by
+-- HSBC." An open-ended end date, so only the opening edge is testable. A
+-- transaction dated before it is not governed by this document at all; the
+-- terms that did govern it are not in the bundle, which is why the answer for
+-- such a transaction is marked Unconfirmed rather than given as zero.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.2 — the transaction date falls within the Programme period` txn MEANS
+    txn's `transaction date` AT LEAST (YMD 2026 4 1)
+
+
+§§ `4. Qualifying Transactions`
+
+-- cl.4 chapeau: "“Qualifying Transactions” refers to posted retail purchases
+-- …, and shall exclude the following transactions (which shall, where
+-- applicable, be determined based on the transaction descriptions reflected in
+-- HSBC's system and the merchant category codes from Visa / Mastercard)".
+--
+-- The chapeau names its own operationalisation, and that is what makes this
+-- clause encodable: the eighteen bullets are not applied as categories, they
+-- are applied through TWO observable facts -- the statement description and
+-- the MCC. cl.4.2 supplies the MCC half as a closed list, so the bullets whose
+-- subject matter is an MCC (donations 8398/8651/8661, quasi-cash 6050/6051/
+-- 7511/7995/9754, financial institutions 6010/6011/6012/6211, insurance
+-- 5960/6300, education 8211-8299, utilities 4900, government 9211-9405,
+-- cleaning 7349, tax 9311) need no separate encoding here -- they are already
+-- in the cl.4.2 table below, and encoding them twice would let the two copies
+-- drift. What is left for THIS rule is the half the chapeau routes through the
+-- transaction description: the named merchants.
+--
+-- WHAT THE BULLETS ARE MADE OF, AND WHICH FACT EACH ONE READS. The eighteen
+-- bullets fall into three groups, and each group is encoded in a different
+-- place, so that no subject matter is encoded twice:
+--   by MCC          bullets 2, 3 (partly), 4 (partly), 8, 11, 12, 13, 14 --
+--                   already in the cl.4.2 table below, which is a closed list
+--                   of 48 codes. Encoding them again here would let the two
+--                   copies drift.
+--   by DESCRIPTION  bullets 1, 4 (crypto), 5, 7, 9 -- the merchants the clause
+--                   NAMES, read through the shared domain's closed
+--                   `Description pattern` enumeration (this rule).
+--   by CHARGE KIND  bullets 3 (quasi-cash), 9 (ATM), 15, 16, 17, 18 -- the
+--                   attributes of the POSTING rather than of the merchant
+--                   (the rule after this one).
+--
+-- WHY THIS RULE NO LONGER READS THE STATEMENT STRING. The first encoding of
+-- this clause tested `transaction description EQUALS "Paypal"` and the like.
+-- That was wrong twice over: a real statement line reads "PAYPAL *STEAM
+-- PURCHASE" and never equals the literal, and a string comparison cannot be
+-- lowered to Catala, which has no string type. The substring work now happens
+-- once, in `classify.l4`, which turns the printed line into the closed list of
+-- `Description pattern`s it carries; this rule tests membership of that list.
+-- The over-matching that substring classification does is layer 1's to state,
+-- and it errs toward EXCLUDING, which understates a reward and never
+-- overstates one.
+--
+-- THREE GAPS, STATED RATHER THAN PAPERED OVER.
+--   (a) Every list in cl.4 is introduced by "including but not limited to", so
+--       the pattern list is a LOWER BOUND on the exclusion. A merchant of an
+--       excluded kind that the clause does not name, and that layer 1 has no
+--       family for, will be answered here as earning, and the T&C would say
+--       otherwise.
+--   (b) BULLET 6 IS NOT ENCODED AT ALL. "Payments to any professional services
+--       provider (including but not limited to GOOGLE Ads, Facebook Ads,
+--       Amazon Web Services, MEDIA TRAFFIC AGENCY INC)" names four merchants
+--       and the domain's `Description pattern` enumeration has no family that
+--       covers any of them. MCCs 8999 (Professional Services) and 7399
+--       (Business Services) are in the cl.4.2 table and catch part of the
+--       subject matter, but none of the four named merchants posts under
+--       either as a rule. Recorded for the domain owner: this bullet needs a
+--       constructor.
+--   (c) BULLET 18 IS NOW HALF ENCODED. "Any unposted, cancelled, disputed and
+--       refunded transactions": `Refund or reversal` reaches the refunded and
+--       cancelled limbs (see the charge-kind rule below), and UNPOSTED and
+--       DISPUTED remain unrepresentable -- the domain's Transaction carries no
+--       disposition field, and one cannot be added from a card module. A
+--       caller holding an unposted or disputed transaction must not ask this
+--       rule.
+-- Written out one `elem` per line rather than dittoed: the pattern names are
+-- of different widths, and a ditto caret that does not land on the column of
+-- the token it replaces resolves to the WRONG token silently, with no
+-- diagnostic and a changed answer. The MCC tables below are dittoed because
+-- their tokens are all four digits wide.
+GIVEN patterns IS A LIST OF `Description pattern`
+GIVETH A BOOLEAN
+`cl.4 — the description names a transaction the clause excludes` patterns MEANS
+    -- bullet 1: "Foreign exchange transactions (including but not limited to Forex.com)"
+       elem `Forex or CFD platform` patterns
+    -- bullet 4: "... the trading of securities, investments or crypto-currencies of any kind"
+    OR elem `Cryptocurrency platform` patterns
+    -- bullet 5: "Payments on money payments/transfers (including but not limited to
+    --            Paypal, SKR skrill.com, CardUp, SmoovPay, iPayMy)"
+    OR elem PayPal patterns
+    OR elem `Skrill or Moneybookers` patterns
+    OR elem CardUp patterns
+    OR elem SmoovPay patterns
+    OR elem iPaymy patterns
+    -- bullet 7: "Top-ups, money transfers or purchase of credits of prepaid cards,
+    --            stored-value cards or e-wallets (including but not limited to
+    --            EZ-Link, Transitlink, NETS Flashpay and Youtrip)"
+    OR elem `EZ-Link` patterns
+    OR elem TRANSIT patterns
+    OR elem FlashPay patterns
+    OR elem YouTrip patterns
+    -- bullet 9: "Any AXS and ATM transactions" -- the AXS limb. The ATM limb is a
+    --           charge kind, and is in the rule below.
+    OR elem AXS patterns
+
+-- THE BULLETS THAT ARE ABOUT THE POSTING, NOT THE MERCHANT. None of these is
+-- visible in an MCC or in a merchant name: they are what KIND of posting the
+-- statement shows, which is what the domain's `Charge kind` carries.
+--
+--   bullet 15  "Balance transfers, fund transfers, cash advances, finance
+--              charges, late charges, HSBC's Cash Instalment Plan, any fees
+--              charged by HSBC"
+--   bullet 16  "The monthly instalment amounts under all card instalment plan
+--              (including HSBC 0% Card Instalment Payment Plan, HSBC PayLater
+--              Instalment Plan and HSBC Spend Instalment)"
+--   bullet 17  "Total purchase amount under HSBC 0% Instalment Payment Plan
+--              and HSBC PayLater Instalment Plan"
+--   bullet 3   "Quasi-cash transactions" -- the quasi-cash limb; its named
+--              examples (money orders, travellers' cheques, gaming, lottery,
+--              gambling) are also MCCs in the cl.4.2 table
+--   bullet 9   "Any AXS and ATM transactions" -- the ATM limb: an ATM
+--              withdrawal on a credit card posts as a cash advance
+--   bullet 18  "Any unposted, cancelled, disputed and refunded transactions"
+--              -- the refunded and cancelled limbs only; see gap (c) above
+--
+-- TWO CHARGE KINDS THE DOCUMENT DOES NOT NAME, AND SO ARE NOT EXCLUDED HERE.
+--   `Bill payment via internet banking` -- other issuers in this corpus
+--       exclude it by name (DBS Woman's cl.11, Citi cl.5); HSBC does not, and
+--       reading it into "fund transfers" would be inference rather than text.
+--   `Pre-authorisation` -- cl.4's chapeau admits "posted retail purchases",
+--       and a pre-authorisation hold is arguably not one, but no bullet says
+--       so. Reading the chapeau that way would exclude on the encoder's
+--       judgement and still report the answer as Verified, which would be a
+--       lie about where the answer came from. A caller holding either should
+--       know that this rule treats it as an ordinary purchase.
+GIVEN `the kind of charge` IS A `Charge kind`
+GIVETH A BOOLEAN
+`cl.4 — the kind of charge is one the clause excludes` `the kind of charge` MEANS
+       `the kind of charge` EQUALS `Balance or funds transfer`      -- bullet 15  balance transfers, fund transfers
+    OR ^                    ^      `Cash advance or quasi-cash`     -- bullets 3, 9, 15  quasi-cash, ATM, cash advances
+    OR ^                    ^      `Interest or finance charge`     -- bullet 15  finance charges, late charges
+    OR ^                    ^      `Annual fee or bank charge`      -- bullet 15  "any fees charged by HSBC"
+    OR ^                    ^      `Instalment plan transaction`    -- bullets 15, 16, 17  Cash Instalment Plan, 0% IPP, PayLater, Spend Instalment
+    OR ^                    ^      `Refund or reversal`             -- bullet 18  the refunded and cancelled limbs
+
+-- cl.4 bullet 10: "Tax payments (except HSBC Tax Payment Facility)".
+--
+-- THIS PROVISO CAN NO LONGER BE ENCODED, AND THAT IS A REGRESSION THIS FILE
+-- OWNS. The first encoding tested the statement description for the literal
+-- "HSBC Tax Payment Facility". That test cannot survive the move off strings:
+-- neither `Merchant` nor `Description pattern` has a constructor for HSBC's
+-- Tax Payment Facility, and a card module may not add one. So MCC 9311
+-- (cl.4.2 row 44) now answers ZERO for every tax payment, including one made
+-- through the facility the clause carves back in, and the two are
+-- indistinguishable to every rule in this file. There is an assertion at the
+-- foot of the module that pins that indistinguishability, so the day a
+-- constructor arrives, something will notice. Recorded for the domain owner
+-- beside gap (b): this is the second of the two constructors cl.4 needs.
+-- Defeasibility site 2 at the foot of this file is now a site with no rule.
+
+
+§§ `4.2 The Merchant Category Codes that earn no Reward points`
+
+-- cl.4.2: "For the avoidance of doubt, transactions made at merchants with the
+-- following MCCs will not earn Reward Points. The following list of MCCs may
+-- be updated by HSBC from time to time without prior notice."
+--
+-- Note the clause's own verb. It does not say these are not Qualifying
+-- Transactions; it says they "will not earn Reward Points" -- a zero-earning
+-- rule laid over the cl.4 definition rather than a carve-out from it. On this
+-- document the distinction is inert, because the 48 codes below and the 49
+-- codes of the cl.7 table are DISJOINT (checked exhaustively), so no code can
+-- be both excluded and eligible; but the distinction is in the text and is
+-- recorded here in case a later revision makes the lists overlap.
+--
+-- The rows are in the DOCUMENT'S OWN ORDER, which is not numeric: rows 23, 24,
+-- 25 print 7299, 7399, 7349. That transposition is the source's, and it is
+-- kept so a reviewer can read this block against the printed table row by row.
+-- Generated from the source text and diffed against it: 48 rows, identical in
+-- value and in order.
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`cl.4.2 — the MCC earns no Reward points` mcc MEANS
+       mcc EQUALS 4829          --  1  Money Transfer
+    OR ^   ^      4900          --  2  Utilities - Electric, Gas, Water and Sanitary
+    OR ^   ^      5199          --  3  Nondurable Good
+    OR ^   ^      5960          --  4  Direct Marketing - Insurance Services
+    OR ^   ^      6010          --  5  Financial Institutions - Manual Cash Disbursements
+    OR ^   ^      6011          --  6  Financial Institutions - Automated Cash Disbursements
+    OR ^   ^      6012          --  7  Financial Institutions - Merchandise, Services, and Debt Repayment
+    OR ^   ^      6050          --  8  Quasi Cash - Customer Financial Institution
+    OR ^   ^      6051          --  9  Non-Financial Institutions - Foreign Currency, Non-Fiat Currency, Money Orders, Travelers Cheques, Debt Repayment
+    OR ^   ^      6211          -- 10  Security Brokers / Dealers
+    OR ^   ^      6300          -- 11  Insurance Sales, Underwriting, and Premiums
+    OR ^   ^      6513          -- 12  Real Estate Agents & Managers - Rentals
+    OR ^   ^      6529          -- 13  Remote Stored Value Load - Member
+    OR ^   ^      6530          -- 14  Remote Stored Value Load - Merchant
+    OR ^   ^      6532          -- 15  PSP-Member-Payment Transaction
+    OR ^   ^      6533          -- 16  PSP-Merchant-Payment Transaction
+    OR ^   ^      6534          -- 17  Money Transfer Member
+    OR ^   ^      6536          -- 18  Moneysend - Intracountry
+    OR ^   ^      6537          -- 19  Moneysend - Intercountry
+    OR ^   ^      6538          -- 20  Moneysend funding
+    OR ^   ^      6540          -- 21  Non-Financial Institutions - Stored Value Card Purchase/Load
+    OR ^   ^      6555          -- 22  Mastercard Imitated Rebate
+    OR ^   ^      7299          -- 23  Other Services - Not Elsewhere Classified
+    OR ^   ^      7399          -- 24  Business Services (Not Elsewhere Classified
+    OR ^   ^      7349          -- 25  CLEAN/MAINT/JANITORIAL SERV
+    OR ^   ^      7511          -- 26  Quasi Cash - Truck Stop Trxns
+    OR ^   ^      7523          -- 27  Automobile Parking Lots and Garages
+    OR ^   ^      7801          -- 28  Government Licensed On-Line Casinos (On-Line Gambling) (US Region only)
+    OR ^   ^      7995          -- 29  Betting, including Lottery Tickets, Casino Gaming Chips, Off-Track Betting, and Wagers at Race Tracks
+    OR ^   ^      8062          -- 30  Hospitals
+    OR ^   ^      8211          -- 31  Elementary and Secondary Schools
+    OR ^   ^      8220          -- 32  Colleges, Universities, Professional Schools, and Junior Colleges
+    OR ^   ^      8241          -- 33  Correspondence Schools
+    OR ^   ^      8244          -- 34  Business and Secretarial Schools
+    OR ^   ^      8249          -- 35  Vocational and Trade Schools
+    OR ^   ^      8299          -- 36  Schools and Educational Services (Not Elsewhere Classified)
+    OR ^   ^      8398          -- 37  Charitable Social Service Organizations
+    OR ^   ^      8651          -- 38  Political Organizations
+    OR ^   ^      8661          -- 39  Religious Organizations
+    OR ^   ^      8999          -- 40  Professional Services (Not Elsewhere Classified)
+    OR ^   ^      9211          -- 41  Court Costs, Including Alimony and Child Support
+    OR ^   ^      9222          -- 42  Fines
+    OR ^   ^      9223          -- 43  Bail and Bond Payments
+    OR ^   ^      9311          -- 44  Tax Payments
+    OR ^   ^      9399          -- 45  Government Services (Not Elsewhere Classified)
+    OR ^   ^      9402          -- 46  Postal Services - Government Only
+    OR ^   ^      9405          -- 47  Intra-Government Purchases - Government Only
+    OR ^   ^      9754          -- 48  Gambling-Horse Racing Dog Racing State Lotteries
+
+
+§§ `5. Selected Contactless Payments`
+
+-- cl.5: "“Selected Contactless Payments” refers to Qualifying Transactions
+-- made via Visa contactless through a contactless terminal mode which includes
+-- Visa payWave, Apple Pay, Google Pay and Samsung Pay."
+--
+-- TWO READINGS OF THIS CLAUSE, AND WHICH ONE IS ENCODED. The operative words
+-- are "through a contactless terminal mode": the test is the TERMINAL MODE,
+-- not the credential. Visa payWave is the physical card's own contactless
+-- mode and the other three are wallet tokens, and the clause puts all four on
+-- one list, which is the spec's point at section 4.4 -- Revolution ignores the
+-- credential. So a tap qualifies whichever of the two the cardholder
+-- presented, and a card INSERTED or SWIPED does not qualify at all, because
+-- that is not a contactless terminal mode.
+--
+-- THE ONE CREDENTIAL THE CLAUSE DOES NOT REACH. `Via Amaze` is the Instarem
+-- proxy card, which is not named here and is not a mode of presenting THIS
+-- Card: the cardholder taps the proxy, and the proxy's operator then charges
+-- the Revolution Card as a separate transaction that never went near the
+-- merchant's terminal. So cl.5 is not satisfied. That reading is an inference
+-- from how the product works, not something the document says, so the answer
+-- that follows from it is marked Unconfirmed rather than Verified.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.5 — the transaction is a Selected Contactless Payment` txn MEANS
+        txn's `payment channel` EQUALS `Tapped at a terminal`
+    AND NOT (txn's `credential` EQUALS `Via Amaze`)
+
+
+§§ `6. Selected Online Transactions`
+
+-- cl.6: "“Selected Online Transactions” refers to Qualifying Transactions made
+-- via the internet and processed by the respective merchants/merchant's
+-- acquiring bank as an online transaction type through the Visa Worldwide
+-- networks, including credential-on-file payments when the Cardholder stores
+-- the Card information with a merchant or payment facilitator to make future
+-- purchases. HSBC determines whether a transaction is a Selected Online
+-- Transaction based on system indicators which are determined by the merchants
+-- and the merchant's acquiring bank."
+--
+-- The clause is a CONJUNCTION of one fact the cardholder controls and one they
+-- do not, and keeping them apart is the whole point of the two-axis domain:
+--   (a) "made via the internet" -- the cardholder knows whether they paid in a
+--       website or app, or left the card on file. The last sentence of the
+--       clause is explicit that credential-on-file counts.
+--   (b) "processed … as an online transaction type", which HSBC decides "based
+--       on system indicators which are determined by the merchants and the
+--       merchant's acquiring bank". The cardholder cannot see this at the
+--       moment of payment; it is latent, and it is stable per merchant.
+-- So (a) is the channel and (b) is the merchant indicator, and when the
+-- indicator is Unknown this module answers under both branches rather than
+-- guessing one. A terminal tap needs no indicator: cl.5 qualifies it on the
+-- terminal mode alone, so nothing there turns on (b).
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.6 — the transaction was made via the internet` txn MEANS
+       txn's `payment channel` EQUALS `Paid in a website or app`
+    OR txn's `payment channel` EQUALS `Card on file or recurring billing`
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.6 — the transaction is a Selected Online Transaction` txn MEANS
+        `cl.6 — the transaction was made via the internet` txn
+    AND txn's `merchant indicator` EQUALS `Flags online`
+
+-- The partiality case, which is NOT the same as a failed condition (spec
+-- section 8: "the merchant indicator is not a condition that is defeated, it
+-- is one that is unevaluable at decision time"). The cardholder paid over the
+-- internet but has never seen this merchant post, so they cannot say which way
+-- the acquirer flags it.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.6 — whether this is a Selected Online Transaction cannot yet be told` txn MEANS
+        `cl.6 — the transaction was made via the internet` txn
+    AND txn's `merchant indicator` EQUALS Unknown
+
+
+§§ `7. Eligible Transactions`
+
+-- cl.7: "“Eligible Transactions” refers to Selected Contactless Payments and
+-- Selected Online Transactions that fall within any one of the following
+-- MCCs". The "and" is a disjunction of the two defined channels -- a
+-- transaction is one or the other, never both -- narrowed by the MCC table.
+--
+-- The table's four category headings are its own, and each becomes a rule, so
+-- the encoding can be read against the printed table one category at a time.
+-- Rows 1-4 are the only rows the document writes as RANGES; every other row is
+-- a single code. That matters, because the ranges do not generalise: rows
+-- 13-21 look like a 5611-5699 apparel range and are not one (5612 through
+-- 5620, among many others, are absent), and rows 27-33 skip 5943 between 5942
+-- and 5944. Written out as the document writes them. Generated from the source
+-- text and diffed against it: 49 rows, identical in value and in order.
+
+-- Rows 1-4, "Travel related such as Airlines, Car Rental, Lodging and Cruise
+-- Lines". The only rows the document states as ranges.
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`cl.7 — the MCC is travel related` mcc MEANS
+       (mcc AT LEAST 3000 AND mcc AT MOST 3350) OR mcc EQUALS 4511    -- 1  Airlines
+    OR (mcc AT LEAST 3351 AND mcc AT MOST 3500)                       -- 2  Car Rental Agencies
+    OR (mcc AT LEAST 3501 AND mcc AT MOST 3999) OR mcc EQUALS 7011    -- 3  Lodging – Hotels, Motels, Resorts
+    OR mcc EQUALS 4411                                                -- 4  Cruise Lines
+
+-- Rows 5-42, "Department Stores and Retail Stores".
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`cl.7 — the MCC is a Department Store or Retail Store` mcc MEANS
+       mcc EQUALS 4816          --  5  Computer Network/Information Services
+    OR ^   ^      5045          --  6  Computers, Computer Peripheral Equipment, Software
+    OR ^   ^      5262          --  7  Marketplaces
+    OR ^   ^      5309          --  8  Duty Free Stores
+    OR ^   ^      5310          --  9  Discount Stores
+    OR ^   ^      5311          -- 10  Department Stores
+    OR ^   ^      5331          -- 11  Variety Stores
+    OR ^   ^      5399          -- 12  Miscellaneous General Merchandise Stores
+    OR ^   ^      5611          -- 13  Men's and Boys' Clothing and Accessories Stores
+    OR ^   ^      5621          -- 14  Women's Ready to Wear Stores
+    OR ^   ^      5631          -- 15  Women's Accessory and Specialty Stores
+    OR ^   ^      5641          -- 16  Children's and Infants' Wear Stores
+    OR ^   ^      5651          -- 17  Family Clothing Stores
+    OR ^   ^      5655          -- 18  Sports Apparel, and Riding Apparel Stores
+    OR ^   ^      5661          -- 19  Shoe Stores
+    OR ^   ^      5691          -- 20  Men's and Women's Clothing Stores
+    OR ^   ^      5699          -- 21  Accessory and Apparel Stores - Miscellaneous
+    OR ^   ^      5732          -- 22  Electronics Sales
+    OR ^   ^      5733          -- 23  Music Stores - Musical Instruments, Pianos and Sheet Music
+    OR ^   ^      5734          -- 24  Computer Software Stores
+    OR ^   ^      5735          -- 25  Record Shops
+    OR ^   ^      5912          -- 26  Drug Stores and Pharmacies
+    OR ^   ^      5942          -- 27  Book Stores
+    OR ^   ^      5944          -- 28  Clock, Jewelry, Watch and Silverware Stores
+    OR ^   ^      5945          -- 29  Game, Toy and Hobby Shops
+    OR ^   ^      5946          -- 30  Camera and Photographic Supply Stores
+    OR ^   ^      5947          -- 31  Card, Gift, Novelty and Souvenir Shops
+    OR ^   ^      5948          -- 32  Leather Goods and Luggage Stores
+    OR ^   ^      5949          -- 33  Fabric, Needlework, Piece Goods and Sewing Stores
+    OR ^   ^      5964          -- 34  Direct Marketing - Catalog Merchants
+    OR ^   ^      5965          -- 35  Direct Marketing - Combination Catalog and Retail Merchant
+    OR ^   ^      5966          -- 36  Direct Marketing - Outbound Telemarketing Merchants
+    OR ^   ^      5967          -- 37  Direct Marketing - Inbound Telemarketing Merchants
+    OR ^   ^      5968          -- 38  Direct Marketing - Continuity/Subscription Merchants
+    OR ^   ^      5969          -- 39  Direct Marketing - Other Direct Marketers - Not Elsewhere Classified
+    OR ^   ^      5970          -- 40  Artist Supply Stores, Craft Shops
+    OR ^   ^      5992          -- 41  Florists
+    OR ^   ^      5999          -- 42  Miscellaneous and Specialty Retail Stores
+
+-- Rows 43-47, "Dining excluding hotel dining". Note what is NOT here: 5814
+-- (fast food) and 5411 (grocery stores) are absent from the whole table, so a
+-- fast-food tap and a supermarket tap earn the cl.8 rate, not the bonus rate.
+-- Hotel dining is excluded by its heading and in practice by the MCC: a hotel
+-- restaurant posts under 7011, which IS in the table at row 3 -- so the
+-- heading's carve-out and the table disagree, and the table is what the clause
+-- makes operative ("that fall within any one of the following MCCs").
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`cl.7 — the MCC is dining excluding hotel dining` mcc MEANS
+       mcc EQUALS 5441          -- 43  Candy, Nut and Confectionery Stores
+    OR ^   ^      5462          -- 44  Bakeries
+    OR ^   ^      5811          -- 45  Caterers
+    OR ^   ^      5812          -- 46  Eating Places and Restaurants
+    OR ^   ^      5813          -- 47  Bars, Cocktail Lounges, Discotheques, Nightclubs and Taverns - Drinking Places (Alcoholic Beverages)
+
+-- Rows 48-49, "Others such as Transportation and Membership Clubs".
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`cl.7 — the MCC is transportation or a membership club` mcc MEANS
+       mcc EQUALS 4121          -- 48  Taxicabs and Limousines
+    OR ^   ^      7997          -- 49  Clubs - Country Clubs, Membership (Athletic, Recreation, Sports), Private Golf Courses
+
+GIVEN mcc IS A NUMBER
+GIVETH A BOOLEAN
+`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` mcc MEANS
+       `cl.7 — the MCC is travel related`                     mcc
+    OR `cl.7 — the MCC is a Department Store or Retail Store`  mcc
+    OR `cl.7 — the MCC is dining excluding hotel dining`       mcc
+    OR `cl.7 — the MCC is transportation or a membership club` mcc
+
+
+§§ `7.1 The Reward points awarded`
+
+-- cl.7.1(i): "1 Reward point (“Base Points”) for every SGD1 of the Eligible
+-- Transaction".
+GIVETH A NUMBER
+`the Base Points for every SGD1` MEANS 1
+
+-- cl.7.1(ii)(b): "if the Cardholder maintains a Deposits ADB of at least
+-- SGD50,000 in the Eligible EGA Account for the calendar month in which the
+-- Eligible Transaction was posted". "Eligible EGA Account" is defined in the
+-- same clause as "a sole HSBC Everyday Global Account (Singapore dollars SGD
+-- account)", and the clause adds that "deposits in joint accounts are not
+-- taken into account". The shared domain carries the figure as one number, so
+-- the soleness of the account is the caller's responsibility to honour when
+-- supplying it; noted as a domain gap.
+GIVEN cardholder IS A Cardholder
+GIVETH A BOOLEAN
+`cl.7.1 — the Cardholder maintains the Deposits ADB threshold` cardholder MEANS
+    cardholder's `HSBC Everyday Global Account deposits ADB this month` AT LEAST 50_000
+
+-- cl.7.1(ii): "(a) 9 Reward points (“Bonus Points”) for every SGD1 … or (b) 19
+-- Bonus Points for every SGD1".
+GIVEN cardholder IS A Cardholder
+GIVETH A NUMBER
+`the Bonus Points for every SGD1` cardholder MEANS
+    IF   `cl.7.1 — the Cardholder maintains the Deposits ADB threshold` cardholder
+    THEN 19
+    ELSE 9
+
+-- cl.9: "the maximum total Reward points that may be awarded for every SGD1 of
+-- an Eligible Transaction is 20 Reward points" -- which is this sum at its
+-- upper branch, and the document's own arithmetic check on cl.7.1.
+GIVEN cardholder IS A Cardholder
+GIVETH A NUMBER
+`the total Reward points for every SGD1 of an Eligible Transaction` cardholder MEANS
+    `the Base Points for every SGD1` PLUS `the Bonus Points for every SGD1` cardholder
+
+-- cl.8: "Cardholders are entitled to earn 1 Reward point for every SGD1
+-- charged on all other Qualifying Transactions that are not Eligible
+-- Transactions." The same figure as the Base Points, arrived at by a different
+-- clause, so it is named separately rather than shared.
+GIVETH A NUMBER
+`the Reward points for every SGD1 of any other Qualifying Transaction` MEANS 1
+
+-- THE CONVERSION IS NOT IN THIS DOCUMENT. cl.13 sends it elsewhere: "The
+-- calculation, use and redemption of the Reward points are subject to the
+-- HSBC's Rewards Programme terms and conditions which are available at
+-- www.hsbc.com.sg/rewards." Those terms are not in the source bundle, so the
+-- figure below is the market conversion and NOT a read from a held document.
+-- Every answer therefore carries `conversion status` IS Unconfirmed, whatever
+-- the status of the earning rule itself.
+GIVETH A NUMBER
+`miles per HSBC Reward point` MEANS 0.4
+
+
+§§ `7.2 The cap on Bonus Points`
+
+-- cl.7.2: "Bonus Points are subject to a cap of: (i) 9,000 Bonus Points per
+-- calendar month; or (ii) 22,800 Bonus Points per calendar month if the
+-- Cardholder maintains a Deposits ADB of at least SGD50,000 … Base Points are
+-- not subject to any cap."
+GIVEN cardholder IS A Cardholder
+GIVETH A NUMBER
+`the cap on Bonus Points per calendar month` cardholder MEANS
+    IF   `cl.7.1 — the Cardholder maintains the Deposits ADB threshold` cardholder
+    THEN 22_800
+    ELSE 9_000
+
+-- THE BASIS AND THE ATTRIBUTION ARE TWO AXES, AND THIS DOCUMENT SETTLES BOTH.
+--
+-- Basis: cl.7.2 says "per calendar month", twice, so `Calendar month`.
+--
+-- Attribution: the brief for this encoding left this open, on the footing that
+-- the T&C does not state it. It does state it, in three places, and they
+-- agree, so it is recorded as `By posting date` rather than Unconfirmed:
+--   cl.7.2   "Reward points shall be calculated based on the total amount of
+--            Eligible Transactions POSTED into HSBC's credit card system
+--            within each qualifying calendar month"
+--   cl.7.1(ii)(b) "for the calendar month in which the Eligible Transaction
+--            WAS POSTED"
+--   cl.9     the illustration table's own row label, "the calendar month in
+--            which the Eligible Transaction was posted"
+-- The first of those is the operative one: it says what the monthly total is
+-- computed over, and it selects the transactions by posting. cl.10 is
+-- consistent with it and is why the distinction bites -- Bonus Points are
+-- credited "by the last day of the following calendar month", so a late
+-- merchant submission moves a purchase into the next month's pot.
+--
+-- `bonus spend per month` is the domain's unit: DOLLARS of bonus-earning
+-- spend, which is the points cap divided by the bonus points per dollar at the
+-- rate being returned. 9,000 / 9 = S$1,000; 22,800 / 19 = S$1,200. The two
+-- branches land on different dollar figures even though the bonus rate rises
+-- with the cap, which is the fact a reader most often gets wrong.
+--
+-- `pool` names WHICH pot the transaction runs against, and on this card there
+-- is exactly one. cl.7.2 states a single cap over "the total amount of
+-- Eligible Transactions", and cl.7 defines Eligible Transactions as Selected
+-- Contactless Payments AND Selected Online Transactions together -- so a
+-- contactless tap and an online purchase draw down the SAME 9,000 or 22,800
+-- Bonus Points. That is worth saying out loud, because the cards that keep
+-- several pots (UOB cl.6(b) caps each Preferred Rewards Category separately)
+-- look the same from the outside and are not.
+GIVEN cardholder IS A Cardholder
+GIVETH A Cap
+`the cl.7.2 cap on an Eligible Transaction` cardholder MEANS
+    Cap WITH
+        `pool`                  IS "Revolution contactless + online (one pool)"
+        `capped`                IS TRUE
+        `bonus spend per month` IS `the cap on Bonus Points per calendar month` cardholder
+                                   DIVIDED BY `the Bonus Points for every SGD1` cardholder
+        `basis`                 IS `Calendar month`
+        `attribution`           IS `By posting date`
+
+-- cl.7.2 last line: "Base Points are not subject to any cap." An answer that
+-- earns only Base Points is therefore uncapped, and per the shared domain's
+-- note the dollar figure is meaningless when `capped` is FALSE. The basis and
+-- attribution are still the document's, and are carried so a reader is not
+-- told "unconfirmed" about something the document settles.
+GIVETH A Cap
+`no cap, because only Base Points are earned` MEANS
+    Cap WITH
+        `pool`                  IS "Revolution contactless + online (one pool)"
+        `capped`                IS FALSE
+        `bonus spend per month` IS 0
+        `basis`                 IS `Calendar month`
+        `attribution`           IS `By posting date`
+
+
+§§ `Assembling the answer`
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+`the lower of` a `and` b MEANS IF a AT MOST b THEN a ELSE b
+
+-- WHICH OF THE FIVE ANSWERS IS BEING BUILT. This enumeration exists for one
+-- reason: the `conditions` a reader is shown differ per answer, and they are
+-- prose, and prose cannot be passed around. A list of STRING is outside the
+-- Catala fragment as a parameter and as a result type -- a string can be
+-- elided where it is a record FIELD, never where it is inside a type -- so the
+-- wording has to be written where it lands, inside the `Rate answer`
+-- construction. Naming the answer is what lets one constructor still do that
+-- for all five: each answer below passes a constant, so the BRANCH on it is a
+-- lookup rather than a second copy of the dispatch in `what the Programme
+-- awards on`.
+DECLARE `Which answer this is` IS ONE OF
+    `No Reward points at all`
+    `The cl.8 base rate`
+    `The cl.8 base rate through a proxy card`
+    `An Eligible Transaction`
+    `An Eligible Transaction only if the merchant flags online`
+
+-- One constructor for every answer this module gives, so the four derived
+-- fields cannot drift between branches.
+--
+-- The two conditional figures are the contract with the projection (spec
+-- section 7): when the indicator is KNOWN, or the rate does not turn on it,
+-- both are the same number and `depends on the merchant indicator` is FALSE by
+-- construction. When they differ the flag is TRUE and `miles per dollar`
+-- carries the LOWER of the two, so the headline figure never overstates.
+--
+-- `earns the bonus rate` is DERIVED here rather than passed in, and that is a
+-- correctness measure, not tidiness. Passed in, it was TRUE on the conditional
+-- answer while that same answer's headline was the base rate of 1 point and
+-- 0.4 miles -- three fields describing one rate, and one of them disagreeing.
+-- Derived from the headline it cannot disagree: it is TRUE exactly when the
+-- figure being led with beats cl.8's rate. The reader learns that the bonus
+-- rate is REACHABLE from `depends on the merchant indicator` and the
+-- `if the merchant flags online` figure, which is where that belongs.
+--
+-- `cardholder` and `txn` are read only by the `conditions` branch, which is
+-- the one place the Eligible Transaction answer has to say WHICH of its four
+-- shapes it is: a tap or an online purchase, at the 10-point rate or the
+-- 20-point one.
+GIVEN `which answer`                       IS A `Which answer this is`
+      cardholder                           IS A Cardholder
+      txn                                  IS A Transaction
+      `if the merchant flags online`       IS A NUMBER
+      `if the merchant flags card-present` IS A NUMBER
+      `the cap`                            IS A Cap
+      `the sources`                        IS A LIST OF Provenance
+      `the status`                         IS A Status
+GIVETH A `Rate answer`
+`a Revolution answer of` `which answer` cardholder txn `if the merchant flags online` `if the merchant flags card-present` `the cap` `the sources` `the status` MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS `the points this answer leads with`
+        `miles per point`                                     IS `miles per HSBC Reward point`
+        `conversion status`                                   IS Unconfirmed
+        `miles per dollar`                                    IS `the points this answer leads with`       TIMES `miles per HSBC Reward point`
+        `miles per dollar if the merchant flags online`       IS `if the merchant flags online`             TIMES `miles per HSBC Reward point`
+        `miles per dollar if the merchant flags card-present` IS `if the merchant flags card-present`       TIMES `miles per HSBC Reward point`
+        `depends on the merchant indicator`                   IS NOT (`if the merchant flags online` EQUALS `if the merchant flags card-present`)
+        `earns the bonus rate`                                IS `the points this answer leads with` GREATER THAN `the Reward points for every SGD1 of any other Qualifying Transaction`
+        `cap`                                                 IS `the cap`
+        `sources`                                             IS `the sources`
+        `status`                                              IS `the status`
+        -- Every branch ends on the conversion caveat, because cl.13 puts the
+        -- conversion in a document this bundle does not hold, and that is true
+        -- of every answer. The two contactless branches also carry the FAQ
+        -- conflict: the held FAQ and the held T&C disagree about what a tap
+        -- earns, and the T&C governs (see the header block).
+        `conditions`                                          IS
+            BRANCH
+                IF   `which answer` EQUALS `No Reward points at all`
+                THEN LIST "this transaction earns no HSBC Reward points at all: cl.4 excludes it from Qualifying Transactions, or cl.4.2 lists its MCC as earning none"
+                        , "0.4 miles per HSBC Reward point is the market conversion, not a figure from a held document: cl.13 puts the conversion in the HSBC Rewards Programme terms, which are not in this bundle"
+                IF   `which answer` EQUALS `The cl.8 base rate`
+                THEN LIST "a Qualifying Transaction that is not an Eligible Transaction: it earns the base 1 Reward point per SGD1, and no Bonus Points"
+                        , "0.4 miles per HSBC Reward point is the market conversion, not a figure from a held document: cl.13 puts the conversion in the HSBC Rewards Programme terms, which are not in this bundle"
+                IF   `which answer` EQUALS `The cl.8 base rate through a proxy card`
+                THEN LIST "this T&C does not address Instarem Amaze: the Card is charged by the proxy's operator and not at the merchant's terminal, so cl.5's contactless limb is not satisfied and the bonus rate is not reached"
+                        , "check what the proxy posts as: if it posts under MCC 6540 or 4829 the charge earns nothing at all, by cl.4.2 rows 21 and 1"
+                        , "0.4 miles per HSBC Reward point is the market conversion, not a figure from a held document: cl.13 puts the conversion in the HSBC Rewards Programme terms, which are not in this bundle"
+                IF   `which answer` EQUALS `An Eligible Transaction only if the merchant flags online`
+                THEN LIST "the rate turns on a fact only the merchant's acquirer knows: cl.6 says HSBC decides this \"based on system indicators which are determined by the merchants and the merchant's acquiring bank\""
+                        , "if this merchant flags the payment as an online transaction it is an Eligible Transaction; if it flags card-present it is not, and earns the base rate"
+                        , "the indicator is stable per merchant, so one test purchase settles it for every future purchase there"
+                        , "0.4 miles per HSBC Reward point is the market conversion, not a figure from a held document: cl.13 puts the conversion in the HSBC Rewards Programme terms, which are not in this bundle"
+                IF   `cl.5 — the transaction is a Selected Contactless Payment` txn
+                     AND `cl.7.1 — the Cardholder maintains the Deposits ADB threshold` cardholder
+                THEN LIST "a contactless tap at an MCC in the cl.7 table, at the higher bonus rate: 20 Reward points per SGD1, Bonus Points capped at 22,800 a calendar month (about S$1,200 of eligible spend)"
+                        , "HSBC's own FAQ still says contactless payments earn 1 Reward point with effect from 15 July 2024; the T&C effective 1 April 2026 makes a contactless tap an Eligible Transaction at cl.5 and cl.7, and is the later instrument"
+                        , "0.4 miles per HSBC Reward point is the market conversion, not a figure from a held document: cl.13 puts the conversion in the HSBC Rewards Programme terms, which are not in this bundle"
+                IF   `cl.5 — the transaction is a Selected Contactless Payment` txn
+                THEN LIST "a contactless tap at an MCC in the cl.7 table: 10 Reward points per SGD1, Bonus Points capped at 9,000 a calendar month (about S$1,000 of eligible spend)"
+                        , "keep a Deposits ADB of at least S$50,000 in a SOLE HSBC Everyday Global Account and cl.7.1(ii)(b) raises this to 20 Reward points per SGD1; joint accounts do not count"
+                        , "HSBC's own FAQ still says contactless payments earn 1 Reward point with effect from 15 July 2024; the T&C effective 1 April 2026 makes a contactless tap an Eligible Transaction at cl.5 and cl.7, and is the later instrument"
+                        , "0.4 miles per HSBC Reward point is the market conversion, not a figure from a held document: cl.13 puts the conversion in the HSBC Rewards Programme terms, which are not in this bundle"
+                IF   `cl.7.1 — the Cardholder maintains the Deposits ADB threshold` cardholder
+                THEN LIST "an online transaction the merchant flags as online, at an MCC in the cl.7 table, at the higher bonus rate: 20 Reward points per SGD1, Bonus Points capped at 22,800 a calendar month (about S$1,200 of eligible spend)"
+                        , "0.4 miles per HSBC Reward point is the market conversion, not a figure from a held document: cl.13 puts the conversion in the HSBC Rewards Programme terms, which are not in this bundle"
+                OTHERWISE
+                     LIST "an online transaction the merchant flags as online, at an MCC in the cl.7 table: 10 Reward points per SGD1, Bonus Points capped at 9,000 a calendar month (about S$1,000 of eligible spend)"
+                        , "keep a Deposits ADB of at least S$50,000 in a SOLE HSBC Everyday Global Account and cl.7.1(ii)(b) raises this to 20 Reward points per SGD1; joint accounts do not count"
+                        , "0.4 miles per HSBC Reward point is the market conversion, not a figure from a held document: cl.13 puts the conversion in the HSBC Rewards Programme terms, which are not in this bundle"
+    WHERE
+        GIVETH A NUMBER
+        `the points this answer leads with` MEANS
+            `the lower of` `if the merchant flags online` `and` `if the merchant flags card-present`
+
+
+§§ `The five answers this document gives`
+
+-- (1) Nothing. cl.4 excludes the transaction from Qualifying Transactions, or
+-- cl.4.2 puts its MCC on the no-points list.
+GIVEN cardholder IS A Cardholder
+      txn        IS A Transaction
+GIVETH A `Rate answer`
+`the answer when no Reward points are earned` cardholder txn MEANS
+    `a Revolution answer of` `No Reward points at all` cardholder txn
+        0 0 `no cap, because only Base Points are earned`
+        (LIST `cl.4 Qualifying Transactions`, `cl.4.1 the acquirer assigns the MCC`, `cl.4.2 the excluded Merchant Category Codes`)
+        Verified
+
+-- (2) One Reward point. cl.8, "all other Qualifying Transactions that are not
+-- Eligible Transactions" -- the card's floor rate, and where a card that is
+-- inserted rather than tapped lands, and where an eligible channel at an MCC
+-- outside the cl.7 table lands.
+GIVEN cardholder IS A Cardholder
+      txn        IS A Transaction
+GIVETH A `Rate answer`
+`the cl.8 answer` cardholder txn MEANS
+    `a Revolution answer of` `The cl.8 base rate` cardholder txn
+        `the Reward points for every SGD1 of any other Qualifying Transaction`
+        `the Reward points for every SGD1 of any other Qualifying Transaction`
+        `no cap, because only Base Points are earned`
+        (LIST `cl.8 all other Qualifying Transactions`, `cl.7 Eligible Transactions`)
+        Verified
+
+-- (2a) The same rate, reached without the document's authority. `Via Amaze` is
+-- the Instarem proxy: the cardholder taps the proxy card, and the proxy's
+-- operator charges this Card afterwards. cl.5 does not reach it (see §5), and
+-- nothing else in the document addresses a forwarded charge, so the rate below
+-- is an inference and is marked Unconfirmed. The second condition is the part
+-- a reader needs most: if the proxy posts under its own MCC the answer is not
+-- 1 point but zero, by cl.4.2.
+GIVEN cardholder IS A Cardholder
+      txn        IS A Transaction
+GIVETH A `Rate answer`
+`the answer when the charge is forwarded by a proxy card` cardholder txn MEANS
+    `a Revolution answer of` `The cl.8 base rate through a proxy card` cardholder txn
+        `the Reward points for every SGD1 of any other Qualifying Transaction`
+        `the Reward points for every SGD1 of any other Qualifying Transaction`
+        `no cap, because only Base Points are earned`
+        (LIST `cl.5 Selected Contactless Payments`, `cl.8 all other Qualifying Transactions`, `cl.4.2 the excluded Merchant Category Codes`)
+        Unconfirmed
+
+-- (3) Ten or twenty Reward points, the indicator not in issue. cl.7 is
+-- satisfied outright: either the transaction was tapped (cl.5, which turns on
+-- the terminal mode alone) or the merchant's indicator is known to flag online
+-- (cl.6), and the MCC is in the table.
+GIVEN cardholder IS A Cardholder
+      txn        IS A Transaction
+GIVETH A `Rate answer`
+`the Eligible Transaction answer` cardholder txn MEANS
+    `a Revolution answer of` `An Eligible Transaction` cardholder txn
+        (`the total Reward points for every SGD1 of an Eligible Transaction` cardholder)
+        (`the total Reward points for every SGD1 of an Eligible Transaction` cardholder)
+        (`the cl.7.2 cap on an Eligible Transaction` cardholder)
+        (LIST `cl.5 Selected Contactless Payments`, `cl.6 Selected Online Transactions`, `cl.7 Eligible Transactions`, `cl.7.1 the Reward points awarded`, `cl.7.2 the calculation and the cap`, `cl.9 the maximum, as illustrated`, `cl.10 crediting`)
+        Verified
+
+-- (4) The conditional answer. The cardholder paid over the internet at an MCC
+-- in the cl.7 table, but cannot say how the merchant's acquirer flags it --
+-- and cl.6 makes that the operative fact. Both branches are filled, the flag
+-- is set, and `miles per dollar` takes the lower. This is partiality, not
+-- defeat: nothing in the document has been overridden, a fact is simply not
+-- available at decision time.
+GIVEN cardholder IS A Cardholder
+      txn        IS A Transaction
+GIVETH A `Rate answer`
+`the answer that turns on the merchant indicator` cardholder txn MEANS
+    `a Revolution answer of` `An Eligible Transaction only if the merchant flags online` cardholder txn
+        (`the total Reward points for every SGD1 of an Eligible Transaction` cardholder)
+        `the Reward points for every SGD1 of any other Qualifying Transaction`
+        (`the cl.7.2 cap on an Eligible Transaction` cardholder)
+        (LIST `cl.6 Selected Online Transactions`, `cl.7 Eligible Transactions`, `cl.7.1 the Reward points awarded`, `cl.7.2 the calculation and the cap`)
+        Verified
+
+-- (5) The answer for a transaction this document did not govern. cl.2 starts
+-- the Programme on 1 April 2026. For an earlier transaction date the rate
+-- below is what the CURRENT terms would give, not what the cardholder actually
+-- earned -- the terms that did govern are not in the bundle. Returning zero
+-- would be worse than useless here: it would assert that nothing was earned,
+-- which the document does not say. So the figures are carried through and the
+-- status is downgraded instead.
+GIVEN `the answer` IS A `Rate answer`
+GIVETH A `Rate answer`
+`the same answer, outside the Programme period` `the answer` MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS `the answer`'s `points per dollar`
+        `miles per point`                                     IS `the answer`'s `miles per point`
+        `conversion status`                                   IS `the answer`'s `conversion status`
+        `miles per dollar`                                    IS `the answer`'s `miles per dollar`
+        `miles per dollar if the merchant flags online`       IS `the answer`'s `miles per dollar if the merchant flags online`
+        `miles per dollar if the merchant flags card-present` IS `the answer`'s `miles per dollar if the merchant flags card-present`
+        `depends on the merchant indicator`                   IS `the answer`'s `depends on the merchant indicator`
+        `earns the bonus rate`                                IS `the answer`'s `earns the bonus rate`
+        `cap`                                                 IS `the answer`'s `cap`
+        `conditions`                                          IS "this Programme starts on 1 April 2026 (cl.2): for an earlier transaction date these figures are what the CURRENT terms would give, and the terms that actually governed are not in this bundle"
+                                                                 FOLLOWED BY (`the answer`'s `conditions`)
+        `sources`                                             IS `cl.2 the Programme period` FOLLOWED BY (`the answer`'s `sources`)
+        `status`                                              IS Unconfirmed
+
+
+§§ `The rule the composer calls`
+
+-- The order of the arms is the order of the document's own layering, and it is
+-- load-bearing: cl.4's three exclusion limbs -- by named merchant, by kind of
+-- charge, and by MCC -- defeat everything beneath them, cl.5 reaches the bonus
+-- rate without an indicator, cl.6 reaches it only with one, and cl.8 catches
+-- everything left. Written as a BRANCH rather than nested IF/ELSE so that the
+-- cascade is flat and reorderable, which is what a priority-ordered exception
+-- list wants in the absence of a native defeasibility construct.
+--
+-- THE MCC ARM NO LONGER CARRIES A CARVE-BACK. It used to read `AND NOT (...
+-- made through the HSBC Tax Payment Facility)`, which was cl.4 bullet 10's
+-- proviso bolted onto cl.4.2. That test read the statement string and could
+-- not survive the move off strings; see the note at cl.4 bullet 10. The arm is
+-- now a plain MCC test, and a tax payment made through HSBC's own facility is
+-- answered zero along with every other tax payment.
+--
+-- `card` and `month` are read by nothing here; see the header block for why.
+@export Given one transaction on an HSBC Revolution Credit Card, decide how many HSBC Reward points and how many miles per dollar it earns under the Reward Points Programme effective 1 April 2026, with the monthly Bonus Points cap, the conditions attached, and the clauses relied on. Answers conditionally when the rate turns on a merchant indicator the cardholder cannot see.
+GIVEN card       IS A Card        @desc Which card the transaction was made on. Passed for uniformity across the card modules; this rule does not read it, because the caller has already chosen the HSBC Revolution rules.
+      cardholder IS A Cardholder  @desc Standing facts about the cardholder. This rule reads only the HSBC Everyday Global Account deposits ADB for the calendar month, which selects 9 or 19 Bonus Points per SGD1.
+      month      IS A `Month position` @desc Where the cardholder's month stands. This rule does not read it: HSBC states no monthly spend threshold, and every field of this record is a DBS or POSB threshold.
+      txn        IS A Transaction @desc The one charge being asked about, as the cardholder and the statement describe it.
+GIVETH A `Rate answer`
+`HSBC Revolution earns on` card cardholder month txn MEANS
+    IF   `cl.2 — the transaction date falls within the Programme period` txn
+    THEN `what the Programme awards on` cardholder txn
+    ELSE `the same answer, outside the Programme period` (`what the Programme awards on` cardholder txn)
+
+GIVEN cardholder IS A Cardholder
+      txn        IS A Transaction
+GIVETH A `Rate answer`
+`what the Programme awards on` cardholder txn MEANS
+    BRANCH
+        IF   `cl.4 — the description names a transaction the clause excludes` (txn's `description patterns`)
+        THEN `the answer when no Reward points are earned` cardholder txn
+        IF   `cl.4 — the kind of charge is one the clause excludes` (txn's `charge kind`)
+        THEN `the answer when no Reward points are earned` cardholder txn
+        IF   `cl.4.2 — the MCC earns no Reward points` (txn's `merchant category code`)
+        THEN `the answer when no Reward points are earned` cardholder txn
+        IF   txn's `credential` EQUALS `Via Amaze`
+        THEN `the answer when the charge is forwarded by a proxy card` cardholder txn
+        IF   `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` (txn's `merchant category code`)
+             AND (   `cl.5 — the transaction is a Selected Contactless Payment` txn
+                  OR `cl.6 — the transaction is a Selected Online Transaction` txn)
+        THEN `the Eligible Transaction answer` cardholder txn
+        IF   `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` (txn's `merchant category code`)
+             AND `cl.6 — whether this is a Selected Online Transaction cannot yet be told` txn
+        THEN `the answer that turns on the merchant indicator` cardholder txn
+        OTHERWISE `the cl.8 answer` cardholder txn
+
+
+§§ `9 — illustrations`
+
+-- The first block below is the document's OWN worked example: the cl.9 table,
+-- read straight off the page. Everything after it is one case per branch of
+-- the rule the composer calls, including the branch where the merchant
+-- indicator is Unknown.
+
+-- EVERY ASSERTION BELOW CALLS THE EXPORTED RULE, SPELLED OUT. There used to be
+-- a one-line convenience wrapper here, taking a cardholder and a transaction,
+-- and it had to go. An @export'd rule compiles to a Catala SCOPE, and Catala
+-- allows a scope call only from inside another scope, so a non-exported rule
+-- that calls the export is refused (R1, §8.1). Exporting the wrapper to satisfy
+-- that would put a second rule on the composer's surface, which is worse than
+-- the verbosity. So the wrapper is inlined at each site: the assertions are
+-- longer, they exercise the real four-parameter entry point, and they lower.
+--
+-- Fixture VALUES are unaffected. A record constant is not a rule and calls
+-- nothing, so the named transactions and cardholders below stay named.
+
+-- Every field of `Month position` is a DBS yuu or POSB PAssion threshold, and
+-- HSBC states none of its own, so the values here are arbitrary on purpose:
+-- if a change to this module ever made one of them matter, these assertions
+-- would be the thing that noticed.
+GIVETH A `Month position`
+`a month position this card does not read` MEANS `Month position` WITH
+    `yuu eligible spend so far this calendar month`                     IS 1_234
+    `yuu participating merchants transacted so far this calendar month` IS 3
+    `PAssion spend at Participating Stores so far this month`           IS 99
+    `PAssion spend at non-Participating Stores so far this month`       IS 77
+
+GIVETH A Cardholder
+`a Cardholder with no Everyday Global Account deposits` MEANS Cardholder WITH
+    `Solitaire preferred rewards categories`               IS EMPTY
+    `yuu account linked to the card`                       IS FALSE
+    `HSBC Everyday Global Account deposits ADB this month` IS 0
+    `PAssion membership registered and card linked in yuu` IS FALSE
+
+-- cl.7.1(ii)(b): "a Deposits ADB of at least SGD50,000". At the threshold, not
+-- above it, because "at least" is the operative phrase and the boundary is
+-- where a mis-encoded comparison would show.
+GIVETH A Cardholder
+`a Cardholder at the SGD50,000 Deposits ADB threshold` MEANS Cardholder WITH
+    `Solitaire preferred rewards categories`               IS EMPTY
+    `yuu account linked to the card`                       IS FALSE
+    `HSBC Everyday Global Account deposits ADB this month` IS 50_000
+    `PAssion membership registered and card linked in yuu` IS FALSE
+
+GIVETH A Cardholder
+`a Cardholder just under the threshold` MEANS Cardholder WITH
+    `Solitaire preferred rewards categories`               IS EMPTY
+    `yuu account linked to the card`                       IS FALSE
+    `HSBC Everyday Global Account deposits ADB this month` IS 49_999
+    `PAssion membership registered and card linked in yuu` IS FALSE
+
+
+§§§ `cl.9 — the document's own table`
+
+-- "Cardholders with Deposits ADB of ≥SGD50,000 for the calendar month in which
+-- the Eligible Transaction was posted | 1 Reward point | 19 Reward points |
+-- 20 Reward points | Subject to a cap of 22,800 Bonus Points per calendar month"
+#ASSERT `the Base Points for every SGD1` EQUALS 1
+#ASSERT `the Bonus Points for every SGD1` `a Cardholder at the SGD50,000 Deposits ADB threshold` EQUALS 19
+#ASSERT `the total Reward points for every SGD1 of an Eligible Transaction` `a Cardholder at the SGD50,000 Deposits ADB threshold` EQUALS 20
+#ASSERT `the cap on Bonus Points per calendar month` `a Cardholder at the SGD50,000 Deposits ADB threshold` EQUALS 22_800
+
+-- "All other Cardholders | 1 Reward point | 9 Reward points | 10 Reward points
+-- | Subject to a cap of 9,000 Bonus Points per calendar month"
+#ASSERT `the Bonus Points for every SGD1` `a Cardholder with no Everyday Global Account deposits` EQUALS 9
+#ASSERT `the total Reward points for every SGD1 of an Eligible Transaction` `a Cardholder with no Everyday Global Account deposits` EQUALS 10
+#ASSERT `the cap on Bonus Points per calendar month` `a Cardholder with no Everyday Global Account deposits` EQUALS 9_000
+
+-- "at least SGD50,000": the boundary itself qualifies, one dollar below does not.
+#ASSERT `cl.7.1 — the Cardholder maintains the Deposits ADB threshold` `a Cardholder at the SGD50,000 Deposits ADB threshold`
+#ASSERT NOT (`cl.7.1 — the Cardholder maintains the Deposits ADB threshold` `a Cardholder just under the threshold`)
+
+-- cl.7.2's cap, converted to the dollars of bonus-earning spend it admits.
+-- The higher cap does NOT buy 22,800/9 dollars of spend, because the bonus
+-- rate rises with it: 22,800 / 19 = 1,200 and 9,000 / 9 = 1,000.
+#ASSERT (`the cl.7.2 cap on an Eligible Transaction` `a Cardholder at the SGD50,000 Deposits ADB threshold`)'s `bonus spend per month` EQUALS 1_200
+#ASSERT (`the cl.7.2 cap on an Eligible Transaction` `a Cardholder with no Everyday Global Account deposits`)'s `bonus spend per month` EQUALS 1_000
+#ASSERT (`the cl.7.2 cap on an Eligible Transaction` `a Cardholder with no Everyday Global Account deposits`)'s `basis` EQUALS `Calendar month`
+#ASSERT (`the cl.7.2 cap on an Eligible Transaction` `a Cardholder with no Everyday Global Account deposits`)'s `attribution` EQUALS `By posting date`
+
+
+§§§ `The cl.7 table, at its edges`
+
+-- The ranges of rows 1-4, at both ends.
+#ASSERT `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 3000
+#ASSERT `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 3350
+#ASSERT `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 3351
+#ASSERT `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 3999
+#ASSERT `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 4411
+#ASSERT `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 4511
+#ASSERT `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 7011
+#ASSERT NOT (`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 2999)
+#ASSERT NOT (`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 4000)
+
+-- The rows that LOOK like ranges and are not. 5611 to 5699 is a list of nine
+-- codes, not a range: 5612 is absent. And 5943 is absent between 5942 and 5944.
+#ASSERT `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 5611
+#ASSERT `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 5699
+#ASSERT NOT (`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 5612)
+#ASSERT `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 5942
+#ASSERT `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 5944
+#ASSERT NOT (`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 5943)
+
+-- Absent from the whole table, and both are everyday spend: fast food and
+-- groceries earn the cl.8 rate on this card.
+#ASSERT NOT (`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 5814)
+#ASSERT NOT (`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 5411)
+
+-- The two tables are disjoint: no MCC is both excluded by cl.4.2 and eligible
+-- under cl.7. Spot-checked at the codes closest to each other.
+#ASSERT `cl.4.2 — the MCC earns no Reward points` 6300
+#ASSERT NOT (`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 6300)
+#ASSERT `cl.4.2 — the MCC earns no Reward points` 7523
+#ASSERT `cl.4.2 — the MCC earns no Reward points` 7995
+#ASSERT `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` 7997
+#ASSERT `cl.4.2 — the MCC earns no Reward points` 5960
+#ASSERT NOT (`cl.4.2 — the MCC earns no Reward points` 5999)
+#ASSERT `cl.4.2 — the MCC earns no Reward points` 9311
+
+
+§§§ `One transaction per branch of the exported rule`
+
+-- (3) An Eligible Transaction reached through cl.5: a tap with a wallet token
+-- at a restaurant, MCC 5812, row 46. The merchant indicator says card-present
+-- and it makes no difference, because cl.5 turns on the terminal mode alone.
+GIVETH A Transaction
+`a wallet tap at a restaurant` MEANS Transaction WITH
+    `merchant name`           IS "Tiong Bahru Bakery"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 5812
+    `transaction description` IS "TIONG BAHRU BAKERY SINGAPORE SG"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 38.50
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 4
+    `posting date`            IS YMD 2026 5 6
+    `payment channel`         IS `Tapped at a terminal`
+    `credential`              IS `A mobile wallet token`
+    `merchant indicator`      IS `Flags card-present`
+    `made in Singapore`       IS TRUE
+
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a wallet tap at a restaurant`)'s `points per dollar` EQUALS 10
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a wallet tap at a restaurant`)'s `miles per dollar` EQUALS 4
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a wallet tap at a restaurant`)'s `earns the bonus rate`
+#ASSERT NOT ((`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a wallet tap at a restaurant`)'s `depends on the merchant indicator`)
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a wallet tap at a restaurant`)'s `status` EQUALS Verified
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a wallet tap at a restaurant`)'s `conversion status` EQUALS Unconfirmed
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `a wallet tap at a restaurant`)'s `points per dollar` EQUALS 20
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `a wallet tap at a restaurant`)'s `miles per dollar` EQUALS 8
+
+-- The same tap with the physical card, which cl.5 treats identically: Visa
+-- payWave and the three wallets are one list in that clause.
+GIVETH A Transaction
+`a physical-card tap at a restaurant` MEANS Transaction WITH
+    `merchant name`           IS "Tiong Bahru Bakery"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 5812
+    `transaction description` IS "TIONG BAHRU BAKERY SINGAPORE SG"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 38.50
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 4
+    `posting date`            IS YMD 2026 5 6
+    `payment channel`         IS `Tapped at a terminal`
+    `credential`              IS `The physical card`
+    `merchant indicator`      IS `Flags card-present`
+    `made in Singapore`       IS TRUE
+
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a physical-card tap at a restaurant`)'s `points per dollar` EQUALS 10
+
+-- (3) An Eligible Transaction reached through cl.6: an online bookstore
+-- purchase, MCC 5942 row 27, at a merchant the cardholder has seen post as
+-- online before.
+GIVETH A Transaction
+`an online bookstore purchase the merchant flags online` MEANS Transaction WITH
+    `merchant name`           IS "Kinokuniya"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 5942
+    `transaction description` IS "KINOKUNIYA ONLINE SG"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 64
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 11
+    `posting date`            IS YMD 2026 5 12
+    `payment channel`         IS `Paid in a website or app`
+    `credential`              IS `The physical card`
+    `merchant indicator`      IS `Flags online`
+    `made in Singapore`       IS TRUE
+
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `an online bookstore purchase the merchant flags online`)'s `points per dollar` EQUALS 10
+#ASSERT NOT ((`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `an online bookstore purchase the merchant flags online`)'s `depends on the merchant indicator`)
+
+-- cl.6 also reaches a card left on file: "including credential-on-file
+-- payments when the Cardholder stores the Card information with a merchant or
+-- payment facilitator to make future purchases".
+GIVETH A Transaction
+`a subscription billed to a card on file` MEANS Transaction WITH
+    `merchant name`           IS "Kinokuniya"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 5942
+    `transaction description` IS "KINOKUNIYA BOOK CLUB SG"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 20
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 11
+    `posting date`            IS YMD 2026 5 12
+    `payment channel`         IS `Card on file or recurring billing`
+    `credential`              IS `The physical card`
+    `merchant indicator`      IS `Flags online`
+    `made in Singapore`       IS TRUE
+
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a subscription billed to a card on file`)'s `points per dollar` EQUALS 10
+
+-- (4) THE PARTIAL ANSWER. The same bookstore purchase at a merchant the
+-- cardholder has never seen post. cl.6 makes the acquirer's indicator the
+-- operative fact and it is not available, so both branches are filled, the
+-- flag is set, and the headline figure takes the LOWER of the two.
+GIVETH A Transaction
+`an online purchase whose indicator is unknown` MEANS Transaction WITH
+    `merchant name`           IS "A Bookshop Nobody Here Has Used"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 5942
+    `transaction description` IS "A BOOKSHOP SG"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 64
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 11
+    `posting date`            IS YMD 2026 5 12
+    `payment channel`         IS `Paid in a website or app`
+    `credential`              IS `The physical card`
+    `merchant indicator`      IS Unknown
+    `made in Singapore`       IS TRUE
+
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `an online purchase whose indicator is unknown`)'s `depends on the merchant indicator`
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `an online purchase whose indicator is unknown`)'s `miles per dollar if the merchant flags online` EQUALS 4
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `an online purchase whose indicator is unknown`)'s `miles per dollar if the merchant flags card-present` EQUALS 0.4
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `an online purchase whose indicator is unknown`)'s `miles per dollar` EQUALS 0.4
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `an online purchase whose indicator is unknown`)'s `points per dollar` EQUALS 1
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `an online purchase whose indicator is unknown`)'s `miles per dollar if the merchant flags online` EQUALS 8
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `an online purchase whose indicator is unknown`)'s `miles per dollar` EQUALS 0.4
+
+-- The headline fields of one answer must agree with each other. On the
+-- conditional answer the figure led with is cl.8's, so `earns the bonus rate`
+-- is FALSE even though the bonus rate is reachable -- the reachability is what
+-- `depends on the merchant indicator` and the if-online figure are for. These
+-- three assertions are the invariant, and they are what caught the field being
+-- passed in as TRUE while the same answer said 1 point and 0.4 miles.
+#ASSERT NOT ((`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `an online purchase whose indicator is unknown`)'s `earns the bonus rate`)
+#ASSERT NOT ((`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `an online purchase whose indicator is unknown`)'s `earns the bonus rate`)
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `an online purchase whose indicator is unknown`)'s `miles per dollar if the merchant flags online` EQUALS 8
+
+-- A TAP needs no indicator, so an Unknown indicator on a tap is not a
+-- conditional answer. This is the assertion that would fail if cl.5 were ever
+-- wired through cl.6's indicator test.
+GIVETH A Transaction
+`a tap whose indicator is unknown` MEANS Transaction WITH
+    `merchant name`           IS "A Cafe Nobody Here Has Used"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 5812
+    `transaction description` IS "A CAFE SG"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 12
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 11
+    `posting date`            IS YMD 2026 5 12
+    `payment channel`         IS `Tapped at a terminal`
+    `credential`              IS `A mobile wallet token`
+    `merchant indicator`      IS Unknown
+    `made in Singapore`       IS TRUE
+
+#ASSERT NOT ((`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a tap whose indicator is unknown`)'s `depends on the merchant indicator`)
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a tap whose indicator is unknown`)'s `points per dollar` EQUALS 10
+
+-- (2) cl.8. A card INSERTED at a department store: MCC 5311 is row 10 of the
+-- cl.7 table, but inserting is not a contactless terminal mode and not the
+-- internet, so neither channel is satisfied and the base rate applies.
+GIVETH A Transaction
+`a card inserted at a department store` MEANS Transaction WITH
+    `merchant name`           IS "Takashimaya"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 5311
+    `transaction description` IS "TAKASHIMAYA SINGAPORE SG"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 210
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 14
+    `posting date`            IS YMD 2026 5 15
+    `payment channel`         IS `Inserted or swiped at a terminal`
+    `credential`              IS `The physical card`
+    `merchant indicator`      IS `Flags card-present`
+    `made in Singapore`       IS TRUE
+
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a card inserted at a department store`)'s `points per dollar` EQUALS 1
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a card inserted at a department store`)'s `miles per dollar` EQUALS 0.4
+#ASSERT NOT ((`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a card inserted at a department store`)'s `earns the bonus rate`)
+#ASSERT NOT ((`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a card inserted at a department store`)'s `cap`)'s `capped`
+
+-- (2) cl.8 again, by the other route: a perfectly good tap at an MCC the cl.7
+-- table does not list. A supermarket, 5411.
+GIVETH A Transaction
+`a tap at a supermarket` MEANS Transaction WITH
+    `merchant name`           IS "FairPrice"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 5411
+    `transaction description` IS "NTUC FAIRPRICE SINGAPORE SG"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 88
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 14
+    `posting date`            IS YMD 2026 5 15
+    `payment channel`         IS `Tapped at a terminal`
+    `credential`              IS `A mobile wallet token`
+    `merchant indicator`      IS `Flags card-present`
+    `made in Singapore`       IS TRUE
+
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a tap at a supermarket`)'s `points per dollar` EQUALS 1
+
+-- (1) cl.4.2. An insurance premium, MCC 6300, row 11 of the excluded table.
+-- Paid online at a merchant that flags online, which would otherwise be the
+-- best possible case: the exclusion defeats it anyway.
+GIVETH A Transaction
+`an insurance premium paid online` MEANS Transaction WITH
+    `merchant name`           IS "An Insurer"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 6300
+    `transaction description` IS "AN INSURER PREMIUM SG"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 450
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 20
+    `posting date`            IS YMD 2026 5 21
+    `payment channel`         IS `Paid in a website or app`
+    `credential`              IS `The physical card`
+    `merchant indicator`      IS `Flags online`
+    `made in Singapore`       IS TRUE
+
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `an insurance premium paid online`)'s `points per dollar` EQUALS 0
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `an insurance premium paid online`)'s `miles per dollar` EQUALS 0
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `an insurance premium paid online`)'s `status` EQUALS Verified
+#ASSERT NOT ((`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `an insurance premium paid online`)'s `earns the bonus rate`)
+#ASSERT NOT ((`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `an insurance premium paid online`)'s `depends on the merchant indicator`)
+
+-- (1) cl.4, by statement description rather than by MCC. cl.4 bullet 5 names
+-- Paypal among "Payments on money payments/transfers". The statement line is
+-- written the way a real one reads -- "PAYPAL *STEAM PURCHASE", not the bare
+-- word -- because that is the case the first encoding of this clause got
+-- WRONG: an exact-match test on the description would have answered this
+-- transaction as earning. Layer 1 classifies the line as carrying the PayPal
+-- family, and this rule tests the family.
+GIVETH A Transaction
+`a payment through Paypal` MEANS Transaction WITH
+    `merchant name`           IS "PayPal"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 5999
+    `transaction description` IS "PAYPAL *STEAM PURCHASE"
+    `description patterns`    IS LIST PayPal
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 30
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 22
+    `posting date`            IS YMD 2026 5 23
+    `payment channel`         IS `Paid in a website or app`
+    `credential`              IS `The physical card`
+    `merchant indicator`      IS `Flags online`
+    `made in Singapore`       IS TRUE
+
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a payment through Paypal`)'s `points per dollar` EQUALS 0
+
+-- cl.4 bullet 10's proviso, AS A RECORD OF ITS LOSS. MCC 9311 is row 44 of the
+-- excluded table, so a tax payment earns nothing -- EXCEPT through the HSBC Tax
+-- Payment Facility, which the bullet carves back in and which ought therefore
+-- to fall to cl.8's base rate.
+--
+-- The two fixtures below differ only in their `transaction description`, and no
+-- rule in this module reads a description any more, so THEY NOW ANSWER
+-- IDENTICALLY. That is the regression recorded at cl.4 bullet 10: the domain
+-- has no constructor for HSBC's Tax Payment Facility, so the carve-back cannot
+-- be reached. Both fixtures are kept, and the assertion below pins their
+-- sameness rather than deleting the evidence -- the day a constructor arrives,
+-- that assertion is what will fail and say so.
+GIVETH A Transaction
+`a tax payment at a government portal` MEANS Transaction WITH
+    `merchant name`           IS "IRAS"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 9311
+    `transaction description` IS "IRAS TAX PAYMENT SG"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 1_000
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 25
+    `posting date`            IS YMD 2026 5 26
+    `payment channel`         IS `Paid in a website or app`
+    `credential`              IS `The physical card`
+    `merchant indicator`      IS `Flags online`
+    `made in Singapore`       IS TRUE
+
+GIVETH A Transaction
+`a tax payment through the HSBC Tax Payment Facility` MEANS Transaction WITH
+    `merchant name`           IS "IRAS"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 9311
+    `transaction description` IS "HSBC Tax Payment Facility"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 1_000
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 25
+    `posting date`            IS YMD 2026 5 26
+    `payment channel`         IS `Paid in a website or app`
+    `credential`              IS `The physical card`
+    `merchant indicator`      IS `Flags online`
+    `made in Singapore`       IS TRUE
+
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a tax payment at a government portal`)'s `points per dollar` EQUALS 0
+-- THE CARVE-BACK IS UNREACHABLE. This assertion used to read EQUALS 1, and it
+-- is the one place in this module where the encoding is known to disagree with
+-- the document. Not a caveat: a failing case, pinned so it stays visible.
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a tax payment through the HSBC Tax Payment Facility`)'s `points per dollar` EQUALS 0
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a tax payment through the HSBC Tax Payment Facility`)'s `points per dollar` EQUALS (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a tax payment at a government portal`)'s `points per dollar`
+
+-- (2a) The proxy card. A tap at a department store made through Instarem
+-- Amaze, which cl.5 does not reach. The rate is cl.8's, but the STATUS is
+-- Unconfirmed, because that reading is an inference from how the proxy works
+-- and not something this document says.
+GIVETH A Transaction
+`an Amaze tap at a department store` MEANS Transaction WITH
+    `merchant name`           IS "Takashimaya"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 5311
+    `transaction description` IS "AMAZE*TAKASHIMAYA SG"
+    `description patterns`    IS LIST AMAZE
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 210
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 14
+    `posting date`            IS YMD 2026 5 15
+    `payment channel`         IS `Tapped at a terminal`
+    `credential`              IS `Via Amaze`
+    `merchant indicator`      IS `Flags card-present`
+    `made in Singapore`       IS TRUE
+
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `an Amaze tap at a department store`)'s `points per dollar` EQUALS 1
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `an Amaze tap at a department store`)'s `status` EQUALS Unconfirmed
+
+-- (5) Before the Programme period. cl.2 starts it on 1 April 2026; the day
+-- before is governed by terms this bundle does not hold, so the figures are
+-- carried through and the status is downgraded rather than zeroed.
+GIVETH A Transaction
+`a tap at a restaurant the day before the Programme starts` MEANS Transaction WITH
+    `merchant name`           IS "Tiong Bahru Bakery"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 5812
+    `transaction description` IS "TIONG BAHRU BAKERY SINGAPORE SG"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 38.50
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 3 31
+    `posting date`            IS YMD 2026 4 2
+    `payment channel`         IS `Tapped at a terminal`
+    `credential`              IS `A mobile wallet token`
+    `merchant indicator`      IS `Flags card-present`
+    `made in Singapore`       IS TRUE
+
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a tap at a restaurant the day before the Programme starts`)'s `status` EQUALS Unconfirmed
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a tap at a restaurant the day before the Programme starts`)'s `points per dollar` EQUALS 10
+#ASSERT `cl.2 — the transaction date falls within the Programme period` `a wallet tap at a restaurant`
+#ASSERT NOT (`cl.2 — the transaction date falls within the Programme period` `a tap at a restaurant the day before the Programme starts`)
+
+-- Rows 1-4 of the cl.7 table, exercised end to end: an airline ticket inside
+-- the 3000-3350 range, a hotel at 7011, a taxi at 4121.
+GIVETH A Transaction
+`an airline ticket bought online` MEANS Transaction WITH
+    `merchant name`           IS "Singapore Airlines"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 3055
+    `transaction description` IS "SINGAPORE AIRLINES SG"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 1_450
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 6 1
+    `posting date`            IS YMD 2026 6 2
+    `payment channel`         IS `Paid in a website or app`
+    `credential`              IS `The physical card`
+    `merchant indicator`      IS `Flags online`
+    `made in Singapore`       IS TRUE
+
+GIVETH A Transaction
+`a taxi fare tapped` MEANS Transaction WITH
+    `merchant name`           IS "Comfort"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 4121
+    `transaction description` IS "COMFORT TAXI SG"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 18.40
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 6 3
+    `posting date`            IS YMD 2026 6 4
+    `payment channel`         IS `Tapped at a terminal`
+    `credential`              IS `A mobile wallet token`
+    `merchant indicator`      IS Unknown
+    `made in Singapore`       IS TRUE
+
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `an airline ticket bought online`)'s `points per dollar` EQUALS 10
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a taxi fare tapped`)'s `points per dollar` EQUALS 10
+
+
+§§§ `cl.4's two exclusion limbs, one assertion per named merchant and per kind`
+
+-- THE DESCRIPTION LIMB. One line per merchant cl.4 names, in the bullets'
+-- order, each as the `Description pattern` layer 1 assigns to that merchant's
+-- statement line. These are unit tests on the predicate rather than on the
+-- exported rule, because a statement line carries a LIST and the interesting
+-- cases are the lists, not the transactions around them.
+#ASSERT `cl.4 — the description names a transaction the clause excludes` (LIST `Forex or CFD platform`)      -- bullet 1  Forex.com
+#ASSERT `cl.4 — the description names a transaction the clause excludes` (LIST `Cryptocurrency platform`)    -- bullet 4  crypto-currencies of any kind
+#ASSERT `cl.4 — the description names a transaction the clause excludes` (LIST PayPal)                       -- bullet 5  Paypal
+#ASSERT `cl.4 — the description names a transaction the clause excludes` (LIST `Skrill or Moneybookers`)     -- bullet 5  SKR skrill.com
+#ASSERT `cl.4 — the description names a transaction the clause excludes` (LIST CardUp)                       -- bullet 5  CardUp
+#ASSERT `cl.4 — the description names a transaction the clause excludes` (LIST SmoovPay)                     -- bullet 5  SmoovPay
+#ASSERT `cl.4 — the description names a transaction the clause excludes` (LIST iPaymy)                       -- bullet 5  iPayMy
+#ASSERT `cl.4 — the description names a transaction the clause excludes` (LIST `EZ-Link`)                    -- bullet 7  EZ-Link
+#ASSERT `cl.4 — the description names a transaction the clause excludes` (LIST TRANSIT)                      -- bullet 7  Transitlink
+#ASSERT `cl.4 — the description names a transaction the clause excludes` (LIST FlashPay)                     -- bullet 7  NETS Flashpay
+#ASSERT `cl.4 — the description names a transaction the clause excludes` (LIST YouTrip)                      -- bullet 7  Youtrip
+#ASSERT `cl.4 — the description names a transaction the clause excludes` (LIST AXS)                          -- bullet 9  "Any AXS and ATM transactions"
+
+-- A statement line carries every family it matches, and one match is enough.
+-- "AMAZE*AXS PTE LTD" carries both; AMAZE alone is not a cl.4 exclusion on
+-- this card, AXS is, and the line is excluded.
+#ASSERT `cl.4 — the description names a transaction the clause excludes` (LIST AMAZE, AXS)
+#ASSERT NOT (`cl.4 — the description names a transaction the clause excludes` (LIST AMAZE))
+
+-- The negative control, which is what makes the twelve lines above mean
+-- anything: families the clause does NOT name, and a line that carries none.
+#ASSERT NOT (`cl.4 — the description names a transaction the clause excludes` (LIST FavePay))
+#ASSERT NOT (`cl.4 — the description names a transaction the clause excludes` (LIST ShopeePay, `BUS/MRT`, `Government levy`))
+#ASSERT NOT (`cl.4 — the description names a transaction the clause excludes` (`a wallet tap at a restaurant`'s `description patterns`))
+
+-- THE CHARGE-KIND LIMB, bullets 3, 9, 15, 16, 17 and 18.
+#ASSERT `cl.4 — the kind of charge is one the clause excludes` `Balance or funds transfer`     -- bullet 15  balance transfers, fund transfers
+#ASSERT `cl.4 — the kind of charge is one the clause excludes` `Cash advance or quasi-cash`    -- bullets 3, 9, 15  quasi-cash, ATM, cash advances
+#ASSERT `cl.4 — the kind of charge is one the clause excludes` `Interest or finance charge`    -- bullet 15  finance charges, late charges
+#ASSERT `cl.4 — the kind of charge is one the clause excludes` `Annual fee or bank charge`     -- bullet 15  "any fees charged by HSBC"
+#ASSERT `cl.4 — the kind of charge is one the clause excludes` `Instalment plan transaction`   -- bullets 15, 16, 17
+#ASSERT `cl.4 — the kind of charge is one the clause excludes` `Refund or reversal`            -- bullet 18  refunded and cancelled
+
+-- And the four kinds this document does NOT exclude. The last three are the
+-- encoding decisions recorded at the rule: a bill payment and a mail order are
+-- excluded by name in other issuers' lists and not in HSBC's, and a
+-- pre-authorisation is excluded only on a reading of the chapeau that the
+-- bullets do not support. If any of these is ever read into cl.4, one of these
+-- four assertions is where it has to be argued for.
+#ASSERT NOT (`cl.4 — the kind of charge is one the clause excludes` `Retail purchase`)
+#ASSERT NOT (`cl.4 — the kind of charge is one the clause excludes` `Bill payment via internet banking`)
+#ASSERT NOT (`cl.4 — the kind of charge is one the clause excludes` `Telephone or mail order`)
+#ASSERT NOT (`cl.4 — the kind of charge is one the clause excludes` `Pre-authorisation`)
+
+
+§§§ `The two new limbs, end to end`
+
+-- Each fixture below is a transaction that would earn the bonus rate but for
+-- ONE field. Holding everything else at a known 10-point case is the point:
+-- if the answer moves, the field that moved it is the only candidate.
+
+-- bullets 16 and 17. The same restaurant tap as the first illustration, posted
+-- as a monthly instalment: "The monthly instalment amounts under all card
+-- instalment plan (including HSBC 0% Card Instalment Payment Plan, HSBC
+-- PayLater Instalment Plan and HSBC Spend Instalment)".
+GIVETH A Transaction
+`an instalment on a restaurant purchase` MEANS Transaction WITH
+    `merchant name`           IS "Tiong Bahru Bakery"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 5812
+    `transaction description` IS "HSBC SPEND INSTALMENT 3 OF 12"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Instalment plan transaction`
+    `amount`                  IS 38.50
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 4
+    `posting date`            IS YMD 2026 5 6
+    `payment channel`         IS `Tapped at a terminal`
+    `credential`              IS `A mobile wallet token`
+    `merchant indicator`      IS `Flags card-present`
+    `made in Singapore`       IS TRUE
+
+-- bullet 18, the refunded limb. Same tap, reversed.
+GIVETH A Transaction
+`a refund of a restaurant tap` MEANS Transaction WITH
+    `merchant name`           IS "Tiong Bahru Bakery"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 5812
+    `transaction description` IS "TIONG BAHRU BAKERY SINGAPORE SG REVERSAL"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Refund or reversal`
+    `amount`                  IS 38.50
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 4
+    `posting date`            IS YMD 2026 5 8
+    `payment channel`         IS `Tapped at a terminal`
+    `credential`              IS `A mobile wallet token`
+    `merchant indicator`      IS `Flags card-present`
+    `made in Singapore`       IS TRUE
+
+-- bullet 15, the fee limb: "any fees charged by HSBC". An annual fee posts to
+-- the Account rather than at a merchant, so the MCC and the channel below are
+-- the ones that would otherwise pay -- which is exactly the point of holding
+-- them fixed.
+GIVETH A Transaction
+`the annual fee charged to the Account` MEANS Transaction WITH
+    `merchant name`           IS "HSBC"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 5812
+    `transaction description` IS "HSBC ANNUAL FEE"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Annual fee or bank charge`
+    `amount`                  IS 160
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 4
+    `posting date`            IS YMD 2026 5 6
+    `payment channel`         IS `Tapped at a terminal`
+    `credential`              IS `A mobile wallet token`
+    `merchant indicator`      IS `Flags card-present`
+    `made in Singapore`       IS TRUE
+
+-- bullet 7, the description limb, at an MCC that IS in the cl.7 table: MCC 5999
+-- is row 42, and an online purchase the merchant flags online would otherwise
+-- be an Eligible Transaction at 10 points. The statement line says YOUTRIP, so
+-- cl.4 takes it out before cl.7 is reached.
+GIVETH A Transaction
+`a Youtrip top-up bought online` MEANS Transaction WITH
+    `merchant name`           IS "YouTrip"
+    `merchant`                IS `Another merchant`
+    `merchant category code`  IS 5999
+    `transaction description` IS "YOUTRIP SINGAPORE SG"
+    `description patterns`    IS LIST YouTrip
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 200
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 5 4
+    `posting date`            IS YMD 2026 5 6
+    `payment channel`         IS `Paid in a website or app`
+    `credential`              IS `The physical card`
+    `merchant indicator`      IS `Flags online`
+    `made in Singapore`       IS TRUE
+
+-- The control, restated here rather than left 500 lines up in the cl.5 block:
+-- the restaurant tap pays 10, and the three charge-kind fixtures above differ
+-- from it in exactly one field. The first line below is deliberately the same
+-- assertion as the one in that block, so this differential can be read on its
+-- own.
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a wallet tap at a restaurant`)'s `points per dollar` EQUALS 10
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `an instalment on a restaurant purchase`)'s `points per dollar` EQUALS 0
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a refund of a restaurant tap`)'s `points per dollar` EQUALS 0
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `the annual fee charged to the Account`)'s `points per dollar` EQUALS 0
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a Youtrip top-up bought online`)'s `points per dollar` EQUALS 0
+
+-- An excluded transaction is excluded at the higher Deposits ADB too: cl.4
+-- defeats cl.7 whatever the cardholder's balance.
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `an instalment on a restaurant purchase`)'s `points per dollar` EQUALS 0
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `a Youtrip top-up bought online`)'s `miles per dollar` EQUALS 0
+
+-- A zero answer is a Verified zero, not a hedge: cl.4 says so in terms.
+#ASSERT (`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a refund of a restaurant tap`)'s `status` EQUALS Verified
+#ASSERT NOT ((`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a Youtrip top-up bought online`)'s `depends on the merchant indicator`)
+
+-- The cap on an excluded transaction is the uncapped one, because there are no
+-- Bonus Points to cap. `pool` is set on both Caps and is deliberately NOT
+-- asserted anywhere: it is a STRING, and an assertion that compared it would
+-- be the one string comparison left in this module.
+#ASSERT NOT ((`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `a refund of a restaurant tap`)'s `cap`)'s `capped`
+#ASSERT ((`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `a wallet tap at a restaurant`)'s `cap`)'s `capped`
+#ASSERT ((`HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `a wallet tap at a restaurant`)'s `cap`)'s `bonus spend per month` EQUALS 1_200
+
+
+-- Two evaluations of the exported rule, printing the whole `Rate answer` the
+-- composer receives rather than one field of it. The first is the partial
+-- answer, which is the shape worth looking at; the second is the top of the
+-- card.
+--
+-- Both become Catala test scopes and `clerk test` runs them, but WITHOUT AN
+-- EXPECTED OUTPUT: a `Rate answer` has no Catala JSON rendering, so the
+-- exporter has nothing to record against. They prove the lowering executes end
+-- to end; the assertions above are what check the answers.
+#EVAL `HSBC Revolution earns on` `HSBC Revolution` `a Cardholder with no Everyday Global Account deposits` `a month position this card does not read` `an online purchase whose indicator is unknown`
+#EVAL `HSBC Revolution earns on` `HSBC Revolution` `a Cardholder at the SGD50,000 Deposits ADB threshold` `a month position this card does not read` `a wallet tap at a restaurant`
+
+
+-- ===========================================================================
+-- DEFEASIBILITY SITES (spec section 4.5). Where a native DESPITE / SUBJECT TO /
+-- exception construct would have collapsed several guards into one rule.
+-- One entry per site: the clause, the shape in the text (general rule +
+-- exception list), the L4 shape used instead, and what a native construct
+-- would have bought.
+-- ===========================================================================
+--
+-- SITE 1 -- cl.4, the eighteen-bullet exclusion list.
+--   TEXT   A general rule with an exception list attached by one word:
+--          "'Qualifying Transactions' refers to posted retail purchases …, and
+--          shall exclude the following transactions: •…•…" (18 bullets).
+--   L4     Not one rule but four: the general limb is never stated at all
+--          (nothing in this module says "a posted retail purchase qualifies"),
+--          and the exclusions are three separate predicates -- one over the
+--          statement line's `Description pattern`s, one over the posting's
+--          `Charge kind`, one over the MCC -- filling the first three arms of
+--          the top-level BRANCH so they defeat everything below them.
+--   BOUGHT A native construct would let the general limb BE WRITTEN, which is
+--          the part that has gone missing here. As it stands the positive rule
+--          exists only as the absence of a match, so a reader cannot check the
+--          encoding against the chapeau -- there is no sentence to compare it
+--          to. That is the most expensive thing on this list, and the
+--          `Charge kind` fact makes it sharper rather than softer: the chapeau
+--          admits "POSTED retail purchases", and `Retail purchase` versus
+--          `Pre-authorisation` is now a fact the module can see and still does
+--          not act on, because no bullet tells it to.
+--
+-- SITE 2 -- cl.4 bullet 10, "Tax payments (except HSBC Tax Payment Facility)".
+--   TEXT   An exception to an exception, in one parenthesis. MCC 9311 is
+--          excluded by cl.4.2 row 44; the HSBC facility is carved back in.
+--   L4     NOTHING. This is now a defeasibility site with no rule at it. The
+--          carve-back used to be `AND NOT (… made through the HSBC Tax Payment
+--          Facility)` bolted onto the cl.4.2 arm, testing the statement string;
+--          moving off strings took the test away and the shared domain has no
+--          constructor to put in its place. The two fixtures that used to
+--          differ now answer identically, and an assertion pins that.
+--   BOUGHT Nothing would be bought by a defeasibility construct here, which is
+--          what makes this entry worth keeping: the obstacle is not the shape
+--          of the rule but the poverty of the ontology. A construct that let
+--          the carve-back out-rank the exclusion would still have nothing to
+--          say WHICH transactions it applies to. This is the site that says
+--          the expressive gap is sometimes in the facts, not the logic.
+--
+-- SITE 3 -- cl.4.2 laid over cl.4.
+--   TEXT   Two different operations with the same effect. cl.4 says certain
+--          transactions are NOT QUALIFYING TRANSACTIONS; cl.4.2 says
+--          transactions at certain MCCs "WILL NOT EARN REWARD POINTS". The
+--          second is a zero-earning rule over the top of the first, not a
+--          carve-out from it.
+--   L4     Separate arms of the top-level BRANCH -- two for cl.4, one for
+--          cl.4.2 -- all returning the SAME zero answer, because on THIS
+--          document the two lists are disjoint and the distinction cannot
+--          change an outcome. The arms are separate; the answer is not.
+--   BOUGHT The distinction survives. If a future revision put an MCC on both
+--          lists, the collapsed encoding would answer zero and say nothing;
+--          a construct with explicit priority would surface the overlap. The
+--          disjointness is asserted in the illustrations so that the day it
+--          stops being true, something fails.
+--
+-- SITE 4 -- cl.8 as the residual of cl.7.
+--   TEXT   "1 Reward point for every SGD1 charged on ALL OTHER Qualifying
+--          Transactions THAT ARE NOT ELIGIBLE TRANSACTIONS" -- a default
+--          defined by subtraction from the rule above it.
+--   L4     The `OTHERWISE` arm of the BRANCH. This is the one site where the
+--          flat-cascade shape is a genuinely good fit.
+--   BOUGHT Very little. Recorded because it is the base case that makes the
+--          other sites legible as departures from it.
+--
+-- SITE 5 -- cl.7's heading against cl.7's table.
+--   TEXT   The category heading reads "Dining EXCLUDING HOTEL DINING", and the
+--          table three rows above it admits 7011 (Lodging), under which hotel
+--          dining posts. The heading carves out what the table lets in.
+--   L4     The table wins and the heading is encoded NOWHERE -- it survives
+--          only as a comment -- because the clause's operative words are "that
+--          fall within any one of the following MCCs".
+--   BOUGHT This is the site that most wants Catala's conflict behaviour. A
+--          native defeater would let the heading be ENCODED as a rule, and the
+--          two would then be visibly incomparable on a hotel restaurant charge
+--          -- which is the honest answer. Encoded by hand, the encoder's
+--          judgement is silently baked in and the reader never learns there
+--          was a question.
+--
+-- SITE 6 -- cl.2, the Programme period.
+--   TEXT   Not an exception to a rule but a condition on the whole
+--          instrument: "The Programme period starts from 1 April 2026".
+--   L4     A wrapper rule that recomputes the answer and then RE-LISTS ALL
+--          TWELVE FIELDS of the Rate answer to change two of them, because L4
+--          has no record-update form.
+--   BOUGHT A module-level SUBJECT TO would remove the twelve-field copy
+--          entirely. The copy is the kind of code that goes wrong when the
+--          record gains a thirteenth field, and nothing would warn.
+--
+-- SITE 7 -- cl.5's inclusive list against a credential it does not name.
+--   TEXT   "a contactless terminal mode WHICH INCLUDES Visa payWave, Apple
+--          Pay, Google Pay and Samsung Pay" -- an open list, so the clause
+--          does not say whether a third-party proxy card is in or out.
+--   L4     A hand-written `AND NOT (credential EQUALS Via Amaze)` conjunct,
+--          plus a branch of its own returning the cl.8 rate at Unconfirmed
+--          status. The gap is DECIDED here, and marked as decided.
+--   BOUGHT A construct that distinguishes "this rule does not reach the case"
+--          from "this rule excludes the case". Today both are spelled `NOT`.
+--
+-- SITE 8 -- the FAQ against the T&C, which is a conflict between SOURCES.
+--   TEXT   The held FAQ, Q2: "With effect from 15 July 2024, contactless
+--          payment transactions will earn 1 HSBC Reward point." The held T&C,
+--          cl.5 with cl.7: a contactless tap is an Eligible Transaction at 10
+--          or 20 points. They cannot both be right.
+--   L4     The T&C is encoded, the FAQ is not encoded at all, and the conflict
+--          is carried as a string in `conditions` on every contactless answer.
+--   BOUGHT A priority relation between DOCUMENTS rather than between clauses
+--          -- "the later dated instrument defeats the earlier" stated once,
+--          instead of the encoder resolving it silently and leaving a note.
+--          This is the one site on the list that is not about this document's
+--          internal structure, and it is the one the corpus exists to find.
+-- ===========================================================================

@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "What a single transaction earns on a DBS yuu Visa or DBS yuu American Express Card, in yuu Points and miles per dollar, with the monthly bonus cap, the conditions still attached, and the clause of the DBS yuu Card T&C each figure comes from.",
+    "properties": {
+        "card": {
+            "$ref": "#/$defs/Card",
+            "description": "The card the charge was made on. Use `DBS yuu Visa` or `DBS yuu American Express`; Appendix 1 treats the two differently at 7-Eleven and Charge+."
+        },
+        "cardholder": {
+            "$ref": "#/$defs/Cardholder",
+            "description": "The cardholder's standing facts. Only `yuu account linked to the card` is read, and only to warn about crediting."
+        },
+        "month": {
+            "$ref": "#/$defs/Month position",
+            "description": "Where this calendar month stands so far, for cl.7(b)'s S$800 of Eligible Spend and 4 Participating Merchants."
+        },
+        "txn": {
+            "$ref": "#/$defs/Transaction",
+            "description": "The one charge being asked about, as the statement shows it."
+        }
+    },
+    "required": [
+        "card",
+        "cardholder",
+        "month",
+        "txn"
+    ],
+    "title": "DBS yuu earns on",
+    "type": "object"
+}

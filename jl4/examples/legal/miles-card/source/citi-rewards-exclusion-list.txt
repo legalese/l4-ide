@@ -1,0 +1,162 @@
+ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion Terms and
+Conditions
+
+   1. All Principal and Supplementary Cardmembers of Visa/Mastercard Credit and/or Charge Cards
+      issued by Citibank Singapore Ltd ("Citibank") as listed below (which may be amended by Citibank
+      from time to time at any time at its discretion) will be excluded from ThankYou Points / Citi Miles
+      / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion for transactions listed in Paragraph
+      2 below:
+
+           a. Citi ULTIMA Card
+           b. Citi Prestige Card
+           c. Citi PremierMiles Card
+           d. Citi Cash Back+ Card
+           e. Citi Cash Back Card
+           f. Citi Rewards Card
+           g. Citi Classic / Gold / Platinum Card
+           h. Citi Clear Classic / Platinum Card
+           i. Citi Clear Card
+           j. Citi M1 Card
+           k. Citi SMRT Card
+           l. Citi Business Card
+           m. Citi Corporate Card (Personal Liability / Joint & Several / Cardmember Liability / Sole
+              Corporate Liability)
+           n. Citi Purchasing Card
+           o. Citi Travel Account Card
+
+       Such Cards as Citibank may exclude from time to time at any time at its sole and
+       absolute discretion with notice.
+
+   2. ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate will not be
+      awarded to the above Cards with transactions made in the following Merchant Category Codes
+      (“MCC”):
+
+         Quasi Cash /          MCC 6529        Quasi Cash – Remote Stored Value Load – Financial
+         Financial Services                    Institute
+         (MCC 6529-6540),      MCC 6530        Quasi Cash – Remote Stored Value Load – Merchant
+         such as but not       MCC 6534        Quasi Cash – Money Transfer – Member Financial
+         limited to:                           Institution
+                               MCC 6540        Non-Financial Institutions – Stored Value Card
+                                               Purchase/Load
+                               MCC 7349        Cleaning and Maintenance, Janitorial Services
+                               MCC 7511        Quasi Cash – Truck Stop Transactions
+                               MCC 7523        Parking Lots, Parking Meters and Garages
+                               MCC 7800        Government-Owned Lotteries (US Region only)
+                               MCC 7995        Betting, including Lottery Tickets, Casino Gaming Chips, Off-
+                                               Track Betting, and Wagers at Race Tracks
+                               MCC 4829        Wire Transfer Money Orders (WTMOs)
+                               MCC 4900*       Utilities – Electric, Gas, Water, and Sanitary
+Updated November 2024. With effect from 16 December 2024.
+                                MCC 5199         Nondurable Goods (Not Elsewhere Classified)
+                                MCC 5960         Direct Marketing – Insurance Services
+                                MCC 6012         Financial Institutions – Merchandise, Services, and Debt
+                                                 Repayment
+                                MCC 6050         Quasi Cash – Financial institutions, Merchandise, Services
+                                MCC 6051         Non-Financial Institutions – Foreign Currency, Money
+                                                 Orders (Not Wire Transfer), Stored Value Card/Load,
+                                                 Travelers Cheques, and Debt Repayment
+                                MCC 6211         Securities – Brokers and Dealers
+                                MCC 6300         Insurance Sales, Underwriting and Premiums
+                                MCC 6513         Real Estate Agents and Managers – Rentals
+         Education              MCC 8211         Elementary and Secondary Schools
+         Institutions (MCC      MCC 8220         Colleges, Junior Colleges, Universities, and Professional
+         8211-8299), such as                     Schools
+         but not limited to:    MCC 8241         Correspondence Schools
+                                MCC 8244         Business and Secretarial Schools
+                                MCC 8249         Vocational and Trade Schools
+                                MCC 8299         Schools and Educational Services (Not Elsewhere Classified)
+                                MCC 8398         Charitable and Social Service Organizations
+         Professional           MCC 8062**       Hospitals
+         Services and
+         Membership             MCC 8651         Political Organizations
+         Organizations (MCC
+         8062, 8651-8661),      MCC 8661         Religious Organizations
+         such as
+         but not limited to:
+         Government             MCC 9211         Court Costs Including Alimony and Child Support
+         Services (MCC          MCC 9222         Fines
+         9000-9999), such as    MCC 9223         Bail and Bond Payments
+         but not limited to:    MCC 9311         Tax Payments
+                                MCC 9399         Government Services (Not Elsewhere Classified)
+                                MCC 9402         Postal Services – Government Only
+                                MCC 9405         U.S. Federal Government Agencies or Departments
+                                MCC 9754         Quasi Cash – Gambling – Horse Racing, Dog Racing, State
+                                                 Lotteries
+         Other                  MCC 5993         Cigar Stores and Stands
+         Miscellaneous,
+         such as but not
+         limited to:
+
+       *Not applicable for Citi Business Visa Card / Citi Corporate Visa Card, Citi Purchasing Visa Card, Citi
+       Travel Account Visa Card
+
+       **Not applicable for Citi ULTIMA Card
+
+
+
+
+Updated November 2024. With effect from 16 December 2024.
+   3. In addition, transactions with the following merchants1 and/or bearing the following merchant
+      descriptions2 will not earn ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate /
+      Cash Rebate, including but not limited to:
+              i.   AXS
+              ii. AMAZE* AXS
+             iii. BANC DE BINARY
+            iv.    BUS/MRT^
+            v.     AMAZE* BUS/MRT
+            vi.    EZ-link
+            vii. AMAZE* EZ-link
+            viii. OANDA ASIA PAC
+            ix.    SAM
+           x.      Saxo Cap Mkts Pte Ltd
+           xi.     SIMPLYGO*
+           xii.    SPL AUTO*
+           xiii. SPL ATU*
+           xiv. SPL ONLINE*
+            xv.    SKYFX.COM
+           xvi.    TL-ABT
+          xvii.    TRANSIT
+          xviii. AMAZE* TRANSIT
+           xix.    Transit Link
+           xx.     Youtrip Singapore SG
+
+       1
+        Transactions made at the abovementioned merchants will be excluded from rewards earn,
+       regardless of how the merchant is described in your credit card statement.
+
+       2
+        Further, transactions bearing any of the abovementioned merchant descriptions including any
+       combination, permutation or derivation of the abovementioned merchant descriptions, whether
+       in whole or in part, will be excluded from rewards earn (for example, transactions bearing the
+       merchant description of “[Company Name]*AXS”, “[Company Name]*BUS”, “[Company
+       Name]*MRT”, “[Company Name]*EZ-link” and “[Company Name]*TRANSIT”, where [Company
+       Name] could refer to any entity will be excluded from rewards earn). The Bank’s decision on this
+       is final.
+
+       ^
+        Please note that Citi SMRT Cardholders can earn SMRT$ for transactions with the merchant
+       description of BUS/MRT and Merchant Category Code 4111 charged to the Citi SMRT Card, subject
+       to the terms of the Citi SMRT$ Rewards Program.
+
+
+
+
+Updated November 2024. With effect from 16 December 2024.
+   4. Please note that the above excluded Merchant Category Codes (“MCC”) and the above excluded
+      merchant list is not exhaustive and may be updated from time to time at any time at our
+      discretion. Cardmembers are advised to check this list regularly for updates.
+
+   5. A Merchant Category Code (“MCC”) is a four-digit number assigned to a merchant/business by
+      the merchant’s acquiring bank. The acquiring bank provides the credit card payment facilities used
+      by the merchant and it determines and applies (with respect to the account), the MCC which in
+      its view best describes the merchant activity. Citibank does not determine the merchant’s MCC.
+
+   6. Citibank may at any time vary, modify or amend these terms and conditions as it may, in its
+      reasonable discretion, think fit, and the Cardmember shall be bound by such variations and
+      amendments provided such variations and amendments are communicated to the Cardmember.
+
+
+
+
+Updated November 2024. With effect from 16 December 2024.
+

@@ -42,3 +42,12 @@ Encodes the "Spend → card waterfall" from a personal miles-card cheatsheet
 categories — `TeslaSupercharger` (Tesla in-app billing → always flat PRVI, can't
 earn yuu) vs `TeslaChargePlus` (Charge+ stations → yuu while the cap has room,
 else PRVI) — which the `#EVAL` block demonstrates.
+
+## Superseded (2026-09-21)
+
+This directory encodes the household **cheat sheet** as two decision tables. The encoding of the
+issuers' own terms and conditions — which the cheat sheet summarises, and disagrees with in places —
+lives at `jl4/examples/legal/miles-card/` (subject `sg-miles-card` under `etc/go/subjects/`). The
+`categorize.dmn.md` table here is carried over there unchanged as layer 1; `card-to-use.dmn.md` is
+superseded by the per-issuer rule modules. This directory is kept as the record of the earlier shape
+and is in no golden glob.
