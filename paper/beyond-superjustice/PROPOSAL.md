@@ -3,7 +3,7 @@
 ### A chapter proposal for _Beyond Superjustice_
 
 _Drafted 2026-09-21. **Not sent.** Nothing in this directory has been communicated to Becher, Alarie, OUP, or the Creative Destruction Lab._
-_Target: the _Beyond Superjustice_ response volume edited by Samuel I. Becher (City University of Hong Kong) and Benjamin Alarie (University of Toronto), with workshops on 18–19 March 2027 at CityU and 25–26 May 2027 at Toronto. No call for papers has been published; see [`../README.md`](../README.md) §Venues and deadlines._
+_Target: the Beyond Superjustice response volume edited by Samuel I. Becher (City University of Hong Kong) and Benjamin Alarie (University of Toronto), with workshops on 18–19 March 2027 at CityU and 25–26 May 2027 at Toronto. No call for papers has been published; see [`../README.md`](../README.md) §Venues and deadlines._
 
 ---
 
@@ -19,7 +19,7 @@ Drawing on a decade of building L4, a typed functional language for legal rules,
 
 ## The argument, in four moves
 
-1. **The concession is in the text.** The singularity is defined as a state "at once extraordinarily more complex in its specification than it is today, and yet operationally vastly more knowable." Both halves are asserted; only one is mechanised. We separate them and show the failure mode where the first arrives alone: a rule system the subject cannot read *and* a probability they cannot appeal, which is worse than the present.
+1. **The concession is in the text.** The singularity is defined as a state "at once extraordinarily more complex in its specification than it is today, and yet operationally vastly more knowable." Both halves are asserted; only one is mechanised. We separate them and show the failure mode where the first arrives alone: a rule system the subject cannot read _and_ a probability they cannot appeal, which is worse than the present.
 
 2. **The definition is a type, and prediction does not inhabit it.** `Facts → Consequences` is a function. A predictor computes `Facts → Distribution Outcome`. There is no total map from the second to the first that does not introduce an unwritten decision rule — and a decision rule about legal consequence is itself law, unpromulgated and unreviewable. The practical corollaries are the ones institutions feel: you cannot appeal a distribution, version one against a commencement date, or locate a drafting defect inside one.
 
