@@ -55,6 +55,7 @@ import qualified Data.Text as Text
 import Optics (cosmosOf, gplate, toListOf, (^.))
 
 import L4.Annotation (getAnno, rangeOf)
+import L4.API.EmbeddedLibraries (embeddedLibraryNames)
 import L4.Catala.Emit (renderCatType)
 import L4.Catala.Equivalence (EqvUnit (..), equivalenceUnit)
 import L4.Catala.IR
@@ -133,6 +134,11 @@ data FieldStatus
   = FEmitted !CatType
   | FElidedString            -- ^ R11: a @STRING@ that nothing inspects
   | FElidedComputed          -- ^ a @MEANS@ field: Catala structures carry data only
+  | FElidedEmptyRecord !Text
+    -- ^ R11 addendum (2026-09-21): the field's type is built from a structure
+    -- every one of whose own fields was elided. Catala cannot declare a
+    -- structure with no fields, so that structure is not emitted and this field
+    -- goes with it. Carries the vanished structure's L4 name.
   | FUnsupported !Text       -- ^ a type with no Catala counterpart at all
   deriving stock (Eq, Show)
 
@@ -223,6 +229,12 @@ data Ctx = Ctx
   , cxScopes   :: !(Map Unique ScopeSig)
   , cxHelpers  :: !(Map Unique HelperSig)
   , cxAssumes  :: !(Map Unique AssumeInfo)
+  , cxEmpty    :: !(Set Text)
+    -- ^ Catala structures every one of whose fields was elided, by mangled
+    -- name. They are not emitted at all (catala 1.2.1 refuses a fieldless
+    -- @declaration structure@ /and/ the value @P { }@), so naming one in a type
+    -- or building one is a refusal rather than a narrowing — see
+    -- 'emptyRecordMsg' and the R11 addendum of 2026-09-21.
   , cxAssumeOK :: !Bool                       -- ^ may this body read an @ASSUME@? (scopes yes)
   , cxInScope  :: !Bool
     -- ^ is this expression being emitted /inside a Catala scope body/? Catala
@@ -261,25 +273,79 @@ defaultLowerOptions :: LowerOptions
 defaultLowerOptions = LowerOptions { loBooleanOnly = False }
 
 lowerModule :: Module Resolved -> Either [LowerError] CatModule
-lowerModule = lowerModuleWith defaultLowerOptions
+lowerModule = lowerModuleWith defaultLowerOptions []
 
-lowerModuleWith :: LowerOptions -> Module Resolved -> Either [LowerError] CatModule
-lowerModuleWith opts mod' = case getExportedFunctions mod' of
+-- | Lower one module, with its resolved import closure.
+--
+-- The closure is what the typechecker already resolved for the entry file (the
+-- CLI hands over @tc.dependencies@, flattened); passing @[]@ lowers the module
+-- alone, which is what every caller did before imported declarations were
+-- visible here.
+--
+-- Everything lands in ONE emitted @.catala_en@. Catala has modules of its own,
+-- and an L4 import could in principle become a Catala @> Using@ — that is out
+-- of scope for v1 and is not what this does. An imported @DECLARE@ the emitted
+-- code reaches is re-declared in the output module, and an imported helper it
+-- calls is emitted as one more private toplevel, exactly as a local helper is
+-- (R1, §8.1).
+lowerModuleWith
+  :: LowerOptions -> [Module Resolved] -> Module Resolved -> Either [LowerError] CatModule
+lowerModuleWith opts imports mod' = case getExportedFunctions mod' of
   []  -> Left [LowerError "" Nothing "no @export-annotated DECIDE found to compile to Catala"]
-  efs -> runV (buildModule opts mod' efs)
+  efs -> runV (buildModule opts imports mod' efs)
 
-buildModule :: LowerOptions -> Module Resolved -> [ExportedFunction] -> V CatModule
-buildModule opts mod' efs =
-  recursionErrors decides reach *> (collectEnums mod' `vThen` assemble)
+buildModule
+  :: LowerOptions -> [Module Resolved] -> Module Resolved -> [ExportedFunction] -> V CatModule
+buildModule opts imports mod' efs =
+  recursionErrors decides reach
+    *> duplicateDeclCheck neededTypes declModules
+    *> (collectEnums emptyL4 neededTypes declModules `vThen` assemble)
  where
-  decides   = collectDecides mod'
-  assumes   = collectAssumes mod'
-  typeNames = collectTypeNames mod'
-  records   = collectRecords mod'
+  -- Two views of the import closure, and the split is load-bearing.
+  --
+  -- 'declModules' is everything: a rule may be typed over a @DECLARE@ from any
+  -- module it can see, including the stdlib's, so type resolution reads them
+  -- all. 'codeModules' drops the stdlib, because the prelude's and daydate's
+  -- FUNCTIONS are not lowered — they reach the emitter through R5's combinator
+  -- recogniser and R3's date recogniser, which absorb them into Catala's own
+  -- list and date forms. Collecting them here instead would take precedence
+  -- over both ('lowerApp' consults 'cxHelpers' before the recognisers), pull
+  -- every prelude function an exported decision touches into the reachable set,
+  -- and then refuse the module for recursion, since `map` and `foldl` are
+  -- recursive.
+  declModules = mod' : imports
+  codeModules = mod' : filter (not . isLibraryModule) imports
+
+  decides   = collectDecides codeModules
+  assumes   = collectAssumes codeModules
+  needed    = \m -> Map.filterWithKey (\u _ -> Set.member u neededTypes) m
+  typeNames = needed (collectTypeNames declModules)
+  rawRecords = needed (collectRecords declModules)
+  records   = Map.map (markEmptyFields emptyL4) rawRecords
   fieldMap  = Map.fromList
     [ (f.rfUnique, f) | ri <- dedupOn (.riL4) (Map.elems records), f <- ri.riFields ]
-  consMap   = enumConstructors mod'
+  consMap   = needed (enumConstructors declModules)
   exportUs  = [ getUnique (decideName ef.exportDecide) | ef <- efs ]
+
+  -- Which declarations the artifact carries. The entry module's own are all
+  -- emitted, as they always were — an unreferenced `DECLARE` is part of the
+  -- document. An IMPORTED one is emitted only when something reaches it, so
+  -- `IMPORT prelude` does not drag the stdlib's declarations into the output.
+  neededTypes = reachableTypes (typeGraph declModules) (localKeys <> typeSeeds)
+  localKeys   = Set.fromList (concatMap fst (declKeyInfo [mod']))
+  typeSeeds   = Set.fromList $
+       [ getUnique r
+       | u <- reach, di <- maybeToList (Map.lookup u decides)
+       , r <- concatMap toList di.diGivens
+              <> foldMap toList di.diGiveth
+              <> toList di.diBody ]
+    <> [ getUnique r | ai <- Map.elems assumes, t <- maybeToList ai.aiType, r <- toList t ]
+
+  -- R11 addendum (2026-09-21): the structures that lost EVERY field, and so
+  -- cannot be emitted at all, keyed by mangled name and carrying the L4 name a
+  -- diagnostic should quote. 'markEmptyFields' then drops the fields of other
+  -- structures that carry one, which is why this is a fixpoint.
+  emptyL4 = emptyRecords rawRecords
 
   -- R1: only what an @export decision reaches is emitted at all.
   reach    = reachableFrom decides exportUs
@@ -327,11 +393,15 @@ buildModule opts mod' efs =
                      | f <- ri.riFields, FEmitted t <- [f.rfStatus] ]
         }
     | ri <- dedupOn (.riL4) (Map.elems records)
+    , not (Map.member ri.riName emptyL4)
     ]
 
   -- R11 and its neighbours: every field that does not survive into the emitted
   -- structure is named, so the shape divergence is disclosed rather than silent.
-  fieldNotes =
+  -- The structures that vanish whole are named the same way, above their own
+  -- fields' notes, because a reader meeting only "field `doc` was elided" would
+  -- not learn that `Provenance` itself is gone from the artifact.
+  fieldNotes = structNotes <>
     [ "field `" <> f.rfL4 <> "` of `" <> ri.riL4 <> "` " <> why
     | ri <- dedupOn (.riL4) (Map.elems records), f <- ri.riFields
     , why <- case f.rfStatus of
@@ -340,7 +410,18 @@ buildModule opts mod' efs =
                             \emitted structure (R11). Reading it is an error."]
         FElidedComputed -> ["is a computed (MEANS) field; Catala structures carry data only, so it \
                             \is not emitted."]
+        FElidedEmptyRecord n ->
+          ["has a type built from `" <> n <> "`, every field of which was elided (R11); Catala \
+           \cannot declare a structure with no fields, so `" <> n <> "` is not emitted and this \
+           \field goes with it. Reading it is an error."]
         FUnsupported m  -> ["was not emitted: " <> m]
+    ]
+
+  structNotes =
+    [ "structure `" <> l4 <> "` is not emitted at all: every one of its fields was elided (R11), \
+      \and Catala rejects both a `declaration structure` with no fields and the value `"
+      <> nm <> " { }` (measured, catala 1.2.1). Naming it in a type, or building one, is an error."
+    | (nm, l4) <- Map.toList emptyL4
     ]
 
   sectionPaths = Map.fromList
@@ -357,10 +438,11 @@ buildModule opts mod' efs =
     [ ri.riName
     | ri <- dedupOn (.riL4) (Map.elems records), f <- ri.riFields
     , case f.rfStatus of
-        FEmitted _      -> False
-        FElidedComputed -> False   -- a MEANS field is derived, not stored: not part of equality
-        FElidedString   -> True
-        FUnsupported _  -> True
+        FEmitted _           -> False
+        FElidedComputed      -> False -- a MEANS field is derived, not stored: not part of equality
+        FElidedString        -> True
+        FElidedEmptyRecord _ -> True
+        FUnsupported _       -> True
     ]
 
   -- Named type → the types reachable through it, so 'safeCatType' can decide
@@ -393,6 +475,7 @@ buildModule opts mod' efs =
           , cxScopes   = sigs
           , cxHelpers  = hsigs
           , cxAssumes  = assumes
+          , cxEmpty    = Map.keysSet emptyL4
           , cxAssumeOK = False
           , cxInScope  = False
           , cxElided   = elided
@@ -566,12 +649,16 @@ checkComparable ctx rng what operands
   | Set.null ctx.cxNarrowed        = pure ()
   | any (maybe False (safeCatType ctx) . knownTy ctx) operands = pure ()
   | otherwise = vErr rng
-      ( what <> " compares whole values, and this module emits structure(s) "
+      -- "narrows", not "emits … narrower than": since the 2026-09-21 addendum a
+      -- structure can lose EVERY field, and one that does is not emitted at all.
+      -- Naming it here as something the module emits would be false of exactly
+      -- the structure most likely to be in this list.
+      ( what <> " compares whole values, and this module narrows structure(s) "
      <> Text.intercalate ", " [ "`" <> n <> "`" | n <- Set.toList ctx.cxNarrowed ]
-     <> " narrower than their L4 sources (a field was elided under R11, §8.11). A Catala "
-     <> "comparison over the narrowed structure ignores the elided field, so it can answer "
-     <> "`true` where L4 answers `false`. Compare the fields you mean, or drop the elided "
-     <> "field from the declaration." )
+     <> " against their L4 sources (a field was elided under R11, §8.11; one that lost every "
+     <> "field is not emitted at all). A Catala comparison over the narrowed structure ignores "
+     <> "the elided field, so it can answer `true` where L4 answers `false`. Compare the fields "
+     <> "you mean, or drop the elided field from the declaration." )
 
 -- ---------------------------------------------------------------------------
 -- R3's lenient `Date d m y`, as an emitted day-granular helper (§8.3)
@@ -1476,6 +1563,10 @@ lowerType ctx rng = go
           | u == TC.stringUnique  || lo `elem` ["string", "text"]  ->
               bad "`STRING` has no Catala counterpart (§4.8): a string that is never inspected is \
                   \elided at the field or parameter level (R11), but it cannot appear inside a type."
+          -- R11 addendum: a structure that lost every field is not emitted, so
+          -- naming it in a type has nothing to refer to.
+          | Just ri <- Map.lookup u ctx.cxRecords, Set.member ri.riName ctx.cxEmpty ->
+              bad (emptyRecordMsg ri.riL4)
           | Map.member u ctx.cxTypes || Map.member u ctx.cxRecords -> pure (TNamed (catUpper nm))
         _ -> bad ("type `" <> nm <> "` is outside the v1 Catala fragment (§6)")
     Fun {}    -> bad "function-typed values are not expressible in Catala (R5, §8.5)"
@@ -1581,6 +1672,8 @@ lowerExpr ctx = go
                                 <> "in Catala, which has no string type (§4.8)")
       FElidedComputed -> bad e ("field `" <> f.rfL4 <> "` is a computed (MEANS) field; Catala "
                                 <> "structures carry data only — lift it to a helper function")
+      FElidedEmptyRecord n ->
+        bad e ("field `" <> f.rfL4 <> "` has a type built from `" <> n <> "`, and " <> emptyRecordMsg n)
       FUnsupported m  -> bad e ("field `" <> f.rfL4 <> "` was not emitted: " <> m)
     Nothing -> (\x -> EProj x (catIdent (resolvedToText fld))) <$> go inner
 
@@ -1588,6 +1681,7 @@ lowerExpr ctx = go
   lowerNamed e ref named = case Map.lookup (getUnique ref) ctx.cxRecords of
     Nothing -> bad e ("named-argument application of `" <> resolvedToText ref
                       <> "` is only supported for record construction")
+    Just ri | Set.member ri.riName ctx.cxEmpty -> bad e (emptyRecordMsg ri.riL4)
     Just ri ->
       let byUnique = Map.fromList [ (getUnique f, v) | MkNamedExpr _ f v <- named ]
           byName   = Map.fromList [ (catIdent (resolvedToText f), v) | MkNamedExpr _ f v <- named ]
@@ -1701,6 +1795,7 @@ lowerApp ctx e ref args
               <> " argument(s); Catala's `content` carries exactly one value")
 
   record ri
+    | Set.member ri.riName ctx.cxEmpty = bad (emptyRecordMsg ri.riL4)
     | length args /= length ri.riFields =
         bad ("record `" <> ri.riL4 <> "` applied to " <> tshow (length args)
              <> " argument(s) but has " <> tshow (length ri.riFields) <> " field(s)")
@@ -2096,19 +2191,20 @@ topDeclsWithPath (MkModule _ _ section) = goSection [] section
          Section _ sub -> goSection path' sub
          other         -> [(path', other)]
 
--- | Every type declared in the module, keyed by unique.
-collectTypeNames :: Module Resolved -> Map Unique Text
-collectTypeNames mod' = Map.fromList
+-- | Every type declared across these modules, keyed by unique.
+collectTypeNames :: [Module Resolved] -> Map Unique Text
+collectTypeNames mods = Map.fromList
   [ (getUnique tyRes, catUpper (resolvedToText tyRes))
-  | Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) _) <- topDecls mod'
+  | Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) _) <- concatMap topDecls mods
   ]
 
 -- | Record declarations, keyed by /both/ the type's unique and its
 -- constructor's, so a construction site resolves whichever the parser produced.
-collectRecords :: Module Resolved -> Map Unique RecordInfo
-collectRecords mod' = Map.fromList $ concat
+collectRecords :: [Module Resolved] -> Map Unique RecordInfo
+collectRecords mods = Map.fromList $ concat
   [ (getUnique tyRes, ri) : [ (getUnique c, ri) | c <- maybeToList mCon ]
-  | Declare _ d@(MkDeclare _ _ (MkAppForm _ tyRes _ _) (RecordDecl _ mCon fields)) <- topDecls mod'
+  | Declare _ d@(MkDeclare _ _ (MkAppForm _ tyRes _ _) (RecordDecl _ mCon fields))
+      <- concatMap topDecls mods
   , let ri = RecordInfo
                { riName   = catUpper (resolvedToText tyRes)
                , riL4     = resolvedToText tyRes
@@ -2127,37 +2223,49 @@ collectRecords mod' = Map.fromList $ concat
         Right t -> FEmitted t
         Left es -> FUnsupported (Text.intercalate "; " [ x.errMsg | x <- es ])
 
--- | Enumeration declarations. A constructor carrying more than one payload has
--- no Catala shape (@content@ takes exactly one type), so it is an error.
-collectEnums :: Module Resolved -> V [CatEnum]
-collectEnums mod' = vList
+-- | Enumeration declarations the artifact needs. A constructor carrying more
+-- than one payload has no Catala shape (@content@ takes exactly one type), so
+-- it is an error — but only for an enumeration that is actually emitted, which
+-- is why the needed set is a parameter rather than a filter applied afterwards:
+-- an unreferenced declaration in an imported module must not be able to refuse
+-- the whole lowering.
+collectEnums :: Map Text Text -> Set Unique -> [Module Resolved] -> V [CatEnum]
+collectEnums empties needed mods = vList
   [ CatEnum (catUpper (resolvedToText tyRes)) (resolvedToText tyRes) (descOfDeclare d)
       <$> vList (map (conCase (resolvedToText tyRes)) cons)
-  | Declare _ d@(MkDeclare _ _ (MkAppForm _ tyRes _ _) (EnumDecl _ cons)) <- topDecls mod'
+  | Declare _ d@(MkDeclare _ _ (MkAppForm _ tyRes _ _) (EnumDecl _ cons))
+      <- concatMap topDecls mods
+  , Set.member (getUnique tyRes) needed
   ]
  where
   conCase tyNm (MkConDecl _ c payload) =
     let cn = resolvedToText c
     in case payload of
       []                       -> pure (CatCase (catUpper cn) cn Nothing)
-      [MkTypedName _ _ ty _ _] -> CatCase (catUpper cn) cn . Just <$> vIn tyNm (lowerTypeBare ty)
+      [MkTypedName _ _ ty _ _] ->
+        vIn tyNm (lowerTypeBare ty) `vThen` \ct -> case firstEmptyIn (Map.keysSet empties) ct of
+          Just n  -> vBad [LowerError tyNm Nothing
+                            ("constructor `" <> cn <> "` carries `"
+                             <> Map.findWithDefault n n empties <> "`, " <> emptyRecordMsg
+                                 (Map.findWithDefault n n empties))]
+          Nothing -> pure (CatCase (catUpper cn) cn (Just ct))
       _ -> vBad [LowerError tyNm Nothing
                   ("constructor `" <> cn <> "` carries " <> tshow (length payload)
                    <> " payload fields; Catala's `content` takes exactly one type "
                    <> "(declare a structure and carry that instead)")]
 
 -- | Enum constructors, keyed by unique.
-enumConstructors :: Module Resolved -> Map Unique ConInfo
-enumConstructors mod' = Map.fromList
+enumConstructors :: [Module Resolved] -> Map Unique ConInfo
+enumConstructors mods = Map.fromList
   [ ( getUnique c
     , ConInfo (catUpper (resolvedToText tyRes)) (catUpper (resolvedToText c))
               (resolvedToText c) (not (null payload)) )
-  | Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) (EnumDecl _ cons)) <- topDecls mod'
+  | Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) (EnumDecl _ cons)) <- concatMap topDecls mods
   , MkConDecl _ c payload <- cons
   ]
 
-collectDecides :: Module Resolved -> Map Unique DecideInfo
-collectDecides mod' = Map.fromList
+collectDecides :: [Module Resolved] -> Map Unique DecideInfo
+collectDecides mods = Map.fromList
   [ ( getUnique fnRes
     , DecideInfo
         { diUnique  = getUnique fnRes
@@ -2175,11 +2283,11 @@ collectDecides mod' = Map.fromList
         , diRange   = rangeOf d
         } )
   | Decide tdAnn d@(MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) mGiveth)
-                              (MkAppForm _ fnRes appArgs _) body) <- topDecls mod'
+                              (MkAppForm _ fnRes appArgs _) body) <- concatMap topDecls mods
   ]
 
-collectAssumes :: Module Resolved -> Map Unique AssumeInfo
-collectAssumes mod' = Map.fromList
+collectAssumes :: [Module Resolved] -> Map Unique AssumeInfo
+collectAssumes mods = Map.fromList
   [ ( getUnique nRes
     , AssumeInfo
         { aiName  = catIdent (resolvedToText nRes)
@@ -2187,8 +2295,144 @@ collectAssumes mod' = Map.fromList
         , aiType  = mTy <|> ((\(MkGivethSig _ t) -> t) <$> mGiveth)
         , aiRange = rangeOf a
         } )
-  | Assume _ a@(MkAssume _ (MkTypeSig _ _ mGiveth) (MkAppForm _ nRes _ _) mTy _) <- topDecls mod'
+  | Assume _ a@(MkAssume _ (MkTypeSig _ _ mGiveth) (MkAppForm _ nRes _ _) mTy _)
+      <- concatMap topDecls mods
   ]
+
+-- ---------------------------------------------------------------------------
+-- The import closure: which modules are code, and which declarations are needed
+-- ---------------------------------------------------------------------------
+
+-- | Is this module one of the stdlib libraries?
+--
+-- The test is the module's basename against the embedded stdlib's own name
+-- list, and deliberately NOT its path. The same @prelude@ reaches us as
+-- @jl4-embedded:\/prelude.l4@ when the binary resolves its compiled-in copy and
+-- as a @file:@ URI when @JL4_LIBRARY_PATH@ points at a checkout; a path test
+-- would call those two different things, and the two rigs are both ordinary.
+--
+-- The cost, stated so it is not discovered: a project file that shadows a
+-- library name — its own @math.l4@ — is classified as the library. Its
+-- @DECLARE@s are still read (those come from 'declModules', which is
+-- everything), but its helpers are not collected, so a call to one is refused
+-- as an unbound reference. That is loud, not a wrong answer.
+isLibraryModule :: Module Resolved -> Bool
+isLibraryModule m = dropExt (moduleSource m) `elem` embeddedLibraryNames
+
+-- | Per @DECLARE@ in these modules: the uniques it can be /reached by/ (its
+-- type's, and its constructors'), and the uniques its own declaration
+-- /mentions/ (field types, constructor payloads — plus some names that are not
+-- types at all, which is harmless: they match no declaration).
+declKeyInfo :: [Module Resolved] -> [([Unique], [Unique])]
+declKeyInfo mods =
+  [ (getUnique tyRes : map getUnique (declCons decl), map getUnique (toList decl))
+  | Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) decl) <- concatMap topDecls mods
+  ]
+ where
+  declCons = \case
+    RecordDecl _ mCon _ -> maybeToList mCon
+    EnumDecl _ cons     -> [ c | MkConDecl _ c _ <- cons ]
+    _                   -> []
+
+-- | Declaration key → everything reaching that key also reaches: the
+-- declaration's sibling keys, and whatever its field and payload types name.
+typeGraph :: [Module Resolved] -> Map Unique [Unique]
+typeGraph mods = Map.fromListWith (<>)
+  [ (k, keys <> mentions) | (keys, mentions) <- declKeyInfo mods, k <- keys ]
+
+-- | Two modules in the import closure may each declare a type of the same
+-- name. The typechecker is content — they are different entities, told apart by
+-- unique — but the emitted Catala has ONE flat namespace, and the scan that
+-- builds the artifact deduplicates structures by their L4 name. So one
+-- declaration would win, the other's construction sites would be emitted
+-- against the winner's field list, and nothing would say so: 'collisionCheck'
+-- cannot see it, because it compares the L4 names that a mangled name came
+-- from and here those are equal.
+--
+-- Only declarations the artifact actually needs are checked. Two modules in a
+-- large closure may well both declare something the emitted code never reaches,
+-- and refusing that would make importing a module a liability.
+--
+-- This became reachable when the lowering started reading the closure
+-- (§8.1.2, 2026-09-21); with a single module the front end had already ruled it
+-- out.
+duplicateDeclCheck :: Set Unique -> [Module Resolved] -> V ()
+duplicateDeclCheck needed mods = case dupes of
+  [] -> pure ()
+  ds -> vBad
+    [ LowerError "" Nothing
+        ( "`" <> nm <> "` is declared " <> tshow n <> " times among this module and its imports, "
+       <> "and the emitted Catala has one namespace for all of them — the declarations would be "
+       <> "merged into whichever was scanned first, silently. Rename one, or keep one of them out "
+       <> "of the exported decision's reach (§8.1.2)." )
+    | (nm, n) <- ds ]
+ where
+  decls = [ (resolvedToText tyRes, getUnique tyRes)
+          | Declare _ (MkDeclare _ _ (MkAppForm _ tyRes _ _) _) <- concatMap topDecls mods
+          , Set.member (getUnique tyRes) needed ]
+  dupes = [ (nm, n)
+          | (nm, us) <- Map.toList (Map.fromListWith (<>) [ (nm, [u]) | (nm, u) <- decls ])
+          , let n = Set.size (Set.fromList us)
+          , n > 1 ]
+
+-- | Transitive closure of 'typeGraph' from a seed set.
+reachableTypes :: Map Unique [Unique] -> Set Unique -> Set Unique
+reachableTypes g = go Set.empty . Set.toList
+ where
+  go seen [] = seen
+  go seen (u : us)
+    | Set.member u seen = go seen us
+    | otherwise         = go (Set.insert u seen) (Map.findWithDefault [] u g <> us)
+
+-- ---------------------------------------------------------------------------
+-- R11 addendum (2026-09-21): a structure can lose every field
+-- ---------------------------------------------------------------------------
+
+-- | The structures whose every field was elided, mangled name → L4 name.
+--
+-- Catala 1.2.1 has no spelling for such a thing. Measured: @declaration
+-- structure P:@ with no fields is "No fields defined for structure P. Please
+-- define at least one.", and the value @P { }@ is a syntax error at @}@
+-- ("expected a list of field bindings of the form '-- fld : expression'"). So
+-- the structure is elided too — and eliding it takes with it every field of
+-- another structure that carries one, which can empty that structure in turn.
+-- Hence the fixpoint.
+emptyRecords :: Map Unique RecordInfo -> Map Text Text
+emptyRecords recs = go Map.empty
+ where
+  ris = dedupOn (.riL4) (Map.elems recs)
+  go acc =
+    let acc' = Map.fromList [ (ri.riName, ri.riL4) | ri <- ris, all (gone acc) ri.riFields ]
+    in if Map.keysSet acc' == Map.keysSet acc then acc else go acc'
+  gone acc f = case f.rfStatus of
+    FEmitted t -> isJust (firstEmptyIn (Map.keysSet acc) t)
+    _          -> True
+
+-- | Re-status the fields whose type is built from a structure that vanished.
+markEmptyFields :: Map Text Text -> RecordInfo -> RecordInfo
+markEmptyFields empties ri = ri { riFields = map step ri.riFields }
+ where
+  step f = case f.rfStatus of
+    FEmitted t | Just n <- firstEmptyIn (Map.keysSet empties) t ->
+      f { rfStatus = FElidedEmptyRecord (Map.findWithDefault n n empties) }
+    _ -> f
+
+-- | The first vanished structure a type is built from, if any.
+firstEmptyIn :: Set Text -> CatType -> Maybe Text
+firstEmptyIn empties = go
+ where
+  go = \case
+    TNamed n | Set.member n empties -> Just n
+    TList t   -> go t
+    TOption t -> go t
+    _         -> Nothing
+
+emptyRecordMsg :: Text -> Text
+emptyRecordMsg l4 =
+  "every field of `" <> l4 <> "` was elided (R11), so the structure has no fields left and cannot \
+  \be emitted at all: catala 1.2.1 refuses both a `declaration structure` with no fields and the \
+  \value `" <> catUpper l4 <> " { }`. Give it a field Catala can carry, or keep it out of the \
+  \exported decision's reach (§8.11 addendum, 2026-09-21)."
 
 -- | The @\@desc@ text of a declaration, with the leading flag keywords stripped.
 descOfDeclare :: Declare Resolved -> Maybe Text

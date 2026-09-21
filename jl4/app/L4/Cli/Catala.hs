@@ -29,6 +29,7 @@ module L4.Cli.Catala
 
 import Base (Map, Text)
 import Data.Char (isAlpha, isAlphaNum, isAscii, toUpper)
+import qualified Data.List as List
 import qualified Base.Text as Text
 import Data.Ratio (denominator, numerator)
 import qualified Data.Map.Strict as Map
@@ -50,7 +51,7 @@ import L4.EvaluateLazy (EvalDirectiveResult (..), EvalDirectiveValue (..), Asser
 import L4.EvaluateLazy.Machine (pattern ValBool)
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Print (ConstructorFieldNames, extractConstructorFieldNames, prettyLayoutNF)
-import L4.Syntax (Resolved, getUnique, rawName, rawNameToText, getOriginal)
+import L4.Syntax (Module (..), Resolved, getUnique, rawName, rawNameToText, getOriginal)
 import qualified L4.TypeCheck.Environment as TC
 
 import L4.Cli.Common
@@ -98,7 +99,7 @@ catalaCmd opts = do
       -- precondition that matters for lowering.
       putDiagnostics errs
       let lowerOpts = LowerOptions { loBooleanOnly = opts.catBooleanOnly }
-      case lowerModuleWith lowerOpts tc.module' of
+      case lowerModuleWith lowerOpts (importClosure tc) tc.module' of
         Left lerrs -> do
           putDiagnostics
             ( "l4 catala: cannot compile these decisions to Catala:"
@@ -144,6 +145,25 @@ catalaCmd opts = do
   retitle nm (SegProse (l : ls) : rest)
     | "# " `Text.isPrefixOf` l = SegProse (("# " <> nm) : ls) : rest
   retitle _ segs = segs
+
+-- | Every transitively imported module, deduplicated by URI.
+--
+-- The lowering needs these because the typechecker resolves a name to whichever
+-- module declares it, and it does not care which: an exported decision's
+-- @GIVETH@ can be a record declared in an imported file, and its body can call a
+-- helper declared there. Scanning only the entry module found neither, and the
+-- symptom did not say so — a type declared next door was reported as "outside
+-- the v1 Catala fragment (§6)", which reads as a language limit rather than a
+-- missing scan.
+--
+-- Same shape as 'L4.Cli.Render.transitiveDeps'; the MLIR pipeline takes only
+-- @tc.dependencies@'s first level, which would miss a type two imports away.
+importClosure :: Rules.TypeCheckResult -> [Module Resolved]
+importClosure tc = nubOnUri (go tc.dependencies)
+ where
+  go = concatMap (\d -> d.module' : go d.dependencies)
+  nubOnUri = List.nubBy (\a b -> muri a == muri b)
+  muri (MkModule _ u _) = u
 
 -- | The module name Catala will demand for a file with this basename, or
 -- 'Nothing' when no module can live in a file so named.

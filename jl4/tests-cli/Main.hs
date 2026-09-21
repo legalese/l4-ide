@@ -4998,6 +4998,53 @@ spec bin = do
       expectGolden bin ["catala", "examples/catala/export-chain.l4"]
                        "examples/catala/expected/export-chain.catala_en"
 
+    -- The lowering scans the whole IMPORT closure, not just the entry module.
+    -- Before 2026-09-21 it scanned only what it was handed, so a `DECLARE` next
+    -- door was reported as "outside the v1 Catala fragment (§6)" — a message
+    -- about the language, for a defect in the scan.
+    it "compiles a decision built out of imported declarations and an imported helper" $
+      expectGolden bin ["catala", "examples/catala/imports.l4"]
+                       "examples/catala/expected/imports.catala_en"
+
+    -- Reading the closure means the prelude's own declarations are visible too.
+    -- They must not be EMITTED: an imported declaration reaches the artifact
+    -- only when the emitted code reaches it. Assert on what is absent, because
+    -- the golden above can only show what is present.
+    it "emits no stdlib declaration for a module that merely imports the prelude" $ do
+      Output code sout _ <- runL4 bin ["catala", "examples/catala/imports.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("declaration structure Assessment:" `isInfixOf`)
+      sout `shouldSatisfy` ("declaration enumeration Band:" `isInfixOf`)
+      -- Exactly one of each: the two the emitted code reaches. Anything the
+      -- prelude contributes would show up as a third.
+      length (filter ("declaration structure " `isPrefixOf`) (lines sout)) `shouldBe` 1
+      length (filter ("declaration enumeration " `isPrefixOf`) (lines sout)) `shouldBe` 1
+
+    -- R11 addendum, 2026-09-21: a structure every one of whose fields was
+    -- elided cannot be emitted at all — catala 1.2.1 refuses a fieldless
+    -- `declaration structure` AND the value `P { }`. The golden pins that the
+    -- structure and the fields carrying it are both gone, and the test below it
+    -- pins that both disappearances are disclosed rather than silent.
+    it "elides a record whose every field is a STRING, and the fields that carry it" $
+      expectGolden bin ["catala", "examples/catala/all-string-record.l4"]
+                       "examples/catala/expected/all-string-record.catala_en"
+
+    it "discloses an elided structure and the fields that vanish with it" $ do
+      Output code sout _ <- runL4 bin ["catala", "examples/catala/all-string-record.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("structure `Provenance` is not emitted at all" `isInfixOf`)
+      sout `shouldSatisfy`
+        ("field `sources` of `Finding` has a type built from `Provenance`" `isInfixOf`)
+      -- The empty structure and its value are what catala refuses; neither may
+      -- reach the artifact. Assert that by what IS emitted rather than by
+      -- searching for `Provenance { }`: the note above quotes that very string
+      -- to explain why it cannot be written, so an absence test on it fails on
+      -- its own disclosure. (It did, first time out.)
+      sout `shouldSatisfy` (not . ("declaration structure Provenance:" `isInfixOf`))
+      sout `shouldSatisfy` (not . ("data sources" `isInfixOf`))
+      sout `shouldSatisfy`
+        ("Finding { -- amount: (claimed * 2.0) -- settled: (claimed > 0.0) }" `isInfixOf`)
+
     -- R11's disclosure obligation is the point of these two, not the text: a
     -- narrower emitted record than its L4 source is a shape divergence a
     -- reader must be told about, so it goes in the notes block, not just on
@@ -5100,14 +5147,18 @@ spec bin = do
     it "rejects a name collision (distinct L4 names → same Catala identifier)" $
       expectFail bin ["catala", "examples/openfisca/not-ok/name-collision.l4"]
 
-    -- Five shapes that used to compile to Catala saying something other than
+    -- Six shapes that used to compile to Catala saying something other than
     -- what the L4 says. Each fixture's header names the divergence; the point
     -- of the group is that `l4 catala` refuses rather than emitting quietly.
+    -- `duplicate-type-name` became possible only once the lowering read the
+    -- import closure (§8.1.2): two imported modules each declaring a `Thing`,
+    -- which `l4 check` accepts and one flat Catala namespace cannot hold.
     for_ [ "otherwise-not-last"
          , "otherwise-not-last-enum"
          , "local-name-shadow"
          , "elided-string-compared"
          , "enum-constructor-collision"
+         , "duplicate-type-name"
          ] $ \name ->
       it ("rejects " ++ name ++ " rather than changing its denotation") $
         expectFail bin ["catala", "examples/catala/not-ok/" ++ name ++ ".l4"]
