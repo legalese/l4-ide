@@ -1,0 +1,417 @@
+-- Singapore Penal Code 1871 — cheating.
+--
+--   s 415  defines "cheat"                                (the elements)
+--   s 417  punishes whoever cheats                        (the simple charge)
+--   s 420  punishes cheating that dishonestly induces a   (the aggravated charge)
+--          delivery of property or the making, altering
+--          or destroying of a valuable security
+--
+-- A charge is laid under the PUNISHING section, so this module exports two
+-- charges (s 417, s 420) over one facts record, and two offence ladders that
+-- share the s 415 elements. The reported charge it is pinned to:
+--
+--   Lewis Christine v Public Prosecutor [2001] SGHC 113 — s 420, the price-tag
+--   switch. The charge is quoted in the judgment and reproduced in the
+--   directives below, modulo the citation form ("Penal Code, Chapter 224" then,
+--   "Penal Code 1871" now) and the CPC s 124 header, which this row normalises
+--   across every charge it frames.
+--
+-- An ISOMORPHIC encoding in INERT STYLE — see culpable-homicide-301.l4 for the
+-- conventions. Verbatim statutory prose rides as inert strings; only the
+-- operative atoms are lifted into named leaves; the inert strings are mortar,
+-- never shadow copies of the leaf beside them.
+--
+-- ---------------------------------------------------------------------------
+-- The text
+-- ---------------------------------------------------------------------------
+--
+-- 415. Whoever, by deceiving any person, whether or not such deception was the
+--      sole or main inducement, fraudulently or dishonestly induces the person
+--      so deceived to deliver or cause the delivery of any property to any
+--      person, or to consent that any person shall retain any property, or
+--      intentionally induces the person so deceived to do or omit to do
+--      anything which he would not do or omit to do if he were not so deceived,
+--      and which act or omission causes or is likely to cause damage or harm to
+--      any person in body, mind, reputation or property, is said to "cheat".
+--      Explanation 1.—A dishonest concealment of facts is a deception within
+--      the meaning of this section.
+--      Explanation 2.—Mere breach of contract is not of itself proof of an
+--      original fraudulent intent.
+--      Explanation 3.—Whoever makes a representation through any agent is to be
+--      treated as having made the representation himself.
+--      Explanation 4.—A person that is a company or association or body of
+--      persons, whether incorporated or not, can be deceived for the purposes
+--      of this section, even though none of its individual officers, employees
+--      or agents is personally deceived.
+--      Explanation 5.—A person that is a company or association or body of
+--      persons, whether incorporated or not, can be induced to act in a manner
+--      mentioned in this section even though none of its individual officers,
+--      employees or agents is personally induced to act in such manner.
+--                                                                    [15/2019]
+--
+-- 417. Whoever cheats shall be punished with imprisonment for a term which may
+--      extend to 3 years, or with fine, or with both.
+--
+-- 420.—(1) Whoever cheats and thereby dishonestly induces the person deceived to
+--      deliver or cause the delivery of any property to any person, or to make,
+--      alter or destroy the whole or any part of a valuable security, or
+--      anything which is signed or sealed, and which is capable of being
+--      converted into a valuable security, shall be punished with imprisonment
+--      for a term which may extend to 10 years, and shall also be liable to
+--      fine or to caning or to both.        [Act 21 of 2025 wef 30/12/2025]
+--      (2) Whoever cheats by remote communication and thereby dishonestly
+--      induces any of the acts mentioned in subsection (1) shall be punished
+--      with imprisonment for a term which may extend to 10 years and with
+--      caning with not less than 6 strokes, and shall also be liable to fine.
+--                                   [15/2019] [Act 21 of 2025 wef 30/12/2025]
+--
+-- ---------------------------------------------------------------------------
+-- The shape of the section
+-- ---------------------------------------------------------------------------
+--
+-- s 415 is one deception and one of two inducements:
+--
+--   FIRST LIMB   fraudulently or dishonestly induces … to deliver / cause the
+--                delivery of property / consent that any person retain property
+--   SECOND LIMB  intentionally induces … to do or omit anything he would not
+--                otherwise do, and the act or omission causes or is likely to
+--                cause damage or harm in body, mind, reputation or property
+--
+-- "whether or not such deception was the sole or main inducement" removes a
+-- defence rather than adding an element, so it rides inert.
+--
+-- s 420 takes the first limb's DELIVERY (not the consent-to-retain alternative)
+-- and requires that it was induced DISHONESTLY — so cheating done fraudulently
+-- but not dishonestly is s 417 only. That is the switch a reader can throw on
+-- the ladder: turn `dishonestly` off and `fraudulently` on, and the s 420
+-- charge withdraws while the s 417 charge stands.
+--
+-- The particulars the charge recites but the section does not test (who the
+-- victim is, what they were made to believe, what they handed over) are STRING
+-- fields on the same record, so one record is both the ladder's input and the
+-- charge's.
+
+IMPORT prelude
+IMPORT `penal-code-general`
+
+§ `Penal Code 1871 — cheating`
+
+§§ `The facts of one deception`
+
+@ref Penal Code 1871 s 415, s 420 — the operative atoms, and the particulars CPC s 124 requires
+DECLARE `Cheating Facts` HAS
+    particulars           IS A Particulars @desc Who is charged, and when and where the offence was committed
+    victim                IS A STRING  @desc The name of the person deceived, as it is to appear in the charge — for example "Wong Fei Hsia"
+    `victim described as` IS A STRING  @desc How the charge describes the person deceived, after the name — for example "the cashier of Seiyu Departmental Store"; leave blank if not needed
+    `victim pronoun`      IS A Pronoun @desc The pronoun the charge uses for the person deceived
+
+    -- "by deceiving any person"
+    `deceived the victim` IS A BOOLEAN @desc Did the accused deceive the victim? A dishonest concealment of facts is a deception (Explanation 1); a representation made through an agent counts (Explanation 3); a company can be deceived (Explanation 4).
+    `the deception`       IS A STRING  @desc What the victim was deceived into, as it is to read after "by deceiving him/her" — for example "to believe that the price of a pencil casing is worth $5.25, when in actual fact, you knew that the price of the said item is worth $16.95"
+
+    -- "fraudulently or dishonestly" — s 25 and s 24
+    fraudulently          IS A BOOLEAN @desc Did the accused act fraudulently — with intent to deceive, and by means of the deception, for an advantage to anyone or a detriment to anyone else (s 25)?
+    dishonestly           IS A BOOLEAN @desc Did the accused act dishonestly — intending a wrongful gain or a wrongful loss, or in a way reasonable and honest people would call dishonest, knowing that (s 24)?
+
+    -- first limb: "induces the person so deceived to …"
+    deliver               IS A BOOLEAN @desc Was the victim induced to deliver property to anyone?
+    `cause the delivery`  IS A BOOLEAN @desc Was the victim induced to cause property to be delivered to anyone?
+    `consent that any person shall retain any property`
+                          IS A BOOLEAN @desc Was the victim induced to consent to anyone keeping property?
+    `the property`        IS A STRING  @desc What was delivered or retained, as it is to read after "to deliver to you" — for example "the said item for only $5.25"
+
+    -- second limb: "intentionally induces the person so deceived to do or omit to do anything …"
+    intentionally         IS A BOOLEAN @desc Did the accused intend to induce the victim to act, or to refrain from acting, as they did?
+    `do`                  IS A BOOLEAN @desc Was the victim induced to do something they would not have done but for the deception?
+    `omit to do`          IS A BOOLEAN @desc Was the victim induced to leave undone something they would otherwise have done?
+    `the act or omission` IS A STRING  @desc What the victim did or left undone, as it is to read after "to" — for example "hand over the keys to the flat"
+    causes                IS A BOOLEAN @desc Did that act or omission cause damage or harm?
+    `likely to cause`     IS A BOOLEAN @desc Was that act or omission likely to cause damage or harm?
+    damage                IS A BOOLEAN @desc Damage to any person?
+    harm                  IS A BOOLEAN @desc Harm to any person?
+    body                  IS A BOOLEAN @desc … in body?
+    mind                  IS A BOOLEAN @desc … in mind?
+    reputation            IS A BOOLEAN @desc … in reputation?
+    property              IS A BOOLEAN @desc … in property?
+
+    -- s 420(1): the alternative to delivery
+    `make, alter or destroy a valuable security`
+                          IS A BOOLEAN @desc Was the victim induced to make, alter or destroy the whole or any part of a valuable security, or anything signed or sealed that could be converted into one?
+    -- s 420(2)
+    `by remote communication`
+                          IS A BOOLEAN @desc Was the cheating done by remote communication (s 420(2))?
+
+§§ `s 415 — cheating`
+
+@export Whether the accused "cheats" within section 415 of the Penal Code 1871
+GIVEN f IS A `Cheating Facts` @desc The deception, and what it induced the person deceived to do
+GIVETH A BOOLEAN
+DECIDE cheats f IF
+        "Whoever, by"
+   ...  f's `deceived the victim`
+   ...  ", whether or not such deception was the sole or main inducement,"
+   ...  (        (    f's fraudulently
+                 OR   f's dishonestly )
+            ...  "induces the person so deceived to"
+            ...  (    f's deliver
+                 ..   f's `cause the delivery`
+                 ..   "of any property to any person, or to"
+                 OR   f's `consent that any person shall retain any property` )
+        OR  (        f's intentionally
+            ...  "induces the person so deceived to"
+            ...  (    f's `do`
+                 OR   f's `omit to do` )
+            ...  "anything which he would not do or omit to do if he were not so deceived, and which act or omission"
+            ...  (    f's causes
+                 OR   f's `likely to cause` )
+            ...  (    f's damage
+                 OR   f's harm )
+            ...  "to any person in"
+            ...  (    f's body
+                 ..   f's mind
+                 ..   f's reputation
+                 OR   f's property ) ) )
+
+§§ `s 417 — punishment for cheating`
+
+@export Whether the accused has committed an offence punishable under section 417 of the Penal Code 1871 (cheating)
+GIVEN f IS A `Cheating Facts` @desc The deception, and what it induced the person deceived to do
+GIVETH A BOOLEAN
+DECIDE `offence under s 417` f IF
+        "Whoever"
+   ...  cheats f
+
+§§ `s 420 — cheating and dishonestly inducing a delivery of property`
+
+@export Whether the accused has committed an offence punishable under section 420 of the Penal Code 1871 (cheating and dishonestly inducing a delivery of property)
+GIVEN f IS A `Cheating Facts` @desc The deception, and what it induced the person deceived to do
+GIVETH A BOOLEAN
+DECIDE `offence under s 420` f IF
+        "(1) Whoever"
+   ...  cheats f
+   ...  "and thereby"
+   ...  f's dishonestly
+   ...  "induces the person deceived to"
+   ...  (    f's deliver
+        ..   f's `cause the delivery`
+        ..   "of any property to any person, or to"
+        OR   f's `make, alter or destroy a valuable security` )
+
+§§ `The charges`
+
+-- The manner clause s 125 illustration (b) requires: "The charge must set out
+-- the manner in which A cheated B." Read off the leaves that are TRUE, in the
+-- order the section states them. Lewis Christine:
+--
+--   did cheat one Wong Fei Hsia, the cashier of Seiyu Departmental Store by
+--   deceiving her to believe that the price of a "Pochacco" pencil casing is
+--   worth $5.25, when in actual fact, you knew that the price of the said item
+--   is worth $16.95, and by such manner of deception, you dishonestly induced
+--   the said Wong Fei Hsia to deliver to you the said item for only $5.25 which
+--   she would not have done, had she not been so deceived
+GIVEN f IS A `Cheating Facts`
+GIVETH A STRING
+`the manner of the cheating` f MEANS
+    CONCAT "did cheat ", (`one` (f's victim) (f's `victim described as`)),
+           " by deceiving ", (`object pronoun` (f's `victim pronoun`)), " ", f's `the deception`,
+           ", and by such manner of deception, you ", (`the adverb` f), " induced the said ", f's victim,
+           " to ", (`what the victim was induced to do` f),
+           " which ", (`subject pronoun` (f's `victim pronoun`)), " would not have done, had ", (`subject pronoun` (f's `victim pronoun`)), " not been so deceived"
+
+-- "fraudulently or dishonestly" for the first limb; "intentionally" for the
+-- second. Where both mental states hold, the charge says both.
+GIVEN f IS A `Cheating Facts`
+GIVETH A STRING
+`the adverb` f MEANS
+    `joined with` " and " (concat (LIST
+        (`included if` (f's fraudulently) "fraudulently"),
+        (`included if` (f's dishonestly) "dishonestly"),
+        (`included if` (`second limb` f) "intentionally")))
+
+GIVEN f IS A `Cheating Facts`
+GIVETH A STRING
+`what the victim was induced to do` f MEANS
+    `joined with` ", and " (concat (LIST
+        (`included if` (f's deliver) ("deliver to you " APPEND f's `the property`)),
+        (`included if` (f's `cause the delivery`) ("cause the delivery of " APPEND f's `the property`)),
+        (`included if` (f's `consent that any person shall retain any property`) ("consent to the retention of " APPEND f's `the property`)),
+        (`included if` (f's `make, alter or destroy a valuable security`) ("make, alter or destroy " APPEND f's `the property`)),
+        (`included if` (`second limb` f) (f's `the act or omission`))))
+
+GIVEN f IS A `Cheating Facts`
+GIVETH A BOOLEAN
+`second limb` f MEANS
+    f's intentionally AND (f's `do` OR f's `omit to do`)
+
+-- The elements, named for the refusal.
+GIVEN f IS A `Cheating Facts`
+GIVETH A LIST OF STRING
+`elements of cheating not made out` f MEANS
+    concat (LIST
+        (`missing unless` (f's `deceived the victim`) "by deceiving any person"),
+        (`missing unless` (f's fraudulently OR f's dishonestly OR f's intentionally) "fraudulently, dishonestly or intentionally"),
+        (`missing unless` (f's deliver OR f's `cause the delivery` OR f's `consent that any person shall retain any property` OR `second limb` f) "induces the person so deceived to deliver or cause the delivery of property, to consent to its retention, or to do or omit to do anything"),
+        (`missing unless` (cheats f) "the elements of section 415 taken together"))
+
+@export Frame a charge under section 417 of the Penal Code 1871 (cheating), or say why none can be framed
+GIVEN f IS A `Cheating Facts` @desc The deception, what it induced, and the particulars of the charge
+GIVETH A Charge
+`charge under s 417` f MEANS
+    `frame the charge` (f's particulars) "417" "cheating"
+        "imprisonment for a term which may extend to 3 years, or with fine, or with both"
+        (`offence under s 417` f)
+        (`the manner of the cheating` f)
+        (`elements of cheating not made out` f)
+
+@export Frame a charge under section 420 of the Penal Code 1871 (cheating and dishonestly inducing a delivery of property), or say why none can be framed
+GIVEN f IS A `Cheating Facts` @desc The deception, what it induced, and the particulars of the charge
+GIVETH A Charge
+`charge under s 420` f MEANS
+    `frame the charge` (f's particulars) "420" "cheating and dishonestly inducing a delivery of property"
+        (IF f's `by remote communication`
+         THEN "imprisonment for a term which may extend to 10 years and with caning with not less than 6 strokes, and shall also be liable to fine"
+         ELSE "imprisonment for a term which may extend to 10 years, and shall also be liable to fine or to caning or to both")
+        (`offence under s 420` f)
+        (`the manner of the cheating` f)
+        (concat (LIST (`elements of cheating not made out` f),
+                      (`missing unless` (f's dishonestly) "dishonestly (section 420 requires dishonesty; fraud alone is section 417)"),
+                      (`missing unless` (f's deliver OR f's `cause the delivery` OR f's `make, alter or destroy a valuable security`) "induces the person deceived to deliver or cause the delivery of property, or to make, alter or destroy a valuable security")))
+
+§§ `Lewis Christine v Public Prosecutor [2001] SGHC 113`
+
+-- The appellant switched the price tag on a "Pochacco" pencil casing at Seiyu,
+-- Parkway Parade, and paid $5.25 for an item priced at $16.95. Convicted under
+-- s 420; the appeal was against sentence. The charge, as quoted in the
+-- judgment:
+--
+--   You, Christine Lewis, are charged that you, on or about the 24th day of
+--   April 2000, on or about 8.10 pm, at the Seiyu Departmental Store at Parkway
+--   Parade Shopping Centre, Singapore, did cheat one Wong Fei Hsia, the cashier
+--   of Seiyu Departmental Store by deceiving her to believe that the price of a
+--   "Pochacco" pencil casing is worth $5.25, when in actual fact, you knew that
+--   the price of the said item is worth $16.95, and by such manner of
+--   deception, you dishonestly induced the said Wong Fei Hsia to deliver to you
+--   the said item for only $5.25 which she would not have done, had she not
+--   been so deceived, and you have thereby committed an offence punishable
+--   under section 420 of the Penal Code, Chapter 224.
+`Lewis Christine` MEANS `Cheating Facts` WITH
+    particulars           IS Particulars WITH
+                               accused            IS "Christine Lewis"
+                               date               IS "the 24th day of April 2000"
+                               time               IS "8.10 pm"
+                               place              IS "the Seiyu Departmental Store at Parkway Parade Shopping Centre"
+                               `co-accused`       IS ""
+                               `common intention` IS FALSE
+    victim                IS "Wong Fei Hsia"
+    `victim described as` IS "the cashier of Seiyu Departmental Store"
+    `victim pronoun`      IS she
+    `deceived the victim` IS TRUE
+    `the deception`       IS "to believe that the price of a \"Pochacco\" pencil casing is worth $5.25, when in actual fact, you knew that the price of the said item is worth $16.95"
+    fraudulently          IS FALSE
+    dishonestly           IS TRUE
+    deliver               IS TRUE
+    `cause the delivery`  IS FALSE
+    `consent that any person shall retain any property` IS FALSE
+    `the property`        IS "the said item for only $5.25"
+    intentionally         IS FALSE
+    `do`                  IS FALSE
+    `omit to do`          IS FALSE
+    `the act or omission` IS ""
+    causes                IS FALSE
+    `likely to cause`     IS FALSE
+    damage                IS FALSE
+    harm                  IS FALSE
+    body                  IS FALSE
+    mind                  IS FALSE
+    reputation            IS FALSE
+    property              IS FALSE
+    `make, alter or destroy a valuable security` IS FALSE
+    `by remote communication` IS FALSE
+
+-- The same facts with the mental state switched: fraudulently, not dishonestly.
+-- s 415 is still satisfied (the first limb accepts either), so s 417 stands;
+-- s 420 needs "dishonestly" and withdraws.
+`Lewis Christine, fraudulently only` MEANS `Cheating Facts` WITH
+    particulars           IS `Lewis Christine`'s particulars
+    victim                IS `Lewis Christine`'s victim
+    `victim described as` IS `Lewis Christine`'s `victim described as`
+    `victim pronoun`      IS `Lewis Christine`'s `victim pronoun`
+    `deceived the victim` IS TRUE
+    `the deception`       IS `Lewis Christine`'s `the deception`
+    fraudulently          IS TRUE
+    dishonestly           IS FALSE
+    deliver               IS TRUE
+    `cause the delivery`  IS FALSE
+    `consent that any person shall retain any property` IS FALSE
+    `the property`        IS `Lewis Christine`'s `the property`
+    intentionally         IS FALSE
+    `do`                  IS FALSE
+    `omit to do`          IS FALSE
+    `the act or omission` IS ""
+    causes                IS FALSE
+    `likely to cause`     IS FALSE
+    damage                IS FALSE
+    harm                  IS FALSE
+    body                  IS FALSE
+    mind                  IS FALSE
+    reputation            IS FALSE
+    property              IS FALSE
+    `make, alter or destroy a valuable security` IS FALSE
+    `by remote communication` IS FALSE
+
+-- No deception at all: nothing can be framed, and the refusal says why.
+`Lewis Christine, no deception` MEANS `Cheating Facts` WITH
+    particulars           IS `Lewis Christine`'s particulars
+    victim                IS `Lewis Christine`'s victim
+    `victim described as` IS `Lewis Christine`'s `victim described as`
+    `victim pronoun`      IS `Lewis Christine`'s `victim pronoun`
+    `deceived the victim` IS FALSE
+    `the deception`       IS ""
+    fraudulently          IS FALSE
+    dishonestly           IS TRUE
+    deliver               IS TRUE
+    `cause the delivery`  IS FALSE
+    `consent that any person shall retain any property` IS FALSE
+    `the property`        IS `Lewis Christine`'s `the property`
+    intentionally         IS FALSE
+    `do`                  IS FALSE
+    `omit to do`          IS FALSE
+    `the act or omission` IS ""
+    causes                IS FALSE
+    `likely to cause`     IS FALSE
+    damage                IS FALSE
+    harm                  IS FALSE
+    body                  IS FALSE
+    mind                  IS FALSE
+    reputation            IS FALSE
+    property              IS FALSE
+    `make, alter or destroy a valuable security` IS FALSE
+    `by remote communication` IS FALSE
+
+§§ `Directives`
+
+#EVAL cheats `Lewis Christine`
+#EVAL `offence under s 420` `Lewis Christine`
+#EVAL (`charge under s 420` `Lewis Christine`)'s text
+#EVAL (`charge under s 420` `Lewis Christine, no deception`)'s refusal
+
+-- The reported s 420 charge, verbatim from the judgment save for the citation
+-- form ("Penal Code, Chapter 224" → "Penal Code 1871") and the normalised
+-- CPC s 124 header ("on or about 8.10 pm" → "at about 8.10 pm").
+#ASSERT (`charge under s 420` `Lewis Christine`)'s `made out`
+#ASSERT (`charge under s 420` `Lewis Christine`)'s text EQUALS "You, Christine Lewis, are charged that you, on or about the 24th day of April 2000, at about 8.10 pm, at the Seiyu Departmental Store at Parkway Parade Shopping Centre, Singapore, did cheat one Wong Fei Hsia, the cashier of Seiyu Departmental Store by deceiving her to believe that the price of a \"Pochacco\" pencil casing is worth $5.25, when in actual fact, you knew that the price of the said item is worth $16.95, and by such manner of deception, you dishonestly induced the said Wong Fei Hsia to deliver to you the said item for only $5.25 which she would not have done, had she not been so deceived, and you have thereby committed an offence punishable under section 420 of the Penal Code 1871."
+
+-- s 417 is made out on the same facts (every s 420 offence is a s 415 cheat)
+#ASSERT (`charge under s 417` `Lewis Christine`)'s `made out`
+
+-- fraudulently-only: s 417 stands, s 420 withdraws, and the refusal names why
+#ASSERT (`charge under s 417` `Lewis Christine, fraudulently only`)'s `made out`
+#ASSERT NOT ((`charge under s 420` `Lewis Christine, fraudulently only`)'s `made out`)
+#ASSERT (`charge under s 420` `Lewis Christine, fraudulently only`)'s text EQUALS ""
+#ASSERT (`charge under s 420` `Lewis Christine, fraudulently only`)'s refusal EQUALS "A charge under section 420 would assert that the facts fulfil every legal condition of cheating and dishonestly inducing a delivery of property (CPC s 123(5)). On the facts given they do not: dishonestly (section 420 requires dishonesty; fraud alone is section 417)."
+#ASSERT (`charge under s 417` `Lewis Christine, fraudulently only`)'s text EQUALS "You, Christine Lewis, are charged that you, on or about the 24th day of April 2000, at about 8.10 pm, at the Seiyu Departmental Store at Parkway Parade Shopping Centre, Singapore, did cheat one Wong Fei Hsia, the cashier of Seiyu Departmental Store by deceiving her to believe that the price of a \"Pochacco\" pencil casing is worth $5.25, when in actual fact, you knew that the price of the said item is worth $16.95, and by such manner of deception, you fraudulently induced the said Wong Fei Hsia to deliver to you the said item for only $5.25 which she would not have done, had she not been so deceived, and you have thereby committed an offence punishable under section 417 of the Penal Code 1871."
+
+-- no deception: nothing is framed under either section
+#ASSERT NOT (cheats `Lewis Christine, no deception`)
+#ASSERT NOT ((`charge under s 417` `Lewis Christine, no deception`)'s `made out`)
+#ASSERT (`charge under s 417` `Lewis Christine, no deception`)'s refusal EQUALS "A charge under section 417 would assert that the facts fulfil every legal condition of cheating (CPC s 123(5)). On the facts given they do not: by deceiving any person; the elements of section 415 taken together."

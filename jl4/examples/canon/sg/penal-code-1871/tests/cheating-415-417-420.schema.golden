@@ -1,0 +1,154 @@
+{
+    "$defs": {
+        "Cheating Facts": {
+            "properties": {
+                "body": {
+                    "description": "… in body?",
+                    "type": "boolean"
+                },
+                "by remote communication": {
+                    "description": "Was the cheating done by remote communication (s 420(2))?",
+                    "type": "boolean"
+                },
+                "cause the delivery": {
+                    "description": "Was the victim induced to cause property to be delivered to anyone?",
+                    "type": "boolean"
+                },
+                "causes": {
+                    "description": "Did that act or omission cause damage or harm?",
+                    "type": "boolean"
+                },
+                "consent that any person shall retain any property": {
+                    "description": "Was the victim induced to consent to anyone keeping property?",
+                    "type": "boolean"
+                },
+                "damage": {
+                    "description": "Damage to any person?",
+                    "type": "boolean"
+                },
+                "deceived the victim": {
+                    "description": "Did the accused deceive the victim? A dishonest concealment of facts is a deception (Explanation 1); a representation made through an agent counts (Explanation 3); a company can be deceived (Explanation 4).",
+                    "type": "boolean"
+                },
+                "deliver": {
+                    "description": "Was the victim induced to deliver property to anyone?",
+                    "type": "boolean"
+                },
+                "dishonestly": {
+                    "description": "Did the accused act dishonestly — intending a wrongful gain or a wrongful loss, or in a way reasonable and honest people would call dishonest, knowing that (s 24)?",
+                    "type": "boolean"
+                },
+                "do": {
+                    "description": "Was the victim induced to do something they would not have done but for the deception?",
+                    "type": "boolean"
+                },
+                "fraudulently": {
+                    "description": "Did the accused act fraudulently — with intent to deceive, and by means of the deception, for an advantage to anyone or a detriment to anyone else (s 25)?",
+                    "type": "boolean"
+                },
+                "harm": {
+                    "description": "Harm to any person?",
+                    "type": "boolean"
+                },
+                "intentionally": {
+                    "description": "Did the accused intend to induce the victim to act, or to refrain from acting, as they did?",
+                    "type": "boolean"
+                },
+                "likely to cause": {
+                    "description": "Was that act or omission likely to cause damage or harm?",
+                    "type": "boolean"
+                },
+                "make, alter or destroy a valuable security": {
+                    "description": "Was the victim induced to make, alter or destroy the whole or any part of a valuable security, or anything signed or sealed that could be converted into one?",
+                    "type": "boolean"
+                },
+                "mind": {
+                    "description": "… in mind?",
+                    "type": "boolean"
+                },
+                "omit to do": {
+                    "description": "Was the victim induced to leave undone something they would otherwise have done?",
+                    "type": "boolean"
+                },
+                "particulars": {
+                    "$ref": "#/$defs/Particulars",
+                    "description": "Who is charged, and when and where the offence was committed"
+                },
+                "property": {
+                    "description": "… in property?",
+                    "type": "boolean"
+                },
+                "reputation": {
+                    "description": "… in reputation?",
+                    "type": "boolean"
+                },
+                "the act or omission": {
+                    "description": "What the victim did or left undone, as it is to read after \"to\" — for example \"hand over the keys to the flat\"",
+                    "type": "string"
+                },
+                "the deception": {
+                    "description": "What the victim was deceived into, as it is to read after \"by deceiving him/her\" — for example \"to believe that the price of a pencil casing is worth $5.25, when in actual fact, you knew that the price of the said item is worth $16.95\"",
+                    "type": "string"
+                },
+                "the property": {
+                    "description": "What was delivered or retained, as it is to read after \"to deliver to you\" — for example \"the said item for only $5.25\"",
+                    "type": "string"
+                },
+                "victim": {
+                    "description": "The name of the person deceived, as it is to appear in the charge — for example \"Wong Fei Hsia\"",
+                    "type": "string"
+                },
+                "victim described as": {
+                    "description": "How the charge describes the person deceived, after the name — for example \"the cashier of Seiyu Departmental Store\"; leave blank if not needed",
+                    "type": "string"
+                },
+                "victim pronoun": {
+                    "$ref": "#/$defs/Pronoun",
+                    "description": "The pronoun the charge uses for the person deceived"
+                }
+            },
+            "required": [
+                "particulars",
+                "victim",
+                "victim described as",
+                "victim pronoun",
+                "deceived the victim",
+                "the deception",
+                "fraudulently",
+                "dishonestly",
+                "deliver",
+                "cause the delivery",
+                "consent that any person shall retain any property",
+                "the property",
+                "intentionally",
+                "do",
+                "omit to do",
+                "the act or omission",
+                "causes",
+                "likely to cause",
+                "damage",
+                "harm",
+                "body",
+                "mind",
+                "reputation",
+                "property",
+                "make, alter or destroy a valuable security",
+                "by remote communication"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Whether the accused \"cheats\" within section 415 of the Penal Code 1871",
+    "properties": {
+        "f": {
+            "$ref": "#/$defs/Cheating Facts",
+            "description": "The deception, and what it induced the person deceived to do"
+        }
+    },
+    "required": [
+        "f"
+    ],
+    "title": "cheats",
+    "type": "object"
+}

@@ -1,0 +1,329 @@
+-- Singapore Penal Code 1871 — hurt intended to be minor that turns out grave.
+--
+--   s 321   defines "voluntarily to cause hurt"            (the elements)
+--   s 323A  punishes voluntarily causing hurt where the    (the charge)
+--           hurt INTENDED or FORESEEN is not grievous but
+--           the hurt ACTUALLY CAUSED is
+--
+-- A charge is laid under the PUNISHING section, so this module exports one
+-- charge (s 323A) over one facts record.
+--
+-- s 323A is the Code's answer to the one-punch case, and its shape is unusual:
+-- it is a punishing section whose own two elements are a MISMATCH between two
+-- hurts. The hurt the accused aimed at and the hurt the victim suffered are
+-- different facts about different things, so they are two leaves and not one,
+-- and the section is made out only when the first is minor AND the second is
+-- grave. Turn the first leaf off — the accused meant to break the bone he
+-- broke — and s 323A withdraws; that case is s 322 read with s 325
+-- (voluntarily causing grievous hurt), which this module does not encode.
+--
+-- The reported charge it is pinned to:
+--
+--   Ang Boon Han v Public Prosecutor [2024] SGHC 221 — s 323A, the single
+--   two-handed push at a bus stop. The charge is quoted in the judgment and
+--   reproduced in the directives below.
+--
+-- An ISOMORPHIC encoding in INERT STYLE — see culpable-homicide-301.l4 for the
+-- conventions. Verbatim statutory prose rides as inert strings; only the
+-- operative atoms are lifted into named leaves; the inert strings are mortar,
+-- never shadow copies of the leaf beside them.
+--
+-- ---------------------------------------------------------------------------
+-- The text
+-- ---------------------------------------------------------------------------
+--
+-- 321. Whoever does any act with the intention of thereby causing hurt to any
+--      person, or with the knowledge that he is likely thereby to cause hurt
+--      to any person, and does thereby cause hurt to any person, is said
+--      "voluntarily to cause hurt".
+--
+-- 323A. Whoever voluntarily causes hurt, if the hurt which he intends to cause
+--      or knows himself to be likely to cause is not grievous, but the hurt
+--      which he actually causes is grievous, shall be punished with
+--      imprisonment for a term which may extend to 5 years, or with fine which
+--      may extend to $10,000, or with both.
+--      Illustration
+--      At a club, A notices one of A's friends fighting with Z. A runs towards
+--      Z and punches Z in the face intending or knowing himself to be likely
+--      to cause minor injuries to Z's face. Z loses his balance, falls and
+--      hits his head against a ledge. Z suffers from severe brain injuries and
+--      is permanently paralysed. A did not intend to cause grievous hurt but
+--      A's action has actually caused grievous hurt to Z.
+--                                                                  [15/2019]
+--
+-- ---------------------------------------------------------------------------
+-- The shape of the section
+-- ---------------------------------------------------------------------------
+--
+-- s 321 is one act, one of two mental states, and one result:
+--
+--   THE ACT       does any act
+--   THE FAULT     with the intention of thereby causing hurt to any person
+--                 — or with the knowledge that he is likely thereby to cause
+--                   hurt to any person
+--   THE RESULT    and does thereby cause hurt to any person
+--
+-- The act is not lifted to a leaf of its own: "does thereby cause hurt"
+-- presupposes it, and an officer asked "was there an act?" beside "did the act
+-- cause hurt?" has one question to answer, not two.
+--
+-- s 323A then adds two leaves about two different hurts:
+--
+--   THE HURT AIMED AT    the hurt he intends to cause or knows himself to be
+--                        likely to cause is NOT grievous
+--   THE HURT SUFFERED    the hurt he actually causes IS grievous
+--
+-- Both are stated in s 320's terms, and **s 320 is not encoded here**. The two
+-- leaves ask the officer to apply it, and their @desc names the limb of s 320
+-- the reported case turned on (a fracture of a bone).
+--
+-- The particulars the charge recites but the section does not test (who was
+-- hurt, and how) are STRING fields on the same record, so one record is both
+-- the ladder's input and the charge's. There is no pronoun field: unlike the
+-- cheating recital, nothing this module builds needs one — the recital names
+-- the person hurt and CPC s 125's "to wit" particulars are the officer's own
+-- words.
+
+IMPORT prelude
+IMPORT `penal-code-general`
+
+§ `Penal Code 1871 — voluntarily causing hurt which causes grievous hurt`
+
+§§ `The facts of one act`
+
+@ref Penal Code 1871 s 321, s 323A — the operative atoms, and the particulars CPC ss 124-125 require
+DECLARE `Hurt Facts` HAS
+    particulars           IS A Particulars @desc Who is charged, and when and where the offence was committed
+    victim                IS A STRING  @desc The name of the person hurt, as it is to appear in the charge — for example "Lam Mian Sern"
+    `victim described as` IS A STRING  @desc How the charge describes the person hurt, after the name; leave blank if not needed
+    `the manner`          IS A STRING  @desc The particulars CPC s 125 requires, as they are to read after "to wit," — what the accused did, and how it led to the hurt; for example "by using both hands to push the chest of the said Lam Mian Sern once, causing him to fall backward"
+
+    -- s 321: "with the intention of thereby causing hurt to any person, or
+    --         with the knowledge that he is likely thereby to cause hurt"
+    `intention of causing hurt`
+                          IS A BOOLEAN @desc Did the accused do the act intending to cause hurt to somebody? Hurt is bodily pain, disease or infirmity — it need not be serious.
+    `knowledge of being likely to cause hurt`
+                          IS A BOOLEAN @desc Did the accused do the act knowing that it was likely to cause hurt to somebody, whether or not they wanted it to?
+
+    -- s 321: "and does thereby cause hurt to any person"
+    `cause hurt`          IS A BOOLEAN @desc Did the act in fact cause hurt to somebody? If it caused none, there is no offence under this section however dangerous the act was.
+
+    -- s 323A: the mismatch between the hurt aimed at and the hurt suffered
+    `not grievous`        IS A BOOLEAN @desc Was the hurt the accused intended, or knew himself likely to cause, something LESS than grievous hurt within section 320? Answer no if the accused was aiming at an injury such as a fracture — that case is section 325, not this one.
+    grievous              IS A BOOLEAN @desc Was the hurt the accused actually caused grievous hurt within section 320 — for example a fracture or dislocation of a bone?
+
+§§ `s 321 — voluntarily causing hurt`
+
+@export Whether the accused is said "voluntarily to cause hurt" within section 321 of the Penal Code 1871
+GIVEN f IS A `Hurt Facts` @desc What the accused did, what they meant or foresaw by it, and what it caused
+GIVETH A BOOLEAN
+DECIDE `voluntarily causes hurt` f IF
+        "Whoever does any act with the"
+   ...  (    f's `intention of causing hurt`
+        OR   f's `knowledge of being likely to cause hurt` )
+   ...  "to any person, and does thereby"
+   ...  f's `cause hurt`
+   ...  "to any person"
+
+§§ `s 323A — punishment for voluntarily causing hurt which causes grievous hurt`
+
+@export Whether the accused has committed an offence punishable under section 323A of the Penal Code 1871 (voluntarily causing hurt which causes grievous hurt)
+GIVEN f IS A `Hurt Facts` @desc What the accused did, what they meant or foresaw by it, and what it caused
+GIVETH A BOOLEAN
+DECIDE `offence under s 323A` f IF
+        "Whoever"
+   ...  `voluntarily causes hurt` f
+   ...  ", if the hurt which he intends to cause or knows himself to be likely to cause is"
+   ...  f's `not grievous`
+   ...  ", but the hurt which he actually causes is"
+   ...  f's grievous
+
+§§ `The charge`
+
+-- CPC s 125 is why this recital carries a "to wit": the gravamen of s 323A is
+-- the gap between what the accused aimed at and what happened, and a charge
+-- that does not narrate the sequence does not tell the accused which gap is
+-- alleged. Ang Boon Han:
+--
+--   did voluntarily cause hurt with the intention to cause hurt which is not
+--   grievous, but which actually caused grievous hurt to one Lam Mian Sern, to
+--   wit, by using both hands to push the chest of the said Lam Mian Sern once,
+--   causing him to fall backward and on his right hand, which was used to
+--   cushion his impact, resulting in the said Lam Mian Sern suffering
+--   fractures of both the distal radius and scaphoid at the right wrist
+GIVEN f IS A `Hurt Facts`
+GIVETH A STRING
+`the recital of the hurt` f MEANS
+    CONCAT "did voluntarily cause hurt ", (`the mens rea of the hurt` f),
+           ", but which actually caused grievous hurt to ", (`one` (f's victim) (f's `victim described as`)),
+           ", to wit, ", f's `the manner`
+
+-- "with the intention to cause hurt which is not grievous" for the intention
+-- limb; the knowledge limb where the accused foresaw rather than aimed. Where
+-- both hold, the charge says both.
+GIVEN f IS A `Hurt Facts`
+GIVETH A STRING
+`the mens rea of the hurt` f MEANS
+    `joined with` " and " (concat (LIST
+        (`included if` (f's `intention of causing hurt`) "with the intention to cause hurt which is not grievous"),
+        (`included if` (f's `knowledge of being likely to cause hurt`) "with the knowledge that you were likely to cause hurt which is not grievous")))
+
+-- The s 321 elements, named for the refusal.
+GIVEN f IS A `Hurt Facts`
+GIVETH A LIST OF STRING
+`elements of voluntarily causing hurt not made out` f MEANS
+    concat (LIST
+        (`missing unless` (f's `intention of causing hurt` OR f's `knowledge of being likely to cause hurt`) "with the intention of thereby causing hurt to any person, or with the knowledge that he is likely thereby to cause hurt to any person"),
+        (`missing unless` (f's `cause hurt`) "does thereby cause hurt to any person"),
+        (`missing unless` (`voluntarily causes hurt` f) "the elements of section 321 taken together"))
+
+@export Frame a charge under section 323A of the Penal Code 1871 (voluntarily causing hurt which causes grievous hurt), or say why none can be framed
+GIVEN f IS A `Hurt Facts` @desc What the accused did, what it caused, and the particulars of the charge
+GIVETH A Charge
+`charge under s 323A` f MEANS
+    `frame the charge` (f's particulars) "323A" "voluntarily causing hurt which causes grievous hurt"
+        "imprisonment for a term which may extend to 5 years, or with fine which may extend to $10,000, or with both"
+        (`offence under s 323A` f)
+        (`the recital of the hurt` f)
+        (concat (LIST (`elements of voluntarily causing hurt not made out` f),
+                      (`missing unless` (f's `not grievous`) "the hurt which he intends to cause or knows himself to be likely to cause is not grievous (where the accused aimed at grievous hurt the offence is section 325, not this one)"),
+                      (`missing unless` (f's grievous) "the hurt which he actually causes is grievous")))
+
+§§ `Ang Boon Han v Public Prosecutor [2024] SGHC 221`
+
+-- The appellant pushed the victim's chest with both hands once, at a bus stop
+-- on Woodlands Avenue 2. The victim fell backward onto his right hand, which
+-- he had put out to cushion the fall, and fractured both the distal radius and
+-- the scaphoid. Nobody suggested the appellant meant to break a bone; the push
+-- was aimed at hurt that was not grievous, and the hurt it produced was. That
+-- is s 323A exactly. The charge, as quoted in the judgment:
+--
+--   … did voluntarily cause hurt with the intention to cause hurt which is not
+--   grievous, but which actually caused grievous hurt to one Lam Mian Sern, to
+--   wit, by using both hands to push the chest of the said Lam Mian Sern once,
+--   causing him to fall backward and on his right hand, which was used to
+--   cushion his impact, resulting in the said Lam Mian Sern suffering
+--   fractures of both the distal radius and scaphoid at the right wrist, and
+--   you have thereby committed an offence punishable under Section 323A of the
+--   Penal Code, Chapter 224.
+`Ang Boon Han` MEANS `Hurt Facts` WITH
+    particulars           IS Particulars WITH
+                               accused            IS "Ang Boon Han"
+                               date               IS "15 May 2021"
+                               time               IS "10.30pm"
+                               place              IS "in the vicinity of bus stop no. 46229 along Woodlands Ave 2"
+                               `co-accused`       IS ""
+                               `common intention` IS FALSE
+    victim                IS "Lam Mian Sern"
+    `victim described as` IS ""
+    `the manner`          IS "by using both hands to push the chest of the said Lam Mian Sern once, causing him to fall backward and on his right hand, which was used to cushion his impact, resulting in the said Lam Mian Sern suffering fractures of both the distal radius and scaphoid at the right wrist"
+    `intention of causing hurt`               IS TRUE
+    `knowledge of being likely to cause hurt` IS FALSE
+    `cause hurt`          IS TRUE
+    `not grievous`        IS TRUE
+    grievous              IS TRUE
+
+-- THE NEGATIVE FIXTURE. The same push, but now the accused meant to break the
+-- wrist. s 321 is still made out — hurt was intended and hurt was caused — and
+-- so is the grievous result. What fails is the mismatch s 323A is built on:
+-- the hurt aimed at was itself grievous. That case belongs to s 322 read with
+-- s 325, which this module does not encode, so the refusal says which element
+-- is missing and points there rather than framing the wrong charge.
+`Ang Boon Han, the hurt intended was grievous` MEANS `Hurt Facts` WITH
+    particulars           IS `Ang Boon Han`'s particulars
+    victim                IS `Ang Boon Han`'s victim
+    `victim described as` IS `Ang Boon Han`'s `victim described as`
+    `the manner`          IS `Ang Boon Han`'s `the manner`
+    `intention of causing hurt`               IS TRUE
+    `knowledge of being likely to cause hurt` IS FALSE
+    `cause hurt`          IS TRUE
+    `not grievous`        IS FALSE
+    grievous              IS TRUE
+
+-- The push that connects with nothing. s 321 needs a hurt in fact, so the
+-- ladder fails one rung earlier and the refusal names two elements.
+`Ang Boon Han, no hurt caused` MEANS `Hurt Facts` WITH
+    particulars           IS `Ang Boon Han`'s particulars
+    victim                IS `Ang Boon Han`'s victim
+    `victim described as` IS `Ang Boon Han`'s `victim described as`
+    `the manner`          IS `Ang Boon Han`'s `the manner`
+    `intention of causing hurt`               IS TRUE
+    `knowledge of being likely to cause hurt` IS FALSE
+    `cause hurt`          IS FALSE
+    `not grievous`        IS TRUE
+    grievous              IS FALSE
+
+-- The same facts on s 321's other limb: the accused did not aim at hurt but
+-- knew the push was likely to cause it. The offence stands and the recital
+-- says "with the knowledge" in place of "with the intention".
+`Ang Boon Han, on the knowledge limb` MEANS `Hurt Facts` WITH
+    particulars           IS `Ang Boon Han`'s particulars
+    victim                IS `Ang Boon Han`'s victim
+    `victim described as` IS `Ang Boon Han`'s `victim described as`
+    `the manner`          IS `Ang Boon Han`'s `the manner`
+    `intention of causing hurt`               IS FALSE
+    `knowledge of being likely to cause hurt` IS TRUE
+    `cause hurt`          IS TRUE
+    `not grievous`        IS TRUE
+    grievous              IS TRUE
+
+-- The section's own Illustration: the punch at the club. The Illustration
+-- pleads the fault in the alternative ("intending or knowing himself to be
+-- likely"); this fixture takes the intention limb, which is the reading its
+-- last sentence confirms ("A did not intend to cause grievous hurt").
+`the Illustration to s 323A` MEANS `Hurt Facts` WITH
+    particulars           IS Particulars WITH
+                               accused            IS "A"
+                               date               IS "1 January 2026"
+                               time               IS ""
+                               place              IS "a club"
+                               `co-accused`       IS ""
+                               `common intention` IS FALSE
+    victim                IS "Z"
+    `victim described as` IS ""
+    `the manner`          IS "by punching the said Z in the face once, causing the said Z to lose his balance, to fall and to hit his head against a ledge, resulting in the said Z suffering severe brain injuries and being permanently paralysed"
+    `intention of causing hurt`               IS TRUE
+    `knowledge of being likely to cause hurt` IS FALSE
+    `cause hurt`          IS TRUE
+    `not grievous`        IS TRUE
+    grievous              IS TRUE
+
+§§ `Directives`
+
+#EVAL `voluntarily causes hurt` `Ang Boon Han`
+#EVAL `offence under s 323A` `Ang Boon Han`
+#EVAL (`charge under s 323A` `Ang Boon Han`)'s text
+#EVAL (`charge under s 323A` `Ang Boon Han, the hurt intended was grievous`)'s refusal
+#EVAL (`charge under s 323A` `Ang Boon Han, no hurt caused`)'s refusal
+#EVAL (`charge under s 323A` `Ang Boon Han, on the knowledge limb`)'s text
+#EVAL (`charge under s 323A` `the Illustration to s 323A`)'s text
+
+-- The reported s 323A charge, verbatim from the judgment in the body, with the
+-- citation form ("Penal Code, Chapter 224" → "Penal Code 1871") and the CPC
+-- s 124 header normalised as this row normalises every charge it frames.
+#ASSERT `voluntarily causes hurt` `Ang Boon Han`
+#ASSERT `offence under s 323A` `Ang Boon Han`
+#ASSERT (`charge under s 323A` `Ang Boon Han`)'s `made out`
+#ASSERT (`charge under s 323A` `Ang Boon Han`)'s text EQUALS "You, Ang Boon Han, are charged that you, on or about 15 May 2021, at about 10.30pm, at in the vicinity of bus stop no. 46229 along Woodlands Ave 2, Singapore, did voluntarily cause hurt with the intention to cause hurt which is not grievous, but which actually caused grievous hurt to one Lam Mian Sern, to wit, by using both hands to push the chest of the said Lam Mian Sern once, causing him to fall backward and on his right hand, which was used to cushion his impact, resulting in the said Lam Mian Sern suffering fractures of both the distal radius and scaphoid at the right wrist, and you have thereby committed an offence punishable under section 323A of the Penal Code 1871."
+#ASSERT (`charge under s 323A` `Ang Boon Han`)'s punishment EQUALS "imprisonment for a term which may extend to 5 years, or with fine which may extend to $10,000, or with both"
+
+-- THE NEGATIVE FIXTURE. s 321 stands; s 323A does not, and the refusal names
+-- the one element that fails and where that case belongs instead.
+#ASSERT `voluntarily causes hurt` `Ang Boon Han, the hurt intended was grievous`
+#ASSERT NOT (`offence under s 323A` `Ang Boon Han, the hurt intended was grievous`)
+#ASSERT NOT ((`charge under s 323A` `Ang Boon Han, the hurt intended was grievous`)'s `made out`)
+#ASSERT (`charge under s 323A` `Ang Boon Han, the hurt intended was grievous`)'s text EQUALS ""
+#ASSERT (`charge under s 323A` `Ang Boon Han, the hurt intended was grievous`)'s refusal EQUALS "A charge under section 323A would assert that the facts fulfil every legal condition of voluntarily causing hurt which causes grievous hurt (CPC s 123(5)). On the facts given they do not: the hurt which he intends to cause or knows himself to be likely to cause is not grievous (where the accused aimed at grievous hurt the offence is section 325, not this one)."
+
+-- No hurt in fact: s 321 fails a rung earlier, and so does the grievous result.
+#ASSERT NOT (`voluntarily causes hurt` `Ang Boon Han, no hurt caused`)
+#ASSERT NOT ((`charge under s 323A` `Ang Boon Han, no hurt caused`)'s `made out`)
+#ASSERT (`charge under s 323A` `Ang Boon Han, no hurt caused`)'s refusal EQUALS "A charge under section 323A would assert that the facts fulfil every legal condition of voluntarily causing hurt which causes grievous hurt (CPC s 123(5)). On the facts given they do not: does thereby cause hurt to any person; the elements of section 321 taken together; the hurt which he actually causes is grievous."
+
+-- The knowledge limb: same offence, and the recital swaps one clause.
+#ASSERT `offence under s 323A` `Ang Boon Han, on the knowledge limb`
+#ASSERT (`charge under s 323A` `Ang Boon Han, on the knowledge limb`)'s text EQUALS "You, Ang Boon Han, are charged that you, on or about 15 May 2021, at about 10.30pm, at in the vicinity of bus stop no. 46229 along Woodlands Ave 2, Singapore, did voluntarily cause hurt with the knowledge that you were likely to cause hurt which is not grievous, but which actually caused grievous hurt to one Lam Mian Sern, to wit, by using both hands to push the chest of the said Lam Mian Sern once, causing him to fall backward and on his right hand, which was used to cushion his impact, resulting in the said Lam Mian Sern suffering fractures of both the distal radius and scaphoid at the right wrist, and you have thereby committed an offence punishable under section 323A of the Penal Code 1871."
+
+-- The Illustration.
+#ASSERT `offence under s 323A` `the Illustration to s 323A`
+#ASSERT (`charge under s 323A` `the Illustration to s 323A`)'s text EQUALS "You, A, are charged that you, on or about 1 January 2026, at a club, Singapore, did voluntarily cause hurt with the intention to cause hurt which is not grievous, but which actually caused grievous hurt to one Z, to wit, by punching the said Z in the face once, causing the said Z to lose his balance, to fall and to hit his head against a ledge, resulting in the said Z suffering severe brain injuries and being permanently paralysed, and you have thereby committed an offence punishable under section 323A of the Penal Code 1871."

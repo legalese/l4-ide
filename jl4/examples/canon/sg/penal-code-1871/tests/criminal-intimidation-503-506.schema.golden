@@ -1,0 +1,119 @@
+{
+    "$defs": {
+        "Criminal Intimidation Facts": {
+            "properties": {
+                "an offence punishable with death or with imprisonment for 7 years or more": {
+                    "description": "Was the threat a threat to cause an offence punishable with death, or with imprisonment for a term which may extend to 7 years or more?",
+                    "type": "boolean"
+                },
+                "cause alarm": {
+                    "description": "Did the accused make the threat intending to cause alarm to the person threatened? Alarm the person in fact felt is evidence of this intent and is not the same thing as it.",
+                    "type": "boolean"
+                },
+                "death": {
+                    "description": "Was the threat a threat to cause death?",
+                    "type": "boolean"
+                },
+                "do an act not legally bound to do": {
+                    "description": "Did the accused intend the threat to make the person threatened do something they were under no legal duty to do?",
+                    "type": "boolean"
+                },
+                "grievous hurt": {
+                    "description": "Was the threat a threat to cause grievous hurt within section 320 — for example emasculation, loss of sight or hearing, or a fracture or dislocation of a bone?",
+                    "type": "boolean"
+                },
+                "language": {
+                    "description": "The language the threat was uttered in — for example \"Hokkien\"; leave blank if it does not need stating",
+                    "type": "string"
+                },
+                "omit an act legally entitled to do": {
+                    "description": "Did the accused intend the threat to make the person threatened leave undone something they were legally entitled to do?",
+                    "type": "boolean"
+                },
+                "particulars": {
+                    "$ref": "#/$defs/Particulars",
+                    "description": "Who is charged, and when and where the offence was committed"
+                },
+                "person": {
+                    "description": "Did the threat threaten injury to the body of the person threatened — for example a threat to kill, to shoot or to beat?",
+                    "type": "boolean"
+                },
+                "person of one in whom interested": {
+                    "description": "Did the threat threaten injury to the body of somebody else the person threatened is interested in — for example their child?",
+                    "type": "boolean"
+                },
+                "property": {
+                    "description": "Did the threat threaten injury to the property of the person threatened — for example a threat to burn their house?",
+                    "type": "boolean"
+                },
+                "reputation": {
+                    "description": "Did the threat threaten injury to the reputation of the person threatened — for example a threat to publish something defamatory of them?",
+                    "type": "boolean"
+                },
+                "reputation of one in whom interested": {
+                    "description": "Did the threat threaten injury to the reputation of somebody else the person threatened is interested in? The Explanation puts a threat to injure the reputation of a DECEASED person they are interested in within the section.",
+                    "type": "boolean"
+                },
+                "the destruction of any property by fire": {
+                    "description": "Was the threat a threat to destroy any property by fire?",
+                    "type": "boolean"
+                },
+                "threat words": {
+                    "description": "The words of the threat, verbatim, as they are to be quoted after \"by uttering\" — for example \"I will shoot her to death\"; leave blank if the threat was not spoken",
+                    "type": "string"
+                },
+                "threatened the victim": {
+                    "description": "Did the accused threaten the person named? A threat may be made by words, in writing or by conduct.",
+                    "type": "boolean"
+                },
+                "victim": {
+                    "description": "The name of the person threatened, as it is to appear in the charge — for example \"SSSgt Jessie Lim Geok Hwee\"",
+                    "type": "string"
+                },
+                "victim described as": {
+                    "description": "How the charge describes the person threatened, after the name; leave blank if not needed",
+                    "type": "string"
+                },
+                "victim pronoun": {
+                    "$ref": "#/$defs/Pronoun",
+                    "description": "The pronoun the charge uses for the person threatened"
+                }
+            },
+            "required": [
+                "particulars",
+                "victim",
+                "victim described as",
+                "victim pronoun",
+                "threat words",
+                "language",
+                "threatened the victim",
+                "person",
+                "reputation",
+                "property",
+                "person of one in whom interested",
+                "reputation of one in whom interested",
+                "cause alarm",
+                "do an act not legally bound to do",
+                "omit an act legally entitled to do",
+                "death",
+                "grievous hurt",
+                "the destruction of any property by fire",
+                "an offence punishable with death or with imprisonment for 7 years or more"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Whether the accused \"commits criminal intimidation\" within section 503 of the Penal Code 1871",
+    "properties": {
+        "f": {
+            "$ref": "#/$defs/Criminal Intimidation Facts",
+            "description": "The threat, what injury it threatened, and what the accused meant it to achieve"
+        }
+    },
+    "required": [
+        "f"
+    ],
+    "title": "commits criminal intimidation",
+    "type": "object"
+}

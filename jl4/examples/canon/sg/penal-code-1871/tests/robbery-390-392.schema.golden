@@ -1,0 +1,174 @@
+{
+    "$defs": {
+        "Robbery Facts": {
+            "properties": {
+                "any other person jointly concerned in committing or attempting to commit such robbery": {
+                    "description": "If somebody else caused the hurt, was the accused nonetheless jointly concerned in committing or attempting to commit the robbery?",
+                    "type": "boolean"
+                },
+                "attempting to commit robbery": {
+                    "description": "If the robbery was not completed, was it attempted? s 394 reaches an attempt; s 392 does not.",
+                    "type": "boolean"
+                },
+                "attempts to cause": {
+                    "description": "Did the accused try to cause it, whether or not they succeeded?",
+                    "type": "boolean"
+                },
+                "causes": {
+                    "description": "Did the accused actually cause the harm?",
+                    "type": "boolean"
+                },
+                "committed after 7 p.m. and before 7 a.m.": {
+                    "description": "Was the robbery committed after 7 p.m. and before 7 a.m.? This changes the punishment s 392 prescribes and nothing else — the offence is made out either way.",
+                    "type": "boolean"
+                },
+                "death": {
+                    "description": "… death?",
+                    "type": "boolean"
+                },
+                "extortion": {
+                    "$ref": "#/$defs/Extortion Facts",
+                    "description": "The extortion s 390(3) upgrades, if the robbery is an extortion-robbery; leave every leaf FALSE if it is not"
+                },
+                "fear of instant death": {
+                    "description": "… fear of instant death?",
+                    "type": "boolean"
+                },
+                "fear of instant hurt": {
+                    "description": "… fear of instant hurt?",
+                    "type": "boolean"
+                },
+                "fear of instant wrongful restraint": {
+                    "description": "… fear of instant wrongful restraint?",
+                    "type": "boolean"
+                },
+                "for that end": {
+                    "description": "Was the violence done FOR THE PURPOSE of the theft? Illustration (a): the wrongful restraint was caused \"in order to the committing of that theft\". Violence that merely happens to accompany a theft is not robbery.",
+                    "type": "boolean"
+                },
+                "hurt": {
+                    "description": "… hurt?",
+                    "type": "boolean"
+                },
+                "in attempting to carry away property obtained by the theft": {
+                    "description": "Was the violence done AFTERWARDS, while trying to make off with what had been taken?",
+                    "type": "boolean"
+                },
+                "in carrying away property obtained by the theft": {
+                    "description": "Was the violence done AFTERWARDS, while making off with what had been taken?",
+                    "type": "boolean"
+                },
+                "in committing the theft": {
+                    "description": "Was the violence done WHILE the theft was being committed?",
+                    "type": "boolean"
+                },
+                "in order to commit theft": {
+                    "description": "Was the violence done BEFORE the theft, to bring it about?",
+                    "type": "boolean"
+                },
+                "in the presence of the person put in fear": {
+                    "description": "Was the accused present when the extortion was committed? Present means sufficiently near to put the other person in fear of instant death, instant hurt or instant wrongful restraint (Explanation). Illustration (d): a threat about a child held elsewhere by a gang is not made in anyone's presence.",
+                    "type": "boolean"
+                },
+                "instant death": {
+                    "description": "… instant death?",
+                    "type": "boolean"
+                },
+                "instant hurt": {
+                    "description": "… instant hurt? Illustration (b): showing a pistol and demanding a purse.",
+                    "type": "boolean"
+                },
+                "instant wrongful restraint": {
+                    "description": "… instant wrongful restraint?",
+                    "type": "boolean"
+                },
+                "particulars": {
+                    "$ref": "#/$defs/Particulars",
+                    "description": "Who is charged, and when and where the offence was committed"
+                },
+                "such person": {
+                    "description": "Is the accused the person who voluntarily caused that hurt?",
+                    "type": "boolean"
+                },
+                "the hurt": {
+                    "description": "How the hurt was caused, as it is to read after \"to wit, by\" in a s 394 charge — for example \"slapping him and banging his head against the wall\"; leave blank if no s 394 charge is laid",
+                    "type": "string"
+                },
+                "theft": {
+                    "$ref": "#/$defs/Theft Facts",
+                    "description": "The theft s 390(2) upgrades, if the robbery is a theft-robbery; leave every leaf FALSE if it is not"
+                },
+                "then and there": {
+                    "description": "Was the thing delivered up on the spot, then and there, rather than later? Illustration (d): property sent to a gang afterwards is extortion, not robbery.",
+                    "type": "boolean"
+                },
+                "to some other person": {
+                    "description": "Was it harm to somebody else? Illustration (c): the child on the high road.",
+                    "type": "boolean"
+                },
+                "to that person": {
+                    "description": "Was the instant harm feared harm to the person put in fear themselves?",
+                    "type": "boolean"
+                },
+                "voluntarily": {
+                    "description": "Was it done VOLUNTARILY? The adverb governs both limbs of “voluntarily causes or attempts to cause”, so it is asked once and of both. Section 39 defines it: caused by means he intended to cause it by, or by means he knew or had reason to believe likely to cause it.",
+                    "type": "boolean"
+                },
+                "voluntarily causes hurt": {
+                    "description": "Did any person voluntarily cause hurt in committing or attempting to commit the robbery? It need not have been the accused — s 394 reaches everyone jointly concerned.",
+                    "type": "boolean"
+                },
+                "wrongful restraint": {
+                    "description": "… wrongful restraint — obstructing someone so as to prevent them going where they have a right to go? A group closing round a person restrains them.",
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "particulars",
+                "theft",
+                "extortion",
+                "the hurt",
+                "in order to commit theft",
+                "in committing the theft",
+                "in carrying away property obtained by the theft",
+                "in attempting to carry away property obtained by the theft",
+                "for that end",
+                "voluntarily",
+                "causes",
+                "attempts to cause",
+                "death",
+                "hurt",
+                "wrongful restraint",
+                "fear of instant death",
+                "fear of instant hurt",
+                "fear of instant wrongful restraint",
+                "in the presence of the person put in fear",
+                "instant death",
+                "instant hurt",
+                "instant wrongful restraint",
+                "to that person",
+                "to some other person",
+                "then and there",
+                "committed after 7 p.m. and before 7 a.m.",
+                "attempting to commit robbery",
+                "voluntarily causes hurt",
+                "such person",
+                "any other person jointly concerned in committing or attempting to commit such robbery"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Whether a theft is \"robbery\" within section 390(2) of the Penal Code 1871",
+    "properties": {
+        "f": {
+            "$ref": "#/$defs/Robbery Facts",
+            "description": "The theft, and the violence s 390(2) requires on top of it"
+        }
+    },
+    "required": [
+        "f"
+    ],
+    "title": "theft is robbery",
+    "type": "object"
+}

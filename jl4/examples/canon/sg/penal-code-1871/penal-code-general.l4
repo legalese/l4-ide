@@ -1,0 +1,380 @@
+-- Singapore Penal Code 1871 — the general definitions the property offences
+-- lean on (ss 22–25), and the FORM OF A CHARGE prescribed by the Criminal
+-- Procedure Code 2010 (ss 123–126).
+--
+-- Every offence module in this row (cheating, theft, extortion, robbery,
+-- criminal breach of trust, criminal intimidation) IMPORTs this one. It holds
+-- what they share and nothing that belongs to any one of them.
+--
+-- ---------------------------------------------------------------------------
+-- Why a charge is an L4 artefact at all — CPC 2010 s 123(5)
+-- ---------------------------------------------------------------------------
+--
+--   123.—(5) The fact that the charge is made is equivalent to a statement
+--            that every legal condition required by law to constitute the
+--            offence charged was fulfilled in the particular case.
+--
+-- So a charge is a claim that every leaf of the offence's ladder is TRUE. The
+-- `Charge` record below carries that claim as `made out`, and the text of the
+-- charge is built ONLY when it holds. When it does not, the record carries a
+-- refusal naming the elements that are missing, and no text.
+--
+-- The other rules of form the builders below observe:
+--
+--   123.—(1) Every charge must state the offence with which the accused is
+--            charged. (2) If the law which creates the offence gives it any
+--            specific name, the offence may be described in the charge by that
+--            name only. … (4) The law and section of the law against which the
+--            offence is said to have been committed must be mentioned in the
+--            charge.
+--   124.—(1) The charge must contain such particulars as to the time and place
+--            of the alleged offence and the person (if any) against whom or the
+--            thing (if any) in respect of which it was committed, as are
+--            reasonably sufficient to give the accused notice of what he is
+--            charged with.
+--   125.     When the nature of the case is such that the particulars mentioned
+--            in sections 123 and 124 do not give the accused sufficient notice
+--            of the matter with which he is charged, the charge must also
+--            contain such particulars of the manner in which the alleged
+--            offence was committed as will be sufficient for that purpose.
+--            Illustration (a): A is accused of the theft of a certain article
+--            at a certain time and place. The charge need not set out the manner
+--            in which the theft was effected. (b): A is accused of cheating B at
+--            a given time and place. The charge must set out the manner in which
+--            A cheated B.
+--   126.     In every charge words used in describing an offence are deemed to
+--            have been used in the sense attached to them respectively by the
+--            law under which the offence is punishable.
+--
+-- s 125 is why the recital depth is SECTION-DEPENDENT: the cheating, extortion,
+-- criminal breach of trust and criminal intimidation builders recite the
+-- manner; the theft and robbery builders do not. s 126 is why "dishonestly" in
+-- a charge means s 24 and "fraudulently" means s 25 — which is what the two
+-- ladders in this module spell out.
+--
+-- ---------------------------------------------------------------------------
+-- A design call, recorded rather than hidden
+-- ---------------------------------------------------------------------------
+--
+-- Each offence's facts record carries `dishonestly` and `fraudulently` as FLAT
+-- booleans, with the s 24 / s 25 definition quoted in the field's @desc. The
+-- definitions are ALSO encoded below as ladders over their own records, and
+-- exported, so a reader can drill into what "dishonestly" means. They are not
+-- nested into the offence records because a call to another rule is drawn as a
+-- single leaf on the offence's ladder — a leaf the reader cannot open in place —
+-- and the point of the offence ladders is that every element is a box the
+-- reader can toggle. When the ladder route can inline a called rule, nest them.
+
+IMPORT prelude
+
+§ `Penal Code 1871 — general`
+
+§§ `s 22 — property`
+
+-- 22. In this Code — "immovable property" means land, benefits to arise out of
+--     land and things attached to the earth or permanently fastened to anything
+--     attached to the earth; "movable property" includes property of every
+--     description, except immovable property; "property" means money and all
+--     other property, movable or immovable, including things in action, other
+--     intangible or incorporeal property and virtual currency; …
+--
+-- Ontology only. Theft reads `movable property` as a leaf whose @desc quotes
+-- this; nothing here needs a rule.
+
+§§ `s 23 — wrongful gain and wrongful loss`
+
+@ref Penal Code 1871 s 23 — the operative atoms of subsections (1) and (2)
+DECLARE `Gain or Loss Facts` HAS
+    `gain by unlawful means of property to which the person gaining it is not legally entitled`
+        IS A BOOLEAN @desc Did the person gain, by unlawful means, property they were not legally entitled to? Gain includes keeping what one has (Explanation 2).
+    `avoidance by unlawful means of a loss of property which the person is not legally entitled to avoid`
+        IS A BOOLEAN @desc Did the person avoid, by unlawful means, a loss of property they were not legally entitled to avoid?
+    `loss by unlawful means of property to which the person losing it is legally entitled`
+        IS A BOOLEAN @desc Did the person lose, by unlawful means, property they were legally entitled to? Loss includes not getting what one might get (Explanation 3).
+    `exposure of risk to a loss by unlawful means of property to which the person exposed is legally entitled`
+        IS A BOOLEAN @desc Was the person exposed, by unlawful means, to the risk of losing property they were legally entitled to?
+
+@export Whether there is a "wrongful gain" within section 23(1) of the Penal Code 1871
+GIVEN g IS A `Gain or Loss Facts` @desc What was gained, avoided, lost or put at risk, and by what means
+GIVETH A BOOLEAN
+DECIDE `wrongful gain within section 23` g IF
+        "(1) A “wrongful gain” is"
+    ..  g's `gain by unlawful means of property to which the person gaining it is not legally entitled`
+    OR  g's `avoidance by unlawful means of a loss of property which the person is not legally entitled to avoid`
+
+@export Whether there is a "wrongful loss" within section 23(2) of the Penal Code 1871
+GIVEN g IS A `Gain or Loss Facts` @desc What was gained, avoided, lost or put at risk, and by what means
+GIVETH A BOOLEAN
+DECIDE `wrongful loss within section 23` g IF
+        "(2) A “wrongful loss” is"
+    ..  g's `loss by unlawful means of property to which the person losing it is legally entitled`
+    OR  g's `exposure of risk to a loss by unlawful means of property to which the person exposed is legally entitled`
+
+§§ `s 24 — dishonestly`
+
+-- 24. A person (A) is said to do an act dishonestly if —
+--     (a) A does that act with the intention of causing wrongful gain to A or
+--         another person, or wrongful loss to another person, regardless of
+--         whether such gain or loss is temporary or permanent; or
+--     (b) that act done by A is dishonest by the ordinary standards of
+--         reasonable and honest persons and A knows that that act is dishonest
+--         by such standards.
+
+@ref Penal Code 1871 s 24 — the operative atoms of paragraphs (a) and (b)
+DECLARE `Dishonesty Facts` HAS
+    `intention of causing wrongful gain to A or another person`
+        IS A BOOLEAN @desc Did the accused do the act intending to cause a wrongful gain (s 23) to themselves or to anyone else, whether temporary or permanent?
+    `intention of causing wrongful loss to another person`
+        IS A BOOLEAN @desc Did the accused do the act intending to cause a wrongful loss (s 23) to another person, whether temporary or permanent?
+    `dishonest by the ordinary standards of reasonable and honest persons`
+        IS A BOOLEAN @desc Would reasonable and honest people regard the act as dishonest?
+    `A knows that that act is dishonest by such standards`
+        IS A BOOLEAN @desc Did the accused know that reasonable and honest people would regard the act as dishonest?
+
+@export Whether an act was done "dishonestly" within section 24 of the Penal Code 1871
+GIVEN d IS A `Dishonesty Facts` @desc What the accused intended by the act, and what the accused knew about it
+GIVETH A BOOLEAN
+DECIDE `dishonestly within section 24` d IF
+        "A person (A) is said to do an act dishonestly if —"
+    ..  "(a) A does that act with the"
+        ...  (    d's `intention of causing wrongful gain to A or another person`
+              OR  d's `intention of causing wrongful loss to another person` )
+        ...  ", regardless of whether such gain or loss is temporary or permanent"
+    OR  "(b) that act done by A is"
+        ...  d's `dishonest by the ordinary standards of reasonable and honest persons`
+        AND  d's `A knows that that act is dishonest by such standards`
+
+§§ `s 25 — fraudulently`
+
+-- 25. A person (A) is said to do an act fraudulently if A does that act with
+--     intent to deceive another person (B) and by means of such deception, that
+--     an advantage should accrue to A or another person or detriment should
+--     befall B or another person (other than A), regardless of whether such
+--     advantage or detriment is temporary or permanent.
+--     Explanation 1.—Where the advantage or the detriment A intended by means
+--     of the act done is so slight that no reasonable person of ordinary sense
+--     or temper would complain of it, the act is not done fraudulently.
+--     Explanation 2.—It is sufficient in any charge for an offence under this
+--     Code involving doing an act fraudulently to allege a general intent to
+--     act fraudulently without naming any particular person intended to be
+--     deceived.
+
+@ref Penal Code 1871 s 25 — the operative atoms, with Explanation 1 as a proviso
+DECLARE `Fraud Facts` HAS
+    `intent to deceive another person`
+        IS A BOOLEAN @desc Did the accused do the act intending to deceive someone?
+    `an advantage should accrue to A or another person`
+        IS A BOOLEAN @desc Was the deception meant to bring an advantage to the accused or to anyone else?
+    `detriment should befall B or another person other than A`
+        IS A BOOLEAN @desc Was the deception meant to bring a detriment on the person deceived or on anyone other than the accused?
+    `the advantage or detriment intended is so slight that no reasonable person would complain of it`
+        IS A BOOLEAN @desc Is the advantage or detriment intended so slight that no reasonable person of ordinary sense or temper would complain of it? (Explanation 1 — if so, the act is not done fraudulently.)
+
+@export Whether an act was done "fraudulently" within section 25 of the Penal Code 1871
+GIVEN f IS A `Fraud Facts` @desc What the accused intended by the deception
+GIVETH A BOOLEAN
+DECIDE `fraudulently within section 25` f IF
+        "A person (A) is said to do an act fraudulently if A does that act with"
+    ... f's `intent to deceive another person`
+    ... "and by means of such deception, that"
+    ... (    f's `an advantage should accrue to A or another person`
+         OR  f's `detriment should befall B or another person other than A` )
+    ... ", regardless of whether such advantage or detriment is temporary or permanent."
+    ... "Explanation 1.—"
+    ... NOT (f's `the advantage or detriment intended is so slight that no reasonable person would complain of it`)
+
+§ `Criminal Procedure Code 2010 — the form of a charge`
+
+§§ `The person spoken of`
+
+-- A charge speaks of the person against whom the offence was committed in the
+-- third person ("by deceiving HER to believe", "which SHE would not have done").
+-- The builders need the pronoun, so the facts carry it.
+DECLARE Pronoun IS ONE OF
+    he
+    she
+    they
+
+GIVEN p IS A Pronoun
+GIVETH A STRING
+`subject pronoun` p MEANS
+    CONSIDER p
+    WHEN he   THEN "he"
+    WHEN she  THEN "she"
+    WHEN they THEN "they"
+
+GIVEN p IS A Pronoun
+GIVETH A STRING
+`object pronoun` p MEANS
+    CONSIDER p
+    WHEN he   THEN "him"
+    WHEN she  THEN "her"
+    WHEN they THEN "them"
+
+GIVEN p IS A Pronoun
+GIVETH A STRING
+`possessive pronoun` p MEANS
+    CONSIDER p
+    WHEN he   THEN "his"
+    WHEN she  THEN "her"
+    WHEN they THEN "their"
+
+§§ `s 124 — particulars of time, place and person`
+
+@ref Criminal Procedure Code 2010 s 124(1) — time, place and person; s 34 Penal Code for the joint-charge rider
+DECLARE Particulars HAS
+    accused            IS A STRING  @desc The accused person's full name, as it is to appear in the charge
+    date               IS A STRING  @desc The date of the offence, as it is to read after "on or about" — for example "the 24th day of April 2000"
+    time               IS A STRING  @desc The time of day, as it is to read after "at about" — for example "8.10 pm"; leave blank if not known
+    place              IS A STRING  @desc Where the offence was committed, as it is to read after "at" — "Singapore" is added for you
+    `co-accused`       IS A STRING  @desc Anyone charged jointly with the accused, as they are to be named in the charge; leave blank if none
+    `common intention` IS A BOOLEAN @desc Was the act done in furtherance of a common intention shared with the co-accused, so that section 34 is read with the charge?
+
+§§ `s 123 — the charge`
+
+@ref Criminal Procedure Code 2010 s 123 — the charge states the offence, the law and the section; s 123(5) makes it a claim that every legal condition is fulfilled
+DECLARE Charge HAS
+    section    IS A STRING  @desc The section of the Penal Code 1871 under which the charge is framed — the punishing section
+    offence    IS A STRING  @desc The name the Code gives the offence
+    `made out` IS A BOOLEAN @desc Whether every legal condition of the offence is fulfilled on the facts given — a charge asserts that it is (CPC s 123(5))
+    text       IS A STRING  @desc The charge as it is to be read to the accused, or blank if it cannot be framed on these facts
+    refusal    IS A STRING  @desc Why no charge can be framed on these facts, or blank
+    punishment IS A STRING  @desc The punishment the section prescribes, verbatim
+
+§§ `The words every charge shares`
+
+-- "You, <accused>, are charged that you, on or about <date>, at about <time>,
+--  at <place>, Singapore, [together with <co-accused> and in furtherance of the
+--  common intention of you all, ]"
+GIVEN p IS A Particulars
+GIVETH A STRING
+`the opening words of the charge` p MEANS
+    CONCAT "You, ", p's accused, ", are charged that you, on or about ", p's date, `the time clause` p, ", at ", p's place, ", Singapore, ", `the joint charge clause` p
+
+GIVEN p IS A Particulars
+GIVETH A STRING
+`the time clause` p MEANS
+    IF   p's time EQUALS ""
+    THEN ""
+    ELSE CONCAT ", at about ", p's time
+
+GIVEN p IS A Particulars
+GIVETH A STRING
+`the joint charge clause` p MEANS
+    BRANCH
+        IF p's `co-accused` EQUALS "" THEN ""
+        IF p's `common intention`     THEN CONCAT "together with ", p's `co-accused`, " and in furtherance of the common intention of you all, "
+        OTHERWISE                          CONCAT "together with ", p's `co-accused`, ", "
+
+-- ", and you have thereby committed an offence punishable under section <N>
+--  [read with section 34] of the Penal Code 1871."
+GIVEN p       IS A Particulars
+      section IS A STRING
+GIVETH A STRING
+`the closing words of the charge` p section MEANS
+    CONCAT ", and you have thereby committed an offence punishable under section ", section, `the section 34 rider` p, " of the Penal Code 1871."
+
+GIVEN p IS A Particulars
+GIVETH A STRING
+`the section 34 rider` p MEANS
+    IF   p's `common intention`
+    THEN " read with section 34"
+    ELSE ""
+
+§§ `Framing, or refusing to frame`
+
+-- The one place a `Charge` is built. `made out` is the verdict of the offence's
+-- ladder; `body` is the offence-specific recital between the opening and the
+-- closing words; `missing` names the elements that are not made out, for the
+-- refusal.
+GIVEN p          IS A Particulars
+      section    IS A STRING
+      offence    IS A STRING
+      punishment IS A STRING
+      `made out` IS A BOOLEAN
+      body       IS A STRING
+      missing    IS A LIST OF STRING
+GIVETH A Charge
+`frame the charge` p section offence punishment `made out` body missing MEANS
+    Charge WITH
+        section    IS section
+        offence    IS offence
+        `made out` IS `made out`
+        text       IS IF `made out`
+                      THEN CONCAT (`the opening words of the charge` p), body, (`the closing words of the charge` p section)
+                      ELSE ""
+        refusal    IS IF `made out`
+                      THEN ""
+                      ELSE CONCAT "A charge under section ", section, " would assert that the facts fulfil every legal condition of ", offence, " (CPC s 123(5)). On the facts given they do not: ", `joined with` "; " missing, "."
+        punishment IS punishment
+
+-- An element's name, for the refusal, unless it holds.
+GIVEN holds IS A BOOLEAN
+      name  IS A STRING
+GIVETH A LIST OF STRING
+`missing unless` holds name MEANS
+    IF holds THEN EMPTY ELSE LIST name
+
+-- A phrase, for the recital, if its element holds.
+GIVEN holds  IS A BOOLEAN
+      phrase IS A STRING
+GIVETH A LIST OF STRING
+`included if` holds phrase MEANS
+    IF holds THEN LIST phrase ELSE EMPTY
+
+GIVEN sep IS A STRING
+      xs  IS A LIST OF STRING
+GIVETH A STRING
+`joined with` sep xs MEANS
+    CONSIDER xs
+    WHEN EMPTY THEN ""
+    WHEN x FOLLOWED BY rest THEN
+        CONSIDER rest
+        WHEN EMPTY THEN x
+        WHEN y FOLLOWED BY more THEN CONCAT x, sep, (`joined with` sep rest)
+
+-- "one Wong Fei Hsia, the cashier of Seiyu Departmental Store" — the person
+-- against whom the offence was committed, named once with a description.
+GIVEN name        IS A STRING
+      description IS A STRING
+GIVETH A STRING
+`one` name description MEANS
+    IF   description EQUALS ""
+    THEN CONCAT "one ", name
+    ELSE CONCAT "one ", name, ", ", description
+
+§§ `Directives`
+
+`Lewis Christine particulars` MEANS Particulars WITH
+    accused            IS "Christine Lewis"
+    date               IS "the 24th day of April 2000"
+    time               IS "8.10 pm"
+    place              IS "the Seiyu Departmental Store at Parkway Parade Shopping Centre"
+    `co-accused`       IS ""
+    `common intention` IS FALSE
+
+`Sarjit Singh particulars` MEANS Particulars WITH
+    accused            IS "Sarjit Singh Rapati"
+    date               IS "10 July 2003"
+    time               IS "12.30 pm"
+    place              IS "Newton Hawker Centre car-park"
+    `co-accused`       IS "one Paramjit Singh s/o Buta Singh (M/43 yrs, NRIC No. S1436488-I)"
+    `common intention` IS TRUE
+
+#EVAL `the opening words of the charge` `Lewis Christine particulars`
+#ASSERT `the opening words of the charge` `Lewis Christine particulars` EQUALS "You, Christine Lewis, are charged that you, on or about the 24th day of April 2000, at about 8.10 pm, at the Seiyu Departmental Store at Parkway Parade Shopping Centre, Singapore, "
+#ASSERT `the closing words of the charge` `Lewis Christine particulars` "420" EQUALS ", and you have thereby committed an offence punishable under section 420 of the Penal Code 1871."
+#ASSERT `the opening words of the charge` `Sarjit Singh particulars` EQUALS "You, Sarjit Singh Rapati, are charged that you, on or about 10 July 2003, at about 12.30 pm, at Newton Hawker Centre car-park, Singapore, together with one Paramjit Singh s/o Buta Singh (M/43 yrs, NRIC No. S1436488-I) and in furtherance of the common intention of you all, "
+#ASSERT `the closing words of the charge` `Sarjit Singh particulars` "384" EQUALS ", and you have thereby committed an offence punishable under section 384 read with section 34 of the Penal Code 1871."
+#ASSERT `joined with` "; " (LIST "a", "b", "c") EQUALS "a; b; c"
+#ASSERT `joined with` "; " (LIST "a") EQUALS "a"
+#ASSERT `one` "Wong Fei Hsia" "the cashier of Seiyu Departmental Store" EQUALS "one Wong Fei Hsia, the cashier of Seiyu Departmental Store"
+
+-- s 24 (a): wrongful gain intended → dishonestly; (b) alone also suffices
+#ASSERT `dishonestly within section 24` (`Dishonesty Facts` WITH `intention of causing wrongful gain to A or another person` IS TRUE, `intention of causing wrongful loss to another person` IS FALSE, `dishonest by the ordinary standards of reasonable and honest persons` IS FALSE, `A knows that that act is dishonest by such standards` IS FALSE)
+#ASSERT `dishonestly within section 24` (`Dishonesty Facts` WITH `intention of causing wrongful gain to A or another person` IS FALSE, `intention of causing wrongful loss to another person` IS FALSE, `dishonest by the ordinary standards of reasonable and honest persons` IS TRUE, `A knows that that act is dishonest by such standards` IS TRUE)
+#ASSERT NOT (`dishonestly within section 24` (`Dishonesty Facts` WITH `intention of causing wrongful gain to A or another person` IS FALSE, `intention of causing wrongful loss to another person` IS FALSE, `dishonest by the ordinary standards of reasonable and honest persons` IS TRUE, `A knows that that act is dishonest by such standards` IS FALSE))
+
+-- s 25: intent to deceive for an advantage; Explanation 1 defeats a trifle
+#ASSERT `fraudulently within section 25` (`Fraud Facts` WITH `intent to deceive another person` IS TRUE, `an advantage should accrue to A or another person` IS TRUE, `detriment should befall B or another person other than A` IS FALSE, `the advantage or detriment intended is so slight that no reasonable person would complain of it` IS FALSE)
+#ASSERT NOT (`fraudulently within section 25` (`Fraud Facts` WITH `intent to deceive another person` IS TRUE, `an advantage should accrue to A or another person` IS TRUE, `detriment should befall B or another person other than A` IS FALSE, `the advantage or detriment intended is so slight that no reasonable person would complain of it` IS TRUE))

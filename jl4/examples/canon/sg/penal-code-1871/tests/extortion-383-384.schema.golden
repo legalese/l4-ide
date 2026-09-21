@@ -1,0 +1,119 @@
+{
+    "$defs": {
+        "Extortion Facts": {
+            "properties": {
+                "any other person": {
+                    "description": "Was the harm feared harm to somebody other than the victim? Illustration (b): the threat was to keep Z's child in wrongful confinement, and the fear was Z's.",
+                    "type": "boolean"
+                },
+                "any property": {
+                    "description": "Was property delivered — money or property of any description (s 22)?",
+                    "type": "boolean"
+                },
+                "anything signed or sealed which may be converted into a valuable security": {
+                    "description": "Was something signed or sealed delivered which may be turned into a valuable security? Illustration (d): a blank paper the victim was made to sign.",
+                    "type": "boolean"
+                },
+                "body": {
+                    "description": "… harm in body — death, hurt, confinement, or any other harm to the person?",
+                    "type": "boolean"
+                },
+                "dishonestly": {
+                    "description": "Did the accused act dishonestly — intending a wrongful gain or a wrongful loss, or in a way reasonable and honest people would call dishonest, knowing that (s 24)? It does not matter that the threatened harm was one the accused was entitled to cause; a creditor who frightens a debtor into paying what is actually owed gains nothing wrongfully.",
+                    "type": "boolean"
+                },
+                "induced the person so put in fear": {
+                    "description": "Was the delivery brought about BY that fear? Somebody who is in fear but who hands the thing over for an unrelated reason has not been extorted.",
+                    "type": "boolean"
+                },
+                "intentionally": {
+                    "description": "Did the accused mean to put the victim in fear, as opposed to frightening them by accident or in passing?",
+                    "type": "boolean"
+                },
+                "mind": {
+                    "description": "… harm in mind?",
+                    "type": "boolean"
+                },
+                "particulars": {
+                    "$ref": "#/$defs/Particulars",
+                    "description": "Who is charged, and when and where the offence was committed"
+                },
+                "property": {
+                    "description": "… harm in property?",
+                    "type": "boolean"
+                },
+                "put the victim in fear": {
+                    "description": "Was the victim in fact put in fear? A threat that the victim shrugs off has not put them in fear.",
+                    "type": "boolean"
+                },
+                "reputation": {
+                    "description": "… harm in reputation? Illustration (a): a threat to publish a defamatory libel.",
+                    "type": "boolean"
+                },
+                "that person": {
+                    "description": "Was the harm feared harm to the victim themselves?",
+                    "type": "boolean"
+                },
+                "the fear": {
+                    "description": "What the victim was put in fear of, as it is to read after \"in fear\" — for example \"that you would continue to keep his cousin, one Md Faruq Ahmed [“Faruq”], M/23 yrs, in wrongful confinement\"",
+                    "type": "string"
+                },
+                "the property extorted": {
+                    "description": "What was delivered up, as it is to read after \"did extort\" — for example \"cash of $200/-\"",
+                    "type": "string"
+                },
+                "valuable security": {
+                    "description": "Was a valuable security delivered?",
+                    "type": "boolean"
+                },
+                "victim": {
+                    "description": "The name of the person put in fear, as it is to appear in the charge — for example \"Mohammad Sharful Islam [“Sharful”]\"",
+                    "type": "string"
+                },
+                "victim described as": {
+                    "description": "How the charge describes that person, after the name — for example \"M/27 yrs\"; leave blank if not needed",
+                    "type": "string"
+                },
+                "victim pronoun": {
+                    "$ref": "#/$defs/Pronoun",
+                    "description": "The pronoun the charge uses for the person put in fear"
+                }
+            },
+            "required": [
+                "particulars",
+                "victim",
+                "victim described as",
+                "victim pronoun",
+                "the property extorted",
+                "the fear",
+                "intentionally",
+                "put the victim in fear",
+                "that person",
+                "any other person",
+                "body",
+                "mind",
+                "reputation",
+                "property",
+                "dishonestly",
+                "induced the person so put in fear",
+                "any property",
+                "valuable security",
+                "anything signed or sealed which may be converted into a valuable security"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Whether the accused \"commits extortion\" within section 383 of the Penal Code 1871",
+    "properties": {
+        "f": {
+            "$ref": "#/$defs/Extortion Facts",
+            "description": "The threat, whom it frightened, and what it got"
+        }
+    },
+    "required": [
+        "f"
+    ],
+    "title": "commits extortion",
+    "type": "object"
+}

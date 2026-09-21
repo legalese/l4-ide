@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+charge-sheet.l4:89:1-57:
+  LIST "420", "417"
+charge-sheet.l4:90:1-63:
+  LIST "394", "392", "379"
+charge-sheet.l4:91:1-76:
+  LIST "394", "393"
+charge-sheet.l4:94:1-84:
+  assertion satisfied
+charge-sheet.l4:96:1-97:
+  assertion satisfied
+charge-sheet.l4:99:1-103:
+  assertion satisfied

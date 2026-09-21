@@ -1,0 +1,44 @@
+{
+    "$defs": {
+        "Gain or Loss Facts": {
+            "properties": {
+                "avoidance by unlawful means of a loss of property which the person is not legally entitled to avoid": {
+                    "description": "Did the person avoid, by unlawful means, a loss of property they were not legally entitled to avoid?",
+                    "type": "boolean"
+                },
+                "exposure of risk to a loss by unlawful means of property to which the person exposed is legally entitled": {
+                    "description": "Was the person exposed, by unlawful means, to the risk of losing property they were legally entitled to?",
+                    "type": "boolean"
+                },
+                "gain by unlawful means of property to which the person gaining it is not legally entitled": {
+                    "description": "Did the person gain, by unlawful means, property they were not legally entitled to? Gain includes keeping what one has (Explanation 2).",
+                    "type": "boolean"
+                },
+                "loss by unlawful means of property to which the person losing it is legally entitled": {
+                    "description": "Did the person lose, by unlawful means, property they were legally entitled to? Loss includes not getting what one might get (Explanation 3).",
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "gain by unlawful means of property to which the person gaining it is not legally entitled",
+                "avoidance by unlawful means of a loss of property which the person is not legally entitled to avoid",
+                "loss by unlawful means of property to which the person losing it is legally entitled",
+                "exposure of risk to a loss by unlawful means of property to which the person exposed is legally entitled"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Whether there is a \"wrongful gain\" within section 23(1) of the Penal Code 1871",
+    "properties": {
+        "g": {
+            "$ref": "#/$defs/Gain or Loss Facts",
+            "description": "What was gained, avoided, lost or put at risk, and by what means"
+        }
+    },
+    "required": [
+        "g"
+    ],
+    "title": "wrongful gain within section 23",
+    "type": "object"
+}
