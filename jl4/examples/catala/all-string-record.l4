@@ -1,0 +1,64 @@
+IMPORT prelude
+
+§ `A record whose every field is a STRING`
+
+-- REGRESSION EXHIBIT. R11 elides an uninspected `STRING` field from the
+-- emitted structure. A record all of whose fields are strings therefore loses
+-- all of them, and until 2026-09-21 the emitter printed what was left:
+--
+--     declaration structure Provenance:
+--
+--     … Finding { -- amount: claimed -- sources: [ Provenance { } ] … }
+--
+-- and exited 0. Catala 1.2.1 accepts neither half. Measured, both errors from
+-- one `catala typecheck` run:
+--
+--   * "No fields defined for structure Provenance. Please define at least
+--     one." — there is no spelling of an empty structure to fall back on;
+--   * a syntax error at `}` in `Provenance { }` — "expected a list of field
+--     bindings of the form '-- fld : expression'".
+--
+-- So R11's elision now carries upward: a structure that loses every field is
+-- itself elided, and so is every field of another structure that carries one,
+-- which is why `sources` is gone from `Finding` below. Both disclosures are in
+-- the emitted notes block. Reading such a field, naming such a structure in a
+-- type, or building one is a `LowerError` — the shape divergence is the cost
+-- R11 already discloses, and answering a question about a field that is not
+-- there would be worse.
+--
+-- `Finding` survives because two of its fields are not strings. The whole of
+-- the citation apparatus — which document, which clause — is what Catala
+-- cannot carry, and the numbers it was cited in support of are what it can.
+
+DECLARE Provenance
+    HAS document IS A STRING
+        clause   IS A STRING
+
+DECLARE Finding
+    HAS amount  IS A NUMBER
+        sources IS A LIST OF Provenance
+        settled IS A BOOLEAN
+
+@export What is found on a claimed amount, with the sources relied on.
+GIVEN claimed IS A NUMBER
+GIVETH A Finding
+`finding on` claimed MEANS
+    Finding WITH
+        amount  IS claimed TIMES 2
+        sources IS LIST (Provenance WITH document IS "Terms", clause IS "cl.3")
+        settled IS claimed GREATER THAN 0
+
+@export The amount found, without the apparatus that cites it.
+GIVEN claimed IS A NUMBER
+GIVETH A NUMBER
+`amount found on` claimed MEANS (`finding on` claimed)'s amount
+
+-- The whole `Finding` has no Catala JSON rendering — `sources` is not in the
+-- emitted structure, so L4's value and Catala's are different shapes and R7
+-- declines to write an expected block rather than write a wrong one. The note
+-- saying so sits in the run's stderr. The second directive is testable, and is
+-- here so this exhibit contributes a live `clerk test` case rather than only a
+-- golden.
+#EVAL `finding on` 50
+
+#EVAL `amount found on` 50
