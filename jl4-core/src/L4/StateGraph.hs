@@ -116,6 +116,30 @@ data ContractState = ContractState
   , stateName :: Text      -- ^ Human-readable name (e.g., "purchase template", "Fulfilled")
   , stateType :: StateType
   , stateFan  :: FanKind   -- ^ How this state's outgoing transitions relate
+  , stateConstruct :: Maybe Text
+    -- ^ The rule construct that made this state a junction — @RAND@, @ROR@ or
+    -- @IF@ — set by 'markFan' at the moment the construct is known, and
+    -- 'Nothing' on every 'Linear' state and on a hand-built fixture.
+    --
+    -- 'FanKind' cannot answer this: @ROR@ and a regulative @IF@ are BOTH
+    -- 'OneOf', so a junction drawn from either says \"ONE OF\" and a reader
+    -- cannot tell a choice the obliged party makes from a branch the facts
+    -- make — the distinction 'guardedIfBranches' exists to preserve. It is a
+    -- field rather than a third 'FanKind' constructor because the two answer
+    -- different questions: 'FanKind' says how many branches fire, which is
+    -- what a gateway needs, and this says which keyword wrote them.
+  , stateSite :: Maybe SrcRange
+    -- ^ @rangeOf@ the 'RAction' of the obligation this state is the ENTRY of,
+    -- when it is one — the same range that obligation's own edges carry in
+    -- 'labelSite'. Set only where 'wireTarget' names a state after an
+    -- obligation ('describeDeonton'), so an edge whose 'labelSite' equals it
+    -- is an edge whose caption the state's own name already gives.
+    --
+    -- That equality is the structural correlation key "L4.StateGraph.Dot"
+    -- uses to stop printing the party, the modal and the act twice. Comparing
+    -- the rendered texts would do the same job until either spelling drifted,
+    -- and then fail silently; the range cannot drift, because both sides read
+    -- the same 'RAction'.
   } deriving (Eq, Show)
 
 -- | Classification of states for rendering
@@ -524,20 +548,33 @@ type ExtractM = St.State ExtractState
 -- | Create a new state and return its ID. States start out 'Linear'; a state
 -- becomes a junction only when 'markFan' is applied to it.
 newState :: Text -> StateType -> ExtractM StateId
-newState name stype = do
+newState = newStateAt Nothing
+
+-- | 'newState', recording the obligation the state is the entry of.
+--
+-- Only 'wireTarget' passes a site, and only where it names the state after an
+-- obligation, so 'stateSite' is 'Just' exactly on the states whose name is a
+-- 'describeDeonton'. Everything else — the @initial@ state, a named rule's
+-- entry, a junction, a terminal — goes through 'newState' and stays 'Nothing',
+-- which is what makes the equality test in "L4.StateGraph.Dot" safe: a
+-- 'Nothing' site never matches an edge.
+newStateAt :: Maybe SrcRange -> Text -> StateType -> ExtractM StateId
+newStateAt site name stype = do
   st <- St.get
   let sid = st.esNextId
-      s = ContractState sid name stype Linear
+      s = ContractState sid name stype Linear Nothing site
   St.put st { esNextId = sid + 1, esStates = s : st.esStates }
   pure sid
 
--- | Turn an existing state into a junction of the given kind.
-markFan :: StateId -> FanKind -> ExtractM ()
-markFan sid kind = St.modify $ \st ->
+-- | Turn an existing state into a junction of the given kind, recording the
+-- rule construct that did it. The construct travels with the state because
+-- the 'FanKind' alone cannot recover it: see 'stateConstruct'.
+markFan :: StateId -> FanKind -> Text -> ExtractM ()
+markFan sid kind construct = St.modify $ \st ->
   st { esStates = map retag st.esStates }
   where
     retag s
-      | s.stateId == sid = s { stateFan = kind }
+      | s.stateId == sid = s { stateFan = kind, stateConstruct = Just construct }
       | otherwise        = s
 
 -- | Add a transition
@@ -698,10 +735,10 @@ extractExpr mFromState expr = case expr of
   Regulative _ obl -> extractDeonton mFromState obl
 
   -- Parallel composition: every branch must be fulfilled.
-  RAnd{} -> extractFan AllOf mFromState (flattenRAnd expr)
+  RAnd{} -> extractFan AllOf "RAND" mFromState (flattenRAnd expr)
 
   -- Choice: exactly one branch is taken.
-  ROr{}  -> extractFan OneOf mFromState (flattenROr expr)
+  ROr{}  -> extractFan OneOf "ROR" mFromState (flattenROr expr)
 
   -- A conditional over regulative arms. Also a @OneOf@ junction — exactly one
   -- arm applies — but unlike @ROr@ the arms are selected by the facts, and the
@@ -781,9 +818,9 @@ flattenROr = \case
 -- an arm back into it is a back-edge. An @IF@'s arms are exclusive — the
 -- facts run one — and keep sharing ('extractIfFan'), as do an obligation's
 -- @HENCE@ and @LEST@, which are two outcomes of which exactly one occurs.
-extractFan :: FanKind -> Maybe StateId -> [Expr Resolved] -> ExtractM ()
-extractFan kind mFromState branches =
-  extractGuardedFanWith perBranch kind mFromState [(Nothing, b) | b <- branches]
+extractFan :: FanKind -> Text -> Maybe StateId -> [Expr Resolved] -> ExtractM ()
+extractFan kind construct mFromState branches =
+  extractGuardedFanWith perBranch kind construct mFromState [(Nothing, b) | b <- branches]
 
 -- | Run one branch's extraction and restore the memo afterwards, so what the
 -- branch memoised is visible below it and nowhere else.
@@ -796,7 +833,7 @@ perBranch act = do
 -- | 'extractGuardedFan' over @IF@ arms, whose guards are structured.
 extractIfFan :: Maybe StateId -> [(BranchGuard, Expr Resolved)] -> ExtractM ()
 extractIfFan mFromState branches =
-  extractGuardedFan OneOf mFromState [(Just g, b) | (g, b) <- branches]
+  extractGuardedFan OneOf "IF" mFromState [(Just g, b) | (g, b) <- branches]
 
 -- | Extract an @IF@ chain whose arms are regulative as a guarded @OneOf@
 -- junction. A chain none of whose arms is regulative is not a rule and
@@ -812,7 +849,7 @@ extractIf mFromState expr
 
 -- | As 'extractFan', with a guard attached to each branch edge.
 extractGuardedFan
-  :: FanKind -> Maybe StateId -> [(Maybe BranchGuard, Expr Resolved)] -> ExtractM ()
+  :: FanKind -> Text -> Maybe StateId -> [(Maybe BranchGuard, Expr Resolved)] -> ExtractM ()
 extractGuardedFan = extractGuardedFanWith id
 
 -- | 'extractGuardedFan' with each branch's extraction wrapped: 'perBranch'
@@ -820,12 +857,17 @@ extractGuardedFan = extractGuardedFanWith id
 -- arms are exclusive (see 'extractFan').
 extractGuardedFanWith
   :: (ExtractM () -> ExtractM ())
-  -> FanKind -> Maybe StateId -> [(Maybe BranchGuard, Expr Resolved)] -> ExtractM ()
-extractGuardedFanWith wrap kind mFromState branches = do
+  -> FanKind -> Text -> Maybe StateId -> [(Maybe BranchGuard, Expr Resolved)] -> ExtractM ()
+extractGuardedFanWith wrap kind construct mFromState branches = do
   junction <- case mFromState of
     Just sid -> pure sid
+    -- Still @initial@, deliberately: this is the graph's ENTRY, and that is
+    -- the more useful thing for the node to say. Which construct fanned it is
+    -- recorded on 'stateConstruct' and drawn beside the fan kind, so naming
+    -- the state after the construct instead would trade the start of the
+    -- contract for a fact the page already carries.
     Nothing  -> newState "initial" InitialState
-  markFan junction kind
+  markFan junction kind construct
   traverse_ (wrap . uncurry (extractBranch junction)) branches
 
 -- | Extract one branch of a junction, wiring the junction to its entry state.
@@ -878,7 +920,11 @@ wireTarget from label ttype otherName expr = do
     TargetBreach    -> terminal "Breach" TerminalBreach
 
     TargetDeonton obl -> do
-      entryId <- newState (describeDeonton obl) IntermediateState
+      -- Named after the obligation, so it is stamped with that obligation's
+      -- site: the edges 'extractDeonton' hangs off it carry the same range in
+      -- 'labelSite', and that equality is how the renderer knows the caption
+      -- would merely repeat the node.
+      entryId <- newStateAt (deontonSite obl) (describeDeonton obl) IntermediateState
       addTransition from entryId label ttype
       extractDeonton (Just entryId) obl
 
@@ -999,6 +1045,10 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
       -- 'RAction' that @armNormKey@ stamps on the runtime step.
       site = rangeOf action
 
+      -- This obligation as its own entry state is named, so an arm of it that
+      -- has to mint a state can say which obligation it is an arm OF.
+      selfName = describeAction subject action
+
       label = TransitionLabel
         { labelParty    = partyText
         , labelModal    = modalVal
@@ -1011,13 +1061,31 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
         , labelSite     = site
         }
 
+      -- The deadline that TAKES this arm, as against the one that bounds the
+      -- act. They are the same clause read from opposite ends: on the HENCE
+      -- edge the @WITHIN@ says by when the act still counts, and here it names
+      -- the instant the arm fires. 'lestArmWording' says WHAT happens and has
+      -- only ever read the deadline's PRESENCE; this says WHEN, so an edge
+      -- captioned "timeout" no longer leaves the reader to hunt the sibling
+      -- edge for which timeout it was.
+      --
+      -- 'DMustNot' is 'Nothing', and that is the same short-circuit
+      -- lestArmWording makes on its first line: a prohibition's arm is
+      -- taken by the ACT being performed, not by the clock, so a deadline here
+      -- would name an event that does not fire this arm. For a prohibition the
+      -- deadline running out means COMPLIANCE.
+      armTrigger = case action.modal of
+        DMustNot -> Nothing
+        _        -> memberDeadline label
+
       -- The caption for whichever LEST arm this obligation turns out to have.
       -- It carries the modal too: without it a consumer holding only this edge
       -- cannot tell a missed deadline from a prohibition that was breached,
-      -- which is the whole of smucclaw/l4-ide#927. The party, deadline and
-      -- guard are deliberately absent — they belong to the obligation, which
-      -- the HENCE edge already restates, and repeating them here would read as
-      -- a second, contradictory copy of the rule.
+      -- which is the whole of smucclaw/l4-ide#927. The party and the guard are
+      -- deliberately absent — they belong to the obligation, which the HENCE
+      -- edge already restates, and repeating them here would read as a second,
+      -- contradictory copy of the rule. The DEADLINE is not in that company:
+      -- see 'armTrigger'.
       -- The caption reads the deadline that expires a MEMBER, which for a
       -- quantified rule may sit on the join line rather than on the act; see
       -- 'memberDeadline'. Passing @due@ here said "unreachable: no WITHIN" of
@@ -1027,7 +1095,7 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
         , labelModal    = modalVal
         , labelAction   = lestArmWording action.modal (memberDeadline label)
         , labelOpening  = Nothing
-        , labelDeadline = Nothing
+        , labelDeadline = armTrigger
         , labelGuard    = Nothing
         , labelBranch   = Nothing
         , labelQuantifier = Nothing
@@ -1040,7 +1108,14 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
 
   -- Handle HENCE (success path)
   case hence of
-    Just henceExpr -> wireTarget fromState label HenceTransition "next" henceExpr
+    -- The fallback name is used only where the target is not already a state
+    -- (wireTarget's TargetOther): a bare RAND / ROR / IF below a
+    -- HENCE, in practice. It used to be the word @next@, which named neither
+    -- the construct that put the node there nor the obligation it continues,
+    -- so @ok/contracts.l4@ drew a junction captioned @next@. Naming it after
+    -- the arm and its obligation says both, and the junction's own construct
+    -- arrives separately on 'stateConstruct'.
+    Just henceExpr -> wireTarget fromState label HenceTransition ("HENCE of " <> selfName) henceExpr
 
     -- No HENCE specified. Every modal defaults it to FULFILLED — see the HENCE
     -- table in doc/reference/regulative/README.md and @fromMaybe fulfilExpr@ in
@@ -1069,7 +1144,7 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
   -- with a literal @\"timeout\"@ and no modal, left over from before #927;
   -- it now goes through 'wireTarget' with the same caption as its siblings.
   case lest of
-    Just lestExpr -> wireTarget fromState lestLabel LestTransition "failure" lestExpr
+    Just lestExpr -> wireTarget fromState lestLabel LestTransition ("LEST of " <> selfName) lestExpr
 
     Nothing -> do
       -- No LEST specified - use default based on modal
@@ -1178,7 +1253,13 @@ classifyTarget rules = \case
 
 -- | Generate a descriptive name for an obligation (for intermediate states)
 describeDeonton :: Deonton Resolved -> Text
-describeDeonton MkDeonton{subject, action} =
+describeDeonton MkDeonton{subject, action} = describeAction subject action
+
+-- | 'describeDeonton' for a subject and act held separately, which is how
+-- 'extractDeonton' has them: it needs the same words to name the states its
+-- own arms land on ('wireTarget'\'s fallback names).
+describeAction :: Subject Resolved -> RAction Resolved -> Text
+describeAction subject action =
   let partyT = subjectText subject
       modalT = case action.modal of
         DMust    -> "must"
@@ -1187,6 +1268,12 @@ describeDeonton MkDeonton{subject, action} =
         DDo      -> "do"
       actionT = prettyPattern action.action
   in partyT <> " " <> modalT <> " " <> actionT
+
+-- | @rangeOf@ an obligation's act: the key its own edges carry in 'labelSite',
+-- stamped on the state that is its entry. One reader, one range — see
+-- 'stateSite'.
+deontonSite :: Deonton Resolved -> Maybe SrcRange
+deontonSite MkDeonton{action} = rangeOf action
 
 -- | The subject of a deonton as label text.
 --

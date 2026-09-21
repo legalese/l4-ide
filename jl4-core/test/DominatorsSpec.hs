@@ -192,11 +192,11 @@ orphanGraph = StateGraph
   { sgName = "orphan"
   , sgDecide = Nothing
   , sgStates =
-      [ ContractState 0 "initial" InitialState Linear
-      , ContractState 1 "Bob must deliver" IntermediateState Linear
-      , ContractState 2 "Fulfilled" TerminalFulfilled Linear
-      , ContractState 3 "Breach" TerminalBreach Linear
-      , ContractState 4 "nobody comes here" IntermediateState Linear
+      [ ContractState 0 "initial" InitialState Linear Nothing Nothing
+      , ContractState 1 "Bob must deliver" IntermediateState Linear Nothing Nothing
+      , ContractState 2 "Fulfilled" TerminalFulfilled Linear Nothing Nothing
+      , ContractState 3 "Breach" TerminalBreach Linear Nothing Nothing
+      , ContractState 4 "nobody comes here" IntermediateState Linear Nothing Nothing
       ]
   , sgTransitions =
       [ Transition 0 1 (act "Alice" "pay") HenceTransition

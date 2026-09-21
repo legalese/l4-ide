@@ -906,14 +906,18 @@ spec = do
     it "does not change the unmarked edges' attributes" $
       withGraph (graphFor linearSrc) \sg -> do
         let marked = stateGraphToDot defaultStateGraphOptions { showDominators = True } sg
-            timeoutEdge from =
-              from <> " -> 3 [label=timeout\n           ,color=\"#dc3545\"\n           ,style=dashed];"
+            -- The caption names the deadline that TAKES the arm, not just the
+            -- fact that one ran out, so it is per-edge: 3 for Alice's, 5 for
+            -- Bob's. Before 2026-09-21 both read the bare word "timeout".
+            timeoutEdge from due =
+              from <> " -> 3 [label=\"timeout [" <> due
+                   <> "]\"\n           ,color=\"#dc3545\"\n           ,style=dashed];"
         -- The two timeouts dominate nothing, and their three lines are
         -- exactly the default output's: the annotation only ADDS, to the
         -- edges it marks.
-        dotFor sg `shouldSatisfy` Text.isInfixOf (timeoutEdge "0")
-        marked `shouldSatisfy` Text.isInfixOf (timeoutEdge "0")
-        marked `shouldSatisfy` Text.isInfixOf (timeoutEdge "1")
+        dotFor sg `shouldSatisfy` Text.isInfixOf (timeoutEdge "0" "3")
+        marked `shouldSatisfy` Text.isInfixOf (timeoutEdge "0" "3")
+        marked `shouldSatisfy` Text.isInfixOf (timeoutEdge "1" "5")
  where
   isJust' = maybe False (const True)
   allSame xs = case xs of
