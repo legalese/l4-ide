@@ -18,6 +18,7 @@
     "demo": "tsx demo/s415.ts",
     "demo:implies": "tsx demo/implies.ts",
     "demo:regcf": "tsx demo/regcf.ts",
+    "demo:robbery": "tsx demo/robbery.ts",
     "standalone": "bash standalone/build.sh",
     "playground": "node standalone/serve.mjs"
   },
