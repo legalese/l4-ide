@@ -447,6 +447,35 @@ jobs:
       - name: No retired vocabulary in the learning-oriented pages
         run: node etc/check-retired-terms.mjs --dir doc/tutorials doc/courses skills
 
+      # Fourth instance of the same reasoning, pointed OUTWARD. We cite
+      # legalese/canon in prose -- a section of a subject's NOTES.md, a file:line
+      # inside an encoding, a count of its assertions -- and every one of those is
+      # a claim about another repository that nothing in this one re-checks. A
+      # section number always LOOKS right, which is why the rot is invisible.
+      #
+      # Two of the three classes need no canon checkout and no network: file:line
+      # and assertion-count citations resolve against the VENDORED MIRROR under
+      # jl4/examples/canon/, so they are checked on every event. NOTES.md is not
+      # in the pin's allowlist, so those citations print as explicitly unchecked
+      # rather than passing silently.
+      #
+      # The stakes are doubled by duplication: skills/writing-l4-rules/ is copied
+      # verbatim into legalese/l4-plugin and shipped as a marketplace bundle, so a
+      # citation that rots here rots in two repositories at once, and the bundle's
+      # readers are the ones least able to notice.
+      #
+      # Selftest first, for the reason the NOT checker's comment gives: this
+      # landed in the same commit as the tree it checks, so "it passes" and "it
+      # cannot see anything" are the same observation until something proves
+      # otherwise. The selftest found a real off-by-one on its first run -- a
+      # trailing newline counted as a line, so a citation one past the end of a
+      # file resolved.
+      - name: The canon-citation checker still detects what it claims to
+        run: node etc/check-canon-citations.mjs --selftest
+
+      - name: Every citation into legalese/canon still resolves
+        run: node etc/check-canon-citations.mjs
+
   # ============================================
   # Repo-wide invariants: unfiltered, no build
   # ============================================

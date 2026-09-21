@@ -1,0 +1,114 @@
+{
+    "$defs": {
+        "a role carrying a supplement": {
+            "enum": [
+                "homeroom teacher of a class other than the first grade",
+                "homeroom teacher of a first-grade class",
+                "subject coordinator",
+                "road-safety coordinator",
+                "security coordinator",
+                "social-education coordinator",
+                "grade-level coordinator",
+                "laboratory coordinator",
+                "assessment and measurement coordinator"
+            ],
+            "type": "string"
+        },
+        "a stage of education": {
+            "enum": [
+                "a primary school",
+                "a junior high school"
+            ],
+            "type": "string"
+        },
+        "a teacher": {
+            "properties": {
+                "classes in the coordinated grade level": {
+                    "type": "number"
+                },
+                "first role": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/a role carrying a supplement"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "fraction of a full post": {
+                    "type": "number"
+                },
+                "qualification": {
+                    "$ref": "#/$defs/a teaching qualification"
+                },
+                "rank": {
+                    "type": "number"
+                },
+                "second role": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/a role carrying a supplement"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "seniority in years": {
+                    "type": "number"
+                },
+                "stage of education": {
+                    "$ref": "#/$defs/a stage of education"
+                },
+                "units of the school-role supplement": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "qualification",
+                "seniority in years",
+                "rank",
+                "stage of education",
+                "fraction of a full post",
+                "classes in the coordinated grade level",
+                "units of the school-role supplement"
+            ],
+            "type": "object"
+        },
+        "a teaching qualification": {
+            "enum": [
+                "academic — holds a recognised first degree",
+                "academic — holds a recognised second degree",
+                "academic — holds a doctorate",
+                "certified but not academic",
+                "senior certified but not academic",
+                "unqualified"
+            ],
+            "type": "string"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Compute the monthly pay of an Israeli teacher employed on Ofek Hadash terms — the combined salary from the 2022 table, Tosefet Ofek 2022, the doctorate and role supplements and the school-role supplement, net of the 2025-2026 wage reduction",
+    "properties": {
+        "the date": {
+            "description": "The teacher: qualification, seniority in years, rank 1 to 9, primary or junior high, the fraction of a full post (1 for a whole post), up to two role supplements, the classes in any grade they coordinate, and the units of school-role supplement allotted to them",
+            "format": "date",
+            "type": "string"
+        },
+        "the teacher": {
+            "$ref": "#/$defs/a teacher"
+        },
+        "the value of any seniority step taken in september 2025": {
+            "description": "The month being computed. The 2025-2026 reduction, the Tosefet Ofek increase of 1.9.2023, the shekel floors of 1.9.2023 and the school-role supplement start of 1.9.2026 all turn on it",
+            "type": "number"
+        }
+    },
+    "required": [
+        "the teacher",
+        "the date",
+        "the value of any seniority step taken in september 2025"
+    ],
+    "title": "the monthly pay of",
+    "type": "object"
+}

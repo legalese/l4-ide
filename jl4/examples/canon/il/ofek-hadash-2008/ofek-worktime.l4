@@ -1,0 +1,374 @@
+IMPORT prelude
+IMPORT `ofek-domain`
+
+§ `The working week, the post, and the value of an hour`
+
+-- ===========================================================================
+-- §§ 14 to 33 of the collective agreement of 25 December 2008.
+--
+-- Ofek Hadash's central bargain was structural, not just numerical: it bought
+-- a longer, differently-shaped week. A full post became 36 hours SPENT IN THE
+-- SCHOOL, split three ways — hours in front of a class, hours with a small
+-- group or a single pupil, and hours present in the building doing the work
+-- that teaching requires. That three-way split is what this module encodes,
+-- because everything paid by the hour is priced off it (§ 31).
+--
+-- THE THREE KINDS OF HOUR, in the agreement's own vocabulary:
+--   frontal    (sha'ot frontaliyot)  — in front of a class
+--   individual (sha'ot pratani'ot)   — with up to 5 pupils, or one pupil
+--   presence   (sha'ot shehiya)      — in the school: meetings, preparation,
+--                                      marking, meeting parents
+-- ===========================================================================
+
+§§ `Section 14 — the working days`
+
+-- § 14: a full-post teacher works five days a week, INCLUDING in schools that
+-- operate six days. The four-day arrangement is a grandfathered exception,
+-- needing the principal's agreement, and capped at a nine-hour day.
+`the working days in a full week` MEANS 5
+`the longest day allowed under the four-day exception` MEANS 9
+
+GIVEN `the teacher worked four days before the crossover` IS A BOOLEAN
+      `the school had already moved to a five-day week`   IS A BOOLEAN
+      `the principal agrees`                              IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the teacher may keep working four days` IF
+        `the teacher worked four days before the crossover`
+    AND `the school had already moved to a five-day week`
+    AND `the principal agrees`
+
+§§ `Sections 15 and 17 — the shape of the week`
+
+DECLARE `a weekly work pattern` HAS
+    `frontal hours`    IS A NUMBER
+    `individual hours` IS A NUMBER
+    `presence hours`   IS A NUMBER
+
+GIVEN `the pattern` IS A `a weekly work pattern`
+GIVETH A NUMBER
+`the hours in` `the pattern`
+    @nlg the total weekly hours in %the pattern%
+    MEANS   `the pattern`'s `frontal hours`
+      PLUS  `the pattern`'s `individual hours`
+      PLUS  `the pattern`'s `presence hours`
+
+-- § 15(a)-(d) and § 17(a)-(d): the ordinary full-post week, by stage.
+GIVEN `the stage` IS A `a stage of education`
+GIVETH A `a weekly work pattern`
+`the ordinary full-post week in` `the stage`
+    @nlg the ordinary full-post week in %the stage%
+    MEANS
+    -- § 15 gives the primary school 36 hours as 26 frontal, 5 individual and
+    -- 5 presence, of which up to two are working meetings. § 17 gives the
+    -- junior high the same 36, cut 23/4/9 with up to four meeting hours: it
+    -- gives up three frontal hours to presence, which is the reform's answer
+    -- to the older pupils. Built positionally, so the two rows line up and the
+    -- trade is visible as a column.
+    --                                                     frontal, individual, presence
+    CONSIDER `the stage`
+    WHEN `a primary school`     THEN `a weekly work pattern` OF      26,          5,        5
+    WHEN `a junior high school` ^    ^                       ^       23,          4,        9
+
+-- § 15, closing table, and § 17, closing table: a teacher who is also GRADE
+-- COORDINATOR (memuneh shichva) keeps the 36 hours but re-cuts them, giving
+-- up frontal hours as the grade grows. The agreement prints this as a table
+-- with four bands, in both articles.
+GIVEN `the stage` IS A `a stage of education`
+      `the classes in the grade` IS A NUMBER
+GIVETH A `a weekly work pattern`
+`the full-post week of a grade coordinator in` `the stage` `the classes in the grade`
+    @nlg the full-post week of a grade coordinator in %the stage%
+    MEANS
+    -- The tables § 15 and § 17 print at the foot of each article, as tables:
+    -- one row per band of grade size, three columns of hours. The total stays
+    -- 36 throughout — the coordinator gives up frontal hours, not working time.
+    CONSIDER `the stage`
+    WHEN `a primary school` THEN
+        --                                              frontal, individual, presence
+        BRANCH IF `the classes in the grade` AT MOST 4 THEN `a weekly work pattern` OF 26,          4,        6
+               IF ^                          AT MOST 6 ^    ^                       ^  25,          3,        8
+               IF ^                          AT MOST 8 ^    ^                       ^  24,          3,        9
+               OTHERWISE                                    ^                       ^  23,          3,       10
+    WHEN `a junior high school` THEN
+        --                                              frontal, individual, presence
+        BRANCH IF `the classes in the grade` AT MOST 4 THEN `a weekly work pattern` OF 23,          3,       10
+               IF ^                          AT MOST 6 ^    ^                       ^  22,          2,       12
+               IF ^                          AT MOST 8 ^    ^                       ^  21,          2,       13
+               OTHERWISE                                    ^                       ^  20,          2,       14
+
+§§ `Section 26 — the age hours`
+
+-- § 26 gives older teachers back some of the week, and it draws the line
+-- differently for existing and new teachers: an existing teacher gets a
+-- second reduction at 55, a new teacher does not (§ 26(c), final sentence).
+-- § 26(d) fixes entitlement for the whole school year by the teacher's age on
+-- 31 December falling in it.
+GIVEN `the teacher` IS A `a teacher`
+      `the age on 31 December of the school year` IS A NUMBER
+      `the pattern` IS A `a weekly work pattern`
+GIVETH A `a weekly work pattern`
+`the week after the age reduction for` `the teacher` `the age on 31 December of the school year` `the pattern`
+    @nlg the weekly pattern of %the teacher% after the section 26 age reduction
+    MEANS
+    CONSIDER `the teacher`'s `how they entered`
+    WHEN `an existing teacher converted under sections 43 to 50` THEN
+        -- § 26(a): 50 up to but not including 55 — two frontal hours off.
+        -- § 26(b): 55 and above — three frontal hours and one individual.
+        BRANCH IF `the age on 31 December of the school year` AT LEAST 55 THEN `a weekly work pattern` WITH
+                   `frontal hours`    IS `the pattern`'s `frontal hours` MINUS 3
+                   `individual hours` IS `the pattern`'s `individual hours` MINUS 1
+                   `presence hours`   IS `the pattern`'s `presence hours`
+               IF `the age on 31 December of the school year` AT LEAST 50 THEN `a weekly work pattern` WITH
+                   `frontal hours`    IS `the pattern`'s `frontal hours` MINUS 2
+                   `individual hours` IS `the pattern`'s `individual hours`
+                   `presence hours`   IS `the pattern`'s `presence hours`
+               OTHERWISE `the pattern`
+    WHEN `a new teacher placed under section 36` THEN
+        -- § 26(c): 50 and above — two frontal hours off, and nothing further
+        -- at 55.
+        IF `the age on 31 December of the school year` AT LEAST 50
+            THEN `a weekly work pattern` WITH
+                     `frontal hours`    IS `the pattern`'s `frontal hours` MINUS 2
+                     `individual hours` IS `the pattern`'s `individual hours`
+                     `presence hours`   IS `the pattern`'s `presence hours`
+            ELSE `the pattern`
+
+§§ `Sections 27 and 33 — how large a post may be`
+
+-- § 27(a): the floor is a third of a post. § 27(c): a NEW teacher may not go
+-- below half a post without the approval of the head of teaching personnel,
+-- unless § 27(d) or § 27(e) applies to them.
+`the smallest post in the reform` MEANS 1 DIVIDED BY 3
+`the smallest post for a new teacher without approval` MEANS 50%
+
+GIVEN `the teacher` IS A `a teacher`
+      `special approval has been given` IS A BOOLEAN
+      `the teacher is paramedical or an integration teacher` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the post is large enough` IF
+    -- § 27(e): a paramedical teacher or an integration teacher (mo'ra
+    -- meshalevet) may be employed below a third of a post, so the floor does
+    -- not reach them at all.
+    IF `the teacher is paramedical or an integration teacher`
+        THEN TRUE
+        ELSE     `the teacher`'s `fraction of a full post` AT LEAST `the smallest post in the reform`
+             AND `the new-teacher floor is satisfied`
+    WHERE
+        `the new-teacher floor is satisfied` MEANS
+            CONSIDER `the teacher`'s `how they entered`
+            WHEN `a new teacher placed under section 36` THEN
+                    `the teacher`'s `fraction of a full post` AT LEAST `the smallest post for a new teacher without approval`
+                OR (`special approval has been given` AND `the teacher`'s `teaches special education`)
+                OR `special approval has been given`
+            WHEN `an existing teacher converted under sections 43 to 50` THEN TRUE
+
+-- § 33(a): the ceiling is a full post. § 33(c) lets the districts go beyond
+-- it where a teacher is needed, on conditions.
+`the largest ordinary post` MEANS 100%
+
+-- § 33(c)(2): where a teacher is employed beyond a full post, the extra hours
+-- are frontal only, the day is capped at 8.5 hours (5 on a Friday), and the
+-- week at 42 hours. § 33(b)(3) applies the same 42-hour week to a teacher
+-- who also works in a school outside the reform.
+`the longest day beyond a full post` MEANS 8.5
+`the longest friday beyond a full post` MEANS 5
+`the longest week beyond a full post` MEANS 42
+
+GIVEN `the hours in the day` IS A NUMBER
+      `the hours in the week` IS A NUMBER
+      `the day is a friday` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the section 33 hour caps are respected` IF
+        `the hours in the week` AT MOST `the longest week beyond a full post`
+    AND (IF `the day is a friday`
+            THEN `the hours in the day` AT MOST `the longest friday beyond a full post`
+            ELSE `the hours in the day` AT MOST `the longest day beyond a full post`)
+
+§§ `Section 31 — the value of an hour`
+
+-- § 31(b), verbatim: "The basis for calculating the value of an hour for a
+-- 100% post: 4.33 (weeks) X 36 (hours)". Both numbers are printed in the
+-- article; neither is derived here.
+`the weeks in a month for this purpose` MEANS 4.33
+`the hours in a full-post week` MEANS 36
+`the hours in a full-post month` MEANS `the weeks in a month for this purpose` TIMES `the hours in a full-post week`
+
+-- § 31(a): the article does NOT use one salary base for every hourly payment.
+-- It names four purposes and gives each its own base, and the difference
+-- matters: a substitution hour is priced off the combined salary alone, while
+-- a school activity is priced off the combined salary PLUS the role
+-- supplements that count toward the pensionable salary.
+DECLARE `a purpose for which an hour is valued` IS ONE OF
+    `a substitution hour`                             -- § 31(a)(1)
+    `a substitution hour taken in place of a presence hour`  -- § 31(a)(2)
+    `a school activity`                               -- § 31(a)(3)
+    `a deduction for an hour of absence`              -- § 31(a)(4)
+    `an hour worked beyond a full post`               -- § 33(c)(3), applying § 31(a)(1)
+
+GIVEN `the purpose` IS A `a purpose for which an hour is valued`
+GIVETH A BOOLEAN
+DECIDE `the role supplements enter the hourly base for` `the purpose` IF
+    -- § 31(a)(1) takes the combined salary alone — except that for a special
+    -- education teacher substituting in a special education class it also
+    -- takes the special education supplement. § 31(a)(2), (3) and (4) all
+    -- take the combined salary together with the role supplements counted
+    -- toward the pensionable salary.
+    CONSIDER `the purpose`
+    WHEN `a substitution hour`                                     THEN FALSE
+    WHEN `a substitution hour taken in place of a presence hour`   THEN TRUE
+    WHEN `a school activity`                                       THEN TRUE
+    WHEN `a deduction for an hour of absence`                      THEN TRUE
+    WHEN `an hour worked beyond a full post`                       THEN FALSE
+
+GIVEN `the monthly base for the purpose` IS A NUMBER
+      `the fraction of a full post` IS A NUMBER
+GIVETH A NUMBER
+`the value of an hour on a base of` `the monthly base for the purpose` `the fraction of a full post`
+    @nlg the value of one hour on a monthly base of %the monthly base for the purpose%
+    MEANS
+    -- § 31(b) divides by the FULL-POST month, not by the teacher's own hours.
+    -- The base handed in is the teacher's actual monthly figure, already
+    -- pro-rated for a part post, so the pro-rating is undone here: two
+    -- teachers on the same rank and seniority are worth the same per hour
+    -- whatever the size of their post.
+    IF `the fraction of a full post` AT MOST 0
+        THEN 0
+        ELSE (`the monthly base for the purpose` DIVIDED BY `the fraction of a full post`)
+                 DIVIDED BY `the hours in a full-post month`
+
+§§ `Sections 29 and 30 — the hours paid on top`
+
+-- § 29(b) and § 30(a): both a substitution hour and a school activity are
+-- paid at 125% of the value of an hour.
+`the rate for a substitution hour` MEANS 125%
+`the rate for a school activity` MEANS 125%
+`the rate for an ordinary presence hour` MEANS 100%
+-- § 33(c)(3): an hour beyond a full post is paid at 100%, not 125%.
+`the rate for an hour beyond a full post` MEANS 100%
+
+-- § 30(a): a school activity is capped at 18 hours in each HALF of the school
+-- year, and § 30(c) caps each kind within that: a general school assembly at
+-- 4 hours, individual parent-and-child meetings at 8, an after-hours event
+-- at 6. The three sub-caps sum to 18, so the overall cap binds exactly when
+-- every kind is exhausted.
+`the school activity hours allowed in a half year` MEANS 18
+`the assembly hours allowed in a half year` MEANS 4
+`the parent and child meeting hours allowed in a half year` MEANS 8
+`the after-hours event hours allowed in a half year` MEANS 6
+
+GIVEN `the assembly hours` IS A NUMBER
+      `the parent and child meeting hours` IS A NUMBER
+      `the after-hours event hours` IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `the school activity caps are respected` IF
+        `the assembly hours` AT MOST `the assembly hours allowed in a half year`
+    AND `the parent and child meeting hours` AT MOST `the parent and child meeting hours allowed in a half year`
+    AND `the after-hours event hours` AT MOST `the after-hours event hours allowed in a half year`
+    AND (`the assembly hours` PLUS `the parent and child meeting hours` PLUS `the after-hours event hours`)
+            AT MOST `the school activity hours allowed in a half year`
+
+-- § 29(c)-(e) and § 30(d)-(f): the four cases the agreement spells out for an
+-- hour worked in place of, or beside, a presence hour. The third is the one
+-- worth encoding — the teacher who moves the presence hour to another day is
+-- paid BOTH, and the one who does not is paid only the 125%.
+DECLARE `how the extra hour stood to the presence hour` IS ONE OF
+    `it fell on the teacher's free day`                       -- § 29(c), § 30(d)
+    `it replaced a presence hour that was not made up`        -- § 29(d), § 30(e)
+    `it replaced a presence hour made up on another day`      -- § 29(e), § 30(f)
+
+GIVEN `the case` IS A `how the extra hour stood to the presence hour`
+      `the value of an hour` IS A NUMBER
+GIVETH A NUMBER
+`the pay for one extra hour where` `the case` `the value of an hour`
+    @nlg the pay for one extra hour where %the case%
+    MEANS
+    CONSIDER `the case`
+    WHEN `it fell on the teacher's free day` THEN
+        `the value of an hour` TIMES `the rate for a substitution hour`
+    WHEN `it replaced a presence hour that was not made up` THEN
+        -- 125% for the hour worked, and the ordinary 100% for the presence
+        -- hour is NOT paid: it was not worked.
+        `the value of an hour` TIMES `the rate for a substitution hour`
+    WHEN `it replaced a presence hour made up on another day` THEN
+        -- 125% for the hour worked AND 100% for the presence hour, which was.
+        `the value of an hour` TIMES (`the rate for a substitution hour` PLUS `the rate for an ordinary presence hour`)
+
+§§ `Illustrations`
+
+-- § 31(b): the divisor, on the agreement's own two numbers.
+#ASSERT `the hours in a full-post month` EQUALS 155.88
+
+-- A teacher whose monthly base is 10,000 on a full post is worth 10,000 /
+-- 155.88 an hour, and a substitution hour pays a quarter more again.
+#ASSERT ROUND (`the value of an hour on a base of` 10_000 1 TIMES 100) EQUALS 6415
+#ASSERT ROUND (`the value of an hour on a base of` 10_000 1 TIMES `the rate for a substitution hour` TIMES 100) EQUALS 8019
+
+-- The hourly value does not depend on the size of the post: a half-post
+-- teacher on 5,000 is worth exactly what a full-post teacher on 10,000 is.
+#ASSERT `the value of an hour on a base of` 5_000 (50%) EQUALS `the value of an hour on a base of` 10_000 1
+
+-- § 29(e) and § 30(f): making the presence hour up on another day is worth
+-- 225% in total, against 125% for not making it up.
+#ASSERT `the pay for one extra hour where` `it replaced a presence hour made up on another day` 100 EQUALS 225
+#ASSERT `the pay for one extra hour where` `it replaced a presence hour that was not made up` 100 EQUALS 125
+#ASSERT `the pay for one extra hour where` `it fell on the teacher's free day` 100 EQUALS 125
+
+-- THE INVARIANT OF THE REFORM: a full post is 36 hours, whichever stage the
+-- teacher is in and however the grade coordinator's week is re-cut. The
+-- agreement never states this in terms — it prints eight patterns across two
+-- articles and leaves the reader to add them up. Encoding it makes the claim
+-- checkable, and it holds in all ten patterns.
+#ASSERT `the hours in` (`the ordinary full-post week in` `a primary school`) EQUALS 36
+#ASSERT `the hours in` (`the ordinary full-post week in` `a junior high school`) EQUALS 36
+#ASSERT `the hours in` (`the full-post week of a grade coordinator in` `a primary school` 3) EQUALS 36
+#ASSERT `the hours in` (`the full-post week of a grade coordinator in` `a primary school` 6) EQUALS 36
+#ASSERT `the hours in` (`the full-post week of a grade coordinator in` `a primary school` 8) EQUALS 36
+#ASSERT `the hours in` (`the full-post week of a grade coordinator in` `a primary school` 12) EQUALS 36
+#ASSERT `the hours in` (`the full-post week of a grade coordinator in` `a junior high school` 3) EQUALS 36
+#ASSERT `the hours in` (`the full-post week of a grade coordinator in` `a junior high school` 6) EQUALS 36
+#ASSERT `the hours in` (`the full-post week of a grade coordinator in` `a junior high school` 8) EQUALS 36
+#ASSERT `the hours in` (`the full-post week of a grade coordinator in` `a junior high school` 12) EQUALS 36
+
+-- And the coordinator gives up frontal hours as the grade grows, which is the
+-- point of the table.
+#ASSERT (`the full-post week of a grade coordinator in` `a junior high school` 12)'s `frontal hours` EQUALS 20
+#ASSERT (`the ordinary full-post week in` `a junior high school`)'s `frontal hours` EQUALS 23
+#ASSERT (`the ordinary full-post week in` `a primary school`)'s `frontal hours` EQUALS 26
+
+-- § 26: an EXISTING teacher of 56 loses three frontal hours and one
+-- individual hour; a NEW teacher of 56 loses two frontal hours and nothing
+-- else. That difference is § 26(c)'s closing sentence, and it is worth 1.9%
+-- of a week.
+#ASSERT `the hours in` (`the week after the age reduction for` `Dvora` 56 (`the ordinary full-post week in` `a primary school`)) EQUALS 32
+#ASSERT `the hours in` (`the week after the age reduction for` `Yael` 56 (`the ordinary full-post week in` `a junior high school`)) EQUALS 34
+#ASSERT `the hours in` (`the week after the age reduction for` `Dvora` 52 (`the ordinary full-post week in` `a primary school`)) EQUALS 34
+#ASSERT `the hours in` (`the week after the age reduction for` `Dvora` 49 (`the ordinary full-post week in` `a primary school`)) EQUALS 36
+#ASSERT `the hours in` (`the week after the age reduction for` `Yael` 49 (`the ordinary full-post week in` `a junior high school`)) EQUALS 36
+
+-- § 27: a third of a post is the floor, and a new teacher needs half a post
+-- or an approval. Noa is a new teacher on exactly half a post, so she is
+-- inside § 27(c) without needing one.
+#ASSERT `the post is large enough` `Noa` FALSE FALSE
+#ASSERT `the post is large enough` `Yael` FALSE FALSE
+#ASSERT `the post is large enough` `Dvora` FALSE FALSE
+
+-- § 33(c)(2): the caps on a week that runs beyond a full post.
+#ASSERT `the section 33 hour caps are respected` 8.5 42 FALSE
+#ASSERT NOT `the section 33 hour caps are respected` 9 42 FALSE
+#ASSERT NOT `the section 33 hour caps are respected` 8 43 FALSE
+#ASSERT `the section 33 hour caps are respected` 5 40 TRUE
+#ASSERT NOT `the section 33 hour caps are respected` 6 40 TRUE
+
+-- § 30: the three sub-caps sum exactly to the overall cap, so a teacher who
+-- exhausts every kind of activity is at 18 hours and no more.
+#ASSERT `the assembly hours allowed in a half year` PLUS `the parent and child meeting hours allowed in a half year` PLUS `the after-hours event hours allowed in a half year` EQUALS `the school activity hours allowed in a half year`
+#ASSERT `the school activity caps are respected` 4 8 6
+#ASSERT NOT `the school activity caps are respected` 5 8 6
+#ASSERT NOT `the school activity caps are respected` 4 9 6
+
+-- § 31(a): the bases differ by purpose, and a substitution hour is the one
+-- priced off the combined salary alone.
+#ASSERT NOT `the role supplements enter the hourly base for` `a substitution hour`
+#ASSERT `the role supplements enter the hourly base for` `a school activity`
+#ASSERT `the role supplements enter the hourly base for` `a deduction for an hour of absence`
+#ASSERT NOT `the role supplements enter the hourly base for` `an hour worked beyond a full post`

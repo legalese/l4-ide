@@ -1,0 +1,204 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Ofek Hadash — the shared ontology`
+
+-- ===========================================================================
+-- OFEK HADASH ("New Horizon"), the Israeli teachers' pay reform.
+--
+-- This module declares the nouns. Every other module in this encoding reads
+-- its types from here and adds rules; nothing here decides anything.
+--
+-- SOURCE. The collective agreement of 25 December 2008 between the State of
+-- Israel and the Teachers' Union (Histadrut HaMorim), implementing the Ofek
+-- Hadash reform, together with the wage agreement of 19 October 2022 and the
+-- approved collective agreement of 29 June 2026. Article numbers cited as
+-- "§ n" below are articles of the 2008 base agreement unless another
+-- instrument is named.
+--
+-- The corpus these are read from is
+--   https://morimovilimcatala.github.io/ofek-hadash-corpus/
+-- whose own caveats are reproduced in NOTES.md. Hebrew terms are given in
+-- transliteration with the Hebrew beside them, because the instruments name
+-- these things in Hebrew and a reader checking this against the agreement
+-- needs the word that appears on the page.
+-- ===========================================================================
+
+§§ `Who the reform applies to`
+
+-- § 3: the agreement applies to employees graded in the TEACHING GRADE
+-- (dirug ovdei hora'a) employed in kindergartens, primary schools and junior
+-- high schools, including special education. § 7 then defines the persons.
+
+-- § 7(d)-(h): the qualification ladder. A teacher is academic (holds a
+-- recognised degree), certified, senior-certified, or unqualified. The
+-- distinction drives WHICH salary table applies (§ 36) and, for existing
+-- teachers, which conversion chapter (§§ 43-50 academic, §§ 51-61 not).
+DECLARE `a teaching qualification` IS ONE OF
+    `academic — holds a recognised first degree`      -- § 7(d), (e)
+    `academic — holds a recognised second degree`
+    `academic — holds a doctorate`
+    `certified but not academic`                      -- § 7(f) mo're musmach
+    `senior certified but not academic`               -- § 7(g) mo're bachir
+    `unqualified`                                     -- § 7(h)
+
+-- § 36(c)-(d): the table a teacher is placed in is selected by degree, and
+-- the RATING CODE (kod dirug) printed on the table's own heading identifies
+-- it. 101 is the BA table, 102 the MA table; a doctorate is placed in the
+-- MA table and paid a further 5% (§ 36(d)(2)).
+DECLARE `a salary table` IS ONE OF
+    `the BA table — rating code 101`
+    `the MA table — rating code 102`
+
+-- § 7(i)-(j): an EXISTING teacher (mo're kayam) was employed before the
+-- reform reached their school and crosses over by CONVERSION (hamara,
+-- §§ 43-50); a NEW teacher (mo're chadash) starts inside the reform and is
+-- placed at rank 1, seniority 0 (§ 36(a)).
+DECLARE `how the teacher entered the reform` IS ONE OF
+    `a new teacher placed under section 36`
+    `an existing teacher converted under sections 43 to 50`
+
+-- §§ 15-22: the working week differs by the stage of education, because the
+-- frontal / individual / presence split does. Only the two stages the 2008
+-- agreement sets out in full are carried here; see NOTES.md on what is not.
+DECLARE `a stage of education` IS ONE OF
+    `a primary school`            -- § 15  beit sefer yesodi
+    `a junior high school`        -- § 17  chativat beinayim
+
+-- § 39(a): the role supplements (gmulei tafkid) that SURVIVE into the
+-- reform, in the order the article lists them. § 39(a)(3) and (4) are the
+-- special-education supplements, which § 39(b) excludes from the "combined
+-- salary for a full post" basis, so they are named separately below.
+DECLARE `a role carrying a supplement` IS ONE OF
+    `homeroom teacher of a class other than the first grade`   -- § 39(a)(1)
+    `homeroom teacher of a first-grade class`                  -- § 39(a)(2)
+    `subject coordinator`                                      -- § 39(a)(5)
+    `road-safety coordinator`                                  -- § 39(a)(6)
+    `security coordinator`                                     -- § 39(a)(7)
+    `social-education coordinator`                             -- § 39(a)(8)
+    `grade-level coordinator`                                  -- § 39(a)(9)
+    `laboratory coordinator`                                   -- § 39(a)(10)
+    `assessment and measurement coordinator`                   -- § 39(a)(11)
+
+§§ `The teacher, as one record`
+
+-- The whole encoding takes one record and reads fields off it. This is the
+-- house style: one GIVEN parameter, one shape to document, one JSON object
+-- at the API boundary.
+--
+-- SENIORITY (vetek, § 37) is recognised teaching seniority as the Teachers'
+-- Service Regulations (takanon) define it, excluding the internship year but
+-- including teaching service in the IDF or national teaching service. It is
+-- an INPUT here: the takanon's own recognition rules are not encoded, and
+-- NOTES.md records that as the largest single gap.
+--
+-- RANK (darga, §§ 36, 38) is the 1-to-9 rank. It is likewise an input: § 38
+-- makes promotion depend on ministry criteria and, for ranks 7 to 9, on
+-- evaluations and a system-wide quota, none of which is a function of this
+-- record.
+DECLARE `a teacher` HAS
+    `qualification`                IS A `a teaching qualification`
+    `seniority in years`           IS A NUMBER   -- § 37, vetek
+    `rank`                         IS A NUMBER   -- §§ 36, 38, darga, 1..9
+    `stage of education`           IS A `a stage of education`
+    `how they entered`             IS A `how the teacher entered the reform`
+    `fraction of a full post`      IS A NUMBER   -- § 33, 1 means 100%
+    `roles`                        IS A LIST OF `a role carrying a supplement`
+    `classes in the coordinated grade level` IS A NUMBER  -- § 39(a)(9), 0 if none
+    `units of the school-role supplement`    IS A NUMBER  -- 2022 § 22, 0 if none
+    `teaches special education`    IS A BOOLEAN  -- § 39(a)(3)
+    `special education percentage` IS A NUMBER   -- § 39(a)(3): 5.5, 8.5, 9 or 14
+
+§§ `Reading the record`
+
+GIVEN `the teacher` IS A `a teacher`
+GIVETH A `a salary table`
+`the table the teacher is placed in` `the teacher`
+    @nlg the salary table %the teacher% is placed in
+    MEANS
+    -- § 36(c): first degree to the first-degree table; second degree to the
+    -- second-degree table; § 36(d)(1) places a doctorate in the SECOND-degree
+    -- table, and pays the 5% separately.
+    CONSIDER `the teacher`'s `qualification`
+    WHEN `academic — holds a recognised first degree`  THEN `the BA table — rating code 101`
+    WHEN `academic — holds a recognised second degree` THEN `the MA table — rating code 102`
+    WHEN `academic — holds a doctorate`                THEN `the MA table — rating code 102`
+    -- §§ 51-53 give teachers who are not academic their own tables. Those
+    -- tables are NOT in the corpus this encoding reads (NOTES.md § 4), so a
+    -- non-academic teacher is placed in the BA table here and the encoding
+    -- says so rather than inventing a table.
+    OTHERWISE                                          `the BA table — rating code 101`
+
+GIVEN `the teacher` IS A `a teacher`
+GIVETH A BOOLEAN
+DECIDE `the teacher is academic` IF
+    -- § 7(d): "academic teacher" for the purposes the reform uses it for.
+    CONSIDER `the teacher`'s `qualification`
+    WHEN `academic — holds a recognised first degree`  THEN TRUE
+    WHEN `academic — holds a recognised second degree` THEN TRUE
+    WHEN `academic — holds a doctorate`                THEN TRUE
+    OTHERWISE                                          FALSE
+
+GIVEN `the teacher` IS A `a teacher`
+GIVETH A BOOLEAN
+DECIDE `the teacher holds a doctorate` IF
+    -- § 36(d)(2): the 5% doctorate supplement hangs off this alone.
+    CONSIDER `the teacher`'s `qualification`
+    WHEN `academic — holds a doctorate` THEN TRUE
+    OTHERWISE                           FALSE
+
+§§ `Illustrations`
+
+-- A teacher used by every module downstream as the running example: a
+-- BA-qualified junior-high homeroom teacher, eleven years in, rank 4, full
+-- post. The numbers she produces are traced through NOTES.md § 6.
+`Yael` MEANS `a teacher` WITH
+    `qualification`                IS `academic — holds a recognised first degree`
+    `seniority in years`           IS 11
+    `rank`                         IS 4
+    `stage of education`           IS `a junior high school`
+    `how they entered`             IS `a new teacher placed under section 36`
+    `fraction of a full post`      IS 1
+    `roles`                        IS LIST `homeroom teacher of a class other than the first grade`
+    `classes in the coordinated grade level` IS 0
+    `units of the school-role supplement`    IS 0
+    `teaches special education`    IS FALSE
+    `special education percentage` IS 0
+
+-- A second-degree primary-school teacher at the top of the table, holding
+-- two supplements and three units of the 2022 school-role supplement.
+`Dvora` MEANS `a teacher` WITH
+    `qualification`                IS `academic — holds a recognised second degree`
+    `seniority in years`           IS 30
+    `rank`                         IS 8
+    `stage of education`           IS `a primary school`
+    `how they entered`             IS `an existing teacher converted under sections 43 to 50`
+    `fraction of a full post`      IS 1
+    `roles`                        IS LIST `homeroom teacher of a first-grade class`
+                                        , `subject coordinator`
+    `classes in the coordinated grade level` IS 0
+    `units of the school-role supplement`    IS 3
+    `teaches special education`    IS FALSE
+    `special education percentage` IS 0
+
+-- A half-post doctorate holder, to exercise § 36(d)(2) and the § 33
+-- pro-rating together.
+`Noa` MEANS `a teacher` WITH
+    `qualification`                IS `academic — holds a doctorate`
+    `seniority in years`           IS 6
+    `rank`                         IS 3
+    `stage of education`           IS `a junior high school`
+    `how they entered`             IS `a new teacher placed under section 36`
+    `fraction of a full post`      IS 50%
+    `roles`                        IS EMPTY
+    `classes in the coordinated grade level` IS 0
+    `units of the school-role supplement`    IS 0
+    `teaches special education`    IS FALSE
+    `special education percentage` IS 0
+
+#ASSERT `the table the teacher is placed in` `Yael`  EQUALS `the BA table — rating code 101`
+#ASSERT `the table the teacher is placed in` `Dvora` EQUALS `the MA table — rating code 102`
+#ASSERT `the table the teacher is placed in` `Noa`   EQUALS `the MA table — rating code 102`
+#ASSERT `the teacher is academic` `Yael`
+#ASSERT `the teacher holds a doctorate` `Noa`
+#ASSERT NOT `the teacher holds a doctorate` `Yael`

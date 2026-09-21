@@ -1,0 +1,361 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `ofek-domain`
+
+§ `The supplements`
+
+-- ===========================================================================
+-- What a teacher is paid ON TOP of the combined salary.
+--
+-- Three instruments, layered:
+--
+--   § 39 of the base agreement (25.12.2008) states the role supplements as
+--   PERCENTAGES of the combined salary, and caps how many may be held at once.
+--
+--   § 10 of the wage agreement (19.10.2022) puts a SHEKEL FLOOR under five of
+--   them from 1.9.2023: the supplement becomes "the higher of" the percentage
+--   and a stated amount. This matters most at the bottom of the table, where
+--   10% of a rank-1 salary is well under the floor.
+--
+--   §§ 5 and 22 of the same 2022 agreement add two NEW payments that are not
+--   percentages of anything: Tosefet Ofek 2022, a shekel amount by rank, and
+--   the school-role supplement, a shekel amount by units.
+--
+-- The distinction that runs through all of it is whether a payment IS part of
+-- the combined salary. Tosefet Ofek 2022 is (2022 § 5.4), so it enters the
+-- base of every percentage supplement and of the hourly value. The
+-- school-role supplement is NOT (2022 § 22.11), so it enters neither.
+-- ===========================================================================
+
+§§ `Section 39 — the role supplements`
+
+-- § 39(a)(1)-(11), as percentages of the combined salary. Two of them depend
+-- on the stage of education and one on the size of the grade, which is why
+-- this takes the teacher's own facts rather than the role alone.
+GIVEN `the role` IS A `a role carrying a supplement`
+      `the stage` IS A `a stage of education`
+      `the classes in the grade` IS A NUMBER
+GIVETH A NUMBER
+`the section 39 rate for` `the role` `the stage` `the classes in the grade`
+    @nlg the section 39 rate for %the role%
+    MEANS
+    CONSIDER `the role`
+    WHEN `homeroom teacher of a class other than the first grade` THEN 10%    -- § 39(a)(1)
+    WHEN `homeroom teacher of a first-grade class`                THEN 11.5%  -- § 39(a)(2)
+    -- § 39(a)(5): 6% in a primary school, 8% in a junior high.
+    WHEN `subject coordinator` THEN
+        CONSIDER `the stage`
+        WHEN `a primary school`     THEN 6%
+        WHEN `a junior high school` THEN 8%
+    WHEN `road-safety coordinator`  THEN 6%   -- § 39(a)(6)
+    WHEN `security coordinator`     THEN 6%   -- § 39(a)(7)
+    -- § 39(a)(8): 6% in a primary school, 10% in a junior high.
+    WHEN `social-education coordinator` THEN
+        CONSIDER `the stage`
+        WHEN `a primary school`     THEN 6%
+        WHEN `a junior high school` THEN 10%
+    -- § 39(a)(9): 7% for a grade of up to 4 classes, 6% for more. The rate
+    -- falls as the grade grows, which is the opposite direction to § 15's
+    -- hours table, where a bigger grade buys MORE relief. Both are as
+    -- printed.
+    WHEN `grade-level coordinator` THEN
+        IF `the classes in the grade` AT MOST 4 THEN 7% ELSE 6%
+    WHEN `laboratory coordinator`                 THEN 3%   -- § 39(a)(10)
+    WHEN `assessment and measurement coordinator` THEN 6%   -- § 39(a)(11)
+
+-- § 39(b): "for the purposes of this section, other than sub-sections (a)(3)
+-- and (a)(4), 'combined salary' means the combined salary for a FULL post
+-- (100%), provided that the teacher was employed for at least 1/3 of a post."
+--
+-- This is the striking one, and it is not a rounding detail. A teacher on
+-- half a post who is a homeroom teacher takes the FULL 10% of a full-post
+-- salary, not half of it — the supplement attaches to the job, not to the
+-- fraction. Below a third of a post it is not payable at all.
+`the smallest post that carries a role supplement` MEANS 1 DIVIDED BY 3
+
+GIVEN `the fraction of a full post` IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `the post carries the role supplements` IF
+    `the fraction of a full post` AT LEAST `the smallest post that carries a role supplement`
+
+-- § 39(c): at most TWO role supplements, unless the district director
+-- approves a further one. The special education supplement is expressly not
+-- counted for this purpose.
+`the role supplements a teacher may hold` MEANS 2
+
+GIVEN `the roles held` IS A NUMBER
+      `the district director has approved a further supplement` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the number of role supplements is allowed` IF
+    IF `the district director has approved a further supplement`
+        THEN `the roles held` AT MOST (`the role supplements a teacher may hold` PLUS 1)
+        ELSE `the roles held` AT MOST `the role supplements a teacher may hold`
+
+§§ `Section 10 of the 2022 agreement — the shekel floors`
+
+-- From 1.9.2023 the homeroom and grade-coordinator supplements became "the
+-- higher of" the § 39 percentage and a shekel amount. The floors are per
+-- 2022 §§ 10.1.1.2 and 10.2.1.2.
+`the date the shekel floors take effect` MEANS YMD 2023 9 1
+`the floor under the homeroom supplement` MEANS 1_000          -- 2022 § 10.1.1.2
+`the floor under the grade coordinator supplement` MEANS 1_100 -- 2022 § 10.2.1.2
+
+GIVEN `the role` IS A `a role carrying a supplement`
+GIVETH A NUMBER
+`the shekel floor under` `the role`
+    @nlg the shekel floor under %the role%
+    MEANS
+    -- 2022 § 10 reaches five supplements. Three of them — young-division
+    -- management, deputy headship and kindergarten management — are roles
+    -- this encoding does not carry (NOTES.md § 4), so only the two that bear
+    -- on a classroom teacher appear here. Every other § 39 supplement has no
+    -- floor at all.
+    CONSIDER `the role`
+    WHEN `homeroom teacher of a class other than the first grade` THEN `the floor under the homeroom supplement`
+    WHEN `homeroom teacher of a first-grade class`                THEN `the floor under the homeroom supplement`
+    WHEN `grade-level coordinator`                                THEN `the floor under the grade coordinator supplement`
+    OTHERWISE                                                          0
+
+GIVEN `the role` IS A `a role carrying a supplement`
+      `the stage` IS A `a stage of education`
+      `the classes in the grade` IS A NUMBER
+      `the combined salary for a full post` IS A NUMBER
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the role supplement for` `the role` `the stage` `the classes in the grade` `the combined salary for a full post` `the date`
+    @nlg the supplement payable for %the role%
+    MEANS
+    IF `the date` `is before` `the date the shekel floors take effect`
+        THEN `the percentage amount`
+        ELSE max `the percentage amount` (`the shekel floor under` `the role`)
+    WHERE
+        `the percentage amount` MEANS
+            `the combined salary for a full post`
+                TIMES (`the section 39 rate for` `the role` `the stage` `the classes in the grade`)
+
+§§ `Section 5 of the 2022 agreement — Tosefet Ofek 2022`
+
+-- A flat shekel amount by RANK, and it runs the opposite way to everything
+-- else in this encoding: rank 1 gets the most and rank 9 gets nothing. It is
+-- a levelling payment, compressing the bottom of the table toward the top,
+-- and it doubled after its first year.
+--
+-- SOURCE, and again the corrected printing. The amounts below are appendices
+-- bet-1/bet-2 (from 1.9.2022) and gimel-1/gimel-2 (from 1.9.2023) as reissued
+-- to the AGORA by the follow-up committee decision of 14 January 2025. The
+-- shekel printing at /tables/2022-09-01_ofek-hadash_tosefet-ofek-2022_BA.html
+-- rounds these (793 for 792.77, 18 for 17.77).
+--
+-- THE SAME DECISION FIXES THE DATE. The 2022 agreement's appendix gimel
+-- carried "1.1.23" as the date the increased amounts took effect; the
+-- decision records this as a scribal error (ta'ut sofer) and corrects it to
+-- 1.9.2023, which is the date used below.
+--
+-- The BA amounts fall by exactly 125 a rank and the 1.9.2023 figures are
+-- exactly double the 1.9.2022 ones. The MA amounts fall by 131.25 a rank, and
+-- their doubling is out by an agora at five of the nine ranks — the corpus's
+-- provenance note attributes that to half-agora values in the underlying
+-- figures rather than to a transcription error, and both printings are
+-- reproduced here as they stand.
+`the date tosefet ofek 2022 takes effect` MEANS YMD 2022 9 1
+`the date tosefet ofek 2022 is increased` MEANS YMD 2023 9 1
+
+GIVEN `the table` IS A `a salary table`
+      `the rank` IS A NUMBER
+GIVETH A NUMBER
+`tosefet ofek 2022 from september 2022 in` `the table` `the rank`
+    @nlg Tosefet Ofek 2022 as it stood from September 2022 for rank %the rank%
+    MEANS
+    CONSIDER `the table`
+    WHEN `the BA table — rating code 101` THEN
+        BRANCH IF `the rank` AT MOST 1 THEN 792.77
+               IF `the rank` EQUALS 2  THEN 667.77
+               IF `the rank` EQUALS 3  THEN 542.77
+               IF `the rank` EQUALS 4  THEN 417.77
+               IF `the rank` EQUALS 5  THEN 292.77
+               IF `the rank` EQUALS 6  THEN 167.77
+               IF `the rank` EQUALS 7  THEN 92.77
+               IF `the rank` EQUALS 8  THEN 17.77
+               OTHERWISE                    0
+    WHEN `the MA table — rating code 102` THEN
+        BRANCH IF `the rank` AT MOST 1 THEN 832.44
+               IF `the rank` EQUALS 2  THEN 701.19
+               IF `the rank` EQUALS 3  THEN 569.94
+               IF `the rank` EQUALS 4  THEN 438.69
+               IF `the rank` EQUALS 5  THEN 307.44
+               IF `the rank` EQUALS 6  THEN 176.19
+               IF `the rank` EQUALS 7  THEN 97.44
+               IF `the rank` EQUALS 8  THEN 18.69
+               OTHERWISE                    0
+
+GIVEN `the table` IS A `a salary table`
+      `the rank` IS A NUMBER
+GIVETH A NUMBER
+`tosefet ofek 2022 from september 2023 in` `the table` `the rank`
+    @nlg Tosefet Ofek 2022 as increased from September 2023 for rank %the rank%
+    MEANS
+    CONSIDER `the table`
+    WHEN `the BA table — rating code 101` THEN
+        BRANCH IF `the rank` AT MOST 1 THEN 1_585.54
+               IF `the rank` EQUALS 2  THEN 1_335.54
+               IF `the rank` EQUALS 3  THEN 1_085.54
+               IF `the rank` EQUALS 4  THEN 835.54
+               IF `the rank` EQUALS 5  THEN 585.54
+               IF `the rank` EQUALS 6  THEN 335.54
+               IF `the rank` EQUALS 7  THEN 185.54
+               IF `the rank` EQUALS 8  THEN 35.54
+               OTHERWISE                    0
+    WHEN `the MA table — rating code 102` THEN
+        BRANCH IF `the rank` AT MOST 1 THEN 1_664.87
+               IF `the rank` EQUALS 2  THEN 1_402.37
+               IF `the rank` EQUALS 3  THEN 1_139.87
+               IF `the rank` EQUALS 4  THEN 877.37
+               IF `the rank` EQUALS 5  THEN 614.87
+               IF `the rank` EQUALS 6  THEN 352.37
+               IF `the rank` EQUALS 7  THEN 194.87
+               IF `the rank` EQUALS 8  THEN 37.37
+               OTHERWISE                    0
+
+-- 2022 § 5.3: unlike a § 39 role supplement, Tosefet Ofek 2022 IS pro-rated
+-- "in proportion to the fraction of the post, compared with a teacher on a
+-- full post". The two payments therefore behave differently on a half post,
+-- which is the sort of thing a payslip gets wrong.
+GIVEN `the table` IS A `a salary table`
+      `the rank` IS A NUMBER
+      `the fraction of a full post` IS A NUMBER
+      `the date` IS A DATE
+GIVETH A NUMBER
+`tosefet ofek 2022 for` `the table` `the rank` `the fraction of a full post` `the date`
+    @nlg Tosefet Ofek 2022 payable at rank %the rank%
+    MEANS
+    IF `the date` `is before` `the date tosefet ofek 2022 takes effect`
+        THEN 0
+        ELSE `the amount at the date` TIMES `the fraction of a full post`
+    WHERE
+        `the amount at the date` MEANS
+            IF `the date` `is before` `the date tosefet ofek 2022 is increased`
+                THEN `tosefet ofek 2022 from september 2022 in` `the table` `the rank`
+                ELSE `tosefet ofek 2022 from september 2023 in` `the table` `the rank`
+
+§§ `Section 22 of the 2022 agreement — the school-role supplement`
+
+-- The principal designates school roles and allots each between two and five
+-- whole UNITS; a unit is 200 shekels a month (2022 § 22.4). It is unlike
+-- everything above it in three ways, all of them expressly stated: it is not
+-- part of the combined salary and does not enter the base of any other
+-- supplement (§ 22.11); it is paid at its FULL shekel value to a part-time
+-- teacher, provided the post is at least a third (§ 22.9); and no study-fund
+-- contribution is made on it (§ 22.12).
+`the value of one school-role unit` MEANS 200        -- 2022 § 22.4
+`the fewest units a school role may carry` MEANS 2   -- 2022 § 22.2
+`the most units a school role may carry` MEANS 5     -- 2022 § 22.2
+`the smallest post that carries the school-role supplement` MEANS 1 DIVIDED BY 3  -- 2022 § 22.6, § 22.9
+
+-- 2022 § 22.1 set this running from the school year beginning 1.9.2025. The
+-- approved collective agreement of 29.6.2026, § 19, replaced that with the
+-- school year beginning 1.9.2026 — one of the economies the wage-reduction
+-- agreement paid for. Both dates are carried, because a computation about
+-- the 2025/26 school year and one about 2026/27 need different answers.
+`the date section 22 was first to take effect` MEANS YMD 2025 9 1
+`the date section 22 takes effect as postponed` MEANS YMD 2026 9 1
+
+GIVEN `the units` IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `the units are within the section 22 range` IF
+        `the units` AT LEAST `the fewest units a school role may carry`
+    AND `the units` AT MOST `the most units a school role may carry`
+
+GIVEN `the units` IS A NUMBER
+      `the fraction of a full post` IS A NUMBER
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the school-role supplement for` `the units` `the fraction of a full post` `the date`
+    @nlg the school-role supplement for %the units% units
+    MEANS
+    IF       `the date` `is before` `the date section 22 takes effect as postponed`
+         OR  NOT (`the units are within the section 22 range` `the units`)
+         OR  `the fraction of a full post` BELOW `the smallest post that carries the school-role supplement`
+        THEN 0
+        -- § 22.9 and § 22.10: the full shekel value, whether the post is a
+        -- third or more than whole. There is no pro-rating in either
+        -- direction.
+        ELSE `the units` TIMES `the value of one school-role unit`
+
+§§ `Illustrations`
+
+`the first day of the 2024 school year` MEANS YMD 2024 9 1
+`a day in the 2022 school year` MEANS YMD 2022 10 1
+`a day in the 2026 school year` MEANS YMD 2026 10 1
+
+-- § 39(a): the rates, read back against the article.
+#ASSERT `the section 39 rate for` `homeroom teacher of a class other than the first grade` `a primary school` 0 EQUALS 10%
+#ASSERT `the section 39 rate for` `homeroom teacher of a first-grade class` `a primary school` 0 EQUALS 11.5%
+#ASSERT `the section 39 rate for` `subject coordinator` `a primary school` 0 EQUALS 6%
+#ASSERT `the section 39 rate for` `subject coordinator` `a junior high school` 0 EQUALS 8%
+#ASSERT `the section 39 rate for` `social-education coordinator` `a junior high school` 0 EQUALS 10%
+#ASSERT `the section 39 rate for` `laboratory coordinator` `a primary school` 0 EQUALS 3%
+
+-- § 39(a)(9): the grade-coordinator rate FALLS as the grade grows.
+#ASSERT `the section 39 rate for` `grade-level coordinator` `a primary school` 4 EQUALS 7%
+#ASSERT `the section 39 rate for` `grade-level coordinator` `a primary school` 5 EQUALS 6%
+
+-- § 39(b): a third of a post carries the supplements; below that, nothing.
+#ASSERT `the post carries the role supplements` (50%)
+#ASSERT NOT `the post carries the role supplements` 0.3
+
+-- § 39(c): two supplements, or three with the district director's approval.
+#ASSERT `the number of role supplements is allowed` 2 FALSE
+#ASSERT NOT `the number of role supplements is allowed` 3 FALSE
+#ASSERT `the number of role supplements is allowed` 3 TRUE
+#ASSERT NOT `the number of role supplements is allowed` 4 TRUE
+
+-- 2022 § 10.1: the floor bites at the bottom of the table and not at the top.
+-- On a rank-1 BA salary of 6,300 the homeroom supplement would be 630, so the
+-- 1,000 floor lifts it; on 12,000 the 10% is 1,200 and the floor is idle.
+#ASSERT `the role supplement for` `homeroom teacher of a class other than the first grade` `a junior high school` 0 6_300 `the first day of the 2024 school year` EQUALS 1_000
+#ASSERT `the role supplement for` `homeroom teacher of a class other than the first grade` `a junior high school` 0 12_000 `the first day of the 2024 school year` EQUALS 1_200
+
+-- Before 1.9.2023 there was no floor, so the same rank-1 teacher had 630.
+#ASSERT `the role supplement for` `homeroom teacher of a class other than the first grade` `a junior high school` 0 6_300 `a day in the 2022 school year` EQUALS 630
+
+-- A supplement outside 2022 § 10 has no floor at any date.
+#ASSERT `the role supplement for` `laboratory coordinator` `a primary school` 0 6_300 `the first day of the 2024 school year` EQUALS 189
+
+-- 2022 § 5: Tosefet Ofek 2022 falls as the rank rises, and is nil at rank 9.
+#ASSERT `tosefet ofek 2022 for` `the BA table — rating code 101` 1 1 `the first day of the 2024 school year` EQUALS 1_585.54
+#ASSERT `tosefet ofek 2022 for` `the BA table — rating code 101` 9 1 `the first day of the 2024 school year` EQUALS 0
+#ASSERT `tosefet ofek 2022 for` `the MA table — rating code 102` 1 1 `the first day of the 2024 school year` EQUALS 1_664.87
+
+-- It doubled on 1.9.2023, and was nil before it began.
+#ASSERT `tosefet ofek 2022 for` `the BA table — rating code 101` 1 1 `a day in the 2022 school year` EQUALS 792.77
+#ASSERT `tosefet ofek 2022 for` `the BA table — rating code 101` 1 1 (YMD 2022 1 1) EQUALS 0
+
+-- 2022 § 5.3: it IS pro-rated, unlike a § 39 role supplement.
+#ASSERT `tosefet ofek 2022 for` `the BA table — rating code 101` 1 (50%) `the first day of the 2024 school year` EQUALS 792.77
+
+-- THE CONTRAST WORTH SEEING. On the same half post, at the same moment, the
+-- homeroom supplement is paid WHOLE and Tosefet Ofek 2022 is paid HALF. Both
+-- are stated expressly — 2008 § 39(b) and 2022 § 5.3 — and they point in
+-- opposite directions.
+#ASSERT `the role supplement for` `homeroom teacher of a class other than the first grade` `a junior high school` 0 12_000 `the first day of the 2024 school year` EQUALS 1_200
+#ASSERT `tosefet ofek 2022 for` `the BA table — rating code 101` 4 (50%) `the first day of the 2024 school year` EQUALS 417.77
+
+-- 2022 § 22, as postponed by the 2026 agreement § 19: nothing is payable in
+-- the 2025/26 school year, and three units are worth 600 a month from
+-- 1.9.2026.
+#ASSERT `the school-role supplement for` 3 1 (YMD 2025 10 1) EQUALS 0
+#ASSERT `the school-role supplement for` 3 1 `a day in the 2026 school year` EQUALS 600
+#ASSERT `the school-role supplement for` 5 1 `a day in the 2026 school year` EQUALS 1_000
+
+-- § 22.2: fewer than two units or more than five is not a school role.
+#ASSERT NOT `the units are within the section 22 range` 1
+#ASSERT `the units are within the section 22 range` 2
+#ASSERT `the units are within the section 22 range` 5
+#ASSERT NOT `the units are within the section 22 range` 6
+#ASSERT `the school-role supplement for` 1 1 `a day in the 2026 school year` EQUALS 0
+
+-- § 22.9 and § 22.10: the full shekel value on a third of a post, and on
+-- more than a whole one; nothing below a third.
+#ASSERT `the school-role supplement for` 3 (1 DIVIDED BY 3) `a day in the 2026 school year` EQUALS 600
+#ASSERT `the school-role supplement for` 3 1.2 `a day in the 2026 school year` EQUALS 600
+#ASSERT `the school-role supplement for` 3 0.3 `a day in the 2026 school year` EQUALS 0

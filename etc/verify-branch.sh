@@ -132,6 +132,16 @@ step "jl4-core-test"  bash -c "cd '$WT' && cabal test jl4-core-test 2>&1 | tee /
 
 step "check-corpus-goldens" bash -c "cd '$WT' && node etc/check-corpus-goldens.mjs"
 
+# Citations INTO legalese/canon. Selftest first -- a checker's green means
+# nothing until something has shown it can go red. The sweep itself needs no
+# canon checkout for the file:line and assertion-count classes, which resolve
+# against the vendored mirror; NOTES.md section citations print as explicitly
+# unchecked when canon is absent, and CANON_DIR=... makes them checkable. This
+# gate does not pass --require, because a laptop without canon beside l4-ide is
+# a normal state and not a branch defect.
+step "check-canon-citations --selftest" bash -c "cd '$WT' && node etc/check-canon-citations.mjs --selftest"
+step "check-canon-citations" bash -c "cd '$WT' && node etc/check-canon-citations.mjs"
+
 step "doc/test-docs.sh --no-l4" bash -c "cd '$WT' && ./doc/test-docs.sh --no-l4 2>&1 | tail -6"
 
 # Prettier over the WHOLE repo trips on a missing workspace package in a fresh

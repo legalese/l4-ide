@@ -1,0 +1,51 @@
+{
+    "$defs": {
+        "an application for promotion in rank": {
+            "properties": {
+                "all teaching posts": {
+                    "type": "number"
+                },
+                "the current rank": {
+                    "type": "number"
+                },
+                "the evaluations recommend promotion": {
+                    "type": "boolean"
+                },
+                "the ministry criteria are met": {
+                    "type": "boolean"
+                },
+                "the posts already at the rank sought": {
+                    "type": "number"
+                },
+                "years already waited having qualified": {
+                    "type": "number"
+                },
+                "years of standing in the current rank": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "the current rank",
+                "years of standing in the current rank",
+                "the ministry criteria are met",
+                "the evaluations recommend promotion",
+                "the posts already at the rank sought",
+                "all teaching posts",
+                "years already waited having qualified"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Decide whether an Israeli teacher under the Ofek Hadash reform may be promoted to the next rank, applying the standing periods, ministry criteria, evaluations and rank quotas of section 38 of the collective agreement of 25 December 2008",
+    "properties": {
+        "the application": {
+            "$ref": "#/$defs/an application for promotion in rank"
+        }
+    },
+    "required": [
+        "the application"
+    ],
+    "title": "the teacher may be promoted",
+    "type": "object"
+}

@@ -1,0 +1,25 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Compute the monthly pay of an Israeli teacher employed on Ofek Hadash terms, from the combined salary table, Tosefet Ofek 2022, the doctorate and role supplements and the school-role supplement, net of the 2025-2026 wage reduction",
+    "properties": {
+        "the date": {
+            "description": "The teacher's qualification, seniority in years, rank (1 to 9), stage of education, whether they entered the reform as a new or an existing teacher, the fraction of a full post, the roles they hold, the classes in any grade they coordinate, the units of school-role supplement allotted to them, and their special education facts",
+            "format": "date",
+            "type": "string"
+        },
+        "the teacher": {
+            "$ref": "#/$defs/a teacher"
+        },
+        "the value of any seniority step taken in september 2025": {
+            "description": "The month being computed, as a date. The 2025-2026 reduction, the Tosefet Ofek increase of 1.9.2023, the shekel floors of 1.9.2023 and the school-role supplement's postponed start of 1.9.2026 all turn on it",
+            "type": "number"
+        }
+    },
+    "required": [
+        "the teacher",
+        "the date",
+        "the value of any seniority step taken in september 2025"
+    ],
+    "title": "the monthly pay of",
+    "type": "object"
+}

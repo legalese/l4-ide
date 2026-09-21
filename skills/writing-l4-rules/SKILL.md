@@ -724,7 +724,7 @@ that back typechecks and evaluates. See [Record construction and access](#record
 
 - `@desc` — human-readable description behind any line or `GIVEN` parameter (internal unless paired with `@export`)
 - `@export` — atop the `GIVEN`. mark a function for deployment
-- `@nlg` — natural-language generation hint
+- `@nlg` — natural-language generation hint. A rule's goes on its own line immediately ABOVE the definition — trailing the definition line never reaches the rule, and can silently land on the next `DECLARE`. A parameter's trails its own line; a record field's goes on its own line BELOW the field. Takes a language subtag and several per name — `@nlg:he`, `@nlg:en` — selected with `l4 nlg --lang he` or `l4 render --lang he`, and `@lang he` sets what an untagged one means. [gotchas](references/gotchas.md) has the measured placements and what the tag does not buy.
 - `@ref`, `@ref-src`, `@ref-map` — cross-reference to a legal source
 
 ### Imports

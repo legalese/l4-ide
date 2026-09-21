@@ -1,0 +1,37 @@
+`the teacher may be promoted` with `a promotion from rank 3`
+not `the teacher may be promoted` with `a promotion from rank 3 one year early`
+`the teacher may be promoted` with `a promotion into rank 7 with room`
+not `the teacher may be promoted` with `a promotion into rank 7 with the quota full`
+not `the teacher may be promoted` with `a promotion into rank 7 without an evaluation`
+`the teacher meets the conditions for promotion` with `a promotion into rank 7 with the quota full`
+not `the quota admits the promotion` with `a promotion into rank 7 with the quota full`
+`the teacher has waited as long as section 38(i) allows` with `a promotion into rank 7 with the quota full`
+`the years of standing required to leave rank` with 1 is equal to 2
+`the years of standing required to leave rank` with 2 is equal to 2
+`the years of standing required to leave rank` with 3 is equal to 3
+`the years of standing required to leave rank` with 5 is equal to 3
+`the years of standing required to leave rank` with 8 is equal to 3
+the sum of the sum of the sum of the sum of the sum of the sum of the sum of `the years of standing required to leave rank` with 1 and `the years of standing required to leave rank` with 2 and `the years of standing required to leave rank` with 3 and `the years of standing required to leave rank` with 4 and `the years of standing required to leave rank` with 5 and `the years of standing required to leave rank` with 6 and `the years of standing required to leave rank` with 7 and `the years of standing required to leave rank` with 8 is equal to 22
+`the share of all teaching posts the quota allows at rank` with 7 is equal to 10 % 
+`the share of all teaching posts the quota allows at rank` with 8 is equal to 5 % 
+`the share of all teaching posts the quota allows at rank` with 9 is equal to 3 % 
+not `the rank is rationed by quota` with 6
+`the rank is rationed by quota` with 7
+`the years of standing contributed by a year of` with `a sabbatical year meeting a section 38(c)(5) condition` is equal to 50 % 
+`the years of standing contributed by a year of` with `a sabbatical year meeting neither section 38(c)(5) condition` is equal to 0
+`the years of standing contributed by a year of` with `unpaid leave of any kind` is equal to 0
+`the years of standing contributed by a year of` with `maternity leave under statute` is equal to 1
+`the years of standing contributed by a year of` with `reserve military service` is equal to 1
+not `the period counts as recognised seniority` with `the internship year`
+not `the period counts as recognised seniority` with `compulsory military service`
+`the period counts as recognised seniority` with `teaching service in the IDF`
+`the period counts as recognised seniority` with `national service performed as teaching`
+`the doctorate supplement for` with `Noa` and 10000 is equal to 500
+`the doctorate supplement for` with `Yael` and 10000 is equal to 0
+`section 36(e) bars the teacher from advancing in rank` with `Noa` and `FALSE`
+not `section 36(e) bars the teacher from advancing in rank` with `Noa` and `TRUE`
+not `section 36(e) bars the teacher from advancing in rank` with `Yael` and `FALSE`
+not `section 36(e) bars the teacher from advancing in rank` with `Dvora` and `FALSE`
+`the rank a new academic teacher starts at` is equal to 1
+`the seniority a new academic teacher is placed at with` with 0 is equal to 0
+`the seniority a new academic teacher is placed at with` with 2 is equal to 2

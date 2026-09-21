@@ -1,0 +1,37 @@
+`the reduction rate on` with `a day in april 2025` is equal to 0
+`the reduction rate on` with `a day in november 2025` is equal to 0.95 % 
+`the reduction rate on` with `a day in march 2026` is equal to 1.2 % 
+`the reduction rate on` with `a day in march 2027` is equal to 0
+`the reduction rate on` with `YMD` with 2025, 5 and 1 is equal to 0.95 % 
+`the reduction rate on` with `YMD` with 2025, 12 and 31 is equal to 0.95 % 
+`the reduction rate on` with `YMD` with 2026, 1 and 1 is equal to 1.2 % 
+`the reduction rate on` with `YMD` with 2026, 12 and 31 is equal to 1.2 % 
+`the reduction rate on` with `YMD` with 2027, 1 and 1 is equal to 0
+`the monthly wage reduction on` with 12000 and `a day in november 2025` is equal to 114
+`the monthly wage reduction on` with 12000 and `a day in march 2026` is equal to 144
+not `the component is in the determining base` with `the recreation payment`
+not `the component is in the determining base` with `the clothing allowance`
+not `the component is in the determining base` with `a reimbursement of expenses`
+`the component is in the determining base` with `a payment made monthly weekly or daily`
+`the reduction is ignored in computing` with `an employer contribution to a pension fund`
+`the reduction is ignored in computing` with `the determining salary for a budgetary pension`
+`the reduction is ignored in computing` with `a one-off payment on the end of employment`
+not `the reduction is ignored in computing` with `ordinary monthly pay`
+`the study fund base after the reduction` with 10000 and `a day in march 2026` is equal to 9880
+`the section 16 withholding on` with 130, `TRUE` and `a day in november 2025` is equal to 130
+`the section 16 withholding on` with 130, `TRUE` and `YMD` with 2026, 1 and 1 is equal to 0
+`the section 16 withholding on` with 130, `FALSE` and `a day in november 2025` is equal to 0
+`the single payslip line for` with 12000, 130, `TRUE` and `a day in november 2025` is equal to 244
+`the single payslip line for` with 12000, 130, `FALSE` and `a day in november 2025` is equal to 114
+`the single payslip line for` with 12000, 130, `TRUE` and `a day in march 2026` is equal to 144
+`the clothing allowance reduction for 2025` with 2500, 2400 and 1 is equal to 191
+`the clothing allowance reduction for 2025` with 2500, 2400 and 50 %  is equal to 95.5
+`the pay for the section 25 additional hour` with 64.15 and `FALSE` is equal to 16.0375
+`the pay for the section 25 additional hour` with 64.15 and `TRUE` is equal to 0
+`the additional hour is required of the teacher` with `FALSE`
+not `the additional hour is required of the teacher` with `TRUE`
+`the rate for the section 25 additional hour` is equal to 25 % 
+`the 2026 agreement applies to work` with `an education institution on Ofek Hadash terms`
+`the 2026 agreement applies to work` with `an ulpan on Ofek Hadash terms`
+not `the 2026 agreement applies to work` with `a teacher training college`
+not `the 2026 agreement applies to work` with `a supervision or headquarters role`
