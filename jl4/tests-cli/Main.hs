@@ -2095,6 +2095,105 @@ spec bin = do
       "...and also when the entry file is named bare"
       (checkFrom shadowImporterDir)
 
+  -- smucclaw/l4-ide#971: an IMPORT that resolves to nothing has to say so, and a
+  -- candidate URI has to read back as the path it was built from.
+  --
+  -- Every fixture here is written at run time and run with a RELATIVE entry path,
+  -- because that is the only regime the URI defect lives in. The CLI takes its
+  -- root directory from `takeDirectory` of the entry path, so `l4 run
+  -- importer.l4` from inside the project makes every candidate path relative --
+  -- and a relative `file:` URI cannot carry a percent-escape without losing it
+  -- (see `roundTrippingFileUri` in LSP.L4.Rules). Handed the very same files by
+  -- an ABSOLUTE path, the bug does not reproduce at all, which is why a suite
+  -- whose fixture paths all carry a directory component could not see it.
+  --
+  -- The basename that triggers it here is ASCII, with a SPACE in it. The defect
+  -- was found with Hebrew module names, but Hebrew is not the cause: any basename
+  -- that percent-escapes is lost the same way, and a space keeps a non-ASCII
+  -- FILENAME out of this suite, where it would depend on the runner's filesystem
+  -- encoding rather than on the code under test. jl4-lsp-test's ImportUriSpec
+  -- covers the non-ASCII spelling directly, at the string level, where no locale
+  -- is involved.
+  describe "l4 IMPORT resolution failures (#971)" $ do
+    let sandbox name files act = do
+          tmp <- getTemporaryDirectory
+          let dir = tmp </> name
+          removePathForcibly dir
+          createDirectoryIfMissing True dir
+          mapM_ (\(nm, body) -> BS.writeFile (dir </> nm) (TE.encodeUtf8 (T.pack body))) files
+          act dir
+        -- A library whose basename percent-escapes. It is ordinary L4 otherwise.
+        doubler = unlines
+          [ "GIVEN n IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "`double it` n MEANS n TIMES 2"
+          ]
+        runIn dir args = do
+          absDir <- makeAbsolute dir
+          runL4EmbeddedOnlyIn (Just absDir) bin args
+
+    it "resolves an import whose basename needs percent-escaping" $
+      sandbox "l4-971-escaping"
+        [ ("my mod.l4", doubler)
+        , ("importer.l4", "IMPORT `my mod`\n#ASSERT `double it` 3 EQUALS 6\n")
+        ] \dir -> do
+          Output code sout serr <- runIn dir ["run", "importer.l4"]
+          -- Before the fix this exited 1 with "I could not find a definition for
+          -- the identifier `double it`": the file WAS found on disk, and the URI
+          -- handed downstream read back as the literal name "my%20mod.l4".
+          case code of
+            ExitSuccess -> pure ()
+            ExitFailure n -> expectationFailure $
+              "Expected `my mod` to resolve, but l4 exited " ++ show n
+              ++ "\n--- stdout ---\n" ++ sout
+              ++ "\n--- stderr ---\n" ++ serr
+          sout `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
+
+    it "reports an import of such a module that is genuinely broken" $
+      sandbox "l4-971-escaping-broken"
+        [ ("bad mod.l4", "THIS IS NOT L4 @@@\n")
+        , ("importer.l4", "IMPORT `bad mod`\n")
+        ] \dir -> do
+          -- The sharper half of the same defect: the import "resolved", the
+          -- imported module was never read, and nothing complained. Exit 0.
+          Output code sout serr <- runIn dir ["run", "importer.l4"]
+          code `shouldSatisfy` (/= ExitSuccess)
+          -- and the error must name the module that is actually broken
+          (sout ++ serr) `shouldSatisfy` ("bad mod.l4" `isInfixOf`)
+
+    it "fails, naming the module and where it looked, when an import resolves to nothing" $
+      sandbox "l4-971-missing"
+        [ ("importer.l4", "IMPORT `zz no such module 971`\n#ASSERT `double it` 3 EQUALS 6\n") ]
+        \dir -> do
+          Output code _sout serr <- runIn dir ["run", "importer.l4"]
+          code `shouldSatisfy` (/= ExitSuccess)
+          serr `shouldSatisfy`
+            ("could not find a module with this name: zz no such module 971" `isInfixOf`)
+          serr `shouldSatisfy` ("I have tried the following locations" `isInfixOf`)
+          -- The message has to be reachable. Until #971 an unresolved import was
+          -- reported as the importing module's own URI, so this run also said
+          -- "Your module depends on itself" -- three times, against one copy of
+          -- the message that says what is wrong.
+          serr `shouldSatisfy` (not . ("depends on itself" `isInfixOf`))
+
+    it "fails even when nothing in the module reads the unresolved import" $
+      sandbox "l4-971-missing-unreferenced"
+        [ ("importer.l4", "IMPORT `zz no such module 971`\n") ]
+        \dir -> do
+          -- This is the case the issue is named for: with no reference to the
+          -- import there is no undefined-identifier error to notice, so the exit
+          -- code is the whole signal. It has always been 1 here; the golden suite
+          -- is the harness that could not see it (jl4/tests/Main.hs, checkFile).
+          Output code sout serr <- runIn dir ["run", "importer.l4"]
+          case code of
+            ExitFailure _ -> pure ()
+            ExitSuccess -> expectationFailure $
+              "An IMPORT that resolves to nothing left the module green."
+              ++ "\n--- stdout ---\n" ++ sout
+              ++ "\n--- stderr ---\n" ++ serr
+          serr `shouldSatisfy`
+            ("could not find a module with this name: zz no such module 971" `isInfixOf`)
+
   -- Track S0: `l4 export --to=dmn|dmn-md|bpmn [--fidelity-report]`.
   --
   -- The interesting property of these goldens is that they are not new files.
