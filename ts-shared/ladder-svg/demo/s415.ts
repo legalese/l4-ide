@@ -144,6 +144,17 @@ const sceneCourtBelow = layout(
   tm,
 );
 const sceneAppl = layout(fn, defaultViewSpec({ states: applicantStates }), tm);
+// HEAD-AS-SINK (opt-in). `LADDER_HEAD_AS_SINK=1 npx tsx demo/s415.ts` also writes the
+// `-head` variant: the same scene with the decision's own name — "is said to cheat
+// (second limb)" — boxed as the rightmost node, the way Woon's normalised diagrams name
+// their consequent. Off by default, so the eight figures above are byte-identical to
+// what this demo has always written.
+const HEAD_AS_SINK = process.env.LADDER_HEAD_AS_SINK === "1";
+const sceneCourtHead = layout(
+  fn,
+  defaultViewSpec({ states: courtStates, headAsSink: true }),
+  tm,
+);
 // fold the deception group -> its leading inert becomes the placeholder label
 const sceneFolded = layout(
   fn,
@@ -248,3 +259,4 @@ write("s415-applicants.svg", sceneAppl);
 write("s415-diff.svg", diff(sceneCourt, sceneAppl));
 write("s415-folded.svg", sceneFolded);
 write("s415-defaults.svg", sceneDefaults);
+if (HEAD_AS_SINK) write("s415-court-head.svg", sceneCourtHead);

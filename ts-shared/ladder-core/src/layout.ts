@@ -1304,6 +1304,51 @@ function measureImplies(e: Implies, ctx: Ctx): Measured {
   };
 }
 
+/**
+ * The HEAD as a terminal node (`ViewSpec.headAsSink`) — the decision's own name, in a
+ * box, sitting between the body and the sink terminal.
+ *
+ * Why it is worth a node at all. A Layman Allen normalised diagram (Woon, *Essential
+ * Criminal Law* ch 8) is read left to right and names BOTH ends: `Offender` at the left
+ * margin, `Commits Robbery` at the right. Our ladder has always drawn the left end as a
+ * power terminal and the right end as another, so the picture said what had to be true
+ * and never said what followed — the reader had to carry the rule's name in from the
+ * caption. This puts it in the diagram, where a textbook page can be laid beside it.
+ *
+ * Three properties, each load-bearing:
+ *
+ *   NO `act`. The head's value is DERIVED — it holds exactly when the body conducts —
+ *   so a click that cycled it would be offering to set something that is not settable.
+ *   `svg.ts` keys `lad-clickable` off `act`, so omitting it is the whole fix.
+ *
+ *   NO break glyph. A `dead` head does not draw its own open contact, because the
+ *   break belongs where the current actually stopped, which is inside the body (see
+ *   `leafBox`'s `ownBreak`). Drawing a second one would report one failure twice.
+ *
+ *   STATE COMES FROM THE BODY, not from `fn.id`. `values` is filled by walking
+ *   `fn.body`, so `fn.id` is simply absent from it; reading state off the body's id is
+ *   both correct and the only reading that stays correct if the two id spaces ever
+ *   overlap.
+ *
+ * The label drops L4's backticks — a wire name arrives as `` `theft is robbery` ``
+ * (`viz-adapter.ts`: `name: viz.name.label`), and the backticks are that language's
+ * quoting for a spaced identifier, not part of the name a reader should see.
+ */
+function headSink(
+  fn: FunDecl,
+  ctx: Ctx,
+): { label: string; w: number; h: number; state: State } | null {
+  const { tm, k } = ctx;
+  const label = fn.name.replace(/`/g, "").trim();
+  if (label === "") return null;
+  return {
+    label,
+    w: tm.width(label, k.FONT) + 2 * k.PAD_X,
+    h: tm.lineHeight(k.FONT) + 2 * k.PAD_Y,
+    state: renderState(ctx, fn.body.id),
+  };
+}
+
 export function layout(
   fn: FunDecl,
   vs: ViewSpec,
@@ -1367,27 +1412,65 @@ export function layout(
   // observation is paid off: what was a second power terminal BECOMES the two lamps
   // that report the verdict.
   const twoSinks = fn.body.$type === "Implies";
+  // The head is drawn only where there IS one sink to put it in front of. An `Implies`
+  // body already ends in the two lamps, and those lamps are the consequent (§25.4), so
+  // `headAsSink` is deliberately inert there rather than inventing a third terminal.
+  const head = !twoSinks && vs.headAsSink ? headSink(fn, ctx) : null;
+  let sinkX = ox + m.w + LEAD;
   if (!twoSinks) {
+    const railFlow = flowFor(
+      em,
+      !!em?.get(fn.body.id)?.outE,
+      trueConducts(gvalues, fn.body),
+      provisionalConducts(ctx, fn.body),
+    );
     prims.push({
       kind: "wire",
-      path: [outPort, { x: ox + m.w + LEAD, y: outPort.y }],
+      path: [outPort, { x: sinkX, y: outPort.y }],
       role: "rail",
       state: "inert",
-      flow: flowFor(
-        em,
-        !!em?.get(fn.body.id)?.outE,
-        trueConducts(gvalues, fn.body),
-        provisionalConducts(ctx, fn.body),
-      ),
+      flow: railFlow,
     });
+    if (head) {
+      const hy = outPort.y - head.h / 2;
+      prims.push({
+        kind: "box",
+        id: fn.id,
+        rect: { x: sinkX, y: hy, w: head.w, h: head.h },
+        role: "head",
+        state: head.state,
+      });
+      prims.push({
+        kind: "text",
+        at: { x: sinkX + head.w / 2, y: outPort.y },
+        text: head.label,
+        anchor: "middle",
+        state: head.state,
+        id: fn.id,
+      });
+      // The run OUT of the head carries exactly what ran into it — the head is a
+      // pass-through, not a gate — so both segments take the body's own flow.
+      prims.push({
+        kind: "wire",
+        path: [
+          { x: sinkX + head.w, y: outPort.y },
+          { x: sinkX + head.w + LEAD, y: outPort.y },
+        ],
+        role: "rail",
+        state: "inert",
+        flow: railFlow,
+      });
+      sinkX += head.w + LEAD;
+    }
     prims.push({
       kind: "glyph",
-      at: { x: ox + m.w + LEAD, y: outPort.y },
+      at: { x: sinkX, y: outPort.y },
       role: "power-terminal",
     });
   }
 
-  const w = ox + m.w + (twoSinks ? 0 : LEAD) + MARGIN;
+  const w =
+    ox + m.w + (twoSinks ? 0 : LEAD) + (head ? head.w + LEAD : 0) + MARGIN;
   // The root's `outE` IS the end-to-end answer: `energize` seeds the body with the
   // source rail's current, so the body conducting out means the leader reached the
   // sink. No second pass needed — the forward pass already knows (DESIGN §20 / G1).
@@ -1402,7 +1485,17 @@ export function layout(
         (n) => em.get(n.id)?.outE && provisionalConducts(ctx, n),
       )
     : undefined;
-  return { size: { w, h: oy + m.h + MARGIN }, prims, complete, provisional };
+  // The head box is ONE LINE tall and centred on the out-port, so in every tree drawn so
+  // far it lands inside the body's own vertical extent. `Math.max` is there for the one
+  // shape that could still poke out — a body whose out-port sits at its very bottom edge
+  // — and costs nothing when it does not.
+  const bottom = head ? Math.max(oy + m.h, outPort.y + head.h / 2) : oy + m.h;
+  return {
+    size: { w, h: bottom + MARGIN },
+    prims,
+    complete,
+    provisional,
+  };
 }
 
 /** Cheap P0 metrics — proportional-ish estimate; good enough to prove centering.
