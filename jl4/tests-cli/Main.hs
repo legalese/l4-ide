@@ -1489,6 +1489,47 @@ spec bin = do
       Output _ asked _ <- runL4 bin ["render", "--format", "text", "--lang", "zz", bilingualFixture]
       asked `shouldBe` plain
 
+  ----------------------------------------------------------------------------
+  -- The HTML wrapper's own language (smucclaw/l4-ide#970).
+  --
+  -- `<html lang=...>` used to be the literal "en" whatever was rendered, so a
+  -- Hebrew document arrived labelled English and with no `dir`, leaving the
+  -- browser to guess direction from the characters. The label is what a screen
+  -- reader picks a voice from and what `dir` hangs off, so it is not cosmetic.
+  --
+  -- Asserted here rather than as a golden because NO golden captures
+  -- `renderHtml` at all (measured 2026-09-21: its only callers are this CLI
+  -- verb and the LSP export handler), so a black-box CLI assertion is the only
+  -- guard this wrapper has.
+  ----------------------------------------------------------------------------
+  describe "l4 render --format html (document language)" $ do
+    let langModule = "examples/ok/nlg-module-lang.l4"   -- carries `@lang he`
+
+    it "labels a Hebrew rendering he and marks it right-to-left" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "he", langModule]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("<html lang=\"he\" dir=\"rtl\">" `isInfixOf`)
+
+    it "labels an English rendering en and emits no dir at all" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "en", langModule]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("<html lang=\"en\">" `isInfixOf`)
+      -- The absence is the assertion: `ltr` is the HTML default, so `dir`
+      -- appearing at all is what means "this document runs the other way".
+      sout `shouldNotSatisfy` ("dir=" `isInfixOf`)
+
+    it "falls back to the module's own @lang when no --lang is given" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", langModule]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("<html lang=\"he\" dir=\"rtl\">" `isInfixOf`)
+
+    it "falls back to en for a module that declares no language" $ do
+      -- bilingual.l4 tags its heralds individually and declares no `@lang`.
+      Output code sout _ <- runL4 bin ["render", "--format", "html", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("<html lang=\"en\">" `isInfixOf`)
+      sout `shouldNotSatisfy` ("dir=" `isInfixOf`)
+
   describe "l4 ast" $ do
     it "dumps a parsed AST for a clean file" $ do
       Output code sout _ <- runL4 bin ["ast", cleanFixture]

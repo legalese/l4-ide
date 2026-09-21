@@ -894,7 +894,13 @@ handlers evalConfig recorder =
             , _xdata = Nothing }
           Just reqParams -> do
             let nuri = toNormalizedUri reqParams.verDocId._uri
-            mTc <- liftIO $ runAction "l4/exportDocument" _ide $ use TypeCheck nuri
+            -- The token stream alongside the type-check result, for the same
+            -- reason `l4 render` reads it: the HTML wrapper's @lang@ comes from
+            -- the module's declared @\@lang@, which lives in the tokens. This
+            -- request carries no language of its own, so there is nothing to
+            -- override it with here.
+            (mTc, mToks) <- liftIO $ runAction "l4/exportDocument" _ide $
+              (,) <$> use TypeCheck nuri <*> use GetLexTokens nuri
             case mTc of
               Nothing -> pure $ Left $ TResponseError
                 { _code = InR ErrorCodes_InvalidRequest
@@ -919,7 +925,10 @@ handlers evalConfig recorder =
                     rcfg = ExportRender.MkRenderConfig
                              { ExportRender.numberSections = reqParams.numberSections
                              , ExportRender.numberClauses = reqParams.numberClauses
-                             , ExportRender.toc = reqParams.toc }
+                             , ExportRender.toc = reqParams.toc
+                             , ExportRender.docLang =
+                                 Maybe.fromMaybe defaultModuleLang
+                                   (declaredModuleLang . fst =<< mToks) }
                     doc = ExportDoc.buildDocument ecfg tcResult.module' deps
                     content = case reqParams.format of
                       "text" -> ExportRender.renderText rcfg doc

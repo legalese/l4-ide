@@ -270,7 +270,7 @@ Provisions
     - otherwise: the invoice's amount × 0.05
 ```
 
-Options: `--format html|text|json|plan`, `-o/--output FILE`, `--toc` (table of contents), `--number-sections`, `--number-clauses`, and `--include-unused`.
+Options: `--format html|text|json|plan`, `-o/--output FILE`, `--toc` (table of contents), `--number-sections`, `--number-clauses`, `--include-unused`, and `--lang SUBTAG` (render the `@nlg:SUBTAG` wordings; in `html` this also sets `<html lang=…>` and, for a right-to-left language, `dir="rtl"`).
 
 ### `l4 batch` — many cases at once
 

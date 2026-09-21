@@ -318,6 +318,25 @@ Every format `render` supports — `text`, `html`, `akn`, `json`, `plan` —
 follows the flag, because the language is chosen before the document is built
 rather than inside each writer.
 
+### The HTML document says which language it is in
+
+The `html` format labels the document itself, not just its sentences.
+
+```
+<html lang="he" dir="rtl">
+```
+
+`lang` is the language the document was rendered in: the `--lang` you asked for, or the module's own `@lang` when you asked for nothing, or `en` when the module declares nothing either.
+It is what a screen reader picks a voice from, what a browser hyphenates and spell-checks by, and what a translation tool decides to leave alone.
+
+`dir="rtl"` appears only for a right-to-left language — Hebrew, Arabic, Persian, Urdu, Yiddish, Pashto, Central Kurdish, Divehi.
+For everything else there is no `dir` at all, because left-to-right is already HTML's default and the attribute appearing is the signal.
+Without it a browser guesses direction from the characters, which gets a paragraph of Hebrew right and then puts the punctuation at the wrong end of a line that mixes in a number or a Latin name.
+The stylesheet mirrors with it: clause numbers, indents and table alignment move to the other side, because every rule that has a side is written in terms of the start and end of a line rather than of left and right.
+
+A subtag the module carries no renderings for still labels the document, because the label records what you asked for.
+`--lang he` on a module with two Hebrew rules out of ten gives you `lang="he"` and eight English paragraphs — which is the same partial-translation story as the section above, told in the wrapper.
+
 ### Translate incrementally
 
 A rule with no rendering in the language you asked for falls back to its default

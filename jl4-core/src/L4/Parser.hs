@@ -14,6 +14,8 @@ module L4.Parser (
   PError (..),
   mkPError,
   PState (..),
+  langTagOfToken,
+  declaredModuleLang,
   MixfixHintRegistry,
   buildMixfixHintRegistry,
   emptyMixfixHintRegistry,
@@ -126,10 +128,36 @@ spaceOrAnnotations = do
 -- | @\@lang he@. Collected like any other annotation, so its tokens ride in
 -- the same hidden cluster and exactprint re-emits the line unchanged.
 langP :: Parser (Epa LangTag)
-langP = hidden $ spacedTokenWs (\ case
+langP = hidden $ spacedTokenWs langTagOfToken "Language declaration"
+
+-- | The language tag a @\@lang@ token carries, if that is what this token is.
+--
+-- Factored out so that the two things that read a @\@lang@ declaration — the
+-- parser, through 'langP', and 'declaredModuleLang', which scans a bare token
+-- stream — agree on what the token looks like by construction rather than by
+-- both being edited together.
+langTagOfToken :: TokenType -> Maybe LangTag
+langTagOfToken = \ case
   TAnnotations (TLang tag _) -> Just tag
-  _ -> Nothing)
-  "Language declaration"
+  _ -> Nothing
+
+-- | A module's declared @\@lang@, read straight off its token stream, or
+-- 'Nothing' when it declares none.
+--
+-- The LAST declaration in source order wins, which is the same rule
+-- 'execParserForTokensWithHints' applies below: it takes @listToMaybe
+-- pstate.langs@, and 'addLang' accumulates by prepending, so that head IS the
+-- last one written. Stated in both places because the two have different
+-- inputs (a token list here, the parser state there); they are checked against
+-- each other by @jl4-test@'s corpus, every file of which goes through both.
+--
+-- This exists because a consumer downstream of the parse — @l4 render@, which
+-- labels its HTML @<html lang="…">@ — needs the declaration itself, not its
+-- effect on annotations. The effect ('withDefaultLang') is unrecoverable for a
+-- module that declares a language and carries no @\@nlg@ at all.
+declaredModuleLang :: [PosToken] -> Maybe LangTag
+declaredModuleLang ts =
+  listToMaybe [ tag | t <- reverse ts, Just tag <- [langTagOfToken t.payload] ]
 
 refP :: Parser (Epa Ref)
 refP = do

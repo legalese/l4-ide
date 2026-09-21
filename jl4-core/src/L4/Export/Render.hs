@@ -8,6 +8,8 @@
 module L4.Export.Render
   ( RenderConfig (..)
   , defaultRenderConfig
+  , isRtlLang
+  , rtlLangTags
   , renderHtml
   , renderText
   , renderAkn
@@ -19,21 +21,65 @@ import qualified Base.Text as Text
 import Data.Char (toUpper)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 
 import L4.Export.Document
+import L4.Lexer (LangTag (..))
+import L4.Syntax (defaultModuleLang)
 
--- | Rendering knobs. Both default to off (no auto-enumeration of section
--- headings or top-level clauses).
+-- | Rendering knobs. The three numbering\/contents switches default to off (no
+-- auto-enumeration of section headings or top-level clauses, no table of
+-- contents); 'docLang' defaults to 'defaultModuleLang'.
 data RenderConfig = MkRenderConfig
   { numberSections :: !Bool
   , numberClauses  :: !Bool
   , toc            :: !Bool   -- ^ prepend a linked table of contents (HTML)
+  , docLang        :: !LangTag
+    -- ^ The language this document is being rendered in, as @<html lang="…">@
+    -- (HTML only). The caller decides it; 'L4.Cli.Render' uses @--lang@ if
+    -- given, else the module's own @\@lang@, else 'defaultModuleLang'. The
+    -- renderer only reports it, and asks 'isRtlLang' whether it also needs a
+    -- @dir@.
   }
   deriving stock (Eq, Show, Generic)
 
 defaultRenderConfig :: RenderConfig
 defaultRenderConfig =
-  MkRenderConfig { numberSections = False, numberClauses = False, toc = False }
+  MkRenderConfig
+    { numberSections = False
+    , numberClauses = False
+    , toc = False
+    , docLang = defaultModuleLang
+    }
+
+-- | The language subtags whose script runs right to left.
+--
+-- One explicit list rather than a lookup into a locale database: the whole
+-- point of @dir@ is that a browser's bidi heuristics are not enough, and a
+-- short list we can read is worth more here than a complete one we cannot.
+-- Extend it when a corpus needs one — that is a one-line change with a test
+-- next to it, not a dependency.
+--
+-- Matched on the PRIMARY subtag only, so @he-IL@ and @ar-EG@ are covered by
+-- @he@ and @ar@ without an entry each. Comparison is case-insensitive: BCP 47
+-- says language subtags are case-insensitive, and @--lang HE@ is a thing a
+-- user types.
+rtlLangTags :: Set.Set Text
+rtlLangTags = Set.fromList
+  [ "he"   -- Hebrew
+  , "ar"   -- Arabic
+  , "fa"   -- Persian
+  , "ur"   -- Urdu
+  , "yi"   -- Yiddish
+  , "ps"   -- Pashto
+  , "ckb"  -- Central Kurdish (Sorani)
+  , "dv"   -- Divehi / Dhivehi
+  ]
+
+-- | Does this language need @dir="rtl"@?
+isRtlLang :: LangTag -> Bool
+isRtlLang (MkLangTag tag) =
+  Text.toLower (Text.takeWhile (/= '-') tag) `Set.member` rtlLangTags
 
 -- ----------------------------------------------------------------------------
 -- Plain-text rendering
@@ -161,7 +207,7 @@ renderHtml :: RenderConfig -> Document -> Text
 renderHtml cfg doc =
   Text.intercalate "\n"
     [ "<!DOCTYPE html>"
-    , "<html lang=\"en\">"
+    , "<html" <> langAttrs <> ">"
     , "<head>"
     , "<meta charset=\"utf-8\">"
     , "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
@@ -178,6 +224,15 @@ renderHtml cfg doc =
     , "</html>"
     ]
  where
+  -- @lang@ always; @dir@ only for a right-to-left language. An explicit
+  -- @dir="ltr"@ for everything else would be correct but is not what the rest
+  -- of the world writes, and the HTML default is already @ltr@ — so the
+  -- attribute appearing at all is the signal that this document is RTL.
+  langAttrs =
+    let MkLangTag tag = cfg.docLang
+    in " lang=\"" <> esc tag <> "\""
+         <> (if isRtlLang cfg.docLang then " dir=\"rtl\"" else "")
+
   linkMap = collectLinks doc
 
   sectionHtml depth sec =
@@ -569,6 +624,15 @@ esc =
   . Text.replace "&" "&amp;"
 
 -- | Styling that mimics a printed legal contract.
+--
+-- Every direction-sensitive rule is written with LOGICAL properties
+-- (@padding-inline-start@, @inset-inline-start@, @text-align:start@) rather
+-- than @left@\/@right@, so the whole page mirrors when the document carries
+-- @dir="rtl"@ (see 'isRtlLang'). In a left-to-right document each one is
+-- exactly the physical property it replaced, so this changes nothing there —
+-- and without it a Hebrew document would run right to left while its clause
+-- numbers and indents stayed on the left, which looks like a layout bug
+-- rather than like a translation.
 css :: Text
 css = Text.intercalate "\n"
   [ "  :root { --ink:#000; --muted:#3a3a3a; }"
@@ -594,19 +658,21 @@ css = Text.intercalate "\n"
   , "            border:1px solid #e6e6e6; }"
   , "  nav.toc .toc-title { font-weight:700; text-transform:uppercase;"
   , "       letter-spacing:.08em; font-size:.8rem; color:var(--muted); margin-bottom:.5rem; }"
-  , "  nav.toc ul { margin:0; padding-left:1.2rem; list-style:none; }"
-  , "  nav.toc > ul { padding-left:0; }"
+  , "  nav.toc ul { margin:0; padding-inline-start:1.2rem; list-style:none; }"
+  , "  nav.toc > ul { padding-inline-start:0; }"
   , "  nav.toc li { margin:.15rem 0; }"
   , "  nav.toc a { color:inherit; text-decoration:none;"
   , "       border-bottom:1px dotted color-mix(in srgb, currentColor 45%, transparent); }"
   , "  nav.toc a:hover { border-bottom-style:solid; }"
   , "  ol.clauses { margin:0 0 1rem; padding:0; list-style:none; counter-reset:clause; }"
   , "  ol.clauses > li.clause { position:relative; margin:0 0 1rem; }"
-  , "  ol.tree { margin:.35rem 0 .35rem 1.6rem; padding:0; list-style:none; counter-reset:t; }"
-  , "  ol.tree > li { position:relative; margin:.28rem 0; padding-left:1.9rem; }"
+  , "  ol.tree { margin:.35rem 0; margin-inline-start:1.6rem; padding:0;"
+  , "            list-style:none; counter-reset:t; }"
+  , "  ol.tree > li { position:relative; margin:.28rem 0; padding-inline-start:1.9rem; }"
   , "  ol.tree > li::before {"
   , "       counter-increment:t; content:'(' counter(t, lower-alpha) ')';"
-  , "       position:absolute; left:0; top:0; width:1.5rem; color:var(--muted); }"
+  , "       position:absolute; inset-inline-start:0; top:0; width:1.5rem;"
+  , "       color:var(--muted); }"
   , "  ol.tree ol.tree > li::before { content:'(' counter(t, lower-roman) ')'; }"
   , "  ol.tree ol.tree ol.tree > li::before { content:'(' counter(t, decimal) ')'; }"
   , "  ol.tree ol.tree ol.tree ol.tree > li::before { content:'(' counter(t, upper-alpha) ')'; }"
@@ -617,22 +683,23 @@ css = Text.intercalate "\n"
   , "  a.ref:hover { border-bottom-style:solid; }"
   , "  .field { font-weight:600; }"
   -- Local WHERE / LET definitions attached to a rule.
-  , "  .where-label { font-style:italic; color:var(--muted); margin-left:.15rem; }"
-  , "  ol.where-defs { margin:.25rem 0 .35rem 1.6rem; padding-left:0; list-style:none; }"
+  , "  .where-label { font-style:italic; color:var(--muted); margin-inline-start:.15rem; }"
+  , "  ol.where-defs { margin:.25rem 0 .35rem; margin-inline-start:1.6rem;"
+  , "                  padding-inline-start:0; list-style:none; }"
   , "  ol.where-defs > li { margin:.2rem 0; }"
   -- Tables for list-of-record definitions.
   , "  table.l4-table { border-collapse:collapse; margin:.6rem 0; width:100%;"
   , "                   font-size:.95em; }"
   , "  table.l4-table th, table.l4-table td {"
-  , "       border:1px solid #cfcfcf; padding:.3rem .55rem; text-align:left;"
+  , "       border:1px solid #cfcfcf; padding:.3rem .55rem; text-align:start;"
   , "       vertical-align:top; }"
   , "  table.l4-table th { background:#f0f0f0; font-weight:700; }"
   , "  table.l4-table tbody tr:nth-child(even) { background:#fafafa; }"
   , "  table.l4-table table.l4-table { margin:.2rem 0; }"
-  , "  .num-clauses ol.clauses > li.clause { padding-left:2.4rem; }"
+  , "  .num-clauses ol.clauses > li.clause { padding-inline-start:2.4rem; }"
   , "  .num-clauses ol.clauses > li.clause::before {"
   , "       counter-increment:clause; content:counter(clause) '.';"
-  , "       position:absolute; left:0; top:0; width:1.9rem; text-align:right;"
+  , "       position:absolute; inset-inline-start:0; top:0; width:1.9rem; text-align:end;"
   , "       font-variant-numeric:tabular-nums; }"
   -- Tighten the page margins on narrow viewports (e.g. the IDE preview
   -- pane) so the content isn't crowded by generous desktop padding.
