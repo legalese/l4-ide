@@ -1,0 +1,12 @@
+IMPORT prelude
+
+-- The other one. Its `Thing` is a different entity from `duplicate-type-a`'s,
+-- with a different field of a different type. L4 tells them apart by unique
+-- and is content; Catala has one flat namespace and cannot.
+
+DECLARE Thing
+    HAS m IS A BOOLEAN
+
+GIVEN x IS A BOOLEAN
+GIVETH A Thing
+`from b` x MEANS Thing WITH m IS x

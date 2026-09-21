@@ -1,0 +1,36 @@
+IMPORT prelude
+IMPORT `duplicate-type-a`
+IMPORT `duplicate-type-b`
+
+-- Two imported modules each declare a `Thing`, and this module's exported
+-- decisions reach both. `l4 check` SUCCEEDS: they are distinct entities and
+-- every use resolves to the right one.
+--
+-- The emitted Catala has one flat namespace, and the scan that builds the
+-- artifact deduplicates structures by their L4 name. Measured on the binary
+-- that read the import closure but did not yet check this — exit 0, and:
+--
+--     declaration structure Thing:
+--       data n content decimal
+--     …
+--       equals Thing { -- n: x }
+--     …
+--       equals Thing { -- m: x }
+--
+-- one declaration, two incompatible construction sites, nothing said. The
+-- existing collision check cannot see it: it reports when DISTINCT L4 names
+-- mangle to one Catala name, and here the L4 names are equal.
+--
+-- Refused instead (§8.1.2). Only declarations the artifact needs are checked —
+-- two modules in a large closure may both declare something the emitted code
+-- never reaches, and refusing that would make importing a module a liability.
+
+@export reaches the first `Thing`
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+top x MEANS (`from a` x)'s n
+
+@export reaches the second one
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+other x MEANS (`from b` x)'s m
