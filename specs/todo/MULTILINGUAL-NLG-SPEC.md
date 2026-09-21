@@ -9,9 +9,9 @@ the language tag itself as **#423** — verified in `unstable` by feature presen
 **A bilingual document set is producible today**: two `@nlg:xx` renderings on one name, and
 `l4 nlg --lang he` / `--lang en` over one encoding. §8a records what was built, what was
 deliberately not, and the one live defect found on the way._ Every measurement in §2 was executed on 2026-09-17 against `unstable` @
-`cab6988d0` and canon `mengwong/drafts` @ `61a4755`. Seven measurement errors in earlier drafts
+`cab6988d0` and canon `mengwong/drafts` @ `61a4755`. Eight measurement errors in earlier drafts
 of this file have been corrected in place, each re-measured rather than taken on report —
-§2.3's gap count, §2.4's annotation census and its bare-inline count, a line citation, three
+§2.3's gap count (twice: 76 → 52 → 59, the last on 2026-09-21), §2.4's annotation census and its bare-inline count, a line citation, three
 dangling cross-references, `L4.Nlg`'s size, and §4's claim about where decoding happens; §2.4 and §4.1 carry
 the corrections rather than hiding them. Written on branch `spec/multilingual-nlg`; §4.1 and
 R-M7 by the `nlg-locale` session.\_
@@ -43,7 +43,7 @@ language, with `@nlg` carrying the other languages, and projections selecting by
 **This spec chooses (B) for the Penal Law, and (A) stays an experiment.** Three reasons; the
 third decides it.
 
-1. Parallel encodings drift and nothing catches it. The Penal Law is 644 sections under active
+1. Parallel encodings drift and nothing catches it. The Penal Law is 651 sections under active
    amendment — Amendment 155 landed 2026-06-30 and was on Wikisource by 2026-07-07.
 2. Renderings are what a projection layer is for. The wizard, ladder diagrams, docassemble
    output and `doc/` pages all want the reader's language, not the encoder's.
@@ -96,10 +96,10 @@ Re-run: `python3` over `source/penal-law-1977.wikitext`, counting `{{\s*(ח:[^|}
 
 Three properties matter for isomorphic encoding:
 
-- **The tree is well-formed.** 673 section events in document order, **0 subsections appearing
+- **The tree is well-formed.** 673 section-template events in document order (666 `ח:סעיף` + 7 `ח:סעיף*`; see the count note under §2.3), **0 subsections appearing
   before any section**, and only **12 level skips** out of 1,334 subsection nodes (99.1% clean).
 - **Sections are self-describing.** `{{ח:סעיף|2|ענישה לפי חקיקת משנה|תיקון: תשנ״ד־3, תשפ״ב־2}}`
-  carries number, title _and_ an inline amendment trail. **455 of 673 sections (67%)** carry a
+  carries number, title _and_ an inline amendment trail. **456 of 651 sections (70%)** carry a
   `תיקון:` trail, so per-section provenance is free.
 - **Definitions are semantically tagged.** `{{ח:ת|סוג=הגדרה}}` marks a definition paragraph —
   **73** of them. That is the `DECLARE`/`MEANS` boundary handed to us by the source.
@@ -119,21 +119,22 @@ Comparing section inventories, with Hebrew suffixes normalised as **gematria** (
 not `J`+`A`):
 
 ```
-Hebrew sections : 644
+Hebrew sections : 651
 English sections: 592
 in BOTH         : 592          <- 100% of the English exists in the Hebrew
 ENGLISH-only    :   0
-English coverage of Hebrew: 91.9%
+English coverage of Hebrew: 90.9%
 ```
 
 **Zero English-only sections.** The translation never contradicts the current Hebrew; it only
 stops short. That is the best possible shape for version skew — the gap is purely additive and
-fully enumerable. The 52 sections needing fresh translation:
+fully enumerable. The 59 sections needing fresh translation:
 
 ```
-34W, 40A-40O (15), 50, 51, 71C, 71D, 71E, 86B, 122A, 138, 144D, 188, 205D,
-207, 210, 211, 212, 213, 265, 266, 275A, 275B, 301A, 301B, 301C, 311A,
-332A, 347B, 357, 358, 359, 360, 382A, 384A, 428A, 428B, 434, 435
+34J1, 34W, 40A-40O (15), 50, 51, 51H1, 51J1, 71C, 71D, 71E, 86B, 122A, 138,
+144D, 144D1, 144D2, 144D3, 188, 205D, 207, 210, 211, 212, 213, 265, 266,
+275A, 275B, 301A, 301B, 301C, 311A, 332A, 347B, 357, 358, 359, 360, 368C1,
+382A, 384A, 428A, 428B, 434, 435
 ```
 
 And the gap is legible rather than scattered — it clusters on identifiable reform blocks:
@@ -146,7 +147,30 @@ And the gap is legible rather than scattered — it clusters on identifiable ref
 > into `34JA` instead of `34K`, manufacturing ~24 phantom divergences in the 34-series alone.
 > (ii) Requiring whitespace after the section period (`^\s*(\d+)([A-Z]*)\.\s`) missed every
 > section the PDF typesets as `34R.(a)` or `34S.For`, dropping 24 real matches. The first draft
-> of this section read "76 Hebrew-only sections"; the true figure is 52.
+> of this section read "76 Hebrew-only sections"; that draft's correction said 52.
+> (iii) **Corrected 2026-09-21 (HEPTAGON): 52 was also wrong, by seven, and so was every figure
+> derived from the Hebrew inventory.**
+> The normaliser accepted `\d+` plus Hebrew letters and nothing after, so a section id with a
+> **trailing digit** — a second-level insertion such as `144ד1`, the section inserted after `144ד` —
+> was silently dropped from the Hebrew side.
+> Seven sections have that shape: `34י1`, `51ח1`, `51י1`, `144ד1`, `144ד2`, `144ד3`, `368ג1`
+> (`34J1`, `51H1`, `51J1`, `144D1`–`144D3`, `368C1` after gematria).
+> All seven are real, titled sections — `34י1` is the defence-of-dwelling provision, `144ד2` is
+> incitement to violence — and none is in the ICJ text, so all seven belong in the gap list above.
+> Hebrew inventory 644 → **651**; Hebrew-only 52 → **59**; coverage 91.9% → **90.9%**.
+> The two findings that matter did not move: **zero English-only sections**, and 592 in both.
+> Two things about how this was found are worth more than the number.
+> The 651 came from a different instrument — counting `ח:סעיף` templates by part in the deposited
+> wikitext, where it is also the figure in canon's `subject.json` since `5cf2878` — and the 644 was
+> only ever "the number this script printed", with no second count to disagree with it.
+> And the previous correction, "the true figure is 52", was written with exactly the confidence
+> this note now has; it was one comparison against an independent count away from being caught.
+> Every number in §2.2 and §2.3 is now produced by the runnable code in §9, and a re-run that
+> disagrees with this section says which figure moved.
+> Note also that `455 of 673` in §2.2 divided by a denominator containing the 7 `ח:סעיף*`
+> schedule items, which are a different template; over the 651 sections of the Act it is 456 (70%).
+> The non-greedy regex that produced 455 also stops at the first `}}` of a cross-reference nested
+> inside a section title, missing the trail on `34כג`, `40א` and `86א`; count on the header line.
 
 ### 2.4 `@nlg` today: one language, no escape
 
@@ -644,7 +668,7 @@ carries `lang="en"`).
 | **R-M1** | `@nlg:he` vs `@nlg he "…"` vs a separate `@lang` block — which surface syntax?                  | **ANSWERED 2026-09-17 (Meng)**, §3: **`@nlg:he`** on the heralded form; the bare `[…]` form stays **untaggable**, its `[@he …]` spelling **pre-approved** for when a need appears. `@nlg he "…"` rejected on measurement — a `"` is ordinary prose and two `doc/reference/syntax/` annotations already open with one                                    |
 | **R-M2** | How does a module declare its default language for untagged `@nlg`?                             | **ANSWERED 2026-09-17 (Meng)**, §3: absent declaration means **`en`**, and a module-level `@lang` is **required** in any module that uses a tag. Backward-compatible for all 131 existing annotations, and forces explicitness exactly where ambiguity can arise                                                                                        |
 | **R-M3** | Escape convention for a literal `%` and `]`?                                                    | **ANSWERED 2026-09-17**, §4: **backslash** (`\%`, `\]`, `\\`). Doubling does not generalise to `]`, and L4 string literals already use Haskell escapes. Measured 0 corpus uses of either convention, so both were free to take                                                                                                                          |
-| **R-M4** | One canonical encoding + `@nlg` (B), not parallel per-language encodings (A), for the Penal Law | **ANSWERED 2026-09-17**, §1. Driven by: 644 sections under active amendment; Amendment 155 reached Wikisource in 7 days; and the legal-status argument in §1, point 3                                                                                                                                                                                   |
+| **R-M4** | One canonical encoding + `@nlg` (B), not parallel per-language encodings (A), for the Penal Law | **ANSWERED 2026-09-17**, §1. Driven by: 651 sections under active amendment (the row read 644 when ruled; corrected per §2.3 note (iii), and the argument is unchanged); Amendment 155 reached Wikisource in 7 days; and the legal-status argument in §1, point 3                                                                                       |
 | **R-M5** | Which language is canonical for `il/penal-law-1977`?                                            | **ANSWERED 2026-09-17**: **Hebrew.** It is the enacted and binding text, it is the only one on Wikisource, and it is the only one current to Amendment 155                                                                                                                                                                                              |
 | **R-M6** | Is the ICJ English text usable for `@nlg:en`?                                                   | **ANSWERED 2026-09-17 (Meng).** _Depositing_ it in canon: **NO.** Link to it and use it internally as a working alignment document; it does not enter `canon`. _Consulting_ it: **yes**, and it is the better use — see §6.1. Nothing in the pilot depends on the deposit, so declining costs nothing and removes the licence question                  |
 | **R-M7** | Confirm the Hebrew-binds / Arabic-special-status claim against primary sources                  | **ANSWERED 2026-09-17**, §1 point 3: Interpretation Law 5741-1981 §24 and Basic Law: Nation-State §4, both read in the primary text. The rule is language-of-enactment rather than "Hebrew always"; it reaches Hebrew here by application. Verified by the `nlg-locale` session                                                                         |
@@ -685,12 +709,38 @@ two Hebrew renderings and is reported as ambiguous — correct, and new. And the
 diagnostic can no longer distinguish "untagged" from "tagged", because by the time it runs
 nothing is untagged; it says so in one sentence instead of guessing.
 
-**The residual wrinkle, recorded rather than fixed:** absent-means-`en` labels a monolingual
-Hebrew module as English. That is the Penal Law pilot's exact shape, and R-M2's "required in
-any module that uses a tag" does not reach it, because such a module uses no tags. Nothing
-observable is wrong today — it renders Hebrew either way — and it becomes wrong when §5's
-fidelity channel starts asking which rules lack a translation. The cheap fix is to declare
-`@lang he`, which the documentation now tells Hebrew authors to do.
+**The residual wrinkle — RULED 2026-09-19 (Meng): `en` stays the default; the pilot declares.**
+Absent-means-`en` labels a monolingual Hebrew module as English, which is the Penal Law pilot's
+exact shape, and R-M2's "required in any module that uses a tag" does not reach it because such
+a module uses no tags. Meng declined to change the default and ruled the other way instead: the
+encoding carries an explicit `@lang`. So **`il/penal-law-1977` must declare `@lang he` in every
+module from its first commit** — see §8 step 5, where that is now part of the step rather than
+a thing to remember.
+
+State of `legalese/canon` @ `b9c8f99` (`mengwong/drafts`), measured 2026-09-19 and **re-verified 2026-09-21**:
+
+| where                                                   | modules                                    | declare `@lang`                |
+| ------------------------------------------------------- | ------------------------------------------ | ------------------------------ |
+| `canon subjects/il/penal-law-1977/encodings/`           | **0** — sources deposited, nothing encoded | n/a                            |
+| `…/il/ofek-hadash-2008/encodings/legalese-he-revoiced/` | 9                                          | **9, all `@lang he`**          |
+| `…/il/ofek-hadash-2008/encodings/legalese/`             | 9                                          | 0 — and correct, it is English |
+
+There is nothing to retrofit in the pilot this ruling governs: `il/penal-law-1977` has no `.l4` files, so the ruling binds work not yet written.
+
+**But one of those nine declarations is not reproducible, and that is the failure worth recording.**
+`ofek-salary-table.l4` is GENERATED — `source/build-salary-table-module.py` assembles it and concatenates `source/_salary-table-tail.l4` onto the end.
+The generator does not emit `@lang he`; the declaration on the committed module was added by hand.
+Regenerating with `OFEK_CORPUS` set reproduces the committed module byte-for-byte **minus the declaration**, so the next regeneration silently strips it.
+
+**This is the silent half of the failure, which is why it gets the words.**
+A module that never declared would at worst be mislabelled `en` while rendering Hebrew correctly either way — harmless until §5's fidelity channel asks which rules lack a translation.
+A module whose declaration is hand-added to generated output is worse: it reads as compliant, and loses compliance at a moment nobody is looking at this spec.
+The fix belongs in the generator, not the file, and is the encoding owner's; it was made on canon branch `ofek/legalese-he`.
+
+**Recorded because the wrong version of this paragraph nearly shipped.**
+A re-measurement on 2026-09-21 reported 10 files declaring 9 and named the tail fragment as a non-declaring module.
+Both halves were artefacts of a `find` that recursed into `source/`: the tail is a generator input, not a module, and the counts above were right as first written.
+The instrument counted `.l4` files when the question was about modules — and the number moving from 9 to 10 was explained before asking what the tenth file _was_.
 
 **Superseded, kept because it is the reasoning that preceded the change:** there is no `@lang`,
 and untagged means "unlabelled" rather than "`en`". The ruling
@@ -734,12 +784,12 @@ the Hebrew is structurally ambiguous, a professional translator has already comm
 reading, and a disagreement between that reading and ours is a signal worth stopping on. Treat a
 divergence as a question to resolve against the Hebrew, never as a defect in either text.
 
-**The 52-section gap (§2.3) is where this stops helping**, and it stops abruptly — those sections
+**The 59-section gap (§2.3) is where this stops helping**, and it stops abruptly — those sections
 have no counterpart to consult, so their English is ours alone and should be marked as such.
 
 ## 7. What this spec does NOT decide
 
-- **The Penal Law encoding itself.** This is the multilingual mechanism. What of 644 sections
+- **The Penal Law encoding itself.** This is the multilingual mechanism. What of 651 sections
   gets encoded, and in what order, belongs in a Penal Law subject spec. The `pacing_note` in
   `canon subjects/il/penal-law-1977/subject.json` already pairs it with `sg/penal-code-1871` and
   asks for one ontology of offence elements across both — that constraint is not addressed here.
@@ -822,7 +872,14 @@ have no counterpart to consult, so their English is ours alone and should be mar
    surface; the wizard and ladder diagrams follow.
 5. **Penal Law pilot.** One chapter, Hebrew-canonical, with `@nlg:en` informed by the ICJ text
    — **consulted, never deposited** (R-M6) — to exercise the whole path before committing to
-   644 sections. **No `@nlg:ar`** (R-M8).
+   651 sections. **No `@nlg:ar`** (R-M8).
+
+   **Every module declares `@lang he`, from its first commit** (Meng, 2026-09-19). Absent
+   declaration means `en`, and that ruling stands, so a Hebrew module that says nothing is
+   labelled English: it still RENDERS Hebrew, and it reports as untranslated the moment §5's
+   fidelity channel asks which rules lack a rendering. One line per module buys the label.
+   Nothing to retrofit — the subject has sources deposited and no `.l4` files yet (measured
+   2026-09-19), so this is a constraint on the encoding as it is written, not a cleanup.
 
 ## 8a. What was built, 2026-09-19
 
@@ -880,6 +937,21 @@ its annotations.** The file that exists to test `@nlg` renders none of its own. 
 sampled files, 11 of 116 annotations sit on a builtin type name; `prelude.l4` has 0 of 67, so
 the idiomatic style avoids it by habit rather than by construction.
 
+**RULED 2026-09-19 (Meng), and implemented.** Trailing a line, an annotation describes what is
+on that line; starting a line of its own, it describes what follows — with ONE exception, ruled
+separately the same day: inside a record-field list, an annotation on its own line describes the
+field ABOVE it. A field list is a column of things rather than a sequence of declarations, and
+the evidence is that authors write it that way: across three independently generated Hebrew
+encodings, field and parameter heralds are the largest single category — 100 of 334 — and every
+one is written below its field (measured by the `ofek` session; our own corpus contains
+essentially none of that shape, so no golden of ours would ever have raised the question).
+
+The field name therefore claims two disjoint regions: everything before its type, which is its
+own trailing gloss, and everything on a later line. What falls between — trailing the TYPE on
+the field's own line — stays with the type, which is what keeps `ok/nlg_declare1.l4`'s
+deliberate `head [Get First Element] IS AN a [Start Element]` working. Giving the name the whole
+line instead makes those two collide and loses both; that was measured before it was narrowed.
+
 There is precedent for the fix inside the same pass: a **leading `@ref` already attaches
 FORWARD**, to the declaration that follows it, and `RefAnnotationSpec` pins that specifically
 ("attaches a leading `@ref` to the first declaration, not the Module"). `@nlg` attaching
@@ -920,7 +992,27 @@ python3 - "$CANON/penal-law-1977.wikitext"     # see §2.2 for the regexes
 curl -sfL -o /tmp/icj.pdf \
   https://www.icj.org/wp-content/uploads/2013/05/Israel-Penal-Law-5737-1977-eng.pdf
 pdftotext /tmp/icj.pdf /tmp/icj.txt
-# then diff section inventories, normalising Hebrew suffixes as GEMATRIA (§2.3)
+# 2.2 + 2.3 section counts and the inventory diff (added 2026-09-21; prints every §2.2/§2.3 figure)
+python3 - "$CANON/penal-law-1977.wikitext" /tmp/icj.txt <<'EOF'
+import re, sys
+G = {'א':1,'ב':2,'ג':3,'ד':4,'ה':5,'ו':6,'ז':7,'ח':8,'ט':9,'י':10,'כ':20,'ך':20,'ל':30,
+     'מ':40,'ם':40,'נ':50,'ן':50,'ס':60,'ע':70,'פ':80,'ף':80,'צ':90,'ץ':90,'ק':100,'ר':200,'ש':300,'ת':400}
+txt = open(sys.argv[1], encoding='utf-8').read(); L = txt.split('\n')
+starts = [i for i, l in enumerate(L) if l.startswith('{{ח:קטע1')]
+body = '\n'.join(L[:starts[3]])                       # parts 0, A, B — not the comparison table
+ids = re.findall(r'\{\{ח:סעיף\|([^|}]*)', body)     # plain template only; ח:סעיף* is schedule items
+def norm(s):                                          # 144ד1 -> 144D1 ; 34יא -> 34K (gematria)
+    n, suf, tail = re.match(r'^(\d+)([\u0590-\u05FF]*)(\d*)$', s.strip()).groups()
+    v = sum(G[c] for c in suf); return f"{n}{chr(64+v) if v else ''}{tail}"
+heb = {norm(s) for s in ids}
+hdrs = [txt[m.start():txt.find('\n', m.start())] for m in re.finditer(r'\{\{ח:סעיף\|', body)]
+print('Act sections            :', len(ids), '   with תיקון: trail:', sum('תיקון:' in h for h in hdrs))
+eng = {m.group(1) for m in re.finditer(r'^(\d+[A-Z]*)\.', open(sys.argv[2], encoding='utf-8').read(), re.M)}
+print('English sections        :', len(eng)); print('in BOTH                 :', len(heb & eng))
+print('ENGLISH-only            :', sorted(eng - heb)); print('HEBREW-only             :', len(heb - eng))
+print(f'English coverage of Hebrew: {100*len(heb & eng)/len(heb):.1f}%')
+EOF
+# expected on revision 3023424: 651 / 456 / 592 / 592 / [] / 59 / 90.9%
 # 2.4 @nlg has no language field and no escape
 grep -n "nlgAnnotation ::\|nlgExprDelimiterSymbol\|^nlgString ::" -A 6 \
   jl4-core/src/L4/Lexer.hs

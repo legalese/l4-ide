@@ -1,0 +1,352 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Singapore miles-card reward programmes — the shared domain`
+
+-- ===========================================================================
+-- THE SHARED ONTOLOGY for eight Singapore consumer card reward programmes,
+-- encoded from the issuers' own terms and conditions (private contract text,
+-- NOT law, and nothing in this corpus is advice about anyone's real cover).
+--
+-- WHY ONE ONTOLOGY. Every card answers the same question -- "what does THIS
+-- transaction earn on THIS card?" -- over the same facts: who the merchant
+-- is, how the cardholder paid, what the merchant's acquirer reported, and
+-- where the month's caps stand. Eight private notions of "a transaction"
+-- would let the eight answers disagree about what was asked.
+--
+-- So this module owns the nouns. Each card module owns its own rules,
+-- imports these types, and never redeclares them.
+--
+-- MEMBERSHIP TEST. A field belongs here iff a witness of ordinary competence
+-- could depose to it WITHOUT reading any T&C: "I tapped my phone at a
+-- terminal", "the statement shows MCC 5812", "I have linked my yuu account".
+-- Whether that tap earns 4 mpd or 0.4 is a rule, and lives in the card
+-- module for the clause that says so.
+--
+-- TWO AXES, NOT ONE (spec section 4.4). "Contactless" is overloaded and is
+-- the wrong primitive. The cardholder controls the CREDENTIAL (the physical
+-- card, or a wallet token); the merchant's acquirer controls the INDICATOR
+-- the bank receives (online vs card-present). DBS Woman's Card T&C cl.13:
+-- "DBS determines an online transaction based on system indicators. These
+-- indicators are decided by the merchant and their banker". Citi 10X cl.6(ii):
+-- "These indicators are decided by the relevant merchant and/or their acquirer
+-- and are not determined by Citibank". HSBC Revolution cl.6: "based on system
+-- indicators which are determined by the merchants and the merchant's
+-- acquiring bank". Three issuers, one design: the indicator is a fact about
+-- the MERCHANT, latent to the cardholder at decision time, so it carries an
+-- explicit `Unknown` and every rule that reads it answers conditionally.
+--
+-- CATALA. This corpus must lower to Catala (spec section 2). DECLARE-only
+-- here; no rule anywhere reads a section GIVEN; every rule takes its inputs
+-- positionally.
+-- ===========================================================================
+
+
+§§ `The cards`
+
+-- The eight programmes in the household stack. DBS yuu is issued on two
+-- networks and the T&C treats them differently at named merchants (Appendix 1:
+-- "Points will not be awarded for any transactions made with DBS yuu American
+-- Express Card" at 7-Eleven before 13 Aug 2026 and at Charge+), so the network
+-- is part of the card's identity rather than a separate fact.
+DECLARE Card IS ONE OF
+    `DBS yuu Visa`
+    `DBS yuu American Express`
+    `DBS Woman's World`
+    `UOB Lady's Solitaire`
+    `HSBC Revolution`
+    `Citi Rewards`
+    `POSB PAssion Debit`
+    `UOB PRVI Miles`
+    `Citi PremierMiles`
+
+-- UOB Lady's Cards T&C Schedule 1: the transaction categories a Solitaire
+-- cardmember elects two of (cl.4(b)). Each is defined by an MCC list in the
+-- Schedule; the mapping from MCC to category is the UOB module's rule.
+DECLARE `Solitaire category` IS ONE OF
+    `Beauty & Wellness`
+    Dining
+    Entertainment
+    Family
+    Fashion
+    Transport
+    Travel
+
+
+§§ `How the cardholder paid`
+
+-- What the cardholder can see themselves doing at the moment of payment.
+-- This is NOT the channel the bank sees; see `Merchant indicator` below.
+DECLARE `Payment channel` IS ONE OF
+    `Tapped at a terminal`
+    `Inserted or swiped at a terminal`
+    `Paid in a website or app`
+    `Card on file or recurring billing`
+
+-- What was presented. A wallet token is Apple Pay, Google Pay or Samsung Pay;
+-- HSBC Revolution cl.5 names all three. `Via Amaze` is a third-party proxy
+-- card (Instarem Amaze) that forwards the charge to the underlying card; it
+-- appears in the household's routing and in several exclusion lists, so it is
+-- a credential the cardholder can depose to.
+DECLARE Credential IS ONE OF
+    `The physical card`
+    `A mobile wallet token`
+    `Via Amaze`
+
+-- The system indicator the merchant's acquirer attaches to the transaction
+-- when it is posted. Three issuers say in terms that they do not determine
+-- it. It is latent but stable per merchant (spec section 8), so a cardholder
+-- who has seen this merchant post before can supply it; one who has not
+-- supplies `Unknown`, and the rules answer under both branches rather than
+-- defaulting either way.
+DECLARE `Merchant indicator` IS ONE OF
+    `Flags online`
+    `Flags card-present`
+    Unknown
+
+
+§§ `Merchants and statement descriptions the documents name`
+
+-- CATALA HAS NO STRINGS, AND THE T&Cs KEY MERCHANTS BY NAME (measured
+-- 2026-09-21; see NOTES.md section 3). So the string work is done once, in
+-- layer 1 (`classify.l4`, which reads `merchant name` and `transaction
+-- description` with the prefix builtin `CONTAINS`), and every rule reads only
+-- the closed enumerations below. A witness can depose to "it was Cold
+-- Storage" as readily as to the printed name, so the membership test holds.
+--
+-- The constructors are the merchants some held document NAMES. A merchant no
+-- document names is `Another merchant` -- the household app's categories
+-- (Shopee, Netflix, Tesla ...) live in `categorize.l4`, not here.
+DECLARE Merchant IS ONE OF
+    `Cold Storage`             -- yuu cl.8: Cold Storage, CS Fresh, Jasons Deli count as ONE; PAssion cl.5(i)
+    `Cold Storage On The Go`   -- yuu Appendix 1: within Esso stations, base only
+    Giant                      -- yuu cl.8: Giant, Giant Hypermart, Giant Express; PAssion cl.5(i)
+    Guardian                   -- yuu cl.8; PAssion cl.5(i)
+    `7-Eleven`                 -- yuu cl.8; PAssion cl.5(i)
+    foodpanda                  -- yuu cl.8: food delivery, panda mart, panda shops; PAssion cl.5(vi)
+    Gojek                      -- yuu cl.8; PAssion cl.5(v)
+    SimplyGo                   -- yuu cl.8: bus and train rides via SimplyGo
+    `Charge+`                  -- yuu cl.8
+    CHAGEE                     -- yuu cl.8: orders placed via the CHAGEE app only
+    Singtel                    -- yuu cl.8: Singtel Shop, Singtel Exclusive Retailers; PAssion cl.5(iv)
+    BreadTalk                  -- PAssion cl.5(ii)
+    `Toast Box`                -- PAssion cl.5(ii)
+    `Thye Moh Chan`            -- PAssion cl.5(ii)
+    `Butter Bean`              -- PAssion cl.5(ii)
+    `Food Republic`            -- PAssion cl.5(ii): withdrawn wef 27 Oct 2024
+    `Food Junction`            -- PAssion cl.5(ii): withdrawn wef 27 Oct 2024
+    `Mandai Wildlife Group`    -- PAssion cl.5(iii): Zoo, River Wonders, Night Safari, Bird Paradise
+    `Another merchant`
+
+-- The families of statement-line text the exclusion lists match on: DBS
+-- Woman's cl.11 Table 2, yuu cl.9(i), Citi exclusion list paragraph 3, UOB
+-- cl.35, HSBC cl.4. A transaction may match several (an "AMAZE*AXS" line
+-- matches two), so `Transaction` carries a LIST of them. Layer 1 decides
+-- membership by substring, which is what "matching the terms" and "any
+-- combination, permutation or derivation" describe; the rules then test
+-- `elem`. Read the issuer's own list to see which family each rule uses.
+DECLARE `Description pattern` IS ONE OF
+    AXS                        -- AXS, AXS BizPay, AXS PTE LTD, PAYPAL AXS PTE LTD
+    AMAZE                      -- AMAZE, AMAZE*<merchant>
+    `EZ-Link`                  -- EZLINK, EZ-LINK, EZ Link, MYEZLINK
+    TRANSIT                    -- TRANSIT, TRANSIT 3, Transit Link
+    `BUS/MRT`                  -- BUS/MRT (Citi paragraph 3)
+    `SimplyGo description`     -- SIMPLYGO* (Citi paragraph 3); distinct from the SimplyGo merchant
+    FlashPay                   -- FLASHPAY, NETSFLASHPAY, NETS VCASHCARD
+    YouTrip                    -- YOUTRIP, Youtrip Singapore SG
+    CardUp                     -- CARDUP
+    iPaymy                     -- IPAYMY
+    FavePay                    -- FAVEPAY, FAVE ECARD
+    ShopeePay                  -- SHOPEEPAY
+    SAM                        -- SAM PAYMENTS, SINGPOST-SAM, "SAM –"
+    RazerPay                   -- RAZERPAY
+    SmoovPay                   -- SmoovPay, SMOOVPAY (EC), SMOOV PTE LTD
+    `Singtel Dash`             -- SINGTEL DASH
+    PayPal                     -- PAYPAL (yuu/PAssion Appendix 1; HSBC cl.4)
+    `Skrill or Moneybookers`   -- SKR*SKRILL.COM, MB MONEYBOOKERS.COM
+    `Forex or CFD platform`    -- OANDA, SAXO CAP MKTS, IGMARKETS, PLUS500, CITY INDEX, BANC DE BINARY, SKYFX, XTRADE, TOROPTION
+    `Cryptocurrency platform`  -- COINBASE, BITSTAMP, BITPANDA, COINIFY, INDACOIN, SIMPLEX_*, and the rest of Woman's Table 2
+    `Payment platform`         -- BAGUS, CANTINE, SEDAP, SGEBIZ, Singapore E-Business, KASHMI, MATCHMOVE PAY, IPLMILESLIFE
+    `Government levy`          -- RWS-LEVY (UOB cl.35)
+
+-- What KIND of posting this is. Every issuer excludes the same family of
+-- non-purchases -- fees, interest, instalment plans, transfers, cash
+-- advances, bill payments -- and none of them is visible in an MCC or a
+-- merchant name: they are attributes of the posting, which the statement
+-- does show. Citi cl.5(i)-(iii), yuu cl.9(a)-(e), UOB cl.32, HSBC cl.4,
+-- DBS Woman's cl.11(iii)-(vii).
+DECLARE `Charge kind` IS ONE OF
+    `Retail purchase`
+    `Annual fee or bank charge`
+    `Interest or finance charge`
+    `Instalment plan transaction`
+    `Balance or funds transfer`
+    `Cash advance or quasi-cash`
+    `Bill payment via internet banking`
+    `Telephone or mail order`
+    `Pre-authorisation`
+    `Refund or reversal`
+
+
+§§ `The transaction`
+
+-- One charge, as the cardholder and the statement describe it. `merchant
+-- category code` is the acquirer's MCC as it appears on the statement (every
+-- issuer here says the acquirer assigns it and the issuer does not).
+-- `merchant name` and `transaction description` are the printed strings;
+-- `merchant` and `description patterns` are their classification by layer 1
+-- (`classify.l4`), and are what the rules read -- a rule never compares a
+-- string (Catala has none). `charge kind` is the posting's kind. `posted in a
+-- foreign currency` is the fact DBS Woman's cl.12, PAssion cl.7(d) and the flat
+-- cards' overseas rates turn on, as a boolean because a rule may not compare
+-- the `currency` string. `posting date` may lag `transaction
+-- date`; DBS attributes to the transaction date and UOB to the posting date,
+-- and both are facts the statement shows.
+DECLARE Transaction
+    HAS `merchant name`             IS A STRING
+        `merchant`                  IS A Merchant
+        `merchant category code`    IS A NUMBER
+        `transaction description`   IS A STRING
+        `description patterns`      IS A LIST OF `Description pattern`
+        `charge kind`               IS A `Charge kind`
+        `amount`                    IS A NUMBER
+        `currency`                  IS A STRING
+        `posted in a foreign currency` IS A BOOLEAN
+        `transaction date`          IS A DATE
+        `posting date`              IS A DATE
+        `payment channel`           IS A `Payment channel`
+        `credential`                IS A Credential
+        `merchant indicator`        IS A `Merchant indicator`
+        `made in Singapore`         IS A BOOLEAN
+
+
+§§ `The cardholder`
+
+-- Standing facts about the cardholder that the T&Cs make operative and that
+-- change rarely: which Solitaire categories are elected this Quarter (UOB
+-- cl.4(b), cl.5); whether the yuu account is linked (DBS yuu cl.11, cl.17);
+-- the HSBC Everyday Global Account deposits ADB, which selects 9 or 19 bonus
+-- points (HSBC cl.7.1(ii)); PAssion membership and linkage (PAssion cl.1).
+--
+-- NOT MODELLED, AND WHY. The household cheat sheet credits Solitaire with
+-- "6 mpd (4 card + 2 savings)" conditional on a Lady's Savings Account
+-- balance. The UOB Lady's Cards T&C in this corpus states 10X UNI$ per S$5 =
+-- 4 miles per S$1 and says nothing about a savings-account uplift; that
+-- promotion's terms are NOT HELD. The uplift is therefore Unconfirmed in
+-- every answer, not a field here.
+DECLARE Cardholder
+    HAS `Solitaire preferred rewards categories`                 IS A LIST OF `Solitaire category`
+        `yuu account linked to the card`                         IS A BOOLEAN
+        `HSBC Everyday Global Account deposits ADB this month`   IS A NUMBER
+        `PAssion membership registered and card linked in yuu`   IS A BOOLEAN
+
+
+§§ `Where the month stands`
+
+-- The monthly thresholds the T&Cs condition bonus rates on, as at the
+-- moment of the transaction. These are FACTS about the month so far (a
+-- statement shows them); whether they satisfy a threshold is each card
+-- module's rule. Cap ROOM is deliberately not here: how much of a cap
+-- remains is the allocation problem, out of scope (spec section 6).
+--
+-- yuu cl.7(b): "Minimum S$800 worth of Eligible Spend ... and Transact at 4
+-- Participating Merchants" per calendar month. PAssion cl.8(a): "At least
+-- S$300 total spend at Participating Stores" and "At least S$400 total spend
+-- at non-Participating Stores" per Qualifying Month.
+DECLARE `Month position`
+    HAS `yuu eligible spend so far this calendar month`                     IS A NUMBER
+        `yuu participating merchants transacted so far this calendar month` IS A NUMBER
+        `PAssion spend at Participating Stores so far this month`           IS A NUMBER
+        `PAssion spend at non-Participating Stores so far this month`       IS A NUMBER
+
+
+§§ `Provenance and epistemic status`
+
+-- Every rule answers with its sources attached (spec section 8). A
+-- Provenance names the document by its id in source/source-bundle.json, the
+-- clause as the issuer numbers it, the document's own dating line, and the
+-- operative words verbatim.
+DECLARE Provenance
+    HAS `document`   IS A STRING
+        `clause`     IS A STRING
+        `dated`      IS A STRING
+        `document date`  IS A DATE
+        `quote`      IS A STRING
+
+-- `document date` is the same fact as `dated`, as a DATE: the day the
+-- document says it was updated or took effect, so that two citations can be
+-- compared for currency. (It also keeps this record from being all-string,
+-- which the Catala exporter could not emit; measured 2026-09-21.)
+
+-- What a reader may do with the answer.
+--   Verified          -- read from a held T&C, clause cited
+--   Unconfirmed       -- the T&C that would settle it is not held, or is
+--                        silent; a real value that propagates, never a default
+--   `Source expired`  -- read from a held T&C whose own stated period has
+--                        ended (PAssion cl.3: 1 Oct 2023 to 30 Sep 2025)
+--   `Disputed by source` -- a secondary source claims otherwise and the
+--                        primary text does not support it
+DECLARE Status IS ONE OF
+    Verified
+    Unconfirmed
+    `Source expired`
+    `Disputed by source`
+
+-- The basis on which a monthly cap refills, and the date a purchase is
+-- attributed by. Two independent axes (spec section 4.3): settling one does
+-- not settle the other. `Unconfirmed` is a value on both.
+DECLARE `Cap basis` IS ONE OF
+    `Calendar month`
+    `Statement month`
+    `Unconfirmed basis`
+
+DECLARE Attribution IS ONE OF
+    `By transaction date`
+    `By posting date`
+    `Unconfirmed attribution`
+
+-- A monthly bonus cap as the T&C states it, converted to the dollars of
+-- bonus-earning spend it admits. `capped` FALSE means this transaction does
+-- not run against any pool, whether because the T&C states no cap or because
+-- the cap does not reach this transaction (PAssion and HSBC answer FALSE on
+-- documents that do state a cap), and the dollar figure is meaningless. `pool` names WHICH pot the
+-- transaction runs against, because one card may keep several (UOB cl.6(b):
+-- each Preferred Rewards Category capped separately; HSBC cl.7.2: one pool
+-- for contactless and online together) and the cheat sheet's claim that two
+-- pots do not transfer is only checkable if the pot is named.
+DECLARE Cap
+    HAS `pool`                         IS A STRING
+        `capped`                       IS A BOOLEAN
+        `bonus spend per month`        IS A NUMBER
+        `basis`                        IS A `Cap basis`
+        `attribution`                  IS AN Attribution
+
+
+§§ `The answer`
+
+-- What every card module returns for (cardholder, month position,
+-- transaction): the rate with its conditions, its citations and its status.
+-- When the merchant indicator is Unknown and the card's rate turns on it,
+-- the two conditional rates differ, `depends on the merchant indicator` is
+-- TRUE, and `miles per dollar` carries the LOWER branch so the headline
+-- figure never overstates (spec section 7: the projection must render the
+-- uncertainty, not resolve it).
+-- `points per dollar` is the issuer's own unit (yuu Points, DBS Points, UNI$,
+-- HSBC Reward points, Citi ThankYou Points) and is what the T&C states;
+-- `miles per point` is the conversion, and `conversion status` says whether
+-- a HELD document states it (yuu cl.12: "0.28 miles or more"; UOB cl.3:
+-- "UNI$1 = 2 miles") or not (HSBC and Citi state their conversions in
+-- programme documents this corpus does not hold).
+DECLARE `Rate answer`
+    HAS `points per dollar`                                   IS A NUMBER
+        `miles per point`                                     IS A NUMBER
+        `conversion status`                                   IS A Status
+        `miles per dollar`                                    IS A NUMBER
+        `miles per dollar if the merchant flags online`       IS A NUMBER
+        `miles per dollar if the merchant flags card-present` IS A NUMBER
+        `depends on the merchant indicator`                   IS A BOOLEAN
+        `earns the bonus rate`                                IS A BOOLEAN
+        `cap`                                                 IS A Cap
+        `conditions`                                          IS A LIST OF STRING
+        `sources`                                             IS A LIST OF Provenance
+        `status`                                              IS A Status

@@ -143,6 +143,7 @@ P7_LEG_ORDER=(
   p7-tnr
   p7-wizard
   p7-akn
+  p7-catala
 )
 
 # Stages that exist as entry points and cannot run. Each refuses with exit 3 and
@@ -846,6 +847,7 @@ cmd_plan_deposit() {
       p7-tnr) legwhy="the sidecar declares no legs['p7-tnr'].golden for this encoding — a .nlg.golden is on disk but undeclared, and an undeclared golden gates nothing" ;;
       p7-wizard) legwhy="its well-formedness checks read the committed wizard module; the deposit declares no wizard split" ;;
       p7-akn) legwhy="re-pointing its shallow well-formedness pass at the deposit is unbuilt" ;;
+      p7-catala) legwhy="the leg itself is deposit-ready — it iterates GO_MODULES, which resolves to the SELECTED encoding — but the toolchain gate is not wired on this path and nothing has measured it over a deposit; declare it here once one has" ;;
       *) legwhy="re-pointing this leg at the deposit is unbuilt" ;;
     esac
     printf '  %-14s %-9s %-11s %s\n' "$leg" "NOT WIRED" "-" "$legwhy"

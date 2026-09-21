@@ -1,0 +1,69 @@
+{
+    "$defs": {
+        "Hurt Facts": {
+            "properties": {
+                "cause hurt": {
+                    "description": "Did the act in fact cause hurt to somebody? If it caused none, there is no offence under this section however dangerous the act was.",
+                    "type": "boolean"
+                },
+                "grievous": {
+                    "description": "Was the hurt the accused actually caused grievous hurt within section 320 — for example a fracture or dislocation of a bone?",
+                    "type": "boolean"
+                },
+                "intention of causing hurt": {
+                    "description": "Did the accused do the act intending to cause hurt to somebody? Hurt is bodily pain, disease or infirmity — it need not be serious.",
+                    "type": "boolean"
+                },
+                "knowledge of being likely to cause hurt": {
+                    "description": "Did the accused do the act knowing that it was likely to cause hurt to somebody, whether or not they wanted it to?",
+                    "type": "boolean"
+                },
+                "not grievous": {
+                    "description": "Was the hurt the accused intended, or knew himself likely to cause, something LESS than grievous hurt within section 320? Answer no if the accused was aiming at an injury such as a fracture — that case is section 325, not this one.",
+                    "type": "boolean"
+                },
+                "particulars": {
+                    "$ref": "#/$defs/Particulars",
+                    "description": "Who is charged, and when and where the offence was committed"
+                },
+                "the manner": {
+                    "description": "The particulars CPC s 125 requires, as they are to read after \"to wit,\" — what the accused did, and how it led to the hurt; for example \"by using both hands to push the chest of the said Lam Mian Sern once, causing him to fall backward\"",
+                    "type": "string"
+                },
+                "victim": {
+                    "description": "The name of the person hurt, as it is to appear in the charge — for example \"Lam Mian Sern\"",
+                    "type": "string"
+                },
+                "victim described as": {
+                    "description": "How the charge describes the person hurt, after the name; leave blank if not needed",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "particulars",
+                "victim",
+                "victim described as",
+                "the manner",
+                "intention of causing hurt",
+                "knowledge of being likely to cause hurt",
+                "cause hurt",
+                "not grievous",
+                "grievous"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Whether the accused is said \"voluntarily to cause hurt\" within section 321 of the Penal Code 1871",
+    "properties": {
+        "f": {
+            "$ref": "#/$defs/Hurt Facts",
+            "description": "What the accused did, what they meant or foresaw by it, and what it caused"
+        }
+    },
+    "required": [
+        "f"
+    ],
+    "title": "voluntarily causes hurt",
+    "type": "object"
+}

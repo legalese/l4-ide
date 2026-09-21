@@ -1,0 +1,371 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+cheatsheet-claims.l4:349:1-128:
+  assertion failed
+cheatsheet-claims.l4:350:1-143:
+  assertion satisfied
+cheatsheet-claims.l4:352:1-123:
+  assertion satisfied
+cheatsheet-claims.l4:353:1-139:
+  assertion satisfied
+cheatsheet-claims.l4:355:1-124:
+  assertion satisfied
+cheatsheet-claims.l4:356:1-124:
+  assertion satisfied
+cheatsheet-claims.l4:364:1-124:
+  assertion failed
+cheatsheet-claims.l4:365:1-139:
+  assertion satisfied
+cheatsheet-claims.l4:367:1-119:
+  assertion satisfied
+cheatsheet-claims.l4:368:1-135:
+  assertion satisfied
+cheatsheet-claims.l4:370:1-120:
+  assertion satisfied
+cheatsheet-claims.l4:380:1-123:
+  assertion failed
+cheatsheet-claims.l4:381:1-137:
+  assertion failed
+cheatsheet-claims.l4:383:1-130:
+  assertion failed
+cheatsheet-claims.l4:384:1-145:
+  assertion satisfied
+cheatsheet-claims.l4:386:1-128:
+  assertion failed
+cheatsheet-claims.l4:387:1-143:
+  assertion failed
+cheatsheet-claims.l4:388:1-126:
+  assertion satisfied
+cheatsheet-claims.l4:399:1-136:
+  assertion failed
+cheatsheet-claims.l4:400:1-151:
+  assertion satisfied
+cheatsheet-claims.l4:402:1-131:
+  assertion failed
+cheatsheet-claims.l4:403:1-147:
+  assertion satisfied
+cheatsheet-claims.l4:405:1-132:
+  assertion satisfied
+cheatsheet-claims.l4:417:1-143:
+  assertion failed
+cheatsheet-claims.l4:418:1-158:
+  assertion satisfied
+cheatsheet-claims.l4:419:1-143:
+  assertion failed
+cheatsheet-claims.l4:420:1-158:
+  assertion satisfied
+cheatsheet-claims.l4:422:1-136:
+  assertion failed
+cheatsheet-claims.l4:423:1-152:
+  assertion satisfied
+cheatsheet-claims.l4:425:1-139:
+  assertion satisfied
+cheatsheet-claims.l4:439:1-128:
+  assertion failed
+cheatsheet-claims.l4:440:1-142:
+  assertion failed
+cheatsheet-claims.l4:442:1-135:
+  assertion failed
+cheatsheet-claims.l4:443:1-150:
+  assertion satisfied
+cheatsheet-claims.l4:445:1-133:
+  assertion failed
+cheatsheet-claims.l4:446:1-148:
+  assertion failed
+cheatsheet-claims.l4:447:1-132:
+  assertion failed
+cheatsheet-claims.l4:448:1-127:
+  assertion failed
+cheatsheet-claims.l4:458:1-127:
+  assertion failed
+cheatsheet-claims.l4:459:1-142:
+  assertion satisfied
+cheatsheet-claims.l4:461:1-123:
+  assertion satisfied
+cheatsheet-claims.l4:470:1-136:
+  assertion failed
+cheatsheet-claims.l4:471:1-151:
+  assertion satisfied
+cheatsheet-claims.l4:473:1-131:
+  assertion failed
+cheatsheet-claims.l4:474:1-147:
+  assertion satisfied
+cheatsheet-claims.l4:476:1-131:
+  assertion satisfied
+cheatsheet-claims.l4:477:1-147:
+  assertion satisfied
+cheatsheet-claims.l4:478:1-132:
+  assertion satisfied
+cheatsheet-claims.l4:487:1-119:
+  assertion failed
+cheatsheet-claims.l4:488:1-133:
+  assertion failed
+cheatsheet-claims.l4:490:1-121:
+  assertion satisfied
+cheatsheet-claims.l4:491:1-137:
+  assertion satisfied
+cheatsheet-claims.l4:493:1-130:
+  assertion failed
+cheatsheet-claims.l4:494:1-122:
+  assertion satisfied
+cheatsheet-claims.l4:503:1-120:
+  assertion satisfied
+cheatsheet-claims.l4:504:1-136:
+  assertion satisfied
+cheatsheet-claims.l4:506:1-129:
+  assertion failed
+cheatsheet-claims.l4:507:1-145:
+  assertion satisfied
+cheatsheet-claims.l4:509:1-121:
+  assertion satisfied
+cheatsheet-claims.l4:519:1-123:
+  assertion failed
+cheatsheet-claims.l4:520:1-137:
+  assertion failed
+cheatsheet-claims.l4:522:1-125:
+  assertion failed
+cheatsheet-claims.l4:523:1-141:
+  assertion failed
+cheatsheet-claims.l4:525:1-126:
+  assertion satisfied
+cheatsheet-claims.l4:533:1-124:
+  assertion failed
+cheatsheet-claims.l4:534:1-139:
+  assertion satisfied
+cheatsheet-claims.l4:536:1-119:
+  assertion failed
+cheatsheet-claims.l4:537:1-135:
+  assertion failed
+cheatsheet-claims.l4:539:1-120:
+  assertion satisfied
+cheatsheet-claims.l4:549:1-130:
+  assertion satisfied
+cheatsheet-claims.l4:550:1-146:
+  assertion satisfied
+cheatsheet-claims.l4:552:1-131:
+  assertion satisfied
+cheatsheet-claims.l4:553:1-131:
+  assertion satisfied
+cheatsheet-claims.l4:561:1-121:
+  assertion failed
+cheatsheet-claims.l4:562:1-137:
+  assertion satisfied
+cheatsheet-claims.l4:564:1-116:
+  assertion failed
+cheatsheet-claims.l4:565:1-132:
+  assertion satisfied
+cheatsheet-claims.l4:567:1-119:
+  assertion failed
+cheatsheet-claims.l4:568:1-135:
+  assertion satisfied
+cheatsheet-claims.l4:569:1-120:
+  assertion satisfied
+cheatsheet-claims.l4:577:1-121:
+  assertion failed
+cheatsheet-claims.l4:578:1-137:
+  assertion satisfied
+cheatsheet-claims.l4:580:1-116:
+  assertion failed
+cheatsheet-claims.l4:581:1-132:
+  assertion satisfied
+cheatsheet-claims.l4:583:1-120:
+  assertion satisfied
+cheatsheet-claims.l4:584:1-120:
+  assertion satisfied
+cheatsheet-claims.l4:592:1-121:
+  assertion failed
+cheatsheet-claims.l4:593:1-137:
+  assertion satisfied
+cheatsheet-claims.l4:595:1-116:
+  assertion failed
+cheatsheet-claims.l4:596:1-132:
+  assertion satisfied
+cheatsheet-claims.l4:598:1-119:
+  assertion failed
+cheatsheet-claims.l4:599:1-135:
+  assertion satisfied
+cheatsheet-claims.l4:600:1-120:
+  assertion satisfied
+cheatsheet-claims.l4:609:1-127:
+  assertion failed
+cheatsheet-claims.l4:610:1-143:
+  assertion satisfied
+cheatsheet-claims.l4:612:1-122:
+  assertion failed
+cheatsheet-claims.l4:613:1-138:
+  assertion satisfied
+cheatsheet-claims.l4:615:1-126:
+  assertion satisfied
+cheatsheet-claims.l4:616:1-126:
+  assertion satisfied
+cheatsheet-claims.l4:634:1-119:
+  assertion failed
+cheatsheet-claims.l4:635:1-133:
+  assertion failed
+cheatsheet-claims.l4:644:1-132:
+  assertion satisfied
+cheatsheet-claims.l4:645:1-132:
+  assertion satisfied
+cheatsheet-claims.l4:647:1-135:
+  assertion satisfied
+cheatsheet-claims.l4:648:1-135:
+  assertion satisfied
+cheatsheet-claims.l4:656:1-122:
+  assertion failed
+cheatsheet-claims.l4:657:1-136:
+  assertion failed
+cheatsheet-claims.l4:659:1-125:
+  assertion satisfied
+cheatsheet-claims.l4:660:1-125:
+  assertion satisfied
+cheatsheet-claims.l4:675:1-125:
+  assertion satisfied
+cheatsheet-claims.l4:676:1-141:
+  assertion satisfied
+cheatsheet-claims.l4:678:1-126:
+  assertion satisfied
+cheatsheet-claims.l4:679:1-126:
+  assertion satisfied
+cheatsheet-claims.l4:681:1-150:
+  assertion satisfied
+cheatsheet-claims.l4:683:1-146:
+  assertion satisfied
+cheatsheet-claims.l4:692:1-128:
+  assertion failed
+cheatsheet-claims.l4:693:1-141:
+  assertion failed
+cheatsheet-claims.l4:695:1-124:
+  assertion satisfied
+cheatsheet-claims.l4:696:1-124:
+  assertion satisfied
+cheatsheet-claims.l4:705:1-135:
+  assertion satisfied
+cheatsheet-claims.l4:706:1-135:
+  assertion satisfied
+cheatsheet-claims.l4:707:1-138:
+  assertion satisfied
+cheatsheet-claims.l4:708:1-138:
+  assertion satisfied
+cheatsheet-claims.l4:711:1-138:
+  assertion satisfied
+cheatsheet-claims.l4:712:1-141:
+  assertion satisfied
+cheatsheet-claims.l4:713:1-138:
+  assertion satisfied
+cheatsheet-claims.l4:731:1-127:
+  assertion satisfied
+cheatsheet-claims.l4:732:1-127:
+  assertion satisfied
+cheatsheet-claims.l4:738:1-138:
+  assertion satisfied
+cheatsheet-claims.l4:744:1-134:
+  assertion satisfied
+cheatsheet-claims.l4:746:1-145:
+  assertion satisfied
+cheatsheet-claims.l4:748:1-123:
+  assertion satisfied
+cheatsheet-claims.l4:754:1-133:
+  assertion satisfied
+cheatsheet-claims.l4:755:1-144:
+  assertion satisfied
+cheatsheet-claims.l4:757:1-122:
+  assertion satisfied
+cheatsheet-claims.l4:763:1-147:
+  assertion satisfied
+cheatsheet-claims.l4:764:1-149:
+  assertion satisfied
+cheatsheet-claims.l4:768:1-143:
+  assertion satisfied
+cheatsheet-claims.l4:769:1-145:
+  assertion satisfied
+cheatsheet-claims.l4:775:1-135:
+  assertion satisfied
+cheatsheet-claims.l4:777:1-117:
+  assertion satisfied
+cheatsheet-claims.l4:785:1-135:
+  assertion satisfied
+cheatsheet-claims.l4:786:1-146:
+  assertion satisfied
+cheatsheet-claims.l4:787:1-131:
+  assertion satisfied
+cheatsheet-claims.l4:793:1-129:
+  assertion failed
+cheatsheet-claims.l4:808:1-225:
+  assertion satisfied
+cheatsheet-claims.l4:809:1-239:
+  assertion satisfied
+cheatsheet-claims.l4:814:1-237:
+  assertion satisfied
+cheatsheet-claims.l4:817:1-222:
+  assertion satisfied
+cheatsheet-claims.l4:835:1-149:
+  assertion failed
+cheatsheet-claims.l4:836:1-165:
+  assertion satisfied
+cheatsheet-claims.l4:843:1-141:
+  assertion satisfied
+cheatsheet-claims.l4:876:1-178:
+  assertion satisfied
+cheatsheet-claims.l4:877:1-174:
+  assertion satisfied
+cheatsheet-claims.l4:878:1-180:
+  assertion satisfied
+cheatsheet-claims.l4:879:1-186:
+  assertion satisfied
+cheatsheet-claims.l4:880:1-184:
+  assertion satisfied
+cheatsheet-claims.l4:881:1-193:
+  assertion satisfied
+cheatsheet-claims.l4:882:1-193:
+  assertion satisfied
+cheatsheet-claims.l4:883:1-189:
+  assertion satisfied
+cheatsheet-claims.l4:884:1-185:
+  assertion satisfied
+cheatsheet-claims.l4:885:1-177:
+  assertion satisfied
+cheatsheet-claims.l4:886:1-186:
+  assertion failed
+cheatsheet-claims.l4:887:1-184:
+  assertion failed
+cheatsheet-claims.l4:888:1-176:
+  assertion satisfied
+cheatsheet-claims.l4:889:1-183:
+  assertion satisfied
+cheatsheet-claims.l4:890:1-175:
+  assertion satisfied
+cheatsheet-claims.l4:891:1-182:
+  assertion satisfied
+cheatsheet-claims.l4:892:1-180:
+  assertion satisfied
+cheatsheet-claims.l4:893:1-174:
+  assertion satisfied
+cheatsheet-claims.l4:894:1-185:
+  assertion satisfied
+cheatsheet-claims.l4:895:1-174:
+  assertion satisfied
+cheatsheet-claims.l4:896:1-174:
+  assertion satisfied
+cheatsheet-claims.l4:897:1-174:
+  assertion satisfied
+cheatsheet-claims.l4:898:1-180:
+  assertion satisfied
+cheatsheet-claims.l4:899:1-176:
+  assertion satisfied
+cheatsheet-claims.l4:900:1-186:
+  assertion satisfied
+cheatsheet-claims.l4:901:1-179:
+  assertion satisfied
+cheatsheet-claims.l4:902:1-180:
+  assertion satisfied
+cheatsheet-claims.l4:903:1-197:
+  assertion satisfied
+cheatsheet-claims.l4:904:1-178:
+  assertion satisfied
+cheatsheet-claims.l4:905:1-189:
+  assertion satisfied
+cheatsheet-claims.l4:906:1-192:
+  assertion failed
+cheatsheet-claims.l4:907:1-202:
+  assertion failed

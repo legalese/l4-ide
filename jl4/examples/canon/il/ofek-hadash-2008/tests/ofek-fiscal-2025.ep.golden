@@ -1,0 +1,330 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `ofek-domain`
+
+§ `The 2025-2026 wage reduction`
+
+-- ===========================================================================
+-- HOW A WAR REACHES A PAYSLIP.
+--
+-- As part of the 2025 State budget the Knesset enacted, in Chapter 9 of the
+-- Budget Objectives Act 5785-2025 (published 27 March 2025), a temporary
+-- provision titled "Law for the participation of employees and office-holders
+-- in the public service in steps for fiscal stabilisation during 2025 and
+-- 2026". Its mechanism is unusual and is the reason this module exists:
+--
+--   the Act does NOT itself set the reduction for a group that reaches an
+--   agreement. It reduces pay "in accordance with the provisions laid down in
+--   a collective agreement applying to the employee, APPROVED for this
+--   purpose by the Minister of Finance or the Wage Commissioner"; and only in
+--   the ABSENCE of such an approved agreement does the Act's own § 3 rate
+--   apply.
+--
+-- For teachers on Ofek Hadash terms that approved agreement is the collective
+-- agreement of 29 June 2026 between the State and the Teachers' Union, and it
+-- is the operative instrument. Everything below is from that agreement unless
+-- the Act is named.
+--
+-- WHY THE ACT IS NOT ENCODED FROM ITS OWN TEXT. The corpus's copy of the Act
+-- is a PDF extraction of the whole Budget Act, and the corpus itself records
+-- that PDF-extracted text is bidi-damaged: in Chapter 9 the Hebrew arrives
+-- with words duplicated and reversed, so that the definition of "the
+-- determining base" appears twice, interleaved with itself. The collective
+-- agreement's copy of the SAME definition is clean, and it is the instrument
+-- that governs here in any event. NOTES.md § 5 records this as a deliberate
+-- choice about which of two sources to encode from, not an oversight.
+-- ===========================================================================
+
+§§ `Sections 6 and 7 — who is caught`
+
+-- § 6 catches state employees of the Ministry of Education graded in the
+-- teaching grade and employed on Ofek Hadash terms, including in ulpanim, and
+-- teaching staff in instruction roles for the instruction fraction of their
+-- post. § 7 excludes two groups "for the avoidance of doubt".
+DECLARE `a place of employment for the 2026 agreement` IS ONE OF
+    `an education institution on Ofek Hadash terms`   -- § 6
+    `an ulpan on Ofek Hadash terms`                   -- § 6
+    `an instruction role on Ofek Hadash terms`        -- § 6
+    `a teacher training college`                      -- § 7, excluded
+    `a supervision or headquarters role`              -- § 7, excluded
+
+GIVEN `the place` IS A `a place of employment for the 2026 agreement`
+GIVETH A BOOLEAN
+DECIDE `the 2026 agreement applies to work` `the place` IF
+    CONSIDER `the place`
+    WHEN `an education institution on Ofek Hadash terms` THEN TRUE
+    WHEN `an ulpan on Ofek Hadash terms`                 THEN TRUE
+    WHEN `an instruction role on Ofek Hadash terms`      THEN TRUE
+    WHEN `a teacher training college`                    THEN FALSE
+    WHEN `a supervision or headquarters role`            THEN FALSE
+
+§§ `Section 8 — the determining base`
+
+-- § 8 defines "the determining base" (ha-basis ha-kove'a) as SALARY, less
+-- four things. The exclusions are what make the reduction narrower than it
+-- looks: the two annual allowances that a teacher would most notice — the
+-- recreation payment and the clothing allowance — are outside the base, and
+-- are dealt with separately and once by § 20.
+DECLARE `a component of the pay packet` IS ONE OF
+    `a payment made monthly weekly or daily`                       -- inside the base
+    `a payment neither periodic nor computed on other components`  -- § 8(a), out
+    `the recreation payment`                                       -- § 8(b), out
+    `the clothing allowance`                                       -- § 8(b), out
+    `a reimbursement of expenses`                                  -- § 8(c), out
+    `an employer grossing-up of the employee's tax`                -- § 8(d), out
+
+GIVEN `the component` IS A `a component of the pay packet`
+GIVETH A BOOLEAN
+DECIDE `the component is in the determining base` `the component` IF
+    CONSIDER `the component`
+    WHEN `a payment made monthly weekly or daily`                      THEN TRUE
+    WHEN `a payment neither periodic nor computed on other components` THEN FALSE
+    WHEN `the recreation payment`                                      THEN FALSE
+    WHEN `the clothing allowance`                                      THEN FALSE
+    WHEN `a reimbursement of expenses`                                 THEN FALSE
+    WHEN `an employer grossing-up of the employee's tax`               THEN FALSE
+
+§§ `Section 9 — the rates, and the two periods`
+
+`the first day of the first reduction period` MEANS YMD 2025 5 1
+`the last day of the first reduction period` MEANS YMD 2025 12 31
+`the first day of the second reduction period` MEANS YMD 2026 1 1
+`the last day of the second reduction period` MEANS YMD 2026 12 31
+
+`the rate for the first reduction period` MEANS 0.95%   -- § 9(a)
+`the rate for the second reduction period` MEANS 1.2%   -- § 9(b)
+
+GIVEN `the date` IS A DATE
+GIVETH A NUMBER
+`the reduction rate on` `the date`
+    @nlg the wage reduction rate applying on %the date%
+    MEANS
+    -- § 9(a): 1.5.2025 to 31.12.2025 — 0.95% of the determining base.
+    -- § 9(b): 1.1.2026 to 31.12.2026 — 1.2%. Outside those two windows the
+    -- temporary provision does not bite at all: it is an hora'at sha'a, and
+    -- it expires.
+    BRANCH IF `the date` `is before` `the first day of the first reduction period` THEN 0
+           IF `the date` AT MOST `the last day of the first reduction period` THEN `the rate for the first reduction period`
+           IF `the date` AT MOST `the last day of the second reduction period` THEN `the rate for the second reduction period`
+           OTHERWISE                                                                    0
+
+GIVEN `the determining base` IS A NUMBER
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the monthly wage reduction on` `the determining base` `the date`
+    @nlg the monthly wage reduction on a determining base of %the determining base%
+    MEANS `the determining base` TIMES (`the reduction rate on` `the date`)
+
+-- § 12: the base on which the employer's study-fund contribution is computed
+-- is reduced by the same rate, so the reduction reaches beyond take-home pay
+-- into the teacher's savings.
+GIVEN `the study fund base` IS A NUMBER
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the study fund base after the reduction` `the study fund base` `the date`
+    @nlg the study fund base after the section 12 reduction
+    MEANS `the study fund base` TIMES (1 MINUS (`the reduction rate on` `the date`))
+
+§§ `Section 18 — what the reduction is NOT allowed to touch`
+
+-- § 18 is the article that keeps a temporary cash saving from becoming a
+-- permanent cut to a pension. Five payments are computed "as they would have
+-- been calculated but for these provisions, that is, as though they had been
+-- paid at their time and without the reduction".
+DECLARE `a payment computed on salary` IS ONE OF
+    `a one-off payment on the end of employment`      -- § 18(1)
+    `an employer contribution to a pension fund`      -- § 18(2)
+    `the determining salary for a budgetary pension`  -- § 18(3)
+    `a payment of budgetary pension`                  -- § 18(4)
+    `a bridging payment or purchased pension top-up`  -- § 18(5)
+    `ordinary monthly pay`                            -- not listed: reduced
+
+GIVEN `the payment` IS A `a payment computed on salary`
+GIVETH A BOOLEAN
+DECIDE `the reduction is ignored in computing` `the payment` IF
+    CONSIDER `the payment`
+    WHEN `a one-off payment on the end of employment`     THEN TRUE
+    WHEN `an employer contribution to a pension fund`     THEN TRUE
+    WHEN `the determining salary for a budgetary pension` THEN TRUE
+    WHEN `a payment of budgetary pension`                 THEN TRUE
+    WHEN `a bridging payment or purchased pension top-up` THEN TRUE
+    WHEN `ordinary monthly pay`                           THEN FALSE
+
+§§ `Sections 15 and 16 — the seniority step, given and taken back`
+
+-- § 15 says the rules for recognising seniority for advancement in the salary
+-- table are unchanged. § 16 then says, "notwithstanding § 15 and any other
+-- agreement", that a teacher entitled to a seniority advancement in the
+-- September 2025 salary shall have their pay reduced BY THE AMOUNT OF THE
+-- INCREASE, in the salaries from September to December 2025 inclusive.
+--
+-- So the step is recognised — the teacher's place in the table really does
+-- move, and stays moved — and its cash value is withheld for four months.
+-- This is a distinct reduction from § 9, and it stacks on top of it.
+`the first month the seniority step is withheld` MEANS YMD 2025 9 1
+`the last month the seniority step is withheld` MEANS YMD 2025 12 31
+
+GIVEN `the date` IS A DATE
+GIVETH A BOOLEAN
+DECIDE `the seniority step is withheld on` `the date` IF
+        NOT (`the date` `is before` `the first month the seniority step is withheld`)
+    AND `the date` AT MOST `the last month the seniority step is withheld`
+
+GIVEN `the value of the seniority step` IS A NUMBER
+      `the teacher advanced in seniority in september 2025` IS A BOOLEAN
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the section 16 withholding on` `the value of the seniority step` `the teacher advanced in seniority in september 2025` `the date`
+    @nlg the section 16 withholding of a seniority step worth %the value of the seniority step%
+    MEANS
+    IF `the teacher advanced in seniority in september 2025` AND (`the seniority step is withheld on` `the date`)
+        THEN `the value of the seniority step`
+        ELSE 0
+
+§§ `Section 20 — the clothing allowance, reduced once`
+
+-- § 20 takes back, from the 5785 (2024/25) clothing allowance alone, the sum
+-- of two things: the whole of that year's index-linkage, and a flat 91
+-- shekels. § 20(b) is careful to add that the following year's allowance is
+-- computed as though this had not happened — so this is a one-off, and it
+-- does not compound.
+`the flat part of the clothing allowance reduction` MEANS 91   -- § 20(a)(1)(b)
+
+GIVEN `the allowance with index linkage` IS A NUMBER
+      `the allowance without index linkage` IS A NUMBER
+      `the fraction of a full post` IS A NUMBER
+GIVETH A NUMBER
+`the clothing allowance reduction for 2025` `the allowance with index linkage` `the allowance without index linkage` `the fraction of a full post`
+    @nlg the one-off 2025 clothing allowance reduction
+    MEANS
+    -- § 20(a)(2): a teacher on a part post, or employed for part of the
+    -- school year, bears the proportionate part.
+    (      (`the allowance with index linkage` MINUS `the allowance without index linkage`)
+     PLUS  `the flat part of the clothing allowance reduction`)
+    TIMES `the fraction of a full post`
+
+§§ `Sections 24 and 25 — the extra substitution hour`
+
+-- A curiosity, and the encoding's clearest single example of why a corpus has
+-- to be read rather than assumed. In the 5786 school year teachers perform ONE
+-- additional frontal substitution hour, on top of the hours in their post, and
+-- § 25 prices it at 25% of the value of an hour.
+--
+-- 25%, not 125%. Every other hour worked on top of a post in this scheme is
+-- paid at 125% (2008 §§ 29, 30) or at 100% (2008 § 33(c)(3)). The corpus
+-- records that this figure was checked against the signed scan precisely
+-- because it reads like a typo, and it is not one: the agreement calls it a
+-- special rate for this agreement, lower than the ordinary substitution rate.
+-- It is a concession extracted in exchange for the industrial peace § 29 buys.
+`the rate for the section 25 additional hour` MEANS 25%
+`the additional hours required in the 5786 school year` MEANS 1
+
+-- § 26: §§ 24 and 25 do not reach a teacher who did regular work on 4 May
+-- 2025 according to their fixed timetable — the day of the industrial action
+-- the agreement is settling.
+GIVEN `the teacher worked normally on 4 May 2025` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the additional hour is required of the teacher` IF
+    NOT `the teacher worked normally on 4 May 2025`
+
+GIVEN `the value of an hour` IS A NUMBER
+      `the teacher worked normally on 4 May 2025` IS A BOOLEAN
+GIVETH A NUMBER
+`the pay for the section 25 additional hour` `the value of an hour` `the teacher worked normally on 4 May 2025`
+    @nlg the pay for the additional substitution hour under section 25
+    MEANS
+    IF `the additional hour is required of the teacher` `the teacher worked normally on 4 May 2025`
+        THEN `the value of an hour` TIMES `the rate for the section 25 additional hour`
+        ELSE 0
+
+§§ `Section 17 — one line on the payslip`
+
+-- § 17 requires the whole of the §§ 9 to 16 reductions to appear as a SINGLE
+-- line, named "Economic Arrangements Law — Ofek". Encoded because it is the
+-- only thing in this agreement a teacher actually sees, and because it means
+-- the § 9 reduction and the § 16 withholding are not separately visible to
+-- the person they are taken from.
+`the name of the line on the payslip` MEANS "חוק הת. כלכלית אופק"
+
+GIVEN `the determining base` IS A NUMBER
+      `the value of the seniority step` IS A NUMBER
+      `the teacher advanced in seniority in september 2025` IS A BOOLEAN
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the single payslip line for` `the determining base` `the value of the seniority step` `the teacher advanced in seniority in september 2025` `the date`
+    @nlg the total shown on the single payslip line required by section 17
+    MEANS   `the monthly wage reduction on` `the determining base` `the date`
+      PLUS  `the section 16 withholding on` `the value of the seniority step` `the teacher advanced in seniority in september 2025` `the date`
+
+§§ `Illustrations`
+
+`a day in november 2025` MEANS YMD 2025 11 1
+`a day in march 2026` MEANS YMD 2026 3 1
+`a day in march 2027` MEANS YMD 2027 3 1
+`a day in april 2025` MEANS YMD 2025 4 1
+
+-- § 9: the two rates, and the two boundaries of the temporary provision.
+#ASSERT `the reduction rate on` `a day in april 2025` EQUALS 0
+#ASSERT `the reduction rate on` `a day in november 2025` EQUALS 0.95%
+#ASSERT `the reduction rate on` `a day in march 2026` EQUALS 1.2%
+#ASSERT `the reduction rate on` `a day in march 2027` EQUALS 0
+#ASSERT `the reduction rate on` (YMD 2025 5 1) EQUALS 0.95%
+#ASSERT `the reduction rate on` (YMD 2025 12 31) EQUALS 0.95%
+#ASSERT `the reduction rate on` (YMD 2026 1 1) EQUALS 1.2%
+#ASSERT `the reduction rate on` (YMD 2026 12 31) EQUALS 1.2%
+#ASSERT `the reduction rate on` (YMD 2027 1 1) EQUALS 0
+
+-- On a determining base of 12,000 the reduction is 114 a month in 2025 and
+-- 144 a month in 2026.
+#ASSERT `the monthly wage reduction on` 12_000 `a day in november 2025` EQUALS 114
+#ASSERT `the monthly wage reduction on` 12_000 `a day in march 2026` EQUALS 144
+
+-- § 8: the recreation payment and the clothing allowance are OUTSIDE the
+-- base, so the percentage reduction never touches them. § 20 is how the
+-- clothing allowance is reached instead, once.
+#ASSERT NOT `the component is in the determining base` `the recreation payment`
+#ASSERT NOT `the component is in the determining base` `the clothing allowance`
+#ASSERT NOT `the component is in the determining base` `a reimbursement of expenses`
+#ASSERT `the component is in the determining base` `a payment made monthly weekly or daily`
+
+-- § 18: the reduction is ignored for everything that determines a pension,
+-- and applies to ordinary monthly pay.
+#ASSERT `the reduction is ignored in computing` `an employer contribution to a pension fund`
+#ASSERT `the reduction is ignored in computing` `the determining salary for a budgetary pension`
+#ASSERT `the reduction is ignored in computing` `a one-off payment on the end of employment`
+#ASSERT NOT `the reduction is ignored in computing` `ordinary monthly pay`
+
+-- § 12: the study fund base falls by the same rate.
+#ASSERT `the study fund base after the reduction` 10_000 `a day in march 2026` EQUALS 9_880
+
+-- § 16: a seniority step worth 130 a month is withheld from September to
+-- December 2025 and not afterwards — and it STACKS on the § 9 reduction, so
+-- a teacher who advanced loses 114 plus 130 in November 2025.
+#ASSERT `the section 16 withholding on` 130 TRUE `a day in november 2025` EQUALS 130
+#ASSERT `the section 16 withholding on` 130 TRUE (YMD 2026 1 1) EQUALS 0
+#ASSERT `the section 16 withholding on` 130 FALSE `a day in november 2025` EQUALS 0
+#ASSERT `the single payslip line for` 12_000 130 TRUE `a day in november 2025` EQUALS 244
+#ASSERT `the single payslip line for` 12_000 130 FALSE `a day in november 2025` EQUALS 114
+#ASSERT `the single payslip line for` 12_000 130 TRUE `a day in march 2026` EQUALS 144
+
+-- § 20: a full-post teacher whose indexed allowance is 2,500 against 2,400
+-- unindexed gives up 100 of linkage plus the flat 91.
+#ASSERT `the clothing allowance reduction for 2025` 2_500 2_400 1 EQUALS 191
+#ASSERT `the clothing allowance reduction for 2025` 2_500 2_400 (50%) EQUALS 95.5
+
+-- §§ 24-26: the additional hour, at a quarter of the value of an hour, and
+-- not required of a teacher who worked normally on 4 May 2025.
+#ASSERT `the pay for the section 25 additional hour` 64.15 FALSE EQUALS 16.0375
+#ASSERT `the pay for the section 25 additional hour` 64.15 TRUE EQUALS 0
+#ASSERT `the additional hour is required of the teacher` FALSE
+#ASSERT NOT `the additional hour is required of the teacher` TRUE
+
+-- The rate really is a quarter, and it is the only rate in this encoding
+-- BELOW the value of the hour it pays for.
+#ASSERT `the rate for the section 25 additional hour` EQUALS 25%
+
+-- §§ 6-7: who is caught, and the two groups expressly outside.
+#ASSERT `the 2026 agreement applies to work` `an education institution on Ofek Hadash terms`
+#ASSERT `the 2026 agreement applies to work` `an ulpan on Ofek Hadash terms`
+#ASSERT NOT `the 2026 agreement applies to work` `a teacher training college`
+#ASSERT NOT `the 2026 agreement applies to work` `a supervision or headquarters role`

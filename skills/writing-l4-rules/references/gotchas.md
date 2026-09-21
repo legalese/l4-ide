@@ -371,7 +371,11 @@ squared x MEANS x TIMES x
 
 ## Annotation fence
 
-All annotations begin with `@` and apply to the following definition:
+All annotations begin with `@`. On its own line, an annotation applies to the **following**
+definition; trailing a line, it applies to what is on that line. `@nlg` follows that rule with
+two twists — a rule takes it only on the line above, and inside a field list an own-line
+annotation describes the field **above** it — which the next section measures. Read it before
+writing one:
 
 | Annotation | Purpose                                                            |
 | ---------- | ------------------------------------------------------------------ |
@@ -383,6 +387,102 @@ All annotations begin with `@` and apply to the following definition:
 | `@ref-map` | Mapping table for references                                       |
 
 `@ref` / `@ref-src` / `@ref-map` are the "link this rule to §3.2 of the statute" annotations — use them whenever the source document has stable citations.
+
+### `@nlg` placement: a rule takes it on the line above, a name takes it trailing — and one leak
+
+Fuller treatment of what to put IN a herald — `%param%` slots, when a sentence replaces the
+implementation, and the three levers before you reach for one — is in
+[`doc/tutorials/natural-language-functions/optimising-natural-language-generation.md`](../../../doc/tutorials/natural-language-functions/optimising-natural-language-generation.md).
+This section is only about WHERE it goes and what it will not do. Every claim below was measured
+on 2026-09-21 on a build of `unstable` at `debf44d34`, which carries both `legalese/l4-ide#433`
+(attachment) and `#435` (field lists); the one-file probe is the measurement, not the merge log.
+
+**A rule's herald goes on its own line, immediately above the definition.** That is the only
+placement that reaches a rule:
+
+```l4
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+@nlg:he שורה משלה
+DECIDE `כפול` n IS n TIMES 2
+```
+
+`l4 nlg --lang he` prints `שורה משלה with 21`.
+
+**Trailing the definition line does NOT reach the rule**, and this is the trap, because it looks
+like it should. `DECIDE f n IS n TIMES 2 @nlg …`, the same with `MEANS`, and the head-line form
+with the body on the next line all render the rule as its bare name. What happens to the herald
+depends on what comes next, and only one of the two outcomes is loud:
+
+- nothing annotatable follows → `Not attached to any valid syntax node`, a parser diagnostic
+  pointing at the herald. Loud, and correct.
+- a `DECLARE` follows → the herald silently becomes THAT type's herald. Measured: a rule's
+  trailing `@nlg SHOULD-BE-ON-RULE` rendered as `SHOULD-BE-ON-RULE where `x` is 1` on the
+  record declared beneath it, with a clean typecheck and no diagnostic. This is the silent one.
+
+**A parameter's herald trails its own line.** `GIVEN n IS A NUMBER @nlg the count` describes `n`
+(`#433`; before it, the `NUMBER`). It describes the parameter, not the rule — a rule whose only
+herald is on a parameter line still renders as a bare name.
+
+**A record field's herald goes on its own line BELOW the field** (`#435`, ruled 2026-09-21: inside
+a field list an annotation on its own line describes the field above it, the one exception to
+"own line describes what follows", because a field list is a column). Trailing the field's line
+reaches the TYPE, not the field, and that is deliberate — a field and its type can be glossed
+separately on one line, and letting the field claim the whole line makes the two collide:
+
+```l4
+DECLARE Payslip
+    HAS base  IS A NUMBER   @nlg the basic salary     -- describes NUMBER; `base` renders bare
+        bonus IS A NUMBER
+        @nlg the bonus                                -- describes `bonus`; renders
+```
+
+`l4 nlg` prints ``where `base` is 100 and the bonus is 5``.
+
+> **A corpus written before 2026-09-19 will not reflect any of this.** Until `#433` merged, an
+> own-line herald under a `GIVEN` was captured by the signature and the rule rendered as a bare
+> name — silently, with a clean typecheck. Three independent Hebrew encodings written days before
+> it produced 334 heralds, 289 of them own-line, one of which rendered; and until `#435` the same
+> encodings' 100 below-the-field heralds rendered nothing either. If an older encoding's renderings
+> look absent, re-run it on a current binary before touching a placement.
+
+### `@nlg:xx` and `@lang` — several renderings, selected by language
+
+A herald takes a language subtag, and **a name may carry more than one**:
+
+```l4
+@lang he
+GIVEN n IS A NUMBER
+@nlg:he שורה משלה
+@nlg:en the doubling rule
+DECIDE `כפול` n IS n TIMES 2
+```
+
+- `l4 nlg FILE --lang he` → `שורה משלה with 21`
+- `l4 nlg FILE --lang en` → `the doubling rule with 21`
+
+`l4 render` takes `--lang` too, which is the flag that produces a bilingual set of **documents**
+rather than linearized prose. `@lang he` at module level declares what an **untagged** `@nlg` in
+that module means, so an existing monolingual file gets labelled without touching every herald.
+
+**One thing a tag does not buy, and it surprises people.** Look again at the output above: `with`
+is the linearizer's own connective, not yours. A tag names the _rendering_; **it does not
+localise the sentence built around it**, and `@lang` does not either — that was measured, not
+assumed. A right-to-left document still has English scaffolding between its Hebrew renderings.
+
+**Non-Latin identifiers need no annotation at all.** L4 takes Hebrew — and by the same rule any
+`Lo`-category script — in every name position: bare and backticked names, types, constructors,
+record fields, mixfix operators, `§` titles. The genitive `'s` works after one, and `l4 format`
+round-trips byte-identically. Two limits:
+
+- **Bidi control characters are a lex error inside backticks** (U+200E, U+200F, U+202A–U+202E,
+  U+2066–U+2069). A right-to-left file relies on the viewer's bidi algorithm, so mixed-direction
+  lines that look wrong in an editor are usually right in the file. Never "fix" one with a mark.
+- **Keep combining marks out of identifiers.** They are legal, but L4 counts source columns in
+  codepoints, so niqqud makes a column count disagree with a table formatter's — and the symptom
+  is a mis-aligned ditto caret, which is the silent kind.
+
+---
 
 ---
 

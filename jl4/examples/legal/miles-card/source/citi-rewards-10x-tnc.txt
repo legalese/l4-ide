@@ -1,0 +1,181 @@
+            Citi Rewards Card – 10X Rewards Promotion Terms and Conditions
+
+1. “Promotion” refers to the Citi Rewards Card – 10X Rewards Promotion.
+
+2. “Citibank” refers to Citibank Singapore Limited.
+
+3. “Eligible Card” refers to a Citi Rewards Visa Signature Card or Citi Rewards World
+   Mastercard.
+
+4. “Eligible Cardholder” refers to a main or supplementary cardholder of an Eligible Card.
+
+5. “Qualifying Charge” means a charge made to an Eligible Card which does not arise from any:
+   (i)    annual fees, interest charges, late payment charges, GST, cash advances,
+          instalment/easy/extended/equal payment plans, preferred payment plans, balance
+          transfers, cash advances, quasi-cash transactions, all fees charged by Citibank or third
+          party, miscellaneous charges imposed by Citibank (unless otherwise stated in writing by
+          Citibank);
+   (ii) funds transfers using the card as source of funds;
+   (iii) bill payments (including via Citibank Online or via any other channel or agent);
+   (iv) payments to educational institutions;
+   (v) payments to government institutions and services (including but not limited to court
+          cases, fines, bail and bonds, tax payment, postal services, parking lots and garages,
+          intra-government purchases);
+   (vi) payments to insurance companies (sales, underwriting, and premiums);
+   (vii) payments to financial institutions (including banks and brokerages);
+   (viii) payments to non-profit organizations;
+   (ix) betting or gambling (including lottery tickets, casino gaming chips, off-track betting,
+          and wagers at race tracks) through any channel;
+   (x) any top-ups or payment of funds to payment service providers, prepaid cards and any
+          prepaid accounts;
+   (xi) transit-related transactions;
+   (xii) transactions performed at establishments/businesses/merchants that fall within an
+          excluded Merchant Category or a merchant that has been excluded by the bank, as set
+          out in www.citibank.com.sg/rwdexcl (this list of excluded Merchant Categories or
+          merchants may be updated from time to time at our discretion and Eligible Cardholders
+          shall refer to this list for any updates).
+
+6. “10X Points Eligible Transaction” refers to
+   (i)   a Qualifying Charge made at any store that sells shoes and bags and clothes as its main
+         business activity, determined by the following Merchant Category Codes (MCC); or
+           Merchant Category Code (MCC)        Description
+           MCC 5311                            Department Stores
+           MCC 5611                            Men’s and Boy’s Clothing and Accessories Stores
+           MCC 5621                            Women’s Ready to Wear Stores
+           MCC 5631                            Women’s Accessory and Specialty Stores
+           MCC 5641                            Children’s and Infant’s Wear Stores
+           MCC 5651                            Family Clothing Stores
+
+
+                                                                                                1
+            MCC 5655                            Sports and Riding Apparel Stores
+            MCC 5661                            Shoe Stores
+            MCC 5691                            Men's and Women's Clothing Stores
+            MCC 5699                            Miscellaneous Apparel and Accessory Shops
+            MCC 5948                            Luggage and Leather Goods Stores
+
+    (ii)   a Qualifying Charge made at an online retail merchant, excluding mobile wallet and
+           travel-related transactions*. These refer to Qualifying Charges made via the internet or
+           mobile applications, which is determined by system indicators reflecting that it is an
+           online transaction and which are processed by the respective merchants/acquirers as
+           an online transaction through Visa/Mastercard networks. These indicators are decided
+           by the relevant merchant and/or their acquirer and are not determined by Citibank.
+
+    *For clarity, travel-related transactions refer to transactions which are either wholly or
+    partially related to any form of travel, whether local or overseas and include but are not
+    limited to transactions that fall within the following MCCs (i.e. any transactions at merchants
+    with the following MCCs will not be a 10X Points Eligible Transaction):
+      Excluded Merchant Category
+                                       Description
+      Code (MCC)
+      MCC 3000 to 3350                 Airlines, Air Carriers
+      MCC 3351 to 3500                 Car Rental Agencies
+      MCC 3501 to 3999                 Lodging – Hotels, Motels, Resorts
+      MCC 4111, 4112 and 4789          Passenger Transport and Railways
+      MCC 4411                         Cruise Lines
+      MCC 4511                         Airlines, Air Carriers (Not Elsewhere Classified)
+      MCC 4722 and 4723                Travel Agencies and Tour Operators
+      MCC 5962                         Direct Marketing – Travel-Related Arrangement Services
+      MCC 7011 and 7012                Lodging – Hotels, Motels, Resorts (Not Elsewhere Classified)
+      MCC 7512                         Car Rental Agencies (Not Elsewhere Classified)
+
+7. Only card transactions made under the 10X Points Eligible Transactions as defined in clause 6
+   above will qualify for 10X Rewards.
+
+8. A Merchant Category Code (MCC) is a four digit number assigned to a merchant/business by
+   the merchant’s acquiring bank. The acquiring bank provides the credit card payment facilities
+   used by the merchant and it determines and applies (with respect to the account), the MCC
+   which in its view best describes the merchant activity. Citibank does not determine the
+   merchant’s MCC.
+
+9. “Points” refers to Citi ThankYou Points or ThankYou Points earned on your Citi Rewards Visa
+   Signature Card or Citi Rewards World Mastercard.
+
+10. “Points Validity Period” means a period of 60 months for Eligible Cardholders by reference to
+    which Points are calculated, but so that the first Points Validity Period shall commence on the
+    date when the Eligible Cardholder is entitled to participate in the Program and expire at the
+    end of 60 months thereafter and each subsequent Points Validity Period will commence on
+    the expiry of the previous one.
+
+11. “Reward” means any goods, services, benefits, arrangements or other privileges (including,
+    without limitation, a waiver of annual cardmembership fees or a cash rebate) , as may be
+    determined by the Bank in its reasonable discretion, which may be redeemed or obtained by
+    the use of the Points under the Citi ThankYou Rewards Program.
+
+                                                                                                 2
+12. Eligible Cardholders will earn 1 Base Point for every S$1 of Qualifying Charges (which are not
+    10X Points Eligible Transactions) made to the Eligible Card. Points shall be calculated on the
+    amount of each Qualifying Charge, rounded down to the nearest S$1.
+
+13. For every 10X Points Eligible Transaction charged to the Eligible Card, an Eligible Cardholder
+    will be awarded:
+    (i)    1 Base Point for every S$1 of a 10X Points Eligible Transaction (“Base Points”); and
+    (ii) 9 Bonus Points for every S$1 of a 10X Points Eligible Transaction (“Bonus Points”).
+
+    Points shall be calculated on the amount of each 10X Points Eligible Transaction, rounded
+    down to the nearest S$1. Base Points are not subject to any cap. However, Bonus Points are
+    subject to a cap of 9,000 Bonus Points per statement month.
+
+    Illustration:
+                     Transaction      Points Eligible   Transaction     Base Points      Bonus Points
+      Transaction
+                      Category         Transaction        Amount          Earned           Earned
+                     Department
+           #1                              10X           S$800.99      800 * 1 = 800    800 * 9 = 7,200
+                        Stores
+           #2        Shoe Stores           10X           S$550.24      550 * 1 = 550    550 * 9 = 4,950
+                           Total                                          1,350             9,000^
+
+    ^As Bonus Points are capped at 9,000 Bonus Points per statement month, Eligible Cardholder
+    will only be awarded a maximum of 9,000 Bonus Points even though Bonus Points for both
+    transactions amounts to a total of 12,150.
+
+    Eligible Cardholder will be awarded a total of 10,350 Points (1,350 Base Points + 9,000 Bonus
+    Points) for the statement month.
+
+14. Points earned within a Points Validity Period must be used within that Points Validity Period
+    and shall not be carried forward to subsequent Points Validity Periods. Any Points which are
+    not used as at the last day of a Points Validity Period shall be available for use for a further 3
+    months, thereupon such unused Points shall be automatically cancelled and shall not
+    thereafter be available for use by the Eligible Cardholder nor be reinstated.
+
+15. The Points earned cannot be used to offset against the minimum payment due on the Eligible
+    Card account. The Eligible Card account must be in good standing at the time the Points are
+    credited.
+
+16. The use and redemption of Points are subject to the Citi ThankYou Rewards Program terms
+    and conditions which is available at www.citibank.com.sg/citirewards.
+
+17. Citibank shall not be responsible for the quality, merchantability or the fitness for any purpose
+    or any other aspect of the products and/or services provided by third parties. Notwithstanding
+    anything herein, Citibank shall not at any time be responsible or held liable for any loss, injury,
+    damage or harm suffered by or in connection with the products and/or services provided by
+    third parties.
+
+18. Citibank’s decision on all matters relating to the Promotion, including determination of
+    whether a transaction is a 10X Points Eligible Transaction, will be at its discretion and will be
+    final. Accordingly, Citibank reserves the right to reverse or cancel any Points already credited
+    at its discretion, exercised reasonably, where there has been a wrongful crediting of Points to
+
+                                                                                                     3
+        an Eligible Card account. In addition, Points reversal will be applied in the statement cycle
+        when the reversal/refunded transaction is posted which may differ from the statement cycle
+        of corresponding Qualifying Charge (for example: the Qualifying Charge could have been made
+        in January 2020 but the reversal/refund of such transaction, whether wholly or partially, could
+        be in March 2020). Bonus Points (as defined above) will be awarded only if cumulative value
+        of new 10X Points Eligible Transactions in the respective spend category is higher than the
+        value of transactions reversed/refunded.
+
+    19. Citibank reserves the right at its reasonable discretion to terminate or amend the Promotion
+        or vary, delete or add to any of these terms and conditions from time to time.
+
+
+
+
+Effective 1 April 2024
+
+
+
+
+                                                                                                     4
+

@@ -1,0 +1,1022 @@
+-- Singapore Penal Code 1871 — robbery.
+--
+--   s 390(1)  in all robbery there is either theft or extortion
+--   s 390(2)  when theft is robbery                       (the aggravation)
+--   s 390(3)  when extortion is robbery                   (the aggravation)
+--   s 392     punishes whoever commits robbery            (the charge)
+--   s 394     punishes hurt caused in committing robbery  (the second charge)
+--
+-- This is the module the rest of the row was built for. s 390 does not define
+-- an offence of its own: it says when one of the TWO offences already defined
+-- elsewhere becomes robbery. So this module IMPORTs both and nests them —
+-- `theft IS A `Theft Facts`` and `extortion IS AN `Extortion Facts`` — rather
+-- than restating their elements. Turn a leaf off inside the nested theft and the
+-- robbery charge withdraws, which is s 390(1) doing its work.
+--
+-- The reported charges this module is pinned to:
+--
+--   Chen Weixiong Jerriek v Public Prosecutor [2003] SGHC 103 — s 392 read with
+--   s 34. The appellant and two others surrounded the victim at a void deck and
+--   took his handphone. The s 392 charge is quoted in the judgment and
+--   reproduced in the directives below, modulo the citation form ("Penal Code"
+--   then, "Penal Code 1871" now) and the CPC s 124 header, which this row
+--   normalises across every charge it frames. The same case also carried s 394
+--   charges; see the caveat on those under "The charges" below.
+--
+-- An ISOMORPHIC encoding in INERT STYLE — see culpable-homicide-301.l4 for the
+-- conventions and cheating-415-417-420.l4 for the charge machinery. Verbatim
+-- statutory prose rides as inert strings; only the operative atoms are lifted
+-- into named leaves; the inert strings are mortar, never shadow copies of the
+-- leaf beside them.
+--
+-- ---------------------------------------------------------------------------
+-- The text
+-- ---------------------------------------------------------------------------
+--
+-- 390.—(1) In all robbery there is either theft or extortion.
+--      When theft is robbery
+--      (2) Theft is "robbery" if, in order to commit theft, or in committing the
+--      theft, or in carrying away or attempting to carry away property obtained
+--      by the theft, the offender, for that end, voluntarily causes or attempts
+--      to cause to any person death, or hurt, or wrongful restraint, or fear of
+--      instant death, or of instant hurt, or of instant wrongful restraint.
+--      When extortion is robbery
+--      (3) Extortion is "robbery" if the offender, at the time of committing the
+--      extortion, is in the presence of the person put in fear, and commits the
+--      extortion by putting that person in fear of instant death, of instant
+--      hurt, or of instant wrongful restraint to that person or to some other
+--      person, and, by so putting in fear, induces the person so put in fear
+--      then and there to deliver up the thing extorted.
+--      Explanation.—The offender is said to be present if he is sufficiently
+--      near to put the other person in fear of instant death, of instant hurt,
+--      or of instant wrongful restraint.
+--      Illustrations
+--      (a) A holds Z down, and dishonestly takes Z's money and jewels from Z's
+--          clothes, without Z's consent. Here A has committed theft, and, in
+--          order to the committing of that theft, has voluntarily caused
+--          wrongful restraint to Z. A has therefore committed robbery.
+--      (b) A meets Z on the high road, shows a pistol, and demands Z's purse. Z,
+--          in consequence surrenders his purse. Here A has extorted the purse
+--          from Z, by putting him in fear of instant hurt, and being at the time
+--          of committing the extortion in his presence. A has therefore
+--          committed robbery.
+--      (c) A meets Z and Z's child on the high road. A takes the child, and
+--          threatens to fling it down a precipice, unless Z delivers his purse.
+--          Z, in consequence, delivers his purse. Here A has extorted the purse
+--          from Z, by causing Z to be in fear of instant hurt to the child, Z
+--          being present. A has therefore committed robbery on Z.
+--      (d) A obtains property from Z by saying, "Your child is in the hands of
+--          my gang, and will be put to death unless you send us $1,000." This is
+--          extortion, and punishable as such; but it is not robbery, unless Z is
+--          put in fear of the instant death of his child.
+--
+-- 392. Whoever commits robbery shall be punished with imprisonment for a term of
+--      not less than 2 years and not more than 10 years and shall also be
+--      punished with caning with not less than 6 strokes; and if the robbery is
+--      committed after 7 p.m. and before 7 a.m. the offender shall be punished
+--      with imprisonment for a term of not less than 3 years and not more than
+--      14 years and shall also be punished with caning with not less than 12
+--      strokes.
+--
+-- 393. Whoever attempts to commit robbery shall be punished with imprisonment
+--      for a term of not less than 2 years and not more than 7 years and shall
+--      also be punished with caning with not less than 6 strokes.
+--
+-- 394. If any person, in committing or in attempting to commit robbery,
+--      voluntarily causes hurt, such person, and any other person, jointly
+--      concerned in committing or attempting to commit such robbery, shall be
+--      punished with imprisonment for a term of not less than 5 years and not
+--      more than 20 years and shall also be punished with caning with not less
+--      than 12 strokes.
+--
+-- ---------------------------------------------------------------------------
+-- The shape of the section
+-- ---------------------------------------------------------------------------
+--
+-- s 390(1) is the whole architecture in one sentence. Robbery is not a third
+-- offence beside theft and extortion; it is either of those two with something
+-- added. So `commits robbery` is a two-way disjunction over the two
+-- subsections, and each subsection begins by calling the offence it upgrades:
+--
+--   s 390(2)  commits theft (s 378)   + WHEN  in order to commit theft / in
+--             committing it / in carrying away property obtained by it / in
+--             attempting to carry away that property
+--                                     + WHAT  for that end, voluntarily, causes
+--             or attempts to cause death / hurt / wrongful restraint / fear of
+--             instant death / instant hurt / instant wrongful restraint
+--
+--   s 390(3)  commits extortion (s 383) + PRESENCE in the presence of the person
+--             put in fear (the Explanation defines presence as being near enough
+--             to put them in fear of the instant harms)
+--                                     + MEANS by putting that person in fear of
+--             instant death / instant hurt / instant wrongful restraint, to that
+--             person or to some other person
+--                                     + IMMEDIACY then and there delivers up
+--
+-- Illustration (d) is the one worth reading twice, because it is the boundary:
+-- a threat to kill a child held elsewhere is extortion but NOT robbery, because
+-- nothing is instant and the offender is not present. Every leaf s 390(3) adds
+-- over s 383 exists to draw that line.
+--
+-- Six calls this encoding makes, recorded rather than hidden:
+--
+--   1. `for that end` is its own leaf. The words are easy to read past, but they
+--      are the purposive link between the violence and the taking, and
+--      Illustration (a) turns on them: the wrongful restraint was caused "in
+--      order to the committing of that theft". Violence that merely happens to
+--      accompany a theft is not robbery.
+--   2. s 390(2)'s six harms and s 390(3)'s three are kept as SEPARATE fields,
+--      even though three of the names overlap in ordinary speech. They are not
+--      the same facts. s 390(2) asks what the offender CAUSED or ATTEMPTED to
+--      cause, in the course of a theft; s 390(3) asks what he PUT THE VICTIM IN
+--      FEAR OF, as the means of an extortion. The path qualifies each: read
+--      along the inert strings and s 390(3)'s leaves come after "commits the
+--      extortion by putting that person in fear of".
+--   3. `committed after 7 p.m. and before 7 a.m.` (s 392) affects ONLY the
+--      punishment string. It is not an element: the offence is the same offence
+--      whenever it was committed, and the charge is made out either way. The
+--      bench below asserts exactly that — same `made out`, same text, different
+--      punishment.
+--   4. The nested records each carry their own `particulars`, so a robbery
+--      fixture states the particulars three times. That is redundancy, not
+--      disagreement — `charge under s 392` reads the OUTER `particulars` and
+--      never the nested ones. It is the price of making `Theft Facts` a record
+--      that can also stand alone under a s 379 charge, which is the shape
+--      theft-378-379.l4 needs.
+--   5. s 393 has ONE element. "Whoever attempts to commit robbery" adds nothing
+--      to s 390 but the word "attempts", so its ladder is a single leaf, and
+--      the leaf is the same `attempting to commit robbery` that s 394 reads.
+--      This encoding deliberately does NOT add a condition that the robbery was
+--      not completed: the section does not say it. That an attempt is usually
+--      not charged once the offence is complete is a matter of how the
+--      Prosecution chooses a charge, not a legal condition s 393 states, and
+--      CPC s 123(5) makes the charge a claim about the conditions the section
+--      states. Pang Khang Chau J read s 393 as a true attempt-punishing
+--      provision in Public Prosecutor v CRH [2024] SGHC 34 at [75], where
+--      ss 354A, 391, 397, 459 and 460 were held not to be.
+--   6. s 390(2) is read at the granularity its own grammar carries, which is
+--      finer than a first pass gives it. “voluntarily causes or attempts to
+--      cause” puts the adverb in front of BOTH verbs, so `voluntarily` is a
+--      leaf in series and the choice that follows it is `causes` OR
+--      `attempts to cause` — fused into a single `voluntarily causes` leaf,
+--      as this module had it until 2026-09-21, the attempt limb loses the
+--      adverb altogether. And “in carrying away or attempting to carry away
+--      property obtained by the theft” names TWO occasions, not one, so the
+--      occasion group has four parallel limbs and not three. Woon, Essential
+--      Criminal Law ch 8 p 187 draws s 390(2) exactly this way. Nothing on
+--      this bench changes answer: every fixture has both carrying-away leaves
+--      FALSE, and wherever the old fused leaf was TRUE both of its halves are.
+--      What changes is the size of the section as the encoding states it —
+--      36 ways to satisfy s 390(2) become 48.
+--
+-- ---------------------------------------------------------------------------
+-- s 125 and the recital: robbery states NO manner, s 394 states "to wit"
+-- ---------------------------------------------------------------------------
+--
+-- CPC 2010 s 125 illustration (a) covers theft, and the reported s 392 charge
+-- shows it reaching robbery on the same footing — it names the thing and the
+-- person and stops:
+--
+--   did rob <one victim> of <the thing robbed>
+--
+-- The s 394 recital goes deeper, because the hurt is a fact the accused needs
+-- notice of and the charge must particularise it ("to wit, by …").
+
+IMPORT prelude
+IMPORT `penal-code-general`
+IMPORT `theft-378-379`
+IMPORT `extortion-383-384`
+
+§ `Penal Code 1871 — robbery`
+
+§§ `The facts of one robbery`
+
+@ref Penal Code 1871 ss 390, 392, 394 — the operative atoms s 390 adds over ss 378 and 383, and the particulars CPC s 124 requires
+DECLARE `Robbery Facts` HAS
+    particulars IS A Particulars     @desc Who is charged, and when and where the offence was committed
+    theft       IS A `Theft Facts`   @desc The theft s 390(2) upgrades, if the robbery is a theft-robbery; leave every leaf FALSE if it is not
+    extortion   IS AN `Extortion Facts` @desc The extortion s 390(3) upgrades, if the robbery is an extortion-robbery; leave every leaf FALSE if it is not
+    `the hurt`  IS A STRING          @desc How the hurt was caused, as it is to read after "to wit, by" in a s 394 charge — for example "slapping him and banging his head against the wall"; leave blank if no s 394 charge is laid
+
+    -- s 390(2): "in order to commit theft, or in committing the theft, or in
+    --            carrying away or attempting to carry away property obtained by
+    --            the theft"
+    `in order to commit theft`  IS A BOOLEAN @desc Was the violence done BEFORE the theft, to bring it about?
+    `in committing the theft`   IS A BOOLEAN @desc Was the violence done WHILE the theft was being committed?
+    `in carrying away property obtained by the theft`
+                                IS A BOOLEAN @desc Was the violence done AFTERWARDS, while making off with what had been taken?
+    `in attempting to carry away property obtained by the theft`
+                                IS A BOOLEAN @desc Was the violence done AFTERWARDS, while trying to make off with what had been taken?
+
+    -- s 390(2): "the offender, for that end, voluntarily causes or attempts to
+    --            cause to any person …"
+    `for that end`              IS A BOOLEAN @desc Was the violence done FOR THE PURPOSE of the theft? Illustration (a): the wrongful restraint was caused "in order to the committing of that theft". Violence that merely happens to accompany a theft is not robbery.
+    voluntarily                 IS A BOOLEAN @desc Was it done VOLUNTARILY? The adverb governs both limbs of “voluntarily causes or attempts to cause”, so it is asked once and of both. Section 39 defines it: caused by means he intended to cause it by, or by means he knew or had reason to believe likely to cause it.
+    causes                      IS A BOOLEAN @desc Did the accused actually cause the harm?
+    `attempts to cause`         IS A BOOLEAN @desc Did the accused try to cause it, whether or not they succeeded?
+    death                       IS A BOOLEAN @desc … death?
+    hurt                        IS A BOOLEAN @desc … hurt?
+    `wrongful restraint`        IS A BOOLEAN @desc … wrongful restraint — obstructing someone so as to prevent them going where they have a right to go? A group closing round a person restrains them.
+    `fear of instant death`     IS A BOOLEAN @desc … fear of instant death?
+    `fear of instant hurt`      IS A BOOLEAN @desc … fear of instant hurt?
+    `fear of instant wrongful restraint`
+                                IS A BOOLEAN @desc … fear of instant wrongful restraint?
+
+    -- s 390(3): "the offender, at the time of committing the extortion, is in
+    --            the presence of the person put in fear"
+    `in the presence of the person put in fear`
+                                IS A BOOLEAN @desc Was the accused present when the extortion was committed? Present means sufficiently near to put the other person in fear of instant death, instant hurt or instant wrongful restraint (Explanation). Illustration (d): a threat about a child held elsewhere by a gang is not made in anyone's presence.
+
+    -- s 390(3): "commits the extortion by putting that person in fear of instant
+    --            death, of instant hurt, or of instant wrongful restraint"
+    `instant death`             IS A BOOLEAN @desc … instant death?
+    `instant hurt`              IS A BOOLEAN @desc … instant hurt? Illustration (b): showing a pistol and demanding a purse.
+    `instant wrongful restraint` IS A BOOLEAN @desc … instant wrongful restraint?
+
+    -- s 390(3): "to that person or to some other person"
+    `to that person`            IS A BOOLEAN @desc Was the instant harm feared harm to the person put in fear themselves?
+    `to some other person`      IS A BOOLEAN @desc Was it harm to somebody else? Illustration (c): the child on the high road.
+
+    -- s 390(3): "induces the person so put in fear then and there to deliver up
+    --            the thing extorted"
+    `then and there`            IS A BOOLEAN @desc Was the thing delivered up on the spot, then and there, rather than later? Illustration (d): property sent to a gang afterwards is extortion, not robbery.
+
+    -- s 392: the aggravated punishment. NOT an element of the offence.
+    `committed after 7 p.m. and before 7 a.m.`
+                                IS A BOOLEAN @desc Was the robbery committed after 7 p.m. and before 7 a.m.? This changes the punishment s 392 prescribes and nothing else — the offence is made out either way.
+
+    -- s 394: hurt caused in committing or attempting to commit the robbery
+    `attempting to commit robbery` IS A BOOLEAN @desc If the robbery was not completed, was it attempted? s 394 reaches an attempt; s 392 does not.
+    `voluntarily causes hurt`   IS A BOOLEAN @desc Did any person voluntarily cause hurt in committing or attempting to commit the robbery? It need not have been the accused — s 394 reaches everyone jointly concerned.
+    `such person`               IS A BOOLEAN @desc Is the accused the person who voluntarily caused that hurt?
+    `any other person jointly concerned in committing or attempting to commit such robbery`
+                                IS A BOOLEAN @desc If somebody else caused the hurt, was the accused nonetheless jointly concerned in committing or attempting to commit the robbery?
+
+§§ `s 390(2) — when theft is robbery`
+
+@export Whether a theft is "robbery" within section 390(2) of the Penal Code 1871
+GIVEN f IS A `Robbery Facts` @desc The theft, and the violence s 390(2) requires on top of it
+GIVETH A BOOLEAN
+DECIDE `theft is robbery` f IF
+        "(2)"
+   ...  `commits theft` (f's theft)
+   ...  "is “robbery” if,"
+   ...  (    f's `in order to commit theft`
+        ..   f's `in committing the theft`
+        ..   f's `in carrying away property obtained by the theft`
+        OR   f's `in attempting to carry away property obtained by the theft` )
+   ...  ", the offender,"
+   ...  f's `for that end`
+   ...  f's voluntarily
+   ...  (    f's causes
+        OR   f's `attempts to cause` )
+   ...  "to any person"
+   ...  (    f's death
+        ..   f's hurt
+        ..   f's `wrongful restraint`
+        ..   f's `fear of instant death`
+        ..   f's `fear of instant hurt`
+        OR   f's `fear of instant wrongful restraint` )
+
+§§ `s 390(3) — when extortion is robbery`
+
+@export Whether an extortion is "robbery" within section 390(3) of the Penal Code 1871
+GIVEN f IS A `Robbery Facts` @desc The extortion, and the presence and immediacy s 390(3) requires on top of it
+GIVETH A BOOLEAN
+DECIDE `extortion is robbery` f IF
+        "(3)"
+   ...  `commits extortion` (f's extortion)
+   ...  "is “robbery” if the offender, at the time of committing the extortion, is"
+   ...  f's `in the presence of the person put in fear`
+   ...  ", and commits the extortion by putting that person in fear of"
+   ...  (    f's `instant death`
+        ..   f's `instant hurt`
+        OR   f's `instant wrongful restraint` )
+   ...  (    f's `to that person`
+        OR   f's `to some other person` )
+   ...  ", and, by so putting in fear, induces the person so put in fear"
+   ...  f's `then and there`
+   ...  "to deliver up the thing extorted"
+
+§§ `s 390(1) — robbery`
+
+@export Whether the accused "commits robbery" within section 390 of the Penal Code 1871
+GIVEN f IS A `Robbery Facts` @desc The theft or the extortion, and the aggravation that upgrades it
+GIVETH A BOOLEAN
+DECIDE `commits robbery` f IF
+        "(1) In all robbery there is either"
+   ..   `theft is robbery` f
+   OR   `extortion is robbery` f
+
+§§ `s 392 — punishment for robbery`
+
+@export Whether the accused has committed an offence punishable under section 392 of the Penal Code 1871 (robbery)
+GIVEN f IS A `Robbery Facts` @desc The theft or the extortion, and the aggravation that upgrades it
+GIVETH A BOOLEAN
+DECIDE `offence under s 392` f IF
+        "Whoever"
+   ...  `commits robbery` f
+
+§§ `s 392 as an implication -- the liability on the right`
+
+-- Woon draws a section left to right: "Offender" enters at the left, the
+-- elements run across in series and in parallel, and the RIGHTMOST box is the
+-- conclusion, "Commits Robbery". `offence under s 392` above cannot be drawn
+-- that way, and the reason is in the keyword. A `DECIDE ... IF` is a
+-- BICONDITIONAL: it says what the name MEANS, so everything in its ladder is
+-- antecedent, and the conclusion is the frame the whole picture sits inside.
+-- `projections/robbery-392.svg` shows exactly that -- one box, no consequent.
+--
+-- `IMPLIES` is one-way, and its ladder has three parts: a scope on the left, a
+-- seam, and the consequent on the right, with two lamps at the far end. That is
+-- Woon's shape, and this section restates s 392 in it.
+--
+-- NOTHING HERE REPLACES ANYTHING. `offence under s 392` and the punishment
+-- string inside `charge under s 392` are untouched; this is a second reading of
+-- the same section, kept beside the first.
+
+-- The ordinary punishment. The statute states this limb UNCONDITIONALLY --
+-- "Whoever commits robbery shall be punished with ..." -- and only then adds
+-- the night limb, after a semicolon. Read literally, BOTH limbs attach to a
+-- night robbery. The `NOT` below is therefore SUPPLIED, not read: it records
+-- the settled construction that the specific provision displaces the general
+-- one. `charge under s 392` makes the same call inside its `IF ... THEN ...
+-- ELSE`; this spelling only makes it visible, which is what the second inert
+-- chapeau is for.
+@export Whether the ordinary punishment under section 392 of the Penal Code 1871 is the one the accused is liable to
+GIVEN f IS A `Robbery Facts` @desc The robbery, and whether it was committed after 7 p.m. and before 7 a.m.
+GIVETH A BOOLEAN
+DECIDE `liable to the ordinary punishment under s 392` f IF
+        "shall be punished with imprisonment for a term of not less than 2 years and not more than 10 years and shall also be punished with caning with not less than 6 strokes"
+   ...  "(supplied, not read: unless the night limb displaces it)"
+   ...  NOT f's `committed after 7 p.m. and before 7 a.m.`
+
+@export Whether the aggravated punishment under section 392 of the Penal Code 1871, for a robbery committed after 7 p.m. and before 7 a.m., is the one the accused is liable to
+GIVEN f IS A `Robbery Facts` @desc The robbery, and whether it was committed after 7 p.m. and before 7 a.m.
+GIVETH A BOOLEAN
+DECIDE `liable to the night punishment under s 392` f IF
+        "and if the robbery is"
+   ...  f's `committed after 7 p.m. and before 7 a.m.`
+   ...  "the offender shall be punished with imprisonment for a term of not less than 3 years and not more than 14 years and shall also be punished with caning with not less than 12 strokes"
+
+-- The consequent, and it is A TAUTOLOGY OVER THESE FACTS, by construction: the
+-- two limbs partition on one boolean, so their disjunction is TRUE whatever the
+-- facts say. That is not a slip in the encoding, it is the shape of s 392 --
+-- the section attaches a punishment to every robbery and excludes none -- but
+-- it has a consequence the reader has to be told, because nothing about it is
+-- visible in a green run: `#ASSERT` on this name, and on the implication below,
+-- CANNOT FAIL. The assertions that carry content are the four on the two limbs,
+-- which pin WHICH punishment attaches. See NOTES.md, "s 392 as an implication".
+@export Whether the accused is liable to the punishment section 392 of the Penal Code 1871 prescribes, under either of its two limbs
+GIVEN f IS A `Robbery Facts` @desc The robbery, and whether it was committed after 7 p.m. and before 7 a.m.
+GIVETH A BOOLEAN
+DECIDE `liable under s 392` f IF
+        `liable to the ordinary punishment under s 392` f
+   ..   `liable to the night punishment under s 392` f
+
+-- The section in Woon's shape: scope on the left, seam, consequent on the
+-- right.
+--
+-- What the picture says and the boolean does not: where no robbery was
+-- committed the scope does not conduct, NEITHER lamp lights, and the ladder
+-- reads "not applicable". The boolean reads TRUE -- vacuously -- and would read
+-- TRUE for the tautology's sake in any event, so in the boolean the two reasons
+-- are indistinguishable. The two-lamp seam is the only carrier in this row that
+-- tells them apart, and that is the whole argument for drawing s 392 this way.
+@export Whether a person who has committed robbery on these facts is liable to the punishment section 392 of the Penal Code 1871 prescribes
+GIVEN f IS A `Robbery Facts` @desc The robbery, and whether it was committed after 7 p.m. and before 7 a.m.
+GIVETH A BOOLEAN
+DECIDE `whoever commits robbery shall be so punished` f IF
+        "392. Whoever"
+   ...  `commits robbery` f
+   IMPLIES
+        `liable under s 392` f
+
+§§ `s 393 — attempt to commit robbery`
+
+-- One leaf, and it is the leaf s 394 already reads. See call 5 in the header
+-- for why nothing is added about the robbery having failed.
+--
+-- Read this beside s 392 and the pair is the whole point of the section: on
+-- facts where the taking never happened, `commits theft` fails, so
+-- `theft is robbery` fails, so `commits robbery` fails, and s 392 refuses to
+-- frame a charge. s 393 frames one on the same facts.
+@export Whether the accused has committed an offence punishable under section 393 of the Penal Code 1871 (attempt to commit robbery)
+GIVEN f IS A `Robbery Facts` @desc The attempted robbery
+GIVETH A BOOLEAN
+DECIDE `offence under s 393` f IF
+        "Whoever"
+   ...  f's `attempting to commit robbery`
+
+§§ `s 394 — voluntarily causing hurt in committing robbery`
+
+-- Note what s 394 does that s 392 does not: it reaches an ATTEMPTED robbery,
+-- and it reaches every participant once hurt is caused by any one of them. So
+-- this ladder is not `offence under s 392` plus a leaf — it has its own first
+-- limb and its own question about where the accused stood.
+@export Whether the accused has committed an offence punishable under section 394 of the Penal Code 1871 (voluntarily causing hurt in committing robbery)
+GIVEN f IS A `Robbery Facts` @desc The robbery or attempted robbery, the hurt, and where the accused stood
+GIVETH A BOOLEAN
+DECIDE `offence under s 394` f IF
+        "If any person, in committing or in attempting to commit"
+   ...  (    `commits robbery` f
+        OR   f's `attempting to commit robbery` )
+   ...  f's `voluntarily causes hurt`
+   ...  (    f's `such person`
+        OR   f's `any other person jointly concerned in committing or attempting to commit such robbery` )
+
+§§ `The charges`
+
+-- s 390(1) means the person robbed and the thing robbed live on whichever
+-- nested record is in play. These three helpers read the theft side when the
+-- robbery is a theft-robbery and the extortion side otherwise, so one recital
+-- serves both limbs.
+-- Which limb of s 390(1) the charge is pleaded on. For a COMPLETED robbery the
+-- aggravation answers it, and that is what these helpers originally asked. It
+-- is not enough once s 393 is in the file: on an attempt neither aggravation is
+-- made out, so the question falls back to which nested record the officer
+-- actually filled in. The extortion limb is preferred when its own aggravation
+-- holds, and the theft limb otherwise whenever a victim was named there.
+--
+-- On every fixture in this module the answer is the one `theft is robbery`
+-- gave: Chen Weixiong Jerriek is a theft-robbery either way, Illustration (b)
+-- an extortion-robbery either way.
+GIVEN f IS A `Robbery Facts`
+GIVETH A BOOLEAN
+`pleaded as a theft-robbery` f MEANS
+    IF   `extortion is robbery` f
+    THEN FALSE
+    ELSE NOT (f's theft's victim EQUALS "")
+
+GIVEN f IS A `Robbery Facts`
+GIVETH A STRING
+`the person robbed` f MEANS
+    IF   `pleaded as a theft-robbery` f
+    THEN (`one` (f's theft's victim) (f's theft's `victim described as`))
+    ELSE (`one` (f's extortion's victim) (f's extortion's `victim described as`))
+
+GIVEN f IS A `Robbery Facts`
+GIVETH A STRING
+`the thing robbed` f MEANS
+    IF   `pleaded as a theft-robbery` f
+    THEN f's theft's `the property`
+    ELSE f's extortion's `the property extorted`
+
+GIVEN f IS A `Robbery Facts`
+GIVETH A STRING
+`the person robbed, spoken of` f MEANS
+    IF   `pleaded as a theft-robbery` f
+    THEN `object pronoun` (f's theft's `victim pronoun`)
+    ELSE `object pronoun` (f's extortion's `victim pronoun`)
+
+-- No manner clause: CPC s 125 illustration (a). Chen Weixiong Jerriek:
+--
+--   did rob one Ng Juin Chye Joel of a handphone valued at about $450/-
+GIVEN f IS A `Robbery Facts`
+GIVETH A STRING
+`the recital of the robbery` f MEANS
+    CONCAT "did rob ", (`the person robbed` f), " of ", (`the thing robbed` f)
+
+-- The attempt recites the same words with one added, for the same reason the
+-- completed robbery states no manner (CPC s 125 illustration (a)). CONSTRUCTED,
+-- NOT REPORTED: no s 393 charge is quoted verbatim in any judgment on this
+-- row's bench, so this wording is derived from the s 392 recital above and is a
+-- fixture of this module, not an oracle.
+GIVEN f IS A `Robbery Facts`
+GIVETH A STRING
+`the recital of the attempted robbery` f MEANS
+    CONCAT "did attempt to rob ", (`the person robbed` f), " of ", (`the thing robbed` f)
+
+-- s 394 particularises the hurt. CONSTRUCTED, NOT REPORTED: unlike the s 392
+-- recital above, this wording is reconstructed from an ELIDED quotation of the
+-- Chen Weixiong Jerriek s 394 charge ("were jointly concerned in committing
+-- robbery … and whilst committing the said robbery, voluntarily caused hurt …
+-- to wit, by slapping him and banging his head against the wall"). The words
+-- between the ellipses have been supplied from this encoding's own fields, so
+-- the asserted body below is a fixture of this module and NOT an oracle.
+--
+-- It also departs from the row's "did …" convention, because the reported s 394
+-- charge does: "were jointly concerned" is the voice a s 394 charge is laid in,
+-- since the section fixes liability on a class rather than on one actor.
+GIVEN f IS A `Robbery Facts`
+GIVETH A STRING
+`the recital of the robbery with hurt` f MEANS
+    CONCAT "were jointly concerned in committing robbery of ", (`the thing robbed` f),
+           " from ", (`the person robbed` f),
+           " and whilst committing the said robbery, voluntarily caused hurt to ", (`the person robbed, spoken of` f),
+           ", to wit, by ", f's `the hurt`
+
+-- The elements, named for the refusal. s 390 is a disjunction of two
+-- subsections, so naming individual leaves would name leaves of the limb the
+-- facts never relied on. The two rows below name the ARCHITECTURE instead: what
+-- s 390(1) requires there to be, and then the aggravation neither subsection
+-- supplied. A reader who needs the leaf can open the nested theft or extortion
+-- and run `charge under s 379` or `charge under s 384` on it, which names its
+-- own elements one by one.
+GIVEN f IS A `Robbery Facts`
+GIVETH A LIST OF STRING
+`elements of robbery not made out` f MEANS
+    concat (LIST
+        (`missing unless` (`commits theft` (f's theft) OR `commits extortion` (f's extortion))
+            "in all robbery there is either theft or extortion (section 390(1))"),
+        (`missing unless` (`theft is robbery` f OR `extortion is robbery` f)
+            "neither the aggravation that makes a theft robbery (section 390(2)) nor the one that makes an extortion robbery (section 390(3))"))
+
+-- s 393's only element, so there is only one thing the refusal can name.
+GIVEN f IS A `Robbery Facts`
+GIVETH A LIST OF STRING
+`elements of attempted robbery not made out` f MEANS
+    `missing unless` (f's `attempting to commit robbery`)
+        "an attempt to commit robbery"
+
+GIVEN f IS A `Robbery Facts`
+GIVETH A LIST OF STRING
+`elements of robbery with hurt not made out` f MEANS
+    concat (LIST
+        (`missing unless` (`commits robbery` f OR f's `attempting to commit robbery`)
+            "in committing or in attempting to commit robbery"),
+        (`missing unless` (f's `voluntarily causes hurt`) "voluntarily causes hurt"),
+        (`missing unless` (f's `such person` OR f's `any other person jointly concerned in committing or attempting to commit such robbery`)
+            "such person, or any other person jointly concerned in committing or attempting to commit such robbery"))
+
+@export Frame a charge under section 392 of the Penal Code 1871 (robbery), or say why none can be framed
+GIVEN f IS A `Robbery Facts` @desc The robbery, and the particulars of the charge
+GIVETH A Charge
+`charge under s 392` f MEANS
+    `frame the charge` (f's particulars) "392" "robbery"
+        (IF f's `committed after 7 p.m. and before 7 a.m.`
+         THEN "imprisonment for a term of not less than 3 years and not more than 14 years and shall also be punished with caning with not less than 12 strokes"
+         ELSE "imprisonment for a term of not less than 2 years and not more than 10 years and shall also be punished with caning with not less than 6 strokes")
+        (`offence under s 392` f)
+        (`the recital of the robbery` f)
+        (`elements of robbery not made out` f)
+
+@export Frame a charge under section 393 of the Penal Code 1871 (attempt to commit robbery), or say why none can be framed
+GIVEN f IS A `Robbery Facts` @desc The attempted robbery, and the particulars of the charge
+GIVETH A Charge
+`charge under s 393` f MEANS
+    `frame the charge` (f's particulars) "393" "attempting to commit robbery"
+        "imprisonment for a term of not less than 2 years and not more than 7 years and shall also be punished with caning with not less than 6 strokes"
+        (`offence under s 393` f)
+        (`the recital of the attempted robbery` f)
+        (`elements of attempted robbery not made out` f)
+
+@export Frame a charge under section 394 of the Penal Code 1871 (voluntarily causing hurt in committing robbery), or say why none can be framed
+GIVEN f IS A `Robbery Facts` @desc The robbery, the hurt, and the particulars of the charge
+GIVETH A Charge
+`charge under s 394` f MEANS
+    `frame the charge` (f's particulars) "394" "voluntarily causing hurt in committing robbery"
+        "imprisonment for a term of not less than 5 years and not more than 20 years and shall also be punished with caning with not less than 12 strokes"
+        (`offence under s 394` f)
+        (`the recital of the robbery with hurt` f)
+        (`elements of robbery with hurt not made out` f)
+
+§§ `Chen Weixiong Jerriek v Public Prosecutor [2003] SGHC 103`
+
+`Chen Weixiong Jerriek particulars` MEANS Particulars WITH
+    accused            IS "Chen Weixiong Jerriek"
+    date               IS "the 5th day of July 2002"
+    time               IS "1.00pm"
+    place              IS "void deck of Blk 121, Lor 1 Toa Payoh"
+    `co-accused`       IS "Koh Bang Long and Chia Jia Ting Samuel"
+    `common intention` IS TRUE
+
+-- The theft s 390(2) upgrades. Standing alone this would support a s 379
+-- charge; what makes it robbery is the aggravation on the outer record.
+`the handphone taken from Ng Juin Chye Joel` MEANS `Theft Facts` WITH
+    particulars           IS `Chen Weixiong Jerriek particulars`
+    victim                IS "Ng Juin Chye Joel"
+    `victim described as` IS ""
+    `victim pronoun`      IS he
+    `the property`        IS "a handphone valued at about $450/-"
+    `intending to take`   IS TRUE
+    dishonestly           IS TRUE
+    `movable property`    IS TRUE
+    `out of the possession of any person` IS TRUE
+    `without that person's consent`       IS TRUE
+    `moves that property`     IS TRUE
+    `in order to such taking` IS TRUE
+
+-- The empty extortion slot for a theft-robbery. s 390(1) is a disjunction, so
+-- one side of it is always unused; leaving every leaf FALSE is how this
+-- encoding says "not this limb".
+`no extortion` MEANS `Extortion Facts` WITH
+    particulars             IS `Chen Weixiong Jerriek particulars`
+    victim                  IS ""
+    `victim described as`   IS ""
+    `victim pronoun`        IS he
+    `the property extorted` IS ""
+    `the fear`              IS ""
+    intentionally           IS FALSE
+    `put the victim in fear` IS FALSE
+    `that person`           IS FALSE
+    `any other person`      IS FALSE
+    body                    IS FALSE
+    mind                    IS FALSE
+    reputation              IS FALSE
+    property                IS FALSE
+    dishonestly             IS FALSE
+    `induced the person so put in fear` IS FALSE
+    `any property`          IS FALSE
+    `valuable security`     IS FALSE
+    `anything signed or sealed which may be converted into a valuable security` IS FALSE
+
+-- The s 392 charge, as quoted in the judgment:
+--
+--   You are charged that you on or about the 5th day of July 2002 at or about
+--   1.00pm at void deck of Blk 121, Lor 1 Toa Payoh, Singapore, together with
+--   Koh Bang Long and Chia Jia Ting Samuel, with furtherance of the common
+--   intention of you all, did rob one Ng Juin Chye Joel of a handphone valued at
+--   about $450/- and thereby committed an offence punishable under s 392 read
+--   with s 34 of the Penal Code.
+--
+-- Three interpretation calls on the s 390(2) aggravation, recorded because the
+-- judgment describes the facts (a group closing round the victim at a void deck
+-- and demanding his handphone) without classifying them against the six harms:
+--
+--   `in committing the theft`  TRUE — the violence and the taking were one
+--                              event, not a prelude or a getaway.
+--   `wrongful restraint`       TRUE — three men closing round one is an
+--                              obstruction of his going where he may go, which
+--                              is the harm Illustration (a) identifies.
+--   `fear of instant hurt`     TRUE — a demand backed by a surrounding group
+--                              puts the person in fear of immediate hurt.
+--   `hurt`                     TRUE — the same case's s 394 charges allege hurt
+--                              by slapping and banging the head, so hurt was in
+--                              fact caused in committing this robbery. It is
+--                              set TRUE for consistency across the two charges;
+--                              because s 390(2)'s six harms are a disjunction,
+--                              nothing in the s 392 result turns on it.
+--
+-- `death`, `fear of instant death` and `fear of instant wrongful restraint` are
+-- FALSE: the restraint was actual rather than feared, and nothing in the
+-- reported facts put anyone in fear of death.
+`Chen Weixiong Jerriek` MEANS `Robbery Facts` WITH
+    particulars IS `Chen Weixiong Jerriek particulars`
+    theft       IS `the handphone taken from Ng Juin Chye Joel`
+    extortion   IS `no extortion`
+    `the hurt`  IS "slapping him and banging his head against the wall"
+    `in order to commit theft`  IS FALSE
+    `in committing the theft`   IS TRUE
+    `in carrying away property obtained by the theft` IS FALSE
+    `in attempting to carry away property obtained by the theft` IS FALSE
+    `for that end`              IS TRUE
+    voluntarily                 IS TRUE
+    causes                      IS TRUE
+    `attempts to cause`         IS FALSE
+    death                       IS FALSE
+    hurt                        IS TRUE
+    `wrongful restraint`        IS TRUE
+    `fear of instant death`     IS FALSE
+    `fear of instant hurt`      IS TRUE
+    `fear of instant wrongful restraint` IS FALSE
+    `in the presence of the person put in fear` IS FALSE
+    `instant death`             IS FALSE
+    `instant hurt`              IS FALSE
+    `instant wrongful restraint` IS FALSE
+    `to that person`            IS FALSE
+    `to some other person`      IS FALSE
+    `then and there`            IS FALSE
+    `committed after 7 p.m. and before 7 a.m.` IS FALSE
+    `attempting to commit robbery` IS FALSE
+    `voluntarily causes hurt`   IS TRUE
+    `such person`               IS TRUE
+    `any other person jointly concerned in committing or attempting to commit such robbery` IS TRUE
+
+-- The same robbery, moved into the night. s 392's second limb is a sentencing
+-- provision, not an element: the charge is made out on identical elements and
+-- recites identical words, and only the punishment changes.
+`Chen Weixiong Jerriek, after 7 p.m.` MEANS `Robbery Facts` WITH
+    particulars IS `Chen Weixiong Jerriek`'s particulars
+    theft       IS `Chen Weixiong Jerriek`'s theft
+    extortion   IS `Chen Weixiong Jerriek`'s extortion
+    `the hurt`  IS `Chen Weixiong Jerriek`'s `the hurt`
+    `in order to commit theft`  IS FALSE
+    `in committing the theft`   IS TRUE
+    `in carrying away property obtained by the theft` IS FALSE
+    `in attempting to carry away property obtained by the theft` IS FALSE
+    `for that end`              IS TRUE
+    voluntarily                 IS TRUE
+    causes                      IS TRUE
+    `attempts to cause`         IS FALSE
+    death                       IS FALSE
+    hurt                        IS TRUE
+    `wrongful restraint`        IS TRUE
+    `fear of instant death`     IS FALSE
+    `fear of instant hurt`      IS TRUE
+    `fear of instant wrongful restraint` IS FALSE
+    `in the presence of the person put in fear` IS FALSE
+    `instant death`             IS FALSE
+    `instant hurt`              IS FALSE
+    `instant wrongful restraint` IS FALSE
+    `to that person`            IS FALSE
+    `to some other person`      IS FALSE
+    `then and there`            IS FALSE
+    `committed after 7 p.m. and before 7 a.m.` IS TRUE
+    `attempting to commit robbery` IS FALSE
+    `voluntarily causes hurt`   IS TRUE
+    `such person`               IS TRUE
+    `any other person jointly concerned in committing or attempting to commit such robbery` IS TRUE
+
+-- The theft with the aggravation taken out: the handphone was taken, but no
+-- violence was caused or attempted for that end. This is plain theft under
+-- s 379 and not robbery, and the refusal says which of the two things s 390
+-- needs is missing.
+`Chen Weixiong Jerriek, no aggravation` MEANS `Robbery Facts` WITH
+    particulars IS `Chen Weixiong Jerriek`'s particulars
+    theft       IS `Chen Weixiong Jerriek`'s theft
+    extortion   IS `Chen Weixiong Jerriek`'s extortion
+    `the hurt`  IS ""
+    `in order to commit theft`  IS FALSE
+    `in committing the theft`   IS TRUE
+    `in carrying away property obtained by the theft` IS FALSE
+    `in attempting to carry away property obtained by the theft` IS FALSE
+    `for that end`              IS FALSE
+    voluntarily                 IS FALSE
+    causes                      IS FALSE
+    `attempts to cause`         IS FALSE
+    death                       IS FALSE
+    hurt                        IS FALSE
+    `wrongful restraint`        IS FALSE
+    `fear of instant death`     IS FALSE
+    `fear of instant hurt`      IS FALSE
+    `fear of instant wrongful restraint` IS FALSE
+    `in the presence of the person put in fear` IS FALSE
+    `instant death`             IS FALSE
+    `instant hurt`              IS FALSE
+    `instant wrongful restraint` IS FALSE
+    `to that person`            IS FALSE
+    `to some other person`      IS FALSE
+    `then and there`            IS FALSE
+    `committed after 7 p.m. and before 7 a.m.` IS FALSE
+    `attempting to commit robbery` IS FALSE
+    `voluntarily causes hurt`   IS FALSE
+    `such person`               IS FALSE
+    `any other person jointly concerned in committing or attempting to commit such robbery` IS FALSE
+
+§§ `The same encounter, one step short — section 393`
+
+-- CONSTRUCTED, NOT REPORTED. Chen Weixiong Jerriek was convicted of the
+-- completed offence; this is a counterfactual built from the same facts so that
+-- s 393 has something to answer, and it is not an account of what happened.
+--
+-- Everything is as the judgment describes it except one leaf: the handphone
+-- never changed hands, so `moves that property` is FALSE. Follow what that
+-- costs. s 378 needs a moving, so `commits theft` fails. s 390(2) upgrades a
+-- theft, so `theft is robbery` fails. s 390(1) is a disjunction over the two
+-- subsections, so `commits robbery` fails, and s 392 refuses.
+--
+-- Two sections survive, for reasons the sections state in their own words:
+-- s 393 punishes whoever ATTEMPTS to commit robbery, and s 394 reaches hurt
+-- caused "in committing or in attempting to commit" one. s 392 does neither.
+`the handphone not taken from Ng Juin Chye Joel` MEANS `Theft Facts` WITH
+    particulars           IS `Chen Weixiong Jerriek particulars`
+    victim                IS "Ng Juin Chye Joel"
+    `victim described as` IS ""
+    `victim pronoun`      IS he
+    `the property`        IS "a handphone valued at about $450/-"
+    `intending to take`   IS TRUE
+    dishonestly           IS TRUE
+    `movable property`    IS TRUE
+    `out of the possession of any person` IS TRUE
+    `without that person's consent`       IS TRUE
+    `moves that property`     IS FALSE
+    `in order to such taking` IS FALSE
+
+-- `in order to commit theft` replaces `in committing the theft` here: on these
+-- facts the violence was done to bring about a taking that never followed.
+`Chen Weixiong Jerriek, the attempt` MEANS `Robbery Facts` WITH
+    particulars IS `Chen Weixiong Jerriek particulars`
+    theft       IS `the handphone not taken from Ng Juin Chye Joel`
+    extortion   IS `no extortion`
+    `the hurt`  IS "slapping him and banging his head against the wall"
+    `in order to commit theft`  IS TRUE
+    `in committing the theft`   IS FALSE
+    `in carrying away property obtained by the theft` IS FALSE
+    `in attempting to carry away property obtained by the theft` IS FALSE
+    `for that end`              IS TRUE
+    voluntarily                 IS TRUE
+    causes                      IS TRUE
+    `attempts to cause`         IS FALSE
+    death                       IS FALSE
+    hurt                        IS TRUE
+    `wrongful restraint`        IS TRUE
+    `fear of instant death`     IS FALSE
+    `fear of instant hurt`      IS TRUE
+    `fear of instant wrongful restraint` IS FALSE
+    `in the presence of the person put in fear` IS FALSE
+    `instant death`             IS FALSE
+    `instant hurt`              IS FALSE
+    `instant wrongful restraint` IS FALSE
+    `to that person`            IS FALSE
+    `to some other person`      IS FALSE
+    `then and there`            IS FALSE
+    `committed after 7 p.m. and before 7 a.m.` IS FALSE
+    `attempting to commit robbery` IS TRUE
+    `voluntarily causes hurt`   IS TRUE
+    `such person`               IS TRUE
+    `any other person jointly concerned in committing or attempting to commit such robbery` IS TRUE
+
+§§ `Illustration (b) to section 390 — the pistol on the high road`
+
+-- The other limb, so that s 390(3) is exercised and not merely encoded.
+-- Illustration (b), laid against constructed particulars:
+--
+--   (b) A meets Z on the high road, shows a pistol, and demands Z's purse. Z, in
+--       consequence surrenders his purse. Here A has extorted the purse from Z,
+--       by putting him in fear of instant hurt, and being at the time of
+--       committing the extortion in his presence. A has therefore committed
+--       robbery.
+--
+-- CONSTRUCTED FIXTURE, not a reported charge. The illustration supplies every
+-- leaf; the names, date, time and place are invented so the recital has
+-- something to recite.
+`high road particulars` MEANS Particulars WITH
+    accused            IS "Ravi s/o Muthu"
+    date               IS "the 9th day of August 2004"
+    time               IS "4.45 pm"
+    place              IS "the footpath along Old Upper Thomson Road"
+    `co-accused`       IS ""
+    `common intention` IS FALSE
+
+`no theft` MEANS `Theft Facts` WITH
+    particulars           IS `high road particulars`
+    victim                IS ""
+    `victim described as` IS ""
+    `victim pronoun`      IS he
+    `the property`        IS ""
+    `intending to take`   IS FALSE
+    dishonestly           IS FALSE
+    `movable property`    IS FALSE
+    `out of the possession of any person` IS FALSE
+    `without that person's consent`       IS FALSE
+    `moves that property`     IS FALSE
+    `in order to such taking` IS FALSE
+
+`the purse surrendered on the high road` MEANS `Extortion Facts` WITH
+    particulars             IS `high road particulars`
+    victim                  IS "Zulkifli bin Hassan"
+    `victim described as`   IS ""
+    `victim pronoun`        IS he
+    `the property extorted` IS "a purse"
+    `the fear`              IS "that you would shoot him with the pistol you were showing him"
+    intentionally           IS TRUE
+    `put the victim in fear` IS TRUE
+    `that person`           IS TRUE
+    `any other person`      IS FALSE
+    body                    IS TRUE
+    mind                    IS FALSE
+    reputation              IS FALSE
+    property                IS FALSE
+    dishonestly             IS TRUE
+    `induced the person so put in fear` IS TRUE
+    `any property`          IS TRUE
+    `valuable security`     IS FALSE
+    `anything signed or sealed which may be converted into a valuable security` IS FALSE
+
+`Illustration (b) to section 390` MEANS `Robbery Facts` WITH
+    particulars IS `high road particulars`
+    theft       IS `no theft`
+    extortion   IS `the purse surrendered on the high road`
+    `the hurt`  IS ""
+    `in order to commit theft`  IS FALSE
+    `in committing the theft`   IS FALSE
+    `in carrying away property obtained by the theft` IS FALSE
+    `in attempting to carry away property obtained by the theft` IS FALSE
+    `for that end`              IS FALSE
+    voluntarily                 IS FALSE
+    causes                      IS FALSE
+    `attempts to cause`         IS FALSE
+    death                       IS FALSE
+    hurt                        IS FALSE
+    `wrongful restraint`        IS FALSE
+    `fear of instant death`     IS FALSE
+    `fear of instant hurt`      IS FALSE
+    `fear of instant wrongful restraint` IS FALSE
+    `in the presence of the person put in fear` IS TRUE
+    `instant death`             IS FALSE
+    `instant hurt`              IS TRUE
+    `instant wrongful restraint` IS FALSE
+    `to that person`            IS TRUE
+    `to some other person`      IS FALSE
+    `then and there`            IS TRUE
+    `committed after 7 p.m. and before 7 a.m.` IS FALSE
+    `attempting to commit robbery` IS FALSE
+    `voluntarily causes hurt`   IS FALSE
+    `such person`               IS FALSE
+    `any other person jointly concerned in committing or attempting to commit such robbery` IS FALSE
+
+§§ `Directives`
+
+#EVAL `commits robbery` `Chen Weixiong Jerriek`
+#EVAL (`charge under s 392` `Chen Weixiong Jerriek`)'s text
+#EVAL (`charge under s 394` `Chen Weixiong Jerriek`)'s text
+#EVAL (`charge under s 392` `Chen Weixiong Jerriek, no aggravation`)'s refusal
+#EVAL (`charge under s 392` `Illustration (b) to section 390`)'s text
+
+-- The reported s 392 charge, verbatim from the judgment save for the citation
+-- form ("s 392 read with s 34 of the Penal Code" → "section 392 read with
+-- section 34 of the Penal Code 1871") and the normalised CPC s 124 header
+-- ("at or about 1.00pm" → "at about 1.00pm"; "with furtherance of the common
+-- intention" → "in furtherance of the common intention").
+#ASSERT `theft is robbery` `Chen Weixiong Jerriek`
+#ASSERT NOT (`extortion is robbery` `Chen Weixiong Jerriek`)
+#ASSERT `commits robbery` `Chen Weixiong Jerriek`
+#ASSERT `offence under s 392` `Chen Weixiong Jerriek`
+#ASSERT (`charge under s 392` `Chen Weixiong Jerriek`)'s `made out`
+#ASSERT `the recital of the robbery` `Chen Weixiong Jerriek` EQUALS "did rob one Ng Juin Chye Joel of a handphone valued at about $450/-"
+#ASSERT (`charge under s 392` `Chen Weixiong Jerriek`)'s text EQUALS "You, Chen Weixiong Jerriek, are charged that you, on or about the 5th day of July 2002, at about 1.00pm, at void deck of Blk 121, Lor 1 Toa Payoh, Singapore, together with Koh Bang Long and Chia Jia Ting Samuel and in furtherance of the common intention of you all, did rob one Ng Juin Chye Joel of a handphone valued at about $450/-, and you have thereby committed an offence punishable under section 392 read with section 34 of the Penal Code 1871."
+#ASSERT (`charge under s 392` `Chen Weixiong Jerriek`)'s punishment EQUALS "imprisonment for a term of not less than 2 years and not more than 10 years and shall also be punished with caning with not less than 6 strokes"
+
+-- s 392's night limb changes the punishment and nothing else: same verdict,
+-- same words, different sentence.
+#ASSERT (`charge under s 392` `Chen Weixiong Jerriek, after 7 p.m.`)'s `made out`
+#ASSERT (`charge under s 392` `Chen Weixiong Jerriek, after 7 p.m.`)'s text EQUALS (`charge under s 392` `Chen Weixiong Jerriek`)'s text
+#ASSERT (`charge under s 392` `Chen Weixiong Jerriek, after 7 p.m.`)'s punishment EQUALS "imprisonment for a term of not less than 3 years and not more than 14 years and shall also be punished with caning with not less than 12 strokes"
+
+-- The s 394 charge. CONSTRUCTED body, not an oracle — see the note on
+-- `the recital of the robbery with hurt`.
+#ASSERT `offence under s 394` `Chen Weixiong Jerriek`
+#ASSERT (`charge under s 394` `Chen Weixiong Jerriek`)'s `made out`
+#ASSERT `the recital of the robbery with hurt` `Chen Weixiong Jerriek` EQUALS "were jointly concerned in committing robbery of a handphone valued at about $450/- from one Ng Juin Chye Joel and whilst committing the said robbery, voluntarily caused hurt to him, to wit, by slapping him and banging his head against the wall"
+#ASSERT (`charge under s 394` `Chen Weixiong Jerriek`)'s punishment EQUALS "imprisonment for a term of not less than 5 years and not more than 20 years and shall also be punished with caning with not less than 12 strokes"
+
+-- The aggravation taken out: the theft still stands, so s 390(1) is satisfied
+-- and only the second row of the refusal fires. That is the s 379/s 392
+-- boundary, stated by the refusal itself.
+#ASSERT `commits theft` `the handphone taken from Ng Juin Chye Joel`
+#ASSERT NOT (`commits robbery` `Chen Weixiong Jerriek, no aggravation`)
+#ASSERT NOT ((`charge under s 392` `Chen Weixiong Jerriek, no aggravation`)'s `made out`)
+#ASSERT (`charge under s 392` `Chen Weixiong Jerriek, no aggravation`)'s text EQUALS ""
+#ASSERT (`charge under s 392` `Chen Weixiong Jerriek, no aggravation`)'s refusal EQUALS "A charge under section 392 would assert that the facts fulfil every legal condition of robbery (CPC s 123(5)). On the facts given they do not: neither the aggravation that makes a theft robbery (section 390(2)) nor the one that makes an extortion robbery (section 390(3))."
+#ASSERT NOT ((`charge under s 394` `Chen Weixiong Jerriek, no aggravation`)'s `made out`)
+
+-- Illustration (b): the other limb. The recital reads the extortion side of the
+-- record, which is what the limb selector above is for.
+#ASSERT `extortion is robbery` `Illustration (b) to section 390`
+#ASSERT NOT (`theft is robbery` `Illustration (b) to section 390`)
+#ASSERT `commits robbery` `Illustration (b) to section 390`
+#ASSERT `the recital of the robbery` `Illustration (b) to section 390` EQUALS "did rob one Zulkifli bin Hassan of a purse"
+#ASSERT (`charge under s 392` `Illustration (b) to section 390`)'s text EQUALS "You, Ravi s/o Muthu, are charged that you, on or about the 9th day of August 2004, at about 4.45 pm, at the footpath along Old Upper Thomson Road, Singapore, did rob one Zulkifli bin Hassan of a purse, and you have thereby committed an offence punishable under section 392 of the Penal Code 1871."
+
+-- The same encounter, one step short. This is the s 392 / s 393 boundary, and
+-- the interesting row is the last one: s 394 survives an attempt because its
+-- own words say so, while s 392 does not.
+#EVAL (`charge under s 392` `Chen Weixiong Jerriek, the attempt`)'s refusal
+#EVAL (`charge under s 393` `Chen Weixiong Jerriek, the attempt`)'s text
+
+#ASSERT NOT (`commits theft` `the handphone not taken from Ng Juin Chye Joel`)
+#ASSERT NOT (`theft is robbery` `Chen Weixiong Jerriek, the attempt`)
+#ASSERT NOT (`extortion is robbery` `Chen Weixiong Jerriek, the attempt`)
+#ASSERT NOT (`commits robbery` `Chen Weixiong Jerriek, the attempt`)
+#ASSERT NOT (`offence under s 392` `Chen Weixiong Jerriek, the attempt`)
+#ASSERT NOT ((`charge under s 392` `Chen Weixiong Jerriek, the attempt`)'s `made out`)
+#ASSERT (`charge under s 392` `Chen Weixiong Jerriek, the attempt`)'s refusal EQUALS "A charge under section 392 would assert that the facts fulfil every legal condition of robbery (CPC s 123(5)). On the facts given they do not: in all robbery there is either theft or extortion (section 390(1)); neither the aggravation that makes a theft robbery (section 390(2)) nor the one that makes an extortion robbery (section 390(3))."
+
+#ASSERT `offence under s 393` `Chen Weixiong Jerriek, the attempt`
+#ASSERT (`charge under s 393` `Chen Weixiong Jerriek, the attempt`)'s `made out`
+#ASSERT `the recital of the attempted robbery` `Chen Weixiong Jerriek, the attempt` EQUALS "did attempt to rob one Ng Juin Chye Joel of a handphone valued at about $450/-"
+#ASSERT (`charge under s 393` `Chen Weixiong Jerriek, the attempt`)'s text EQUALS "You, Chen Weixiong Jerriek, are charged that you, on or about the 5th day of July 2002, at about 1.00pm, at void deck of Blk 121, Lor 1 Toa Payoh, Singapore, together with Koh Bang Long and Chia Jia Ting Samuel and in furtherance of the common intention of you all, did attempt to rob one Ng Juin Chye Joel of a handphone valued at about $450/-, and you have thereby committed an offence punishable under section 393 read with section 34 of the Penal Code 1871."
+#ASSERT (`charge under s 393` `Chen Weixiong Jerriek, the attempt`)'s punishment EQUALS "imprisonment for a term of not less than 2 years and not more than 7 years and shall also be punished with caning with not less than 6 strokes"
+
+-- s 394 reaches the attempt in terms: "in committing or in attempting to
+-- commit robbery".
+#ASSERT `offence under s 394` `Chen Weixiong Jerriek, the attempt`
+#ASSERT (`charge under s 394` `Chen Weixiong Jerriek, the attempt`)'s `made out`
+
+-- And the converse: the completed robbery is not pleaded as an attempt, so
+-- s 393 refuses on the very facts s 392 frames.
+#ASSERT NOT (`offence under s 393` `Chen Weixiong Jerriek`)
+#ASSERT (`charge under s 393` `Chen Weixiong Jerriek`)'s refusal EQUALS "A charge under section 393 would assert that the facts fulfil every legal condition of attempting to commit robbery (CPC s 123(5)). On the facts given they do not: an attempt to commit robbery."
+
+-- s 392 in Woon's shape. Eight assertions, of which FIVE are tests and THREE
+-- are not, and the file should say which is which rather than leave a reader
+-- to count green lines.
+--
+-- THE THREE THAT CANNOT FAIL are the two on `whoever commits robbery shall be
+-- so punished` and the one on `liable under s 392`. That consequent is a
+-- tautology over these facts (see the note on `liable under s 392`), so the
+-- implication is TRUE on every `Robbery Facts` there is. They are kept because
+-- they record the shape, not because they probe it: on the Chen facts the rule
+-- BITES and complies; on the aggravation taken out it is vacuous, the scope
+-- having failed. Only the ladder tells those two TRUEs apart -- `verdictFor`
+-- reads the seam and returns NotApplicable for the second -- and no assertion
+-- in this file can.
+--
+-- THE FIVE THAT CAN FAIL are the four limb assertions, which say which of the
+-- two punishments attaches and would each flip if the night flag moved, and
+-- the `commits robbery` line in the control below.
+#ASSERT `whoever commits robbery shall be so punished` `Chen Weixiong Jerriek`
+#ASSERT `liable under s 392` `Chen Weixiong Jerriek`
+#ASSERT `liable to the ordinary punishment under s 392` `Chen Weixiong Jerriek`
+#ASSERT NOT (`liable to the night punishment under s 392` `Chen Weixiong Jerriek`)
+
+#ASSERT `liable to the night punishment under s 392` `Chen Weixiong Jerriek, after 7 p.m.`
+#ASSERT NOT (`liable to the ordinary punishment under s 392` `Chen Weixiong Jerriek, after 7 p.m.`)
+
+-- The vacuity control. The first line is what makes the second one vacuous, and
+-- it is the line to read: without it the second says nothing at all. It repeats
+-- an assertion made further up, deliberately -- a control that has to be
+-- assembled out of two distant lines is one a reader will misread.
+#ASSERT NOT (`commits robbery` `Chen Weixiong Jerriek, no aggravation`)
+#ASSERT `whoever commits robbery shall be so punished` `Chen Weixiong Jerriek, no aggravation`

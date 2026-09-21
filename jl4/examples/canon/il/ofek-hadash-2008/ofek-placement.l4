@@ -1,0 +1,419 @@
+IMPORT prelude
+IMPORT `ofek-domain`
+IMPORT `ofek-salary-table`
+
+§ `Placement, seniority and promotion`
+
+-- ===========================================================================
+-- Where a teacher sits in the table, and how they move through it.
+--
+-- §§ 36 to 38 of the collective agreement of 25 December 2008. Three
+-- questions, in the order the agreement asks them:
+--
+--   § 36  which table, and where in it, does a teacher START?
+--   § 37  what counts as SENIORITY, the vertical axis?
+--   § 38  what is required to move a RANK, the horizontal axis?
+--
+-- WHAT IS NOT HERE. § 37 defines recognised seniority by reference to the
+-- Teachers' Service Regulations (takanon sherut ovdei hora'a) "as they are
+-- today and as they may be from time to time". Those regulations are in the
+-- corpus — a single 770,000-character document — and their seniority
+-- recognition rules are NOT encoded. Seniority is therefore an INPUT to this
+-- encoding, and NOTES.md § 4 records that as the largest single gap in it.
+-- What § 37 does say in its own words is encoded below, so that a reader can
+-- see exactly how far the agreement takes them before the takanon takes over.
+-- ===========================================================================
+
+§§ `Section 36 — placement on entry`
+
+-- § 36(a): a new academic teacher, having finished the internship year, is
+-- placed at RANK 1 and SENIORITY 0.
+`the rank a new academic teacher starts at` MEANS 1
+`the seniority a new academic teacher starts at` MEANS 0
+
+-- § 36(b) carries one exception to the seniority of 0: a new teacher with
+-- recognised seniority from teaching service in the IDF, or from national
+-- teaching service, is placed according to that seniority (§ 37).
+GIVEN `the recognised prior seniority` IS A NUMBER
+GIVETH A NUMBER
+`the seniority a new academic teacher is placed at with` `the recognised prior seniority`
+    @nlg the seniority a new academic teacher with %the recognised prior seniority% years of recognised service is placed at
+    MEANS
+    IF `the recognised prior seniority` AT MOST 0
+        THEN `the seniority a new academic teacher starts at`
+        ELSE `the recognised prior seniority`
+
+-- § 36(d)(2): a teacher holding a doctorate is placed in the second-degree
+-- table (§ 36(d)(1), encoded in ofek-domain) and is paid, IN ADDITION, 5% of
+-- their combined salary in that table. The agreement adds that the State will
+-- act to have this recognised as a permanent supplement for pension purposes,
+-- and that it bears pension and study-fund contributions — both of which are
+-- consequences outside this module.
+`the doctorate supplement rate` MEANS 5%
+
+GIVEN `the teacher` IS A `a teacher`
+      `the combined salary` IS A NUMBER
+GIVETH A NUMBER
+`the doctorate supplement for` `the teacher` `the combined salary`
+    @nlg the doctorate supplement payable to %the teacher%
+    MEANS
+    IF `the teacher holds a doctorate` `the teacher`
+        THEN `the combined salary` TIMES `the doctorate supplement rate`
+        ELSE 0
+
+-- § 36(e): a bar, not a benefit. A teacher holding a second or third degree
+-- who has NO teaching certificate or teaching qualification, and whose
+-- teaching seniority is BELOW 25 years, may not advance in rank until they
+-- become entitled to one.
+GIVEN `the teacher` IS A `a teacher`
+      `the teacher holds a teaching certificate` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `section 36(e) bars the teacher from advancing in rank` IF
+        NOT `the teacher holds a teaching certificate`
+    AND `the teacher`'s `seniority in years` BELOW 25
+    AND `the degree engages section 36(e)`
+    WHERE
+        -- The bar reaches a second or third degree only. A first-degree
+        -- holder is outside it, as is a teacher who is not academic at all.
+        `the degree engages section 36(e)` MEANS
+            CONSIDER `the teacher`'s `qualification`
+            WHEN `academic — holds a recognised second degree` THEN TRUE
+            WHEN `academic — holds a doctorate`                THEN TRUE
+            OTHERWISE                                          FALSE
+
+§§ `Section 37 — what counts as seniority`
+
+-- § 37(a), in its own terms. Recognised seniority is teaching seniority as
+-- defined in the Teachers' Service Regulations, and the article names three
+-- adjustments to it on the face of the agreement.
+DECLARE `a period offered as seniority` IS ONE OF
+    `teaching seniority recognised by the service regulations`  -- § 37(a), the general rule
+    `the internship year`                                       -- § 37(a), excluded
+    `compulsory military service`                               -- § 37(a), excluded
+    `teaching service in the IDF`                               -- § 37(a), included
+    `national service performed as teaching`                    -- § 37(a), included
+
+GIVEN `the period` IS A `a period offered as seniority`
+GIVETH A BOOLEAN
+DECIDE `the period counts as recognised seniority` IF
+    -- Read straight off § 37(a): seniority is takanon seniority, "not
+    -- including the internship period, except for the period of compulsory
+    -- service in the IDF, but including service in the IDF as teaching or
+    -- national service as teaching in accordance with the rules to be set in
+    -- the Teachers' Service Regulations".
+    CONSIDER `the period`
+    WHEN `teaching seniority recognised by the service regulations` THEN TRUE
+    WHEN `the internship year`                                      THEN FALSE
+    WHEN `compulsory military service`                              THEN FALSE
+    WHEN `teaching service in the IDF`                              THEN TRUE
+    WHEN `national service performed as teaching`                   THEN TRUE
+
+-- § 37(b): for an EXISTING teacher, everything recognised for pay purposes on
+-- the eve of the crossover comes across. The crossover does not restart the
+-- clock, and it does not re-open what had already been recognised.
+GIVEN `the teacher` IS A `a teacher`
+      `the seniority recognised before the crossover` IS A NUMBER
+GIVETH A NUMBER
+`the seniority carried into the reform by` `the teacher` `the seniority recognised before the crossover`
+    @nlg the seniority %the teacher% carries into the reform
+    MEANS
+    CONSIDER `the teacher`'s `how they entered`
+    WHEN `an existing teacher converted under sections 43 to 50` THEN
+        `the seniority recognised before the crossover`
+    WHEN `a new teacher placed under section 36` THEN
+        `the seniority a new academic teacher is placed at with` `the seniority recognised before the crossover`
+
+§§ `Section 38 — promotion in rank`
+
+-- § 38(b) and § 38(f): the time that must be spent standing in the rank
+-- below, before promotion is even in question.
+GIVEN `the rank being left` IS A NUMBER
+GIVETH A NUMBER
+`the years of standing required to leave rank` `the rank being left`
+    @nlg the years of standing required to leave rank %the rank being left%
+    MEANS
+    -- § 38(b)(1)-(5) for ranks 1 to 6; § 38(f)(1)-(3) for ranks 6 to 9. The
+    -- cadence is two years for the first two steps and three thereafter.
+    BRANCH IF `the rank being left` AT MOST 1 THEN 2   -- § 38(b)(1)  1 → 2
+           IF `the rank being left` EQUALS 2  THEN 2   -- § 38(b)(2)  2 → 3
+           IF `the rank being left` EQUALS 3  THEN 3   -- § 38(b)(3)  3 → 4
+           IF `the rank being left` EQUALS 4  THEN 3   -- § 38(b)(4)  4 → 5
+           IF `the rank being left` EQUALS 5  THEN 3   -- § 38(b)(5)  5 → 6
+           IF `the rank being left` EQUALS 6  THEN 3   -- § 38(f)(1)  6 → 7
+           IF `the rank being left` EQUALS 7  THEN 3   -- § 38(f)(2)  7 → 8
+           OTHERWISE                               3   -- § 38(f)(3)  8 → 9
+
+-- § 38(c) and § 38(d): what counts toward that standing while the teacher is
+-- not in front of a class. The sabbatical is the interesting one — it counts
+-- for HALF a year, and only if one of the two § 38(c)(5) conditions is met.
+DECLARE `a period away from the classroom` IS ONE OF
+    `maternity leave under statute`                                  -- § 38(c)(1)
+    `reserve military service`                                       -- § 38(c)(2)
+    `service as principal or first deputy that earned no promotion`  -- § 38(c)(3)
+    `paid rest leave or paid sick leave`                             -- § 38(c)(4)
+    `a sabbatical year meeting a section 38(c)(5) condition`         -- § 38(c)(5)
+    `a sabbatical year meeting neither section 38(c)(5) condition`   -- § 38(d)(2)
+    `unpaid leave of any kind`                                       -- § 38(d)(1)
+
+GIVEN `the period` IS A `a period away from the classroom`
+GIVETH A NUMBER
+`the years of standing contributed by a year of` `the period`
+    @nlg the years of standing a year of %the period% contributes
+    MEANS
+    CONSIDER `the period`
+    WHEN `maternity leave under statute`                                 THEN 1
+    WHEN `reserve military service`                                      THEN 1
+    WHEN `service as principal or first deputy that earned no promotion` THEN 1
+    WHEN `paid rest leave or paid sick leave`                            THEN 1
+    -- § 38(c)(5), final words: "in such a case the sabbatical year shall be
+    -- counted as half a year for the purpose of the period of standing".
+    WHEN `a sabbatical year meeting a section 38(c)(5) condition`        THEN 50%
+    WHEN `a sabbatical year meeting neither section 38(c)(5) condition`  THEN 0
+    WHEN `unpaid leave of any kind`                                      THEN 0
+
+-- § 38(e)(3): from rank 6 upward the teacher must also have evaluations
+-- capable of recommending promotion. Below that, § 38(a) asks only for
+-- standing and the ministry's criteria.
+GIVEN `the rank being left` IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `promotion out of rank requires an evaluation` `the rank being left` IF
+    `the rank being left` AT LEAST 6
+
+-- § 38(g): the ranks that are rationed, and the share of all teaching posts
+-- each may occupy.
+GIVEN `the rank being entered` IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `the rank is rationed by quota` `the rank being entered` IF
+    `the rank being entered` AT LEAST 7
+
+GIVEN `the rank being entered` IS A NUMBER
+GIVETH A NUMBER
+`the share of all teaching posts the quota allows at rank` `the rank being entered`
+    @nlg the share of all teaching posts the quota allows at rank %the rank being entered%
+    MEANS
+    -- § 38(g): rank 7 — 10%; rank 8 — 5%; rank 9 — 3%. Ranks 1 to 6 are not
+    -- rationed, which this expresses as the whole of the establishment.
+    BRANCH IF `the rank being entered` AT MOST 6 THEN 100%
+           IF `the rank being entered` EQUALS 7  THEN 10%
+           IF `the rank being entered` EQUALS 8  THEN 5%
+           OTHERWISE                                  3%
+
+-- § 38(g), applied. "All teaching posts" is defined broadly by the article:
+-- it takes in posts in schools where the reform has not yet been implemented,
+-- and excludes principals, first deputies, inspectors and instructors. It is
+-- also floored at the number of posts existing on the eve of the agreement.
+GIVEN `the posts already at that rank` IS A NUMBER
+      `all teaching posts` IS A NUMBER
+      `the rank being entered` IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `a place in the quota is free at rank` `the posts already at that rank` `all teaching posts` `the rank being entered` IF
+        `the posts already at that rank` PLUS 1
+    AT MOST
+        `all teaching posts` TIMES (`the share of all teaching posts the quota allows at rank` `the rank being entered`)
+
+-- § 38(i): a teacher who HAS met the § 38(e) conditions may not be held back
+-- indefinitely. Three, four and five years for ranks 7, 8 and 9 — but the
+-- article makes even this "subject to the existence of a free quota place",
+-- which is why the entitlement below is expressed as a ceiling on waiting and
+-- not as an override of § 38(g). NOTES.md § 5 records the tension: if the
+-- quota never frees a place, § 38(i) never bites, and the article does not
+-- say what happens then.
+GIVEN `the rank being entered` IS A NUMBER
+GIVETH A NUMBER
+`the years a qualifying teacher may be kept waiting for rank` `the rank being entered`
+    @nlg the years a qualifying teacher may be kept waiting for rank %the rank being entered%
+    MEANS
+    BRANCH IF `the rank being entered` AT MOST 7 THEN 3   -- § 38(i)(1)
+           IF `the rank being entered` EQUALS 8  THEN 4   -- § 38(i)(2)
+           OTHERWISE                                  5   -- § 38(i)(3)
+
+§§ `Putting section 38 together`
+
+DECLARE `an application for promotion in rank` HAS
+    `the current rank`                     IS A NUMBER
+    `years of standing in the current rank` IS A NUMBER  -- § 38(b)/(f), counted per § 38(c)-(d)
+    `the ministry criteria are met`        IS A BOOLEAN  -- § 38(a)(2), (e)(2)
+    `the evaluations recommend promotion`  IS A BOOLEAN  -- § 38(e)(3)
+    `the posts already at the rank sought` IS A NUMBER   -- § 38(g)
+    `all teaching posts`                   IS A NUMBER   -- § 38(g)
+    `years already waited having qualified` IS A NUMBER  -- § 38(i)
+
+GIVEN `the application` IS AN `an application for promotion in rank`
+GIVETH A NUMBER
+`the rank sought by` `the application`
+    @nlg the rank sought by %the application%
+    MEANS `the application`'s `the current rank` PLUS 1
+
+-- § 38(a) and § 38(e): the CUMULATIVE conditions, so called in both articles.
+-- Standing, plus the ministry's criteria, plus — from rank 6 up — the
+-- evaluations. This is entitlement to be CONSIDERED; the quota decides
+-- whether the promotion can actually be made.
+GIVEN `the application` IS AN `an application for promotion in rank`
+GIVETH A BOOLEAN
+DECIDE `the teacher meets the conditions for promotion` IF
+        `the application`'s `years of standing in the current rank`
+            AT LEAST (`the years of standing required to leave rank` (`the application`'s `the current rank`))
+    AND `the application`'s `the ministry criteria are met`
+    AND (   NOT (`promotion out of rank requires an evaluation` (`the application`'s `the current rank`))
+         OR `the application`'s `the evaluations recommend promotion`)
+
+GIVEN `the application` IS AN `an application for promotion in rank`
+GIVETH A BOOLEAN
+DECIDE `the quota admits the promotion` IF
+    -- Ranks 1 to 6 are not rationed at all, so the quota admits them always.
+    IF NOT (`the rank is rationed by quota` (`the rank sought by` `the application`))
+        THEN TRUE
+        ELSE `a place in the quota is free at rank`
+                (`the application`'s `the posts already at the rank sought`)
+                (`the application`'s `all teaching posts`)
+                (`the rank sought by` `the application`)
+
+-- § 38(h) and § 38(i) together: where the quota binds, the ministry runs an
+-- annual check and promotes those who qualify with the highest evaluation
+-- scores; a teacher who qualifies must not be passed over beyond the § 38(i)
+-- ceiling. This reports that the ceiling has been reached — which under
+-- § 38(i) is the point at which the teacher's promotion may no longer be
+-- withheld, ALWAYS subject to a free place.
+GIVEN `the application` IS AN `an application for promotion in rank`
+GIVETH A BOOLEAN
+DECIDE `the teacher has waited as long as section 38(i) allows` IF
+        `the teacher meets the conditions for promotion` `the application`
+    AND `the rank is rationed by quota` (`the rank sought by` `the application`)
+    AND `the application`'s `years already waited having qualified`
+            AT LEAST (`the years a qualifying teacher may be kept waiting for rank` (`the rank sought by` `the application`))
+
+@export Decide whether an Israeli teacher under the Ofek Hadash reform may be promoted to the next rank, applying the standing periods, ministry criteria, evaluations and rank quotas of section 38 of the collective agreement of 25 December 2008
+GIVEN `the application` IS AN `an application for promotion in rank`
+      @desc The teacher's current rank (1 to 9), years of standing in it counted under section 38(c), whether the ministry criteria and evaluations are met, the number of posts already at the rank sought and the total number of teaching posts, and the years already waited after qualifying
+GIVETH A BOOLEAN
+DECIDE `the teacher may be promoted` IF
+        `the teacher meets the conditions for promotion` `the application`
+    AND `the quota admits the promotion` `the application`
+    -- Rank 9 is the top of the table; there is nothing above it to be
+    -- promoted into.
+    AND `the application`'s `the current rank` BELOW 9
+
+§§ `Illustrations`
+
+-- A teacher three years into rank 3, which needs three years' standing, with
+-- the ministry criteria met. Rank 4 is not rationed, so she is promoted.
+`a promotion from rank 3` MEANS `an application for promotion in rank` WITH
+    `the current rank`                      IS 3
+    `years of standing in the current rank` IS 3
+    `the ministry criteria are met`         IS TRUE
+    `the evaluations recommend promotion`   IS FALSE
+    `the posts already at the rank sought`  IS 0
+    `all teaching posts`                    IS 100_000
+    `years already waited having qualified` IS 0
+
+-- The same teacher one year earlier: the standing is short and § 38(b)(3)
+-- is not satisfied.
+`a promotion from rank 3 one year early` MEANS `an application for promotion in rank` WITH
+    `the current rank`                      IS 3
+    `years of standing in the current rank` IS 2
+    `the ministry criteria are met`         IS TRUE
+    `the evaluations recommend promotion`   IS FALSE
+    `the posts already at the rank sought`  IS 0
+    `all teaching posts`                    IS 100_000
+    `years already waited having qualified` IS 0
+
+-- Rank 6 to rank 7 crosses into the rationed part of the table. The teacher
+-- qualifies on standing, criteria and evaluations, and there is room: 9,000
+-- posts already at rank 7 out of 100,000, against a 10% ceiling.
+`a promotion into rank 7 with room` MEANS `an application for promotion in rank` WITH
+    `the current rank`                      IS 6
+    `years of standing in the current rank` IS 3
+    `the ministry criteria are met`         IS TRUE
+    `the evaluations recommend promotion`   IS TRUE
+    `the posts already at the rank sought`  IS 9_000
+    `all teaching posts`                    IS 100_000
+    `years already waited having qualified` IS 0
+
+-- The same teacher when the tenth percentile is already full. Everything
+-- personal to her is satisfied; § 38(g) still stops the promotion.
+`a promotion into rank 7 with the quota full` MEANS `an application for promotion in rank` WITH
+    `the current rank`                      IS 6
+    `years of standing in the current rank` IS 4
+    `the ministry criteria are met`         IS TRUE
+    `the evaluations recommend promotion`   IS TRUE
+    `the posts already at the rank sought`  IS 10_000
+    `all teaching posts`                    IS 100_000
+    `years already waited having qualified` IS 3
+
+-- A rank 6 teacher who qualifies but whose evaluations do not recommend her.
+`a promotion into rank 7 without an evaluation` MEANS `an application for promotion in rank` WITH
+    `the current rank`                      IS 6
+    `years of standing in the current rank` IS 5
+    `the ministry criteria are met`         IS TRUE
+    `the evaluations recommend promotion`   IS FALSE
+    `the posts already at the rank sought`  IS 0
+    `all teaching posts`                    IS 100_000
+    `years already waited having qualified` IS 0
+
+#ASSERT `the teacher may be promoted` `a promotion from rank 3`
+#ASSERT NOT `the teacher may be promoted` `a promotion from rank 3 one year early`
+#ASSERT `the teacher may be promoted` `a promotion into rank 7 with room`
+#ASSERT NOT `the teacher may be promoted` `a promotion into rank 7 with the quota full`
+#ASSERT NOT `the teacher may be promoted` `a promotion into rank 7 without an evaluation`
+
+-- The quota is the only thing standing in the way of the fourth case, and
+-- § 38(i)'s ceiling has been reached: she qualified three years ago and rank
+-- 7 allows three. The agreement says she may not be held back longer — and
+-- says it "subject to a free place", which there is not. Both facts are true
+-- at once, and the encoding reports both rather than choosing.
+#ASSERT `the teacher meets the conditions for promotion` `a promotion into rank 7 with the quota full`
+#ASSERT NOT `the quota admits the promotion` `a promotion into rank 7 with the quota full`
+#ASSERT `the teacher has waited as long as section 38(i) allows` `a promotion into rank 7 with the quota full`
+
+-- The standing periods, read back against § 38(b) and § 38(f).
+#ASSERT `the years of standing required to leave rank` 1 EQUALS 2
+#ASSERT `the years of standing required to leave rank` 2 EQUALS 2
+#ASSERT `the years of standing required to leave rank` 3 EQUALS 3
+#ASSERT `the years of standing required to leave rank` 5 EQUALS 3
+#ASSERT `the years of standing required to leave rank` 8 EQUALS 3
+
+-- Twenty-two years is the earliest a teacher promoted at every opportunity
+-- could stand at the door of rank 9: 2+2+3+3+3+3+3+3.
+#ASSERT `the years of standing required to leave rank` 1 PLUS `the years of standing required to leave rank` 2 PLUS `the years of standing required to leave rank` 3 PLUS `the years of standing required to leave rank` 4 PLUS `the years of standing required to leave rank` 5 PLUS `the years of standing required to leave rank` 6 PLUS `the years of standing required to leave rank` 7 PLUS `the years of standing required to leave rank` 8 EQUALS 22
+
+-- The quota shares, read back against § 38(g).
+#ASSERT `the share of all teaching posts the quota allows at rank` 7 EQUALS 10%
+#ASSERT `the share of all teaching posts the quota allows at rank` 8 EQUALS 5%
+#ASSERT `the share of all teaching posts the quota allows at rank` 9 EQUALS 3%
+#ASSERT NOT `the rank is rationed by quota` 6
+#ASSERT `the rank is rationed by quota` 7
+
+-- § 38(c): a sabbatical that meets a condition is half a year; unpaid leave
+-- is nothing; maternity leave and reserve duty are whole years.
+#ASSERT `the years of standing contributed by a year of` `a sabbatical year meeting a section 38(c)(5) condition` EQUALS 50%
+#ASSERT `the years of standing contributed by a year of` `a sabbatical year meeting neither section 38(c)(5) condition` EQUALS 0
+#ASSERT `the years of standing contributed by a year of` `unpaid leave of any kind` EQUALS 0
+#ASSERT `the years of standing contributed by a year of` `maternity leave under statute` EQUALS 1
+#ASSERT `the years of standing contributed by a year of` `reserve military service` EQUALS 1
+
+-- § 37: the internship year and compulsory service are out; teaching service
+-- in the IDF and national teaching service are in.
+#ASSERT NOT `the period counts as recognised seniority` `the internship year`
+#ASSERT NOT `the period counts as recognised seniority` `compulsory military service`
+#ASSERT `the period counts as recognised seniority` `teaching service in the IDF`
+#ASSERT `the period counts as recognised seniority` `national service performed as teaching`
+
+-- § 36(d)(2): the doctorate supplement is 5% of the combined salary, and is
+-- paid to nobody else.
+#ASSERT `the doctorate supplement for` `Noa` 10_000 EQUALS 500
+#ASSERT `the doctorate supplement for` `Yael` 10_000 EQUALS 0
+
+-- § 36(e): the bar reaches a second-degree holder under 25 years' seniority
+-- who has no certificate, and reaches neither a first-degree holder nor a
+-- teacher who has one.
+#ASSERT `section 36(e) bars the teacher from advancing in rank` `Noa` FALSE
+#ASSERT NOT `section 36(e) bars the teacher from advancing in rank` `Noa` TRUE
+#ASSERT NOT `section 36(e) bars the teacher from advancing in rank` `Yael` FALSE
+#ASSERT NOT `section 36(e) bars the teacher from advancing in rank` `Dvora` FALSE
+
+-- § 36(a)-(b): a new teacher starts at rank 1 and seniority 0, unless
+-- recognised teaching service in the IDF or national service places them
+-- higher.
+#ASSERT `the rank a new academic teacher starts at` EQUALS 1
+#ASSERT `the seniority a new academic teacher is placed at with` 0 EQUALS 0
+#ASSERT `the seniority a new academic teacher is placed at with` 2 EQUALS 2

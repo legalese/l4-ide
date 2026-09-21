@@ -1,0 +1,129 @@
+`TRUNC` with 800.99 and 0 is equal to 800
+`TRUNC` with 550.24 and 0 is equal to 550
+`the Base Points on whole dollars of` with `TRUNC` with 800.99 and 0 is equal to 800
+`the Bonus Points on whole dollars of` with `TRUNC` with 800.99 and 0 is equal to 7200
+`the Base Points on whole dollars of` with `TRUNC` with 550.24 and 0 is equal to 550
+`the Bonus Points on whole dollars of` with `TRUNC` with 550.24 and 0 is equal to 4950
+the sum of `the Base Points on whole dollars of` with `TRUNC` with 800.99 and 0 and `the Base Points on whole dollars of` with `TRUNC` with 550.24 and 0 is equal to 1350
+the sum of `the Bonus Points on whole dollars of` with `TRUNC` with 800.99 and 0 and `the Bonus Points on whole dollars of` with `TRUNC` with 550.24 and 0 is equal to 12150
+`the Bonus Points awarded on` with 12150 is equal to 9000
+the sum of 1350 and `the Bonus Points awarded on` with 12150 is equal to 10350
+`the dollars of 10X spend the bonus cap admits` is equal to 1000
+`clause 6(i) — the Merchant Category limb` with `a phone tap at a department store`
+`a 10X Points Eligible Transaction` with `a phone tap at a department store`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `miles per dollar` is equal to 4
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `earns the bonus rate`
+not `clause 6(i) — the Merchant Category limb` with `a phone payment on a restaurant website`
+not `clause 6(ii) — the online limb` with `a phone payment on a restaurant website`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone payment on a restaurant website` 's `miles per dollar` is equal to 0.4
+not `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone payment on a restaurant website` 's `earns the bonus rate`
+`clause 6(ii) — the online limb` with `the plastic card on a restaurant website`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `the plastic card on a restaurant website` 's `miles per dollar` is equal to 4
+`clause 6(i) — the Merchant Category limb` with `the plastic card on a clothing website`
+`clause 6(ii) — the online limb` with `the plastic card on a clothing website`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `the plastic card on a clothing website` 's `miles per dollar` is equal to 4
+`a Qualifying Charge` with `an airline ticket bought online`
+`a travel-related Merchant Category` with 4511
+not `clause 6(ii) — the online limb` with `an airline ticket bought online`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `an airline ticket bought online` 's `miles per dollar` is equal to 0.4
+`a travel-related Merchant Category` with 3750
+not `a travel-related Merchant Category` with 4000
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a charge at a merchant whose indicator is unknown` 's `depends on the merchant indicator`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a charge at a merchant whose indicator is unknown` 's `miles per dollar if the merchant flags online` is equal to 4
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a charge at a merchant whose indicator is unknown` 's `miles per dollar if the merchant flags card-present` is equal to 0.4
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a charge at a merchant whose indicator is unknown` 's `miles per dollar` is equal to 0.4
+not `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `an apparel charge whose indicator is unknown` 's `depends on the merchant indicator`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `an apparel charge whose indicator is unknown` 's `miles per dollar` is equal to 4
+not `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a wallet charge whose indicator is unknown` 's `depends on the merchant indicator`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a wallet charge whose indicator is unknown` 's `miles per dollar` is equal to 0.4
+`a Qualifying Charge` with `the plastic card at a restaurant`
+not `a 10X Points Eligible Transaction` with `the plastic card at a restaurant`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `the plastic card at a restaurant` 's `miles per dollar` is equal to 0.4
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `the plastic card at a restaurant` 's `points per dollar` is equal to 1
+`a Qualifying Charge` with `an Amaze charge at an unlisted merchant`
+`clause 6(ii) — the online limb` with `an Amaze charge at an unlisted merchant`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `an Amaze charge at an unlisted merchant` 's `miles per dollar` is equal to 4
+`paragraph 3 of the exclusion list reaches this charge` with `an Amaze top-up of an EZ-link card`
+`paragraph 3 of the exclusion list reaches this charge` with `a bus ride billed through SimplyGo`
+not `a Qualifying Charge` with `an Amaze top-up of an EZ-link card`
+not `paragraph 3 of the exclusion list reaches this charge` with `an Amaze charge at an unlisted merchant`
+`paragraph 3 of the exclusion list reaches this charge` with `a company-branded AXS line`
+not `a Qualifying Charge` with `a company-branded AXS line`
+`paragraph 3 of the exclusion list reaches this charge` with `a deposit to a forex platform Citi does not name`
+not `the exclusion list excludes MCC` with 5999
+not `paragraph 3 of the exclusion list reaches this charge` with `a charge described as SAM`
+`a Qualifying Charge` with `a charge described as SAM`
+`paragraph 3 of the exclusion list reaches this charge` with `a charge described as SAM PAYMENTS`
+not `a Qualifying Charge` with `a charge described as SAM PAYMENTS`
+`elem` with five descriptions on Citibank's list — SAM, SPL AUTO*, SPL ATU*, SPL ONLINE* and TL-ABT — are not recognised by the statement-line classifier as it prints them, so a charge bearing one of them is not caught here and `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a charge described as SAM` 's `conditions`
+not `paragraph 3 of the exclusion list reaches this charge` with `a charge described as TL-ABT`
+`a Qualifying Charge` with `a charge described as TL-ABT`
+not `the exclusion list excludes MCC` with 5812
+`the exclusion list names this merchant` with `a SimplyGo ride posting under some other description`
+`paragraph 3 of the exclusion list reaches this charge` with `a SimplyGo ride posting under some other description`
+not `a Qualifying Charge` with `a SimplyGo ride posting under some other description`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a SimplyGo ride posting under some other description` 's `miles per dollar` is equal to 0
+not `the exclusion list names this merchant` with `a top-up through AXS`
+`paragraph 3 of the exclusion list reaches this charge` with `a top-up through AXS`
+not `a Qualifying Charge` with `a top-up through AXS`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a top-up through AXS` 's `miles per dollar` is equal to 0
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a top-up through AXS` 's `points per dollar` is equal to 0
+`the exclusion list excludes MCC` with 9311
+not `a Qualifying Charge` with `a tax payment`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a tax payment` 's `miles per dollar` is equal to 0
+`the exclusion list excludes MCC` with 6535
+`the exclusion list excludes MCC` with 8250
+`the exclusion list excludes MCC` with 8655
+`the exclusion list excludes MCC` with 9000
+not `the exclusion list excludes MCC` with 5311
+not `the exclusion list excludes MCC` with 5812
+not `this revision of the exclusion list was in force` with `an AXS charge before the list commenced`
+`a Qualifying Charge` with `an AXS charge before the list commenced`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store charge in 2023` 's `status` is equal to `Unconfirmed`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `status` is equal to `Verified`
+`elem` with this charge predates the 1 April 2024 effective date of the held terms; the revision that governed it is not held and `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store charge in 2023` 's `conditions`
+not `elem` with this charge predates the 1 April 2024 effective date of the held terms; the revision that governed it is not held and `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `conditions`
+`count` with `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `sources` is equal to 5
+`count` with `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a top-up through AXS` 's `sources` is equal to 4
+`a Qualifying Charge` with `a department store posting booked as` with `Retail purchase`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store posting booked as` with `Retail purchase` 's `miles per dollar` is equal to 4
+not `a Qualifying Charge` with `a department store posting booked as` with `Annual fee or bank charge`
+not `a Qualifying Charge` with `a department store posting booked as` with `Interest or finance charge`
+not `a Qualifying Charge` with `a department store posting booked as` with `Instalment plan transaction`
+not `a Qualifying Charge` with `a department store posting booked as` with `Cash advance or quasi-cash`
+not `a Qualifying Charge` with `a department store posting booked as` with `Balance or funds transfer`
+`a clause 5(i) kind of charge` with `Balance or funds transfer`
+`a clause 5(ii) kind of charge` with `Balance or funds transfer`
+not `a Qualifying Charge` with `a department store posting booked as` with `Bill payment via internet banking`
+`a clause 5(iii) kind of charge` with `Bill payment via internet banking`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store posting booked as` with `Annual fee or bank charge` 's `miles per dollar` is equal to 0
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store posting booked as` with `Annual fee or bank charge` 's `points per dollar` is equal to 0
+`count` with `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store posting booked as` with `Annual fee or bank charge` 's `sources` is equal to 1
+`count` with `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store posting booked as` with `Annual fee or bank charge` 's `conditions` is equal to 1
+`a Qualifying Charge` with `a department store posting booked as` with `Pre-authorisation`
+`a Qualifying Charge` with `a department store posting booked as` with `Telephone or mail order`
+`a Qualifying Charge` with `a department store posting booked as` with `Refund or reversal`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store posting booked as` with `Pre-authorisation` 's `miles per dollar` is equal to 4
+`elem` with clause 5 also excludes GST, and bill payments made through a channel or agent other than internet banking; the statement line does not distinguish either and `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `the plastic card at a restaurant` 's `conditions`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `cap` 's `basis` is equal to `Statement month`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `cap` 's `attribution` is equal to `By posting date`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `cap` 's `capped`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `cap` 's `bonus spend per month` is equal to 1000
+not `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone payment on a restaurant website` 's `cap` 's `capped`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `conversion status` is equal to `Unconfirmed`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `points per dollar` is equal to 10
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `cap` 's `pool` is equal to Citi Rewards 10X bonus (statement month)
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `earns the bonus rate`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `miles per dollar` is greater than `the base rate in miles per dollar`
+not `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `the plastic card at a restaurant` 's `earns the bonus rate`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `the plastic card at a restaurant` 's `miles per dollar` is equal to `the base rate in miles per dollar`
+not `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a top-up through AXS` 's `earns the bonus rate`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a top-up through AXS` 's `miles per dollar` is equal to 0
+not `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store posting booked as` with `Annual fee or bank charge` 's `earns the bonus rate`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a charge at a merchant whose indicator is unknown` 's `depends on the merchant indicator`
+not `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a charge at a merchant whose indicator is unknown` 's `earns the bonus rate`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a charge at a merchant whose indicator is unknown` 's `miles per dollar` is equal to `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a charge at a merchant whose indicator is unknown` 's `miles per dollar if the merchant flags card-present`
+not `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a charge at a merchant whose indicator is unknown` 's `miles per dollar` is greater than `the base rate in miles per dollar`
+`Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a charge at a merchant whose indicator is unknown` 's `miles per dollar if the merchant flags online` is greater than `the base rate in miles per dollar`
+`Citi Rewards earns on` with `Citi Rewards`, `Cardholder` where `Solitaire preferred rewards categories` is `EMPTY`, `yuu account linked to the card` is `FALSE`, `HSBC Everyday Global Account deposits ADB this month` is 0 and `PAssion membership registered and card linked in yuu` is `FALSE`, `Month position` where `yuu eligible spend so far this calendar month` is 0, `yuu participating merchants transacted so far this calendar month` is 0, `PAssion spend at Participating Stores so far this month` is 0 and `PAssion spend at non-Participating Stores so far this month` is 0 and `Transaction` where `merchant name` is METRO PASIR RIS, `merchant` is `Another merchant`, `merchant category code` is 5311, `transaction description` is METRO PASIR RIS, `description patterns` is `EMPTY`, `charge kind` is `Retail purchase`, `amount` is 100, `currency` is SGD, `posted in a foreign currency` is `FALSE`, `transaction date` is `YMD` with 2026, 9 and 1, `posting date` is `YMD` with 2026, 9 and 3, `payment channel` is `Tapped at a terminal`, `credential` is `A mobile wallet token`, `merchant indicator` is `Flags card-present` and `made in Singapore` is `TRUE`
+`Citi Rewards earns on` with `Citi Rewards`, `Cardholder` where `Solitaire preferred rewards categories` is `EMPTY`, `yuu account linked to the card` is `FALSE`, `HSBC Everyday Global Account deposits ADB this month` is 0 and `PAssion membership registered and card linked in yuu` is `FALSE`, `Month position` where `yuu eligible spend so far this calendar month` is 0, `yuu participating merchants transacted so far this calendar month` is 0, `PAssion spend at Participating Stores so far this month` is 0 and `PAssion spend at non-Participating Stores so far this month` is 0 and `Transaction` where `merchant name` is CITIBANK ANNUAL FEE, `merchant` is `Another merchant`, `merchant category code` is 5311, `transaction description` is CITIBANK ANNUAL FEE, `description patterns` is `EMPTY`, `charge kind` is `Annual fee or bank charge`, `amount` is 196.2, `currency` is SGD, `posted in a foreign currency` is `FALSE`, `transaction date` is `YMD` with 2026, 9 and 1, `posting date` is `YMD` with 2026, 9 and 3, `payment channel` is `Card on file or recurring billing`, `credential` is `The physical card`, `merchant indicator` is `Flags card-present` and `made in Singapore` is `TRUE`

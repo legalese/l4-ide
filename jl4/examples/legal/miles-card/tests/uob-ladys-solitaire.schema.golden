@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "What a transaction earns on a UOB Lady's Solitaire Card: the UNI$ per dollar, the miles per dollar, whether it earns the 10X Preferred Rewards Category bonus or only the base, which monthly cap governs, and the clauses of the UOB Lady's Cards T&C relied on.",
+    "properties": {
+        "card": {
+            "$ref": "#/$defs/Card",
+            "description": "The card the transaction was made on. This rule answers for UOB Lady's Solitaire; the parameter is taken for uniformity with the other card rules and is not read."
+        },
+        "cardholder": {
+            "$ref": "#/$defs/Cardholder",
+            "description": "The cardholder, whose Solitaire preferred rewards categories are the two categories registered for this Quarter at uob.com.sg/ladys-enrol."
+        },
+        "month": {
+            "$ref": "#/$defs/Month position",
+            "description": "How much has been spent so far this month. Not read by this rule: UOB's cap is a Bonus UNI$ total the shared domain records no field for."
+        },
+        "txn": {
+            "$ref": "#/$defs/Transaction",
+            "description": "The transaction, as the cardholder and the statement describe it. The Merchant Category Code and the transaction description are what this rule turns on."
+        }
+    },
+    "required": [
+        "card",
+        "cardholder",
+        "month",
+        "txn"
+    ],
+    "title": "UOB Lady's Solitaire earns on",
+    "type": "object"
+}

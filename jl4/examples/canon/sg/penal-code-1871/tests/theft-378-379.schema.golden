@@ -1,0 +1,84 @@
+{
+    "$defs": {
+        "Theft Facts": {
+            "properties": {
+                "dishonestly": {
+                    "description": "Did the accused act dishonestly — intending a wrongful gain or a wrongful loss, or in a way reasonable and honest people would call dishonest, knowing that (s 24)? Illustration (i): taking back one's own watch from a jeweller who has no lien over it is not dishonest.",
+                    "type": "boolean"
+                },
+                "in order to such taking": {
+                    "description": "Was the moving done FOR THE PURPOSE of that taking? Illustration (a): severing a tree is theft the moment it is severed, because the severing was done in order to the taking — a moving done for some other reason is not theft.",
+                    "type": "boolean"
+                },
+                "intending to take": {
+                    "description": "Did the accused intend to TAKE the property — to assume it as their own — as opposed to merely handling, damaging or using it where it lay?",
+                    "type": "boolean"
+                },
+                "movable property": {
+                    "description": "Was the thing taken movable property — property of any description other than land, things attached to the earth, and things permanently fastened to anything so attached (s 22)? A thing attached to the earth becomes capable of theft as soon as it is severed (Explanation 1); money in a bank account is (Explanation 6).",
+                    "type": "boolean"
+                },
+                "moves that property": {
+                    "description": "Did the accused move the property? Removing an obstacle that prevented it from moving, or separating it from another thing, counts as much as carrying it (Explanation 3); causing an animal to move it counts (Explanation 4); transferring intangible property from one account to another counts (Explanation 6).",
+                    "type": "boolean"
+                },
+                "out of the possession of any person": {
+                    "description": "Was the property in the possession of some person at the moment it was moved? Illustration (g): a ring lying on the high road is in nobody's possession, so there is nothing to take it out of — that is misappropriation, not theft.",
+                    "type": "boolean"
+                },
+                "particulars": {
+                    "$ref": "#/$defs/Particulars",
+                    "description": "Who is charged, and when and where the offence was committed"
+                },
+                "the property": {
+                    "description": "What was taken, as it is to read after \"did commit theft of\" — for example \"a handphone valued at about $450/-\"",
+                    "type": "string"
+                },
+                "victim": {
+                    "description": "The name of the person out of whose possession the property was taken, as it is to appear in the charge — for example \"Ng Juin Chye Joel\"",
+                    "type": "string"
+                },
+                "victim described as": {
+                    "description": "How the charge describes that person, after the name — for example \"the owner of the said stall\"; leave blank if not needed",
+                    "type": "string"
+                },
+                "victim pronoun": {
+                    "$ref": "#/$defs/Pronoun",
+                    "description": "The pronoun the charge uses for that person"
+                },
+                "without that person's consent": {
+                    "description": "Was the property moved WITHOUT the consent of the person in possession? Consent may be express or implied, and may be given by the person in possession or by anyone having authority for that purpose, express or implied (Explanation 5). Illustration (m): a friend who borrows a book from an absent friend's library may well have implied consent.",
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "particulars",
+                "victim",
+                "victim described as",
+                "victim pronoun",
+                "the property",
+                "intending to take",
+                "dishonestly",
+                "movable property",
+                "out of the possession of any person",
+                "without that person's consent",
+                "moves that property",
+                "in order to such taking"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Whether the accused \"commits theft\" within section 378 of the Penal Code 1871",
+    "properties": {
+        "f": {
+            "$ref": "#/$defs/Theft Facts",
+            "description": "The taking — what was taken, from whom, with what intent"
+        }
+    },
+    "required": [
+        "f"
+    ],
+    "title": "commits theft",
+    "type": "object"
+}

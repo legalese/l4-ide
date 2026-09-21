@@ -1,0 +1,12 @@
+IMPORT prelude
+
+-- One of the two modules `duplicate-type-name.l4` imports. Not refused on its
+-- own and not compiled on its own; it exists so that its neighbour can declare
+-- a `Thing` too.
+
+DECLARE Thing
+    HAS n IS A NUMBER
+
+GIVEN x IS A NUMBER
+GIVETH A Thing
+`from a` x MEANS Thing WITH n IS x

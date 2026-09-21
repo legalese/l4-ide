@@ -1,0 +1,301 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `miles-card-domain`
+
+§ `UOB PRVI Miles and Citi PremierMiles — placeholders, because no issuer document is held`
+
+-- ===========================================================================
+-- THESE TWO RULES ARE PLACEHOLDERS. Their only honest content is their status.
+--
+-- NO TERMS AND CONDITIONS ARE HELD for either card. The spec's section 9 lists
+-- both under "Still to obtain": "Standard Chartered Smart Card T&C (6% cashback
+-- cap and its cycle); UOB PRVI Miles and Citi PremierMiles (both flat and
+-- uncapped, so low priority)." Every other module in this corpus quotes a
+-- clause from a document committed under source/. This one quotes nothing,
+-- because there is nothing to quote: `sources` is EMPTY on every answer, which
+-- is the field saying so in the shape the app already reads.
+--
+-- WHAT THE NUMBERS ARE. The household's working assumption, carried forward so
+-- the composer has something to rank against rather than a hole:
+--
+--     UOB PRVI Miles        1.4 miles per S$1 local, 2.4 per S$1 non-SGD
+--     Citi PremierMiles     1.2 miles per S$1 local, 2.2 per S$1 non-SGD
+--
+-- They are not read from any issuer document. They are not verified. They are
+-- not even confirmed to be the right SHAPE: a card whose T&C is unread may
+-- carry a minimum spend, an exclusion list, an MCC carve-out, a cap, or a
+-- distinction between foreign CURRENCY and spend made ABROAD that these two
+-- rules do not model. `status` is Unconfirmed on every answer for exactly that
+-- reason, and it is the field a reader should act on before the figure beside
+-- it. Do not promote either rule to Verified without committing the document
+-- under source/ and re-encoding from its clauses.
+--
+-- CURRENCY, NOT GEOGRAPHY, and that choice is itself unconfirmed. The higher
+-- rate is applied when the charge was `posted in a foreign currency`. The
+-- Transaction record also carries `made in Singapore`, and for these two cards
+-- nothing held says which of the two the rate turns on — issuers in this corpus
+-- write the test both ways. Currency is the household's reading; it is recorded
+-- here as a fork.
+--
+-- The test reads the BOOLEAN `posted in a foreign currency`, not the `currency`
+-- string. A rule in this corpus never compares a string: Catala has no string
+-- type, so the string work is layer 1's (`classify.l4`) and `currency` survives
+-- on the transaction for display only.
+--
+-- NO CONVERSION. `points per dollar` carries the miles figure directly and
+-- `miles per point` is 1, because no held document states what unit either
+-- card earns in or what it converts at. UOB's own Lady's Cards T&C states
+-- "UNI$1 = 2 miles" for a DIFFERENT card, and this corpus holds no instrument
+-- saying PRVI Miles earns UNI$ at all. `conversion status` is Unconfirmed
+-- rather than Verified for that reason: the identity conversion here is a
+-- placeholder too, not a measured one.
+--
+-- NEITHER RULE CALLS THE OTHER. Each has its own answer constructor, so the
+-- two cards' figures cannot drift into each other through a shared body, and
+-- the composer's dispatch on the exported name reaches exactly one rule.
+--
+-- `earns the bonus rate` IS DERIVED from the headline, against the card's own
+-- local rate, and is TRUE on the foreign-currency branch. It used to be a flat
+-- FALSE, which read as "there is no bonus tier here because no threshold has
+-- been read" — but the field does not mean "a threshold was met", it means
+-- this answer pays more than the card's ordinary rate, and on the module's own
+-- figures 2.4 does exceed 1.4. A hardcoded FALSE contradicted the number
+-- printed beside it. What remains unread is the FIGURES, and `status` says so
+-- on every answer; the comparison between two figures already stated adds no
+-- claim that was not there.
+--
+-- NO DEFEASIBILITY SITES. There is no text, so there are no exceptions to
+-- record. The section at the foot of every other module in this corpus is
+-- absent here by construction, not by omission.
+-- ===========================================================================
+
+
+§§ `The currency test both cards share`
+
+-- Singapore-dollar spend earns the local rate; anything else earns the higher
+-- one. See the header: which fact this should read is an open fork.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`charged in Singapore dollars` txn MEANS
+    NOT (txn's `posted in a foreign currency`)
+
+-- No document states a cap, a reset basis or an attribution date for either
+-- card, so all three say Unconfirmed rather than picking the convenient value.
+-- An uncapped card whose cap basis reads `Calendar month` would be asserting
+-- something no one has read. `pool` is EMPTY for the same reason: naming a pot
+-- would assert that a pot exists, and neither document is held.
+GIVETH A Cap
+`no cap is known` MEANS
+    Cap WITH
+        `pool`                  IS ""
+        `capped`                IS FALSE
+        `bonus spend per month` IS 0
+        `basis`                 IS `Unconfirmed basis`
+        `attribution`           IS `Unconfirmed attribution`
+
+
+§§ `UOB PRVI Miles`
+
+GIVETH A NUMBER
+`PRVI miles per dollar, local`     MEANS 1.4
+
+GIVETH A NUMBER
+`PRVI miles per dollar, non-SGD`   MEANS 2.4
+
+-- One constructor, so the two currency arms cannot drift apart. `sources` is
+-- EMPTY because there is no document; `conditions` carries the single caveat
+-- string the app should print in place of a citation. The caveat is written
+-- INLINE rather than named: a definition whose result type is STRING cannot be
+-- lowered to Catala, while a string inside a record construction is elided.
+GIVEN miles IS A NUMBER
+GIVETH A `Rate answer`
+`the assumed PRVI answer of` miles MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS miles
+        `miles per point`                                     IS 1
+        `conversion status`                                   IS Unconfirmed
+        `miles per dollar`                                    IS miles
+        `miles per dollar if the merchant flags online`       IS miles
+        `miles per dollar if the merchant flags card-present` IS miles
+        `depends on the merchant indicator`                   IS FALSE
+        `earns the bonus rate`                                IS miles GREATER THAN `PRVI miles per dollar, local`
+        `cap`                                                 IS `no cap is known`
+        `conditions`                                          IS LIST "No UOB terms and conditions for the PRVI Miles card are held in this corpus, so nothing below is read from an issuer document. 1.4 miles per S$1 of Singapore-dollar spend and 2.4 miles per S$1 charged in another currency is the household's working assumption. The card's earning unit, its exclusions, any minimum spend, any cap and any distinction between foreign currency and spend made abroad are all unread. Obtain the T&C before relying on this."
+        `sources`                                             IS EMPTY
+        `status`                                              IS Unconfirmed
+
+@export What one transaction is assumed to earn on a UOB PRVI Miles card. NO UOB TERMS AND CONDITIONS ARE HELD: the figure is the household's working assumption, the status is Unconfirmed, and no clause is cited because none has been read.
+GIVEN card       IS A Card
+      cardholder IS A Cardholder
+      month      IS A `Month position`
+      txn        IS A Transaction
+GIVETH A `Rate answer`
+`UOB PRVI Miles earns on` card cardholder month txn MEANS
+    IF   `charged in Singapore dollars` txn
+    THEN `the assumed PRVI answer of` `PRVI miles per dollar, local`
+    ELSE `the assumed PRVI answer of` `PRVI miles per dollar, non-SGD`
+
+
+§§ `Citi PremierMiles`
+
+GIVETH A NUMBER
+`PremierMiles miles per dollar, local`   MEANS 1.2
+
+GIVETH A NUMBER
+`PremierMiles miles per dollar, non-SGD` MEANS 2.2
+
+GIVEN miles IS A NUMBER
+GIVETH A `Rate answer`
+`the assumed PremierMiles answer of` miles MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS miles
+        `miles per point`                                     IS 1
+        `conversion status`                                   IS Unconfirmed
+        `miles per dollar`                                    IS miles
+        `miles per dollar if the merchant flags online`       IS miles
+        `miles per dollar if the merchant flags card-present` IS miles
+        `depends on the merchant indicator`                   IS FALSE
+        `earns the bonus rate`                                IS miles GREATER THAN `PremierMiles miles per dollar, local`
+        `cap`                                                 IS `no cap is known`
+        `conditions`                                          IS LIST "No Citibank terms and conditions for the PremierMiles card are held in this corpus, so nothing below is read from an issuer document. 1.2 miles per S$1 of Singapore-dollar spend and 2.2 miles per S$1 charged in another currency is the household's working assumption. The card's earning unit, its exclusions, any minimum spend, any cap and any distinction between foreign currency and spend made abroad are all unread. Obtain the T&C before relying on this."
+        `sources`                                             IS EMPTY
+        `status`                                              IS Unconfirmed
+
+@export What one transaction is assumed to earn on a Citi PremierMiles card. NO CITIBANK TERMS AND CONDITIONS ARE HELD: the figure is the household's working assumption, the status is Unconfirmed, and no clause is cited because none has been read.
+GIVEN card       IS A Card
+      cardholder IS A Cardholder
+      month      IS A `Month position`
+      txn        IS A Transaction
+GIVETH A `Rate answer`
+`Citi PremierMiles earns on` card cardholder month txn MEANS
+    IF   `charged in Singapore dollars` txn
+    THEN `the assumed PremierMiles answer of` `PremierMiles miles per dollar, local`
+    ELSE `the assumed PremierMiles answer of` `PremierMiles miles per dollar, non-SGD`
+
+
+§§ `Illustrations`
+
+-- Two fixtures, one per currency branch, and a cardholder and month position
+-- that neither rule reads. `card`, `cardholder` and `month` are taken by both
+-- exported rules because the composer passes all four uniformly; neither rule
+-- reads any of the three, which is itself a fact worth asserting, so the same
+-- month position is used under both branches.
+
+-- The two fixtures differ in exactly one fact, the one the rules read. The
+-- `currency` string moves with it for display, written inline inside the record
+-- construction where a string is elided rather than lowered. `merchant` is
+-- `Another merchant` because no held document names a bookshop, and the
+-- description carries no exclusion-list family.
+GIVEN foreign IS A BOOLEAN
+GIVETH A Transaction
+`a flat-card purchase, posted in a foreign currency` foreign MEANS
+    Transaction WITH
+        `merchant name`                IS "Kinokuniya"
+        `merchant`                     IS `Another merchant`
+        `merchant category code`       IS 5942
+        `transaction description`      IS "KINOKUNIYA"
+        `description patterns`         IS EMPTY
+        `charge kind`                  IS `Retail purchase`
+        `amount`                       IS 100
+        `currency`                     IS (IF foreign THEN "JPY" ELSE "SGD")
+        `posted in a foreign currency` IS foreign
+        `transaction date`             IS YMD 2026 9 21
+        `posting date`                 IS YMD 2026 9 23
+        `payment channel`              IS `Tapped at a terminal`
+        `credential`                   IS `The physical card`
+        `merchant indicator`           IS Unknown
+        `made in Singapore`            IS TRUE
+
+GIVETH A Transaction
+`a purchase in Singapore dollars` MEANS `a flat-card purchase, posted in a foreign currency` FALSE
+
+GIVETH A Transaction
+`a purchase in yen`              MEANS `a flat-card purchase, posted in a foreign currency` TRUE
+
+GIVETH A Cardholder
+`any cardholder` MEANS
+    Cardholder WITH
+        `Solitaire preferred rewards categories`               IS EMPTY
+        `yuu account linked to the card`                       IS FALSE
+        `HSBC Everyday Global Account deposits ADB this month` IS 0
+        `PAssion membership registered and card linked in yuu` IS FALSE
+
+GIVETH A `Month position`
+`any month` MEANS
+    `Month position` WITH
+        `yuu eligible spend so far this calendar month`                     IS 0
+        `yuu participating merchants transacted so far this calendar month` IS 0
+        `PAssion spend at Participating Stores so far this month`           IS 0
+        `PAssion spend at non-Participating Stores so far this month`       IS 0
+
+-- THE ASSERTIONS BELOW CALL THE EXPORTED RULES DIRECTLY, which is why they are
+-- long. Two convenience wrappers used to stand here, fixing the card, the
+-- cardholder and the month, and they had to go: Catala allows a scope call only
+-- from inside another scope, so a definition that is not itself @export'd may
+-- not call one that is (R1, §8.1). Exporting the wrappers would have published
+-- test fixtures as part of this module's interface, so the calls are inlined
+-- instead. Do not reintroduce a wrapper here.
+
+-- ---------------------------------------------------------------------------
+-- One assertion per card per currency branch: the four figures in the header.
+-- ---------------------------------------------------------------------------
+#ASSERT (`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `miles per dollar` EQUALS 1.4
+#ASSERT (`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in yen`)'s `miles per dollar` EQUALS 2.4
+#ASSERT (`Citi PremierMiles earns on` `Citi PremierMiles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `miles per dollar` EQUALS 1.2
+#ASSERT (`Citi PremierMiles earns on` `Citi PremierMiles` `any cardholder` `any month` `a purchase in yen`)'s `miles per dollar` EQUALS 2.2
+
+-- ---------------------------------------------------------------------------
+-- The part that is actually load-bearing: the status, the absent citations and
+-- the single caveat. A future edit that raises either rate without committing
+-- a document will trip these before it reaches a user.
+-- ---------------------------------------------------------------------------
+#ASSERT (`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `status` EQUALS Unconfirmed
+#ASSERT (`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in yen`)'s `status` EQUALS Unconfirmed
+#ASSERT (`Citi PremierMiles earns on` `Citi PremierMiles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `status` EQUALS Unconfirmed
+#ASSERT (`Citi PremierMiles earns on` `Citi PremierMiles` `any cardholder` `any month` `a purchase in yen`)'s `status` EQUALS Unconfirmed
+
+#ASSERT (`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `conversion status` EQUALS Unconfirmed
+#ASSERT (`Citi PremierMiles earns on` `Citi PremierMiles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `conversion status` EQUALS Unconfirmed
+
+-- No clause is cited, because no document has been read.
+#ASSERT count ((`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `sources`) EQUALS 0
+#ASSERT count ((`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in yen`)'s `sources`) EQUALS 0
+#ASSERT count ((`Citi PremierMiles earns on` `Citi PremierMiles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `sources`) EQUALS 0
+#ASSERT count ((`Citi PremierMiles earns on` `Citi PremierMiles` `any cardholder` `any month` `a purchase in yen`)'s `sources`) EQUALS 0
+
+-- Exactly one condition on each answer: the caveat.
+#ASSERT count ((`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `conditions`) EQUALS 1
+#ASSERT count ((`Citi PremierMiles earns on` `Citi PremierMiles` `any cardholder` `any month` `a purchase in yen`)'s `conditions`) EQUALS 1
+
+-- Uncapped, with the basis and attribution left Unconfirmed rather than guessed.
+#ASSERT NOT ((`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `cap`'s `capped`)
+#ASSERT NOT ((`Citi PremierMiles earns on` `Citi PremierMiles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `cap`'s `capped`)
+#ASSERT (`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `cap`'s `basis` EQUALS `Unconfirmed basis`
+#ASSERT (`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `cap`'s `attribution` EQUALS `Unconfirmed attribution`
+
+-- Neither rate turns on the merchant indicator, so both conditional figures
+-- equal the headline one and the flag is FALSE.
+#ASSERT (`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in yen`)'s `miles per dollar if the merchant flags online` EQUALS (`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in yen`)'s `miles per dollar if the merchant flags card-present`
+#ASSERT NOT ((`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in yen`)'s `depends on the merchant indicator`)
+#ASSERT NOT ((`Citi PremierMiles earns on` `Citi PremierMiles` `any cardholder` `any month` `a purchase in yen`)'s `depends on the merchant indicator`)
+
+-- `earns the bonus rate` is derived from the headline against the card's own
+-- local rate, so it agrees with the figure beside it: TRUE where the answer
+-- pays more than the card's ordinary rate, FALSE on local spend.
+#ASSERT      (`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in yen`)'s `earns the bonus rate`
+#ASSERT      (`Citi PremierMiles earns on` `Citi PremierMiles` `any cardholder` `any month` `a purchase in yen`)'s `earns the bonus rate`
+#ASSERT NOT ((`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `earns the bonus rate`)
+#ASSERT NOT ((`Citi PremierMiles earns on` `Citi PremierMiles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `earns the bonus rate`)
+
+-- The derivation is not an independent claim: the flag is TRUE exactly where
+-- the headline exceeds the local figure, on both cards.
+#ASSERT (`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in yen`)'s `miles per dollar` GREATER THAN (`UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `miles per dollar`
+#ASSERT (`Citi PremierMiles earns on` `Citi PremierMiles` `any cardholder` `any month` `a purchase in yen`)'s `miles per dollar` GREATER THAN (`Citi PremierMiles earns on` `Citi PremierMiles` `any cardholder` `any month` `a purchase in Singapore dollars`)'s `miles per dollar`
+
+-- ---------------------------------------------------------------------------
+-- Two directives that call the EXPORTED rules directly rather than a field of
+-- their result, so that the Catala test scopes `clerk test` runs have a whole
+-- `Rate answer` to compare. One per card.
+-- ---------------------------------------------------------------------------
+#EVAL `UOB PRVI Miles earns on` `UOB PRVI Miles` `any cardholder` `any month` `a purchase in yen`
+#EVAL `Citi PremierMiles earns on` `Citi PremierMiles` `any cardholder` `any month` `a purchase in Singapore dollars`

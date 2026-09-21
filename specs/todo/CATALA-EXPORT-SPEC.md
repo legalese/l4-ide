@@ -67,6 +67,33 @@ corpus contained **no** file with an `ASSUME` or a section `GIVEN` — so `colle
 round no filter in `pr-checks.yml` named Catala at all, and `jl4/examples/catala/**` matched
 nothing whatever._
 
+_Import-closure round, 2026-09-21. Two defects, both of which produced the wrong kind of output
+rather than no output. (a) The lowering scanned only the module it was handed, so a `DECLARE` or a
+`DECIDE` in an imported file was invisible to it and the refusal blamed the language — "type `R` is
+outside the v1 Catala fragment (§6)" for an `R` declared next door. It now reads the whole import
+closure, emits an imported declaration when the emitted code reaches it, and lowers an imported
+helper as a toplevel; the stdlib contributes declarations only, because its functions are already
+absorbed by R5 and R3 (§8.1.2, R1.2). Reading the closure creates one hazard of its own — two
+modules declaring a type of the same name, which `l4 check` accepts and one flat Catala namespace
+cannot hold — and that is refused, with a fixture, after a probe confirmed the silent output it
+replaces. (b) R11's elision can empty a structure outright, and catala
+1.2.1 has no spelling for that — it refuses a fieldless `declaration structure` and the value
+`P { }`, measured before the fix rather than assumed — so a wholly-elided structure is now elided
+itself, along with the fields of other structures that carry it, and naming or building one is a
+refusal (§8.11 addendum, R11.1). Both defects are pinned by exhibits
+(`jl4/examples/catala/{imports,all-string-record}.l4`) that the R9 harness runs through catala
+1.2.1. The nine pre-existing goldens are byte-identical across the change._
+
+_Directive-reachability round, 2026-09-21 (same day, follow-up). A third defect the corpus found on
+the fixed binary: R1 rooted its reachability at the `@export`s alone, so a fixture value named only
+in a `#EVAL`/`#ASSERT`'s arguments was never collected and the directive was dropped — only
+literal-argument directives became test scopes, which costs a corpus every assertion that names its
+test data (§8.1.3, R1.3). Fixing it surfaced a fourth defect in the same function: a skip note's
+number counted emitted tests rather than directives, so the second and later skips were mislabelled
+and then deduplicated out of existence. Both are pinned by `jl4/examples/catala/fixtures.l4`, whose
+last two directives are skipped deliberately. Twelve goldens now: `catala typecheck` green ×12,
+`catala proof` green ×12, `clerk test` 83/83; the eleven earlier goldens are byte-identical._
+
 **One-line summary.** Just as an `@export`-annotated `DECIDE`/`MEANS` over a subject record is
 exactly an OpenFisca variable, it is exactly a Catala scope; L4's helper functions are exactly
 Catala's toplevel `declaration … depends on … equals` definitions — and because Catala's
@@ -92,6 +119,8 @@ way when P4 needs it.
 | ------ | ------------ | ------------------------------------------------------- |
 | R1     | **ANSWERED** | as proposed: scopes for `@export`, toplevels, §8.1      |
 | R1.1   | **ANSWERED** | 2026-09-08: refuse a scope call from a toplevel, §8.1.1 |
+| R1.2   | **ANSWERED** | 2026-09-21: the import closure is scanned, §8.1.2       |
+| R1.3   | **ANSWERED** | 2026-09-21: directives are reachability roots, §8.1.3   |
 | R2     | **ANSWERED** | as proposed: `decimal`; `money` never inferred, §8.2    |
 | R3     | **ANSWERED** | as proposed: `YMD` native, `Date` emitted, §8.3         |
 | R4     | **ANSWERED** | **REVERSED**: Mode B primary, hardened gate, §8.4       |
@@ -103,6 +132,7 @@ way when P4 needs it.
 | R9.1   | **ANSWERED** | 2026-09-08: `CATALA_CHECK_REQUIRED`, CI filter, §8.9    |
 | R10    | **ANSWERED** | as proposed: `TYPICALLY` → `context`, §8.10             |
 | R11    | **ANSWERED** | as proposed: opaque strings elided with warning §8.11   |
+| R11.1  | **ANSWERED** | 2026-09-21: a wholly-elided structure is elided, §8.11  |
 
 All eleven rulings were **ANSWERED by Meng on 2026-08-16**: R1–R3 and R5–R11 as proposed; R4
 reversed — Mode B (exception-ladder emission) is the primary rendering, with the equivalence gate
@@ -578,7 +608,11 @@ would adopt, formalised and battle-tested.
 
 ## 6. The v1 source fragment, precisely
 
-`l4 catala` accepts a type-checked module containing: `DECLARE` records/enums; first-order,
+`l4 catala` accepts a type-checked module **and its import closure** (§8.1.2, 2026-09-21: an
+imported `DECLARE` is resolved and re-declared in the single emitted module when the emitted code
+reaches it, and an imported non-exported helper is lowered to a toplevel like a local one; the
+stdlib contributes declarations only, its functions being absorbed by R5 and R3) containing:
+`DECLARE` records/enums; first-order,
 non-recursive, monomorphic-or-prenex `GIVEN`/`GIVETH`/`MEANS`/`DECIDE` functions over
 `BOOLEAN`/`NUMBER`/`DATE`/records/enums/`MAYBE`/lists; `CONSIDER`/`BRANCH`/`IF`/`WHERE`;
 prelude list combinators with literal lambda arguments; uninspected `STRING` fields/params under
@@ -737,6 +771,120 @@ than merely goldening it.
 `#EVAL` of any rule reading a module-level binder is skipped with a note. `export-chain.l4` carries
 one such directive deliberately, so the note sits in a golden. Whether R7 should grow a way to
 supply those inputs is a separate question this ruling does not answer.
+
+#### 8.1.2 R1 applies across the import closure — ANSWERED 2026-09-21
+
+R1 says "every non-exported reachable helper becomes a private toplevel declaration". It did not say
+_reachable in which module_, and the implementation answered "this one": every collector scanned the
+single `Module Resolved` it was handed, so a `DECLARE` or a `DECIDE` in an imported file was
+invisible to the lowering although the typechecker had resolved the name against it perfectly well.
+
+The symptom named the wrong thing. `l4 check` succeeded and `l4 catala` exited 1 with
+
+```
+in `f`: type `R` is outside the v1 Catala fragment (§6)
+```
+
+for an `R` declared in the file next door — a message about the language's limits, for a defect in
+the scan, and one an author could not act on.
+
+**Ruling, three parts.**
+
+1. **Declarations are read from the whole import closure.** The CLI flattens `tc.dependencies` and
+   hands it over; `lowerModuleWith` takes it as an argument, and `[]` reproduces the old behaviour
+   for any caller that has no closure to give.
+2. **An imported helper is lowered exactly as a local one is** — a private toplevel in the emitted
+   module. Refusing it and telling the author to inline it was the alternative and is declined: a
+   helper is a helper wherever it was written, and the refusal would have made "one module owns the
+   nouns, every other module imports them" — the house style this corpus is written in — unusable
+   against this backend.
+3. **The stdlib is a library, not code.** The prelude's and `daydate`'s _declarations_ are read
+   along with everyone else's; their _functions_ are not, because R5's combinator recogniser and
+   R3's date recogniser already absorb them into Catala's own list and date forms. Collecting them
+   as helpers would take precedence over both (`lowerApp` consults the helper table before the
+   recognisers), pull every prelude function an exported decision touches into the reachable set,
+   and then refuse the module under R6 — `map` and `foldl` are recursive.
+
+**Everything still lands in one emitted `.catala_en`.** Catala has modules of its own and an L4
+`IMPORT` could in principle become a `> Using`; that is out of scope for v1. An imported `DECLARE`
+the emitted code reaches is re-declared in the output module.
+
+**What "reaches" means, because the closure is large.** An imported declaration is emitted only when
+the emitted code reaches it, transitively through field and payload types; the entry module's own
+declarations are all emitted, as they always were, since an unreferenced `DECLARE` is part of the
+document. So `IMPORT prelude` costs nothing in the artifact. `jl4/examples/catala/imports.l4` pins
+both directions: two declarations emitted because the code reaches them, and — asserted by count,
+since a golden can only show what is present — no third one from the stdlib.
+
+**The library test is the module's basename against the embedded stdlib's own name list, not its
+path.** The same prelude arrives as `jl4-embedded:/prelude.l4` when the binary resolves its
+compiled-in copy and as a `file:` URI when `JL4_LIBRARY_PATH` points at a checkout; a path test
+would call those two different things and both rigs are ordinary (l4-ide `CLAUDE.md` §3.1). The cost,
+stated rather than discovered: a project file that shadows a library name — its own `math.l4` — is
+classified as the library, so its helpers are not collected and a call to one is refused as an
+unbound reference. Loud, not a wrong answer.
+
+**One hazard the closure creates, and its refusal.** Two modules in the closure may each declare a
+type of the same name. `l4 check` succeeds — they are distinct entities, told apart by unique, and
+every use resolves to the right one — but the emitted Catala has one flat namespace, and the scan
+that builds the artifact deduplicates structures by their L4 name. Measured on the binary that read
+the closure but did not yet check this: exit 0, one `declaration structure Thing: data n content
+decimal`, and two construction sites against it, one of them `Thing { -- m: x }`. `collisionCheck`
+cannot see it — it reports when _distinct_ L4 names mangle to one Catala name, and here the L4
+names are equal. So it is a `LowerError`, over the declarations the artifact needs and no others:
+two modules in a large closure may both declare something the emitted code never reaches, and
+refusing that would make importing a module a liability. Pinned by
+`jl4/examples/catala/not-ok/duplicate-type-name.l4`.
+
+**Not decided.** Whether an imported decision that is `@export`ed _in its own module_ should become
+a scope here rather than a toplevel. Today only the entry module's exports become scopes, which
+keeps §8.1.1's composition condition satisfiable without the author having to re-export a chain
+across a module boundary.
+
+#### 8.1.3 R1's reachability includes the directives — ANSWERED 2026-09-21
+
+R1 prunes: "unreachable code is not emitted at all". It named one root, the `@export` set, and the
+implementation rooted there and nowhere else. But R7 (§8.7) turns every `#EVAL`/`#ASSERT` into a
+`#[test]` scope, and a test scope is emitted code. A definition named only in a directive's
+**arguments** — a fixture value — was therefore never collected as a helper, and the directive was
+dropped with the emitter's own internal-error text:
+
+```
+directive 3 did not become a Catala `#[test]` scope:
+  `the ordinary household` is defined in this module but was not collected as
+  a helper; that is a lowering bug, please report it
+```
+
+accurate about the symptom, useless about the cause. **Only directives whose arguments were
+literals became test scopes.**
+
+That is the wrong half to keep. Naming test data is how a rule over a record with a dozen fields is
+tested at all — the alternative is writing the construction out again in every assertion, and a
+corpus that did so would trade its fixture table for its tests. The miles-card corpus lost every
+assertion that used one.
+
+**Ruling.** The reachable set is rooted at the `@export`s **and** at the definitions named by the
+directives R7 builds a scope from — `#EVAL`, `#EVAL TRACE` and `#ASSERT`. A `#CHECK`, a
+`#TRACE`/contract and a `#ASSERT REFUSED` are skipped with a note, so they are not roots; rooting
+there would emit toplevels nothing in the artifact references. Directives are read from the entry
+module only, as R7 reads them: an imported module's directives are not this module's tests. A
+fixture so collected is lowered as an ordinary R1 toplevel, whatever its arity — nothing new is
+invented for test data, it was simply never collected. Only the entry module's exports become
+scopes, so §8.1.1's refusal still applies inside a fixture: a fixture may take an exported
+decision's result as a parameter, and may not call the scope itself.
+
+The two closures are concatenated rather than rooted together, so that the export closure keeps the
+order it had; `reach` fixes the order helpers are emitted in, and every existing golden depends on
+it. Measured: all nine pre-existing goldens byte-identical.
+
+**A second defect in the same code, found while fixing this one.** The skip note above quotes a
+number, and that number counted the **emitted tests** rather than the directives — so every skip
+after the first was labelled with the previous one's number, and because identical notes are
+deduplicated before emission, the second such skip then **vanished** rather than appearing under
+the wrong number. Measured on a five-directive probe: two skips, one note, and it named neither.
+The wrong number is the visible half; a directive silently untested is the expensive one. The two
+counters are now separate, and `fixtures.l4`'s last two directives are skipped on purpose so the
+golden pins both halves.
 
 ### 8.2 R2 — `NUMBER` lowers to `decimal`; `integer` only where forced; `money` never inferred
 
@@ -1083,6 +1231,53 @@ payloads); otherwise it is a `LowerError` naming the structures. When nothing wa
 module that does not use `STRING` at all — the check is skipped entirely and costs nothing. A
 best-effort type is used deliberately: an operand whose type the lowering cannot determine is
 treated as unsafe, which over-rejects rather than under-rejects.
+
+**Addendum, 2026-09-21: elision carries upward — a structure can lose every field, and Catala has
+no spelling for the result.** R11 narrows a structure. It does not follow that every narrowing
+leaves something behind: a record all of whose fields are `STRING` loses all of them. The
+implementation emitted what was left, and exited 0 doing it — `declaration structure P:` with no
+fields, and the value `P { }`.
+
+Both halves are refused by catala 1.2.1, and it reports them together from one `catala typecheck`:
+
+```
+│  Syntax error at "}":
+│  » expected a list of field bindings of the form '-- fld : expression'.
+├─➤ Empty.catala_en:20.52-53:
+│ 20 │   definition r equals R { -- n: x -- sources: [P { }] -- ok: true }
+
+│  No fields defined for structure P. Please define at least one.
+├─➤ Empty.catala_en:6.23-24:
+│  6 │ declaration structure P:
+```
+
+Measured 2026-09-21 on a hand-written probe, before any change to the emitter, so the question "is
+there a spelling of an empty structure we should be using instead?" is answered rather than
+assumed: there is not. That closes the option the fix would otherwise have preferred.
+
+**Ruling.** A structure whose every field was elided is itself **elided**, and the elision
+propagates. Concretely, and in the emitter today:
+
+- the structure is not declared in the artifact, and a module-level note names it, in the same
+  disclosure slot as the per-field notes — a reader told only "field `document` was elided" would
+  not learn that `Provenance` is gone;
+- a field of another structure whose type is _built from_ one (directly, or through a `LIST OF` or
+  a `MAYBE`) is dropped too, with its own note, and its enclosing structure joins the `narrowed`
+  set that §8.11's comparison guard reads. That can empty the enclosing structure in turn, so the
+  computation is a fixpoint;
+- naming such a structure in a type, reading such a field, or constructing one is a `LowerError`
+  quoting the L4 name and both catala refusals.
+
+Refusal rather than silence for the three reads, on §6's standing position: the fragment boundary
+is a diagnostic. Elision rather than refusal for the declaration itself, because that is R11's
+existing bargain — the citation apparatus a rule carries (which document, which clause) is exactly
+what Catala cannot hold, and rejecting the whole module for it would fail this spec's "as much as
+possible survives" brief. `jl4/examples/catala/all-string-record.l4` is the exhibit, and
+`etc/validate-catala.mjs` runs the real toolchain over its golden.
+
+**Not decided.** Whether the elided structure should still appear in the machine-readable manifest
+the 2026-08-16 "Not decided" contemplates. It is a strictly larger loss than a dropped field and
+has a stronger claim to be recorded there.
 
 ## 9. Non-goals (v1)
 

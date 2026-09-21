@@ -53,10 +53,29 @@
     "the drift this mechanism exists to make visible, so the directory stays out",
     "until its goldens are re-blessed in canon.",
     "",
-    "il/ofek-hadash-2008 and sg/pdpa-2012 — no goldens at all. A directory with",
-    "no goldens cannot be a regression corpus; `failFirstTime` would write them",
-    "on the first run and pass on the second, which tests the harness and not",
-    "the compiler.",
+    "sg/pdpa-2012 — no goldens at all. A directory with no goldens cannot be a",
+    "regression corpus; `failFirstTime` would write them on the first run and",
+    "pass on the second, which tests the harness and not the compiler.",
+    "",
+    "il/ofek-hadash-2008 WAS excluded on that same ground and no longer is:",
+    "canon e29c69a3 blessed its 36 goldens (nine modules, four each), so it is",
+    "in the blessed list below as of 2026-09-19. Read that commit before",
+    "trusting them — it records WHICH BINARY wrote them and why the timing",
+    "mattered. They were generated from unstable at ec20584c1, after four PRs",
+    "that move golden bytes landed on 2026-09-18: #419 (schema goldens double-",
+    "encoded every non-ASCII character, smucclaw#962), #415 (nlg escapes), #418",
+    "(\\> in @ref, which also routes unescapeNlgText through the text/html/json/",
+    "AKN export path) and #423 (@nlg:xx language tags). #419 is the one that",
+    "bites this encoding: 524 of its lines carry non-ASCII, so goldens blessed a",
+    "day earlier would have been wrong in all nine schema files. That is the",
+    "general rule this row is evidence for — a canon directory is blessable the",
+    "day its goldens come from a binary at the tree they will be checked",
+    "against, not the day someone wants it in the corpus.",
+    "",
+    "One caveat that blessing does NOT dispose of: ofek-pay.nlg.golden is empty,",
+    "because that module carries no directive to linearise. It is an accurate",
+    "golden, not a missing one — see etc/go/subjects/ofek/subject.json's account",
+    "of why p7-tnr is not declared for this subject.",
     "",
     "--- the flattening, which is the one place the mirror is not verbatim ----",
     "",
@@ -86,9 +105,9 @@
     "Migrating the encoding is a canon-side improvement and is not done."
   ],
   "repo": "legalese/canon",
-  "sha": "5f24832696662caf4ff84878f139ce6c1954bbfd",
+  "sha": "54353f9f0dfd6081e2449726cb4099475c549c1c",
   "ref": "mengwong/drafts",
-  "pinned": "2026-09-15",
+  "pinned": "2026-09-21",
   "blessed": [
     {
       "from": "subjects/sg/child-support/encodings/legalese",
@@ -109,6 +128,10 @@
     {
       "from": "subjects/us/chubb-hospital-cash/encodings/blind-guarded-2026-08",
       "to": "us/chubb-hospital-cash/blind-guarded"
+    },
+    {
+      "from": "subjects/il/ofek-hadash-2008/encodings/legalese",
+      "to": "il/ofek-hadash-2008"
     }
   ],
   "include": ["*.l4", "tests/*.golden", "encoding.json", "SOURCE-LICENSE.md"]

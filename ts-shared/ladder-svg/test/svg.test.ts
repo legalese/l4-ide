@@ -480,3 +480,31 @@ test("a folded placeholder keeps its neutral only while UNKNOWN — a pinned fol
     /data-fnid="1"[^>]*?fill="#e8f5ec"/,
   );
 });
+
+/* ------------------------------------------------- the head terminal (headAsSink) */
+
+/** The head box is the decision's own name drawn as the rightmost node. In a Layman
+ *  Allen normalised diagram the consequent is an ORDINARY box — Woon's robbery figure
+ *  draws `Commits Robbery` exactly like `voluntarily` — so the emit must not decorate
+ *  it. The one thing it must do is decline to advertise a click: a head's value is
+ *  derived from the body, and `lad-clickable` on it would offer to set what cannot be
+ *  set. That affordance keys off `act`, which a head never carries. */
+test("a head box draws like a leaf and is never advertised as clickable", () => {
+  const box = (role: "leaf" | "head", act?: { t: "value"; id: number }) =>
+    sceneToSvg(
+      scene({
+        kind: "box",
+        id: 1,
+        rect: { x: 10, y: 10, w: 100, h: 40 },
+        role,
+        state: "live",
+        ...(act ? { act } : {}),
+      }),
+    );
+  const head = box("head");
+  assert.doesNotMatch(head, /lad-clickable/);
+  assert.doesNotMatch(head, /data-act/);
+  // same ink as a leaf in the same state — only the absent click affordance differs
+  assert.equal(head, box("leaf"));
+  assert.match(box("leaf", { t: "value", id: 1 }), /lad-clickable/);
+});

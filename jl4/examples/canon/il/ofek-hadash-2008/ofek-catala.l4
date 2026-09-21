@@ -1,0 +1,624 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Ofek Hadash — the pay computation, in one module`
+
+-- ===========================================================================
+-- GENERATED FILE — do not edit by hand.
+--   source/build-catala-module.py, from the corpus grids parsed by
+--   source/tables.py. Regenerate with
+--     OFEK_CORPUS=<checkout> python3 source/build-catala-module.py > ofek-catala.l4
+--
+-- WHAT IT IS FOR. `l4 catala` compiles a SINGLE module: a reference into an
+-- imported module is rejected as unbound, and a type declared elsewhere is
+-- reported as outside the v1 fragment. The eight-module encoding beside this
+-- file is therefore not compilable as it stands. This module is that encoding
+-- flattened to the Catala v1 fragment, and it is what catala/ was compiled
+-- from.
+--
+-- IT IS NOT A COPY. It is generated from the same corpus parse that produced
+-- ofek-salary-table.l4 — the follow-up committee's corrected appendices of
+-- 14 January 2025 — so neither file is derived from the other and a number
+-- cannot drift between them without drifting from the source document. The
+-- worked figures asserted at the foot of this module are the same figures
+-- ofek-cases.l4 asserts against the eight-module encoding, so if the two ever
+-- disagree, one of them goes red.
+--
+-- WHAT IT LEAVES OUT, and why. The Catala v1 fragment takes constitutive
+-- rules — records, enums, first-order functions, CONSIDER/BRANCH/IF/WHERE
+-- over booleans, numbers, dates and lists. It does not take deontic or
+-- regulative material, and it is a decision core rather than the whole
+-- encoding. So this module carries the COMPUTATION of pay and omits:
+--   * the § 38 promotion machinery, whose quota rule is a fact about the
+--     national establishment rather than about a teacher (ofek-placement.l4);
+--   * the §§ 14-33 working-week patterns, other than the § 31 hourly value,
+--     which is what pay actually reads (ofek-worktime.l4);
+--   * the § 39(c) two-supplement cap, which is a constraint on the input and
+--     not a step in the arithmetic.
+-- Those live in the eight-module encoding and are checked there. NOTES.md § 7
+-- carries the full account.
+--
+-- ONE MODELLING DIFFERENCE, stated plainly. The eight-module encoding gives a
+-- teacher a LIST of roles and sums over it. Here a teacher has a first and a
+-- second role, each a MAYBE. That is not a workaround: § 39(c) caps a teacher
+-- at two role supplements without the district director's approval, so two
+-- slots is the shape of the section. It also keeps the module inside the
+-- fragment without a list fold. A teacher holding a third approved supplement
+-- cannot be expressed here, and NOTES.md § 7 records that as the cost.
+-- ===========================================================================
+
+§§ `Who the teacher is`
+
+DECLARE `a teaching qualification` IS ONE OF
+    `academic — holds a recognised first degree`
+    `academic — holds a recognised second degree`
+    `academic — holds a doctorate`
+    `certified but not academic`
+    `senior certified but not academic`
+    `unqualified`
+
+DECLARE `a salary table` IS ONE OF
+    `the BA table — rating code 101`
+    `the MA table — rating code 102`
+
+DECLARE `a stage of education` IS ONE OF
+    `a primary school`
+    `a junior high school`
+
+DECLARE `a role carrying a supplement` IS ONE OF
+    `homeroom teacher of a class other than the first grade`
+    `homeroom teacher of a first-grade class`
+    `subject coordinator`
+    `road-safety coordinator`
+    `security coordinator`
+    `social-education coordinator`
+    `grade-level coordinator`
+    `laboratory coordinator`
+    `assessment and measurement coordinator`
+
+DECLARE `a teacher` HAS
+    `qualification`             IS A `a teaching qualification`
+    `seniority in years`        IS A NUMBER
+    `rank`                      IS A NUMBER
+    `stage of education`        IS A `a stage of education`
+    `fraction of a full post`   IS A NUMBER
+    `first role`                IS A MAYBE `a role carrying a supplement`
+    `second role`               IS A MAYBE `a role carrying a supplement`
+    `classes in the coordinated grade level` IS A NUMBER
+    `units of the school-role supplement`    IS A NUMBER
+
+-- § 36(c)-(d) of the 2008 agreement: a first degree to the first-degree table,
+-- a second degree or a doctorate to the second-degree table.
+GIVEN `the teacher` IS A `a teacher`
+GIVETH A `a salary table`
+`the table the teacher is placed in` `the teacher`
+    @nlg the salary table the teacher is placed in
+    MEANS
+    CONSIDER `the teacher`'s `qualification`
+    WHEN `academic — holds a recognised first degree`  THEN `the BA table — rating code 101`
+    WHEN `academic — holds a recognised second degree` THEN `the MA table — rating code 102`
+    WHEN `academic — holds a doctorate`                THEN `the MA table — rating code 102`
+    OTHERWISE                                          `the BA table — rating code 101`
+
+GIVEN `the teacher` IS A `a teacher`
+GIVETH A BOOLEAN
+DECIDE `the teacher holds a doctorate` IF
+    CONSIDER `the teacher`'s `qualification`
+    WHEN `academic — holds a doctorate` THEN TRUE
+    OTHERWISE                           FALSE
+
+§§ `The combined salary table`
+
+-- §§ 35 of the 2008 agreement, as replaced from 1.9.2022 by § 4.1 of the 2022
+-- wage agreement and reissued to the agora on 14.1.2025. Rows are seniority
+-- 1..36, columns rank 1..9; beyond the frontier the last printed value
+-- repeats, exactly as the shekel printing renders it with merged cells.
+
+DECLARE `a row of the combined salary table` HAS
+    `at rank 1` IS A NUMBER
+    `at rank 2` IS A NUMBER
+    `at rank 3` IS A NUMBER
+    `at rank 4` IS A NUMBER
+    `at rank 5` IS A NUMBER
+    `at rank 6` IS A NUMBER
+    `at rank 7` IS A NUMBER
+    `at rank 8` IS A NUMBER
+    `at rank 9` IS A NUMBER
+
+GIVEN `the row` IS A `a row of the combined salary table`
+      `the rank` IS A NUMBER
+GIVETH A NUMBER
+`the amount in the row at rank` `the row` `the rank`
+    @nlg the amount in the row at the given rank
+    MEANS
+    BRANCH IF `the rank` AT MOST 1 THEN `the row`'s `at rank 1`
+           IF `the rank` EQUALS 2  THEN `the row`'s `at rank 2`
+           IF `the rank` EQUALS 3  THEN `the row`'s `at rank 3`
+           IF `the rank` EQUALS 4  THEN `the row`'s `at rank 4`
+           IF `the rank` EQUALS 5  THEN `the row`'s `at rank 5`
+           IF `the rank` EQUALS 6  THEN `the row`'s `at rank 6`
+           IF `the rank` EQUALS 7  THEN `the row`'s `at rank 7`
+           IF `the rank` EQUALS 8  THEN `the row`'s `at rank 8`
+           OTHERWISE                    `the row`'s `at rank 9`
+
+§§ `Appendix alef-1 — the BA table, rating code 101`
+
+GIVEN `the seniority` IS A NUMBER
+GIVETH A `a row of the combined salary table`
+`the BA table row at seniority` `the seniority`
+    @nlg the row of the BA (rating code 101) table at the given seniority
+    MEANS
+    --                                                                                   rank 1,    rank 2,    rank 3,    rank 4,    rank 5,    rank 6,    rank 7,    rank 8,    rank 9
+    BRANCH IF `the seniority` AT MOST  1 THEN `a row of the combined salary table` OF     6_300,     6_300,     6_300,     6_300,     6_300,     6_300,     6_300,     6_300,     6_300
+           IF ^               EQUALS   2 ^    ^                                    ^      6_426,     6_426,     6_426,     6_426,     6_426,     6_426,     6_426,     6_426,     6_426
+           IF ^               EQUALS   3 ^    ^                                    ^   6_554.52,  7_046.11,  7_046.11,  7_046.11,  7_046.11,  7_046.11,  7_046.11,  7_046.11,  7_046.11
+           IF ^               EQUALS   4 ^    ^                                    ^   6_685.61,  7_187.03,  7_187.03,  7_187.03,  7_187.03,  7_187.03,  7_187.03,  7_187.03,  7_187.03
+           IF ^               EQUALS   5 ^    ^                                    ^   6_819.32,  7_330.77,  7_330.77,  7_330.77,  7_330.77,  7_330.77,  7_330.77,  7_330.77,  7_330.77
+           IF ^               EQUALS   6 ^    ^                                    ^   6_955.71,  7_477.39,  8_038.19,  8_038.19,  8_038.19,  8_038.19,  8_038.19,  8_038.19,  8_038.19
+           IF ^               EQUALS   7 ^    ^                                    ^   7_094.82,  7_626.93,  8_198.96,  8_198.96,  8_198.96,  8_198.96,  8_198.96,  8_198.96,  8_198.96
+           IF ^               EQUALS   8 ^    ^                                    ^   7_165.77,  7_703.20,  8_280.94,  8_902.02,  8_902.02,  8_902.02,  8_902.02,  8_902.02,  8_902.02
+           IF ^               EQUALS   9 ^    ^                                    ^   7_237.43,  7_780.24,  8_363.75,  8_991.04,  8_991.04,  8_991.04,  8_991.04,  8_991.04,  8_991.04
+           IF ^               EQUALS  10 ^    ^                                    ^   7_309.80,  7_858.04,  8_447.39,  9_080.95,  9_080.95,  9_080.95,  9_080.95,  9_080.95,  9_080.95
+           IF ^               EQUALS  11 ^    ^                                    ^   7_382.90,  7_936.62,  8_531.87,  9_171.76,  9_859.64,  9_859.64,  9_859.64,  9_859.64,  9_859.64
+           IF ^               EQUALS  12 ^    ^                                    ^   7_456.73,  8_015.99,  8_617.18,  9_263.47,  9_958.23,  9_958.23,  9_958.23,  9_958.23,  9_958.23
+           IF ^               EQUALS  13 ^    ^                                    ^   7_531.30,  8_096.15,  8_703.36,  9_356.11, 10_057.82, 10_057.82, 10_057.82, 10_057.82, 10_057.82
+           IF ^               EQUALS  14 ^    ^                                    ^   7_606.61,  8_177.11,  8_790.39,  9_449.67, 10_158.39, 10_920.27, 10_920.27, 10_920.27, 10_920.27
+           IF ^               EQUALS  15 ^    ^                                    ^   7_682.68,  8_258.88,  8_878.29,  9_544.17, 10_259.98, 11_029.48, 11_029.48, 11_029.48, 11_029.48
+           IF ^               EQUALS  16 ^    ^                                    ^   7_759.50,  8_341.47,  8_967.08,  9_639.61, 10_362.58, 11_139.77, 11_139.77, 11_139.77, 11_139.77
+           IF ^               EQUALS  17 ^    ^                                    ^   7_837.10,  8_424.88,  9_056.75,     9_736, 10_466.20, 11_251.17, 11_251.17, 11_251.17, 11_251.17
+           IF ^               EQUALS  18 ^    ^                                    ^   7_915.47,  8_509.13,  9_147.31,  9_833.36, 10_570.87, 11_363.68, 12_215.96, 12_215.96, 12_215.96
+           IF ^               EQUALS  19 ^    ^                                    ^   7_994.62,  8_594.22,  9_238.79,  9_931.70, 10_676.57, 11_477.32, 12_338.12, 12_338.12, 12_338.12
+           IF ^               EQUALS  20 ^    ^                                    ^   8_074.57,  8_680.16,  9_331.18, 10_031.01, 10_783.34, 11_592.09, 12_461.50, 12_461.50, 12_461.50
+           IF ^               EQUALS  21 ^    ^                                    ^   8_155.32,  8_766.97,  9_424.49, 10_131.32, 10_891.17, 11_708.01, 12_586.11, 12_586.11, 12_586.11
+           IF ^               EQUALS  22 ^    ^                                    ^   8_236.87,  8_854.63,  9_518.73, 10_232.64, 11_000.09, 11_825.09, 12_711.97, 13_665.37, 13_665.37
+           IF ^               EQUALS  23 ^    ^                                    ^   8_319.24,  8_943.18,  9_613.92, 10_334.96, 11_110.09, 11_943.34, 12_839.09, 13_802.03, 13_802.03
+           IF ^               EQUALS  24 ^    ^                                    ^   8_402.43,  9_032.61,  9_710.06, 10_438.31, 11_221.19, 12_062.78, 12_967.48, 13_940.05, 13_940.05
+           IF ^               EQUALS  25 ^    ^                                    ^   8_486.45,  9_122.94,  9_807.16, 10_542.70, 11_333.40, 12_183.40, 13_097.16, 14_079.45, 14_079.45
+           IF ^               EQUALS  26 ^    ^                                    ^   8_571.32,  9_214.17,  9_905.23, 10_648.12, 11_446.73, 12_305.24, 13_228.13, 14_220.24, 15_286.76
+           IF ^               EQUALS  27 ^    ^                                    ^   8_657.03,  9_306.31, 10_004.28, 10_754.60, 11_561.20, 12_428.29, 13_360.41, 14_362.44, 15_439.63
+           IF ^               EQUALS  28 ^    ^                                    ^   8_743.60,  9_399.37, 10_104.33, 10_862.15, 11_676.81, 12_552.57, 13_494.02, 14_506.07, 15_594.02
+           IF ^               EQUALS  29 ^    ^                                    ^   8_831.04,  9_493.37, 10_205.37, 10_970.77, 11_793.58, 12_678.10, 13_628.96, 14_651.13, 15_749.96
+           IF ^               EQUALS  30 ^    ^                                    ^   8_919.35,  9_588.30, 10_307.42, 11_080.48, 11_911.52, 12_804.88, 13_765.25, 14_797.64, 15_907.46
+           IF ^               EQUALS  31 ^    ^                                    ^   9_008.54,  9_684.18, 10_410.50, 11_191.28, 12_030.63, 12_932.93, 13_902.90, 14_945.62, 16_066.54
+           IF ^               EQUALS  32 ^    ^                                    ^   9_098.63,  9_781.03, 10_514.60, 11_303.20, 12_150.94, 13_062.26, 14_041.93, 15_095.07, 16_227.20
+           IF ^               EQUALS  33 ^    ^                                    ^   9_189.61,  9_878.84, 10_619.75, 11_416.23, 12_272.45, 13_192.88, 14_182.35, 15_246.02, 16_389.47
+           IF ^               EQUALS  34 ^    ^                                    ^   9_281.51,  9_977.62, 10_725.95, 11_530.39, 12_395.17, 13_324.81, 14_324.17, 15_398.48, 16_553.37
+           IF ^               EQUALS  35 ^    ^                                    ^   9_374.33, 10_077.40, 10_833.21, 11_645.70, 12_519.12, 13_458.06, 14_467.41, 15_552.47, 16_718.90
+           OTHERWISE                          ^                                    ^   9_468.07, 10_178.17, 10_941.54, 11_762.15, 12_644.31, 13_592.64, 14_612.09, 15_707.99, 16_886.09
+
+§§ `Appendix alef-2 — the MA table, rating code 102`
+
+GIVEN `the seniority` IS A NUMBER
+GIVETH A `a row of the combined salary table`
+`the MA table row at seniority` `the seniority`
+    @nlg the row of the MA (rating code 102) table at the given seniority
+    MEANS
+    --                                                                                   rank 1,    rank 2,    rank 3,    rank 4,    rank 5,    rank 6,    rank 7,    rank 8,    rank 9
+    BRANCH IF `the seniority` AT MOST  1 THEN `a row of the combined salary table` OF     6_615,     6_615,     6_615,     6_615,     6_615,     6_615,     6_615,     6_615,     6_615
+           IF ^               EQUALS   2 ^    ^                                    ^   6_747.30,  6_747.30,  6_747.30,  6_747.30,  6_747.30,  6_747.30,  6_747.30,  6_747.30,  6_747.30
+           IF ^               EQUALS   3 ^    ^                                    ^   6_882.25,  7_398.41,  7_398.41,  7_398.41,  7_398.41,  7_398.41,  7_398.41,  7_398.41,  7_398.41
+           IF ^               EQUALS   4 ^    ^                                    ^   7_019.89,  7_546.38,  7_546.38,  7_546.38,  7_546.38,  7_546.38,  7_546.38,  7_546.38,  7_546.38
+           IF ^               EQUALS   5 ^    ^                                    ^   7_160.29,  7_697.31,  7_697.31,  7_697.31,  7_697.31,  7_697.31,  7_697.31,  7_697.31,  7_697.31
+           IF ^               EQUALS   6 ^    ^                                    ^   7_303.49,  7_851.26,  8_440.10,  8_440.10,  8_440.10,  8_440.10,  8_440.10,  8_440.10,  8_440.10
+           IF ^               EQUALS   7 ^    ^                                    ^   7_449.56,  8_008.28,  8_608.90,  8_608.90,  8_608.90,  8_608.90,  8_608.90,  8_608.90,  8_608.90
+           IF ^               EQUALS   8 ^    ^                                    ^   7_524.06,  8_088.36,  8_694.99,  9_347.12,  9_347.12,  9_347.12,  9_347.12,  9_347.12,  9_347.12
+           IF ^               EQUALS   9 ^    ^                                    ^   7_599.30,  8_169.25,  8_781.94,  9_440.59,  9_440.59,  9_440.59,  9_440.59,  9_440.59,  9_440.59
+           IF ^               EQUALS  10 ^    ^                                    ^   7_675.29,  8_250.94,  8_869.76,  9_534.99,  9_534.99,  9_534.99,  9_534.99,  9_534.99,  9_534.99
+           IF ^               EQUALS  11 ^    ^                                    ^   7_752.05,  8_333.45,  8_958.46,  9_630.34, 10_352.62, 10_352.62, 10_352.62, 10_352.62, 10_352.62
+           IF ^               EQUALS  12 ^    ^                                    ^   7_829.57,  8_416.78,  9_048.04,  9_726.65, 10_456.15, 10_456.15, 10_456.15, 10_456.15, 10_456.15
+           IF ^               EQUALS  13 ^    ^                                    ^   7_907.86,  8_500.95,  9_138.52,  9_823.91, 10_560.71, 10_560.71, 10_560.71, 10_560.71, 10_560.71
+           IF ^               EQUALS  14 ^    ^                                    ^   7_986.94,  8_585.96,  9_229.91,  9_922.15, 10_666.31, 11_466.29, 11_466.29, 11_466.29, 11_466.29
+           IF ^               EQUALS  15 ^    ^                                    ^   8_066.81,  8_671.82,  9_322.21, 10_021.37, 10_772.98, 11_580.95, 11_580.95, 11_580.95, 11_580.95
+           IF ^               EQUALS  16 ^    ^                                    ^   8_147.48,  8_758.54,  9_415.43, 10_121.59, 10_880.71, 11_696.76, 11_696.76, 11_696.76, 11_696.76
+           IF ^               EQUALS  17 ^    ^                                    ^   8_228.95,  8_846.13,  9_509.58, 10_222.80, 10_989.51, 11_813.73, 11_813.73, 11_813.73, 11_813.73
+           IF ^               EQUALS  18 ^    ^                                    ^   8_311.24,  8_934.59,  9_604.68, 10_325.03, 11_099.41, 11_931.86, 12_826.75, 12_826.75, 12_826.75
+           IF ^               EQUALS  19 ^    ^                                    ^   8_394.36,  9_023.93,  9_700.73, 10_428.28, 11_210.40, 12_051.18, 12_955.02, 12_955.02, 12_955.02
+           IF ^               EQUALS  20 ^    ^                                    ^   8_478.30,  9_114.17,  9_797.73, 10_532.56, 11_322.51, 12_171.69, 13_084.57, 13_084.57, 13_084.57
+           IF ^               EQUALS  21 ^    ^                                    ^   8_563.08,  9_205.31,  9_895.71, 10_637.89, 11_435.73, 12_293.41, 13_215.42, 13_215.42, 13_215.42
+           IF ^               EQUALS  22 ^    ^                                    ^   8_648.71,  9_297.37,  9_994.67, 10_744.27, 11_550.09, 12_416.35, 13_347.57, 14_348.64, 14_348.64
+           IF ^               EQUALS  23 ^    ^                                    ^   8_735.20,  9_390.34, 10_094.62, 10_851.71, 11_665.59, 12_540.51, 13_481.05, 14_492.13, 14_492.13
+           IF ^               EQUALS  24 ^    ^                                    ^   8_822.55,  9_484.24, 10_195.56, 10_960.23, 11_782.25, 12_665.91, 13_615.86, 14_637.05, 14_637.05
+           IF ^               EQUALS  25 ^    ^                                    ^   8_910.78,  9_579.09, 10_297.52, 11_069.83, 11_900.07, 12_792.57, 13_752.02, 14_783.42, 14_783.42
+           IF ^               EQUALS  26 ^    ^                                    ^   8_999.89,  9_674.88, 10_400.49, 11_180.53, 12_019.07, 12_920.50, 13_889.54, 14_931.25, 16_051.10
+           IF ^               EQUALS  27 ^    ^                                    ^   9_089.88,  9_771.63, 10_504.50, 11_292.33, 12_139.26, 13_049.70, 14_028.43, 15_080.56, 16_211.61
+           IF ^               EQUALS  28 ^    ^                                    ^   9_180.78,  9_869.34, 10_609.54, 11_405.26, 12_260.65, 13_180.20, 14_168.72, 15_231.37, 16_373.72
+           IF ^               EQUALS  29 ^    ^                                    ^   9_272.59,  9_968.04, 10_715.64, 11_519.31, 12_383.26,    13_312, 14_310.40, 15_383.68, 16_537.46
+           IF ^               EQUALS  30 ^    ^                                    ^   9_365.32, 10_067.72, 10_822.79, 11_634.50, 12_507.09, 13_445.12, 14_453.51, 15_537.52, 16_702.83
+           IF ^               EQUALS  31 ^    ^                                    ^   9_458.97, 10_168.39, 10_931.02, 11_750.85, 12_632.16, 13_579.57, 14_598.04, 15_692.90, 16_869.86
+           IF ^               EQUALS  32 ^    ^                                    ^   9_553.56, 10_270.08, 11_040.33, 11_868.36, 12_758.48, 13_715.37, 14_744.02, 15_849.83, 17_038.56
+           IF ^               EQUALS  33 ^    ^                                    ^   9_649.10, 10_372.78, 11_150.74, 11_987.04, 12_886.07, 13_852.52, 14_891.46, 16_008.32, 17_208.95
+           IF ^               EQUALS  34 ^    ^                                    ^   9_745.59, 10_476.51, 11_262.24, 12_106.91, 13_014.93, 13_991.05, 15_040.38, 16_168.41, 17_381.04
+           IF ^               EQUALS  35 ^    ^                                    ^   9_843.04, 10_581.27, 11_374.87, 12_227.98, 13_145.08, 14_130.96, 15_190.78, 16_330.09, 17_554.85
+           OTHERWISE                          ^                                    ^   9_941.47, 10_687.08, 11_488.61, 12_350.26, 13_276.53, 14_272.27, 15_342.69, 16_493.39, 17_730.40
+
+§§ `Reading a cell`
+
+GIVEN `the table` IS A `a salary table`
+      `the seniority` IS A NUMBER
+      `the rank` IS A NUMBER
+GIVETH A NUMBER
+`the combined salary for a full post` `the table` `the seniority` `the rank`
+    @nlg the combined salary for a full post at the given seniority and rank
+    MEANS
+    CONSIDER `the table`
+    WHEN `the BA table — rating code 101` THEN
+        `the amount in the row at rank` (`the BA table row at seniority` `the seniority`) `the rank`
+    WHEN `the MA table — rating code 102` THEN
+        `the amount in the row at rank` (`the MA table row at seniority` `the seniority`) `the rank`
+
+§§ `Tosefet Ofek 2022`
+
+-- § 5 of the 2022 wage agreement: a flat shekel amount by rank, falling as the
+-- rank rises and nil at rank 9. Appendix bet ran from 1.9.2022; appendix
+-- gimel doubled it from 1.9.2023 — the date the 2022 agreement misprinted as
+-- 1.1.23 and the 14.1.2025 decision corrected.
+GIVETH A DATE
+`the date tosefet ofek 2022 takes effect` MEANS YMD 2022 9 1
+GIVETH A DATE
+`the date tosefet ofek 2022 is increased` MEANS YMD 2023 9 1
+
+GIVEN `the table` IS A `a salary table`
+      `the rank` IS A NUMBER
+GIVETH A NUMBER
+`tosefet ofek 2022 from september 2022 in` `the table` `the rank`
+    @nlg Tosefet Ofek 2022 as it stood from september 2022, at the given rank
+    MEANS
+    CONSIDER `the table`
+    WHEN `the BA table — rating code 101` THEN
+        BRANCH IF `the rank` AT MOST 1 THEN   792.77
+               IF ^          EQUALS  2 ^      667.77
+               IF ^          EQUALS  3 ^      542.77
+               IF ^          EQUALS  4 ^      417.77
+               IF ^          EQUALS  5 ^      292.77
+               IF ^          EQUALS  6 ^      167.77
+               IF ^          EQUALS  7 ^       92.77
+               IF ^          EQUALS  8 ^       17.77
+               OTHERWISE                           0
+    WHEN `the MA table — rating code 102` THEN
+        BRANCH IF `the rank` AT MOST 1 THEN   832.44
+               IF ^          EQUALS  2 ^      701.19
+               IF ^          EQUALS  3 ^      569.94
+               IF ^          EQUALS  4 ^      438.69
+               IF ^          EQUALS  5 ^      307.44
+               IF ^          EQUALS  6 ^      176.19
+               IF ^          EQUALS  7 ^       97.44
+               IF ^          EQUALS  8 ^       18.69
+               OTHERWISE                           0
+
+GIVEN `the table` IS A `a salary table`
+      `the rank` IS A NUMBER
+GIVETH A NUMBER
+`tosefet ofek 2022 from september 2023 in` `the table` `the rank`
+    @nlg Tosefet Ofek 2022 as it stood from september 2023, at the given rank
+    MEANS
+    CONSIDER `the table`
+    WHEN `the BA table — rating code 101` THEN
+        BRANCH IF `the rank` AT MOST 1 THEN 1_585.54
+               IF ^          EQUALS  2 ^    1_335.54
+               IF ^          EQUALS  3 ^    1_085.54
+               IF ^          EQUALS  4 ^      835.54
+               IF ^          EQUALS  5 ^      585.54
+               IF ^          EQUALS  6 ^      335.54
+               IF ^          EQUALS  7 ^      185.54
+               IF ^          EQUALS  8 ^       35.54
+               OTHERWISE                           0
+    WHEN `the MA table — rating code 102` THEN
+        BRANCH IF `the rank` AT MOST 1 THEN 1_664.87
+               IF ^          EQUALS  2 ^    1_402.37
+               IF ^          EQUALS  3 ^    1_139.87
+               IF ^          EQUALS  4 ^      877.37
+               IF ^          EQUALS  5 ^      614.87
+               IF ^          EQUALS  6 ^      352.37
+               IF ^          EQUALS  7 ^      194.87
+               IF ^          EQUALS  8 ^       37.37
+               OTHERWISE                           0
+
+GIVEN `the table` IS A `a salary table`
+      `the rank` IS A NUMBER
+      `the fraction of a full post` IS A NUMBER
+      `the date` IS A DATE
+GIVETH A NUMBER
+`tosefet ofek 2022 for` `the table` `the rank` `the fraction of a full post` `the date`
+    @nlg Tosefet Ofek 2022 payable at the given rank
+    MEANS
+    -- § 5.3 pro-rates it, unlike a § 39 role supplement.
+    IF `the date` LESS THAN `the date tosefet ofek 2022 takes effect`
+        THEN 0
+        ELSE `the amount at the date` TIMES `the fraction of a full post`
+    WHERE
+        `the amount at the date` MEANS
+            IF `the date` LESS THAN `the date tosefet ofek 2022 is increased`
+                THEN `tosefet ofek 2022 from september 2022 in` `the table` `the rank`
+                ELSE `tosefet ofek 2022 from september 2023 in` `the table` `the rank`
+
+§§ `The role supplements`
+
+-- § 39(a) of the 2008 agreement as percentages, with the shekel floors § 10
+-- of the 2022 agreement put under two of them from 1.9.2023.
+GIVETH A DATE
+`the date the shekel floors take effect` MEANS YMD 2023 9 1
+GIVETH A NUMBER
+`the floor under the homeroom supplement` MEANS 1_000
+GIVETH A NUMBER
+`the floor under the grade coordinator supplement` MEANS 1_100
+GIVETH A NUMBER
+`the smallest post that carries a role supplement` MEANS 1 DIVIDED BY 3
+
+GIVEN `the role` IS A `a role carrying a supplement`
+      `the stage` IS A `a stage of education`
+      `the classes in the grade` IS A NUMBER
+GIVETH A NUMBER
+`the section 39 rate for` `the role` `the stage` `the classes in the grade`
+    @nlg the section 39 rate for the given role
+    MEANS
+    CONSIDER `the role`
+    WHEN `homeroom teacher of a class other than the first grade` THEN 10%
+    WHEN `homeroom teacher of a first-grade class`                THEN 11.5%
+    WHEN `subject coordinator` THEN
+        CONSIDER `the stage`
+        WHEN `a primary school`     THEN 6%
+        WHEN `a junior high school` THEN 8%
+    WHEN `road-safety coordinator`  THEN 6%
+    WHEN `security coordinator`     THEN 6%
+    WHEN `social-education coordinator` THEN
+        CONSIDER `the stage`
+        WHEN `a primary school`     THEN 6%
+        WHEN `a junior high school` THEN 10%
+    WHEN `grade-level coordinator` THEN
+        IF `the classes in the grade` AT MOST 4 THEN 7% ELSE 6%
+    WHEN `laboratory coordinator`                 THEN 3%
+    WHEN `assessment and measurement coordinator` THEN 6%
+
+GIVEN `the role` IS A `a role carrying a supplement`
+GIVETH A NUMBER
+`the shekel floor under` `the role`
+    @nlg the shekel floor under the given role
+    MEANS
+    CONSIDER `the role`
+    WHEN `homeroom teacher of a class other than the first grade` THEN `the floor under the homeroom supplement`
+    WHEN `homeroom teacher of a first-grade class`                THEN `the floor under the homeroom supplement`
+    WHEN `grade-level coordinator`                                THEN `the floor under the grade coordinator supplement`
+    OTHERWISE                                                          0
+
+GIVEN `the role` IS A `a role carrying a supplement`
+      `the stage` IS A `a stage of education`
+      `the classes in the grade` IS A NUMBER
+      `the base` IS A NUMBER
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the role supplement for` `the role` `the stage` `the classes in the grade` `the base` `the date`
+    @nlg the supplement payable for the given role
+    MEANS
+    IF `the date` LESS THAN `the date the shekel floors take effect`
+        THEN `the percentage amount`
+        ELSE max `the percentage amount` (`the shekel floor under` `the role`)
+    WHERE
+        `the percentage amount` MEANS
+            `the base` TIMES (`the section 39 rate for` `the role` `the stage` `the classes in the grade`)
+
+§§ `The school-role supplement`
+
+-- § 22 of the 2022 agreement, as postponed to the 2026/27 school year by § 19
+-- of the approved agreement of 29.6.2026. Two to five whole units at 200 a
+-- month, paid flat to any post of a third or more.
+GIVETH A NUMBER
+`the value of one school-role unit` MEANS 200
+GIVETH A DATE
+`the date section 22 takes effect as postponed` MEANS YMD 2026 9 1
+
+GIVEN `the units` IS A NUMBER
+      `the fraction of a full post` IS A NUMBER
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the school-role supplement for` `the units` `the fraction of a full post` `the date`
+    @nlg the school-role supplement for the given units
+    MEANS
+    IF      `the date` LESS THAN `the date section 22 takes effect as postponed`
+         OR `the units` BELOW 2
+         OR `the units` ABOVE 5
+         OR `the fraction of a full post` BELOW `the smallest post that carries a role supplement`
+        THEN 0
+        ELSE `the units` TIMES `the value of one school-role unit`
+
+§§ `The 2025-2026 wage reduction`
+
+-- §§ 9 and 16 of the approved collective agreement of 29 June 2026, made
+-- under Chapter 9 of the Budget Objectives Act 5785-2025.
+GIVETH A DATE
+`the first day of the first reduction period` MEANS YMD 2025 5 1
+GIVETH A DATE
+`the last day of the first reduction period` MEANS YMD 2025 12 31
+GIVETH A DATE
+`the last day of the second reduction period` MEANS YMD 2026 12 31
+GIVETH A DATE
+`the first month the seniority step is withheld` MEANS YMD 2025 9 1
+GIVETH A DATE
+`the last month the seniority step is withheld` MEANS YMD 2025 12 31
+
+GIVEN `the date` IS A DATE
+GIVETH A NUMBER
+`the reduction rate on` `the date`
+    @nlg the wage reduction rate applying on the given date
+    MEANS
+    BRANCH IF `the date` LESS THAN `the first day of the first reduction period` THEN 0
+           IF `the date` AT MOST `the last day of the first reduction period` THEN 0.95%
+           IF `the date` AT MOST `the last day of the second reduction period` THEN 1.2%
+           OTHERWISE                                                               0
+
+GIVEN `the value of the seniority step` IS A NUMBER
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the section 16 withholding on` `the value of the seniority step` `the date`
+    @nlg the section 16 withholding of the given seniority step
+    MEANS
+    IF      NOT (`the date` LESS THAN `the first month the seniority step is withheld`)
+        AND `the date` AT MOST `the last month the seniority step is withheld`
+        THEN `the value of the seniority step`
+        ELSE 0
+
+§§ `The month`
+
+-- § 39(b) read with 2022 § 5.4: the base for a percentage supplement is the
+-- FULL-POST combined salary plus the FULL-POST Tosefet Ofek 2022.
+GIVEN `the teacher` IS A `a teacher`
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the full-post percentage base for` `the teacher` `the date`
+    @nlg the full-post base on which percentage supplements are computed
+    MEANS
+          `the combined salary for a full post` `the table` (`the teacher`'s `seniority in years`) (`the teacher`'s `rank`)
+    PLUS  `tosefet ofek 2022 for` `the table` (`the teacher`'s `rank`) 1 `the date`
+    WHERE
+        `the table` MEANS `the table the teacher is placed in` `the teacher`
+
+GIVEN `the teacher` IS A `a teacher`
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the combined salary payable to` `the teacher` `the date`
+    @nlg the combined salary payable to the teacher
+    MEANS
+    `the combined salary for a full post`
+        (`the table the teacher is placed in` `the teacher`)
+        (`the teacher`'s `seniority in years`)
+        (`the teacher`'s `rank`)
+    TIMES `the teacher`'s `fraction of a full post`
+
+-- One role slot, or nothing if the slot is empty or the post is too small for
+-- § 39(b) to carry a supplement at all.
+GIVEN `the teacher` IS A `a teacher`
+      `the slot` IS A MAYBE `a role carrying a supplement`
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the supplement for one slot of` `the teacher` `the slot` `the date`
+    @nlg the supplement payable for one role slot
+    MEANS
+    IF `the teacher`'s `fraction of a full post` BELOW `the smallest post that carries a role supplement`
+        THEN 0
+        ELSE CONSIDER `the slot`
+             WHEN NOTHING THEN 0
+             WHEN JUST `the role` THEN
+                 `the role supplement for`
+                     `the role`
+                     (`the teacher`'s `stage of education`)
+                     (`the teacher`'s `classes in the coordinated grade level`)
+                     (`the full-post percentage base for` `the teacher` `the date`)
+                     `the date`
+
+GIVEN `the teacher` IS A `a teacher`
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the monthly pay before the reduction for` `the teacher` `the date`
+    @nlg the monthly pay of the teacher before the 2025-2026 reduction
+    MEANS
+          `the combined salary payable to` `the teacher` `the date`
+    PLUS  (`tosefet ofek 2022 for`
+              (`the table the teacher is placed in` `the teacher`)
+              (`the teacher`'s `rank`)
+              (`the teacher`'s `fraction of a full post`)
+              `the date`)
+    PLUS  (IF `the teacher holds a doctorate` `the teacher`
+              THEN (`the combined salary payable to` `the teacher` `the date`) TIMES 5%
+              ELSE 0)
+    PLUS  `the supplement for one slot of` `the teacher` (`the teacher`'s `first role`) `the date`
+    PLUS  `the supplement for one slot of` `the teacher` (`the teacher`'s `second role`) `the date`
+    PLUS  `the school-role supplement for`
+              (`the teacher`'s `units of the school-role supplement`)
+              (`the teacher`'s `fraction of a full post`)
+              `the date`
+
+@export Compute the monthly pay of an Israeli teacher employed on Ofek Hadash terms — the combined salary from the 2022 table, Tosefet Ofek 2022, the doctorate and role supplements and the school-role supplement, net of the 2025-2026 wage reduction
+GIVEN `the teacher` IS A `a teacher`
+      @desc The teacher: qualification, seniority in years, rank 1 to 9, primary or junior high, the fraction of a full post (1 for a whole post), up to two role supplements, the classes in any grade they coordinate, and the units of school-role supplement allotted to them
+      `the date` IS A DATE
+      @desc The month being computed. The 2025-2026 reduction, the Tosefet Ofek increase of 1.9.2023, the shekel floors of 1.9.2023 and the school-role supplement start of 1.9.2026 all turn on it
+      `the value of any seniority step taken in september 2025` IS A NUMBER
+      @desc The monthly value of the seniority advancement this teacher became entitled to in the September 2025 salary, which section 16 of the 2026 agreement withholds from September to December 2025. Zero if they did not advance
+GIVETH A NUMBER
+`the monthly pay of` `the teacher` `the date` `the value of any seniority step taken in september 2025`
+    @nlg the monthly pay of the teacher
+    MEANS
+          `the monthly pay before the reduction for` `the teacher` `the date`
+    MINUS (`the monthly pay before the reduction for` `the teacher` `the date` TIMES (`the reduction rate on` `the date`))
+    MINUS (`the section 16 withholding on` `the value of any seniority step taken in september 2025` `the date`)
+
+§§ `The same three teachers, and the same answers`
+
+-- These are the fixtures of ofek-cases.l4 and the figures it asserts.
+-- They tie this generated module to the eight-module encoding: the two
+-- were derived independently from the corpus, and they must agree here.
+--
+-- Each fixture is written out once per question rather than named and
+-- reused. That is not redundancy for its own sake: `l4 catala` collects
+-- helpers in a single pass out from the exported decision, so a helper
+-- that calls an uncollected helper is dropped along with its directive.
+-- Inlining keeps every callee inside the exported closure. See
+-- NOTES.md section 7.
+
+-- Yael — a junior-high homeroom teacher, eleven years in, on a full post.
+GIVEN `the date` IS A DATE
+GIVETH A NUMBER
+`the pay of Yael on` `the date`
+    MEANS `the monthly pay of` (`a teacher` WITH `qualification` IS `academic — holds a recognised first degree`, `seniority in years` IS 11, `rank` IS 4, `stage of education` IS `a junior high school`, `fraction of a full post` IS 1, `first role` IS JUST `homeroom teacher of a class other than the first grade`, `second role` IS NOTHING, `classes in the coordinated grade level` IS 0, `units of the school-role supplement` IS 0) `the date` 0
+
+GIVEN `the date` IS A DATE
+GIVETH A NUMBER
+`the pay having advanced of Yael on` `the date`
+    MEANS `the monthly pay of` (`a teacher` WITH `qualification` IS `academic — holds a recognised first degree`, `seniority in years` IS 11, `rank` IS 4, `stage of education` IS `a junior high school`, `fraction of a full post` IS 1, `first role` IS JUST `homeroom teacher of a class other than the first grade`, `second role` IS NOTHING, `classes in the coordinated grade level` IS 0, `units of the school-role supplement` IS 0) `the date` 130
+
+-- Dvora — a primary-school teacher at the top of the table, holding two role supplements and three school-role units.
+GIVEN `the date` IS A DATE
+GIVETH A NUMBER
+`the pay of Dvora on` `the date`
+    MEANS `the monthly pay of` (`a teacher` WITH `qualification` IS `academic — holds a recognised second degree`, `seniority in years` IS 30, `rank` IS 8, `stage of education` IS `a primary school`, `fraction of a full post` IS 1, `first role` IS JUST `homeroom teacher of a first-grade class`, `second role` IS JUST `subject coordinator`, `classes in the coordinated grade level` IS 0, `units of the school-role supplement` IS 3) `the date` 0
+
+GIVEN `the date` IS A DATE
+GIVETH A NUMBER
+`the pay having advanced of Dvora on` `the date`
+    MEANS `the monthly pay of` (`a teacher` WITH `qualification` IS `academic — holds a recognised second degree`, `seniority in years` IS 30, `rank` IS 8, `stage of education` IS `a primary school`, `fraction of a full post` IS 1, `first role` IS JUST `homeroom teacher of a first-grade class`, `second role` IS JUST `subject coordinator`, `classes in the coordinated grade level` IS 0, `units of the school-role supplement` IS 3) `the date` 130
+
+-- Noa — a doctorate holder on half a post.
+GIVEN `the date` IS A DATE
+GIVETH A NUMBER
+`the pay of Noa on` `the date`
+    MEANS `the monthly pay of` (`a teacher` WITH `qualification` IS `academic — holds a doctorate`, `seniority in years` IS 6, `rank` IS 3, `stage of education` IS `a junior high school`, `fraction of a full post` IS 50%, `first role` IS NOTHING, `second role` IS NOTHING, `classes in the coordinated grade level` IS 0, `units of the school-role supplement` IS 0) `the date` 0
+
+GIVEN `the date` IS A DATE
+GIVETH A NUMBER
+`the pay having advanced of Noa on` `the date`
+    MEANS `the monthly pay of` (`a teacher` WITH `qualification` IS `academic — holds a doctorate`, `seniority in years` IS 6, `rank` IS 3, `stage of education` IS `a junior high school`, `fraction of a full post` IS 50%, `first role` IS NOTHING, `second role` IS NOTHING, `classes in the coordinated grade level` IS 0, `units of the school-role supplement` IS 0) `the date` 130
+
+-- Yael on half a post — Yael again, with one field changed: half a post.
+GIVEN `the date` IS A DATE
+GIVETH A NUMBER
+`the pay of Yael on half a post on` `the date`
+    MEANS `the monthly pay of` (`a teacher` WITH `qualification` IS `academic — holds a recognised first degree`, `seniority in years` IS 11, `rank` IS 4, `stage of education` IS `a junior high school`, `fraction of a full post` IS 50%, `first role` IS JUST `homeroom teacher of a class other than the first grade`, `second role` IS NOTHING, `classes in the coordinated grade level` IS 0, `units of the school-role supplement` IS 0) `the date` 0
+
+GIVEN `the date` IS A DATE
+GIVETH A NUMBER
+`the pay having advanced of Yael on half a post on` `the date`
+    MEANS `the monthly pay of` (`a teacher` WITH `qualification` IS `academic — holds a recognised first degree`, `seniority in years` IS 11, `rank` IS 4, `stage of education` IS `a junior high school`, `fraction of a full post` IS 50%, `first role` IS JUST `homeroom teacher of a class other than the first grade`, `second role` IS NOTHING, `classes in the coordinated grade level` IS 0, `units of the school-role supplement` IS 0) `the date` 130
+
+-- The reduction of section 9 is nil outside its two windows, so the September
+-- 2024 figures below are the GROSS pay — the same figures ofek-cases.l4
+-- asserts against the eight-module encoding.
+#ASSERT `the pay of Yael on` (YMD 2024 9 1) EQUALS 11_008.03
+#ASSERT `the pay of Dvora on` (YMD 2024 9 1) EQUALS 18_300.49575
+#ASSERT `the pay of Noa on` (YMD 2024 9 1) EQUALS 5_000.9875
+
+-- The 0.95% of section 9(a) and the 1.2% of section 9(b), on Yael.
+#ASSERT `the pay of Yael on` (YMD 2025 11 1) EQUALS 10_903.453715
+#ASSERT `the pay of Yael on` (YMD 2026 3 1) EQUALS 10_875.93364
+
+-- Section 16 stacks a withheld seniority step on top of section 9 for four
+-- months, and then stops: from January 2026 the step is hers to keep.
+#ASSERT `the pay having advanced of Yael on` (YMD 2025 11 1) EQUALS 10_773.453715
+#ASSERT `the pay having advanced of Yael on` (YMD 2026 3 1) EQUALS 10_875.93364
+
+-- Dvora: the section 22 school-role supplement is worth 600 from 1.9.2026 and
+-- nothing before it, having been postponed a year by section 19 of the 2026
+-- agreement. 18,900.50 gross becomes 18,673.69 after the 1.2%.
+#ASSERT `the pay of Dvora on` (YMD 2026 10 1) EQUALS 18_673.689801
+
+-- And the result the whole encoding exists to make visible: half a post is
+-- not half the pay, because section 39(b) pays the role supplement whole.
+#ASSERT `the pay of Yael on half a post on` (YMD 2024 9 1) EQUALS 6_004.38

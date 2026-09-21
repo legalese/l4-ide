@@ -1,0 +1,317 @@
+-- Singapore Penal Code 1871 — theft.
+--
+--   s 378  defines "theft"                                (the elements)
+--   s 379  punishes whoever commits theft                 (the charge)
+--
+-- A charge is laid under the PUNISHING section, so this module exports one
+-- charge (s 379) over one facts record, and one offence ladder over the s 378
+-- elements.
+--
+-- s 378 is the parent of the whole property-offence family in this row. It is
+-- IMPORTed by robbery-390-392.l4, which nests a `Theft Facts` inside its own
+-- record because s 390(1) says "In all robbery there is either theft or
+-- extortion" — robbery adds an aggravation to a theft, it does not restate one.
+--
+-- An ISOMORPHIC encoding in INERT STYLE — see culpable-homicide-301.l4 for the
+-- conventions and cheating-415-417-420.l4 for the charge machinery. Verbatim
+-- statutory prose rides as inert strings; only the operative atoms are lifted
+-- into named leaves; the inert strings are mortar, never shadow copies of the
+-- leaf beside them.
+--
+-- ---------------------------------------------------------------------------
+-- The text
+-- ---------------------------------------------------------------------------
+--
+-- 378. Whoever, intending to take dishonestly any movable property out of the
+--      possession of any person without that person's consent, moves that
+--      property in order to such taking, is said to commit theft.
+--      Explanation 1.—A thing so long as it is attached to the earth, not being
+--      movable property, is not the subject of theft; but it becomes capable of
+--      being the subject of theft as soon as it is severed from the earth.
+--      Explanation 2.—A moving, effected by the same act which effects the
+--      severance, may be a theft.
+--      Explanation 3.—A person is said to cause a thing to move by removing an
+--      obstacle which prevented it from moving, or by separating it from any
+--      other thing, as well as by actually moving it.
+--      Explanation 4.—A person, who by any means causes an animal to move, is
+--      said to move that animal, and to move everything which in consequence of
+--      the motion so caused is moved by that animal.
+--      Explanation 5.—The consent mentioned in the definition may be express or
+--      implied, and may be given either by the person in possession, or by any
+--      person having for that purpose authority either express or implied.
+--      Explanation 6.—A person may move property which is intangible or
+--      incorporeal by transferring the property from one account to another
+--      account or transferring the interests in the property from one person to
+--      another person or by extinguishing the property.
+--                                                                    [15/2019]
+--
+-- 379. Whoever commits theft shall be punished with imprisonment for a term
+--      which may extend to 3 years, or with fine, or with both.
+--
+-- The seventeen illustrations to s 378 are not reproduced in full. The three
+-- this module's bench turns on are, verbatim:
+--
+--      (g) A finds a ring lying on the high road, not in the possession of any
+--          person. A by taking it commits no theft, though he may commit
+--          criminal misappropriation of property.
+--      (i) A delivers his watch to Z, a jeweller, to be regulated. Z carries it
+--          to his shop. A, not owing to the jeweller any debt for which the
+--          jeweller might lawfully detain the watch as a security, enters the
+--          shop openly, takes his watch by force out of Z's hand, and carries it
+--          away. Here A, though he may have committed criminal trespass and
+--          assault, has not committed theft, inasmuch as what he did was not
+--          done dishonestly.
+--      (q) A gains access to Z's bank account and dishonestly transfers money
+--          from Z's account to A's own account without Z's knowledge or consent.
+--          A commits theft.
+--
+-- ---------------------------------------------------------------------------
+-- The shape of the section
+-- ---------------------------------------------------------------------------
+--
+-- s 378 is ONE sentence and a pure CONJUNCTION — seven elements, every one of
+-- which must hold. There is no disjunctive limb anywhere in it. That is what
+-- makes it the cleanest ladder in the family, and it is why the illustrations
+-- read as they do: each of (g), (i), (m), (n) and (p) knocks out exactly one
+-- leaf and says "A has not committed theft".
+--
+--   MENS REA     intending to take + dishonestly (s 24)
+--   THE THING    any movable property (s 22; Explanations 1, 2 and 6)
+--   THE HOLDING  out of the possession of any person (Illustration (g): a ring
+--                on the high road is in nobody's possession, so there is
+--                nothing to take it out of)
+--   THE CONSENT  without that person's consent (Explanation 5: express or
+--                implied, and Illustration (m) turns on the implied kind)
+--   THE ACT      moves that property (Explanations 3, 4 and 6 tell you what
+--                counts as moving)
+--   THE PURPOSE  in order to such taking (Illustration (a): the severance is a
+--                theft because it was done "in order to such taking"; a moving
+--                that is not for that purpose is not theft)
+--
+-- Two calls this encoding makes, recorded rather than hidden:
+--
+--   1. `without that person's consent` is a leaf of NEGATIVE polarity, not a
+--      positive `consent` leaf under a NOT. The statute's own words are the
+--      answerable question — an investigating officer establishes absence of
+--      consent, not presence — and a positive leaf would force either a double
+--      negative in the ladder's reading ("without … not consent") or an inert
+--      string that shadows its own leaf. The @desc carries Explanation 5, which
+--      is where the difficulty actually lives.
+--   2. `movable property` is a leaf, not a nested call. s 22 is an ontology, not
+--      a rule (see penal-code-general.l4, which encodes ss 22–25 and says so);
+--      there is nothing to call.
+--
+-- The particulars the charge recites but the section does not test (who the
+-- victim is, what was taken) are STRING fields on the same record, so one
+-- record is both the ladder's input and the charge's.
+--
+-- ---------------------------------------------------------------------------
+-- s 125 and the recital: theft is the section that states NO manner
+-- ---------------------------------------------------------------------------
+--
+-- CPC 2010 s 125 illustration (a) is about this very offence: "A is accused of
+-- the theft of a certain article at a certain time and place. The charge need
+-- not set out the manner in which the theft was effected." So the recital this
+-- module builds names the thing and the person it was taken from, and stops:
+--
+--   did commit theft of <the property>, in the possession of <one victim>
+--
+-- CONSTRUCTED, NOT REPORTED. Unlike the s 384 and s 392 recitals in this row,
+-- this wording is not taken from a judgment — the bench has no reported s 379
+-- charge in it. The form follows Singapore charging practice ("in the
+-- possession of one …") and is chosen to track s 378's own "out of the
+-- possession of any person", so that the one element the recital names beyond
+-- the property is an element the ladder actually tests. Treat the asserted body
+-- below as a fixture of this encoding, not as an oracle.
+
+IMPORT prelude
+IMPORT `penal-code-general`
+
+§ `Penal Code 1871 — theft`
+
+§§ `The facts of one taking`
+
+@ref Penal Code 1871 s 378 — the operative atoms, and the particulars CPC s 124 requires
+DECLARE `Theft Facts` HAS
+    particulars           IS A Particulars @desc Who is charged, and when and where the offence was committed
+    victim                IS A STRING  @desc The name of the person out of whose possession the property was taken, as it is to appear in the charge — for example "Ng Juin Chye Joel"
+    `victim described as` IS A STRING  @desc How the charge describes that person, after the name — for example "the owner of the said stall"; leave blank if not needed
+    `victim pronoun`      IS A Pronoun @desc The pronoun the charge uses for that person
+    `the property`        IS A STRING  @desc What was taken, as it is to read after "did commit theft of" — for example "a handphone valued at about $450/-"
+
+    -- "intending to take dishonestly"
+    `intending to take`   IS A BOOLEAN @desc Did the accused intend to TAKE the property — to assume it as their own — as opposed to merely handling, damaging or using it where it lay?
+    dishonestly           IS A BOOLEAN @desc Did the accused act dishonestly — intending a wrongful gain or a wrongful loss, or in a way reasonable and honest people would call dishonest, knowing that (s 24)? Illustration (i): taking back one's own watch from a jeweller who has no lien over it is not dishonest.
+
+    -- "any movable property"
+    `movable property`    IS A BOOLEAN @desc Was the thing taken movable property — property of any description other than land, things attached to the earth, and things permanently fastened to anything so attached (s 22)? A thing attached to the earth becomes capable of theft as soon as it is severed (Explanation 1); money in a bank account is (Explanation 6).
+
+    -- "out of the possession of any person without that person's consent"
+    `out of the possession of any person`
+                          IS A BOOLEAN @desc Was the property in the possession of some person at the moment it was moved? Illustration (g): a ring lying on the high road is in nobody's possession, so there is nothing to take it out of — that is misappropriation, not theft.
+    `without that person's consent`
+                          IS A BOOLEAN @desc Was the property moved WITHOUT the consent of the person in possession? Consent may be express or implied, and may be given by the person in possession or by anyone having authority for that purpose, express or implied (Explanation 5). Illustration (m): a friend who borrows a book from an absent friend's library may well have implied consent.
+
+    -- "moves that property in order to such taking"
+    `moves that property`     IS A BOOLEAN @desc Did the accused move the property? Removing an obstacle that prevented it from moving, or separating it from another thing, counts as much as carrying it (Explanation 3); causing an animal to move it counts (Explanation 4); transferring intangible property from one account to another counts (Explanation 6).
+    `in order to such taking` IS A BOOLEAN @desc Was the moving done FOR THE PURPOSE of that taking? Illustration (a): severing a tree is theft the moment it is severed, because the severing was done in order to the taking — a moving done for some other reason is not theft.
+
+§§ `s 378 — theft`
+
+-- Seven leaves, all conjoined: s 378 has no disjunctive limb. The inert strings
+-- are the sentence's own connective glue, and reading the rule top to bottom
+-- reconstructs the section with no word appearing twice.
+@export Whether the accused "commits theft" within section 378 of the Penal Code 1871
+GIVEN f IS A `Theft Facts` @desc The taking — what was taken, from whom, with what intent
+GIVETH A BOOLEAN
+DECIDE `commits theft` f IF
+        "Whoever,"
+   ...  f's `intending to take`
+   ...  f's dishonestly
+   ...  "any"
+   ...  f's `movable property`
+   ...  f's `out of the possession of any person`
+   ...  f's `without that person's consent`
+   ...  f's `moves that property`
+   ...  f's `in order to such taking`
+   ...  ", is said to commit theft"
+
+§§ `s 379 — punishment for theft`
+
+@export Whether the accused has committed an offence punishable under section 379 of the Penal Code 1871 (theft)
+GIVEN f IS A `Theft Facts` @desc The taking — what was taken, from whom, with what intent
+GIVETH A BOOLEAN
+DECIDE `offence under s 379` f IF
+        "Whoever"
+   ...  `commits theft` f
+
+§§ `The charge`
+
+-- No manner clause: CPC s 125 illustration (a) says a theft charge need not set
+-- out how the theft was effected. The recital names the thing and the person it
+-- was taken from, and stops there.
+GIVEN f IS A `Theft Facts`
+GIVETH A STRING
+`the recital of the theft` f MEANS
+    CONCAT "did commit theft of ", f's `the property`,
+           ", in the possession of ", (`one` (f's victim) (f's `victim described as`))
+
+-- The elements, named for the refusal. s 378 is a pure conjunction, so there is
+-- deliberately no "the elements taken together" row of the kind the cheating
+-- module needs: if every leaf holds, the ladder holds, and such a row could
+-- never fire on its own.
+GIVEN f IS A `Theft Facts`
+GIVETH A LIST OF STRING
+`elements of theft not made out` f MEANS
+    concat (LIST
+        (`missing unless` (f's `intending to take`) "intending to take"),
+        (`missing unless` (f's dishonestly) "dishonestly (section 24)"),
+        (`missing unless` (f's `movable property`) "any movable property (section 22)"),
+        (`missing unless` (f's `out of the possession of any person`) "out of the possession of any person"),
+        (`missing unless` (f's `without that person's consent`) "without that person's consent"),
+        (`missing unless` (f's `moves that property`) "moves that property"),
+        (`missing unless` (f's `in order to such taking`) "in order to such taking"))
+
+@export Frame a charge under section 379 of the Penal Code 1871 (theft), or say why none can be framed
+GIVEN f IS A `Theft Facts` @desc The taking, and the particulars of the charge
+GIVETH A Charge
+`charge under s 379` f MEANS
+    `frame the charge` (f's particulars) "379" "theft"
+        "imprisonment for a term which may extend to 3 years, or with fine, or with both"
+        (`offence under s 379` f)
+        (`the recital of the theft` f)
+        (`elements of theft not made out` f)
+
+§§ `Illustration (q) — the bank transfer`
+
+-- CONSTRUCTED FIXTURE, not a reported charge. Illustration (q) to s 378, laid
+-- against invented particulars so the recital has something to recite:
+--
+--      (q) A gains access to Z's bank account and dishonestly transfers money
+--          from Z's account to A's own account without Z's knowledge or consent.
+--          A commits theft.
+--
+-- Explanation 6 is what makes it theft rather than nothing: money in an account
+-- is intangible property, and transferring it from one account to another IS a
+-- moving. Every one of the seven leaves is TRUE, so the charge frames.
+`Lim Wei Ming` MEANS `Theft Facts` WITH
+    particulars           IS Particulars WITH
+                               accused            IS "Lim Wei Ming"
+                               date               IS "the 3rd day of March 2021"
+                               time               IS "11.15 pm"
+                               place              IS "Blk 123 Ang Mo Kio Avenue 3"
+                               `co-accused`       IS ""
+                               `common intention` IS FALSE
+    victim                IS "Goh Siew Lan"
+    `victim described as` IS ""
+    `victim pronoun`      IS she
+    `the property`        IS "moneys amounting to $4,500/-"
+    `intending to take`   IS TRUE
+    dishonestly           IS TRUE
+    `movable property`    IS TRUE
+    `out of the possession of any person` IS TRUE
+    `without that person's consent`       IS TRUE
+    `moves that property`     IS TRUE
+    `in order to such taking` IS TRUE
+
+-- Illustration (i), on the same particulars: the accused took back what was
+-- already his from someone with no lien over it. Every other leaf stands; the
+-- taking was not dishonest, and s 378 fails on that one leaf.
+`Lim Wei Ming, not dishonestly` MEANS `Theft Facts` WITH
+    particulars           IS `Lim Wei Ming`'s particulars
+    victim                IS `Lim Wei Ming`'s victim
+    `victim described as` IS `Lim Wei Ming`'s `victim described as`
+    `victim pronoun`      IS `Lim Wei Ming`'s `victim pronoun`
+    `the property`        IS `Lim Wei Ming`'s `the property`
+    `intending to take`   IS TRUE
+    dishonestly           IS FALSE
+    `movable property`    IS TRUE
+    `out of the possession of any person` IS TRUE
+    `without that person's consent`       IS TRUE
+    `moves that property`     IS TRUE
+    `in order to such taking` IS TRUE
+
+-- Illustration (g), on the same particulars: the thing was in nobody's
+-- possession when it was moved. Two leaves fall, not one — there being no
+-- person in possession, there is also no consent of such a person to be
+-- without, and the refusal names both.
+`Lim Wei Ming, not in anyone's possession` MEANS `Theft Facts` WITH
+    particulars           IS `Lim Wei Ming`'s particulars
+    victim                IS `Lim Wei Ming`'s victim
+    `victim described as` IS `Lim Wei Ming`'s `victim described as`
+    `victim pronoun`      IS `Lim Wei Ming`'s `victim pronoun`
+    `the property`        IS `Lim Wei Ming`'s `the property`
+    `intending to take`   IS TRUE
+    dishonestly           IS TRUE
+    `movable property`    IS TRUE
+    `out of the possession of any person` IS FALSE
+    `without that person's consent`       IS FALSE
+    `moves that property`     IS TRUE
+    `in order to such taking` IS TRUE
+
+§§ `Directives`
+
+#EVAL `commits theft` `Lim Wei Ming`
+#EVAL (`charge under s 379` `Lim Wei Ming`)'s text
+#EVAL (`charge under s 379` `Lim Wei Ming, not dishonestly`)'s refusal
+#EVAL (`charge under s 379` `Lim Wei Ming, not in anyone's possession`)'s refusal
+
+-- Illustration (q): every leaf holds, so the charge frames.
+#ASSERT `commits theft` `Lim Wei Ming`
+#ASSERT `offence under s 379` `Lim Wei Ming`
+#ASSERT (`charge under s 379` `Lim Wei Ming`)'s `made out`
+#ASSERT `the recital of the theft` `Lim Wei Ming` EQUALS "did commit theft of moneys amounting to $4,500/-, in the possession of one Goh Siew Lan"
+#ASSERT (`charge under s 379` `Lim Wei Ming`)'s text EQUALS "You, Lim Wei Ming, are charged that you, on or about the 3rd day of March 2021, at about 11.15 pm, at Blk 123 Ang Mo Kio Avenue 3, Singapore, did commit theft of moneys amounting to $4,500/-, in the possession of one Goh Siew Lan, and you have thereby committed an offence punishable under section 379 of the Penal Code 1871."
+#ASSERT (`charge under s 379` `Lim Wei Ming`)'s punishment EQUALS "imprisonment for a term which may extend to 3 years, or with fine, or with both"
+
+-- Illustration (i): not dishonestly. One leaf off, no charge, and the refusal
+-- names the leaf.
+#ASSERT NOT (`commits theft` `Lim Wei Ming, not dishonestly`)
+#ASSERT NOT ((`charge under s 379` `Lim Wei Ming, not dishonestly`)'s `made out`)
+#ASSERT (`charge under s 379` `Lim Wei Ming, not dishonestly`)'s text EQUALS ""
+#ASSERT (`charge under s 379` `Lim Wei Ming, not dishonestly`)'s refusal EQUALS "A charge under section 379 would assert that the facts fulfil every legal condition of theft (CPC s 123(5)). On the facts given they do not: dishonestly (section 24)."
+
+-- Illustration (g): in nobody's possession. Two leaves off, and the refusal
+-- names both, in the order the section states them.
+#ASSERT NOT (`commits theft` `Lim Wei Ming, not in anyone's possession`)
+#ASSERT (`charge under s 379` `Lim Wei Ming, not in anyone's possession`)'s refusal EQUALS "A charge under section 379 would assert that the facts fulfil every legal condition of theft (CPC s 123(5)). On the facts given they do not: out of the possession of any person; without that person's consent."

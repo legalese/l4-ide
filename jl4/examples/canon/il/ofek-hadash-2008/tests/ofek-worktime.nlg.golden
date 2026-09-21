@@ -1,0 +1,41 @@
+`the hours in a full-post month` is equal to 155.88
+`ROUND` with the product of `the value of an hour on a base of` with 10000 and 1 and 100 is equal to 6415
+`ROUND` with the product of the product of `the value of an hour on a base of` with 10000 and 1 and `the rate for a substitution hour` and 100 is equal to 8019
+`the value of an hour on a base of` with 5000 and 50 %  is equal to `the value of an hour on a base of` with 10000 and 1
+`the pay for one extra hour where` with `it replaced a presence hour made up on another day` and 100 is equal to 225
+`the pay for one extra hour where` with `it replaced a presence hour that was not made up` and 100 is equal to 125
+`the pay for one extra hour where` with `it fell on the teacher's free day` and 100 is equal to 125
+`the hours in` with `the ordinary full-post week in` with `a primary school` is equal to 36
+`the hours in` with `the ordinary full-post week in` with `a junior high school` is equal to 36
+`the hours in` with `the full-post week of a grade coordinator in` with `a primary school` and 3 is equal to 36
+`the hours in` with `the full-post week of a grade coordinator in` with `a primary school` and 6 is equal to 36
+`the hours in` with `the full-post week of a grade coordinator in` with `a primary school` and 8 is equal to 36
+`the hours in` with `the full-post week of a grade coordinator in` with `a primary school` and 12 is equal to 36
+`the hours in` with `the full-post week of a grade coordinator in` with `a junior high school` and 3 is equal to 36
+`the hours in` with `the full-post week of a grade coordinator in` with `a junior high school` and 6 is equal to 36
+`the hours in` with `the full-post week of a grade coordinator in` with `a junior high school` and 8 is equal to 36
+`the hours in` with `the full-post week of a grade coordinator in` with `a junior high school` and 12 is equal to 36
+`the full-post week of a grade coordinator in` with `a junior high school` and 12 's `frontal hours` is equal to 20
+`the ordinary full-post week in` with `a junior high school` 's `frontal hours` is equal to 23
+`the ordinary full-post week in` with `a primary school` 's `frontal hours` is equal to 26
+`the hours in` with `the week after the age reduction for` with `Dvora`, 56 and `the ordinary full-post week in` with `a primary school` is equal to 32
+`the hours in` with `the week after the age reduction for` with `Yael`, 56 and `the ordinary full-post week in` with `a junior high school` is equal to 34
+`the hours in` with `the week after the age reduction for` with `Dvora`, 52 and `the ordinary full-post week in` with `a primary school` is equal to 34
+`the hours in` with `the week after the age reduction for` with `Dvora`, 49 and `the ordinary full-post week in` with `a primary school` is equal to 36
+`the hours in` with `the week after the age reduction for` with `Yael`, 49 and `the ordinary full-post week in` with `a junior high school` is equal to 36
+`the post is large enough` with `Noa`, `FALSE` and `FALSE`
+`the post is large enough` with `Yael`, `FALSE` and `FALSE`
+`the post is large enough` with `Dvora`, `FALSE` and `FALSE`
+`the section 33 hour caps are respected` with 8.5, 42 and `FALSE`
+not `the section 33 hour caps are respected` with 9, 42 and `FALSE`
+not `the section 33 hour caps are respected` with 8, 43 and `FALSE`
+`the section 33 hour caps are respected` with 5, 40 and `TRUE`
+not `the section 33 hour caps are respected` with 6, 40 and `TRUE`
+the sum of the sum of `the assembly hours allowed in a half year` and `the parent and child meeting hours allowed in a half year` and `the after-hours event hours allowed in a half year` is equal to `the school activity hours allowed in a half year`
+`the school activity caps are respected` with 4, 8 and 6
+not `the school activity caps are respected` with 5, 8 and 6
+not `the school activity caps are respected` with 4, 9 and 6
+not `the role supplements enter the hourly base for` with `a substitution hour`
+`the role supplements enter the hourly base for` with `a school activity`
+`the role supplements enter the hourly base for` with `a deduction for an hour of absence`
+not `the role supplements enter the hourly base for` with `an hour worked beyond a full post`

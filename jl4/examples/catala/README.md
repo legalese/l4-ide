@@ -1,11 +1,13 @@
 # `l4 catala` exhibits
 
-Seven L4 sources and the literate Catala they compile to, plus the
+Eleven L4 sources and the literate Catala they compile to, plus the
 `--boolean-only` rendering of one of them. The goldens under `expected/` are
 byte-for-byte what `l4 catala <file>.l4` prints, and `jl4/tests-cli/Main.hs`
-pins them. `not-ok/` holds five sources that `l4 catala` **refuses**, each
-because emitting it would have made the Catala say something other than the L4
-says; `tests-cli` pins the refusals.
+pins them. A twelfth source, `imported-domain.l4`, is never compiled on its
+own — it is what `imports.l4` imports, and `l4 catala` refuses it correctly for
+carrying no exported decision. `not-ok/` holds eight sources that `l4 catala`
+**refuses**, each because emitting it would have made the Catala say something
+other than the L4 says; `tests-cli` pins the refusals.
 
 Every golden here has been run through the real toolchain (catala 1.2.1). The
 repeatable way to do that is the R9 harness, which finds the toolchain on PATH,
@@ -38,6 +40,11 @@ the third.
 | `flat-tax.l4`  | a port of `../openfisca/flat-tax.l4`: R11 elides the never-inspected `period` string                                                     |
 | `household.l4` | a port of `../openfisca/household.l4`: `LIST OF` group entity, `sum`∘`map` absorbed by R5, two R11 elisions                              |
 | `tariff.l4`    | `CONSIDER` on an enumeration → `match`, and `TYPICALLY` → a `context` variable with an in-scope default (R10)                             |
+| `registry.l4` | R3's dates: `YMD` to native construction and the lenient `Date day month year` through the emitted day-granular helper (§8.3) |
+| `export-chain.l4` | the `@export`-everything hatch, and a section `GIVEN` threaded transitively as a scope `input` (§8.1.1) |
+| `imports.l4` | the import closure: an imported record, an imported enumeration reached only through that record's field, and an imported helper lowered to a toplevel (R1) |
+| `all-string-record.l4` | a record every field of which is a `STRING`, so R11 elides the structure itself and the field that carried it (§8.11 addendum) |
+| `fixtures.l4` | directives that test against NAMED fixtures — nullary, unary, and a helper wrapping an exported call — each reached only from a directive (§8.1.3); its last two directives are skipped on purpose, so the golden also pins their numbering |
 
 The two ports compile **unchanged** from their OpenFisca originals — the same
 L4 file feeds both backends, and what makes it Catala-clean is R11 rather than
@@ -67,3 +74,6 @@ rather than writing a file the toolchain will refuse.
 | `local-name-shadow.l4`           | two `WHERE` locals mangle to one Catala identifier, and Catala's `let` shadows silently                         |
 | `elided-string-compared.l4`      | whole-record equality reads the field R11 elided, so Catala compares a narrower record than L4 does (§8.11)      |
 | `enum-constructor-collision.l4`  | two enumerations' constructors mangle to one capitalised name, which Catala reports as ambiguous                 |
+| `export-chain-broken.l4` | an un-`@export`ed caller of an `@export`ed callee: the scope call would land outside any scope, which `catala typecheck` rejects (§8.1.1) |
+| `export-chain-combinator.l4` | the same condition at the other emission site — an `@export`ed decision passed as a combinator's function argument |
+| `duplicate-type-name.l4` | two imported modules each declare a `Thing`; L4 tells them apart by unique and one flat Catala namespace cannot (§8.1.2). Its two sibling modules are `duplicate-type-{a,b}.l4` |

@@ -1,0 +1,207 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `ofek-domain`
+IMPORT `ofek-salary-table`
+IMPORT `ofek-worktime`
+IMPORT `ofek-supplements`
+IMPORT `ofek-fiscal-2025`
+
+§ `A month's pay`
+
+-- ===========================================================================
+-- The whole computation, assembled.
+--
+-- Nothing new is decided here. Every rate, amount and condition comes from
+-- the modules above; this one puts them in the order the instruments put
+-- them in, and its value is that the ORDER is itself contested ground:
+--
+--   1  the combined salary from the table          (2008 § 35, 2022 § 4)
+--   2  Tosefet Ofek 2022, by rank                  (2022 § 5)
+--   3  the doctorate supplement, 5%                (2008 § 36(d)(2))
+--   4  the role supplements                        (2008 § 39, 2022 § 10)
+--   5  the school-role supplement                  (2022 § 22)
+--   -  the 2025-2026 reduction                     (2026 §§ 9, 16)
+--
+-- WHAT PRO-RATES AND WHAT DOES NOT is the crux, and the instruments do not
+-- treat these five alike:
+--
+--   the combined salary        pro-rated   (2008 § 33 — a post is a fraction)
+--   Tosefet Ofek 2022          pro-rated   (2022 § 5.3, expressly)
+--   the doctorate supplement   pro-rated   (it is a percentage of the above)
+--   the role supplements       NOT         (2008 § 39(b): the full-post figure,
+--                                           provided the post is at least 1/3)
+--   the school-role supplement NOT         (2022 § 22.9, expressly)
+--
+-- So a teacher on half a post does NOT take half the pay of a teacher on a
+-- whole one. That is the single most consequential thing in this encoding,
+-- and it falls out of reading three articles together rather than from any
+-- one of them.
+-- ===========================================================================
+
+§§ `The base on which percentages are computed`
+
+-- 2008 § 39(b): the role supplements are percentages of the combined salary
+-- FOR A FULL POST. 2022 § 5.4: Tosefet Ofek 2022 "shall constitute salary for
+-- all intents and purposes, and shall be taken into account for the purpose
+-- of computing percentage supplements computed on the basis of the combined
+-- salary". Reading the two together, the base is the full-post combined
+-- salary PLUS the full-post Tosefet Ofek 2022.
+--
+-- NOTES.md § 5 records this as an interpretive step: § 5.4 says Tosefet Ofek
+-- enters the base, and § 39(b) says the base is a full-post figure, but no
+-- instrument says in terms that it is the full-post TOSEFET that enters it.
+-- The alternative — adding the teacher's own pro-rated Tosefet to a full-post
+-- salary — mixes two bases in one sum, which is why it is not the reading
+-- taken here.
+GIVEN `the teacher` IS A `a teacher`
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the full-post percentage base for` `the teacher` `the date`
+    @nlg the full-post base on which percentage supplements are computed for %the teacher%
+    MEANS   `the full-post combined salary`
+      PLUS  `the full-post tosefet ofek`
+    WHERE
+        `the table` MEANS `the table the teacher is placed in` `the teacher`
+        `the full-post combined salary` MEANS
+            `the combined salary for a full post` `the table`
+                (`the teacher`'s `seniority in years`) (`the teacher`'s `rank`)
+        `the full-post tosefet ofek` MEANS
+            `tosefet ofek 2022 for` `the table` (`the teacher`'s `rank`) 1 `the date`
+
+§§ `The parts of the pay packet`
+
+-- 1 and 2. The combined salary and Tosefet Ofek 2022, both pro-rated by the
+-- fraction of the post.
+GIVEN `the teacher` IS A `a teacher`
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the combined salary payable to` `the teacher` `the date`
+    @nlg the combined salary payable to %the teacher%
+    MEANS
+    `the combined salary for a full post`
+        (`the table the teacher is placed in` `the teacher`)
+        (`the teacher`'s `seniority in years`)
+        (`the teacher`'s `rank`)
+    TIMES `the teacher`'s `fraction of a full post`
+
+GIVEN `the teacher` IS A `a teacher`
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the tosefet ofek payable to` `the teacher` `the date`
+    @nlg Tosefet Ofek 2022 payable to %the teacher%
+    MEANS
+    `tosefet ofek 2022 for`
+        (`the table the teacher is placed in` `the teacher`)
+        (`the teacher`'s `rank`)
+        (`the teacher`'s `fraction of a full post`)
+        `the date`
+
+-- 3. The doctorate supplement, 5% of the combined salary in the table. It is
+-- computed on the teacher's OWN combined salary, so it pro-rates with it.
+GIVEN `the teacher` IS A `a teacher`
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the doctorate supplement payable to` `the teacher` `the date`
+    @nlg the doctorate supplement payable to %the teacher%
+    MEANS
+    IF `the teacher holds a doctorate` `the teacher`
+        THEN (`the combined salary payable to` `the teacher` `the date`) TIMES 5%
+        ELSE 0
+
+-- 4. The role supplements. Each is a percentage of the FULL-POST base, or the
+-- 2022 § 10 shekel floor if that is higher, and each is paid whole so long as
+-- the post is at least a third (2008 § 39(b)).
+GIVEN `the teacher` IS A `a teacher`
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the role supplements payable to` `the teacher` `the date`
+    @nlg the role supplements payable to %the teacher%
+    MEANS
+    IF NOT (`the post carries the role supplements` (`the teacher`'s `fraction of a full post`))
+        THEN 0
+        ELSE sum (map `the amount for one role` (`the teacher`'s `roles`))
+    WHERE
+        `the amount for one role` `the role` MEANS
+            `the role supplement for`
+                `the role`
+                (`the teacher`'s `stage of education`)
+                (`the teacher`'s `classes in the coordinated grade level`)
+                (`the full-post percentage base for` `the teacher` `the date`)
+                `the date`
+
+-- 5. The school-role supplement: whole units at 200 shekels, flat.
+GIVEN `the teacher` IS A `a teacher`
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the school-role supplement payable to` `the teacher` `the date`
+    @nlg the school-role supplement payable to %the teacher%
+    MEANS
+    `the school-role supplement for`
+        (`the teacher`'s `units of the school-role supplement`)
+        (`the teacher`'s `fraction of a full post`)
+        `the date`
+
+§§ `The month, before and after the reduction`
+
+GIVEN `the teacher` IS A `a teacher`
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the monthly pay before the reduction for` `the teacher` `the date`
+    @nlg the monthly pay of %the teacher% before the 2025-2026 reduction
+    MEANS   `the combined salary payable to` `the teacher` `the date`
+      PLUS  `the tosefet ofek payable to` `the teacher` `the date`
+      PLUS  `the doctorate supplement payable to` `the teacher` `the date`
+      PLUS  `the role supplements payable to` `the teacher` `the date`
+      PLUS  `the school-role supplement payable to` `the teacher` `the date`
+
+-- 2026 § 8: the determining base is salary less the four excluded classes.
+-- Every component above is paid monthly and none of them is a recreation
+-- payment, a clothing allowance, an expense reimbursement or a tax gross-up,
+-- so on these facts the determining base IS the monthly pay. The identity is
+-- stated as its own rule rather than assumed, because it stops holding the
+-- moment a component outside § 8 is added to this module.
+GIVEN `the teacher` IS A `a teacher`
+      `the date` IS A DATE
+GIVETH A NUMBER
+`the determining base for` `the teacher` `the date`
+    @nlg the determining base of %the teacher% for the 2025-2026 reduction
+    MEANS `the monthly pay before the reduction for` `the teacher` `the date`
+
+@export Compute the monthly pay of an Israeli teacher employed on Ofek Hadash terms, from the combined salary table, Tosefet Ofek 2022, the doctorate and role supplements and the school-role supplement, net of the 2025-2026 wage reduction
+GIVEN `the teacher` IS A `a teacher`
+      @desc The teacher's qualification, seniority in years, rank (1 to 9), stage of education, whether they entered the reform as a new or an existing teacher, the fraction of a full post, the roles they hold, the classes in any grade they coordinate, the units of school-role supplement allotted to them, and their special education facts
+      `the date` IS A DATE
+      @desc The month being computed, as a date. The 2025-2026 reduction, the Tosefet Ofek increase of 1.9.2023, the shekel floors of 1.9.2023 and the school-role supplement's postponed start of 1.9.2026 all turn on it
+      `the value of any seniority step taken in september 2025` IS A NUMBER
+      @desc The monthly value of the seniority advancement this teacher became entitled to in the September 2025 salary, which the 2026 agreement section 16 withholds from September to December 2025. Zero if they did not advance
+GIVETH A NUMBER
+`the monthly pay of` `the teacher` `the date` `the value of any seniority step taken in september 2025`
+    @nlg the monthly pay of %the teacher%
+    MEANS   `the monthly pay before the reduction for` `the teacher` `the date`
+      MINUS `the single payslip line for`
+                (`the determining base for` `the teacher` `the date`)
+                `the value of any seniority step taken in september 2025`
+                (`the value of any seniority step taken in september 2025` GREATER THAN 0)
+                `the date`
+
+§§ `The value of an hour, for this teacher`
+
+-- 2008 § 31 read with 2022 § 5.4: Tosefet Ofek 2022 enters the hourly base.
+-- The role supplements enter it or not according to the purpose (§ 31(a)),
+-- which ofek-worktime decides.
+GIVEN `the teacher` IS A `a teacher`
+      `the date` IS A DATE
+      `the purpose` IS A `a purpose for which an hour is valued`
+GIVETH A NUMBER
+`the value of an hour for` `the teacher` `the date` `the purpose`
+    @nlg the value of one hour for %the teacher%
+    MEANS
+    `the value of an hour on a base of` `the base for the purpose` (`the teacher`'s `fraction of a full post`)
+    WHERE
+        `the base for the purpose` MEANS
+            IF `the role supplements enter the hourly base for` `the purpose`
+                THEN      `the combined salary payable to` `the teacher` `the date`
+                     PLUS `the tosefet ofek payable to` `the teacher` `the date`
+                     PLUS `the role supplements payable to` `the teacher` `the date`
+                ELSE      `the combined salary payable to` `the teacher` `the date`
+                     PLUS `the tosefet ofek payable to` `the teacher` `the date`

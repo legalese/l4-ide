@@ -32,6 +32,10 @@
 - [Blawx](exports/blawx.md)
 - [DMN and BPMN](exports/dmn-bpmn.md)
 
+## Apps
+
+- [Charge generator](apps/charge-generator.md)
+
 ## Courses
 
 - [Overview](courses/README.md)

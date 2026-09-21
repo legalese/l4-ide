@@ -118,6 +118,61 @@ export const PROBES = {
       needed_by: ["p7-mcp (deployment); loopback only, see p7-mcp.sh"],
     };
   },
+  // catala + clerk, discovered by the SAME three routes etc/validate-catala.mjs
+  // uses, in the same order: an explicit CATALA_EXE/CLERK_EXE, then PATH, then
+  // an opam switch (CATALA_OPAM_SWITCH, defaulting to `catala`). Kept in step
+  // with that script deliberately -- a forecast computed from a private copy of
+  // the rules drifts into lying about what the stage will do, and the stage
+  // here is p7-catala, whose whole oracle is that script.
+  //
+  // Both tools are probed together because the validator needs BOTH: it skips
+  // when either is missing, so a machine with `catala` and no `clerk` is
+  // exactly as unable to check anything as a machine with neither.
+  catala: () => {
+    const sw = process.env.CATALA_OPAM_SWITCH ?? "catala";
+    const find = (tool, envVar) => {
+      const explicit = process.env[envVar];
+      if (explicit)
+        return existsSync(explicit)
+          ? { how: `${envVar}=${explicit}`, path: explicit }
+          : null;
+      const onPath = which(tool);
+      if (onPath) return { how: `${tool} on PATH`, path: onPath };
+      const r = spawnSync(
+        "opam",
+        ["exec", "--switch", sw, "--", tool, "--version"],
+        { encoding: "utf8" },
+      );
+      return r.status === 0
+        ? {
+            how: `opam switch '${sw}'`,
+            path: `opam exec --switch ${sw} -- ${tool}`,
+          }
+        : null;
+    };
+    const c = find("catala", "CATALA_EXE");
+    const k = find("clerk", "CLERK_EXE");
+    const missing = [!c && "catala", !k && "clerk"].filter(Boolean);
+    return {
+      present: !!(c && k),
+      path: c && k ? `${c.how}; ${k.how}` : null,
+      version: c
+        ? (
+            spawnSync(
+              ...(c.path.startsWith("opam ")
+                ? [
+                    "opam",
+                    ["exec", "--switch", sw, "--", "catala", "--version"],
+                  ]
+                : [c.path, ["--version"]]),
+              { encoding: "utf8" },
+            ).stdout ?? ""
+          ).trim() || null
+        : null,
+      missing,
+      needed_by: ["p7-catala (catala typecheck + catala proof + clerk test)"],
+    };
+  },
   git: () => {
     const p = which("git");
     return {

@@ -1,0 +1,104 @@
+              Citi Rewards Card – 10X Rewards Promotion Frequently Asked Questions
+
+1. What are the transactions eligible for 10X Rewards?
+The eligible transactions that are eligible for 10X Points:
+         (i) a Qualifying Charge made at any department store, or retail store worldwide, or shopping
+         website that sells clothes, shoes and bags as its main business activity, determined by the
+         following Merchant Category Codes (MCC), or:
+         Merchant Category Code (MCC)                    Description
+         MCC 5311                                        Department Stores
+         MCC 5611                                        Men’s and Boy’s Clothing and Accessories Stores
+         MCC 5621                                        Women’s Ready to Wear Stores
+         MCC 5631                                        Women’s Accessory and Specialty Stores
+         MCC 5641                                        Children’s and Infant’s Wear Stores
+         MCC 5651                                        Family Clothing Stores
+         MCC 5655                                        Sports and Riding Apparel Stores
+         MCC 5661                                        Shoe Stores
+         MCC 5691                                        Men's and Women's Clothing Stores
+         MCC 5699                                        Miscellaneous Apparel and Accessory Shops
+         MCC 5948                                        Luggage and Leather Goods Stores
+
+          (ii) a Qualifying Charge made at any online retail merchants, excluding mobile wallet and
+          travel-related transactions*:
+
+          *For clarity, travel-related transactions refer to transactions which are either wholly or partially
+          related to any form of travel, whether local or overseas and include but are not limited to
+          transactions that fall within the following MCCs (i.e. any transactions at merchants with the
+          following MCCs will not be a Qualifying Charge):
+             Merchant Category Code (MCC)                  Description
+             MCC 3000 to 3350                              Airlines, Air Carriers
+             MCC 3351 to 3500                              Car Rental Agencies
+             MCC 3501 to 3999                              Lodging – Hotels, Motels, Resorts
+             MCC 4111, 4112 and 4789                       Passenger Transport and Railways
+             MCC 4411                                      Cruise Lines
+             MCC 4511                                      Airlines, Air Carriers (Not Elsewhere Classified)
+             MCC 4722 to 4723                              Travel Agencies and Tour Operators
+                                                           Direct Marketing – Travel-Related Arrangement
+             MCC 5962
+                                                           Services
+                                                           Lodging – Hotels, Motels, Resorts (Not
+             MCC 7011 to 7012
+                                                           Elsewhere Classified)
+             MCC 7512                                      Car Rental Agencies (Not Elsewhere Classified)
+
+
+
+
+                                                                                                            1
+2. How do I know what Merchant Category Code (MCC) the merchant I want to spend at, falls under?
+A Merchant Category Code (MCC) is a four-digit number assigned to a merchant/business by the
+merchant’s acquiring bank. The acquiring bank provides the credit card payment facilities used by the
+merchant and it determines and applies (with respect to the account), the MCC which in its view best
+describes the merchant activity. Citibank does not determine the merchant’s MCC. You may want to
+check with the merchant on the MCC they are assigned to.
+
+
+3: What are the types of transactions that are not eligible for Rewards?
+    • For transactions that are not eligible for 10X Rewards, please refer to FAQ Point (1) above.
+    • For transactions that are not eligible for 1X Reward, please refer to the following:
+
+        (i)      “Qualifying Charge” means a charge made to an Eligible Card which does not arise from
+                 any annual fees, interest charges, late payment charges, GST, cash advances,
+                 instalment/easy/extended/equal payment plans, preferred payment plans, balance
+                 transfers, cash advances, quasi-cash transactions, all fees charged by Citibank or third
+                 party, miscellaneous charges imposed by Citibank (unless otherwise stated in writing by
+                 Citibank);
+        (ii)     funds transfers using the card as source of funds;
+        (iii)    bill payments (including via Citibank Online or via any other channel or agent);
+        (iv)     payments to educational institutions;
+        (v)      payments to government institutions and services (including but not limited to court
+                 cases, fines, bail and bonds, tax payment, postal services, parking lots and garages, intra-
+                 government purchases);
+        (vi)     payments to insurance companies (sales, underwriting, and premiums);
+        (vii)    payments to financial institutions (including banks and brokerages);
+        (viii)   payments to non-profit organizations;
+        (ix)     betting or gambling (including lottery tickets, casino gaming chips, off-track betting, and
+                 wagers at race tracks) through any channel;
+        (x)      any top-ups or payment of funds to payment service providers, prepaid cards and any
+                 prepaid accounts;
+        (xi)     transit-related transactions;
+        (xii)    quasi-cash transactions. This refers to transactions representing a purchase of foreign
+                 currency or items (including but not limited to, gaming chips, money orders, lottery
+                 tickets, traveler’s cheques and precious metals) which may be convertible to cash; and
+        (xiii)   transactions performed at establishments/businesses/merchants that fall within an
+                 excluded Merchant Category or a merchant that has been excluded by the bank, as set
+                 out in www.citibank.com.sg/rwdexcl (this list of excluded Merchant Categories or
+                 merchants may be updated from time to time at our discretion and Eligible Cardholders
+                 shall refer to this list for any updates).
+
+
+4. What is the maximum amount of rewards that I can earn on 10X Rewards merchants/transactions?.
+For every 10X Points Eligible Transaction charged to the Eligible Card, an Eligible Cardholder will be
+awarded:
+  (i)   1 Base Point for every S$1 of a 10X Points Eligible Transaction (“Base Points”); and
+  (ii) 9 Bonus Points for every S$1 of a 10X Points Eligible Transaction (“Bonus Points”).
+
+Points shall be calculated on the amount of each 10X Points Eligible Transaction, rounded down to the
+nearest S$1. Base Points are not subject to any cap. However, Bonus Points are subject to a cap of 9,000
+Bonus Points per statement month.
+
+
+Effective 1 April 2024
+
+                                                                                                            2
+

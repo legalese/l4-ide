@@ -1,0 +1,26 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "What a single card transaction earns on a named Singapore miles card, from the issuer's own terms: the rate, its conditions, the cap and its reset basis, the clauses relied on, and how far the answer can be trusted",
+    "properties": {
+        "card": {
+            "$ref": "#/$defs/Card"
+        },
+        "cardholder": {
+            "$ref": "#/$defs/Cardholder"
+        },
+        "month": {
+            "$ref": "#/$defs/Month position"
+        },
+        "txn": {
+            "$ref": "#/$defs/Transaction"
+        }
+    },
+    "required": [
+        "card",
+        "cardholder",
+        "month",
+        "txn"
+    ],
+    "title": "the rate on",
+    "type": "object"
+}

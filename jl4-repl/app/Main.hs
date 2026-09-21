@@ -584,7 +584,7 @@ evalExpression st contextFile exprText = do
   let contextUri = normalizedFilePathToUri (toNormalizedFilePath contextFile)
   [mTc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck contextUri]
   originalContent <- case mTc of
-    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives tc.module')
+    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives (Print.restoreMixfixPatterns tc.mixfixRegistry tc.module'))
     Nothing -> do
       -- Fallback to raw text if typecheck failed
       mContent <- Shake.getVirtualFileText st.ideState contextUri
@@ -675,7 +675,7 @@ evalWithTrace st contextFile exprText = do
   let contextUri = normalizedFilePathToUri (toNormalizedFilePath contextFile)
   [mTc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck contextUri]
   originalContent <- case mTc of
-    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives tc.module')
+    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives (Print.restoreMixfixPatterns tc.mixfixRegistry tc.module'))
     Nothing -> do
       mContent <- Shake.getVirtualFileText st.ideState contextUri
       case mContent of
@@ -724,7 +724,7 @@ evalWithTraceAscii st contextFile exprText = do
   let contextUri = normalizedFilePathToUri (toNormalizedFilePath contextFile)
   [mTc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck contextUri]
   originalContent <- case mTc of
-    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives tc.module')
+    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives (Print.restoreMixfixPatterns tc.mixfixRegistry tc.module'))
     Nothing -> do
       mContent <- Shake.getVirtualFileText st.ideState contextUri
       case mContent of
@@ -953,7 +953,7 @@ getExpressionType st contextFile exprText = do
   let contextUri = normalizedFilePathToUri (toNormalizedFilePath contextFile)
   [mTc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck contextUri]
   originalContent <- case mTc of
-    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives tc.module')
+    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives (Print.restoreMixfixPatterns tc.mixfixRegistry tc.module'))
     Nothing -> do
       -- Fallback to raw text if typecheck failed
       mContent <- Shake.getVirtualFileText st.ideState contextUri

@@ -1,0 +1,31 @@
+IMPORT prelude
+
+§ `A domain module, imported by its neighbour`
+
+-- The other half of `imports.l4`. Nothing here is `@export`ed and nothing here
+-- is compiled on its own: `l4 catala imported-domain.l4` refuses it for having
+-- no exported decision, which is correct. It exists so that `imports.l4` has
+-- something to import, and so that the three things an importer can reach —
+-- a record, an enumeration, and a plain helper function — each have a witness.
+--
+-- House style for this corpus (see `miles-card-domain.l4`, the real subject
+-- this pair was cut down from): one module owns the nouns, and every module
+-- that answers a question over them imports these types rather than
+-- redeclaring its own.
+
+DECLARE Band IS ONE OF
+    Lower
+    Upper
+
+-- A record whose own field type is the enumeration above, so that importing
+-- `Assessment` has to drag `Band` in behind it.
+DECLARE Assessment
+    HAS `taxable amount` IS A NUMBER
+        band             IS A Band
+
+-- An ordinary helper. It is not `@export`ed, so under R1 it compiles to a
+-- private Catala toplevel `declaration … depends on … equals` — in the
+-- IMPORTER's emitted module, because everything lands in one `.catala_en`.
+GIVEN n IS A NUMBER
+GIVETH A Band
+`band for` n MEANS IF n GREATER THAN 1000 THEN Upper ELSE Lower

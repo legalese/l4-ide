@@ -1,0 +1,99 @@
+-- Singapore Penal Code 1871 — the charge sheet.
+--
+-- The deployable surface of this row, after the pattern of
+-- jl4/examples/legal/regcf/regcf-wizard.l4 in l4-ide: it re-implements no
+-- law. Every offence module already exports its own ladders (`cheats`,
+-- `offence under s 420`, …) and its own charge builders (`charge under s 420`,
+-- …), because a ladder is drawn from the DECIDE that carries it and a wrapper
+-- would draw as one box. What this module adds is the one question none of
+-- them can answer alone:
+--
+--   given everything the officer has established, which sections are made out?
+--
+-- `Complaint` nests one facts record per offence family. An offence whose
+-- facts the officer has not filled in is simply not made out — an empty record
+-- has every element FALSE — so the router is total.
+
+IMPORT prelude
+IMPORT `penal-code-general`
+IMPORT `cheating-415-417-420`
+IMPORT `theft-378-379`
+IMPORT `extortion-383-384`
+IMPORT `robbery-390-392`
+IMPORT `cbt-405-406`
+IMPORT `criminal-intimidation-503-506`
+IMPORT `hurt-321-323A`
+
+§ `Penal Code 1871 — the charge sheet`
+
+@ref Criminal Procedure Code 2010 s 123 — one complaint, every offence this row encodes
+DECLARE Complaint HAS
+    cheating     IS A  `Cheating Facts`              @desc The deception, if any
+    theft        IS A  `Theft Facts`                 @desc The taking, if any
+    extortion    IS AN `Extortion Facts`             @desc The threat that got property, if any
+    robbery      IS A  `Robbery Facts`               @desc The theft or extortion with violence, if any
+    `breach of trust` IS A `CBT Facts`               @desc The entrustment and what became of the property, if any
+    intimidation IS A  `Criminal Intimidation Facts` @desc The threat meant to alarm, if any
+    hurt         IS A  `Hurt Facts`                  @desc The hurt caused, if any
+
+@export default The punishing sections of the Penal Code 1871 under which a charge can be framed on the facts of this complaint, most serious first within each family
+GIVEN c IS A Complaint @desc Everything the investigation has established, one record per offence family
+GIVETH A LIST OF STRING
+`applicable charges` c MEANS
+    concat (LIST
+        (`included if` (`offence under s 420` (c's cheating)) "420"),
+        (`included if` (`offence under s 417` (c's cheating)) "417"),
+        (`included if` (`offence under s 394` (c's robbery)) "394"),
+        (`included if` (`offence under s 392` (c's robbery)) "392"),
+        (`included if` (`offence under s 393` (c's robbery)) "393"),
+        (`included if` (`offence under s 379` (c's theft)) "379"),
+        (`included if` (`offence under s 384` (c's extortion)) "384"),
+        (`included if` (`offence under s 406` (c's `breach of trust`)) "406"),
+        (`included if` (`offence under s 506` (c's intimidation)) "506"),
+        (`included if` (`offence under s 323A` (c's hurt)) "323A"))
+
+§§ `Directives`
+
+-- The Lewis Christine facts alone: both cheating sections, nothing else.
+`Lewis Christine's complaint` MEANS Complaint WITH
+    cheating          IS `Lewis Christine`
+    theft             IS `no theft`
+    extortion         IS `no extortion`
+    robbery           IS `Chen Weixiong Jerriek, no aggravation`
+    `breach of trust` IS `Carl Elias Moses, as charged`
+    intimidation      IS `Chan Yok Tuang, the facts as they were`
+    hurt              IS `Ang Boon Han, the hurt intended was grievous`
+
+-- Chen Weixiong Jerriek: the robbery, with the hurt the s 394 charges alleged.
+`Chen Weixiong Jerriek's complaint` MEANS Complaint WITH
+    cheating          IS `Lewis Christine, no deception`
+    theft             IS `the handphone taken from Ng Juin Chye Joel`
+    extortion         IS `no extortion`
+    robbery           IS `Chen Weixiong Jerriek`
+    `breach of trust` IS `Carl Elias Moses, as charged`
+    intimidation      IS `Chan Yok Tuang, the facts as they were`
+    hurt              IS `Ang Boon Han, the hurt intended was grievous`
+
+-- The same encounter, one step short: the taking never happened, so s 392 and
+-- s 379 both drop out and s 393 takes their place. s 394 is unmoved, because
+-- it reaches an attempt in terms.
+`Chen Weixiong Jerriek's complaint, the attempt` MEANS Complaint WITH
+    cheating          IS `Lewis Christine, no deception`
+    theft             IS `the handphone not taken from Ng Juin Chye Joel`
+    extortion         IS `no extortion`
+    robbery           IS `Chen Weixiong Jerriek, the attempt`
+    `breach of trust` IS `Carl Elias Moses, as charged`
+    intimidation      IS `Chan Yok Tuang, the facts as they were`
+    hurt              IS `Ang Boon Han, the hurt intended was grievous`
+
+#EVAL `applicable charges` `Lewis Christine's complaint`
+#EVAL `applicable charges` `Chen Weixiong Jerriek's complaint`
+#EVAL `applicable charges` `Chen Weixiong Jerriek's complaint, the attempt`
+
+-- s 420 implies s 417: the router lists both, aggravated first
+#ASSERT `applicable charges` `Lewis Christine's complaint` EQUALS LIST "420", "417"
+-- a robbery is also a theft (s 390(1)): s 394, s 392 and s 379 all lie
+#ASSERT `applicable charges` `Chen Weixiong Jerriek's complaint` EQUALS LIST "394", "392", "379"
+-- an attempted robbery: s 394 still lies (its own words reach an attempt),
+-- s 393 replaces s 392, and the theft charge goes with the completed taking
+#ASSERT `applicable charges` `Chen Weixiong Jerriek's complaint, the attempt` EQUALS LIST "394", "393"
