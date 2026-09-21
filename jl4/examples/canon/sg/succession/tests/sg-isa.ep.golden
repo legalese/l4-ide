@@ -29,17 +29,6 @@ IMPORT `sg-succession-domain`
 -- answer to somebody the Act never governed.
 -- ===========================================================================
 
-
--- A SECOND HOUSE RULE, from the printer rather than the parser: NO TWO MIXFIX
--- OPERATORS IN THIS CORPUS MAY SHARE A HEAD KEYWORD. `L4.Print.prettyLayout`
--- re-emits only the head keyword of a mixfix call, so three operators all
--- beginning `under` printed as three definitions of `under` and the printed
--- module failed to re-typecheck with "multiple definitions for the identifier"
--- (the round-trip property in jl4/tests/Main.hs). That is the limitation
--- CLAUDE.md section 3.2.2 records, whose witness is ok/mixfix-garden-path.l4;
--- the cheap fix is on this side, so the three now read `per stirpes under`,
--- `the stock under` and `splitting under`.
-
 §§ `A house rule this corpus learned the hard way`
 
 -- PARENTHESISE EVERY `NOT`. In L4, `NOT` takes a WHOLE expression, not an

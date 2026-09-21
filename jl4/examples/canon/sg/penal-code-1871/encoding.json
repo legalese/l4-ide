@@ -1,11 +1,33 @@
 {
   "encoder": "legalese",
-  "display_name": "Penal Code s 301 — transferred malice",
+  "display_name": "Penal Code 1871 — six property and intimidation offences, s 301, and the form of a charge",
   "status": "draft",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "license": "Apache-2.0",
-  "maintainer": { "name": "Legalese Pte. Ltd.", "github": "legalese" },
-  "modules": ["culpable-homicide-301.l4"],
-  "versions_encoded": ["as amended by Act 15 of 2019, in force 1 January 2020"],
-  "scope": "Section 301 only. The descriptions of culpable homicide that s 301 transfers are declared as an ontology sourced to ss 299-300; neither of those sections is itself encoded, and neither is s 26G, whose subsection (1) disapplies it where s 301(1) applies."
+  "maintainer": {
+    "name": "Legalese Pte. Ltd.",
+    "github": "legalese"
+  },
+  "modules": [
+    "penal-code-general.l4",
+    "cheating-415-417-420.l4",
+    "theft-378-379.l4",
+    "extortion-383-384.l4",
+    "robbery-390-392.l4",
+    "cbt-405-406.l4",
+    "criminal-intimidation-503-506.l4",
+    "hurt-321-323A.l4",
+    "charge-sheet.l4",
+    "culpable-homicide-301.l4"
+  ],
+  "versions_encoded": [
+    "Penal Code 1871 as in force 17 September 2026 (2020 Revised Edition with amendments to Act 21 of 2025)",
+    "s 301 as substituted by Act 15 of 2019, in force 1 January 2020"
+  ],
+  "scope": "Sections 22–25 (property, wrongful gain and loss, dishonestly, fraudulently); 378–379 theft; 383–384 extortion; 390, 392, 393, 394 robbery; 405–406 criminal breach of trust; 415, 417, 420 cheating; 503, 506 criminal intimidation; 321, 323A hurt; 301 transferred malice. Each punishing section exports a charge builder that recites the charge in the form the Criminal Procedure Code 2010 ss 123–126 prescribe, or refuses with the elements not made out (CPC s 123(5)). Riders: s 34 common intention as a header clause only; no s 109 abetment, no CPC s 124(4) amalgamation, no general attempt under s 511 (s 393, which punishes an attempt at robbery specifically, IS encoded). Illustrations and Explanations are carried as comments and as @desc text, not as rules. The evidence layer (what a fact rests on) is app-side, not encoded.",
+  "validation": {
+    "bench": "seven reported cases whose charges are quoted verbatim in the judgment: Lewis Christine [2001] SGHC 113 (s 420), Sarjit Singh Rapati [2005] SGHC 28 (s 384 r/w 34), Chen Weixiong Jerriek [2003] SGHC 103 (s 392 r/w 34, s 394), Carl Elias Moses [1995] 3 SLR 748 as quoted in Viswanathan Ramachandran [2003] SGHC 183 (s 406, REFUSED as laid), Chan Yok Tuang [2008] SGHC 137 (s 506, REFUSED), Ang Boon Han [2024] SGHC 221 (s 323A); plus s 378 Illustration (q), s 390 Illustration (b), s 405 Illustrations (c)–(d), s 503 Illustration, s 323A Illustration",
+    "asserts": 157,
+    "checked": "l4 run under the l4-ide binary built 2026-09-21 from unstable (ff5358620), JL4_LIBRARY_PATH pinned; every #ASSERT satisfied, zero DiagnosticSeverity_Error, every module round-trips l4 format byte-identically. The count was 132 (not the 133 recorded here before 2026-09-21) until s 393 added 17, and 149 until s 392 as an implication added 8. Count it with an ANCHORED grep -ch '^#ASSERT' *.l4: two comments in robbery-390-392.l4 now name the directive, so the unanchored form returns 159."
+  }
 }

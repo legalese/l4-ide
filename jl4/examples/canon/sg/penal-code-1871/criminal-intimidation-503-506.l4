@@ -1,0 +1,476 @@
+-- Singapore Penal Code 1871 — criminal intimidation.
+--
+--   s 503  defines "criminal intimidation"                (the elements)
+--   s 506  punishes whoever commits it, on two tiers      (the charge, and
+--          — a simple tier, and an aggravated tier for      which punishment
+--          threats of death, grievous hurt, arson or a      it carries)
+--          serious offence
+--
+-- A charge is laid under the PUNISHING section, so this module exports one
+-- charge (s 506) over one facts record. s 506 is ONE offence with TWO
+-- punishments, not two offences: the aggravated limb changes what the court
+-- may impose, not what the Prosecution must prove. So the aggravation leaves
+-- do not sit on the offence ladder at all — they choose the punishment string
+-- the framed charge carries.
+--
+-- The reported charge it is pinned to:
+--
+--   Chan Yok Tuang v Public Prosecutor [2008] SGHC 137 — s 506, the threat
+--   uttered in a police lockup. The charge is quoted in the judgment and
+--   reproduced in the directives below. The conviction was SET ASIDE on
+--   criminal revision, and this module is built so that the two defects the
+--   court found are visible as leaves the officer has to answer:
+--
+--     1. The words "I will shoot her to death" threaten injury to the PERSON
+--        of the officer, not to her REPUTATION, which is what the charge
+--        pleaded. Separate leaves per injury kind, so pleading the wrong one
+--        is a leaf that answers FALSE rather than a phrase nobody re-reads.
+--     2. The statement of facts showed the accused wanted to lodge a
+--        complaint, not to alarm her — so no intent within s 503 at all.
+--        Separate leaves per intent, and the ladder cannot be satisfied with
+--        every one of them FALSE.
+--
+--   Fixture A below is the honest facts (injury to the person, no intent to
+--   alarm) and is REFUSED, with the refusal naming the intent element.
+--   Fixture B flips the one leaf the acquittal turned on.
+--
+-- An ISOMORPHIC encoding in INERT STYLE — see culpable-homicide-301.l4 for the
+-- conventions. Verbatim statutory prose rides as inert strings; only the
+-- operative atoms are lifted into named leaves; the inert strings are mortar,
+-- never shadow copies of the leaf beside them.
+--
+-- ---------------------------------------------------------------------------
+-- The text
+-- ---------------------------------------------------------------------------
+--
+-- 503. Whoever threatens another with any injury to his person, reputation or
+--      property, or to the person or reputation of any one in whom that person
+--      is interested, with intent to cause alarm to that person, or to cause
+--      that person to do any act which he is not legally bound to do, or to
+--      omit to do any act which that person is legally entitled to do, as the
+--      means of avoiding the execution of such threat, commits criminal
+--      intimidation.
+--      Explanation.—A threat to injure the reputation of any deceased person
+--      in whom the person threatened is interested, is within this section.
+--      Illustration
+--      A, for the purpose of inducing B to desist from prosecuting a civil
+--      suit, threatens to burn B's house. A is guilty of criminal
+--      intimidation.
+--
+-- 506. Whoever commits the offence of criminal intimidation shall be punished
+--      with imprisonment for a term which may extend to 2 years, or with fine,
+--      or with both; and if the threat is to cause death or grievous hurt, or
+--      to cause the destruction of any property by fire, or to cause an
+--      offence punishable with death or with imprisonment for a term which may
+--      extend to 7 years or more, shall be punished with imprisonment for a
+--      term which may extend to 10 years, or with fine, or with both.
+--                                                                  [15/2019]
+--
+-- ---------------------------------------------------------------------------
+-- The shape of the section
+-- ---------------------------------------------------------------------------
+--
+-- s 503 is one threat, of one of five injuries, held with one of three
+-- intents:
+--
+--   THE ACT      threatens another
+--   THE INJURY   to HIS person, reputation or property
+--                — or to THE person or reputation of any one in whom that
+--                  person is interested
+--   THE INTENT   to cause alarm to that person
+--                — or to cause that person to do any act he is not legally
+--                  bound to do
+--                — or to omit any act that person is legally entitled to do,
+--                  as the means of avoiding the execution of such threat
+--
+-- The five injuries are separate leaves because the pleaded kind and the
+-- proved kind can come apart, which is the first half of Chan Yok Tuang. The
+-- three intents are separate leaves because the intent is the whole mens rea,
+-- which is the second half.
+--
+-- "as the means of avoiding the execution of such threat" qualifies the two
+-- inducement intents and not the alarm intent — a person alarmed is not
+-- avoiding anything — so it sits inside that group and not beside it. That is
+-- an indentation call, and it is recorded as one.
+--
+-- The Explanation extends the reputation-of-one-interested limb to a DECEASED
+-- person. It removes a limit rather than adding an element, so it rides inert
+-- on that leaf's @desc.
+--
+-- The particulars the charge recites but the section does not test (who was
+-- threatened, what words were used, in what language) are STRING fields on the
+-- same record, so one record is both the ladder's input and the charge's.
+
+IMPORT prelude
+IMPORT `penal-code-general`
+
+§ `Penal Code 1871 — criminal intimidation`
+
+§§ `The facts of one threat`
+
+@ref Penal Code 1871 s 503, s 506 — the operative atoms, and the particulars CPC ss 124-125 require
+DECLARE `Criminal Intimidation Facts` HAS
+    particulars           IS A Particulars @desc Who is charged, and when and where the offence was committed
+    victim                IS A STRING  @desc The name of the person threatened, as it is to appear in the charge — for example "SSSgt Jessie Lim Geok Hwee"
+    `victim described as` IS A STRING  @desc How the charge describes the person threatened, after the name; leave blank if not needed
+    `victim pronoun`      IS A Pronoun @desc The pronoun the charge uses for the person threatened
+    `threat words`        IS A STRING  @desc The words of the threat, verbatim, as they are to be quoted after "by uttering" — for example "I will shoot her to death"; leave blank if the threat was not spoken
+    language              IS A STRING  @desc The language the threat was uttered in — for example "Hokkien"; leave blank if it does not need stating
+
+    -- "Whoever threatens another"
+    `threatened the victim`
+                          IS A BOOLEAN @desc Did the accused threaten the person named? A threat may be made by words, in writing or by conduct.
+
+    -- "with any injury to his person, reputation or property"
+    person                IS A BOOLEAN @desc Did the threat threaten injury to the body of the person threatened — for example a threat to kill, to shoot or to beat?
+    reputation            IS A BOOLEAN @desc Did the threat threaten injury to the reputation of the person threatened — for example a threat to publish something defamatory of them?
+    property              IS A BOOLEAN @desc Did the threat threaten injury to the property of the person threatened — for example a threat to burn their house?
+
+    -- "or to the person or reputation of any one in whom that person is interested"
+    `person of one in whom interested`
+                          IS A BOOLEAN @desc Did the threat threaten injury to the body of somebody else the person threatened is interested in — for example their child?
+    `reputation of one in whom interested`
+                          IS A BOOLEAN @desc Did the threat threaten injury to the reputation of somebody else the person threatened is interested in? The Explanation puts a threat to injure the reputation of a DECEASED person they are interested in within the section.
+
+    -- "with intent to cause alarm to that person, or to cause that person to
+    --  do any act which he is not legally bound to do, or to omit to do any
+    --  act which that person is legally entitled to do, as the means of
+    --  avoiding the execution of such threat"
+    `cause alarm`         IS A BOOLEAN @desc Did the accused make the threat intending to cause alarm to the person threatened? Alarm the person in fact felt is evidence of this intent and is not the same thing as it.
+    `do an act not legally bound to do`
+                          IS A BOOLEAN @desc Did the accused intend the threat to make the person threatened do something they were under no legal duty to do?
+    `omit an act legally entitled to do`
+                          IS A BOOLEAN @desc Did the accused intend the threat to make the person threatened leave undone something they were legally entitled to do?
+
+    -- s 506, the aggravated limb: what the threat was a threat OF
+    death                 IS A BOOLEAN @desc Was the threat a threat to cause death?
+    `grievous hurt`       IS A BOOLEAN @desc Was the threat a threat to cause grievous hurt within section 320 — for example emasculation, loss of sight or hearing, or a fracture or dislocation of a bone?
+    `the destruction of any property by fire`
+                          IS A BOOLEAN @desc Was the threat a threat to destroy any property by fire?
+    `an offence punishable with death or with imprisonment for 7 years or more`
+                          IS A BOOLEAN @desc Was the threat a threat to cause an offence punishable with death, or with imprisonment for a term which may extend to 7 years or more?
+
+§§ `s 503 — criminal intimidation`
+
+@export Whether the accused "commits criminal intimidation" within section 503 of the Penal Code 1871
+GIVEN f IS A `Criminal Intimidation Facts` @desc The threat, what injury it threatened, and what the accused meant it to achieve
+GIVETH A BOOLEAN
+DECIDE `commits criminal intimidation` f IF
+        "Whoever"
+   ...  f's `threatened the victim`
+   ...  "with any injury to"
+   ...  (        (    "his"
+                 ...  (    f's person
+                      ..   f's reputation
+                      OR   f's property ) )
+            OR   (    "or to the"
+                 ...  (    f's `person of one in whom interested`
+                      OR   f's `reputation of one in whom interested` ) ) )
+   ...  "with intent to"
+   ...  (        (    f's `cause alarm`
+                 ...  "to that person" )
+            OR   (    "or to cause that person to"
+                 ...  (    f's `do an act not legally bound to do`
+                      OR   f's `omit an act legally entitled to do` )
+                 ...  "as the means of avoiding the execution of such threat" ) )
+
+§§ `s 506 — punishment for criminal intimidation`
+
+-- One offence, two punishments. The offence ladder is s 503's, unchanged.
+@export Whether the accused has committed an offence punishable under section 506 of the Penal Code 1871 (criminal intimidation)
+GIVEN f IS A `Criminal Intimidation Facts` @desc The threat, what injury it threatened, and what the accused meant it to achieve
+GIVETH A BOOLEAN
+DECIDE `offence under s 506` f IF
+        "Whoever commits the offence of"
+   ...  `commits criminal intimidation` f
+
+-- The second half of s 506, which selects the punishment and proves nothing.
+GIVEN f IS A `Criminal Intimidation Facts`
+GIVETH A BOOLEAN
+DECIDE `the threat falls within the aggravated limb of s 506` f IF
+        "and if the threat is to cause"
+   ..   f's death
+   ..   f's `grievous hurt`
+   ..   "or to cause" ... f's `the destruction of any property by fire`
+   OR   "or to cause" ... f's `an offence punishable with death or with imprisonment for 7 years or more`
+
+GIVEN f IS A `Criminal Intimidation Facts`
+GIVETH A STRING
+`the punishment under s 506` f MEANS
+    IF   `the threat falls within the aggravated limb of s 506` f
+    THEN "imprisonment for a term which may extend to 10 years, or with fine, or with both"
+    ELSE "imprisonment for a term which may extend to 2 years, or with fine, or with both"
+
+§§ `The charge`
+
+-- CPC s 125 requires the manner for criminal intimidation: a charge that says
+-- only "did commit criminal intimidation" tells the accused neither what he is
+-- said to have threatened nor why it was unlawful. Chan Yok Tuang:
+--
+--   did commit criminal intimidation by threatening to cause injury to the
+--   person of SSSgt Jessie Lim Geok Hwee; to wit, by uttering "I will shoot
+--   her to death" in Hokkien at her, with intent to cause alarm to the said
+--   SSSgt Jessie Lim Geok Hwee
+GIVEN f IS A `Criminal Intimidation Facts`
+GIVETH A STRING
+`the manner of the intimidation` f MEANS
+    CONCAT "did commit criminal intimidation by threatening to cause injury to ", (`the injuries threatened` f),
+           (`the utterance clause` f),
+           ", with intent to ", (`the intents` f)
+
+-- The injury kinds that are TRUE, in the order s 503 states them. The two
+-- "one in whom interested" limbs read differently from the first three, so
+-- each carries its own phrase rather than a shared template.
+GIVEN f IS A `Criminal Intimidation Facts`
+GIVETH A STRING
+`the injuries threatened` f MEANS
+    `joined with` " and " (concat (LIST
+        (`included if` (f's person) ("the person of " APPEND `the person threatened` f)),
+        (`included if` (f's reputation) ("the reputation of " APPEND `the person threatened` f)),
+        (`included if` (f's property) ("the property of " APPEND `the person threatened` f)),
+        (`included if` (f's `person of one in whom interested`) (`the phrase for a person interested` f)),
+        (`included if` (f's `reputation of one in whom interested`) (`the phrase for a reputation interested` f))))
+
+-- The person threatened, named and described on the charge's FIRST mention of
+-- them; every later mention is "the said <name>" and carries the name alone.
+GIVEN f IS A `Criminal Intimidation Facts`
+GIVETH A STRING
+`the person threatened` f MEANS
+    IF   f's `victim described as` EQUALS ""
+    THEN f's victim
+    ELSE CONCAT f's victim, ", ", f's `victim described as`
+
+GIVEN f IS A `Criminal Intimidation Facts`
+GIVETH A STRING
+`the phrase for a person interested` f MEANS
+    CONCAT "the person of one in whom the said ", f's victim, " is interested"
+
+GIVEN f IS A `Criminal Intimidation Facts`
+GIVETH A STRING
+`the phrase for a reputation interested` f MEANS
+    CONCAT "the reputation of one in whom the said ", f's victim, " is interested"
+
+-- "; to wit, by uttering <words> in <language> at <her>" — omitted entirely
+-- when the threat was not spoken, and the language dropped when it needs no
+-- stating.
+GIVEN f IS A `Criminal Intimidation Facts`
+GIVETH A STRING
+`the utterance clause` f MEANS
+    IF   f's `threat words` EQUALS ""
+    THEN ""
+    ELSE CONCAT "; to wit, by uttering “", f's `threat words`, "”", (`the language clause` f), " at ", (`object pronoun` (f's `victim pronoun`))
+
+GIVEN f IS A `Criminal Intimidation Facts`
+GIVETH A STRING
+`the language clause` f MEANS
+    IF   f's language EQUALS ""
+    THEN ""
+    ELSE " in " APPEND f's language
+
+-- The intents that are TRUE. Each names the person threatened, because the
+-- inducement limbs are ungrammatical without the name inside them.
+GIVEN f IS A `Criminal Intimidation Facts`
+GIVETH A STRING
+`the intents` f MEANS
+    `joined with` ", and to " (concat (LIST
+        (`included if` (f's `cause alarm`) ("cause alarm to the said " APPEND f's victim)),
+        (`included if` (f's `do an act not legally bound to do`) (`the phrase for doing an act` f)),
+        (`included if` (f's `omit an act legally entitled to do`) (`the phrase for omitting an act` f))))
+
+GIVEN f IS A `Criminal Intimidation Facts`
+GIVETH A STRING
+`the phrase for doing an act` f MEANS
+    CONCAT "cause the said ", f's victim, " to do an act which ", (`subject pronoun` (f's `victim pronoun`)), " is not legally bound to do, as the means of avoiding the execution of the said threat"
+
+GIVEN f IS A `Criminal Intimidation Facts`
+GIVETH A STRING
+`the phrase for omitting an act` f MEANS
+    CONCAT "cause the said ", f's victim, " to omit to do an act which ", (`subject pronoun` (f's `victim pronoun`)), " is legally entitled to do, as the means of avoiding the execution of the said threat"
+
+-- The elements, named for the refusal.
+GIVEN f IS A `Criminal Intimidation Facts`
+GIVETH A LIST OF STRING
+`elements of criminal intimidation not made out` f MEANS
+    concat (LIST
+        (`missing unless` (f's `threatened the victim`) "threatens another"),
+        (`missing unless` (f's person OR f's reputation OR f's property OR f's `person of one in whom interested` OR f's `reputation of one in whom interested`) "with any injury to his person, reputation or property, or to the person or reputation of any one in whom that person is interested"),
+        (`missing unless` (f's `cause alarm` OR f's `do an act not legally bound to do` OR f's `omit an act legally entitled to do`) "with intent to cause alarm to that person, or to cause that person to do any act which he is not legally bound to do, or to omit to do any act which that person is legally entitled to do"),
+        (`missing unless` (`commits criminal intimidation` f) "the elements of section 503 taken together"))
+
+@export Frame a charge under section 506 of the Penal Code 1871 (criminal intimidation), or say why none can be framed
+GIVEN f IS A `Criminal Intimidation Facts` @desc The threat, what it threatened, what it was meant to achieve, and the particulars of the charge
+GIVETH A Charge
+`charge under s 506` f MEANS
+    `frame the charge` (f's particulars) "506" "criminal intimidation"
+        (`the punishment under s 506` f)
+        (`offence under s 506` f)
+        (`the manner of the intimidation` f)
+        (`elements of criminal intimidation not made out` f)
+
+§§ `Chan Yok Tuang v Public Prosecutor [2008] SGHC 137`
+
+-- The applicant, arrested over a family dispute and held in the Central Police
+-- Division lockup, said of the investigating officer, in Hokkien, "I will
+-- shoot her to death". He pleaded guilty and was convicted under s 506. On
+-- criminal revision the conviction was set aside: the charge pleaded injury to
+-- REPUTATION, which those words do not threaten, and the statement of facts he
+-- admitted showed he had wanted to lodge a complaint against the officer
+-- rather than to alarm her — so the intent s 503 requires was absent on the
+-- Prosecution's own facts.
+--
+-- The charge as framed, quoted in the judgment:
+--
+--   … did commit criminal intimidation by threatening to cause injury to the
+--   reputation of SSSgt Jessie Lim Geok Hwee; to wit, by uttering "I will
+--   shoot her to death" in Hokkien at her, with intent to cause alarm to the
+--   said SSSgt Jessie Lim Geok Hwee, and you have thereby committed an offence
+--   punishable under Section 506 of the Penal Code (Cap. 224).
+--
+-- FIXTURE A is not that charge. It is the FACTS the charge was laid on, read
+-- honestly: injury to the person (the words threaten her body), and no intent
+-- to alarm. On those facts no charge can be framed, and the refusal says which
+-- element is missing — which is the holding, arrived at from the leaves.
+`Chan Yok Tuang, the facts as they were` MEANS `Criminal Intimidation Facts` WITH
+    particulars           IS Particulars WITH
+                               accused            IS "Chan Yok Tuang"
+                               date               IS "16 May 2007"
+                               time               IS ""
+                               place              IS "the Central Police Division lockup"
+                               `co-accused`       IS ""
+                               `common intention` IS FALSE
+    victim                IS "SSSgt Jessie Lim Geok Hwee"
+    `victim described as` IS ""
+    `victim pronoun`      IS she
+    `threat words`        IS "I will shoot her to death"
+    language              IS "Hokkien"
+    `threatened the victim` IS TRUE
+    person                IS TRUE
+    reputation            IS FALSE
+    property              IS FALSE
+    `person of one in whom interested`     IS FALSE
+    `reputation of one in whom interested` IS FALSE
+    `cause alarm`         IS FALSE
+    `do an act not legally bound to do`    IS FALSE
+    `omit an act legally entitled to do`   IS FALSE
+    death                 IS TRUE
+    `grievous hurt`       IS FALSE
+    `the destruction of any property by fire` IS FALSE
+    `an offence punishable with death or with imprisonment for 7 years or more` IS FALSE
+
+-- FIXTURE B is the one leaf the revision turned on, flipped: the same words,
+-- the same injury to the person, now uttered with intent to alarm her. A
+-- charge can be framed, and because the threat was a threat to cause death it
+-- carries s 506's aggravated punishment rather than its simple one.
+`Chan Yok Tuang, with intent to alarm` MEANS `Criminal Intimidation Facts` WITH
+    particulars           IS `Chan Yok Tuang, the facts as they were`'s particulars
+    victim                IS `Chan Yok Tuang, the facts as they were`'s victim
+    `victim described as` IS `Chan Yok Tuang, the facts as they were`'s `victim described as`
+    `victim pronoun`      IS `Chan Yok Tuang, the facts as they were`'s `victim pronoun`
+    `threat words`        IS `Chan Yok Tuang, the facts as they were`'s `threat words`
+    language              IS `Chan Yok Tuang, the facts as they were`'s language
+    `threatened the victim` IS TRUE
+    person                IS TRUE
+    reputation            IS FALSE
+    property              IS FALSE
+    `person of one in whom interested`     IS FALSE
+    `reputation of one in whom interested` IS FALSE
+    `cause alarm`         IS TRUE
+    `do an act not legally bound to do`    IS FALSE
+    `omit an act legally entitled to do`   IS FALSE
+    death                 IS TRUE
+    `grievous hurt`       IS FALSE
+    `the destruction of any property by fire` IS FALSE
+    `an offence punishable with death or with imprisonment for 7 years or more` IS FALSE
+
+-- FIXTURE C is fixture B with the aggravation withdrawn — the same intimidation
+-- with a threat that is not a threat of death, grievous hurt, fire or a serious
+-- offence. The offence is unchanged and the punishment string moves to s 506's
+-- simple tier. That is the switch a reader can throw on the ladder.
+`Chan Yok Tuang, threat not aggravated` MEANS `Criminal Intimidation Facts` WITH
+    particulars           IS `Chan Yok Tuang, the facts as they were`'s particulars
+    victim                IS `Chan Yok Tuang, the facts as they were`'s victim
+    `victim described as` IS `Chan Yok Tuang, the facts as they were`'s `victim described as`
+    `victim pronoun`      IS `Chan Yok Tuang, the facts as they were`'s `victim pronoun`
+    `threat words`        IS "I will slap her"
+    language              IS "Hokkien"
+    `threatened the victim` IS TRUE
+    person                IS TRUE
+    reputation            IS FALSE
+    property              IS FALSE
+    `person of one in whom interested`     IS FALSE
+    `reputation of one in whom interested` IS FALSE
+    `cause alarm`         IS TRUE
+    `do an act not legally bound to do`    IS FALSE
+    `omit an act legally entitled to do`   IS FALSE
+    death                 IS FALSE
+    `grievous hurt`       IS FALSE
+    `the destruction of any property by fire` IS FALSE
+    `an offence punishable with death or with imprisonment for 7 years or more` IS FALSE
+
+-- The section's own Illustration: A threatens to burn B's house to make B
+-- desist from prosecuting a civil suit. Injury to PROPERTY, and the intent is
+-- the omission limb — prosecuting a civil suit is something B is legally
+-- entitled to do. It is also aggravated, being a threat to destroy property by
+-- fire.
+`the Illustration to s 503` MEANS `Criminal Intimidation Facts` WITH
+    particulars           IS Particulars WITH
+                               accused            IS "A"
+                               date               IS "1 January 2026"
+                               time               IS ""
+                               place              IS "the dwelling-house of the said B"
+                               `co-accused`       IS ""
+                               `common intention` IS FALSE
+    victim                IS "B"
+    `victim described as` IS "the plaintiff in the said civil suit"
+    `victim pronoun`      IS he
+    `threat words`        IS ""
+    language              IS ""
+    `threatened the victim` IS TRUE
+    person                IS FALSE
+    reputation            IS FALSE
+    property              IS TRUE
+    `person of one in whom interested`     IS FALSE
+    `reputation of one in whom interested` IS FALSE
+    `cause alarm`         IS FALSE
+    `do an act not legally bound to do`    IS FALSE
+    `omit an act legally entitled to do`   IS TRUE
+    death                 IS FALSE
+    `grievous hurt`       IS FALSE
+    `the destruction of any property by fire` IS TRUE
+    `an offence punishable with death or with imprisonment for 7 years or more` IS FALSE
+
+§§ `Directives`
+
+#EVAL `commits criminal intimidation` `Chan Yok Tuang, the facts as they were`
+#EVAL (`charge under s 506` `Chan Yok Tuang, the facts as they were`)'s refusal
+#EVAL (`charge under s 506` `Chan Yok Tuang, with intent to alarm`)'s text
+#EVAL (`charge under s 506` `Chan Yok Tuang, with intent to alarm`)'s punishment
+#EVAL (`charge under s 506` `the Illustration to s 503`)'s text
+
+-- FIXTURE A — the honest facts. The injury kind is made out (the words
+-- threaten her person), the intent is not, so no charge can be framed and the
+-- refusal names the intent element. That is the revision's holding.
+#ASSERT NOT (`commits criminal intimidation` `Chan Yok Tuang, the facts as they were`)
+#ASSERT NOT ((`charge under s 506` `Chan Yok Tuang, the facts as they were`)'s `made out`)
+#ASSERT (`charge under s 506` `Chan Yok Tuang, the facts as they were`)'s text EQUALS ""
+#ASSERT (`charge under s 506` `Chan Yok Tuang, the facts as they were`)'s refusal EQUALS "A charge under section 506 would assert that the facts fulfil every legal condition of criminal intimidation (CPC s 123(5)). On the facts given they do not: with intent to cause alarm to that person, or to cause that person to do any act which he is not legally bound to do, or to omit to do any act which that person is legally entitled to do; the elements of section 503 taken together."
+
+-- FIXTURE B — the same threat with the intent the revision found absent. The
+-- body is the reported charge's, save that it recites injury to the PERSON
+-- where the charge pleaded injury to the REPUTATION; the header and closing
+-- words are this row's normalised CPC ss 123-124 form.
+#ASSERT `commits criminal intimidation` `Chan Yok Tuang, with intent to alarm`
+#ASSERT (`charge under s 506` `Chan Yok Tuang, with intent to alarm`)'s `made out`
+#ASSERT (`charge under s 506` `Chan Yok Tuang, with intent to alarm`)'s text EQUALS "You, Chan Yok Tuang, are charged that you, on or about 16 May 2007, at the Central Police Division lockup, Singapore, did commit criminal intimidation by threatening to cause injury to the person of SSSgt Jessie Lim Geok Hwee; to wit, by uttering “I will shoot her to death” in Hokkien at her, with intent to cause alarm to the said SSSgt Jessie Lim Geok Hwee, and you have thereby committed an offence punishable under section 506 of the Penal Code 1871."
+#ASSERT `the threat falls within the aggravated limb of s 506` `Chan Yok Tuang, with intent to alarm`
+#ASSERT (`charge under s 506` `Chan Yok Tuang, with intent to alarm`)'s punishment EQUALS "imprisonment for a term which may extend to 10 years, or with fine, or with both"
+
+-- FIXTURE C — the aggravation withdrawn. Same offence, simple punishment.
+#ASSERT (`charge under s 506` `Chan Yok Tuang, threat not aggravated`)'s `made out`
+#ASSERT NOT (`the threat falls within the aggravated limb of s 506` `Chan Yok Tuang, threat not aggravated`)
+#ASSERT (`charge under s 506` `Chan Yok Tuang, threat not aggravated`)'s punishment EQUALS "imprisonment for a term which may extend to 2 years, or with fine, or with both"
+
+-- The Illustration: property, and the omission limb, and a threat by fire.
+#ASSERT `commits criminal intimidation` `the Illustration to s 503`
+#ASSERT `the threat falls within the aggravated limb of s 506` `the Illustration to s 503`
+#ASSERT (`charge under s 506` `the Illustration to s 503`)'s text EQUALS "You, A, are charged that you, on or about 1 January 2026, at the dwelling-house of the said B, Singapore, did commit criminal intimidation by threatening to cause injury to the property of B, the plaintiff in the said civil suit, with intent to cause the said B to omit to do an act which he is legally entitled to do, as the means of avoiding the execution of the said threat, and you have thereby committed an offence punishable under section 506 of the Penal Code 1871."

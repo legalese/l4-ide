@@ -86,9 +86,9 @@
     "Migrating the encoding is a canon-side improvement and is not done."
   ],
   "repo": "legalese/canon",
-  "sha": "5f24832696662caf4ff84878f139ce6c1954bbfd",
+  "sha": "54353f9f0dfd6081e2449726cb4099475c549c1c",
   "ref": "mengwong/drafts",
-  "pinned": "2026-09-15",
+  "pinned": "2026-09-21",
   "blessed": [
     {
       "from": "subjects/sg/child-support/encodings/legalese",

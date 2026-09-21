@@ -1,0 +1,59 @@
+{
+    "$defs": {
+        "Complaint": {
+            "properties": {
+                "breach of trust": {
+                    "$ref": "#/$defs/CBT Facts",
+                    "description": "The entrustment and what became of the property, if any"
+                },
+                "cheating": {
+                    "$ref": "#/$defs/Cheating Facts",
+                    "description": "The deception, if any"
+                },
+                "extortion": {
+                    "$ref": "#/$defs/Extortion Facts",
+                    "description": "The threat that got property, if any"
+                },
+                "hurt": {
+                    "$ref": "#/$defs/Hurt Facts",
+                    "description": "The hurt caused, if any"
+                },
+                "intimidation": {
+                    "$ref": "#/$defs/Criminal Intimidation Facts",
+                    "description": "The threat meant to alarm, if any"
+                },
+                "robbery": {
+                    "$ref": "#/$defs/Robbery Facts",
+                    "description": "The theft or extortion with violence, if any"
+                },
+                "theft": {
+                    "$ref": "#/$defs/Theft Facts",
+                    "description": "The taking, if any"
+                }
+            },
+            "required": [
+                "cheating",
+                "theft",
+                "extortion",
+                "robbery",
+                "breach of trust",
+                "intimidation",
+                "hurt"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The punishing sections of the Penal Code 1871 under which a charge can be framed on the facts of this complaint, most serious first within each family",
+    "properties": {
+        "c": {
+            "$ref": "#/$defs/Complaint",
+            "description": "Everything the investigation has established, one record per offence family"
+        }
+    },
+    "required": [
+        "c"
+    ],
+    "title": "applicable charges",
+    "type": "object"
+}

@@ -1,0 +1,99 @@
+{
+    "$defs": {
+        "CBT Facts": {
+            "properties": {
+                "any direction of law prescribing the mode in which such trust is to be discharged": {
+                    "description": "Was that use or disposal in violation of a direction of law prescribing how the trust was to be discharged? (Illustration (a): an executor who disobeys the law directing him to divide the estate according to the will.)",
+                    "type": "boolean"
+                },
+                "any legal contract, express or implied, which he has made touching the discharge of such trust": {
+                    "description": "Was that use or disposal in violation of a legal contract, express or implied, that the accused had made about how the trust was to be discharged? (Illustration (c): an agent who invests a remittance in his own business instead of as directed.)",
+                    "type": "boolean"
+                },
+                "converts that property to his own use": {
+                    "description": "Did the accused convert THE PROPERTY NAMED ABOVE to his own use?",
+                    "type": "boolean"
+                },
+                "dishonestly": {
+                    "description": "Did the accused act dishonestly — intending a wrongful gain or a wrongful loss, or in a way reasonable and honest people would call dishonest, knowing that (s 24)?",
+                    "type": "boolean"
+                },
+                "disposes of that property": {
+                    "description": "Did the accused dispose of THE PROPERTY NAMED ABOVE?",
+                    "type": "boolean"
+                },
+                "entrusted by": {
+                    "description": "The person or body that entrusted the property to the accused, as it is to read after \"being entrusted by\" — for example \"Trans-Pacific Credit Pte Ltd\"; leave blank if the charge does not name them",
+                    "type": "string"
+                },
+                "entrusted with dominion over property": {
+                    "description": "Was the accused entrusted not with the property itself but with dominion over it — a power to deal with it belonging to someone else?",
+                    "type": "boolean"
+                },
+                "entrusted with property": {
+                    "description": "Was the accused entrusted with the property named above, in any manner? \"Property\" means money and all other property, movable or immovable, including things in action and virtual currency (s 22).",
+                    "type": "boolean"
+                },
+                "intentionally suffers any other person to do so": {
+                    "description": "Did the accused deliberately allow someone else to do any of those things with the property? Mere carelessness is not enough — the section says \"intentionally\".",
+                    "type": "boolean"
+                },
+                "misappropriates that property": {
+                    "description": "Did the accused misappropriate THE PROPERTY NAMED ABOVE — the very property entrusted, not its proceeds and not anything bought with it? Section 405 says \"that property\", and a charge that answers about anything else discloses no offence (Carl Elias Moses v PP; Viswanathan Ramachandran v PP).",
+                    "type": "boolean"
+                },
+                "particulars": {
+                    "$ref": "#/$defs/Particulars",
+                    "description": "Who is charged, and when and where the offence was committed"
+                },
+                "property": {
+                    "description": "THE ONE PROPERTY IN THIS CHARGE. What the accused was entrusted with, as it is to read after \"namely,\" — for example \"2,000 Overseas Union Bank Warrant 1994\". Every later clause of the charge speaks of this same thing, because section 405 speaks of \"that property\".",
+                    "type": "string"
+                },
+                "property, in short": {
+                    "description": "A short back-reference to the SAME property, as it is to read after \"the said\" — for example \"warrants\", or \"proceeds\" where the property entrusted was the proceeds of a sale. Leave blank to repeat the property in full.",
+                    "type": "string"
+                },
+                "purpose of the entrustment": {
+                    "description": "What the accused was entrusted with the property for, as it is to read after the property — for example \"for the purpose of delivering these warrants on behalf of the company to DBS Securities Pte Ltd\"",
+                    "type": "string"
+                },
+                "uses that property": {
+                    "description": "Did the accused use THE PROPERTY NAMED ABOVE?",
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "particulars",
+                "entrusted by",
+                "property",
+                "property, in short",
+                "purpose of the entrustment",
+                "entrusted with property",
+                "entrusted with dominion over property",
+                "dishonestly",
+                "misappropriates that property",
+                "converts that property to his own use",
+                "uses that property",
+                "disposes of that property",
+                "any direction of law prescribing the mode in which such trust is to be discharged",
+                "any legal contract, express or implied, which he has made touching the discharge of such trust",
+                "intentionally suffers any other person to do so"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Whether the accused \"commits criminal breach of trust\" within section 405 of the Penal Code 1871",
+    "properties": {
+        "f": {
+            "$ref": "#/$defs/CBT Facts",
+            "description": "The entrustment, and what became of the property entrusted"
+        }
+    },
+    "required": [
+        "f"
+    ],
+    "title": "commits criminal breach of trust",
+    "type": "object"
+}

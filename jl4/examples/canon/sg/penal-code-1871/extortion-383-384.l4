@@ -1,0 +1,358 @@
+-- Singapore Penal Code 1871 — extortion.
+--
+--   s 383  defines "extortion"                            (the elements)
+--   s 384  punishes whoever commits extortion             (the charge)
+--
+-- A charge is laid under the PUNISHING section, so this module exports one
+-- charge (s 384) over one facts record, and one offence ladder over the s 383
+-- elements.
+--
+-- s 383 is IMPORTed by robbery-390-392.l4, which nests an `Extortion Facts`
+-- inside its own record because s 390(1) says "In all robbery there is either
+-- theft or extortion", and s 390(3) says when an extortion is a robbery.
+--
+-- The reported charge this module is pinned to:
+--
+--   Sarjit Singh Rapati v Public Prosecutor [2005] SGHC 28 — s 384 read with
+--   s 34. The charge is quoted in the judgment and reproduced in the directives
+--   below, modulo the citation form ("Penal Code, Chapter 224 read with Section
+--   34 of the same Act" then, "Penal Code 1871" now) and the CPC s 124 header,
+--   which this row normalises across every charge it frames.
+--
+-- An ISOMORPHIC encoding in INERT STYLE — see culpable-homicide-301.l4 for the
+-- conventions and cheating-415-417-420.l4 for the charge machinery. Verbatim
+-- statutory prose rides as inert strings; only the operative atoms are lifted
+-- into named leaves; the inert strings are mortar, never shadow copies of the
+-- leaf beside them.
+--
+-- ---------------------------------------------------------------------------
+-- The text
+-- ---------------------------------------------------------------------------
+--
+-- 383. Whoever intentionally puts any person in fear of any harm to that person
+--      or to any other person, in body, mind, reputation or property, whether
+--      such harm is to be caused legally or illegally, and thereby dishonestly
+--      induces the person so put in fear to deliver to any person any property
+--      or valuable security, or anything signed or sealed which may be converted
+--      into a valuable security, commits "extortion".
+--      Illustrations
+--      (a) A threatens to publish a defamatory libel concerning Z, unless Z
+--          gives him money. He thus induces Z to give him money. A has
+--          committed extortion.
+--      (b) A threatens Z that he will keep Z's child in wrongful confinement,
+--          unless Z will sign and deliver to A a promissory note binding Z to
+--          pay certain moneys to A. Z signs and delivers the note. A has
+--          committed extortion.
+--      (c) A, an enforcement officer, sees Z committing an offence, and
+--          threatens to report the offence unless Z gives him money. Z fears
+--          that the report may result in his being prosecuted for the offence
+--          and delivers money to A. A has committed extortion.
+--      (d) A, by putting Z in fear of grievous hurt, dishonestly induces Z to
+--          sign or affix his seal to a blank paper and deliver it to A. Z signs
+--          and delivers the paper to A. Here, as the paper so signed may be
+--          converted into a valuable security, A has committed extortion.
+--
+-- 384. Whoever commits extortion shall be punished with imprisonment for a term
+--      of not less than 2 years and not more than 7 years and with caning.
+--
+-- ---------------------------------------------------------------------------
+-- The shape of the section
+-- ---------------------------------------------------------------------------
+--
+-- s 383 is one sentence with a spine of conjoined elements and three
+-- disjunctive groups hanging off it:
+--
+--   THE ACT      intentionally + puts any person in fear
+--   WHOSE HARM   that person OR any other person         (Illustration (b): the
+--                child of the person threatened; nothing requires the harm to
+--                be feared for oneself)
+--   WHAT HARM    in body, mind, reputation OR property   (Illustration (a): a
+--                defamatory libel is harm in reputation)
+--   THE LINK     dishonestly (s 24) + thereby induces the person so put in fear
+--   THE DELIVERY any property OR valuable security OR anything signed or sealed
+--                which may be converted into one         (Illustration (d))
+--
+-- "whether such harm is to be caused legally or illegally" removes a defence
+-- rather than adding an element, so it rides inert — and Illustration (c) is
+-- what it is there for: an enforcement officer who threatens to do the very
+-- thing he is entitled to do still puts Z in fear within the section. Note what
+-- that leaves carrying the whole weight. Once a lawful threat is inside s 383,
+-- `dishonestly` is the ONLY leaf standing between this section and ordinary
+-- debt collection, which is exactly what the negative fixture below turns on.
+--
+-- Two calls this encoding makes, recorded rather than hidden:
+--
+--   1. `induced the person so put in fear` is its own leaf, separate from the
+--      delivery group. "Thereby … induces" is a causal claim: a person who is
+--      in fear and who hands something over for an unrelated reason has not
+--      been extorted, and there is nowhere else on the ladder to fail that.
+--   2. `that person` and `any other person` are kept as two leaves rather than
+--      one "whose harm" question. They are not the same fact, and the second is
+--      the one Illustration (b) and s 390(3) both turn on — an encoding that
+--      collapsed them could not express the difference between Illustration (b)
+--      and Illustration (c) of s 390.
+--
+-- The particulars the charge recites but the section does not test (who the
+-- victim is, what was extorted, what the threat was) are STRING fields on the
+-- same record, so one record is both the ladder's input and the charge's.
+--
+-- ---------------------------------------------------------------------------
+-- s 125 and the recital: extortion MUST state the manner
+-- ---------------------------------------------------------------------------
+--
+-- CPC 2010 s 125 illustration (b) is stated for cheating, but the reason it
+-- gives reaches extortion on the same footing: without the manner, "extortion"
+-- alone does not tell the accused what he is said to have done. The reported
+-- Sarjit Singh charge does state it, and that is the form this module builds:
+--
+--   did extort <the property extorted> from <one victim> by intentionally
+--   putting <object pronoun> in fear <the fear>
+--
+-- Contrast theft-378-379.l4 and robbery-390-392.l4, where s 125 illustration
+-- (a) says the manner need NOT be stated and the recital stops at the thing and
+-- the person. The recital depth in this row is section-dependent, and this is
+-- the section at the deep end.
+
+IMPORT prelude
+IMPORT `penal-code-general`
+
+§ `Penal Code 1871 — extortion`
+
+§§ `The facts of one threat`
+
+@ref Penal Code 1871 s 383 — the operative atoms, and the particulars CPC ss 124 and 125 require
+DECLARE `Extortion Facts` HAS
+    particulars             IS A Particulars @desc Who is charged, and when and where the offence was committed
+    victim                  IS A STRING  @desc The name of the person put in fear, as it is to appear in the charge — for example "Mohammad Sharful Islam [“Sharful”]"
+    `victim described as`   IS A STRING  @desc How the charge describes that person, after the name — for example "M/27 yrs"; leave blank if not needed
+    `victim pronoun`        IS A Pronoun @desc The pronoun the charge uses for the person put in fear
+    `the property extorted` IS A STRING  @desc What was delivered up, as it is to read after "did extort" — for example "cash of $200/-"
+    `the fear`              IS A STRING  @desc What the victim was put in fear of, as it is to read after "in fear" — for example "that you would continue to keep his cousin, one Md Faruq Ahmed [“Faruq”], M/23 yrs, in wrongful confinement"
+
+    -- "intentionally puts any person in fear"
+    intentionally           IS A BOOLEAN @desc Did the accused mean to put the victim in fear, as opposed to frightening them by accident or in passing?
+    `put the victim in fear` IS A BOOLEAN @desc Was the victim in fact put in fear? A threat that the victim shrugs off has not put them in fear.
+
+    -- "of any harm to that person or to any other person"
+    `that person`           IS A BOOLEAN @desc Was the harm feared harm to the victim themselves?
+    `any other person`      IS A BOOLEAN @desc Was the harm feared harm to somebody other than the victim? Illustration (b): the threat was to keep Z's child in wrongful confinement, and the fear was Z's.
+
+    -- "in body, mind, reputation or property"
+    body                    IS A BOOLEAN @desc … harm in body — death, hurt, confinement, or any other harm to the person?
+    mind                    IS A BOOLEAN @desc … harm in mind?
+    reputation              IS A BOOLEAN @desc … harm in reputation? Illustration (a): a threat to publish a defamatory libel.
+    property                IS A BOOLEAN @desc … harm in property?
+
+    -- "whether such harm is to be caused legally or illegally, and thereby
+    --  dishonestly induces the person so put in fear to deliver"
+    dishonestly             IS A BOOLEAN @desc Did the accused act dishonestly — intending a wrongful gain or a wrongful loss, or in a way reasonable and honest people would call dishonest, knowing that (s 24)? It does not matter that the threatened harm was one the accused was entitled to cause; a creditor who frightens a debtor into paying what is actually owed gains nothing wrongfully.
+    `induced the person so put in fear`
+                            IS A BOOLEAN @desc Was the delivery brought about BY that fear? Somebody who is in fear but who hands the thing over for an unrelated reason has not been extorted.
+
+    -- "to any person any property or valuable security, or anything signed or
+    --  sealed which may be converted into a valuable security"
+    `any property`          IS A BOOLEAN @desc Was property delivered — money or property of any description (s 22)?
+    `valuable security`     IS A BOOLEAN @desc Was a valuable security delivered?
+    `anything signed or sealed which may be converted into a valuable security`
+                            IS A BOOLEAN @desc Was something signed or sealed delivered which may be turned into a valuable security? Illustration (d): a blank paper the victim was made to sign.
+
+§§ `s 383 — extortion`
+
+@export Whether the accused "commits extortion" within section 383 of the Penal Code 1871
+GIVEN f IS AN `Extortion Facts` @desc The threat, whom it frightened, and what it got
+GIVETH A BOOLEAN
+DECIDE `commits extortion` f IF
+        "Whoever"
+   ...  f's intentionally
+   ...  f's `put the victim in fear`
+   ...  "of any harm to"
+   ...  (    f's `that person`
+        OR   f's `any other person` )
+   ...  ", in"
+   ...  (    f's body
+        ..   f's mind
+        ..   f's reputation
+        OR   f's property )
+   ...  ", whether such harm is to be caused legally or illegally, and thereby"
+   ...  f's dishonestly
+   ...  f's `induced the person so put in fear`
+   ...  "to deliver to any person"
+   ...  (    f's `any property`
+        ..   f's `valuable security`
+        OR   f's `anything signed or sealed which may be converted into a valuable security` )
+   ...  ", commits “extortion”"
+
+§§ `s 384 — punishment for extortion`
+
+@export Whether the accused has committed an offence punishable under section 384 of the Penal Code 1871 (extortion)
+GIVEN f IS AN `Extortion Facts` @desc The threat, whom it frightened, and what it got
+GIVETH A BOOLEAN
+DECIDE `offence under s 384` f IF
+        "Whoever"
+   ...  `commits extortion` f
+
+§§ `The charge`
+
+-- The manner clause s 125 requires. Sarjit Singh Rapati:
+--
+--   did extort cash of $200/- from one Mohammad Sharful Islam ["Sharful"],
+--   M/27 yrs by intentionally putting him in fear that you would continue to
+--   keep his cousin, one Md Faruq Ahmed ["Faruq"], M/23 yrs, in wrongful
+--   confinement
+GIVEN f IS AN `Extortion Facts`
+GIVETH A STRING
+`the manner of the extortion` f MEANS
+    CONCAT "did extort ", f's `the property extorted`,
+           " from ", (`one` (f's victim) (f's `victim described as`)),
+           " by intentionally putting ", (`object pronoun` (f's `victim pronoun`)),
+           " in fear ", f's `the fear`
+
+-- The elements, named for the refusal. Every leaf and every disjunctive group
+-- of s 383 is named here, so — unlike the cheating module — no "the elements
+-- taken together" row is needed: nothing can fail the ladder without one of
+-- these rows firing.
+GIVEN f IS AN `Extortion Facts`
+GIVETH A LIST OF STRING
+`elements of extortion not made out` f MEANS
+    concat (LIST
+        (`missing unless` (f's intentionally) "intentionally"),
+        (`missing unless` (f's `put the victim in fear`) "puts any person in fear"),
+        (`missing unless` (f's `that person` OR f's `any other person`) "of any harm to that person or to any other person"),
+        (`missing unless` (f's body OR f's mind OR f's reputation OR f's property) "in body, mind, reputation or property"),
+        (`missing unless` (f's dishonestly) "dishonestly (section 24)"),
+        (`missing unless` (f's `induced the person so put in fear`) "thereby induces the person so put in fear"),
+        (`missing unless` (f's `any property` OR f's `valuable security` OR f's `anything signed or sealed which may be converted into a valuable security`) "to deliver any property or valuable security, or anything signed or sealed which may be converted into a valuable security"))
+
+@export Frame a charge under section 384 of the Penal Code 1871 (extortion), or say why none can be framed
+GIVEN f IS AN `Extortion Facts` @desc The threat, what it got, and the particulars of the charge
+GIVETH A Charge
+`charge under s 384` f MEANS
+    `frame the charge` (f's particulars) "384" "extortion"
+        "imprisonment for a term of not less than 2 years and not more than 7 years and with caning"
+        (`offence under s 384` f)
+        (`the manner of the extortion` f)
+        (`elements of extortion not made out` f)
+
+§§ `Sarjit Singh Rapati v Public Prosecutor [2005] SGHC 28`
+
+-- The appellant and a co-accused held one Md Faruq Ahmed, and obtained $200
+-- from Faruq's cousin Sharful by putting Sharful in fear that Faruq would be
+-- kept in wrongful confinement. The charge, as quoted in the judgment:
+--
+--   … did extort cash of $200/- from one Mohammad Sharful Islam ["Sharful"],
+--   M/27 yrs by intentionally putting him in fear that you would continue to
+--   keep his cousin, one Md Faruq Ahmed ["Faruq"], M/23 yrs, in wrongful
+--   confinement and you have thereby committed an offence punishable under
+--   Section 384 of the Penal Code, Chapter 224 read with Section 34 of the
+--   same Act.
+--
+-- The particulars are the ones penal-code-general.l4 already carries as
+-- `Sarjit Singh particulars`, and are reused rather than restated.
+--
+-- Two interpretation calls, both recorded because the judgment leaves them
+-- open. The harm feared was harm to ANOTHER person — the cousin, not Sharful —
+-- so `that person` is FALSE and `any other person` is TRUE; that is what the
+-- charge says on its face. And the harm is classified as harm in BODY, on the
+-- footing that continued wrongful confinement is a restraint of Faruq's person:
+-- the judgment does not classify it, and "mind" is arguable on the same facts,
+-- so a reviewer should look here first.
+`Sarjit Singh Rapati` MEANS `Extortion Facts` WITH
+    particulars             IS `Sarjit Singh particulars`
+    victim                  IS "Mohammad Sharful Islam [“Sharful”]"
+    `victim described as`   IS "M/27 yrs"
+    `victim pronoun`        IS he
+    `the property extorted` IS "cash of $200/-"
+    `the fear`              IS "that you would continue to keep his cousin, one Md Faruq Ahmed [“Faruq”], M/23 yrs, in wrongful confinement"
+    intentionally           IS TRUE
+    `put the victim in fear` IS TRUE
+    `that person`           IS FALSE
+    `any other person`      IS TRUE
+    body                    IS TRUE
+    mind                    IS FALSE
+    reputation              IS FALSE
+    property                IS FALSE
+    dishonestly             IS TRUE
+    `induced the person so put in fear` IS TRUE
+    `any property`          IS TRUE
+    `valuable security`     IS FALSE
+    `anything signed or sealed which may be converted into a valuable security` IS FALSE
+
+-- The same shape of facts with the dishonesty taken out: a creditor who
+-- frightens someone into paying a debt actually owed. Every other leaf stands —
+-- the fear is real, and "whether such harm is to be caused legally or
+-- illegally" means a lawful threat does not save him either — but there is no
+-- wrongful gain and no wrongful loss, so the inducement is not dishonest and
+-- s 383 fails on that one leaf. This is the fixture that shows how much weight
+-- `dishonestly` is carrying in this section.
+`Sarjit Singh Rapati, no dishonest inducement` MEANS `Extortion Facts` WITH
+    particulars             IS `Sarjit Singh Rapati`'s particulars
+    victim                  IS `Sarjit Singh Rapati`'s victim
+    `victim described as`   IS `Sarjit Singh Rapati`'s `victim described as`
+    `victim pronoun`        IS `Sarjit Singh Rapati`'s `victim pronoun`
+    `the property extorted` IS `Sarjit Singh Rapati`'s `the property extorted`
+    `the fear`              IS `Sarjit Singh Rapati`'s `the fear`
+    intentionally           IS TRUE
+    `put the victim in fear` IS TRUE
+    `that person`           IS FALSE
+    `any other person`      IS TRUE
+    body                    IS TRUE
+    mind                    IS FALSE
+    reputation              IS FALSE
+    property                IS FALSE
+    dishonestly             IS FALSE
+    `induced the person so put in fear` IS TRUE
+    `any property`          IS TRUE
+    `valuable security`     IS FALSE
+    `anything signed or sealed which may be converted into a valuable security` IS FALSE
+
+-- A threat that got nothing: the victim was put in fear, dishonestly, and
+-- handed nothing over. s 383 is not an inchoate offence — the delivery is an
+-- element — so the whole delivery group fails and with it the causal leaf that
+-- depends on there having been a delivery to induce.
+`Sarjit Singh Rapati, nothing delivered` MEANS `Extortion Facts` WITH
+    particulars             IS `Sarjit Singh Rapati`'s particulars
+    victim                  IS `Sarjit Singh Rapati`'s victim
+    `victim described as`   IS `Sarjit Singh Rapati`'s `victim described as`
+    `victim pronoun`        IS `Sarjit Singh Rapati`'s `victim pronoun`
+    `the property extorted` IS ""
+    `the fear`              IS `Sarjit Singh Rapati`'s `the fear`
+    intentionally           IS TRUE
+    `put the victim in fear` IS TRUE
+    `that person`           IS FALSE
+    `any other person`      IS TRUE
+    body                    IS TRUE
+    mind                    IS FALSE
+    reputation              IS FALSE
+    property                IS FALSE
+    dishonestly             IS TRUE
+    `induced the person so put in fear` IS FALSE
+    `any property`          IS FALSE
+    `valuable security`     IS FALSE
+    `anything signed or sealed which may be converted into a valuable security` IS FALSE
+
+§§ `Directives`
+
+#EVAL `commits extortion` `Sarjit Singh Rapati`
+#EVAL (`charge under s 384` `Sarjit Singh Rapati`)'s text
+#EVAL (`charge under s 384` `Sarjit Singh Rapati, no dishonest inducement`)'s refusal
+#EVAL (`charge under s 384` `Sarjit Singh Rapati, nothing delivered`)'s refusal
+
+-- The reported s 384 charge, verbatim from the judgment save for the citation
+-- form ("Penal Code, Chapter 224 read with Section 34 of the same Act" →
+-- "Penal Code 1871") and the normalised CPC s 124 header.
+#ASSERT `commits extortion` `Sarjit Singh Rapati`
+#ASSERT `offence under s 384` `Sarjit Singh Rapati`
+#ASSERT (`charge under s 384` `Sarjit Singh Rapati`)'s `made out`
+#ASSERT `the manner of the extortion` `Sarjit Singh Rapati` EQUALS "did extort cash of $200/- from one Mohammad Sharful Islam [“Sharful”], M/27 yrs by intentionally putting him in fear that you would continue to keep his cousin, one Md Faruq Ahmed [“Faruq”], M/23 yrs, in wrongful confinement"
+#ASSERT (`charge under s 384` `Sarjit Singh Rapati`)'s text EQUALS "You, Sarjit Singh Rapati, are charged that you, on or about 10 July 2003, at about 12.30 pm, at Newton Hawker Centre car-park, Singapore, together with one Paramjit Singh s/o Buta Singh (M/43 yrs, NRIC No. S1436488-I) and in furtherance of the common intention of you all, did extort cash of $200/- from one Mohammad Sharful Islam [“Sharful”], M/27 yrs by intentionally putting him in fear that you would continue to keep his cousin, one Md Faruq Ahmed [“Faruq”], M/23 yrs, in wrongful confinement, and you have thereby committed an offence punishable under section 384 read with section 34 of the Penal Code 1871."
+#ASSERT (`charge under s 384` `Sarjit Singh Rapati`)'s punishment EQUALS "imprisonment for a term of not less than 2 years and not more than 7 years and with caning"
+
+-- No dishonest inducement: one leaf off, no charge, and the refusal names it.
+#ASSERT NOT (`commits extortion` `Sarjit Singh Rapati, no dishonest inducement`)
+#ASSERT NOT ((`charge under s 384` `Sarjit Singh Rapati, no dishonest inducement`)'s `made out`)
+#ASSERT (`charge under s 384` `Sarjit Singh Rapati, no dishonest inducement`)'s text EQUALS ""
+#ASSERT (`charge under s 384` `Sarjit Singh Rapati, no dishonest inducement`)'s refusal EQUALS "A charge under section 384 would assert that the facts fulfil every legal condition of extortion (CPC s 123(5)). On the facts given they do not: dishonestly (section 24)."
+
+-- Nothing delivered: the causal leaf and the whole delivery group fall.
+#ASSERT NOT (`commits extortion` `Sarjit Singh Rapati, nothing delivered`)
+#ASSERT (`charge under s 384` `Sarjit Singh Rapati, nothing delivered`)'s refusal EQUALS "A charge under section 384 would assert that the facts fulfil every legal condition of extortion (CPC s 123(5)). On the facts given they do not: thereby induces the person so put in fear; to deliver any property or valuable security, or anything signed or sealed which may be converted into a valuable security."

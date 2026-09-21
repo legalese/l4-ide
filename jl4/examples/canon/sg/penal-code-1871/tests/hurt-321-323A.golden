@@ -1,0 +1,51 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+hurt-321-323A.l4:293:1-47:
+  TRUE
+hurt-321-323A.l4:294:1-44:
+  TRUE
+hurt-321-323A.l4:295:1-52:
+  "You, Ang Boon Han, are charged that you, on or about 15 May 2021, at about 10.30pm, at in the vicinity of bus stop no. 46229 along Woodlands Ave 2, Singapore, did voluntarily cause hurt with the intention to cause hurt which is not grievous, but which actually caused grievous hurt to one Lam Mian Sern, to wit, by using both hands to push the chest of the said Lam Mian Sern once, causing him to fall backward and on his right hand, which was used to cushion his impact, resulting in the said Lam Mian Sern suffering fractures of both the distal radius and scaphoid at the right wrist, and you have thereby committed an offence punishable under section 323A of the Penal Code 1871."
+hurt-321-323A.l4:296:1-87:
+  "A charge under section 323A would assert that the facts fulfil every legal condition of voluntarily causing hurt which causes grievous hurt (CPC s 123(5)). On the facts given they do not: the hurt which he intends to cause or knows himself to be likely to cause is not grievous (where the accused aimed at grievous hurt the offence is section 325, not this one)."
+hurt-321-323A.l4:297:1-71:
+  "A charge under section 323A would assert that the facts fulfil every legal condition of voluntarily causing hurt which causes grievous hurt (CPC s 123(5)). On the facts given they do not: does thereby cause hurt to any person; the elements of section 321 taken together; the hurt which he actually causes is grievous."
+hurt-321-323A.l4:298:1-75:
+  "You, Ang Boon Han, are charged that you, on or about 15 May 2021, at about 10.30pm, at in the vicinity of bus stop no. 46229 along Woodlands Ave 2, Singapore, did voluntarily cause hurt with the knowledge that you were likely to cause hurt which is not grievous, but which actually caused grievous hurt to one Lam Mian Sern, to wit, by using both hands to push the chest of the said Lam Mian Sern once, causing him to fall backward and on his right hand, which was used to cushion his impact, resulting in the said Lam Mian Sern suffering fractures of both the distal radius and scaphoid at the right wrist, and you have thereby committed an offence punishable under section 323A of the Penal Code 1871."
+hurt-321-323A.l4:299:1-66:
+  "You, A, are charged that you, on or about 1 January 2026, at a club, Singapore, did voluntarily cause hurt with the intention to cause hurt which is not grievous, but which actually caused grievous hurt to one Z, to wit, by punching the said Z in the face once, causing the said Z to lose his balance, to fall and to hit his head against a ledge, resulting in the said Z suffering severe brain injuries and being permanently paralysed, and you have thereby committed an offence punishable under section 323A of the Penal Code 1871."
+hurt-321-323A.l4:304:1-49:
+  assertion satisfied
+hurt-321-323A.l4:305:1-46:
+  assertion satisfied
+hurt-321-323A.l4:306:1-60:
+  assertion satisfied
+hurt-321-323A.l4:307:1-746:
+  assertion satisfied
+hurt-321-323A.l4:308:1-177:
+  assertion satisfied
+hurt-321-323A.l4:312:1-81:
+  assertion satisfied
+hurt-321-323A.l4:313:1-84:
+  assertion satisfied
+hurt-321-323A.l4:314:1-98:
+  assertion satisfied
+hurt-321-323A.l4:315:1-96:
+  assertion satisfied
+hurt-321-323A.l4:316:1-461:
+  assertion satisfied
+hurt-321-323A.l4:319:1-71:
+  assertion satisfied
+hurt-321-323A.l4:320:1-82:
+  assertion satisfied
+hurt-321-323A.l4:321:1-400:
+  assertion satisfied
+hurt-321-323A.l4:324:1-69:
+  assertion satisfied
+hurt-321-323A.l4:325:1-790:
+  assertion satisfied
+hurt-321-323A.l4:328:1-60:
+  assertion satisfied
+hurt-321-323A.l4:329:1-609:
+  assertion satisfied

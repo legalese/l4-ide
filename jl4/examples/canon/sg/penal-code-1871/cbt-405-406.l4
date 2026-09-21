@@ -1,0 +1,539 @@
+-- Singapore Penal Code 1871 — criminal breach of trust.
+--
+--   s 405  defines "criminal breach of trust"        (the elements)
+--   s 406  punishes whoever commits it               (the charge)
+--
+-- A charge is laid under the PUNISHING section, so this module exports one
+-- charge (s 406) over one facts record, and one ladder for the s 405 elements.
+--
+-- This is the row's NEGATIVE case. The reported charge it is pinned to was held
+-- FUNDAMENTALLY FLAWED, and the module exists to show that the flaw is one a
+-- careful encoding cannot write down at all:
+--
+--   Viswanathan Ramachandran v Public Prosecutor [2003] SGHC 183, in which Yong
+--   Pung How CJ quoted the charge from his own earlier decision in Carl Elias
+--   Moses v Public Prosecutor [1995] 3 SLR 748 and held that a charge alleging
+--   entrustment with one thing and misappropriation of another states no
+--   offence under s 405. The quoted charge and the amendment the court allowed
+--   are both reproduced in the directives below, modulo the citation form
+--   ("Penal Code (Cap 224, 1985 Rev Ed)" then, "Penal Code 1871" now) and the
+--   CPC s 124 header, which this row normalises across every charge it frames.
+--
+-- An ISOMORPHIC encoding in INERT STYLE — see culpable-homicide-301.l4 for the
+-- conventions and cheating-415-417-420.l4 for the shape. Verbatim statutory
+-- prose rides as inert strings; only the operative atoms are lifted into named
+-- leaves; the inert strings are mortar, never shadow copies of the leaf beside
+-- them.
+--
+-- ---------------------------------------------------------------------------
+-- The text
+-- ---------------------------------------------------------------------------
+--
+-- 405. Whoever, being in any manner entrusted with property, or with any
+--      dominion over property, dishonestly misappropriates or converts to his
+--      own use that property, or dishonestly uses or disposes of that property
+--      in violation of any direction of law prescribing the mode in which such
+--      trust is to be discharged, or of any legal contract, express or implied,
+--      which he has made touching the discharge of such trust, or intentionally
+--      suffers any other person to do so, commits “criminal breach of trust”.
+--      Illustrations
+--      (a) A, being executor to the will of a deceased person, dishonestly
+--          disobeys the law which directs him to divide the effects according
+--          to the will, and appropriates them to his own use. A has committed
+--          criminal breach of trust.
+--      (b) A is a warehouse owner or warehouse operator. Z, going on a journey,
+--          entrusts his furniture to A, under a contract that it shall be
+--          returned on payment of a stipulated sum for warehouse room. A
+--          dishonestly sells the goods. A has committed breach of trust.
+--                                            [Act 23 of 2021 wef 01/03/2022]
+--      (c) A, residing in Singapore, is agent for Z, residing in Penang. There
+--          is an express or implied contract between A and Z that all sums
+--          remitted by Z to A shall be invested by A according to Z's
+--          direction. Z remits $5,000 to A, with directions to A to invest the
+--          same in Government securities. A dishonestly disobeys the direction,
+--          and employs the money in his own business. A has committed criminal
+--          breach of trust.
+--      (d) But if A, in the last illustration, not dishonestly, but in good
+--          faith, believing that it will be more for Z's advantage to hold
+--          shares in the Bank X, disobeys Z's directions, and buys shares in
+--          the Bank X for Z, instead of buying Government securities, here,
+--          though Z should suffer loss and should be entitled to bring a civil
+--          action against A on account of that loss, yet A, not having acted
+--          dishonestly, has not committed criminal breach of trust.
+--      (e) A, a collector of Government money, or a clerk in a Government
+--          office, is entrusted with public money, and is either directed by
+--          law, or bound by a contract, express or implied, with the
+--          Government, to pay into a certain treasury all the public money
+--          which he holds. A dishonestly appropriates the money. A has
+--          committed criminal breach of trust.
+--      (f) A, a carrier, is entrusted by Z with property to be carried by land
+--          or by water. A dishonestly misappropriates the property. A has
+--          committed criminal breach of trust.
+--                                                                   [15/2019]
+--
+-- 406. Whoever commits criminal breach of trust shall be punished with
+--      imprisonment for a term which may extend to 7 years, or with fine, or
+--      with both.
+--
+-- One drafting note on vintage. The 2003 judgment quotes s 405 as it then stood,
+-- ending "or WILFULLY suffers any other person to do so". The in-force text
+-- above reads "or INTENTIONALLY suffers", substituted by Act 15 of 2019. The
+-- leaves below follow the in-force text.
+--
+-- ---------------------------------------------------------------------------
+-- The shape of the section
+-- ---------------------------------------------------------------------------
+--
+-- s 405 is one entrustment and one of three ways of betraying it:
+--
+--   ENTRUSTMENT   being in any manner entrusted with property, or with any
+--                 dominion over property
+--
+--   FIRST LIMB    dishonestly misappropriates or converts to his own use that
+--                 property
+--   SECOND LIMB   dishonestly uses or disposes of that property in violation
+--                 of a direction of law, or of a legal contract express or
+--                 implied, touching the discharge of the trust
+--   THIRD LIMB    intentionally suffers any other person to do so
+--
+-- "being in any manner" widens the entrustment rather than adding an element,
+-- so it rides inert. The mental element differs by limb and the encoding keeps
+-- that visible: the first two limbs are governed by "dishonestly" (s 24), the
+-- third by "intentionally" — so a person who merely stands by while another
+-- betrays the trust is outside the section unless he did so on purpose.
+--
+-- The particulars the charge recites but the section does not test (who
+-- entrusted the property, what the property was, what the entrustment was for)
+-- are STRING fields on the same record, so one record is both the ladder's
+-- input and the charge's.
+--
+-- ---------------------------------------------------------------------------
+-- Why the flaw is unexpressible
+-- ---------------------------------------------------------------------------
+--
+-- Written for a lawyer rather than for a programmer.
+--
+-- The charge laid against Carl Elias Moses said two things about property. It
+-- said he had been entrusted with 2,000 Overseas Union Bank warrants. It said
+-- he dishonestly misappropriated the proceeds of their sale. Both of those are
+-- "property" in the wide sense s 22 gives the word, and the Prosecution treated
+-- that as enough. The Chief Justice did not. s 405 does not say
+-- "misappropriates property"; it says "misappropriates THAT property", and
+-- "that property" can only be the property the accused was entrusted with. A
+-- charge that names one thing in its entrustment clause and a different thing
+-- in its misappropriation clause therefore discloses no offence at all, however
+-- dishonest the accused may have been. The conviction fell, and only an
+-- amendment granted on appeal saved the case.
+--
+-- That defect is not a misjudgment. It is a defect of FORM — and a form is
+-- exactly the kind of thing a language can refuse to provide. This encoding has
+-- ONE place to record what the accused was entrusted with: the `property`
+-- field. The entrustment clause of the charge reads that field. The
+-- misappropriation clause reads THE SAME FIELD. There is no second field for
+-- the second clause to disagree with, so the two halves of the recital cannot
+-- name two different things — not because something checks them against each
+-- other, but because there is nowhere to write the second thing down.
+--
+-- What the investigating officer is asked instead is the question s 405 actually
+-- poses. The leaf is `misappropriates that property`, and its @desc spells it
+-- out: did the accused misappropriate THE PROPERTY HE WAS ENTRUSTED WITH? On
+-- these facts the honest answer is no — he delivered the warrants to DBS
+-- Securities exactly as he had been directed to. So the ladder answers FALSE,
+-- the builder declines to write any charge, and the refusal names the element
+-- that failed. The flaw surfaces before anyone is arraigned.
+--
+-- The bench below walks three states of the same file, in order:
+--
+--   `Carl Elias Moses, as charged`
+--       refused. No text is written at all, and the refusal names the limb.
+--
+--   `Carl Elias Moses, with the warrants misappropriated`
+--       frames — but its body now reads "did dishonestly misappropriate the
+--       said warrants". That is a DIFFERENT allegation, and a false one. It is
+--       not the charge that was laid, and nothing in this file can produce the
+--       charge that was laid.
+--
+--   `Carl Elias Moses, the charge amended`
+--       frames the charge the court said should have been laid: entrustment
+--       with the PROCEEDS, misappropriation of the proceeds. Compare the
+--       amendment the court actually substituted in Viswanathan Ramachandran
+--       itself — "being entrusted by WC Heraeus GmbH with the proceeds from the
+--       sale of a sputtering machine amounting to US$35,000 … by dishonestly
+--       misappropriating the proceeds" — which moves the entrustment onto the
+--       proceeds in precisely the same way.
+--
+-- The middle one is the demonstration. Asked for the flawed charge, the
+-- encoding does not produce it; it produces the nearest charge it CAN state,
+-- and that charge alleges something else.
+--
+-- THE LIMIT, stated here because a reader will find it anyway.
+-- `property, in short` exists only so that the recital can write "the said
+-- proceeds" instead of repeating thirty words, which is what real charges do.
+-- It is a short form of `property` and its @desc says so; left blank, the
+-- builder repeats `property` in full, which is always correct. An officer who
+-- types something unrelated into it can still get a wrong word onto the page.
+-- What the encoding forecloses is the STRUCTURAL flaw — two clauses of one
+-- charge resting on two different properties — because the ladder holds one
+-- property and asks one question about it.
+
+IMPORT prelude
+IMPORT `penal-code-general`
+
+§ `Penal Code 1871 — criminal breach of trust`
+
+§§ `The facts of one entrustment`
+
+@ref Penal Code 1871 s 405 — the operative atoms, and the particulars CPC s 124 requires
+DECLARE `CBT Facts` HAS
+    particulars           IS A Particulars @desc Who is charged, and when and where the offence was committed
+    `entrusted by`        IS A STRING  @desc The person or body that entrusted the property to the accused, as it is to read after "being entrusted by" — for example "Trans-Pacific Credit Pte Ltd"; leave blank if the charge does not name them
+    property              IS A STRING  @desc THE ONE PROPERTY IN THIS CHARGE. What the accused was entrusted with, as it is to read after "namely," — for example "2,000 Overseas Union Bank Warrant 1994". Every later clause of the charge speaks of this same thing, because section 405 speaks of "that property".
+    `property, in short`  IS A STRING  @desc A short back-reference to the SAME property, as it is to read after "the said" — for example "warrants", or "proceeds" where the property entrusted was the proceeds of a sale. Leave blank to repeat the property in full.
+    `purpose of the entrustment`
+                          IS A STRING  @desc What the accused was entrusted with the property for, as it is to read after the property — for example "for the purpose of delivering these warrants on behalf of the company to DBS Securities Pte Ltd"
+
+    -- "being in any manner entrusted with property, or with any dominion over property"
+    `entrusted with property`
+                          IS A BOOLEAN @desc Was the accused entrusted with the property named above, in any manner? "Property" means money and all other property, movable or immovable, including things in action and virtual currency (s 22).
+    `entrusted with dominion over property`
+                          IS A BOOLEAN @desc Was the accused entrusted not with the property itself but with dominion over it — a power to deal with it belonging to someone else?
+
+    -- "dishonestly" — s 24
+    dishonestly           IS A BOOLEAN @desc Did the accused act dishonestly — intending a wrongful gain or a wrongful loss, or in a way reasonable and honest people would call dishonest, knowing that (s 24)?
+
+    -- first limb: "dishonestly misappropriates or converts to his own use that property"
+    `misappropriates that property`
+                          IS A BOOLEAN @desc Did the accused misappropriate THE PROPERTY NAMED ABOVE — the very property entrusted, not its proceeds and not anything bought with it? Section 405 says "that property", and a charge that answers about anything else discloses no offence (Carl Elias Moses v PP; Viswanathan Ramachandran v PP).
+    `converts that property to his own use`
+                          IS A BOOLEAN @desc Did the accused convert THE PROPERTY NAMED ABOVE to his own use?
+
+    -- second limb: "dishonestly uses or disposes of that property in violation of …"
+    `uses that property`  IS A BOOLEAN @desc Did the accused use THE PROPERTY NAMED ABOVE?
+    `disposes of that property`
+                          IS A BOOLEAN @desc Did the accused dispose of THE PROPERTY NAMED ABOVE?
+    `any direction of law prescribing the mode in which such trust is to be discharged`
+                          IS A BOOLEAN @desc Was that use or disposal in violation of a direction of law prescribing how the trust was to be discharged? (Illustration (a): an executor who disobeys the law directing him to divide the estate according to the will.)
+    `any legal contract, express or implied, which he has made touching the discharge of such trust`
+                          IS A BOOLEAN @desc Was that use or disposal in violation of a legal contract, express or implied, that the accused had made about how the trust was to be discharged? (Illustration (c): an agent who invests a remittance in his own business instead of as directed.)
+
+    -- third limb: "or intentionally suffers any other person to do so"
+    `intentionally suffers any other person to do so`
+                          IS A BOOLEAN @desc Did the accused deliberately allow someone else to do any of those things with the property? Mere carelessness is not enough — the section says "intentionally".
+
+§§ `s 405 — criminal breach of trust`
+
+@export Whether the accused "commits criminal breach of trust" within section 405 of the Penal Code 1871
+GIVEN f IS A `CBT Facts` @desc The entrustment, and what became of the property entrusted
+GIVETH A BOOLEAN
+DECIDE `commits criminal breach of trust` f IF
+        "Whoever, being in any manner"
+   ...  (    f's `entrusted with property`
+        OR   f's `entrusted with dominion over property` )
+   ...  (        (    f's dishonestly
+                 ...  (    f's `misappropriates that property`
+                      OR   f's `converts that property to his own use` ) )
+            ..  (    f's dishonestly
+                 ...  (    f's `uses that property`
+                      OR   f's `disposes of that property` )
+                 ...  "in violation of"
+                 ...  (    f's `any direction of law prescribing the mode in which such trust is to be discharged`
+                      OR   f's `any legal contract, express or implied, which he has made touching the discharge of such trust` ) )
+            OR  f's `intentionally suffers any other person to do so` )
+
+§§ `s 406 — punishment of criminal breach of trust`
+
+@export Whether the accused has committed an offence punishable under section 406 of the Penal Code 1871 (criminal breach of trust)
+GIVEN f IS A `CBT Facts` @desc The entrustment, and what became of the property entrusted
+GIVETH A BOOLEAN
+DECIDE `offence under s 406` f IF
+        "Whoever"
+   ...  `commits criminal breach of trust` f
+
+§§ `The charge`
+
+-- s 125 requires the manner for criminal breach of trust: the accused cannot
+-- answer a charge that does not say what he was entrusted with, what for, and
+-- what he did with it. Read off the leaves that are TRUE, in the order the
+-- section states them. Carl Elias Moses, as the charge was laid:
+--
+--   being entrusted with property, namely, 2,000 Overseas Union Bank Warrant
+--   1994 for the purpose of delivering these warrants on behalf of
+--   Trans-Pacific Credit Pte Ltd (“the company”) to DBS Securities Pte Ltd
+--   pursuant to a sale (per contract number 414270/501) of the said warrants,
+--   and thereafter to pay the proceeds of the said sale to the company, did
+--   dishonestly misappropriate the said proceeds
+--
+-- Note where the builder differs from that, and why: the last three words come
+-- from `property, in short`, which is a short form of `property`. The charge as
+-- laid could say "proceeds" there while the entrustment said "warrants". This
+-- builder cannot.
+GIVEN f IS A `CBT Facts`
+GIVETH A STRING
+`the manner of the breach of trust` f MEANS
+    CONCAT "being entrusted", (`by whom entrusted` f), " with ", (`what the accused was entrusted with` f),
+           ", namely, ", f's property, " ", f's `purpose of the entrustment`,
+           ", did ", (`the adverb` f), " ", (`what the accused did with it` f),
+           " the said ", (`the property, in short` f), (`in violation of what` f)
+
+GIVEN f IS A `CBT Facts`
+GIVETH A STRING
+`by whom entrusted` f MEANS
+    IF   f's `entrusted by` EQUALS ""
+    THEN ""
+    ELSE CONCAT " by ", f's `entrusted by`
+
+GIVEN f IS A `CBT Facts`
+GIVETH A STRING
+`what the accused was entrusted with` f MEANS
+    `joined with` " and " (concat (LIST
+        (`included if` (f's `entrusted with property`) "property"),
+        (`included if` (f's `entrusted with dominion over property`) "dominion over property")))
+
+-- "dishonestly" governs the first two limbs; "intentionally" the third.
+GIVEN f IS A `CBT Facts`
+GIVETH A STRING
+`the adverb` f MEANS
+    `joined with` " and " (concat (LIST
+        (`included if` (f's dishonestly) "dishonestly"),
+        (`included if` (f's `intentionally suffers any other person to do so`) "intentionally")))
+
+GIVEN f IS A `CBT Facts`
+GIVETH A STRING
+`what the accused did with it` f MEANS
+    `joined with` ", and " (concat (LIST
+        (`included if` (f's `misappropriates that property`) "misappropriate"),
+        (`included if` (f's `converts that property to his own use`) "convert to your own use"),
+        (`included if` (f's `uses that property`) "use"),
+        (`included if` (f's `disposes of that property`) "dispose of"),
+        (`included if` (f's `intentionally suffers any other person to do so`) "suffer another person to misappropriate")))
+
+-- The back-reference is a short form of the ONE property, never a second one.
+-- Blank means "repeat it in full", which is always safe.
+GIVEN f IS A `CBT Facts`
+GIVETH A STRING
+`the property, in short` f MEANS
+    IF   f's `property, in short` EQUALS ""
+    THEN f's property
+    ELSE f's `property, in short`
+
+GIVEN f IS A `CBT Facts`
+GIVETH A STRING
+`in violation of what` f MEANS
+    IF   f's `any direction of law prescribing the mode in which such trust is to be discharged`
+      OR f's `any legal contract, express or implied, which he has made touching the discharge of such trust`
+    THEN " in violation of " APPEND (`joined with` ", or of " (concat (LIST
+             (`included if` (f's `any direction of law prescribing the mode in which such trust is to be discharged`) "a direction of law prescribing the mode in which the said trust was to be discharged"),
+             (`included if` (f's `any legal contract, express or implied, which he has made touching the discharge of such trust`) "a legal contract, express or implied, which you had made touching the discharge of the said trust"))))
+    ELSE ""
+
+-- The elements, named for the refusal. The second entry is the one the reported
+-- charge failed, and it says out loud what "that property" refers back to.
+GIVEN f IS A `CBT Facts`
+GIVETH A LIST OF STRING
+`elements of criminal breach of trust not made out` f MEANS
+    concat (LIST
+        (`missing unless` (f's `entrusted with property` OR f's `entrusted with dominion over property`) "being in any manner entrusted with property, or with any dominion over property"),
+        (`missing unless` (f's dishonestly OR f's `intentionally suffers any other person to do so`) "dishonestly — which governs misappropriation, conversion, use and disposal — or intentionally, which governs suffering any other person to do so"),
+        (`missing unless` ((f's dishonestly AND (f's `misappropriates that property` OR f's `converts that property to his own use`)) OR (f's dishonestly AND (f's `uses that property` OR f's `disposes of that property`) AND (f's `any direction of law prescribing the mode in which such trust is to be discharged` OR f's `any legal contract, express or implied, which he has made touching the discharge of such trust`)) OR f's `intentionally suffers any other person to do so`) "dishonestly misappropriates or converts to his own use THAT property, dishonestly uses or disposes of THAT property in violation of a direction of law or of a legal contract, or intentionally suffers any other person to do so — where “that property” is the property entrusted and nothing else"),
+        (`missing unless` (`commits criminal breach of trust` f) "the elements of section 405 taken together"))
+
+@export Frame a charge under section 406 of the Penal Code 1871 (criminal breach of trust), or say why none can be framed
+GIVEN f IS A `CBT Facts` @desc The entrustment, what became of the property, and the particulars of the charge
+GIVETH A Charge
+`charge under s 406` f MEANS
+    `frame the charge` (f's particulars) "406" "criminal breach of trust"
+        "imprisonment for a term which may extend to 7 years, or with fine, or with both"
+        (`offence under s 406` f)
+        (`the manner of the breach of trust` f)
+        (`elements of criminal breach of trust not made out` f)
+
+§§ `Carl Elias Moses v Public Prosecutor [1995] 3 SLR 748, as quoted in Viswanathan Ramachandran v Public Prosecutor [2003] SGHC 183`
+
+-- The charge, as quoted in the 2003 judgment:
+--
+--   You, Carl Elias s/o Jack Moses Elias, NRIC No 1475884/D, are charged that
+--   you, on or about 23 October 1989, in Singapore, being entrusted with
+--   property, namely, 2,000 Overseas Union Bank Warrant 1994 for the purpose of
+--   delivering these warrants on behalf of Trans-Pacific Credit Pte Ltd (`the
+--   company`) to DBS Securities Pte Ltd pursuant to a sale (per contract number
+--   414270/501) of the said warrants, and thereafter to pay the proceeds of the
+--   said sale to the company, did dishonestly misappropriate the said proceeds,
+--   and you have thereby committed an offence punishable under s 406 of the
+--   Penal Code (Cap 224, 1985 Rev Ed).
+--
+-- He was entrusted with the warrants and he delivered the warrants, exactly as
+-- directed. What he kept was the money DBS paid for them. So the honest answer
+-- to `misappropriates that property` — asked of the property entrusted — is
+-- FALSE, and no charge can be framed on this record.
+`Carl Elias Moses, as charged` MEANS `CBT Facts` WITH
+    particulars           IS Particulars WITH
+                               accused            IS "Carl Elias Moses"
+                               date               IS "23 October 1989"
+                               time               IS ""
+                               place              IS "the premises of Trans-Pacific Credit Pte Ltd"
+                               `co-accused`       IS ""
+                               `common intention` IS FALSE
+    `entrusted by`        IS ""
+    property              IS "2,000 Overseas Union Bank Warrant 1994"
+    `property, in short`  IS "warrants"
+    `purpose of the entrustment`
+                          IS "for the purpose of delivering these warrants on behalf of Trans-Pacific Credit Pte Ltd (“the company”) to DBS Securities Pte Ltd pursuant to a sale (per contract number 414270/501) of the said warrants, and thereafter to pay the proceeds of the said sale to the company"
+    `entrusted with property` IS TRUE
+    `entrusted with dominion over property` IS FALSE
+    dishonestly           IS TRUE
+    `misappropriates that property` IS FALSE
+    `converts that property to his own use` IS FALSE
+    `uses that property`  IS FALSE
+    `disposes of that property` IS FALSE
+    `any direction of law prescribing the mode in which such trust is to be discharged` IS FALSE
+    `any legal contract, express or implied, which he has made touching the discharge of such trust` IS FALSE
+    `intentionally suffers any other person to do so` IS FALSE
+
+-- The nearest thing to the flawed charge that this file CAN state. Answer the
+-- misappropriation question TRUE and a charge is framed — but read its body: it
+-- alleges misappropriation of the WARRANTS, which is a different allegation
+-- from the one that was laid, and a false one on these facts. The words "the
+-- said proceeds" cannot appear, because the property entrusted was not the
+-- proceeds.
+`Carl Elias Moses, with the warrants misappropriated` MEANS `CBT Facts` WITH
+    particulars           IS `Carl Elias Moses, as charged`'s particulars
+    `entrusted by`        IS `Carl Elias Moses, as charged`'s `entrusted by`
+    property              IS `Carl Elias Moses, as charged`'s property
+    `property, in short`  IS `Carl Elias Moses, as charged`'s `property, in short`
+    `purpose of the entrustment`
+                          IS `Carl Elias Moses, as charged`'s `purpose of the entrustment`
+    `entrusted with property` IS TRUE
+    `entrusted with dominion over property` IS FALSE
+    dishonestly           IS TRUE
+    `misappropriates that property` IS TRUE
+    `converts that property to his own use` IS FALSE
+    `uses that property`  IS FALSE
+    `disposes of that property` IS FALSE
+    `any direction of law prescribing the mode in which such trust is to be discharged` IS FALSE
+    `any legal contract, express or implied, which he has made touching the discharge of such trust` IS FALSE
+    `intentionally suffers any other person to do so` IS FALSE
+
+-- The charge the court said should have been laid: move the ENTRUSTMENT onto
+-- the proceeds, which is what the amendment allowed in Viswanathan Ramachandran
+-- did on its own facts. The property is now one thing throughout, and the same
+-- field supplies both clauses.
+`Carl Elias Moses, the charge amended` MEANS `CBT Facts` WITH
+    particulars           IS `Carl Elias Moses, as charged`'s particulars
+    `entrusted by`        IS "Trans-Pacific Credit Pte Ltd (“the company”)"
+    property              IS "the proceeds of the sale of 2,000 Overseas Union Bank Warrant 1994"
+    `property, in short`  IS "proceeds"
+    `purpose of the entrustment`
+                          IS "received by you from DBS Securities Pte Ltd pursuant to a sale (per contract number 414270/501) of the said warrants, for the purpose of paying the same to the company"
+    `entrusted with property` IS TRUE
+    `entrusted with dominion over property` IS FALSE
+    dishonestly           IS TRUE
+    `misappropriates that property` IS TRUE
+    `converts that property to his own use` IS FALSE
+    `uses that property`  IS FALSE
+    `disposes of that property` IS FALSE
+    `any direction of law prescribing the mode in which such trust is to be discharged` IS FALSE
+    `any legal contract, express or implied, which he has made touching the discharge of such trust` IS FALSE
+    `intentionally suffers any other person to do so` IS FALSE
+
+§§ `Illustrations (c) and (d) to section 405`
+
+-- (c) A, residing in Singapore, is agent for Z, residing in Penang. There is an
+--     express or implied contract between A and Z that all sums remitted by Z
+--     to A shall be invested by A according to Z's direction. Z remits $5,000
+--     to A, with directions to A to invest the same in Government securities. A
+--     dishonestly disobeys the direction, and employs the money in his own
+--     business. A has committed criminal breach of trust.
+--
+-- The illustration's own emphasis is on disobeying a direction given under a
+-- contract, so this is the SECOND limb: a dishonest use of the property in
+-- violation of a legal contract touching the discharge of the trust. Z's
+-- direction is not a "direction of law", which is illustration (a)'s limb.
+`the Penang agent, Illustration (c)` MEANS `CBT Facts` WITH
+    particulars           IS Particulars WITH
+                               accused            IS "A"
+                               date               IS "a date unknown"
+                               time               IS ""
+                               place              IS "A's place of business"
+                               `co-accused`       IS ""
+                               `common intention` IS FALSE
+    `entrusted by`        IS "one Z of Penang"
+    property              IS "$5,000 remitted to you by the said Z"
+    `property, in short`  IS "moneys"
+    `purpose of the entrustment`
+                          IS "with directions to you to invest the same in Government securities, pursuant to an express or implied contract between you and the said Z that all sums remitted by the said Z to you shall be invested by you according to his direction"
+    `entrusted with property` IS TRUE
+    `entrusted with dominion over property` IS FALSE
+    dishonestly           IS TRUE
+    `misappropriates that property` IS FALSE
+    `converts that property to his own use` IS FALSE
+    `uses that property`  IS TRUE
+    `disposes of that property` IS FALSE
+    `any direction of law prescribing the mode in which such trust is to be discharged` IS FALSE
+    `any legal contract, express or implied, which he has made touching the discharge of such trust` IS TRUE
+    `intentionally suffers any other person to do so` IS FALSE
+
+-- (d) the same agent, acting in good faith. The illustration says in terms that
+--     he "has not committed criminal breach of trust", so this is the statute's
+--     own negative oracle for the `dishonestly` leaf.
+`the Penang agent in good faith, Illustration (d)` MEANS `CBT Facts` WITH
+    particulars           IS `the Penang agent, Illustration (c)`'s particulars
+    `entrusted by`        IS `the Penang agent, Illustration (c)`'s `entrusted by`
+    property              IS `the Penang agent, Illustration (c)`'s property
+    `property, in short`  IS `the Penang agent, Illustration (c)`'s `property, in short`
+    `purpose of the entrustment`
+                          IS `the Penang agent, Illustration (c)`'s `purpose of the entrustment`
+    `entrusted with property` IS TRUE
+    `entrusted with dominion over property` IS FALSE
+    dishonestly           IS FALSE
+    `misappropriates that property` IS FALSE
+    `converts that property to his own use` IS FALSE
+    `uses that property`  IS TRUE
+    `disposes of that property` IS FALSE
+    `any direction of law prescribing the mode in which such trust is to be discharged` IS FALSE
+    `any legal contract, express or implied, which he has made touching the discharge of such trust` IS TRUE
+    `intentionally suffers any other person to do so` IS FALSE
+
+§§ `Directives`
+
+#EVAL `commits criminal breach of trust` `Carl Elias Moses, as charged`
+#EVAL (`charge under s 406` `Carl Elias Moses, as charged`)'s refusal
+#EVAL (`charge under s 406` `Carl Elias Moses, with the warrants misappropriated`)'s text
+#EVAL (`charge under s 406` `Carl Elias Moses, the charge amended`)'s text
+#EVAL (`charge under s 406` `the Penang agent, Illustration (c)`)'s text
+#EVAL (`charge under s 406` `the Penang agent in good faith, Illustration (d)`)'s refusal
+
+-- The charge AS LAID cannot be framed. Asked about the property entrusted —
+-- the warrants, which he delivered exactly as directed — the misappropriation
+-- element answers FALSE, so no text is written and the refusal names the limb
+-- together with what “that property” refers back to.
+#ASSERT NOT (`commits criminal breach of trust` `Carl Elias Moses, as charged`)
+#ASSERT NOT ((`charge under s 406` `Carl Elias Moses, as charged`)'s `made out`)
+#ASSERT (`charge under s 406` `Carl Elias Moses, as charged`)'s text EQUALS ""
+#ASSERT (`charge under s 406` `Carl Elias Moses, as charged`)'s refusal EQUALS "A charge under section 406 would assert that the facts fulfil every legal condition of criminal breach of trust (CPC s 123(5)). On the facts given they do not: dishonestly misappropriates or converts to his own use THAT property, dishonestly uses or disposes of THAT property in violation of a direction of law or of a legal contract, or intentionally suffers any other person to do so — where “that property” is the property entrusted and nothing else; the elements of section 405 taken together."
+
+-- THE DEMONSTRATION. Answer the misappropriation question TRUE and a charge
+-- IS framed — but its body says “the said warrants”, not “the said proceeds”.
+-- That is a different allegation from the one the Prosecution laid, and the
+-- charge the Prosecution laid is not among the strings this module can emit.
+#ASSERT (`charge under s 406` `Carl Elias Moses, with the warrants misappropriated`)'s `made out`
+#ASSERT (`charge under s 406` `Carl Elias Moses, with the warrants misappropriated`)'s text EQUALS "You, Carl Elias Moses, are charged that you, on or about 23 October 1989, at the premises of Trans-Pacific Credit Pte Ltd, Singapore, being entrusted with property, namely, 2,000 Overseas Union Bank Warrant 1994 for the purpose of delivering these warrants on behalf of Trans-Pacific Credit Pte Ltd (“the company”) to DBS Securities Pte Ltd pursuant to a sale (per contract number 414270/501) of the said warrants, and thereafter to pay the proceeds of the said sale to the company, did dishonestly misappropriate the said warrants, and you have thereby committed an offence punishable under section 406 of the Penal Code 1871."
+
+-- The charge the court said should have been laid: the entrustment moved onto
+-- the proceeds, so one property serves both clauses.
+#ASSERT `commits criminal breach of trust` `Carl Elias Moses, the charge amended`
+#ASSERT `offence under s 406` `Carl Elias Moses, the charge amended`
+#ASSERT (`charge under s 406` `Carl Elias Moses, the charge amended`)'s `made out`
+#ASSERT (`charge under s 406` `Carl Elias Moses, the charge amended`)'s text EQUALS "You, Carl Elias Moses, are charged that you, on or about 23 October 1989, at the premises of Trans-Pacific Credit Pte Ltd, Singapore, being entrusted by Trans-Pacific Credit Pte Ltd (“the company”) with property, namely, the proceeds of the sale of 2,000 Overseas Union Bank Warrant 1994 received by you from DBS Securities Pte Ltd pursuant to a sale (per contract number 414270/501) of the said warrants, for the purpose of paying the same to the company, did dishonestly misappropriate the said proceeds, and you have thereby committed an offence punishable under section 406 of the Penal Code 1871."
+#ASSERT (`charge under s 406` `Carl Elias Moses, the charge amended`)'s punishment EQUALS "imprisonment for a term which may extend to 7 years, or with fine, or with both"
+
+-- Illustration (c): the section's own positive case, on the second limb.
+#ASSERT `commits criminal breach of trust` `the Penang agent, Illustration (c)`
+#ASSERT (`charge under s 406` `the Penang agent, Illustration (c)`)'s `made out`
+#ASSERT (`charge under s 406` `the Penang agent, Illustration (c)`)'s text EQUALS "You, A, are charged that you, on or about a date unknown, at A's place of business, Singapore, being entrusted by one Z of Penang with property, namely, $5,000 remitted to you by the said Z with directions to you to invest the same in Government securities, pursuant to an express or implied contract between you and the said Z that all sums remitted by the said Z to you shall be invested by you according to his direction, did dishonestly use the said moneys in violation of a legal contract, express or implied, which you had made touching the discharge of the said trust, and you have thereby committed an offence punishable under section 406 of the Penal Code 1871."
+
+-- Illustration (d): the same agent in good faith. The illustration says in
+-- terms that he has NOT committed criminal breach of trust, so this is the
+-- statute's own negative oracle for the `dishonestly` leaf.
+#ASSERT NOT (`commits criminal breach of trust` `the Penang agent in good faith, Illustration (d)`)
+#ASSERT NOT ((`charge under s 406` `the Penang agent in good faith, Illustration (d)`)'s `made out`)
+#ASSERT (`charge under s 406` `the Penang agent in good faith, Illustration (d)`)'s refusal EQUALS "A charge under section 406 would assert that the facts fulfil every legal condition of criminal breach of trust (CPC s 123(5)). On the facts given they do not: dishonestly — which governs misappropriation, conversion, use and disposal — or intentionally, which governs suffering any other person to do so; dishonestly misappropriates or converts to his own use THAT property, dishonestly uses or disposes of THAT property in violation of a direction of law or of a legal contract, or intentionally suffers any other person to do so — where “that property” is the property entrusted and nothing else; the elements of section 405 taken together."

@@ -1,0 +1,35 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+extortion-383-384.l4:335:1-48:
+  TRUE
+extortion-383-384.l4:336:1-58:
+  "You, Sarjit Singh Rapati, are charged that you, on or about 10 July 2003, at about 12.30 pm, at Newton Hawker Centre car-park, Singapore, together with one Paramjit Singh s/o Buta Singh (M/43 yrs, NRIC No. S1436488-I) and in furtherance of the common intention of you all, did extort cash of $200/- from one Mohammad Sharful Islam [“Sharful”], M/27 yrs by intentionally putting him in fear that you would continue to keep his cousin, one Md Faruq Ahmed [“Faruq”], M/23 yrs, in wrongful confinement, and you have thereby committed an offence punishable under section 384 read with section 34 of the Penal Code 1871."
+extortion-383-384.l4:337:1-86:
+  "A charge under section 384 would assert that the facts fulfil every legal condition of extortion (CPC s 123(5)). On the facts given they do not: dishonestly (section 24)."
+extortion-383-384.l4:338:1-80:
+  "A charge under section 384 would assert that the facts fulfil every legal condition of extortion (CPC s 123(5)). On the facts given they do not: thereby induces the person so put in fear; to deliver any property or valuable security, or anything signed or sealed which may be converted into a valuable security."
+extortion-383-384.l4:343:1-50:
+  assertion satisfied
+extortion-383-384.l4:344:1-52:
+  assertion satisfied
+extortion-383-384.l4:345:1-66:
+  assertion satisfied
+extortion-383-384.l4:346:1-294:
+  assertion satisfied
+extortion-383-384.l4:347:1-684:
+  assertion satisfied
+extortion-383-384.l4:348:1-166:
+  assertion satisfied
+extortion-383-384.l4:351:1-81:
+  assertion satisfied
+extortion-383-384.l4:352:1-97:
+  assertion satisfied
+extortion-383-384.l4:353:1-95:
+  assertion satisfied
+extortion-383-384.l4:354:1-268:
+  assertion satisfied
+extortion-383-384.l4:357:1-75:
+  assertion satisfied
+extortion-383-384.l4:358:1-403:
+  assertion satisfied
