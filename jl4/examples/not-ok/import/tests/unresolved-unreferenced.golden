@@ -9,11 +9,11 @@ File: unresolved-unreferenced.l4
   Code: <none>
   Message:
     I could not find a module with this name: zz-no-such-module-971
-    So nothing it defines is in scope here: any name you expected from it is reported separately as undefined.
+    Nothing it defines is in scope here; names you expected from it are reported as undefined.
     I have tried the following locations:
-    project:/zz-no-such-module-971.l4, zz-no-such-module-971.l4,
+    project:/zz-no-such-module-971.l4,
     $JL4_LIBRARY_PATH/zz-no-such-module-971.l4,
     $JL4_EXAMPLES/not-ok/import/zz-no-such-module-971.l4,
+    the stdlib embedded in this binary (skipped: JL4_LIBRARY_PATH is set),
     $XDG_DATA_JL4/libraries/zz-no-such-module-971.l4,
-    $EXE_DIR/../../libraries/zz-no-such-module-971.l4,
-    the stdlib embedded in this binary (skipped: JL4_LIBRARY_PATH is set)
+    $EXE_DIR/../../libraries/zz-no-such-module-971.l4

@@ -162,26 +162,38 @@ runs.
 
 ## When nothing resolves
 
-An `IMPORT` whose module cannot be found is an **error**, not a warning.
-It fails `l4 check`, `l4 run`, and every other command that loads the file — including when nothing in your file reads anything from that import.
+An `IMPORT` whose module cannot be found is an **error**, not a warning, and it is reported even when nothing in your file reads anything from that import.
 
 ```
 I could not find a module with this name: myhelpers
-So nothing it defines is in scope here: any name you expected from it is reported separately as undefined.
+Nothing it defines is in scope here; names you expected from it are reported as undefined.
 I have tried the following locations:
 project:/myhelpers.l4,
-file:///work/proj/myhelpers.l4,
 /work/proj/myhelpers.l4,
+the stdlib embedded in this binary (22 modules, not among them),
 /home/dev/.local/share/jl4/libraries/myhelpers.l4,
-/opt/l4/bin/../../libraries/myhelpers.l4,
-the stdlib embedded in this binary (22 modules, not among them)
+/opt/l4/bin/../../libraries/myhelpers.l4
 ```
 
-The list is every candidate from [the table above](#the-resolution-order), in the order it was tried, so a typo shows up as a name you do not recognise and a mis-set store shows up as a path you do not recognise.
+The list is every candidate from [the table above](#the-resolution-order), in that same tier order, so a typo shows up as a name you do not recognise and a mis-set store shows up as a path you do not recognise.
+Each location is listed **once**, however many tiers name it — the in-memory tier keys a file by URI and the filesystem tiers key it by path, so for a project whose root is the importing file's own directory (which is what the CLI uses) the same file arrives twice — and it is printed as the plain path, at the rank of the tier that spells it that way.
+The embedded stdlib sits at its own rank too — tier 4 in the table above — rather than at the end, which is where it used to be printed whatever its rank.
 
 The second line of the message is there because this is usually not the first error you see.
 A failed import produces one `I could not find a definition for the identifier` for every name it was supposed to supply, and those read like broken source rather than like a failed import.
 So if you are looking at a screen full of undefined identifiers, read the top of it.
+
+### Which commands fail on it
+
+**`l4 check` and `l4 run` exit non-zero** — and so does the bare `l4 <file>` form, which is `run`.
+Those two are the commands to gate a build or a pipeline on.
+
+**Every other command that loads the file prints the same error and still exits 0.**
+Measured on this tree, on a module that is otherwise fine: `render`, `nlg`, `trace`, `verify`, `openfisca`, `catala`, `docassemble`, and `export --to=dmn` / `--to=dmn-md` all print it and succeed.
+`l4 format` and `l4 ast` do not typecheck at all, so they neither report it nor fail.
+`l4 lts` and `l4 state-graph` print diagnostics only when the typecheck itself fails, so they say nothing about it.
+
+The reason is that only `check` and `run` weigh the whole set of diagnostics; every other command takes a successful typecheck as its verdict, and an unresolvable `IMPORT` does not stop a module from typechecking — which is the same blindness the repository's own corpus suite had until it was taught to fail on any structural error (`checkFile` in `jl4/tests/Main.hs`), so a corpus fixture can no longer go green with an unresolvable import.
 
 ### Module names that are not plain ASCII
 

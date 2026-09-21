@@ -13,7 +13,7 @@ module Main where
 import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Monad (unless, when)
-import Data.List (findIndex, isInfixOf, isPrefixOf, sort)
+import Data.List (findIndex, isInfixOf, isPrefixOf, nub, sort)
 import Data.Maybe (fromMaybe)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL8
@@ -38,7 +38,7 @@ import System.Directory
   )
 import System.Environment (getEnvironment, lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
-import System.FilePath ((</>))
+import System.FilePath ((</>), isAbsolute, normalise)
 import System.IO (hClose, hSetBinaryMode)
 import System.Process
   ( CreateProcess(..)
@@ -2172,8 +2172,13 @@ spec bin = do
           serr `shouldSatisfy` ("I have tried the following locations" `isInfixOf`)
           -- The message has to be reachable. Until #971 an unresolved import was
           -- reported as the importing module's own URI, so this run also said
-          -- "Your module depends on itself" -- three times, against one copy of
-          -- the message that says what is wrong.
+          -- "Your module depends on itself" -- TWICE on this fixture, against one
+          -- copy of the message that says what is wrong. (Measured 2026-09-21 on
+          -- a binary built at 57286d988: this fixture 2 under both `run` and
+          -- `check`; the unreferenced fixture below 3 under `run` and 1 under
+          -- `check`. The count is a function of how many rules ask for the
+          -- import, so it is a symptom to read rather than a constant: what is
+          -- asserted is that it is now zero.)
           serr `shouldSatisfy` (not . ("depends on itself" `isInfixOf`))
 
     it "fails even when nothing in the module reads the unresolved import" $
@@ -2193,6 +2198,37 @@ spec bin = do
               ++ "\n--- stderr ---\n" ++ serr
           serr `shouldSatisfy`
             ("could not find a module with this name: zz no such module 971" `isInfixOf`)
+
+    it "lists each location it looked in once, not once per tier" $
+      sandbox "l4-971-duplicate-locations"
+        [ ("importer.l4", "IMPORT `zz no such module 971`\n") ]
+        \dir -> do
+          -- The message is a list of places to go and look, so a place listed
+          -- twice is a reader sent somewhere they have already been. It happened
+          -- because the in-memory tier keys a candidate by URI and the
+          -- filesystem tiers key it by path: with the project root at the
+          -- importing file's own directory -- which is what the CLI sets it to,
+          -- from `takeDirectory` of the entry path -- those name one file, and
+          -- the list printed `file://zz no such module 971.l4` above
+          -- `zz no such module 971.l4`. A text-level `nub` cannot see that.
+          --
+          -- So this compares the entries as FILES, not as strings.
+          absDir <- makeAbsolute dir
+          Output _code _sout serr <- runIn dir ["check", "importer.l4"]
+          let listed = locationsTried serr
+              -- `project:` is the web IDE's own scheme and names no path.
+              paths = filter (not . ("project:" `isPrefixOf`)) listed
+              asFile e = normalise (if isAbsolute e then e else absDir </> e)
+          listed `shouldSatisfy` (not . null)
+          -- Every place looked in is named as a PATH. That is the property that
+          -- rules out the same file appearing once as a VFS URI and once as a
+          -- path: there is no URI left for it to appear as. Comparing the two
+          -- spellings instead would mean percent-decoding a `file:` URI and
+          -- resolving /var -> /private/var inside a test, to reach the same
+          -- conclusion.
+          filter ("file:" `isPrefixOf`) paths `shouldBe` []
+          -- ...and no location is listed twice.
+          nub (map asFile paths) `shouldBe` map asFile paths
 
   -- Track S0: `l4 export --to=dmn|dmn-md|bpmn [--fidelity-report]`.
   --
@@ -5362,3 +5398,24 @@ spec bin = do
       expectFail bin ["catala", errorFixture]
   where
     for_ xs f = mapM_ f xs
+
+
+-- | The locations an unresolved-IMPORT diagnostic says it tried, one per entry,
+-- as they appear in @l4@'s stderr. Entries are indented under the message and
+-- separated by a trailing comma; the embedded-stdlib entry is not a path and is
+-- dropped, which is also why a caller cannot just stop reading at it -- it sits
+-- at its own rank in the middle of the list.
+locationsTried :: String -> [String]
+locationsTried serr =
+  case break ("I have tried the following locations" `isInfixOf`) (lines serr) of
+    (_, [])          -> []
+    (_, _hdr : rest) ->
+      [ e
+      | l <- takeWhile ("    " `isPrefixOf`) rest
+      , let e = dropTrailingComma (dropWhile (== ' ') l)
+      , not ("the stdlib embedded" `isPrefixOf` e)
+      ]
+  where
+    dropTrailingComma e
+      | not (null e), last e == ',' = init e
+      | otherwise                   = e

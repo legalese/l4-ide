@@ -273,7 +273,16 @@ data LibraryResolution = LibraryResolution
     -- ^ /every/ candidate that exists, in precedence order — kept so callers
     -- can detect when a lower-priority copy is being shadowed (spec Option E)
   , candidates      :: ![LibraryCandidate]  -- ^ full ordered list probed
-  , searchedPaths   :: ![FilePath]          -- ^ filesystem paths probed (for the not-found diagnostic)
+  , searchedPaths   :: ![FilePath]          -- ^ filesystem paths probed
+  , tiersInOrder    :: ![LibraryCandidate]
+    -- ^ every tier in ladder order, for the not-found diagnostic, INCLUDING the
+    -- embedded one when @JL4_LIBRARY_PATH@ suppressed it. Distinct from
+    -- 'candidates', which lists only what was actually probed and whose 1-based
+    -- indices the winner line and the shadow warning cite: adding an unprobed
+    -- entry there would renumber both. The diagnostic needs the ladder rather
+    -- than the probe list, because it claims to print the locations in the order
+    -- they were tried, and the embedded tier's rank is 4 of 6 -- it used to be
+    -- appended last whatever its rank.
   , hasExplicitPath :: !Bool                -- ^ True if JL4_LIBRARY_PATH is set (embedded copy not consulted)
   }
 
@@ -314,9 +323,14 @@ resolveLibrary rootDirectory mImportingFile modName = do
       xdgCand      = FileCandidate "XDG data dir" (xdgDataDir </> "libraries" </> modName <.> "l4")
       bundledCand  = FileCandidate "VSCode bundle" (extensionRoot </> "libraries" </> modName <.> "l4")
 
-      cands = envCands <> [rootCand] <> siblingCands
-           <> [ EmbeddedCandidate | not hasExplicit ]
+      -- ONE definition of the ladder. 'cands' is what gets probed; 'tiers' is
+      -- what the not-found diagnostic lists. They differ in exactly one entry,
+      -- and writing the order out twice is how they would come to differ in
+      -- more than one.
+      tiers = envCands <> [rootCand] <> siblingCands
+           <> [EmbeddedCandidate]
            <> [xdgCand, bundledCand]
+      cands = [ c | c <- tiers, not (hasExplicit && c == EmbeddedCandidate) ]
 
       probe (i, c) = case c of
         FileCandidate _ p -> do
@@ -333,6 +347,7 @@ resolveLibrary rootDirectory mImportingFile modName = do
     , existing = present
     , candidates = cands
     , searchedPaths = [ p | FileCandidate _ p <- cands ]
+    , tiersInOrder = tiers
     , hasExplicitPath = hasExplicit
     }
 
@@ -394,12 +409,17 @@ roundTrippingFileUri fp
 data ImportOutcome = ImportOutcome
   { importUri  :: !(Maybe NormalizedUri)
   , vfsTried   :: ![NormalizedUri]
-  , pathsTried :: ![FilePath]
+  , libTried   :: ![LibraryCandidate]
+    -- ^ The filesystem + embedded ladder, in the order it was probed
+    -- ('LibraryResolution'’s @tiersInOrder@), so the not-found diagnostic can
+    -- list the locations in that order.
   , embedTried :: !EmbedStatus
-    -- ^ What happened at the embedded tier. Kept SEPARATE from 'pathsTried'
-    -- because the embed has no path, and the not-found diagnostic listed only
-    -- paths — so the one tier that can silently be empty was the one tier the
-    -- error could not mention. See 'renderEmbedStatus'.
+    -- ^ What happened at the embedded tier: 'libTried' says WHERE the embed sits
+    -- in the ladder, this says what came of consulting it — including that it was
+    -- not consulted at all. Separate because the embed has no path, and the
+    -- not-found diagnostic listed only paths, so the one tier that can silently
+    -- be empty was the one tier the error could not mention. See
+    -- 'renderEmbedStatus'.
   }
 
 -- | The embedded-stdlib tier, as the not-found diagnostic needs to describe it.
@@ -430,6 +450,93 @@ renderEmbedStatus = \ case
     , "  from `cabal install`, check that jl4-core.cabal's `data-files` field still"
     , "  precedes every section (`cabal check` reports it if not) and rebuild."
     ]
+
+-- | One location an unresolved import was tried at, as the not-found
+-- diagnostic lists it.
+data TriedLocation = TriedLocation
+  { display       :: !Text
+    -- ^ how this location is printed
+  , sameFileAs    :: !(Maybe FilePath)
+    -- ^ the absolute, normalised path this entry names, when it names a file at
+    -- all. Two entries sharing it are ONE location, however differently they are
+    -- spelled. 'Nothing' for the @project:@ VFS key and for the embedded stdlib,
+    -- neither of which is a path.
+  , spelledAsPath :: !Bool
+    -- ^ True when 'display' is a plain filesystem path rather than a URI
+  }
+
+-- | The not-found diagnostic's list of locations: one line per location, in tier
+-- order, spelled as a plain path wherever any of the entries for that location
+-- is one.
+--
+-- Deduped by 'sameFileAs' — the file — rather than by rendered text, because the
+-- VFS tier prints URIs and the filesystem tiers print paths, and when the project
+-- root is the importing file's own directory (which is what the CLI sets it to)
+-- those are the same file. So a CLI run printed
+--
+-- >     file://zz-nope.l4,
+-- >     zz-nope.l4,
+--
+-- two lines that read as a repeat, for one place looked in once; in an LSP
+-- session it was four lines for two locations. A text-level @nub@ cannot see
+-- that, because the two spellings differ.
+--
+-- The path spelling wins because the URI is a VFS key rather than anything the
+-- user wrote: @file://zz-nope.l4@ is a /relative/ @file:@ URI, which is not a
+-- location a reader can go and look at, while @zz-nope.l4@ is the name they
+-- typed. And the location is printed at the rank of the entry whose spelling
+-- won — so a file the VFS tier and a filesystem tier both name appears at the
+-- filesystem tier's rank, and the list comes out in the order of the ladder
+-- table the reader is about to compare it against
+-- (doc\/reference\/libraries\/resolution.md). Positioning it at its FIRST try
+-- instead was built and measured: it put the project directory above
+-- @$JL4_LIBRARY_PATH@, because the VFS probe of that directory precedes every
+-- filesystem tier, which is true and reads as wrong.
+dedupeTriedLocations :: [TriedLocation] -> [Text]
+dedupeTriedLocations locs =
+  [ l.display | (i, l) <- indexed, chosenIndex (keyOf l) == Just i ]
+  where
+    indexed = zip [0 :: Int ..] locs
+    -- A location with no path is keyed on its own text, which is what the
+    -- text-level `nub` did for every entry.
+    keyOf l = maybe (Left l.display) Right l.sameFileAs
+    chosenIndex k =
+      let grp = [ il | il@(_, l) <- indexed, keyOf l == k ]
+       in fst <$> (Maybe.listToMaybe (filter ((.spelledAsPath) . snd) grp)
+                   <|> Maybe.listToMaybe grp)
+
+-- | Every location an unresolved import was tried at, in the order it was tried,
+-- ready to print. 'makeAbsolute' is what makes two spellings of one file
+-- comparable; it reads the current directory and touches nothing else, and a
+-- failure falls back to the entry's own spelling, which still collapses exact
+-- duplicates.
+triedLocations :: ImportOutcome -> IO [Text]
+triedLocations outcome = do
+  vfs <- traverse vfsLoc outcome.vfsTried
+  lib <- traverse libLoc outcome.libTried
+  pure $ dedupeTriedLocations (vfs <> lib)
+  where
+    absKey p = either (\ (_ :: SomeException) -> normalise p) id <$> tryAny (makeAbsolute p)
+    vfsLoc u = do
+      key <- traverse (absKey . fromNormalizedFilePath) (uriToNormalizedFilePath u)
+      pure TriedLocation
+        { display = (fromNormalizedUri u).getUri
+        , sameFileAs = key
+        , spelledAsPath = False
+        }
+    libLoc = \ case
+      EmbeddedCandidate -> pure TriedLocation
+        { display = renderEmbedStatus outcome.embedTried
+        , sameFileAs = Nothing
+        , spelledAsPath = False
+        }
+      FileCandidate _ p -> do
+        key <- absKey p
+        pure TriedLocation
+          { display = Text.pack (normalise p)
+          , sameFileAs = Just key
+          , spelledAsPath = True
+          }
 
 -- | Resolve one bare-module-name import. This is the /single/ resolution code
 -- path shared by 'GetMixfixRegistry' (parser-hint resolution) and 'GetImports'
@@ -501,7 +608,7 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
       logWith recorder Info $ LogImportResolution $
         "Found in VFS: " <> (fromNormalizedUri vfsUri).getUri
       -- Resolved above the library tiers entirely, so the embed was never reached.
-      pure ImportOutcome { importUri = Just vfsUri, vfsTried = vfsUris, pathsTried = []
+      pure ImportOutcome { importUri = Just vfsUri, vfsTried = vfsUris, libTried = []
                          , embedTried = EmbedSkipped }
     Nothing -> do
       let mImportingNfp = uriToNormalizedFilePath importerUri
@@ -530,7 +637,7 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
             | otherwise           = EmbedMissing n
             where n = Map.size EmbeddedLibraries.embeddedLibraries
           outcome mUri = ImportOutcome
-            { importUri = mUri, vfsTried = vfsUris, pathsTried = res.searchedPaths
+            { importUri = mUri, vfsTried = vfsUris, libTried = res.tiersInOrder
             , embedTried = embedStatus }
 
       case res.winner of
@@ -704,33 +811,25 @@ jl4Rules evalConfig rootDirectory recorder = do
         mkImportUri (range, modName, outcome) = case outcome.importUri of
           Just u ->
             pure ([], Just u)
-          Nothing ->
-            -- nub, over NORMALISED paths: the CLI sets the project root to the
-            -- importing file's own directory, so the root and importer-relative
-            -- tiers coincide and the list used to repeat every path twice. `nub`
-            -- alone was not enough, because the two tiers can spell that one
-            -- directory differently -- the root candidate keeps whatever
-            -- spelling the root directory arrived with, while the sibling
-            -- candidate comes back through `fromNormalizedFilePath`, which is
-            -- `normalise`. Measured under `cabal test` on 2026-09-21: the two
-            -- differed by a `/./` inside the path, so the reader got two lines
-            -- that looked identical. Only the filesystem paths are normalised
-            -- here; the VFS entries are URIs, not paths.
-            let allPaths = List.nub
-                  ( map ((.getUri) . fromNormalizedUri) outcome.vfsTried
-                 <> map (Text.pack . normalise) outcome.pathsTried )
-                 <> [renderEmbedStatus outcome.embedTried]
-                diag = mkSimpleFileDiagnostic uri
+          Nothing -> do
+            -- One line per location, in probe order, deduped by the FILE rather
+            -- than by the spelling: see 'dedupeTriedLocations', which is where
+            -- both of those properties are argued and unit-tested. The embedded
+            -- tier is in 'libTried' at its own rank (tier 4 of the ladder), not
+            -- appended after everything else as it was until 2026-09-21: a list
+            -- that says it is in the order things were tried has to be.
+            allPaths <- liftIO $ triedLocations outcome
+            let diag = mkSimpleFileDiagnostic uri
                   $ mkSimpleDiagnostic
                     (fromNormalizedUri uri).getUri
                     (Text.unlines
                       [ "I could not find a module with this name: " <> Text.pack modName
-                      , "So nothing it defines is in scope here: any name you expected from it is reported separately as undefined."
+                      , "Nothing it defines is in scope here; names you expected from it are reported as undefined."
                       , "I have tried the following locations:"
                       , Text.intercalate ",\n" allPaths
                       ])
                     (fromSrcRange <$> range)
-             in pure ([diag], Nothing)
+            pure ([diag], Nothing)
 
         mkDiagsAndImports :: TopDecl Name -> Ap Action [([FileDiagnostic], Maybe ImportResult)]
         mkDiagsAndImports = \ case

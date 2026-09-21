@@ -77,8 +77,9 @@ L4 looks in more places than those two, and in a fixed order — a copy sitting 
 outranks the copy built into the compiler, for instance. [Library Resolution](resolution.md)
 sets out the whole order and when each step matters.
 
-An `IMPORT` that resolves to nothing is an error and fails the run, even if your file never uses
-anything from it; the message names the module and every location that was searched. See
+An `IMPORT` that resolves to nothing is an error, even if your file never uses anything from it: the
+message names the module and every location that was searched. It fails `l4 check` and `l4 run`;
+other commands print it and still exit 0. See
 [When nothing resolves](resolution.md#when-nothing-resolves).
 
 ## See Also

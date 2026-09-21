@@ -735,12 +735,12 @@ See [Libraries](../libraries/README.md) for the full list of available libraries
 
 ```
 I could not find a module with this name: modulename
-So nothing it defines is in scope here: any name you expected from it is reported separately as undefined.
+Nothing it defines is in scope here; names you expected from it are reported as undefined.
 I have tried the following locations:
 ...
 ```
 
-This is an error, not a warning: it fails `l4 check` and `l4 run` even when nothing in your file reads anything from the missing module. The message lists every place that was searched, in the order it was tried.
+This is an error, not a warning: it fails `l4 check` and `l4 run` even when nothing in your file reads anything from the missing module. The message lists every place that was searched once each, in the order it was tried. Other commands — `l4 render`, `l4 nlg` and the transpilers among them — print the same error and still exit 0; [When nothing resolves](../libraries/resolution.md#which-commands-fail-on-it) has the measured list.
 
 **What went wrong:** L4 could not find the module you are trying to import. L4 searches for modules in this order (first match wins):
 
