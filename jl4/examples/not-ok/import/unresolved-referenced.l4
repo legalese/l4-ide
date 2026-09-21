@@ -1,0 +1,21 @@
+-- An IMPORT that resolves to nothing, WITH a rule in this module that reads a
+-- name the import was meant to supply. Both errors below are expected, and the
+-- order they are written in is the point of the fixture: the IMPORT error says
+-- what is wrong, and the undefined identifier under it is the SYMPTOM that used
+-- to be the only thing a reader saw (smucclaw/l4-ide#971).
+--
+-- `zz-no-such-module-971` is deliberately the name of nothing: no file in this
+-- directory, no stdlib module, nothing in any ambient tier. The golden therefore
+-- records every location the resolver probed -- including two machine-global
+-- ones -- which is why `mkPathScrubber` in jl4/tests/Main.hs has to scrub the
+-- XDG store and the executable's own directory as well as the two prefixes it
+-- scrubbed before.
+--
+-- Its twin is `unresolved-unreferenced.l4`, which references nothing and so
+-- typechecks; between them they pin that a bad IMPORT fails in both cases.
+
+IMPORT `zz-no-such-module-971`
+
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+`cost of` amount MEANS amount TIMES `the missing rate`

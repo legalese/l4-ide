@@ -705,12 +705,20 @@ jl4Rules evalConfig rootDirectory recorder = do
           Just u ->
             pure ([], Just u)
           Nothing ->
-            -- nub: the CLI sets the project root to the importing file's own
-            -- directory, so the root and importer-relative tiers coincide and
-            -- the list used to repeat every path twice.
+            -- nub, over NORMALISED paths: the CLI sets the project root to the
+            -- importing file's own directory, so the root and importer-relative
+            -- tiers coincide and the list used to repeat every path twice. `nub`
+            -- alone was not enough, because the two tiers can spell that one
+            -- directory differently -- the root candidate keeps whatever
+            -- spelling the root directory arrived with, while the sibling
+            -- candidate comes back through `fromNormalizedFilePath`, which is
+            -- `normalise`. Measured under `cabal test` on 2026-09-21: the two
+            -- differed by a `/./` inside the path, so the reader got two lines
+            -- that looked identical. Only the filesystem paths are normalised
+            -- here; the VFS entries are URIs, not paths.
             let allPaths = List.nub
                   ( map ((.getUri) . fromNormalizedUri) outcome.vfsTried
-                 <> map Text.pack outcome.pathsTried )
+                 <> map (Text.pack . normalise) outcome.pathsTried )
                  <> [renderEmbedStatus outcome.embedTried]
                 diag = mkSimpleFileDiagnostic uri
                   $ mkSimpleDiagnostic

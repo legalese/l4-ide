@@ -35,6 +35,27 @@ oneshotL4ActionAndErrors evalConfig fp act = do
   errs <- getLog
   pure (errs, res)
 
+-- | 'oneshotL4ActionAndErrors' plus the structured diagnostics.
+--
+-- The rendered @[Text]@ is a log, so a caller reading it can only pattern-match
+-- on wording; the @[FileDiagnostic]@ carries severity and source, which is what
+-- a pass\/fail verdict needs. The golden suite uses this so that an Error
+-- published by a rule OTHER than the typechecker still counts as a failure:
+-- @GetImports@\'s unresolvable-IMPORT error does not block
+-- @SuccessfulTypeCheck@, so a module importing a module that does not exist and
+-- referencing nothing from it used to pass the suite while @l4 check@ failed it
+-- (smucclaw\/l4-ide#971).
+oneshotL4ActionAndDiagnostics
+  :: EvalConfig
+  -> FilePath
+  -> (NormalizedFilePath -> Action b)
+  -> IO ([Text], [FileDiagnostic], b)
+oneshotL4ActionAndDiagnostics evalConfig fp act = do
+  (getLog, recorder) <- fmap (cmapWithPrio pretty) <$> makeRefRecorder
+  (diags, res) <- oneshotL4ActionWithDiags recorder evalConfig fp act
+  errs <- getLog
+  pure (errs, diags, res)
+
 oneshotL4Action :: Recorder (WithPriority Log) -> EvalConfig -> FilePath -> (NormalizedFilePath -> Action b) -> IO b
 oneshotL4Action recorder evalConfig fp act = snd <$> oneshotL4ActionWithDiags recorder evalConfig fp act
 
