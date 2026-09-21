@@ -67,9 +67,10 @@ const piles = [
 // one a reader should be handed. A bare property name would have made a
 // STRUCTURE fixture look like it was exercising a token-game property.
 //
-// A FIDELITY entry is stored WITHOUT the trailing sentence that names the
-// sidecar, because that sentence carries the path as it was given on the command
-// line and this self-test passes absolute ones.
+// A FIDELITY entry is stored as the PREFIX up to the element list, for two
+// reasons: the tail names the sidecar by the path it was given on the command
+// line and this self-test passes absolute ones, and the element list is a
+// measurement that a change to the net would legitimately move.
 const EXERCISES = {
   "deadlock-boundary-in-rand.bpmn": "FAIL  S2 no deadlock",
   "deadlock-ror-in-rand.bpmn": "FAIL  S2 no deadlock",
@@ -86,7 +87,16 @@ const EXERCISES = {
   // checked in beside it with all nine of the notes it really carried, which is
   // what makes this a test of the rule rather than of a missing file.
   "historical-fork-undeclared-sibling-loss.bpmn":
-    'FIDELITY  End_3 "Breach" discards every remaining token, and up to 4 can be live',
+    'FIDELITY  End_3 "Breach" throws away up to 3 token(s) still in flight',
+  // The same rule, from the other side: not a historical file but today's fork
+  // golden with one `<errorEventDefinition>` put back, i.e. the defect
+  // RE-INTRODUCED. It exists because the rule as first written did not catch
+  // that — it also read the terminating end event's own `<documentation>`, and
+  // the exporter puts a counterfactual about error ends on exactly that element.
+  // The file keeps that documentation unedited; what changed is that nothing
+  // reads it.
+  "refork-counterfactual-documentation.bpmn":
+    'FIDELITY  EndBreach_0 "Breach" throws away up to 3 token(s) still in flight',
   "mislabelled-gateway-direction.bpmn":
     'STRUCTURE  exclusiveGateway Split_0 declares gatewayDirection="Diverging" ' +
     "but has 2 incoming and 2 outgoing sequence flow(s)",

@@ -1,6 +1,6 @@
 # Deliberately sound BPMN
 
-Hand-written diagrams that **must not be flagged**. They are the third pile the
+Diagrams that **must not be flagged**. They are the third pile the
 self-test reads, alongside `../expected/` (exporter goldens, also required to be
 sound) and `../unsound/` (required to be caught).
 
@@ -15,38 +15,97 @@ until it blocked the change that introduced it.
 | --------------------------- | ---------------------------------------------------------------- |
 | `joined-beside-breach.bpmn` | an error end event **terminates the instance**, discarding every remaining token |
 | `mi-subprocess-fork.bpmn` | a multi-instance sub-process is **played by copy-expansion**, and its escalation fan-in is the one place copies are not independent |
-| both of the above | and, since 2026-09-21, that a diagram which discards its siblings **says so on the end event that does it** — see below |
+| `terminate-upstream-of-split.bpmn` | that a run-stopping end event **upstream of a split discards nothing**, so the declaration rule must stay silent on it — see below |
 | `mi-subprocess-two-ways-to-done.bpmn` | an instance is finished by **whichever** of its paths reaches an end, not by all of them |
 | `mi-subprocess-throw-and-finish.bpmn` | an instance that **throws** is also **finished** — the escalation leaves, and the instance has no tokens left |
 | `mi-subprocess-every-instance-throws.bpmn` | the same, in its strongest form — EVERY instance throws and the scope still completes; the one fixture with a **measured engine** answer |
 
-## Two of these now carry a `<documentation>` on their breach end, and why
+## The declaration rule, and what these fixtures say about it
 
-`etc/check-bpmn-soundness.mjs` gained a third class of finding on 2026-09-21:
-a file with a terminating end event and more than one token live at once must
-declare that reaching that end throws the others away, or it FAILS. The rule and
-its two channels are written up in `../README.md` under "A terminating end beside
-concurrency owes a declaration".
+`etc/check-bpmn-soundness.mjs` gained a third class of finding on 2026-09-21: an
+end event that stops the whole run and measurably throws away a token something
+else was still holding must be declared in the fidelity report beside the file, or
+the check FAILS. The rule is written up in `../README.md` under "A terminating end
+beside concurrency owes a declaration".
 
-`joined-beside-breach.bpmn` (peak 2) and `mi-subprocess-fork.bpmn` (peak 4 at two
-instances) are both exactly that shape — they exist to pin the terminate reading,
-so of course they are — and neither has an exporter fidelity report beside it,
-being hand-written. So each declares it on the end event itself, in the second
-channel the rule allows: a `<bpmn:documentation>` on `End_Breach` and on `End_3`.
+**One fixture here is about the rule NOT firing.**
+`terminate-upstream-of-split.bpmn` is a run-stopping error end whose only feeder is
+a boundary event on the task BEFORE the split, so it can only ever fire while it
+holds the last token in flight. The net peaks at two tokens, so the rule's first
+version — which read peak concurrency — failed it, and nothing an author could
+write would have fixed that: the exporter writes no `P-NOJOIN` when the join was
+drawn, and there was no loss to declare anyway. Unlike its neighbours this file is
+captured `l4 export` output rather than hand-written, because that is the
+load-bearing half of the claim; the source it came from is quoted below. Its real
+`.fidelity.txt` sidecar is checked in beside it, deliberately: the rule only reads
+sidecars, so a file without one is NOT EVALUATED and would prove nothing.
 
-That is the better channel for these two anyway. A `.fidelity.txt` in this
-directory would be a hand-written file in the exporter's own report format, which
-is a thing a later reader could mistake for exporter output; a `<documentation>`
-is what somebody who opens the diagram in Camunda Modeler and clicks the end
-event actually reads. Both files still parse at **0 warnings** under
-`etc/validate-bpmn.mjs` (measured 2026-09-21, after the edit).
+**Two fixtures here really do discard siblings, and really are not evaluated.**
+`joined-beside-breach.bpmn` (1 token discarded) and `mi-subprocess-fork.bpmn` (3 at
+two instances) are exactly the rule's shape — they exist to pin the terminate
+reading, so of course they are — and being hand-written, neither has an exporter
+report beside it. A file with no report is NOT EVALUATED for the declaration rule,
+which is why they pass.
+
+Each of the two still carries a `<bpmn:documentation>` on its breach end saying
+what reaching it does, and that text is for a reader who opens the diagram in
+Camunda Modeler and clicks the end event. **Nothing mechanical reads it.** It was
+briefly a second channel of the rule, and that channel was removed on the day it
+was reviewed: the exporter puts a COUNTERFACTUAL about error ends on exactly that
+element, which the rule then accepted as a declaration. See
+`../unsound/refork-counterfactual-documentation.bpmn`. Both files parse at **0
+warnings** under `etc/validate-bpmn.mjs`, measured 2026-09-21 after the edit.
 
 `mi-subprocess-fork.bpmn`'s note says one more thing, because it has to: its
 top-level error end is the **pre-`fcd7ecb2c`** shape, the one that cancelled the
 members who had not breached, and the exporter stopped emitting it. The fixture
-keeps it deliberately — what it pins is how the checker plays a scope, not how
-the exporter draws one — and the note says so rather than leaving a reader to
-infer that the current exporter would emit this.
+keeps it deliberately — what it pins is how the checker plays a scope, not how the
+exporter draws one — and the note says so rather than leaving a reader to infer
+that the current exporter would emit this.
+
+## `terminate-upstream-of-split.bpmn`
+
+One ordinary obligation, then `consultation.l4`'s joinable `RAND` — the suite's
+only positive join case — placed after it. `End_6 "Breach"` is an error end and so
+terminates the instance; its only incoming flow comes from `Boundary_0`, attached
+to `Task_0`, strictly upstream of `Split_1`.
+
+Captured on 2026-09-21 from this source, with `JL4_LIBRARY_PATH` pointed at
+`jl4-core/libraries`:
+
+```
+DECLARE Participant IS ONE OF Resident, Developer, Registrar
+
+DECLARE Submission IS ONE OF
+  `open the consultation`
+  `file written comments`
+  `file a response`
+  `publish the record`
+
+`the staged consultation` MEANS
+  PARTY Registrar
+  MUST `open the consultation`
+  WITHIN 5
+  HENCE     (PARTY Resident MAY `file written comments`
+               HENCE PARTY Registrar MAY `publish the record`)
+        RAND (PARTY Developer MAY `file a response`)
+  LEST BREACH
+```
+
+```
+l4 export p1.l4 --to bpmn --rule 'the staged consultation' -o p1.bpmn --fidelity-report
+```
+
+The `.bpmn` here is that emission with a comment header added and the XML
+otherwise verbatim; the `.fidelity.txt` is that emission's report, unedited (seven
+notes: `F1` x4, `P-DEADLINE-UNIT`, `F2`, `F5` — and no `P-NOJOIN`, because the join
+WAS drawn).
+
+**It is not a golden.** The source is not committed under `../` and no row in
+`jl4/tests/BpmnExport.hs` regenerates it, because adding one would also need a row
+in `etc/bpmn-kie-baseline.txt` — which is a measurement from the jBPM harness and
+not something to invent. Re-capture it by hand if the exporter's output for this
+shape changes.
 
 ## `joined-beside-breach.bpmn`
 

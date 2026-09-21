@@ -234,19 +234,52 @@ two branches of a `RAND`, or several members of an `EVERY` — then reaching tha
 whatever the others still had to do. A duty one party had already earned disappears from the
 diagram, one flow after it was drawn.
 
-So: **where an exported diagram has an end event that stops the run AND can have more than one
-token live at once, the fidelity report has to say what becomes of the others.** If it does not,
+So: **where an exported diagram has an end event that stops the run and really can throw away a
+token somebody else was still holding, the fidelity report has to say so.** If it does not,
 `etc/check-bpmn-soundness.mjs` fails the file — it is a `FIDELITY` finding, distinct from the four
-liveness properties, and the four will all say PASS above it. The check is happy with either the
-`<name>.fidelity.txt` beside the file (a `lossy` or `blocking` note naming the end event) or a
-`<documentation>` on that end event.
+liveness properties, and the four will all say PASS above it.
+
+**"Really can" is measured, not assumed**, and the distinction is the whole difference between a
+useful check and one nobody can satisfy. The checker plays the token game, and for each such end
+event it asks: over every state in which this end event can fire, how many tokens were in flight
+besides the one it consumed? If the answer is none, the end event forfeits nothing and nothing is
+owed — a breach deadline hanging off a task that runs _before_ a split is exactly that case, and the
+checker says so out loud rather than staying silent:
+
+```
+info  End_6 "Breach" can only fire while it holds the last token in flight, so it
+      discards nothing and owes no declaration
+```
+
+An earlier version of this rule asked only whether the diagram was ever concurrent _anywhere_, which
+failed that file with nothing its author could have written to fix it. The witness is committed as
+`jl4/examples/bpmn/sound/terminate-upstream-of-split.bpmn`.
+
+**What counts as saying so** is a `lossy` or `blocking` note in the `<name>.fidelity.txt` beside the
+file, filed against the end event itself or against another element whose token that end event
+discards. Both halves are doing work. The severity matters because an `advisory` note is by
+definition one that forfeits nothing, and the exporter has a note that matches the wording and is
+advisory — `P-FORK-BREACH-UNMARKED`, which describes an error marking the end event does _not_ carry.
+The element matters because it is the pointer a reader follows from the report back to the diagram;
+an earlier version accepted the end event's _name_ anywhere in the note text, and since every
+terminating end in this corpus is called "Breach", that accepted almost anything.
+
+What the check does not do, so that nobody has to find out the hard way: it does not judge whether a
+note's prose is _about_ this loss. It can only insist that the note is filed at a severity that
+admits a loss, against an element the loss actually touches.
+
+**A diagram with no fidelity report beside it is not evaluated for this rule**, and says so. That is
+deliberate: `--fidelity-report` is optional, so the same XML would otherwise be sound or unsound
+depending on whether somebody passed the flag, and anyone checking a diagram they were handed — from
+Camunda Modeler, from a counterparty — would get a failure about a missing file rather than about
+their diagram. Emitting with `--fidelity-report` is what puts the file under the rule.
 
 Today the report says it as `P-NOJOIN`, whose wording is the one the rule was written from: a branch
-here can reach BREACH, "whose error end abandons its siblings rather than waiting for them". Of the
-sixteen committed BPMN goldens, two are that shape — `offering` and `tenancy-fork-beside-party`. Of
-the other fourteen, eight have such an end event but only ever one thing happening at a time, so
-there is nothing for it to abandon; the remaining six do run several things at once and have no such
-end event at all.
+here can reach BREACH, "whose error end abandons its siblings rather than waiting for them", filed
+against the split that forked the branches. Of the sixteen committed BPMN goldens, two are that
+shape — `offering` (up to 3 tokens thrown away) and `tenancy-fork-beside-party` (up to 4, at two
+members). Eight more have such an end event and measurably discard nothing; the remaining six run
+several things at once and have no run-stopping end event at all.
 
 Why this is a hard check and not another note: the gate had been **printing the evidence on every
 run**, as `121 marking(s) can reach completion ONLY by terminating`, and scoring the file sound —

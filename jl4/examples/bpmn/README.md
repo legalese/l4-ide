@@ -79,7 +79,7 @@ Three directories of `.bpmn`, read by `etc/check-bpmn-soundness.selftest.mjs`:
 | directory   | what it holds                    | required verdict                             |
 | ----------- | -------------------------------- | -------------------------------------------- |
 | `expected/` | exporter goldens, reproducible byte-for-byte by `l4 export` | SOUND       |
-| `sound/`    | hand-written diagrams the gate must **not** flag            | SOUND       |
+| `sound/`    | diagrams the gate must **not** flag — hand-written, plus one captured emission | SOUND       |
 | `unsound/`  | hand-written and historical diagrams the gate **must** catch | UNSOUND, on a named property — an `S`, a `STRUCTURE` or a `FIDELITY` |
 
 ## A quantified obligation is multi-instance — a task, or a whole scope
@@ -359,10 +359,9 @@ reported as information — `offering.bpmn` peaks at four, by design — and, si
 
 There is a third class of finding, printed as `FIDELITY`, and it is the one rule here that is not about the token game at all.
 
-**Where a file has at least one terminating end event AND more than one token can be live at once, it must carry a fidelity note saying that reaching that end throws the others away.**
+**Where an end event stops the whole run AND can measurably throw away a token something else was still holding, the file must carry a fidelity note saying so.**
 Otherwise the check FAILS.
 
-The two halves are exactly the two `info` lines this script was already printing.
 Terminating is a legitimate way to complete, so S1–S4 all pass on a diagram where one branch's `BREACH` cancels duties its siblings had already earned — and for four goldens they did, for four days, while the gate said so on every run under a severity nobody triages:
 
 ```
@@ -372,33 +371,68 @@ info  121 marking(s) can reach completion ONLY by terminating
 That is `fcd7ecb2c`'s own account of how the defect was found: not by the gate, by a reader asked specifically about concurrency.
 A gate that tells you the truth in a class nobody reads is not finished, so the observation is now a rule.
 
-What counts as the declaration is `declaresSiblingLoss` in the script, and it has two channels:
+#### "Can measurably throw away" is measured per end event, not read off `peak`
 
-- the `<name>.fidelity.txt` beside the file, where the note must be filed **`lossy` or `blocking`** and must name the end event by id or by name.
-  The severity is load-bearing: a declared loss IS a loss, and an `advisory` note is by its own definition one that forfeits nothing.
-  That is what keeps `P-FORK-BREACH-UNMARKED` from answering the question — it matches the wording and is `advisory`, because it describes the `errorEventDefinition` its end event does **not** carry, which is a counterfactual and not a declaration.
-- a `<documentation>` on the terminating end event itself, for a hand-written diagram with no exporter report.
-  There is no severity to read there, so the channel is narrower in compensation: that one element's own documentation, not any documentation in the file.
-  Measured 2026-09-21, the narrowing matters — the exporter puts "an error end event ends every active thread in the process" on the escalation boundary of every fork golden, which is true and is about a different end event.
+The first version of this rule fired when the net's PEAK concurrency exceeded one token, anywhere.
+That is an over-approximation, and the review of 2026-09-21 found what it costs: it does not ask whether the concurrency and the terminate ever MEET.
+Put one ordinary obligation in front of `consultation.l4`'s joinable `RAND` and the exporter emits a diagram that peaks at two tokens whose breach boundary hangs off the task BEFORE the split — so the terminate can only ever fire while it holds the last token, and it discards nothing.
+The old rule failed that file, and nothing its author could write would have fixed it: the exporter writes no `P-NOJOIN` when the join was drawn.
+`sound/terminate-upstream-of-split.bpmn` is that emission, checked in with its real sidecar.
 
-Green and red, both already in the tree and both used as controls:
+What the script does now, per terminating end event, is take the maximum over every reachable marking in which that end event can fire of "tokens in this marking, minus the one it consumes" — and it prints the answer either way:
 
-| file | peak | terminating end | verdict |
-| ---- | ---- | --------------- | ------- |
-| `expected/offering.bpmn` | 4 | `End_4 "Breach"` | passes, on `P-NOJOIN` (`lossy`) |
-| `expected/tenancy-fork-beside-party.bpmn` | 2 at n=0, 5 at n=2 | `End_3 "Breach"` | passes, on `P-NOJOIN` (`lossy`) |
-| `sound/joined-beside-breach.bpmn` | 2 | `End_Breach "Breach"` | passes, on the end event's own `<documentation>` |
-| `sound/mi-subprocess-fork.bpmn` | 4 at n=2 | `End_3 "Breach"` | passes, on the end event's own `<documentation>` |
-| `unsound/historical-fork-undeclared-sibling-loss.bpmn` | 4 at n=2 | `End_3 "Breach"` | **FAILS**, with S1–S4 all PASS |
+```
+info  End_6 "Breach" can only fire while it holds the last token in flight, so it
+      discards nothing and owes no declaration
+```
 
-The last row is byte-for-byte the tenancy fork as the exporter really emitted it before `fcd7ecb2c`, with the nine-note fidelity report it really carried checked in beside it.
-That pairing is the point: the fixture fails the rule while a report *exists*, so what is being tested is the rule and not a missing file.
+#### What counts as the declaration
+
+One channel: the `<name>.fidelity.txt` beside the file, where the note must be filed **`lossy` or `blocking`** and must be filed **against an element this loss touches** — the terminating end event itself, or a node whose token it discards (both ends of any sequence flow holding one, and any activity holding one; instance copies map back to their source ids).
+
+Both narrowings are load-bearing, and each replaced something weaker:
+
+- **Severity.** A declared loss IS a loss, and an `advisory` note is by its own definition one that forfeits nothing.
+  This is what keeps `P-FORK-BREACH-UNMARKED` from answering the question — it matches the wording and is `advisory`, because it describes the `errorEventDefinition` its end event does NOT carry, which is a counterfactual and not a declaration.
+- **The element.** The `element` field is the pointer a reader follows from report to diagram, so it is the thing to check.
+  The first version instead looked for the end event's id or `name` anywhere in the note's text, which is vacuous: every terminating end in this corpus is named "Breach" and the exporter's prose says "breach" constantly, so a `lossy` note filed against an unrelated element passed.
+
+**There is no longer a `<documentation>` channel, and its removal is a fix.**
+A hand-written diagram used to be able to declare the loss on the end event itself.
+Measured 2026-09-21, the only text in this corpus that matched was the exporter's own, and it sits on an `endEvent` — `EndBreach_0` in three `modals-*-fork` goldens and in `tenancy-fork`, `EndBreach_1` in `tenancy-fork-beside-party`, `End_3` in `sound/mi-subprocess-fork` — not on a boundary event, as an earlier version of this section claimed.
+So the per-element narrowing did not exclude it, and the sentence it matched is a counterfactual: "A plain end and not an error end: an error end event ends every active thread in the process, so it would cancel the instances of the members who did not breach."
+Re-mark that end event as an error end and the pre-`fcd7ecb2c` defect passed SOUND, declared by a sentence saying the opposite.
+`unsound/refork-counterfactual-documentation.bpmn` is that file, and it is red now.
+
+**A file with no sidecar beside it is NOT EVALUATED for this rule**, and says so in an `info` line.
+`--fidelity-report` is opt-in, so otherwise byte-identical XML is sound or unsound according to how it was emitted — measured: emitting `tenancy-fork-beside-party`'s XML without the flag produced a byte-identical file and exit 1 — and anyone checking a diagram they were handed got a failure about a missing file.
+The consequence to know: `sound/`'s hand-written diagrams are hand-written and have no sidecar, so two of them really do discard siblings and really are not evaluated.
+Their `<documentation>` still says what happens, for a reader in Camunda Modeler; nothing mechanical reads it.
+
+#### Green and red, all in the tree
+
+| file | discarded, measured | terminating end | verdict |
+| ---- | ------------------- | --------------- | ------- |
+| `expected/offering.bpmn` | up to 3 | `End_4 "Breach"` | passes, on `P-NOJOIN` (`lossy`) filed on `Split_1` |
+| `expected/tenancy-fork-beside-party.bpmn` | 1 at n=0, 4 at n=2 | `End_3 "Breach"` | passes, on `P-NOJOIN` (`lossy`) filed on `Split_0` |
+| `sound/terminate-upstream-of-split.bpmn` | **0** (peak is 2) | `End_6 "Breach"` | passes because nothing is owed |
+| `sound/joined-beside-breach.bpmn` | 1 | `End_Breach "Breach"` | NOT EVALUATED: no sidecar |
+| `sound/mi-subprocess-fork.bpmn` | 3 at n=2 | `End_3 "Breach"` | NOT EVALUATED: no sidecar |
+| `unsound/historical-fork-undeclared-sibling-loss.bpmn` | 3 at n=2 | `End_3 "Breach"` | **FAILS**, with S1–S4 all PASS |
+| `unsound/refork-counterfactual-documentation.bpmn` | 3 at n=2 | `EndBreach_0 "Breach"` | **FAILS**, with S1–S4 all PASS |
+
+The two red rows are a pair on purpose.
+The first is byte-for-byte the tenancy fork as the exporter really emitted it before `fcd7ecb2c`, with the nine-note report it really carried beside it — so it fails the rule while a report EXISTS, which is what makes it a test of the rule rather than of a missing file.
+The second is today's fork with the error marking put back, which is the same defect arriving as a regression rather than as history.
 
 Measured over the sixteen goldens on 2026-09-21, the other fourteen are silent for one of two reasons, and the split is worth knowing because only one of them is stable.
-Eight have a terminating end and peak at **one** token, so there is never a sibling to abandon: `option`, the three `regcf-*`, `tenancy-barrier`, `modals-may-barrier`, `modals-shant-barrier` and `modals-must-barrier-both-deadlines`.
-Six peak **above** one and have no terminating end event at all — `consultation`, `handover`, and the four forks, whose breach ends stopped being error ends at `fcd7ecb2c`.
-That second group is one commit away from owing a declaration: give a fork back a top-level error end and the rule fires, which is exactly what `unsound/historical-fork-undeclared-sibling-loss.bpmn` is.
-Mutation-tested 2026-09-21 on scratch copies of the two passing goldens: deleting the sibling-loss sentence, demoting `P-NOJOIN` to `advisory`, renaming the end event so the note no longer names it, and deleting the sidecar outright each turn exit 0 into exit 1.
+Eight have a terminating end event that discards nothing: `option`, the three `regcf-*`, `tenancy-barrier`, `modals-may-barrier`, `modals-shant-barrier` and `modals-must-barrier-both-deadlines`.
+Six have no terminating end event at all — `consultation`, `handover`, and the four forks, whose breach ends stopped being error ends at `fcd7ecb2c`.
+That second group is one commit away from owing a declaration, which is exactly what the second red fixture is.
+
+Mutation-tested 2026-09-21 on scratch copies of the two passing goldens, baseline exit 0 for both: deleting the sibling-loss sentence from `P-NOJOIN`'s `lost:` line, demoting `P-NOJOIN` from `lossy` to `advisory` and nothing else, and re-filing `P-NOJOIN` on `Start_0` — an element the loss cannot touch — each turn exit 0 into exit 1.
+Deleting the sidecar outright now leaves exit 0, deliberately, per the NOT EVALUATED rule above.
+
 
 S1 and S2 are the properties the deadlocking join violated, and
 `unsound/` holds two reconstructions of that shape to prove the check fires on
