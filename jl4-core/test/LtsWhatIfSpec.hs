@@ -29,6 +29,13 @@
 --      and the tick past opening + WITHIN breaches, both before any event
 --      (the WITHIN re-anchored on the opening) and after an early act (the
 --      residual's due counted from the opening, not the clock);
+--  11. a pattern that BINDS describes a SET of acts, and the what-if
+--      answers for the set by replaying one act drawn from it: a binder
+--      that IS the whole action (any act by the bearer), one in an
+--      argument with no guard (any value), and one a PROVIDED guard names
+--      (any value the guard accepts). A witness the contract passes over,
+--      and a set no witness could be built for, stay refused — and say so
+--      in their own words, not in the unforced-local one.
 --  10. an action that NAMES a local the residual holds unforced — a member's
 --      pattern-bound `amount` read through a fork's HENCE; a rule GIVEN no
 --      event has compared yet — is refused before any replay, with the
@@ -50,7 +57,7 @@ import L4.EvaluateLazy.Machine (emptyEnvironment, pattern ValFulfilled)
 import L4.Lts.Marking
 import L4.Lts.WhatIf
 import L4.Print (prettyLayout)
-import L4.Syntax (DeonticModal (..))
+import L4.Syntax (DeonticModal (..), getOriginal)
 import L4.TracePolicy (apiDefaultPolicy)
 
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
@@ -184,6 +191,77 @@ aContractSrc = Text.unlines
   , ""
   , "#TRACE aContract AT 0 WITH"
   , "  PARTY S DOES delivery AT 2"
+  ]
+
+-- 11. the whole action is the binder: jl4/examples/ok/contracts.l4's
+--     aContract at the file's own first #TRACE, where `return` names
+--     nothing the file declares, so the pattern binds it and B doing
+--     ANYTHING discharges the contract. No constructor wraps the binder, so
+--     there is no declared type to read a value from; the witness is an act
+--     the #TRACE itself writes ('authoredAct').
+aReturnSrc :: Text.Text
+aReturnSrc = Text.unlines
+  [ "DECLARE Person IS ONE OF B, S"
+  , "DECLARE Action IS ONE OF"
+  , "  delivery"
+  , "  payment HAS amount IS A NUMBER"
+  , "  foo"
+  , ""
+  , "aContract MEANS"
+  , "  PARTY S"
+  , "  MUST delivery"
+  , "  WITHIN 3"
+  , "  HENCE"
+  , "    PARTY B"
+  , "    MUST payment price PROVIDED price >= 20"
+  , "    WITHIN 3"
+  , "    HENCE (IF price = 20 THEN FULFILLED ELSE PARTY B MUST return WITHIN 10)"
+  , "    LEST"
+  , "      PARTY B"
+  , "      MUST EXACTLY payment fine"
+  , "      WITHIN 3"
+  , "  WHERE"
+  , "  fine MEANS 10"
+  , ""
+  , "#TRACE aContract AT 0 WITH"
+  , "  PARTY S DOES delivery AT 2"
+  , "  PARTY B DOES payment 21 AT 4"
+  , "  (`WAIT UNTIL` 10)"
+  ]
+
+-- 11'. the same shape with nothing authored to draw a witness from: the set
+--      is still named, and the refusal says plainly that nothing was tried.
+aReturnFreshSrc :: Text.Text
+aReturnFreshSrc = Text.unlines $ prologue <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS PARTY Alice MUST whatever WITHIN 10"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  ]
+
+-- 12. an argument binder with no guard: `amount` is one of `pay`'s declared
+--     fields, so its type is the type checker's own and the simplest value
+--     of it is 0 — which the contract takes, because the rule binds the
+--     amount and does not test it.
+payAnySrc :: Text.Text
+payAnySrc = Text.unlines $ prologue <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS PARTY Alice MUST pay amount WITHIN 10"
+  , ""
+  , "#TRACE c AT 0 WITH"
+  ]
+
+-- 12'. the same, with a guard the witness does NOT satisfy. The witness is
+--      the guard's own other side (20), and 20 is not MORE than 20, so the
+--      contract passes it over — which confirms nothing about the set, and
+--      is reported as untried rather than as the contract's answer for
+--      every amount.
+payOverSrc :: Text.Text
+payOverSrc = Text.unlines $ prologue <>
+  [ "GIVETH DEONTIC Person Action"
+  , "c MEANS PARTY Alice MUST pay amount PROVIDED amount GREATER THAN 20 WITHIN 10"
+  , ""
+  , "#TRACE c AT 0 WITH"
   ]
 
 -- 9. the window's opening edge: AFTER 5 WITHIN 10 is [5, 15]. Two
@@ -385,11 +463,16 @@ spec = describe "LTS-VISUALISER §2.4 / P2c: the enabled set by replay" $ do
       [ Row (ActOf "Alice" "deliver" 0) (Advances ["in effect: Bob MUST pay 50 WITHIN 5"])
       , Row (TickAt 11 ["Alice"]) Discharges ]
 
-  it "4. aContract one event in: `payment price` binds and is listed Untried; the tick advances to the LEST" $ do
+  it "4/13. aContract one event in: `payment price PROVIDED price >= 20` is tried with the guard's own threshold and DISCHARGES; the tick advances to the LEST" $ do
+    -- Until 2026-09-21 the first row was `CouldNot "B" "payment price"`,
+    -- Untriable, "the action binds `price`, which the what-if cannot
+    -- choose" — the tier-3 half of LTS-VISUALISER §7.7 point 2. The
+    -- witness is the guard's other side, 20; the HENCE is
+    -- `IF price = 20 THEN FULFILLED`, so it discharges.
     es <- enabledAt 0 aContractSrc
     es.esPosition.posClock `shouldBe` 2
     map row es.esOutcomes `shouldBe`
-      [ Row (CouldNot "B" "payment price") Untriable
+      [ Row (ActOf "B" "payment price" 2) Discharges
       -- the source writes EXACTLY, so the deontic printer keeps it, in its own
       -- bracketed form — the same form `l4 run`'s DEONTIC print uses. The
       -- LEST's WITHIN 3 counts from the missed deadline (5), not from the
@@ -398,10 +481,77 @@ spec = describe "LTS-VISUALISER §2.4 / P2c: the enabled set by replay" $ do
       -- from the runtime on 2026-09-17, when that change was rebased over
       -- this module; it read WITHIN 3 before it.
       , Row (TickAt 6 ["B"]) (Advances ["in effect: B MUST (EXACTLY (payment OF fine)) WITHIN 2"]) ]
-    -- and the reason names the binder
     case es.esOutcomes of
-      (o : _) -> o.ocCandidate.cdHypothetical `shouldBe` Left "the action binds `price`, which the what-if cannot choose"
+      (o : _) -> case o.ocCandidate.cdBound of
+        Just b -> do
+          b.baScope `shouldBe` BoundArgument
+          map (prettyLayout . getOriginal) b.baBinders `shouldBe` ["price"]
+          -- the guard is printed as the rule wrote it, and it is what
+          -- narrows the set
+          b.baGuard `shouldBe` Just "price AT LEAST 20"
+          -- the witness is the guard's own other side, not a value invented here
+          fmap (map (prettyLayout . snd)) b.baWitness `shouldBe` Right ["20"]
+          -- and the act that was replayed carries it
+          fmap (prettyLayout . (.hyAction)) o.ocCandidate.cdHypothetical `shouldBe` Right "payment OF 20"
+        Nothing -> expectationFailure "expected a bound act"
       []      -> expectationFailure "no outcomes"
+
+  it "11. the whole action is the binder: B does ANYTHING and the contract is fulfilled, checked on an act the #TRACE itself writes" $ do
+    es <- enabledAt 0 aReturnSrc
+    es.esPosition.posClock `shouldBe` 10
+    map row es.esOutcomes `shouldBe`
+      [ Row (ActOf "B" "return" 10) Discharges
+      , Row (TickAt 15 ["B"]) (Breaches (Just "B")) ]
+    case es.esOutcomes of
+      (o : _) -> case o.ocCandidate.cdBound of
+        Just b -> do
+          b.baScope `shouldBe` BoundWholeAction
+          b.baGuard `shouldBe` Nothing
+          map (prettyLayout . getOriginal) b.baBinders `shouldBe` ["return"]
+          -- `delivery` is the first act the #TRACE writes; the what-if did
+          -- not invent it, and the replay is what says it discharges
+          fmap (map (prettyLayout . snd)) b.baWitness `shouldBe` Right ["delivery"]
+        Nothing -> expectationFailure "expected a bound act"
+      []      -> expectationFailure "no outcomes"
+
+  it "11'. a whole-action binder with nothing authored to try: the set is named, the refusal says nothing was replayed, and it is not the unforced-local sentence" $ do
+    es <- enabledAt 0 aReturnFreshSrc
+    map row es.esOutcomes `shouldBe`
+      [ Row (CouldNot "Alice" "whatever") Untriable
+      , Row (TickAt 11 ["Alice"]) (Breaches (Just "Alice")) ]
+    case es.esOutcomes of
+      (o : _) -> do
+        o.ocCandidate.cdHypothetical `shouldBe`
+          Left "the rule binds `whatever`, so any act by this party would match; no witness could be built to check that (this #TRACE writes no act of its own to try), so nothing was replayed"
+        o.ocSteps `shouldBe` []
+      [] -> expectationFailure "no outcomes"
+
+  it "12. an argument binder with no guard: any amount counts, checked with the simplest value of its declared type" $ do
+    es <- enabledAt 0 payAnySrc
+    map row es.esOutcomes `shouldBe`
+      [ Row (ActOf "Alice" "pay amount" 0) Discharges
+      , Row (TickAt 11 ["Alice"]) (Breaches (Just "Alice")) ]
+    case es.esOutcomes of
+      (o : _) -> case o.ocCandidate.cdBound of
+        Just b -> do
+          b.baScope `shouldBe` BoundArgument
+          b.baGuard `shouldBe` Nothing
+          fmap (map (prettyLayout . snd)) b.baWitness `shouldBe` Right ["0"]
+        Nothing -> expectationFailure "expected a bound act"
+      [] -> expectationFailure "no outcomes"
+
+  it "12'. a guard the witness does not satisfy: the pass-over is reported as untried, not as the contract's answer for every amount" $ do
+    es <- enabledAt 0 payOverSrc
+    map row es.esOutcomes `shouldBe`
+      [ Row (ActOf "Alice" "pay amount" 0) Untriable
+      , Row (TickAt 11 ["Alice"]) (Breaches (Just "Alice")) ]
+    case es.esOutcomes of
+      (o : _) -> do
+        -- the bare replay still says what the machine said; only the
+        -- verdict is held back, because one value proves nothing about the rest
+        o.ocVerdict `shouldBe`
+          Untried "the rule binds `amount`, which the condition amount GREATER THAN 20 tests; the one value tried, `amount` = 20, was passed over, so what would discharge it is not confirmed here"
+      [] -> expectationFailure "no outcomes"
 
   it "5. a barrier of three, nobody acted: each member's act ADVANCES to 1 of 3; the tick breaches" $ do
     es <- enabledAt 0 barrierSrc
@@ -457,7 +607,7 @@ spec = describe "LTS-VISUALISER §2.4 / P2c: the enabled set by replay" $ do
       Just (rig, tr : _) -> pure (rig, tr)
       _ -> fail "no rig"
     pos <- position rig tr >>= maybe (fail "no position") pure
-    cands <- candidatesOf pos
+    cands <- candidatesOf rig tr pos
     tick <- case [ c | c@MkCandidate {cdKind = TickPast 10 _} <- cands ] of
       (c : _) -> pure c
       []      -> fail "no tick candidate at 10"

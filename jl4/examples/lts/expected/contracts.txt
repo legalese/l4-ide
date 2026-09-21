@@ -7,11 +7,13 @@ aContract — after 3 events, the clock stands at 10 (the #TRACE on line 23)
   Owed now:
     - B MUST return — due by 14 (4 from now)
 
+  What would discharge it (the contract ends fulfilled):
+    - B does anything now (at 10) → fulfilled
+      any act by B counts: the rule binds `return` rather than naming an act
+      checked by replaying one act from that set, with `return` = delivery
+
   What would put someone in breach:
     - nothing happens by 14 (the clock reaches 15) → B is in breach: MUST return was due by 14; the clock reached 15 without it
-
-  What could not be tried:
-    - B does return — the action binds `return`, which the what-if cannot choose
 
   Next deadline: 14 (B: return)
 

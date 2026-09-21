@@ -11,8 +11,10 @@
 -- * @every-run-example@ is the reference page's own pair with events, so
 --   its step log shows a barrier counting up to its release and a fork
 --   continuing per member.
--- * @contracts@ is the classic corpus: a live position with a candidate
---   the what-if cannot instantiate, and two explicit breaches.
+-- * @contracts@ is the classic corpus: a live position whose only act is
+--   a bare pattern BINDER — @PARTY B MUST return@, where @return@ names
+--   nothing the file declares — so it is where the list has to say that
+--   ANY act by B discharges the contract, and two explicit breaches.
 -- * @after-example@ is the AFTER reference page's own file: a window with
 --   an opening edge (EVERY-EACH-QUANTIFIER-SPEC §5.1.2), seen from an early
 --   act — the deadline listed from the OPENING, not the clock, the act
@@ -215,7 +217,7 @@ spec = do
         other -> expectationFailure ("expected four reports, got " <> show (length other))
 
   describe "contracts: a live position" $ do
-    it "the first trace owes B a return, lists the tick as breaching and the act as untriable" $ do
+    it "the first trace owes B a return, lists the tick as breaching and ANY act by B as discharging" $ do
       reports <- reportsOf (cases !! 0)
       case reports of
         (rp : _) -> do
@@ -224,5 +226,11 @@ spec = do
           fmap fst rp.rpNext `shouldBe` Just 14
           let txt = renderReport False rp
           txt `shouldSatisfy` Text.isInfixOf "B MUST return — due by 14 (4 from now)"
-          txt `shouldSatisfy` Text.isInfixOf "What could not be tried:"
+          -- LTS-VISUALISER §7.7 point 2: until 2026-09-21 this said
+          -- "What could not be tried:" and named the binder. The set is
+          -- the answer; the witness is how it was checked.
+          txt `shouldSatisfy` Text.isInfixOf "B does anything now (at 10) → fulfilled"
+          txt `shouldSatisfy` Text.isInfixOf "any act by B counts: the rule binds `return` rather than naming an act"
+          txt `shouldSatisfy` Text.isInfixOf "checked by replaying one act from that set, with `return` = delivery"
+          txt `shouldNotSatisfy` Text.isInfixOf "What could not be tried:"
         [] -> expectationFailure "no reports"
