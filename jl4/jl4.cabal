@@ -40,7 +40,6 @@ executable l4
     filepath,
     hls-graph,
     lsp-types,
-    optics,
     process,
     text,
     time,

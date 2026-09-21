@@ -980,6 +980,52 @@ with `@lang he` and an untagged herald produces the identical attachment to a mo
 untaggable (R-M1), no Arabic, no projection locale, and no change to the Ofek encodings — GM
 owns collapsing the 56 tags now that `@lang` exists.
 
+### 8a.3 The residue §8a.1 left — a herald on a rule head's INPUT, shipped 2026-09-21
+
+§8a.1's ruling settled where an annotation ATTACHES.
+It left open what a herald attaching to an input means when the rule's head names that input a second time, which is the shape both Ofek encodings use throughout.
+The answer the two projections gave was not the same answer, and that is the defect (smucclaw/l4-ide#972).
+
+**Measured 2026-09-21, before the change.**
+`l4 render` read such a herald as the RULE's sentence: `L4.Export.Document.decideNlg` searches the appform's arguments deliberately and its comment says so.
+`l4 nlg` read it as the input's gloss, because `L4.Nlg`'s `Linearize` instance for `Resolved` is handed one name at a time with no way up to the enclosing `DECIDE`.
+So a positional call site printed the rule's bare name and a `WITH` call site printed the sentence in the `where` clause — the loss was per CALL SITE, not per file.
+
+| encoding | heralds in that shape | read by `l4 render` | read by `l4 nlg` |
+| --- | --- | --- | --- |
+| canon `il/ofek-hadash-2008/encodings/legalese` (the vendored mirror) | 65 | 65 | 0 |
+| canon `il/ofek-hadash-2008/encodings/legalese-he-revoiced` | 56 | 56 | 0 |
+
+**RULED by the measurement, not by preference: the rule's sentence.**
+Every one of the 121 heralds above, and the 67 in `jl4-core/libraries/prelude.l4` that write `null list @nlg %list% is empty`, is prose about the rule rather than a label for its input.
+`L4.Nlg.promoteHeadInputNlg` therefore MOVES such a herald onto the rule before linearizing, through the same `L4.Nlg.decideNlg` lookup `l4 render` uses — one function now, where there had been two hand-kept copies and, for `l4 nlg`, none.
+It moves rather than copies: left on the input as well, the sentence printed twice in one line at a named-argument call site.
+
+**Three exclusions, each forced by a measurement rather than chosen.**
+
+- **A rule that heralds itself** keeps its own sentence; the lookup finds it before the appform.
+- **A herald written in the `GIVEN`** stays an input gloss. `l4 nlg` is RIGHT about that case and `l4 render` is wrong — measured, `GIVEN amount IS A NUMBER @nlg the sum of money` on a head with no input renders as "P seven holds if the sum of money." Agreement is not worth propagating a wrong answer, so each projection was fixed from whichever side was right. **This exclusion is not the one you would write first**: a head with no arguments does not arrive with an empty argument list, because `L4.TypeCheck.checkTermAppFormTypeSigConsistency` hoists the `GIVEN`'s term names into it. The hoist applies `clearSourceAnno`, so a hoisted argument has no source range, and that is the only thing telling the two apart. The first cut of the function did promote it.
+- **A head carrying an `AKA`** is untouched; the herald lands on the `AKA`'s name rather than on an argument, and no placement on such a head satisfies both projections. That is a different defect and needs its own issue.
+
+**What it moved, measured over every committed `.nlg.golden`** (420 unchanged, 10 changed, 99 not comparable because their modules do not typecheck and the CLI writes diagnostics to stderr while the golden appends them):
+
+- `ok/nlg-percent.l4`, two lines — its two inline `[…]` annotations written after the head's input. `l4 render` already printed exactly those two sentences, so this is the agreement arriving.
+- six modules of the vendored canon mirror, 119 lines across them. **Those may not be re-blessed in this repository** (`CLAUDE.md` §3.1), so they stay red here and a canon-side re-bless plus an `etc/sync-canon.mjs --bump` is owed.
+- three `not-ok/nlg/*` goldens whose prose is byte-identical; they differ only in the diagnostics block, which is an artifact of comparing a CLI run against a golden and not a change.
+
+`l4 render` is byte-identical over 425 corpus files before and after, which is the point: the change is one-directional.
+
+**What the mirror's red goldens expose, and it is not this change.**
+The canon encoding writes multi-word input names unbackticked inside the percent signs, and such a marker does not resolve — it prints literally.
+All 35 `%slot%` markers in the mirror are in that state, and 8 of the 39 in the revoiced encoding.
+`l4 render` has always printed those raw markers (`the salary table%the teacher% is placed in`); making the sentence reach `l4 nlg` is what makes it a second witness.
+So the canon-side follow-up is a re-bless AND a backticking sweep, in that order of discovery and the reverse order of fixing.
+
+**Still owed: the cross-module case.**
+`promoteHeadInputNlg` folds over the module it is given, so a call to a heralded rule defined in an IMPORTED module still prints the bare name — the prelude's 67 among them.
+`l4 render` handles that, and it needs a different key to do it: `L4.Export.Document.nlgFnInfo` is keyed by `(name, arity)` rather than by `Unique` precisely because each module is resolved independently and a call site does not share a `Unique` with its definition.
+Extending the promotion across imports therefore means a second mechanism, and it would move goldens wherever a directive calls a prelude function — measured as zero of the 10 changed goldens above, because every heralded rule the corpus reaches is defined in the module that calls it.
+
 ## 9. Reproducing the measurements
 
 All inputs are already deposited; nothing needs re-fetching.

@@ -86,6 +86,7 @@ import L4.Export
 import L4.Interchange.Fidelity
   (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), emptyReport)
 import L4.Nlg (simpleLinearizer)
+import qualified L4.Nlg as Nlg
 import L4.Parser.SrcSpan (SrcRange)
 import L4.Relational.IR
 import L4.Syntax
@@ -611,27 +612,17 @@ linearNlg = \case
 
 -- | The @\@nlg@ attached to a @DECIDE@, __wherever it landed__.
 --
--- Authors place it differently for @MEANS@ (where it attaches to an appform
--- argument) and for @DECIDE … IF@ (where it attaches to the head name), so all
--- of the declaration's annotation-bearing positions are searched. Same positions
--- and same order as @L4.Export.Document.decideNlg@ (@Document.hs:301-310@),
--- which is private to that module and whose comment records that the list was
--- arrived at by measurement rather than by reading the grammar — plus the
--- enclosing @TopDecl@\'s own annotation, where an annotation written above the
--- declaration lands and where @L4.Dmn.Lower@ looks first (@Dmn\/Lower.hs:3754@).
--- Measured on @jl4\/examples\/relational\/tiers.l4@: a @\@ref@ written on the
--- line above @GIVEN@ is found /only/ there.
+-- The search is 'L4.Nlg.decideNlg'; this wrapper only supplies the enclosing
+-- @TopDecl@\'s own annotation, where an annotation written above the declaration
+-- lands and where @L4.Dmn.Lower@ looks first (@Dmn\/Lower.hs:3754@). Measured on
+-- @jl4\/examples\/relational\/tiers.l4@: a @\@ref@ written on the line above
+-- @GIVEN@ is found /only/ there.
+--
+-- It used to restate the whole position list, kept in step with
+-- @L4.Export.Document.decideNlg@ by hand and with @l4 nlg@ not at all — which is
+-- how the three came to disagree (smucclaw\/l4-ide#972).
 decideNlg :: Anno -> Decide Resolved -> Maybe Nlg
-decideNlg outer (MkDecide decAnno (MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm afAnno headName appArgs _) body) =
-  foldr (<|>) Nothing $
-       [ outer ^. annNlg
-       , decAnno ^. annNlg
-       , afAnno ^. annNlg
-       , body ^. annoOf % annNlg
-       , getOriginal headName ^. annoOf % annNlg
-       ]
-    <> [ getOriginal a ^. annoOf % annNlg | a <- appArgs ]
-    <> [ getOriginal r ^. annoOf % annNlg | MkOptionallyTypedName _ r _ _ <- names ]
+decideNlg outer = Nlg.decideNlg (Just outer)
 
 -- | The citation itself, without its herald.
 --

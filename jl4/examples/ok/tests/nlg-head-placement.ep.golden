@@ -1,0 +1,223 @@
+-- Where an `@nlg` herald may sit relative to a rule's head, and which consumer
+-- reads what. smucclaw/l4-ide#972.
+--
+-- The rule PR #433 landed is that an annotation attaches to what it sits with:
+-- trailing a line it describes what is on that line, starting a line of its
+-- own it describes what follows. What that left unsaid is what happens when
+-- the head carries an INPUT, because then the last thing the herald sits with
+-- may be the input rather than the rule. The appform argument is that input's
+-- BINDING occurrence (L4.TypeCheck.ensureNameConsistency does `def` on it, not
+-- `mkref`), so the herald lands on the input.
+--
+-- WHAT THE TWO PROJECTIONS USED TO DO ABOUT THAT, and why it was a defect
+-- rather than a placement rule. `l4 render` reads such a herald as the RULE's
+-- sentence, on purpose -- L4.Export.Document.decideNlg searches the appform's
+-- arguments and its comment says so. `l4 nlg` did not, because its Linearize
+-- instance for Resolved sees only the Name a call site resolves to, with no way
+-- back up to the enclosing DECIDE. Same bytes, two answers: measured over the
+-- nine modules of canon's il/ofek-hadash-2008/encodings/legalese, 65 heralds
+-- written, 65 read by `l4 render`, 0 by `l4 nlg`.
+--
+-- L4.Nlg.promoteHeadInputNlg now MOVES such a herald onto the rule before
+-- linearizing, using the same L4.Nlg.decideNlg lookup `l4 render` uses, so
+-- every row below reads the same in both projections. It moves rather than
+-- copies: left on the input as well, the sentence printed twice in one line at
+-- a named-argument call site, once as the heading and again as the input's
+-- gloss.
+--
+-- Measured 2026-09-21, one rule per row. Every row carries BOTH a positional
+-- and a `WITH` directive, because the loss used to be per CALL SITE -- a
+-- positional call printed the bare name while a `WITH` call printed the
+-- sentence as the input's gloss -- and the `.nlg.golden` beside this file is
+-- what pins that the two columns now agree.
+--
+--   #  head shape                      herald placement        nlg positional  nlg WITH   render
+--   1  DECIDE `r` IF ...               trailing the head       herald          herald     herald
+--   2  DECIDE `r` IF ...               own line above          herald          herald     herald
+--   3  `r` MEANS ...                   trailing the head       herald          herald     herald
+--   4  `r` MEANS ...                   own line above          herald          herald     herald
+--   5  `r` p MEANS ...                 trailing the head       herald          herald     herald
+--   6  `r` p MEANS ...                 own line above          herald          herald     herald
+--   7  `r` p / herald / MEANS ...      own line BELOW the p    herald          herald     herald
+--   8  DECIDE `r` p IS ...             trailing the head       herald          herald     herald
+--   9  `r` / herald / p MEANS ...      own line ABOVE the p    herald          herald     herald
+--  10  `r` p AKA `a` / herald / MEANS  own line below the AKA  herald          herald     BARE
+--  11  herald / `r` p AKA `a` MEANS    own line above          BARE NAME       BARE NAME  herald
+--  12  `r` p q / herald / MEANS ...    own line below the q    herald          herald     herald
+--  13  herald / `r` p / herald / MEANS both                    OUTER           OUTER      OUTER
+--
+-- Rows 5, 7, 8 and 12 are the repair. Before it they printed the bare rule name
+-- positionally; rows 1-4, 6 and 9 already read the herald and are unchanged,
+-- which is the point of keeping them here -- the fix must not disturb the
+-- placements that already worked.
+--
+-- Three things the table settles, and none is what you would guess.
+--
+-- (a) The variable was never `DECIDE` versus `MEANS`, and it was never trailing
+-- versus own line. Rows 9 and 6 both put the herald on a line of its own and
+-- both always reached the rule; row 9 does it from INSIDE the head, above the
+-- input. The condition was which name the herald was written after, and the
+-- repair is that it no longer matters.
+--
+-- (b) Row 13 is why the repair cannot be "always promote". A rule that heralds
+-- ITSELF above its head keeps that sentence: L4.Nlg.decideNlg finds the rule's
+-- own annotation before it reaches the appform arguments, so nothing is moved
+-- and the inner herald stays the input's gloss. An author who writes both meant
+-- two different things.
+--
+-- (c) An `AKA` on the head is a SEPARATE axis and this change does not touch
+-- it. Row 10 reaches `l4 nlg` (the AKA's name claims the herald) and not
+-- `l4 render`; row 11 reaches `l4 render` and not `l4 nlg`. So on an `AKA` head
+-- there is still no placement that satisfies both. That is not #972 -- the
+-- herald there is not on an appform argument -- and it needs its own issue.
+--
+-- The prelude writes row 5's shape 67 times (`null list @nlg %list% is empty`),
+-- so those 67 sentences reach a positional `l4 nlg` call for the first time
+-- under this change. That is the intended effect, not a side effect.
+
+-- Row 1: DECIDE, trailing the head.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `row one` @nlg row one saw %amount%
+  IF amount GREATER THAN 100
+
+#EVAL `row one` 200
+#EVAL `row one` WITH amount IS 200
+
+-- Row 2: DECIDE, own line above the head.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+@nlg row two saw %amount%
+DECIDE `row two` IF amount GREATER THAN 100
+
+#EVAL `row two` 200
+#EVAL `row two` WITH amount IS 200
+
+-- Row 3: MEANS, trailing the head.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+`row three` @nlg row three saw %amount%
+  MEANS amount GREATER THAN 100
+
+#EVAL `row three` 200
+#EVAL `row three` WITH amount IS 200
+
+-- Row 4: MEANS, own line above the head.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+@nlg row four saw %amount%
+`row four` MEANS amount GREATER THAN 100
+
+#EVAL `row four` 200
+#EVAL `row four` WITH amount IS 200
+
+-- Row 5: MEANS with the input in the head, herald trailing. The prelude's own
+-- shape, 67 times over. The herald lands on `amount` and is moved to the rule.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+`row five` amount @nlg row five saw %amount%
+  MEANS amount GREATER THAN 100
+
+#EVAL `row five` 200
+#EVAL `row five` WITH amount IS 200
+
+-- Row 6: input in the head, herald on its own line ABOVE the head. This is the
+-- placement the reference page recommends, and rows 5, 7, 8 and 12 now render
+-- identically to it.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+@nlg row six saw %amount%
+`row six` amount MEANS amount GREATER THAN 100
+
+#EVAL `row six` 200
+#EVAL `row six` WITH amount IS 200
+
+-- Row 7: the input in the head, herald on a line of its own BELOW it. The shape
+-- every one of the 65 heralds in canon's Ofek Hadash encoding uses, and the
+-- shape the issue was filed about.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+`row seven` amount
+    @nlg row seven saw %amount%
+    MEANS amount GREATER THAN 100
+
+#EVAL `row seven` 200
+#EVAL `row seven` WITH amount IS 200
+
+-- Row 8: the same shape as row 5 under the `DECIDE ... IS` spelling, which is
+-- why neither the repair nor this table keys on the keyword.
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+DECIDE `row eight` amount @nlg row eight saw %amount%
+  IS amount TIMES 0.1
+
+#EVAL `row eight` 200
+#EVAL `row eight` WITH amount IS 200
+
+-- Row 9: INSIDE the head but ABOVE the input. This is the counterexample to
+-- "an annotation inside a head describes the input": the herald is written
+-- after the rule's name and before the input, so the rule claimed it all along
+-- and nothing is moved here.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+`row nine`
+    @nlg row nine saw %amount%
+    amount
+    MEANS amount GREATER THAN 100
+
+#EVAL `row nine` 200
+#EVAL `row nine` WITH amount IS 200
+
+-- Row 10: an AKA on the head, herald on a line of its own below it. The AKA's
+-- name claims the herald, so it is not on an appform argument, nothing is
+-- moved, and the pre-existing asymmetry stands: `l4 nlg` prints it and
+-- `l4 render` prints its own paraphrase. Pinned so that a later change to the
+-- AKA case has to notice this file.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+`row ten` amount AKA `row ten alias`
+    @nlg row ten saw %amount%
+    MEANS amount GREATER THAN 100
+
+#EVAL `row ten` 200
+#EVAL `row ten` WITH amount IS 200
+
+-- Row 11: the same AKA head with the herald ABOVE it. `l4 render` finds it;
+-- `l4 nlg` prints the bare name, and still does -- the herald is not on an
+-- appform argument, so this repair does not reach it. The one row in this table
+-- where the two projections still disagree, kept visible on purpose.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+@nlg row eleven saw %amount%
+`row eleven` amount AKA `row eleven alias` MEANS amount GREATER THAN 100
+
+#EVAL `row eleven` 200
+#EVAL `row eleven` WITH amount IS 200
+
+-- Row 12: TWO inputs. The herald attaches to the LAST one, and that is the one
+-- moved. Worth pinning, because "the input" is ambiguous in a head that carries
+-- several, and because the `where` clause below shows both inputs recovering
+-- their own names once the sentence has moved off the second one.
+GIVEN floor IS A NUMBER
+      amount IS A NUMBER
+GIVETH A BOOLEAN
+`row twelve` floor amount
+    @nlg row twelve saw %amount% over %floor%
+    MEANS amount GREATER THAN floor
+
+#EVAL `row twelve` 100 200
+#EVAL `row twelve` WITH floor IS 100, amount IS 200
+
+-- Row 13: the rule ALSO heralds itself above its head. The rule's own sentence
+-- wins in both projections and the inner herald stays the input's gloss, so an
+-- author who writes both still gets both. This is the case that makes the
+-- repair conditional rather than unconditional.
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+@nlg row thirteen the rule saw %amount%
+`row thirteen` amount
+    @nlg row thirteen the input
+    MEANS amount GREATER THAN 100
+
+#EVAL `row thirteen` 200
+#EVAL `row thirteen` WITH amount IS 200

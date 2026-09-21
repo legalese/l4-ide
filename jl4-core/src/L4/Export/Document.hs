@@ -38,7 +38,6 @@ module L4.Export.Document
 
 import Base
 
-import Control.Applicative ((<|>))
 import qualified Base.Text as Text
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
@@ -54,6 +53,7 @@ import L4.Desugar (carameliseNode)
 import L4.Export (isExportedDecide)
 import L4.Mixfix (MixfixInfo (..), MixfixPatternToken (..))
 import L4.Nlg (simpleLinearizer, unescapeNlgText)
+import qualified L4.Nlg as Nlg
 import L4.Syntax
 import L4.Names (stripSectionBinderElaborations)
 import L4.TypeCheck.Types (CheckInfo (..), FunTypeSig (..), MixfixRegistry (..))
@@ -299,20 +299,15 @@ nlgFnInfo mods = Map.fromList
   , Just nlg <- [ decideNlg d ]
   ]
 
--- | The @\@nlg@ annotation attached to a DECIDE, wherever it landed: authors
--- place it differently for the @MEANS@ shorthand (lands on an appform argument)
--- vs the @DECIDE … IF@ form (lands on the head name), so we look in all of the
--- declaration's annotation-bearing positions.
+-- | The @\@nlg@ annotation attached to a DECIDE, wherever it landed.
+--
+-- One line now, because the search itself moved to 'L4.Nlg.decideNlg' — this
+-- module, 'L4.Relational.Lower' and @l4 nlg@ had three different answers for the
+-- same bytes while two of them kept the same list of positions by hand
+-- (smucclaw\/l4-ide#972). The enclosing 'TopDecl'\'s annotation is not
+-- available here, hence the 'Nothing'.
 decideNlg :: Decide Resolved -> Maybe Nlg
-decideNlg (MkDecide decAnno (MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm afAnno headName appArgs _) body) =
-  foldr (<|>) Nothing $
-       [ decAnno ^. annNlg
-       , afAnno ^. annNlg
-       , body ^. annoOf % annNlg
-       , getOriginal headName ^. annoOf % annNlg
-       ]
-    <> [ getOriginal a ^. annoOf % annNlg | a <- appArgs ]
-    <> [ getOriginal r ^. annoOf % annNlg | MkOptionallyTypedName _ r _ _ <- names ]
+decideNlg = Nlg.decideNlg Nothing
 
 substNlgInUnit :: Map.Map (Text, Int) (Nlg, [Unique]) -> Unit -> Unit
 substNlgInUnit info u = case u.uDecl of

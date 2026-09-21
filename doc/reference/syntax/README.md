@@ -267,6 +267,62 @@ DECIDE `is large` IF amount GREATER THAN 100
 own, it describes what follows.** That is the whole rule, and it holds whether
 the thing is a rule, a parameter, a field or a type declaration.
 
+**A head that names its own inputs is the case that used to need a warning here, and no longer does.**
+A rule may name its inputs twice, once in the `GIVEN` and again in the head, and an annotation written after an input's name in the head lands on that INPUT rather than on the rule.
+It is read as the rule's sentence anyway: whichever of the four places an annotation lands in — above the head, trailing the head, inside the head, under the input — the rule gets it.
+
+```l4
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+@nlg the claim of %amount% is large              -- above the head
+`is large` amount MEANS amount GREATER THAN 100
+
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+`is large` amount
+    @nlg the claim of %amount% is large          -- under the input: the same
+    MEANS amount GREATER THAN 100
+```
+
+Both render as `the claim of \`amount\` is large`, at every call site and in every projection.
+
+**Until 2026-09-21, only one projection agreed with that.**
+`l4 render` read such an annotation as the rule's sentence; `l4 nlg` read it as the input's gloss, so a positional call printed the rule's bare name and a `WITH` call printed the sentence in the `where` clause instead of as the heading.
+Measured over the nine modules of the Ofek Hadash encoding in the regression corpus: 65 annotations written in that shape, 65 read by `l4 render`, none by `l4 nlg`.
+If you are reading a document produced before that date and its headings are bare names, this is why.
+
+The measured table, in case you are reading this because output surprised you.
+Each row is one rule; the two `l4 nlg` columns are a positional call and a `WITH` call of that same rule.
+
+| #   | head shape                     | annotation placement   | `l4 nlg` positional | `l4 nlg` `WITH` | `l4 render` |
+| --- | ------------------------------ | ---------------------- | ------------------- | --------------- | ----------- |
+| 1   | `DECIDE` name                  | trailing the head      | sentence            | sentence        | sentence    |
+| 2   | `DECIDE` name                  | own line above         | sentence            | sentence        | sentence    |
+| 3   | name, then `MEANS`             | trailing the head      | sentence            | sentence        | sentence    |
+| 4   | name, then `MEANS`             | own line above         | sentence            | sentence        | sentence    |
+| 5   | name and input, then `MEANS`   | trailing the head      | sentence            | sentence        | sentence    |
+| 6   | name and input, then `MEANS`   | own line above         | sentence            | sentence        | sentence    |
+| 7   | name and input, then `MEANS`   | own line under input   | sentence            | sentence        | sentence    |
+| 8   | `DECIDE` name and input        | trailing the head      | sentence            | sentence        | sentence    |
+| 9   | name, then input, then `MEANS` | own line BEFORE input  | sentence            | sentence        | sentence    |
+| 10  | name and input with `AKA`      | own line after the AKA | sentence            | sentence        | **bare**    |
+| 11  | name and input with `AKA`      | own line above         | **bare name**       | **bare name**   | sentence    |
+
+Rows 5, 7 and 8 are the ones that changed; rows 1 to 4, 6 and 9 always read the sentence and still do.
+The row numbers are the rule names in [`jl4/examples/ok/nlg-head-placement.l4`](../../../jl4/examples/ok/nlg-head-placement.l4), whose committed golden pins both `l4 nlg` columns, and a CLI test pins the `l4 render` one — so a change to any cell is a test failure rather than stale prose here.
+
+**A head carrying an `AKA` is the one shape where the two projections still disagree**, rows 10 and 11.
+The annotation lands on the `AKA`'s name rather than on an input, which is a different question from this one, and no placement on such a head satisfies both projections.
+Write the sentence above the head if the document matters more, under the `AKA` if `l4 nlg` does.
+
+**Where the sentence goes when you write it in the `GIVEN` instead.**
+That is an input gloss and stays one — it labels the input in a `WITH` call's `where` clause, and it is not the rule's sentence.
+Which occurrence BINDS is what decides this, not which line you wrote on: when the head names the input, the head is the binding occurrence and the `GIVEN` is a reference back to it, so a gloss written in the `GIVEN` there reaches nothing at all.
+Put a sentence for the rule on the rule and a gloss for an input in the `GIVEN` of a head that does not repeat it.
+
+**Two annotations in the same language on one input collide**, neither attaches, and both projections fall back to their own paraphrase.
+L4 reports that separately, as an ambiguity naming the input.
+
 **An empty `@nlg` is ignored, and says so.** A rendering replaces what it
 annotates, so `@nlg` with nothing after it would erase the name from the
 output rather than leave it alone. L4 drops it and warns instead.

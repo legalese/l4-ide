@@ -1,6 +1,11 @@
 module L4.Nlg (
   simpleLinearizer,
+  linearizeDirectives,
   selectLanguage,
+  NlgSite (..),
+  decideNlg,
+  decideNlgSite,
+  promoteHeadInputNlg,
   Linearize (..),
   lin,
   unescapeNlgText,
@@ -8,6 +13,8 @@ module L4.Nlg (
 
 import Base
 import qualified Base.Text as Text
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 
 import L4.Annotation
 import L4.Lexer (LangTag, PosToken, isNlgEscapable)
@@ -99,6 +106,198 @@ selectLanguage mlang    m = over (gplate @Name) promote m
   promote n = case nlgFor mlang (getAnno n) of
     Nothing -> n
     Just r  -> n & annoOf %~ setNlg r
+
+-- ----------------------------------------------------------------------------
+-- Where a DECIDE's @nlg landed, and what to do about a head's input
+-- ----------------------------------------------------------------------------
+
+-- | Which annotation-bearing position of a @DECIDE@ its @\@nlg@ was found in.
+--
+-- Only 'decideNlgSite' produces these, and only 'promoteHeadInputNlg' reads
+-- them; 'decideNlg' throws the site away. It exists because exactly one caller
+-- has to tell an INPUT's annotation apart from the rule's own, and inferring
+-- that from the 'Nlg' after the fact is not possible — the same sentence can
+-- legitimately sit in either place.
+data NlgSite
+  = NlgOnDeclaration
+    -- ^ The enclosing 'TopDecl'\'s annotation, the @DECIDE@\'s own, the app
+    -- form's, or the body's. All four mean "the rule", so they are one case.
+  | NlgOnHeadName
+    -- ^ The rule's name in its head.
+  | NlgOnHeadInput Resolved
+    -- ^ An appform argument THE AUTHOR WROTE IN THE HEAD, which is that input's
+    -- BINDING occurrence. This is the case the two projections used to disagree
+    -- about; see 'promoteHeadInputNlg'.
+  | NlgOnHoistedInput Resolved
+    -- ^ An appform argument the TYPE CHECKER put there. A head with no arguments
+    -- gets the @GIVEN@\'s term names hoisted into it
+    -- (@L4.TypeCheck.checkTermAppFormTypeSigConsistency@, whose own @TODO@ says
+    -- "the appform occurrences aren't truly there"), so an annotation found on
+    -- one of these was written in the @GIVEN@ and is an input gloss.
+    --
+    -- The two are told apart by whether the argument still has a source range:
+    -- the hoist applies 'L4.Annotation.clearSourceAnno', which sets @range@ to
+    -- 'Nothing'. That is the only place in the pipeline where an appform argument
+    -- has no range, and it is exactly the distinction that matters here.
+  | NlgOnGivenName Resolved
+    -- ^ A @GIVEN@ name that is not in the appform at all — in practice a type
+    -- variable, which @filter isTerm@ leaves out of the hoist.
+  deriving stock (Show, Eq, Generic)
+
+-- | The @\@nlg@ attached to a @DECIDE@, __wherever it landed__, with the
+-- position it was found in.
+--
+-- __One lookup, three projections.__ Authors place a herald differently for
+-- @MEANS@ (where it lands on an appform argument) and for @DECIDE … IF@ (where
+-- it lands on the head name), so every annotation-bearing position of the
+-- declaration is searched. This used to be two hand-kept copies of the same
+-- list — one private to 'L4.Export.Document', one in 'L4.Relational.Lower' —
+-- and @l4 nlg@ had no copy at all, which is exactly how the three came to
+-- disagree (smucclaw\/l4-ide#972). It is one function now, and the order below
+-- is the order both copies had.
+--
+-- The optional 'Anno' is the enclosing 'TopDecl'\'s, where an annotation
+-- written above the declaration lands; pass 'Nothing' where you do not have it.
+-- Measured on @jl4\/examples\/relational\/tiers.l4@: a @\@ref@ written on the
+-- line above @GIVEN@ is found /only/ there.
+decideNlgSite :: Maybe Anno -> Decide Resolved -> Maybe (NlgSite, Nlg)
+decideNlgSite mouter (MkDecide decAnno (MkTypeSig _ (MkGivenSig _ names) _) (MkAppForm afAnno headName appArgs _) body) =
+  -- 'asum' rather than @foldr (<|>) Nothing@: same first-Just semantics, and
+  -- '<|>' is not in scope in this module.
+  asum $
+       [ (NlgOnDeclaration,) <$> (outer ^. annNlg) | outer <- toList mouter ]
+    <> [ (NlgOnDeclaration,) <$> decAnno ^. annNlg
+       , (NlgOnDeclaration,) <$> afAnno ^. annNlg
+       , (NlgOnDeclaration,) <$> body ^. annoOf % annNlg
+       , (NlgOnHeadName,)    <$> getOriginal headName ^. annoOf % annNlg
+       ]
+    <> [ (siteOfAppArg a,)   <$> getOriginal a ^. annoOf % annNlg | a <- appArgs ]
+    <> [ (NlgOnGivenName r,) <$> getOriginal r ^. annoOf % annNlg | MkOptionallyTypedName _ r _ _ <- names ]
+ where
+  siteOfAppArg a
+    | isJust (rangeOf (getOriginal a)) = NlgOnHeadInput a
+    | otherwise                        = NlgOnHoistedInput a
+
+-- | 'decideNlgSite' without the position — the shape both exporters want.
+decideNlg :: Maybe Anno -> Decide Resolved -> Maybe Nlg
+decideNlg mouter = fmap snd . decideNlgSite mouter
+
+-- | Move a herald written on a rule head's INPUT onto the rule, so a call site
+-- linearizes the author's sentence instead of the rule's bare name.
+--
+-- __The defect this repairs, and the narrow shape of it__ (smucclaw\/l4-ide#972,
+-- measured 2026-09-21). A head may name its inputs a second time —
+-- @\`is large\` amount MEANS …@ — and the appform argument is then that input's
+-- BINDING occurrence, because 'L4.TypeCheck.ensureNameConsistency' does @def@ on
+-- it and @mkref@ on the @GIVEN@ one. A herald written after it therefore sits
+-- with the INPUT. 'decideNlgSite' searches the appform arguments on purpose, so
+-- @l4 render@ reads such a herald as the rule's sentence; this linearizer's
+-- 'Linearize' instance for 'Resolved' sees only the 'Name' a call site resolves
+-- to, so at a POSITIONAL call site it printed the rule's bare name. Same bytes,
+-- two answers. Measured over the nine modules of canon's
+-- @il\/ofek-hadash-2008\/encodings\/legalese@: 65 heralds written, 65 read by
+-- @l4 render@, 0 by @l4 nlg@.
+--
+-- __A rewrite rather than a change to 'Linearize', for the reason
+-- 'selectLanguage' gives.__ Every consumer of an annotation reads 'annNlg' and
+-- nothing else, and 'Linearize' is handed one node at a time with no way back up
+-- to the enclosing @DECIDE@. Putting the sentence where the readers already look
+-- makes them all agree without any of them being touched.
+--
+-- __It MOVES rather than copies, and that is the judgement in here.__ Leaving the
+-- herald on the input as well prints the sentence twice in one line at a
+-- named-argument call site — once as the call's heading and again as the input's
+-- gloss. After the move, a head that repeats its input renders exactly as the
+-- same rule with the herald written above its head, which is the placement the
+-- reference page recommends; the two become indistinguishable, which is what
+-- "the projections agree" has to mean.
+--
+-- __Three cases it deliberately leaves alone.__
+--
+--   * A rule whose head name carries its own herald: 'decideNlgSite' finds that
+--     one first, so nothing is promoted and the rule keeps the sentence its
+--     author wrote for it.
+--   * A herald written in the @GIVEN@ ('NlgOnHoistedInput', or 'NlgOnGivenName'
+--     for a type variable). That is a genuine input gloss, and @l4 nlg@ already
+--     gets it right while @l4 render@ does not — measured,
+--     @GIVEN amount IS A NUMBER \@nlg the sum of money@ on a head with no input
+--     renders as "P seven holds if the sum of money." Agreement is not worth
+--     propagating a wrong answer into a second projection, so the disagreement is
+--     fixed from whichever side is right about each case. The @GIVEN@ side is a
+--     separate defect and needs its own issue.
+--
+--     This exclusion is load-bearing and it is not the one you would write first.
+--     A head with no arguments does not reach here with an empty @appArgs@ list:
+--     the type checker hoists the @GIVEN@\'s term names into it, so the herald IS
+--     found on an appform argument and a naive @NlgOnHeadInput@ test promotes it.
+--     Measured — that is exactly what the first cut of this function did to the
+--     probe above.
+--   * A collision — two heralds in one language on one input — attaches neither,
+--     so there is nothing to find and nothing to move.
+promoteHeadInputNlg :: Module Resolved -> Module Resolved
+promoteHeadInputNlg m
+  | Map.null promote = m
+  | otherwise        = over (gplate @Resolved) fixup m
+ where
+  (promote, suppress) = foldTopLevelDecides collect m
+
+  collect :: Decide Resolved -> (Map Unique (Nlg, [Nlg]), Set Unique)
+  collect d@(MkDecide _ _ (MkAppForm _ headName _ _) _) =
+    case decideNlgSite Nothing d of
+      Just (NlgOnHeadInput input, nlg) ->
+        ( Map.singleton (getUnique headName)
+            (unslot nlg, fmap unslot (getOriginal input ^. annoOf % annNlgAlts))
+        , Set.singleton (getUnique input)
+        )
+      _ -> mempty
+
+  fixup :: Resolved -> Resolved
+  fixup r
+    | Just (nlg, alts) <- Map.lookup (getUnique r) promote =
+        overBothNames (annoOf %~ setNlgs nlg alts) r
+    | Set.member (getUnique r) suppress =
+        overBothNames (annoOf %~ (annNlg .~ Nothing) . (annNlgAlts .~ [])) r
+    | otherwise = r
+
+-- | Apply a function to both 'Name's a 'Resolved' carries.
+--
+-- 'traverseResolved' deliberately reaches only the ACTUAL name, and that is not
+-- enough here: 'Linearize' for 'Resolved' consults the ORIGINAL at a referring
+-- occurrence, and the original is a copy taken when the reference was resolved,
+-- so writing to one and not the other leaves the two disagreeing about the same
+-- name.
+overBothNames :: (Name -> Name) -> Resolved -> Resolved
+overBothNames f = \ case
+  Def u n        -> Def u (f n)
+  Ref r u o      -> Ref (f r) u (f o)
+  OutOfScope u n -> OutOfScope u (f n)
+
+-- | Clear the annotations on a sentence's own @%slot%@ references.
+--
+-- A slot names an input, and the sentence being moved is the one that input was
+-- carrying, so without this the slot would expand to the whole sentence again.
+unslot :: Nlg -> Nlg
+unslot = \ case
+  MkResolvedNlg a t fs -> MkResolvedNlg a t (fmap (fmap (overBothNames clear)) fs)
+  other                -> other
+ where
+  clear = annoOf %~ (annNlg .~ Nothing) . (annNlgAlts .~ [])
+
+-- | The payload of @l4 nlg@ and of @jl4-test@\'s @\<stem\>.nlg.golden@.
+--
+-- __Shared rather than duplicated, deliberately.__ Both used to spell this
+-- expression out, with a comment in @L4.Cli.Nlg@ saying that changing one
+-- without the other breaks the command and the golden at once. The rewrites
+-- below make that a three-way invariant rather than a two-way one, which is
+-- more than a comment should be asked to hold.
+--
+-- Order matters: 'promoteHeadInputNlg' moves a herald and its other-language
+-- renderings together, and 'selectLanguage' then picks from where they now are.
+linearizeDirectives :: Maybe LangTag -> Module Resolved -> [Text]
+linearizeDirectives mlang mod'' =
+  fmap simpleLinearizer (toListOf (gplate @(Directive Resolved)) mod')
+ where
+  mod' = selectLanguage mlang (promoteHeadInputNlg mod'')
 
 -- | Translate an 'a' to something that can be linearized.
 class Linearize a where

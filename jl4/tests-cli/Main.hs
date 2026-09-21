@@ -1156,6 +1156,13 @@ nlgRegcfGolden  = "examples/legal/regcf/tests/regcf.nlg.golden"
 nlgWizardSource = "examples/legal/regcf/regcf-wizard.l4"
 nlgWizardGolden = "examples/legal/regcf/tests/regcf-wizard.nlg.golden"
 
+-- The eleven-plus-two placement rows for an @nlg on a rule's head. Its
+-- `.nlg.golden` pins the `l4 nlg` columns; `l4 render` has no golden anywhere in
+-- the tree, so the tests below are the only thing pinning that the two
+-- projections agree (smucclaw/l4-ide#972).
+nlgHeadPlacementSource :: FilePath
+nlgHeadPlacementSource = "examples/ok/nlg-head-placement.l4"
+
 shadowEmbeddedEntry, shadowSiblingEntry, shadowExtraEntry :: FilePath
 shadowEmbeddedEntry = fixtureDir </> "library-shadow" </> "embedded-wins" </> "main.l4"
 shadowSiblingEntry  = fixtureDir </> "library-shadow" </> "sibling-wins"  </> "main.l4"
@@ -1195,6 +1202,7 @@ main = do
        , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
        , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
        , nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden
+       , nlgHeadPlacementSource
        , exportTwoRulesFixture, exportNothingFixture
        , exportBlockingOnlyFixture, exportAdvisoryOnlyFixture
        , bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity
@@ -2971,6 +2979,71 @@ spec bin = do
 
     it "reproduces the committed regcf-wizard NLG golden byte for byte" $
       expectGolden bin ["nlg", nlgWizardSource] nlgWizardGolden
+
+  -- An @nlg on a rule head's INPUT, which is the one placement the two
+  -- projections used to disagree about (smucclaw/l4-ide#972). `l4 render` read it
+  -- as the rule's sentence and `l4 nlg` as the input's gloss, so a positional
+  -- call printed the rule's bare name. These assert the AGREEMENT, from both
+  -- sides, because only one side has a golden: the `.nlg.golden` beside the
+  -- fixture pins the `l4 nlg` column and nothing anywhere pins `l4 render`'s.
+  --
+  -- Rows 5, 7, 8 and 12 of the fixture are the repaired ones; row 13 and the
+  -- `AKA` rows are the controls, and they are the assertions that fail if the
+  -- repair is widened into an unconditional promotion.
+  describe "an @nlg on a rule head's input" $ do
+    let nlgOf   = runL4 bin ["nlg", nlgHeadPlacementSource]
+        renderOf = runL4 bin ["render", "--format", "text", nlgHeadPlacementSource]
+
+    it "reaches l4 nlg at a POSITIONAL call site, whichever side of the input it sits" $ do
+      Output code sout _ <- nlgOf
+      code `shouldBe` ExitSuccess
+      -- Trailing the head (row 5), under the input (row 7), the DECIDE spelling
+      -- (row 8) and the two-input case (row 12). "with 200" is what an App
+      -- linearizes its arguments to, so these pin the sentence as the HEADING
+      -- rather than anywhere on the line.
+      sout `shouldSatisfy` ("row five saw `amount` with 200" `isInfixOf`)
+      sout `shouldSatisfy` ("row seven saw `amount` with 200" `isInfixOf`)
+      sout `shouldSatisfy` ("row eight saw `amount` with 200" `isInfixOf`)
+      sout `shouldSatisfy` ("row twelve saw `amount` over `floor` with 100 and 200" `isInfixOf`)
+
+    it "reaches l4 nlg at a NAMED-argument call site without printing twice" $ do
+      Output _ sout _ <- nlgOf
+      -- The sentence MOVES rather than being copied: leaving it on the input as
+      -- well printed it once as the heading and again as the input's gloss.
+      sout `shouldSatisfy` ("row five saw `amount` where `amount` is 200" `isInfixOf`)
+      sout `shouldSatisfy` ("row seven saw `amount` where `amount` is 200" `isInfixOf`)
+
+    it "renders the same sentences through l4 render, which is the point" $ do
+      Output code sout _ <- renderOf
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("row five saw amount" `isInfixOf`)
+      sout `shouldSatisfy` ("row seven saw amount" `isInfixOf`)
+      sout `shouldSatisfy` ("row eight saw amount" `isInfixOf`)
+      sout `shouldSatisfy` ("row twelve saw amount over floor" `isInfixOf`)
+
+    it "leaves the placements that already worked byte-identical" $ do
+      Output _ sout _ <- nlgOf
+      sout `shouldSatisfy` ("row one saw `amount` with 200" `isInfixOf`)
+      sout `shouldSatisfy` ("row four saw `amount` with 200" `isInfixOf`)
+      sout `shouldSatisfy` ("row six saw `amount` with 200" `isInfixOf`)
+      sout `shouldSatisfy` ("row nine saw `amount` with 200" `isInfixOf`)
+
+    it "keeps a rule's OWN sentence when it also heralds itself (row 13)" $ do
+      Output _ sout _ <- nlgOf
+      -- The rule's own annotation is found first, so nothing is moved and the
+      -- inner herald stays the input's gloss. An unconditional promotion would
+      -- overwrite the outer one with the inner.
+      sout `shouldSatisfy` ("row thirteen the rule saw `amount` with 200" `isInfixOf`)
+      sout `shouldSatisfy` ("row thirteen the input" `isInfixOf`)
+
+    it "does not touch an AKA head, where the disagreement is a different one" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      -- Row 10: the AKA's name claims the herald, so `l4 nlg` prints it and
+      -- `l4 render` prints its own paraphrase. Row 11: the other way round.
+      nlgOut `shouldSatisfy` ("row ten saw `amount` with 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("`row eleven` with 200" `isInfixOf`)
+      renOut `shouldSatisfy` ("row eleven saw amount" `isInfixOf`)
 
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a

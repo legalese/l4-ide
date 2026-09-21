@@ -1,0 +1,26 @@
+row one saw `amount` with 200
+row one saw `amount` where `amount` is 200
+row two saw `amount` with 200
+row two saw `amount` where `amount` is 200
+row three saw `amount` with 200
+row three saw `amount` where `amount` is 200
+row four saw `amount` with 200
+row four saw `amount` where `amount` is 200
+row five saw `amount` with 200
+row five saw `amount` where `amount` is 200
+row six saw `amount` with 200
+row six saw `amount` where `amount` is 200
+row seven saw `amount` with 200
+row seven saw `amount` where `amount` is 200
+row eight saw `amount` with 200
+row eight saw `amount` where `amount` is 200
+row nine saw `amount` with 200
+row nine saw `amount` where `amount` is 200
+row ten saw `amount` with 200
+row ten saw `amount` where `amount` is 200
+`row eleven` with 200
+`row eleven` where `amount` is 200
+row twelve saw `amount` over `floor` with 100 and 200
+row twelve saw `amount` over `floor` where `floor` is 100 and `amount` is 200
+row thirteen the rule saw `amount` with 200
+row thirteen the rule saw `amount` where row thirteen the input is 200
