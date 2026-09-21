@@ -25,10 +25,11 @@ simply verified.
 | `D.generated.js` | its output. Overwritten on every run; do not edit.                                |
 | `DIFF.md`        | the generated array against the app's current hand-edited one, classified.        |
 
-**The app itself is not in this repository and must not be copied into it.** `which-card.html`
-belongs to Alexis, is read-only to us, and lives at `docs/projects/miles-card/app/which-card.html`
-in the homelab checkout. The generator reads it only when you ask for a comparison, from the path
-you give, and never writes to it.
+**The app itself is not in this repository and must not be copied into it.** Two copies live in
+the homelab checkout under `docs/projects/miles-card/app/`: `which-card.alexis-original.html`,
+Alexis's, which nothing touches, and `which-card.html`, Meng's fork, which is where generated
+output goes. The generator reads a copy only when you ask for a comparison, from the path you give,
+and never writes to either.
 
 ## Regenerating
 

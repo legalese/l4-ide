@@ -50,4 +50,4 @@ The third line is the gate the spec requires and the L4 exit code is not it (smu
 
 ## Ownership
 
-The cheat sheet and the original consumer app belong to Alexis and are not committed; the L4 is Meng's and moves to `legalese/canon` once it lands here.
+The cheat sheet and the original consumer app belong to Alexis and are not committed; Meng's fork of the app, in homelab, is where `app/D.generated.js` lands. The L4 is Meng's and moves to `legalese/canon` once it lands here.

@@ -236,7 +236,7 @@ None changed a rule; two produced a witness, and the table below is the disposit
 
 ## 7. Ownership
 
-The cheat sheet (`[S5]`) and the original `which-card.html` belong to Alexis and are read-only;
+The cheat sheet (`[S5]`) and the original app (`which-card.alexis-original.html` in homelab) belong to Alexis and are read-only; Meng's fork `which-card.html` beside it takes the generated `D[]`;
 neither is committed here.
 The T&C PDFs are the issuers' published documents, mirrored for versioning.
 The L4 is Meng's, and moves to `legalese/canon` under `subjects/sg/miles-card/` once it lands
