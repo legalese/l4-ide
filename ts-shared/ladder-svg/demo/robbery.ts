@@ -57,6 +57,21 @@ const ROW = resolve(CANON, "subjects/sg/penal-code-1871/encodings/legalese");
 const CORPUS = resolve(ROW, "robbery-390-392.l4");
 const OUT = resolve(ROW, "projections");
 const LSP_PORT = Number(process.env.JL4_LSP_PORT || 5019);
+/**
+ * Opt-in second variant (`LADDER_HEAD_AS_SINK=1`): the same figures with the decision's
+ * own name boxed as the RIGHTMOST node — `commits robbery`, `theft is robbery` — written
+ * to `<slug>-head.{svg,txt}` beside the originals.
+ *
+ * This is the reading Woon's *Essential Criminal Law* ch 8 uses: subject at the left
+ * margin, consequent at the right ("Offender" … "Commits Robbery", p 187). It is a
+ * SECOND variant rather than a replacement so the committed figures, and NOTES.md's
+ * references to them, do not move.
+ *
+ * Only `.svg` and `.txt` get a `-head` twin. `.mmd` and `.sentences` are emitted from
+ * the `FunDecl`, never from the `Scene`, so `headAsSink` cannot reach them; a twin
+ * identical to its original would be a claim that the option had applied.
+ */
+const HEAD_AS_SINK = process.env.LADDER_HEAD_AS_SINK === "1";
 
 if (!existsSync(CORPUS)) {
   console.log(
@@ -91,6 +106,16 @@ const SUBJECTS: { decision: string; slug: string; why: string }[] = [
     decision: "offence under s 392",
     slug: "robbery-392",
     why: "the punishing section: one rung over `commits robbery`, which is what makes the definition/punishment split visible",
+  },
+  {
+    decision: "whoever commits robbery shall be so punished",
+    slug: "robbery-392-implies",
+    why: "s 392 a second time, as a top-level IMPLIES: the punishment is a consequent, not an element, so the figure ends in the two lamps (complies / in breach) where Woon's diagrams put their consequent node",
+  },
+  {
+    decision: "liable under s 392",
+    slug: "robbery-392-liability",
+    why: "the consequent of the implication on its own: the two punishment limbs the section splits (ordinary, and after 7 p.m. and before 7 a.m.) as a two-way OR",
   },
   {
     decision: "offence under s 393",
@@ -297,10 +322,43 @@ async function main() {
     });
 
     const scene = layout(decoded.fn, vs, estimateMetrics);
-    writeFileSync(`${OUT}/${s.slug}.svg`, sceneToSvg(scene, "ink"));
+    const svg = sceneToSvg(scene, "ink");
+    writeFileSync(`${OUT}/${s.slug}.svg`, svg);
 
     const asciiScene = layout(decoded.fn, vs, monoMetrics(), ASCII_GEOMETRY);
-    writeFileSync(`${OUT}/${s.slug}.txt`, sceneToAscii(asciiScene) + "\n");
+    const txt = sceneToAscii(asciiScene) + "\n";
+    writeFileSync(`${OUT}/${s.slug}.txt`, txt);
+
+    if (HEAD_AS_SINK) {
+      const headVs = defaultViewSpec({
+        valuation: decoded.valuation,
+        provenance: decoded.provenance,
+        headAsSink: true,
+      });
+      const headSvg = sceneToSvg(
+        layout(decoded.fn, headVs, estimateMetrics),
+        "ink",
+      );
+      const headTxt =
+        sceneToAscii(
+          layout(decoded.fn, headVs, monoMetrics(), ASCII_GEOMETRY),
+        ) + "\n";
+      // A twin identical to its original is not written: it would claim the option
+      // had applied when it had not. Two honest causes — an `Implies` body, where
+      // ladder-core ignores headAsSink by design (its two lamps ARE the consequent),
+      // and a stale ladder-core build, which ignores it by accident. Both are logged
+      // so the reader can tell which happened.
+      if (headSvg === svg && headTxt === txt) {
+        const why =
+          decoded.fn.body.$type === "Implies"
+            ? "implication body: headAsSink is a no-op by design, twin not written"
+            : "HEAD TWIN IDENTICAL TO ORIGINAL — is @repo/ladder-core built from a tree that has headAsSink? twin not written";
+        console.log(`  ${s.slug}-head: ${why}`);
+      } else {
+        writeFileSync(`${OUT}/${s.slug}-head.svg`, headSvg);
+        writeFileSync(`${OUT}/${s.slug}-head.txt`, headTxt);
+      }
+    }
 
     writeFileSync(
       `${OUT}/${s.slug}.mmd`,
