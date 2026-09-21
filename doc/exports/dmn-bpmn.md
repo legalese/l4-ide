@@ -264,23 +264,40 @@ failed that file with nothing its author could have written to fix it. The witne
 `jl4/examples/bpmn/sound/terminate-upstream-of-split.bpmn`.
 
 **What counts as saying so** is a `lossy` or `blocking` note in the `<name>.fidelity.txt` beside the
-file, filed against the end event itself or against another element whose token that end event
-discards. Both halves are doing work. The severity matters because an `advisory` note is by
-definition one that forfeits nothing, and the exporter has a note that matches the wording and is
-advisory — `P-FORK-BREACH-UNMARKED`, which describes an error marking the end event does _not_ carry.
-The element matters because it is the pointer a reader follows from the report back to the diagram;
-an earlier version accepted the end event's _name_ anywhere in the note text, and since every
-terminating end in this corpus is called "Breach", that accepted almost anything.
+file, filed **on the end event itself, or on the junction that made the discarded tokens concurrent
+with it** — the parallel split, or the multi-instance sub-process whose copies run side by side. Any
+other element is refused, including ones the loss passes through.
+
+That sounds like a technicality and is the opposite of one, because **a note about a neighbouring
+loss is not a declaration of this one.** `tenancy-fork-beside-party` is the case that proves it. It
+draws a cast of tenants inside one branch of a `RAND`, so its report carries a true `P-NOJOIN` on the
+split: the two branches were not joined, and one of them reaching BREACH abandons the other. That note
+declares the loss of _the other branch_, and it is accepted for exactly that. Give the cast's own
+breach end an error marking, though, and a second loss appears which the split cannot see: one member
+of the cast cancelling **another member**. The junction there is the sub-process's multiplicity, and
+since no element in a BPMN file names one member's run, the only place that loss can be declared is
+the end event. Two earlier versions of this rule accepted the `P-NOJOIN` for it and scored the file
+sound — which is the very defect the rule exists to catch, so the file is committed as
+`jl4/examples/bpmn/unsound/refork-beside-party-cross-instance.bpmn` and the gate now fails it.
+
+The severity matters for a different reason: an `advisory` note is by definition one that forfeits
+nothing, and the exporter has a note that is filed on precisely the right element, matches the
+wording, and is advisory — `P-FORK-BREACH-UNMARKED`, which describes an error marking the end event
+does _not_ carry.
 
 What the check does not do, so that nobody has to find out the hard way: it does not judge whether a
-note's prose is _about_ this loss. It can only insist that the note is filed at a severity that
-admits a loss, against an element the loss actually touches.
+note's prose is _about_ this loss. No text test can. It insists on the two things it can check — the
+element and the severity — and then, as a courtesy filter, that the note states the loss in one of a
+short list of recognised forms. That list is no longer what decides anything: with the element test
+structural, removing the list entirely moves no verdict in the corpus.
 
-**A diagram with no fidelity report beside it is not evaluated for this rule**, and says so. That is
-deliberate: `--fidelity-report` is optional, so the same XML would otherwise be sound or unsound
-depending on whether somebody passed the flag, and anyone checking a diagram they were handed — from
-Camunda Modeler, from a counterparty — would get a failure about a missing file rather than about
-their diagram. Emitting with `--fidelity-report` is what puts the file under the rule.
+**A diagram with no fidelity report beside it cannot be judged, and says so** — in those words, with
+exit 0, because the rule was not run rather than passed. That is deliberate: `--fidelity-report` is
+optional, so the same XML would otherwise be sound or unsound depending on whether somebody passed the
+flag, and anyone checking a diagram they were handed — from Camunda Modeler, from a counterparty —
+would get a failure about a missing file rather than about their diagram. Emitting with
+`--fidelity-report` is what puts the file under the rule; for a hand-written diagram you can write the
+sidecar by hand, which is what the two `jl4/examples/bpmn/sound/` fixtures with a real loss now do.
 
 Today the report says it as `P-NOJOIN`, whose wording is the one the rule was written from: a branch
 here can reach BREACH, "whose error end abandons its siblings rather than waiting for them", filed

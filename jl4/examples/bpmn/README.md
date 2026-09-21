@@ -389,14 +389,28 @@ info  End_6 "Breach" can only fire while it holds the last token in flight, so i
 
 #### What counts as the declaration
 
-One channel: the `<name>.fidelity.txt` beside the file, where the note must be filed **`lossy` or `blocking`** and must be filed **against an element this loss touches** — the terminating end event itself, or a node whose token it discards (both ends of any sequence flow holding one, and any activity holding one; instance copies map back to their source ids).
+One channel: the `<name>.fidelity.txt` beside the file, where the note must be filed **`lossy` or `blocking`** and must be filed **on the terminating end event itself, or on a junction that accounts for the WHOLE loss** — a fork that made every one of the discarded tokens concurrent with that end event.
+Which forks those are is computed, not guessed: `forkAnalysis` in the checker walks the net's own transitions, and a fork qualifies only when the discarded place and the place the terminate consumed are reachable from two different branches of it.
 
-Both narrowings are load-bearing, and each replaced something weaker:
+The element test is the discriminator, and it took three attempts:
 
-- **Severity.** A declared loss IS a loss, and an `advisory` note is by its own definition one that forfeits nothing.
-  This is what keeps `P-FORK-BREACH-UNMARKED` from answering the question — it matches the wording and is `advisory`, because it describes the `errorEventDefinition` its end event does NOT carry, which is a counterfactual and not a declaration.
-- **The element.** The `element` field is the pointer a reader follows from report to diagram, so it is the thing to check.
-  The first version instead looked for the end event's id or `name` anywhere in the note's text, which is vacuous: every terminating end in this corpus is named "Breach" and the exporter's prose says "breach" constantly, so a `lossy` note filed against an unrelated element passed.
+1. **The end event's name anywhere in the note text.** Vacuous: every terminating end in this corpus is named "Breach" and the exporter's prose says "breach" constantly, so a `lossy` note filed against an unrelated element passed.
+2. **Any element the loss TOUCHES.** Still vacuous where it mattered. On a fork inside an unjoined `RAND` the loss touches 12 of the file's 15 flow nodes, so the one true `P-NOJOIN` about the `RAND`'s branches exempted a completely different loss — one member of a cast cancelling another member.
+3. **A junction that accounts for the whole loss, or the end event.** What is in the tree now.
+
+**Severity is the second narrowing**, and it is doing work of its own: a declared loss IS a loss, and an `advisory` note is by its own definition one that forfeits nothing.
+This is what keeps `P-FORK-BREACH-UNMARKED` from answering the question — it is filed on exactly the right element and matches the wording, and it is `advisory` because it describes the `errorEventDefinition` its end event does NOT carry, which is a counterfactual and not a declaration.
+
+**The phrase list is a third and weakest filter, and is no longer the discriminator.**
+Measured 2026-09-21 by replacing the matcher with one that always succeeds and re-running `etc/check-bpmn-soundness.selftest.mjs`: 0 failures, no verdict moves on any of the 31 committed `.bpmn` files.
+Before the element test became structural, that same mutation turned both red fixtures green.
+
+#### A cross-instance loss can only be declared on the end event
+
+When the junction is a multi-instance sub-process's own multiplicity, the token thrown away belongs to **another member's run** — and no element in a BPMN file names one member's run.
+The sub-process id names the drawn box, which is what the exporter's notes on it are about: `P-CAST` is the cardinality, `P-FORK-JOIN` the wait, `P-FORK-LANES` the bands.
+So accepting the scope's id there would accept a note about the box as a declaration about one member cancelling another, and it did: measured 2026-09-21, `P-FORK-JOIN` (`lossy`, filed on the scope) was rejected only by its wording.
+For that class of loss the rule accepts the terminating end event and nothing else, and says so in the finding.
 
 **There is no longer a `<documentation>` channel, and its removal is a fix.**
 A hand-written diagram used to be able to declare the loss on the end event itself.
@@ -405,10 +419,15 @@ So the per-element narrowing did not exclude it, and the sentence it matched is 
 Re-mark that end event as an error end and the pre-`fcd7ecb2c` defect passed SOUND, declared by a sentence saying the opposite.
 `unsound/refork-counterfactual-documentation.bpmn` is that file, and it is red now.
 
-**A file with no sidecar beside it is NOT EVALUATED for this rule**, and says so in an `info` line.
-`--fidelity-report` is opt-in, so otherwise byte-identical XML is sound or unsound according to how it was emitted — measured: emitting `tenancy-fork-beside-party`'s XML without the flag produced a byte-identical file and exit 1 — and anyone checking a diagram they were handed got a failure about a missing file.
-The consequence to know: `sound/`'s hand-written diagrams are hand-written and have no sidecar, so two of them really do discard siblings and really are not evaluated.
+**A file with no sidecar beside it CANNOT BE JUDGED**, and says so in those words, in an `info` line, at exit 0 — the rule was not run rather than passed.
+`--fidelity-report` is opt-in, so otherwise byte-identical XML would be sound or unsound according to how it was emitted — measured: emitting `tenancy-fork-beside-party`'s XML without the flag produced a byte-identical file and exit 1 — and anyone checking a diagram they were handed got a failure about a missing file.
+
+**Nothing in this corpus is exempt by that route any more.**
+The two hand-written `sound/` diagrams that really do discard siblings each carry a hand-written sidecar, in the format the exporter renders, so both are checked and both pass ON A DECLARATION.
+They were left unevaluated when the rule landed, and the reviewer's objection was the trap that left: adding a sidecar is the obvious thing a later session does, and doing it would have turned the self-test red.
+`joined-beside-breach` declares on its split and `mi-subprocess-fork` on its end event, so the pair is also the hand-written witness for both accepted elements.
 Their `<documentation>` still says what happens, for a reader in Camunda Modeler; nothing mechanical reads it.
+The CANNOT JUDGE path is exercised in `etc/check-bpmn-soundness.selftest.mjs` instead, on a temp-directory copy of a fixture with its sidecar withheld.
 
 #### Green and red, all in the tree
 
@@ -417,22 +436,52 @@ Their `<documentation>` still says what happens, for a reader in Camunda Modeler
 | `expected/offering.bpmn` | up to 3 | `End_4 "Breach"` | passes, on `P-NOJOIN` (`lossy`) filed on `Split_1` |
 | `expected/tenancy-fork-beside-party.bpmn` | 1 at n=0, 4 at n=2 | `End_3 "Breach"` | passes, on `P-NOJOIN` (`lossy`) filed on `Split_0` |
 | `sound/terminate-upstream-of-split.bpmn` | **0** (peak is 2) | `End_6 "Breach"` | passes because nothing is owed |
-| `sound/joined-beside-breach.bpmn` | 1 | `End_Breach "Breach"` | NOT EVALUATED: no sidecar |
-| `sound/mi-subprocess-fork.bpmn` | 3 at n=2 | `End_3 "Breach"` | NOT EVALUATED: no sidecar |
+| `sound/joined-beside-breach.bpmn` | 1 | `End_Breach "Breach"` | passes, on a hand-written note filed on `Split_0` |
+| `sound/mi-subprocess-fork.bpmn` | 3 at n=2 | `End_3 "Breach"` | passes, on a hand-written note filed on `End_3` |
 | `unsound/historical-fork-undeclared-sibling-loss.bpmn` | 3 at n=2 | `End_3 "Breach"` | **FAILS**, with S1–S4 all PASS |
 | `unsound/refork-counterfactual-documentation.bpmn` | 3 at n=2 | `EndBreach_0 "Breach"` | **FAILS**, with S1–S4 all PASS |
+| `unsound/refork-beside-party-cross-instance.bpmn` | 4 at n=2 | `EndBreach_1 "Breach"` | **FAILS**, with S1–S4 all PASS, and with a matching `lossy` `P-NOJOIN` in its report |
 
-The two red rows are a pair on purpose.
+The three red rows are a set, and each one fails for a reason the others cannot show.
 The first is byte-for-byte the tenancy fork as the exporter really emitted it before `fcd7ecb2c`, with the nine-note report it really carried beside it — so it fails the rule while a report EXISTS, which is what makes it a test of the rule rather than of a missing file.
-The second is today's fork with the error marking put back, which is the same defect arriving as a regression rather than as history.
+The second is today's fork with the error marking put back: the same defect arriving as a regression rather than as history, and it keeps the exporter's counterfactual `<documentation>` unedited to pin that nothing reads it.
+The third is the acceptance test the rule was rewritten around, and the only one where the wording does no work at all: its report carries a `lossy` `P-NOJOIN` that matches the phrase list and is filed on a real junction of the net, and it is refused anyway, because that junction accounts for the `RAND` half of the loss and not for one member of the cast cancelling another.
+Measured: disable the phrase list entirely and this fixture stays red.
 
 Measured over the sixteen goldens on 2026-09-21, the other fourteen are silent for one of two reasons, and the split is worth knowing because only one of them is stable.
 Eight have a terminating end event that discards nothing: `option`, the three `regcf-*`, `tenancy-barrier`, `modals-may-barrier`, `modals-shant-barrier` and `modals-must-barrier-both-deadlines`.
 Six have no terminating end event at all — `consultation`, `handover`, and the four forks, whose breach ends stopped being error ends at `fcd7ecb2c`.
-That second group is one commit away from owing a declaration, which is exactly what the second red fixture is.
+That second group is one commit away from owing a declaration, which is exactly what the last two red fixtures are.
+That sentence used to be false, and the correction is the reason this section was rewritten.
+Measured 2026-09-21 on scratch copies, putting one `<bpmn:errorEventDefinition>` back on the breach end — one injected line each — and running the rule at its three versions:
 
-Mutation-tested 2026-09-21 on scratch copies of the two passing goldens, baseline exit 0 for both: deleting the sibling-loss sentence from `P-NOJOIN`'s `lost:` line, demoting `P-NOJOIN` from `lossy` to `advisory` and nothing else, and re-filing `P-NOJOIN` on `Start_0` — an element the loss cannot touch — each turn exit 0 into exit 1.
-Deleting the sidecar outright now leaves exit 0, deliberately, per the NOT EVALUATED rule above.
+| re-marked fixture | rule as first written (`9a7e6be2c`) | after the first repair (`0d79f3b40`) | now |
+| ----------------- | ----------------------------------- | ------------------------------------ | --- |
+| `modals-may-fork` | exit 0 | exit 1 | exit 1 |
+| `modals-must-fork-join-deadline` | exit 0 | exit 1 | exit 1 |
+| `modals-shant-fork` | exit 0 | exit 1 | exit 1 |
+| `tenancy-fork` | exit 0 | exit 1 | exit 1 |
+| `tenancy-fork-beside-party` | exit 0 | **exit 0** | exit 1 |
+
+The last row is why there are three red fixtures and not two: the first repair caught the plain forks and left the one fork that sits inside an unjoined `RAND`, because that file has a `P-NOJOIN` and the others do not.
+
+**Mutation-tested 2026-09-21 against `etc/check-bpmn-soundness.selftest.mjs` (35 fixtures, baseline 0 failures), by breaking one piece of the rule at a time:**
+
+| mutation | failures |
+| -------- | -------- |
+| every loss reported as declared | 6 |
+| no loss ever reported as declared | 6 |
+| element test removed (any element accepted) | 3 |
+| severity test removed (`advisory` accepted) | 5 |
+| junction cover unioned instead of intersected | 2 |
+| a cross-instance loss may be declared on the scope | 1 |
+| phrase list removed | **0** |
+
+The last two rows are the ones that carry a lesson.
+The cross-instance narrowing was invisible to every committed fixture until a self-test leg was written for it, because on the acceptance fixture a note on the scope is refused for a second reason as well — and the three red fixtures survived that mutation on the exporter's wording alone, which is precisely the fragility this rewrite was for.
+The phrase list scoring zero is not a gap to fill but the measurement that says it is no longer the rule.
+
+Deleting a sidecar outright leaves exit 0, deliberately, per the CANNOT JUDGE rule above.
 
 
 S1 and S2 are the properties the deadlocking join violated, and

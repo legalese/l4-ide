@@ -43,7 +43,15 @@
 // Exit 0 if every expectation held, 1 otherwise.
 
 import { execFileSync } from "node:child_process";
-import { readdirSync, existsSync } from "node:fs";
+import {
+  readdirSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -97,6 +105,18 @@ const EXERCISES = {
   // reads it.
   "refork-counterfactual-documentation.bpmn":
     'FIDELITY  EndBreach_0 "Breach" throws away up to 3 token(s) still in flight',
+  // THE ACCEPTANCE FIXTURE for the declaration rule, and the only one of the
+  // three where the phrase list does no work at all. Today's
+  // tenancy-fork-beside-party with one `<errorEventDefinition>` put back, i.e.
+  // the same re-introduction as above — but inside an unjoined RAND, so its real
+  // report carries a `lossy` `P-NOJOIN` that matches the phrase list and is filed
+  // on a junction of this net. Two earlier versions of the rule read that as the
+  // declaration and scored the file SOUND. It is not one: P-NOJOIN is about the
+  // RAND's two branches, and this loss is one member of the cast cancelling
+  // another, which the split cannot see. See CHANNELS below for the mutations
+  // that pin the rest of the contract.
+  "refork-beside-party-cross-instance.bpmn":
+    'FIDELITY  EndBreach_1 "Breach" throws away up to 4 token(s) still in flight',
   "mislabelled-gateway-direction.bpmn":
     'STRUCTURE  exclusiveGateway Split_0 declares gatewayDirection="Diverging" ' +
     "but has 2 incoming and 2 outgoing sequence flow(s)",
@@ -167,6 +187,139 @@ for (const { dir, verdict, code } of piles) {
     }
   }
 }
+
+// CHANNELS: THE DECLARATION RULE MUST BE SATISFIABLE, AND MUST REFUSE TO GUESS.
+//
+// A red fixture on its own proves only that a rule can say no, and a rule that
+// says no to everything is not a gate either — it is a `--fail` flag. Both of the
+// following run on copies of the SAME red fixture in a temp directory, one line
+// of its report apart, so what is being demonstrated is the rule and not a
+// difference between two diagrams.
+//
+//   POSITIVE CONTROL  append one `lossy` note filed on the terminating end event
+//                     and the identical XML is SOUND, exit 0. Without this leg,
+//                     hard-coding `undeclared.push(...)` would pass this file.
+//   CANNOT JUDGE      take the sidecar away and the verdict does NOT flip. The
+//                     rule is not run, the output says so in those words, and the
+//                     exit code is 0 — because `--fidelity-report` is opt-in and a
+//                     verdict must be a property of the diagram plus whatever
+//                     report came with it, never of whether someone passed a flag.
+//   NEGATIVE CONTROL  append the SAME declaring note filed on the SUB-PROCESS
+//                     instead, and the file stays UNSOUND. This is the one leg
+//                     that pins the cross-instance narrowing, and it was added
+//                     because nothing else did: mutation-tested 2026-09-21, and
+//                     with this leg absent, accepting the scope's id for a
+//                     cross-instance loss left the whole self-test green — the
+//                     three red fixtures survived on the wording of the exporter's
+//                     `P-FORK-JOIN` alone, which is exactly the fragility two
+//                     rounds of review were about.
+const unsoundDir = join(repo, "jl4/examples/bpmn/unsound");
+// The acceptance fixture: a fork INSIDE an unjoined RAND, so the loss spans both
+// the cast's own multiplicity and the RAND's branches.
+const CHANNEL_SRC = join(unsoundDir, "refork-beside-party-cross-instance");
+// A fork with NOTHING beside it, so the loss is purely cross-instance and the
+// sub-process is the only junction in the file. That is what makes it the witness
+// for the narrowing: on the fixture above, a note on the scope is rejected anyway
+// for not covering the RAND half of the loss, so it proves nothing about it.
+const FORK_SRC = join(unsoundDir, "refork-counterfactual-documentation");
+const declaringNote = (element) =>
+  `  [P-TERMINATE-CANCELS] lossy — ${element}\n` +
+  "      Reaching this end ends every active thread in the process, so the runs of the members who did not breach are cancelled along with the one that did.\n" +
+  "      lost: the duties of every member who had not breached when this end was reached\n";
+const DECLARING_NOTE = declaringNote("EndBreach_1");
+
+const run = (path) => {
+  try {
+    return {
+      out: execFileSync(process.execPath, [checker, path], {
+        encoding: "utf8",
+      }),
+      status: 0,
+    };
+  } catch (err) {
+    return {
+      out: `${err.stdout ?? ""}${err.stderr ?? ""}`,
+      status: err.status ?? 1,
+    };
+  }
+};
+
+const tmp = mkdtempSync(join(tmpdir(), "bpmn-soundness-selftest-"));
+const channels = [
+  {
+    name: "positive control: one lossy note on the terminating end event",
+    stem: "declared",
+    report:
+      readFileSync(`${CHANNEL_SRC}.fidelity.txt`, "utf8") + DECLARING_NOTE,
+    wantStatus: 0,
+    wantIn: [": SOUND", "[P-TERMINATE-CANCELS] on EndBreach_1"],
+    wantNotIn: ["FIDELITY"],
+  },
+  {
+    name: "no sidecar: the rule is not run, and says so, without flipping the verdict",
+    stem: "nosidecar",
+    report: null,
+    wantStatus: 0,
+    wantIn: [
+      ": SOUND",
+      "CANNOT JUDGE: no fidelity report",
+      "this is not a pass",
+    ],
+    wantNotIn: ["FIDELITY"],
+  },
+  {
+    name: "negative control: on a pure fork, that note filed on the sub-process is not a declaration",
+    src: FORK_SRC,
+    stem: "onscope",
+    report:
+      readFileSync(`${FORK_SRC}.fidelity.txt`, "utf8") +
+      declaringNote("Scope_0"),
+    wantStatus: 1,
+    wantIn: [
+      ": UNSOUND",
+      'FIDELITY  EndBreach_0 "Breach"',
+      "no element in this file names one",
+    ],
+    wantNotIn: ["on Scope_0 by"],
+  },
+  {
+    name: "positive control on the same pure fork: filed on its end event, it is",
+    src: FORK_SRC,
+    stem: "onend",
+    report:
+      readFileSync(`${FORK_SRC}.fidelity.txt`, "utf8") +
+      declaringNote("EndBreach_0"),
+    wantStatus: 0,
+    wantIn: [": SOUND", "[P-TERMINATE-CANCELS] on EndBreach_0"],
+    wantNotIn: ["FIDELITY"],
+  },
+];
+for (const c of channels) {
+  const bpmn = join(tmp, `${c.stem}.bpmn`);
+  writeFileSync(bpmn, readFileSync(`${c.src ?? CHANNEL_SRC}.bpmn`, "utf8"));
+  if (c.report !== null)
+    writeFileSync(join(tmp, `${c.stem}.fidelity.txt`), c.report);
+  const { out, status } = run(bpmn);
+  checked++;
+  const problems = [];
+  if (status !== c.wantStatus)
+    problems.push(`exit ${status}, expected ${c.wantStatus}`);
+  for (const s of c.wantIn)
+    if (!out.includes(s))
+      problems.push(`output does not contain ${JSON.stringify(s)}`);
+  for (const s of c.wantNotIn)
+    if (out.includes(s))
+      problems.push(`output contains ${JSON.stringify(s)} and must not`);
+  if (problems.length) {
+    failures++;
+    console.error(`FAIL  channel — ${c.name}`);
+    for (const p of problems) console.error(`        ${p}`);
+    console.error(out.replace(/^/gm, "      | "));
+  } else {
+    console.log(`ok    channel — ${c.name}`);
+  }
+}
+rmSync(tmp, { recursive: true, force: true });
 
 // The other direction: a declared fixture that never turned up. Deleting a
 // witness must break this self-test, not quietly shrink its coverage.

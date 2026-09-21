@@ -1,6 +1,6 @@
 # Deliberately unsound BPMN
 
-Eight diagrams that are **wrong in a way no parser can see**, kept so that
+Nine diagrams that are **wrong in a way no parser can see**, kept so that
 `etc/check-bpmn-soundness.mjs` can be shown to fail. They are the negative half
 of `etc/check-bpmn-soundness.selftest.mjs`; the positive halves are
 `../expected/` (exporter goldens) and `../sound/` (hand-written diagrams that
@@ -31,6 +31,7 @@ declaration" in `../README.md`.
 | `deadlock-inside-mi-subprocess.bpmn`            | **S2** no deadlock            | a join inside one member's instance starves; invisible at 0 instances | hand-written                   |
 | `historical-fork-undeclared-sibling-loss.bpmn`  | **FIDELITY** undeclared loss  | a member's escalation meets a top-level ERROR end, cancelling the members who did not breach — and nothing says so | **real pre-fix exporter output** |
 | `refork-counterfactual-documentation.bpmn`      | **FIDELITY** undeclared loss  | the same defect as a REGRESSION: today's fork golden with one `errorEventDefinition` put back | **real exporter output, one attribute added** |
+| `refork-beside-party-cross-instance.bpmn`       | **FIDELITY** undeclared loss  | the same regression on the one fork that sits inside an unjoined `RAND`, where a TRUE note about the `RAND` used to exempt it | **real exporter output, one element added** |
 
 **Today's exporter cannot emit any of these shapes** — for the four join
 defects, declining to is exactly the fix that `addJoin` in
@@ -38,11 +39,12 @@ defects, declining to is exactly the fix that `addJoin` in
 `withGatewayDirections`, which computes the attribute from the edges instead of
 guessing it a pass too early; and for the undeclared loss it is `addForkScope`,
 which mints the fork its own plain `EndBreach_<n>` rather than routing an
-escalation into a shared error end. Four of the eight are hand-written and must
-never be treated as goldens. Three are real exporter output — two byte-for-byte,
-and `refork-counterfactual-documentation.bpmn` with exactly one element added — and
-they are the reason to believe the rest; the gateway one is a hand-written minimum
-of a contradiction that really did ship in `../expected/regcf-reporting.bpmn`.
+escalation into a shared error end. Four of the nine are hand-written and must
+never be treated as goldens. Four are real exporter output — two byte-for-byte, and
+`refork-counterfactual-documentation.bpmn` and `refork-beside-party-cross-instance.bpmn`
+with exactly one element added each — and they are the reason to believe the rest;
+the gateway one is a hand-written minimum of a contradiction that really did ship in
+`../expected/regcf-reporting.bpmn`.
 
 ## `mislabelled-gateway-direction.bpmn` — the one that plays perfectly
 
@@ -134,6 +136,47 @@ is gone, not the text.
 | ----------------------------------------------- | ----------------------------------------------------------------------------- |
 | `etc/validate-bpmn.mjs` (bpmn-moddle, a parser) | **OK — 0 warnings**, 11 flow nodes, 8 sequence flows, all drawn                |
 | `etc/check-bpmn-soundness.mjs`                  | SOUND at 0 instances; at 2, **UNSOUND on `FIDELITY`** with S1–S4 all **PASS** |
+| `etc/check-bpmn-kie.sh` (jBPM 7.74.1)           | not run here — the baseline covers `../expected/` only                         |
+
+## `refork-beside-party-cross-instance.bpmn` — the acceptance test, where a TRUE note is not a declaration
+
+`../expected/tenancy-fork-beside-party.bpmn` exactly as the exporter emits it today,
+with one `<bpmn:errorEventDefinition>` put back on `EndBreach_1`. Its
+`.fidelity.txt` is today's real twelve-note report, unedited. Same one-element diff
+as its sibling above; the difference is the file it is applied to.
+
+**Why a third fixture of the same defect.** This is the only fork golden that sits
+inside an unjoined `RAND`, so its report carries `[P-NOJOIN] lossy — Split_0` — a
+note that is TRUE, admits a loss, is filed on a real junction of this net, and
+matches the phrase list. The rule accepted it for `EndBreach_1` and scored this file
+**SOUND** in both of its first two versions, where the four plain forks were caught
+by the second:
+
+| re-marked fixture | rule `9a7e6be2c` | rule `0d79f3b40` | now |
+| ----------------- | ---------------- | ---------------- | --- |
+| the four plain forks | exit 0 | exit 1 | exit 1 |
+| this one | exit 0 | **exit 0** | exit 1 |
+
+**What the note is actually about.** `P-NOJOIN` on `Split_0` says the top-level
+`RAND`'s two branches were not joined, so one branch reaching BREACH abandons the
+other. That is a real loss and it IS declared — the file's other terminating end,
+`End_3`, is accepted on exactly that note. What `EndBreach_1` now does is different:
+one member of the cast cancels **another member**, on one side of that split, where
+the split cannot see it. The junction is the sub-process's own multiplicity, and no
+element in a BPMN file names one member's run, so the only element that can carry
+that declaration is `EndBreach_1` itself. Nothing in the report is filed there but
+`P-FORK-BREACH-UNMARKED`, which is `advisory`.
+
+So this fixture is the one place in the tree where the **wording does no work at
+all**: measured 2026-09-21, replacing the phrase matcher with one that always
+succeeds leaves it red. Its positive control lives in
+`etc/check-bpmn-soundness.selftest.mjs`, which appends one `lossy` note on
+`EndBreach_1` to a copy of this report and asserts the same diagram then passes.
+
+| checker                                         | verdict                                                                       |
+| ----------------------------------------------- | ----------------------------------------------------------------------------- |
+| `etc/validate-bpmn.mjs` (bpmn-moddle, a parser) | **OK — 0 warnings**, 14 flow nodes, 10 sequence flows, all drawn               |
+| `etc/check-bpmn-soundness.mjs`                  | SOUND at 0 instances (21 markings, peak 2); at 2, **UNSOUND on `FIDELITY`** (486 markings, peak 5, 24 net transitions) with S1–S4 all **PASS** |
 | `etc/check-bpmn-kie.sh` (jBPM 7.74.1)           | not run here — the baseline covers `../expected/` only                         |
 
 ## `historical-handover-edge-counted-join.bpmn` — the measurement, not the argument
@@ -272,9 +315,11 @@ Run from the repo root. This is the evidence for adding a soundness check at
 all: the check the repo already had passes **all five** files at zero warnings.
 
 **The table below is the original five, and is left at that scope rather than
-widened by guesswork.** Of the two fixtures added since,
-`historical-fork-undeclared-sibling-loss.bpmn` has its own measured table in the
-section of that name; `deadlock-inside-mi-subprocess.bpmn` has never had a
+widened by guesswork.** Four fixtures have been added since. Three of them —
+`historical-fork-undeclared-sibling-loss.bpmn`,
+`refork-counterfactual-documentation.bpmn` and
+`refork-beside-party-cross-instance.bpmn` — have their own measured tables in the
+sections of those names. `deadlock-inside-mi-subprocess.bpmn` has never had a
 section here and its provenance is the comment header inside the file. Measured
 2026-09-21, it is **UNSOUND, S1+S2+S3 fail** at 2 instances with four deadlocked
 markings (and SOUND at 0, which is the point of reading the verdict across the

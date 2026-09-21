@@ -38,30 +38,50 @@ drawn, and there was no loss to declare anyway. Unlike its neighbours this file 
 captured `l4 export` output rather than hand-written, because that is the
 load-bearing half of the claim; the source it came from is quoted below. Its real
 `.fidelity.txt` sidecar is checked in beside it, deliberately: the rule only reads
-sidecars, so a file without one is NOT EVALUATED and would prove nothing.
+sidecars, so a file without one CANNOT BE JUDGED and would prove nothing.
 
-**Two fixtures here really do discard siblings, and really are not evaluated.**
-`joined-beside-breach.bpmn` (1 token discarded) and `mi-subprocess-fork.bpmn` (3 at
-two instances) are exactly the rule's shape — they exist to pin the terminate
-reading, so of course they are — and being hand-written, neither has an exporter
-report beside it. A file with no report is NOT EVALUATED for the declaration rule,
-which is why they pass.
+**Two fixtures here really do discard siblings, and each carries a HAND-WRITTEN
+sidecar that declares it.** `joined-beside-breach.bpmn` (1 token discarded) and
+`mi-subprocess-fork.bpmn` (3 at two instances) are exactly the rule's shape — they
+exist to pin the terminate reading, so of course they are. Being hand-written they
+have no `.l4` source to run `l4 export --fidelity-report` over, so their
+`.fidelity.txt` files were written by hand, in the format
+`L4.Interchange.Fidelity.renderNote` emits. Each says so on its first lines.
 
-Each of the two still carries a `<bpmn:documentation>` on its breach end saying
-what reaching it does, and that text is for a reader who opens the diagram in
-Camunda Modeler and clicks the end event. **Nothing mechanical reads it.** It was
-briefly a second channel of the rule, and that channel was removed on the day it
-was reviewed: the exporter puts a COUNTERFACTUAL about error ends on exactly that
+**That is a correction, not a decoration.** Until 2026-09-21 both files had no
+sidecar at all and so were CANNOT-JUDGE — the rule reads sidecars only, and a file
+without one is not evaluated. They passed for that reason, which set a trap: adding
+a sidecar is the obvious thing a later session does to bring this directory under
+the rule, and doing it would have turned the self-test red. Now they pass because
+the loss is declared, and there is nothing left here that a sidecar would break.
+
+**The pair also covers both accepted elements**, which is the other reason to have
+written them by hand rather than deleting the files:
+
+| fixture | filed on | why that element |
+| ------- | -------- | ---------------- |
+| `joined-beside-breach.bpmn` | `Split_0` | the junction that made the two branches concurrent accounts for the whole loss |
+| `mi-subprocess-fork.bpmn` | `End_3` | the junction is the scope's own multiplicity, so what is thrown away is another member's run — and no element in a BPMN file names one |
+
+Each of the two also carries a `<bpmn:documentation>` on its breach end saying what
+reaching it does, and that text is for a reader who opens the diagram in Camunda
+Modeler and clicks the end event. **Nothing mechanical reads it.** It was briefly a
+second channel of the rule, and that channel was removed on the day it was
+reviewed: the exporter puts a COUNTERFACTUAL about error ends on exactly that
 element, which the rule then accepted as a declaration. See
 `../unsound/refork-counterfactual-documentation.bpmn`. Both files parse at **0
 warnings** under `etc/validate-bpmn.mjs`, measured 2026-09-21 after the edit.
 
-`mi-subprocess-fork.bpmn`'s note says one more thing, because it has to: its
+`mi-subprocess-fork.bpmn` needs one more sentence, and its sidecar carries it. Its
 top-level error end is the **pre-`fcd7ecb2c`** shape, the one that cancelled the
-members who had not breached, and the exporter stopped emitting it. The fixture
-keeps it deliberately — what it pins is how the checker plays a scope, not how the
-exporter draws one — and the note says so rather than leaving a reader to infer
-that the current exporter would emit this.
+members who had not breached, and the exporter stopped emitting it. **So why is the
+defect shape in `sound/`?** Because the FIDELITY rule is not about the shape: a
+diagram may throw sibling work away, and what it may not do is throw it away in
+silence. Declared, the shape is sound — and this fixture's job is to pin how the
+checker plays a multi-instance scope, which is a different question from how the
+exporter draws one. The undeclared version of the same shape is red twice over, at
+`../unsound/historical-fork-undeclared-sibling-loss.bpmn` and
+`../unsound/refork-beside-party-cross-instance.bpmn`.
 
 ## `terminate-upstream-of-split.bpmn`
 
