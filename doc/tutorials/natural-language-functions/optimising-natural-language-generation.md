@@ -351,6 +351,7 @@ For everything else there is no `dir` at all, because left-to-right is already H
 **The script subtag wins when the tag has one**, because the script is the part of a language tag that actually decides direction.
 `--lang he-Latn` is Hebrew romanised in Latin letters and gets no `dir`; `--lang az-Arab` is Azerbaijani written in Arabic script and gets `dir="rtl"`, even though neither `he-Latn` nor `az-Arab` could be read off its first subtag.
 A region or a case difference is not a direction: `he-IL`, `HE` and `he` are one answer.
+That is about direction only — the document is _labelled_ `he-IL` just when the module actually carries `@nlg:he-IL` renderings, since (above) a tag nothing renders does not relabel; `--lang he-IL` on a module whose heralds are tagged `he` gives you `lang="he"` and says so.
 
 **What `dir` does, exactly**, because it is easy to expect too much of it.
 It sets the document's _base_ direction, and the base direction decides where the neutral characters at the edges of a line go and in which order whole runs of the other direction sit.
@@ -373,7 +374,8 @@ The stylesheet mirrors along with `dir`: clause numbers, indents and table align
 
 **`--lang` is validated before it reaches the markup.**
 Surrounding whitespace is trimmed and the primary subtag is lowercased, so `--lang 'he '` and `--lang HE` are the tag you meant — the first of those used to label the document `he ` and then silently lose `dir="rtl"`.
-An empty value, or one with anything in it but letters, digits and `-`, is refused with a message instead of being pasted into the attribute.
+An empty value, one with anything in it but letters, digits and `-`, and one whose `-`-separated parts are not each one to eight characters (`he-`, `he--IL`) are refused with a message instead of being pasted into the attribute.
+That is a check on the shape of a tag rather than a check against the register of real ones: `xx-Qrst` is shaped like a language tag and is accepted.
 
 ### The Akoma Ntoso document says the same thing, in FRBR
 

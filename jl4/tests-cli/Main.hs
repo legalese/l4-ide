@@ -1590,16 +1590,21 @@ spec bin = do
       htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
       sout `shouldSatisfy` ("עולה על הסף" `isInfixOf`)
 
-    it "keeps a region subtag as typed" $ do
-      Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "he-IL", langModule]
+    it "passes a region subtag through unmangled, and falls back because nothing carries it" $ do
+      -- Two things at once, and the name says both because the label alone would
+      -- mislead: the reader keeps `he-IL` as typed (the stderr note quotes it
+      -- back verbatim), and the LABEL is still the module's `he`, because no
+      -- herald in the module is tagged `he-IL`.
+      Output code sout serr <- runL4 bin ["render", "--format", "html", "--lang", "he-IL", langModule]
       code `shouldBe` ExitSuccess
-      -- `he-IL` is carried by nothing, so the LABEL falls back to the module's
-      -- `he`; what this pins is that the reader did not mangle the tag on the
-      -- way in — the stderr note quotes it back.
       htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+      serr `shouldSatisfy` ("no renderings in \"he-IL\"" `isInfixOf`)
 
     it "rejects an empty or malformed --lang instead of putting it in the markup" $ do
-      for_ ["", "  ", "-he", "he_IL", "en\"><script>"] \bad -> do
+      -- `he-`, `he--IL` and the over-long subtag are the SHAPE cases: every
+      -- character is legal and the tag is still not one, so a character-class
+      -- check alone would have let them into the attribute.
+      for_ ["", "  ", "-he", "he-", "he--IL", "abcdefghij", "he_IL", "en\"><script>"] \bad -> do
         Output code _ serr <- runL4 bin ["render", "--format", "html", "--lang", bad, langModule]
         code `shouldNotBe` ExitSuccess
         serr `shouldSatisfy` ("Invalid --lang value" `isInfixOf`)

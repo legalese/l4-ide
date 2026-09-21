@@ -136,20 +136,29 @@ fixedNowParser = fmap FixedNowOpt $ optional $
 --     This also makes @--lang HE@ SELECT the @\@nlg:he@ renderings, which it did
 --     not before — rendering selection compares tags exactly.
 --
--- Rejected: empty or all-whitespace, anything outside @[A-Za-z0-9-]@, and a tag
--- with no primary subtag at all (@-he@).
+-- Rejected: empty or all-whitespace, anything outside @[A-Za-z0-9-]@, and any tag
+-- whose @-@-separated subtags are not each one to eight characters — which covers
+-- a leading, trailing or doubled hyphen (@-he@, @he-@, @he--IL@) and an
+-- over-long subtag, because BCP 47 spells every subtag @1*8alphanum@.
+--
+-- __That is a shape check, not a grammar.__ It does not know which subtags are
+-- registered, nor that a script sits before a region; @xx-Qrst@ passes. The line
+-- is drawn at "could this be a language tag at all", because the point is to keep
+-- an unreadable value out of an attribute, not to validate against the IANA
+-- registry — which would mean vendoring it.
 langTagReader :: ReadM LangTag
 langTagReader = eitherReader \input ->
-  let tag            = Text.strip (Text.pack input)
+  let tag             = Text.strip (Text.pack input)
+      subtags         = Text.splitOn "-" tag
       (primary, rest) = Text.break (== '-') tag
-      bad why        = Left $ "Invalid --lang value " <> show input <> ": " <> why
-                            <> " (expected a BCP 47 language tag, e.g. he, he-IL, az-Arab)"
+      bad why = Left $ "Invalid --lang value " <> show input <> ": " <> why
+                     <> " (expected a BCP 47 language tag, e.g. he, he-IL, az-Arab)"
   in if Text.null tag
        then bad "empty"
      else if not (Text.all isLangTagChar tag)
        then bad "only letters, digits and '-' are allowed"
-     else if Text.null primary
-       then bad "no language subtag before the first '-'"
+     else if any (\ st -> Text.null st || Text.length st > 8) subtags
+       then bad "each '-'-separated subtag must be 1 to 8 characters"
      else Right (MkLangTag (Text.toLower primary <> rest))
 
 -- | The @--lang@ option itself, so that every verb that takes one takes the
