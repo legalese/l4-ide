@@ -709,12 +709,38 @@ two Hebrew renderings and is reported as ambiguous — correct, and new. And the
 diagnostic can no longer distinguish "untagged" from "tagged", because by the time it runs
 nothing is untagged; it says so in one sentence instead of guessing.
 
-**The residual wrinkle, recorded rather than fixed:** absent-means-`en` labels a monolingual
-Hebrew module as English. That is the Penal Law pilot's exact shape, and R-M2's "required in
-any module that uses a tag" does not reach it, because such a module uses no tags. Nothing
-observable is wrong today — it renders Hebrew either way — and it becomes wrong when §5's
-fidelity channel starts asking which rules lack a translation. The cheap fix is to declare
-`@lang he`, which the documentation now tells Hebrew authors to do.
+**The residual wrinkle — RULED 2026-09-19 (Meng): `en` stays the default; the pilot declares.**
+Absent-means-`en` labels a monolingual Hebrew module as English, which is the Penal Law pilot's
+exact shape, and R-M2's "required in any module that uses a tag" does not reach it because such
+a module uses no tags. Meng declined to change the default and ruled the other way instead: the
+encoding carries an explicit `@lang`. So **`il/penal-law-1977` must declare `@lang he` in every
+module from its first commit** — see §8 step 5, where that is now part of the step rather than
+a thing to remember.
+
+State of `legalese/canon` @ `b9c8f99` (`mengwong/drafts`), measured 2026-09-19 and **re-verified 2026-09-21**:
+
+| where                                                   | modules                                    | declare `@lang`                |
+| ------------------------------------------------------- | ------------------------------------------ | ------------------------------ |
+| `canon subjects/il/penal-law-1977/encodings/`           | **0** — sources deposited, nothing encoded | n/a                            |
+| `…/il/ofek-hadash-2008/encodings/legalese-he-revoiced/` | 9                                          | **9, all `@lang he`**          |
+| `…/il/ofek-hadash-2008/encodings/legalese/`             | 9                                          | 0 — and correct, it is English |
+
+There is nothing to retrofit in the pilot this ruling governs: `il/penal-law-1977` has no `.l4` files, so the ruling binds work not yet written.
+
+**But one of those nine declarations is not reproducible, and that is the failure worth recording.**
+`ofek-salary-table.l4` is GENERATED — `source/build-salary-table-module.py` assembles it and concatenates `source/_salary-table-tail.l4` onto the end.
+The generator does not emit `@lang he`; the declaration on the committed module was added by hand.
+Regenerating with `OFEK_CORPUS` set reproduces the committed module byte-for-byte **minus the declaration**, so the next regeneration silently strips it.
+
+**This is the silent half of the failure, which is why it gets the words.**
+A module that never declared would at worst be mislabelled `en` while rendering Hebrew correctly either way — harmless until §5's fidelity channel asks which rules lack a translation.
+A module whose declaration is hand-added to generated output is worse: it reads as compliant, and loses compliance at a moment nobody is looking at this spec.
+The fix belongs in the generator, not the file, and is the encoding owner's; it was made on canon branch `ofek/legalese-he`.
+
+**Recorded because the wrong version of this paragraph nearly shipped.**
+A re-measurement on 2026-09-21 reported 10 files declaring 9 and named the tail fragment as a non-declaring module.
+Both halves were artefacts of a `find` that recursed into `source/`: the tail is a generator input, not a module, and the counts above were right as first written.
+The instrument counted `.l4` files when the question was about modules — and the number moving from 9 to 10 was explained before asking what the tenth file _was_.
 
 **Superseded, kept because it is the reasoning that preceded the change:** there is no `@lang`,
 and untagged means "unlabelled" rather than "`en`". The ruling
@@ -847,6 +873,13 @@ have no counterpart to consult, so their English is ours alone and should be mar
 5. **Penal Law pilot.** One chapter, Hebrew-canonical, with `@nlg:en` informed by the ICJ text
    — **consulted, never deposited** (R-M6) — to exercise the whole path before committing to
    651 sections. **No `@nlg:ar`** (R-M8).
+
+   **Every module declares `@lang he`, from its first commit** (Meng, 2026-09-19). Absent
+   declaration means `en`, and that ruling stands, so a Hebrew module that says nothing is
+   labelled English: it still RENDERS Hebrew, and it reports as untranslated the moment §5's
+   fidelity channel asks which rules lack a rendering. One line per module buys the label.
+   Nothing to retrofit — the subject has sources deposited and no `.l4` files yet (measured
+   2026-09-19), so this is a constraint on the encoding as it is written, not a cleanup.
 
 ## 8a. What was built, 2026-09-19
 
