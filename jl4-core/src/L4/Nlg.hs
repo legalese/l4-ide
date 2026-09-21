@@ -287,9 +287,9 @@ unslot = \ case
 --
 -- __Shared rather than duplicated, deliberately.__ Both used to spell this
 -- expression out, with a comment in @L4.Cli.Nlg@ saying that changing one
--- without the other breaks the command and the golden at once. The rewrites
--- below make that a three-way invariant rather than a two-way one, which is
--- more than a comment should be asked to hold.
+-- without the other breaks the command and the golden at once. Two rewrites now
+-- have to be applied in the right order as well, which is more than a comment
+-- should be asked to hold.
 --
 -- Order matters: 'promoteHeadInputNlg' moves a herald and its other-language
 -- renderings together, and 'selectLanguage' then picks from where they now are.

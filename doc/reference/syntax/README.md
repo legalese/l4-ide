@@ -267,7 +267,7 @@ DECIDE `is large` IF amount GREATER THAN 100
 own, it describes what follows.** That is the whole rule, and it holds whether
 the thing is a rule, a parameter, a field or a type declaration.
 
-**A head that names its own inputs is the case that used to need a warning here, and no longer does.**
+**One case the rule above does not settle on its own: a head that names its own inputs.**
 A rule may name its inputs twice, once in the `GIVEN` and again in the head, and an annotation written after an input's name in the head lands on that INPUT rather than on the rule.
 It is read as the rule's sentence anyway: whichever of the four places an annotation lands in — above the head, trailing the head, inside the head, under the input — the rule gets it.
 
@@ -284,7 +284,7 @@ GIVETH A BOOLEAN
     MEANS amount GREATER THAN 100
 ```
 
-Both render as `the claim of \`amount\` is large`, at every call site and in every projection.
+Both render as ``the claim of `amount` is large``, at every call site and in every projection.
 
 **Until 2026-09-21, only one projection agreed with that.**
 `l4 render` read such an annotation as the rule's sentence; `l4 nlg` read it as the input's gloss, so a positional call printed the rule's bare name and a `WITH` call printed the sentence in the `where` clause instead of as the heading.

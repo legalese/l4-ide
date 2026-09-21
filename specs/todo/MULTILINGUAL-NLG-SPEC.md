@@ -991,10 +991,10 @@ The answer the two projections gave was not the same answer, and that is the def
 `l4 nlg` read it as the input's gloss, because `L4.Nlg`'s `Linearize` instance for `Resolved` is handed one name at a time with no way up to the enclosing `DECIDE`.
 So a positional call site printed the rule's bare name and a `WITH` call site printed the sentence in the `where` clause — the loss was per CALL SITE, not per file.
 
-| encoding | heralds in that shape | read by `l4 render` | read by `l4 nlg` |
-| --- | --- | --- | --- |
-| canon `il/ofek-hadash-2008/encodings/legalese` (the vendored mirror) | 65 | 65 | 0 |
-| canon `il/ofek-hadash-2008/encodings/legalese-he-revoiced` | 56 | 56 | 0 |
+| encoding                                                             | heralds in that shape | read by `l4 render` | read by `l4 nlg` |
+| -------------------------------------------------------------------- | --------------------- | ------------------- | ---------------- |
+| canon `il/ofek-hadash-2008/encodings/legalese` (the vendored mirror) | 65                    | 65                  | 0                |
+| canon `il/ofek-hadash-2008/encodings/legalese-he-revoiced`           | 56                    | 56                  | 0                |
 
 **RULED by the measurement, not by preference: the rule's sentence.**
 Every one of the 121 heralds above, and the 67 in `jl4-core/libraries/prelude.l4` that write `null list @nlg %list% is empty`, is prose about the rule rather than a label for its input.
