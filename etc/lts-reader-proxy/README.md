@@ -7,6 +7,12 @@ the run's transcripts by `extract-transcripts.mjs`, which also checks that `resu
 judges' output and the judges' input is the readers' output).** Nothing in this directory is a
 verdict on the gate.
 
+**The gate itself was ruled on 2026-09-21 — NO, P2d and P2e are not built** (LTS-VISUALISER.md
+§7.3). That ruling cites this proxy as one of four grounds and is explicit that a proxy is not
+the experiment; it also names what would reopen the gate, one of which is a rerun of these same
+48 readings against a repaired `WhatIf`. This directory remains materials and evidence, not a
+verdict.
+
 `specs/todo/lexipedia-superset/LTS-VISUALISER.md` §7.3 gates the two-plane picture (P2d/P2e) on a
 **reader** experiment: can readers answer _what do I owe, what discharges it, what breaches it_
 from the plain list (`l4 lts`, §7.6), and does a picture add _where am I_ and _what happens

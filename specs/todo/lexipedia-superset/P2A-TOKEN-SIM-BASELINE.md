@@ -540,6 +540,16 @@ What this does **not** settle, and why the gate is still open:
 So: the second conjunct looks satisfied on this evidence, the first is untested, and the gate is
 not this document's to close. Recorded as a `RESULT` block under LTS-VISUALISER.md §7.2.
 
+**Closed elsewhere, 2026-09-21: the gate is RULED NO** (LTS-VISUALISER.md §7.3). This document's
+conjunct is the one that was found **met**, and run 4 made it stronger — the simulator has no
+multi-instance behaviour at all, so the per-member picture is not drawable with it by
+configuration or otherwise. The gate is conjunctive, and it failed on the _other_ conjunct:
+§7.7's reader proxy did not show readers unable to answer the three questions from the list
+(pooled Q1–Q3, list 39/48 against the DOT's 41/48 and the BPMN's 42/48; ahead of both on Q1 and
+Q3). **P2d and P2e are not built.** Nothing in this document is retracted by that — its findings
+stand as the second conjunct, and as the reason no one should reach for this simulator as the
+per-member picture.
+
 ---
 
 ## 7. The empirical warrant this leans on
