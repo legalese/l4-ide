@@ -1496,5 +1496,136 @@
         "text": ""
       }
     }
+  },
+  "Chen Weixiong Jerriek, the attempt": {
+    "type": "Robbery Facts",
+    "module": "robbery-390-392.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Chen Weixiong Jerriek",
+        "date": "the 5th day of July 2002",
+        "time": "1.00pm",
+        "place": "void deck of Blk 121, Lor 1 Toa Payoh",
+        "co-accused": "Koh Bang Long and Chia Jia Ting Samuel",
+        "common intention": true
+      },
+      "theft": {
+        "particulars": {
+          "accused": "Chen Weixiong Jerriek",
+          "date": "the 5th day of July 2002",
+          "time": "1.00pm",
+          "place": "void deck of Blk 121, Lor 1 Toa Payoh",
+          "co-accused": "Koh Bang Long and Chia Jia Ting Samuel",
+          "common intention": true
+        },
+        "victim": "Ng Juin Chye Joel",
+        "victim described as": "",
+        "victim pronoun": "he",
+        "the property": "a handphone valued at about $450/-",
+        "intending to take": true,
+        "dishonestly": true,
+        "movable property": true,
+        "out of the possession of any person": true,
+        "without that person's consent": true,
+        "moves that property": false,
+        "in order to such taking": false
+      },
+      "extortion": {
+        "particulars": {
+          "accused": "Chen Weixiong Jerriek",
+          "date": "the 5th day of July 2002",
+          "time": "1.00pm",
+          "place": "void deck of Blk 121, Lor 1 Toa Payoh",
+          "co-accused": "Koh Bang Long and Chia Jia Ting Samuel",
+          "common intention": true
+        },
+        "victim": "",
+        "victim described as": "",
+        "victim pronoun": "he",
+        "the property extorted": "",
+        "the fear": "",
+        "intentionally": false,
+        "put the victim in fear": false,
+        "that person": false,
+        "any other person": false,
+        "body": false,
+        "mind": false,
+        "reputation": false,
+        "property": false,
+        "dishonestly": false,
+        "induced the person so put in fear": false,
+        "any property": false,
+        "valuable security": false,
+        "anything signed or sealed which may be converted into a valuable security": false
+      },
+      "the hurt": "slapping him and banging his head against the wall",
+      "in order to commit theft": true,
+      "in committing the theft": false,
+      "in carrying away or attempting to carry away property obtained by the theft": false,
+      "for that end": true,
+      "voluntarily causes": true,
+      "attempts to cause": false,
+      "death": false,
+      "hurt": true,
+      "wrongful restraint": true,
+      "fear of instant death": false,
+      "fear of instant hurt": true,
+      "fear of instant wrongful restraint": false,
+      "in the presence of the person put in fear": false,
+      "instant death": false,
+      "instant hurt": false,
+      "instant wrongful restraint": false,
+      "to that person": false,
+      "to some other person": false,
+      "then and there": false,
+      "committed after 7 p.m. and before 7 a.m.": false,
+      "attempting to commit robbery": true,
+      "voluntarily causes hurt": true,
+      "such person": true,
+      "any other person jointly concerned in committing or attempting to commit such robbery": true
+    },
+    "charges": {
+      "392": {
+        "made out": true,
+        "offence": "robbery",
+        "punishment": "imprisonment for a term of not less than 2 years and not more than 10 years and shall also be punished with caning with not less than 6 strokes",
+        "refusal": "",
+        "section": "392",
+        "text": "You, Chen Weixiong Jerriek, are charged that you, on or about the 5th day of July 2002, at about 1.00pm, at void deck of Blk 121, Lor 1 Toa Payoh, Singapore, together with Koh Bang Long and Chia Jia Ting Samuel and in furtherance of the common intention of you all, did rob one Ng Juin Chye Joel of a handphone valued at about $450/-, and you have thereby committed an offence punishable under section 392 read with section 34 of the Penal Code 1871."
+      },
+      "394": {
+        "made out": true,
+        "offence": "voluntarily causing hurt in committing robbery",
+        "punishment": "imprisonment for a term of not less than 5 years and not more than 20 years and shall also be punished with caning with not less than 12 strokes",
+        "refusal": "",
+        "section": "394",
+        "text": "You, Chen Weixiong Jerriek, are charged that you, on or about the 5th day of July 2002, at about 1.00pm, at void deck of Blk 121, Lor 1 Toa Payoh, Singapore, together with Koh Bang Long and Chia Jia Ting Samuel and in furtherance of the common intention of you all, were jointly concerned in committing robbery of a handphone valued at about $450/- from one Ng Juin Chye Joel and whilst committing the said robbery, voluntarily caused hurt to him, to wit, by slapping him and banging his head against the wall, and you have thereby committed an offence punishable under section 394 read with section 34 of the Penal Code 1871."
+      }
+    }
+  },
+  "the handphone not taken from Ng Juin Chye Joel": {
+    "type": "Theft Facts",
+    "module": "theft-378-379.l4",
+    "facts": {
+      "particulars": {
+        "accused": "Chen Weixiong Jerriek",
+        "date": "the 5th day of July 2002",
+        "time": "1.00pm",
+        "place": "void deck of Blk 121, Lor 1 Toa Payoh",
+        "co-accused": "Koh Bang Long and Chia Jia Ting Samuel",
+        "common intention": true
+      },
+      "victim": "Ng Juin Chye Joel",
+      "victim described as": "",
+      "victim pronoun": "he",
+      "the property": "a handphone valued at about $450/-",
+      "intending to take": true,
+      "dishonestly": true,
+      "movable property": true,
+      "out of the possession of any person": true,
+      "without that person's consent": true,
+      "moves that property": false,
+      "in order to such taking": false
+    }
   }
 }

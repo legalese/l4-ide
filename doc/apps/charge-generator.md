@@ -18,7 +18,7 @@ it runs is not in the app at all.
 The encodings live in the `legalese/canon` repository, under
 `subjects/sg/penal-code-1871/encodings/legalese/`, and are deployed to `jl4-service` as one
 bundle. There is one module per offence family — cheating (ss 415, 417, 420), theft (378–379),
-extortion (383–384), robbery (390, 392, 394), criminal breach of trust (405–406), criminal
+extortion (383–384), robbery (390, 392, 393, 394), criminal breach of trust (405–406), criminal
 intimidation (503–506), hurt (321, 323A) — plus a general module for the definitions every
 offence shares (ss 22–25) and for the form of a charge, and a "charge sheet" that lists which
 sections a whole complaint makes out.
@@ -72,22 +72,27 @@ The corpus is validated against reported cases whose judgments quote the charge 
 are positive oracles — the encoded section reproduces the charge's body word for word — and two
 are **refusals**, which is where s 123(5) becomes visible:
 
-| case                                                          | section         | what it shows                                                                                            |
-| ------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------- |
-| Lewis Christine v PP [2001] SGHC 113                          | 420             | the price-tag switch; the flagship recital                                                               |
-| Sarjit Singh Rapati v PP [2005] SGHC 28                       | 384 r/w 34      | extortion by fear of harm to another person; the common-intention rider                                  |
-| Chen Weixiong Jerriek v PP [2003] SGHC 103                    | 392 r/w 34, 394 | robbery composed from theft; a theft charge need not state the manner (s 125 illus (a))                  |
-| Carl Elias Moses, in Viswanathan Ramachandran [2003] SGHC 183 | 406             | **refused**: the property misappropriated must be the property entrusted; the amended charge is framed   |
-| Chan Yok Tuang v PP [2008] SGHC 137                           | 506             | **refused**: the words threaten the person, not the reputation pleaded, and there was no intent to alarm |
-| Ang Boon Han v PP [2024] SGHC 221                             | 323A            | hurt intended as slight that turned out grievous                                                         |
-| s 378 Illustration (q)                                        | 379             | theft of money by bank transfer                                                                          |
+| case                                                          | section         | what it shows                                                                                                                             |
+| ------------------------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Lewis Christine v PP [2001] SGHC 113                          | 420             | the price-tag switch; the flagship recital                                                                                                |
+| Sarjit Singh Rapati v PP [2005] SGHC 28                       | 384 r/w 34      | extortion by fear of harm to another person; the common-intention rider                                                                   |
+| Chen Weixiong Jerriek v PP [2003] SGHC 103                    | 392 r/w 34, 394 | robbery composed from theft; a theft charge need not state the manner (s 125 illus (a))                                                   |
+| Carl Elias Moses, in Viswanathan Ramachandran [2003] SGHC 183 | 406             | **refused**: the property misappropriated must be the property entrusted; the amended charge is framed                                    |
+| Chan Yok Tuang v PP [2008] SGHC 137                           | 506             | **refused**: the words threaten the person, not the reputation pleaded, and there was no intent to alarm                                  |
+| Ang Boon Han v PP [2024] SGHC 221                             | 323A            | hurt intended as slight that turned out grievous                                                                                          |
+| s 378 Illustration (q)                                        | 379             | theft of money by bank transfer                                                                                                           |
+| Chen Weixiong Jerriek, **constructed**: nothing taken         | 393 r/w 34, 394 | the attempt boundary — s 392 refuses because there is no theft, s 393 frames, and s 394 is unmoved because its own words reach an attempt |
 
 ## Limits
 
 - Six offence families and s 301. Nothing else in the Code is encoded, and the assistant
   cannot charge what is not deployed.
 - The s 34 common-intention rider is a clause in the charge header, not an encoded rule. No
-  abetment (s 109), no attempt (s 511), no amalgamated charges (CPC s 124(4)).
+  abetment (s 109), no general attempt under s 511, no amalgamated charges (CPC s 124(4)).
+  Section 393, which punishes an attempt at robbery specifically, **is** encoded.
+- One bench case is not a reported case. The s 393 row above is a **constructed** variation on
+  Chen Weixiong Jerriek with one fact changed, because no judgment on this bench quotes a s 393
+  charge. Its recital is derived from the s 392 one and is not an oracle; the module says so.
 - The header of the charge is normalised to one form; the reported charges vary in
   punctuation ("at or about", "Chapter 224"), and the bench asserts the body, not the header.
 - The evidence graph is kept by the app, not by the L4. Nothing in the corpus models proof.

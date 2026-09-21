@@ -103,6 +103,23 @@ export const OFFENCES: readonly Offence[] = [
     factsParam: 'f',
   },
   {
+    section: '393',
+    title: 'attempt to commit robbery',
+    defines: 'ss 390, 393',
+    family: 'robbery',
+    offenceFn: 'offence under s 393',
+    chargeFn: 'charge under s 393',
+    definitionFns: [
+      'commits robbery',
+      'theft is robbery',
+      'extortion is robbery',
+      'commits theft',
+      'commits extortion',
+    ],
+    factsType: 'Robbery Facts',
+    factsParam: 'f',
+  },
+  {
     section: '394',
     title: 'voluntarily causing hurt in committing robbery',
     defines: 'ss 390, 394',
