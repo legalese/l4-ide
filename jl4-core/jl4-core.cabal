@@ -235,6 +235,7 @@ test-suite jl4-core-test
     CatalaLowerSpec
     NumberLiteralSpec
     NlgLangTagSpec
+    RenderLangDirSpec
     DirectiveRenameSpec
     DirectiveAmbiguitySpec
     ResolutionCascadeSpec
