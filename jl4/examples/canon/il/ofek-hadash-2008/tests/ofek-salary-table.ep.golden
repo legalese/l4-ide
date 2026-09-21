@@ -1,0 +1,396 @@
+IMPORT prelude
+IMPORT `ofek-domain`
+
+§ `The combined salary tables`
+
+-- ===========================================================================
+-- GENERATED FILE — do not edit by hand.
+--   source/build-salary-table-module.py, from the grids parsed by
+--   source/tables.py and laid out by source/_tablefmt.py. Regenerate with
+--     OFEK_CORPUS=<checkout> python3 source/build-salary-table-module.py > ofek-salary-table.l4
+--
+-- THE COMBINED SALARY TABLE (tavlat ha-sachar ha-meshulav), § 35 of the 2008
+-- agreement as replaced from 1 September 2022 by § 4.1 of the collective
+-- agreement of 19 October 2022.
+--
+-- WHICH PRINTING IS AUTHORITATIVE. The 2022 agreement attached its tables
+-- rounded to the SHEKEL. A decision of the joint follow-up committee (vaadat
+-- maakav) of 14 January 2025 corrected a scribal error in that agreement and
+-- REPLACED appendices alef-1 and alef-2 with tables to the AGORA, effective
+-- from the same 1 September 2022. The agorot tables are therefore the text in
+-- force for the whole period, and they are what this module encodes:
+--   /agreements/ofek-hadash/2025-01-14_ofek-hadash_vaadat-maakev_taut-sofer-correction_agorot-salary-tables.html
+-- The shekel printing at /tables/2022-09-01_ofek-hadash_salary-table_BA.html
+-- and its MA sibling round these figures and are otherwise identical; they are
+-- what a reader is most likely to find first, which is why the difference is
+-- stated here.
+--
+-- WHAT THE TABLE IS. Rows are SENIORITY (vetek, § 37), 1 to 36. Columns are
+-- RANK (darga, §§ 36 and 38), 1 to 9. A cell is the monthly combined salary in
+-- new shekels for a FULL post; § 33 and the 2022 agreement § 5.3 pro-rate it
+-- for a part post.
+--
+-- THE MERGED CELLS. The table does not give 324 distinct numbers. It gives
+-- 224, and the shekel printing spreads each across the ranks to its right as a
+-- merged cell: at seniority 3 it prints one figure under rank 1 and another
+-- spanning ranks 2 to 9. This module reproduces that — the last defined value
+-- is repeated into each rank beyond it — and records the frontier separately
+-- below, because the frontier is the part a reader can check against § 38.
+-- The agorot printing and the 1.1.2015 tables leave the very same positions
+-- BLANK instead of merging them, which is why NOTES.md § 5 treats "what a
+-- merged cell means" as an open question of construction rather than a settled
+-- reading.
+--
+-- HOW TO READ THE TWO TABLES BELOW. Each is a decision table, one row per
+-- seniority. The record is built positionally with `OF`, so the rank is
+-- carried by the column rather than by a repeated field name, and the ruler
+-- comment above each table names those columns once. The guard subject, THEN,
+-- the constructor and OF are written on the first row and dittoed with `^`
+-- after it — a caret is the token at that column on the line above. What is
+-- left on a row is what varies: the seniority, and nine amounts.
+-- ===========================================================================
+
+§§ `A row of the table`
+
+DECLARE `a row of the combined salary table` HAS
+    `at rank 1` IS A NUMBER
+    `at rank 2` IS A NUMBER
+    `at rank 3` IS A NUMBER
+    `at rank 4` IS A NUMBER
+    `at rank 5` IS A NUMBER
+    `at rank 6` IS A NUMBER
+    `at rank 7` IS A NUMBER
+    `at rank 8` IS A NUMBER
+    `at rank 9` IS A NUMBER
+
+GIVEN `the row` IS A `a row of the combined salary table`
+      `the rank` IS A NUMBER
+GIVETH A NUMBER
+`the amount in the row at rank` `the row` `the rank`
+    @nlg the amount in the row at the given rank
+    MEANS
+    -- Ranks run 1 to 9 (§ 38). A rank below 1 reads the first column and a
+    -- rank above 9 the last; neither is reachable through § 38, and the
+    -- placement module refuses such a rank before this is ever called.
+    -- A backtick identifier is ONE token, so the field names cannot be
+    -- dittoed away; the record and its genitive can.
+    BRANCH IF `the rank` AT MOST 1 THEN `the row`'s `at rank 1`
+           IF ^          EQUALS  2 ^    ^        ^  `at rank 2`
+           IF ^          EQUALS  3 ^    ^        ^  `at rank 3`
+           IF ^          EQUALS  4 ^    ^        ^  `at rank 4`
+           IF ^          EQUALS  5 ^    ^        ^  `at rank 5`
+           IF ^          EQUALS  6 ^    ^        ^  `at rank 6`
+           IF ^          EQUALS  7 ^    ^        ^  `at rank 7`
+           IF ^          EQUALS  8 ^    ^        ^  `at rank 8`
+           OTHERWISE                    ^        ^  `at rank 9`
+
+§§ `Appendix alef-1 — the BA table, rating code 101`
+
+GIVEN `the seniority` IS A NUMBER
+GIVETH A `a row of the combined salary table`
+`the BA table row at seniority` `the seniority`
+    @nlg the row of the BA (rating code 101) table at the given seniority
+    MEANS
+    --                                                                                   rank 1,    rank 2,    rank 3,    rank 4,    rank 5,    rank 6,    rank 7,    rank 8,    rank 9
+    BRANCH IF `the seniority` AT MOST  1 THEN `a row of the combined salary table` OF     6_300,     6_300,     6_300,     6_300,     6_300,     6_300,     6_300,     6_300,     6_300
+           IF ^               EQUALS   2 ^    ^                                    ^      6_426,     6_426,     6_426,     6_426,     6_426,     6_426,     6_426,     6_426,     6_426
+           IF ^               EQUALS   3 ^    ^                                    ^   6_554.52,  7_046.11,  7_046.11,  7_046.11,  7_046.11,  7_046.11,  7_046.11,  7_046.11,  7_046.11
+           IF ^               EQUALS   4 ^    ^                                    ^   6_685.61,  7_187.03,  7_187.03,  7_187.03,  7_187.03,  7_187.03,  7_187.03,  7_187.03,  7_187.03
+           IF ^               EQUALS   5 ^    ^                                    ^   6_819.32,  7_330.77,  7_330.77,  7_330.77,  7_330.77,  7_330.77,  7_330.77,  7_330.77,  7_330.77
+           IF ^               EQUALS   6 ^    ^                                    ^   6_955.71,  7_477.39,  8_038.19,  8_038.19,  8_038.19,  8_038.19,  8_038.19,  8_038.19,  8_038.19
+           IF ^               EQUALS   7 ^    ^                                    ^   7_094.82,  7_626.93,  8_198.96,  8_198.96,  8_198.96,  8_198.96,  8_198.96,  8_198.96,  8_198.96
+           IF ^               EQUALS   8 ^    ^                                    ^   7_165.77,  7_703.20,  8_280.94,  8_902.02,  8_902.02,  8_902.02,  8_902.02,  8_902.02,  8_902.02
+           IF ^               EQUALS   9 ^    ^                                    ^   7_237.43,  7_780.24,  8_363.75,  8_991.04,  8_991.04,  8_991.04,  8_991.04,  8_991.04,  8_991.04
+           IF ^               EQUALS  10 ^    ^                                    ^   7_309.80,  7_858.04,  8_447.39,  9_080.95,  9_080.95,  9_080.95,  9_080.95,  9_080.95,  9_080.95
+           IF ^               EQUALS  11 ^    ^                                    ^   7_382.90,  7_936.62,  8_531.87,  9_171.76,  9_859.64,  9_859.64,  9_859.64,  9_859.64,  9_859.64
+           IF ^               EQUALS  12 ^    ^                                    ^   7_456.73,  8_015.99,  8_617.18,  9_263.47,  9_958.23,  9_958.23,  9_958.23,  9_958.23,  9_958.23
+           IF ^               EQUALS  13 ^    ^                                    ^   7_531.30,  8_096.15,  8_703.36,  9_356.11, 10_057.82, 10_057.82, 10_057.82, 10_057.82, 10_057.82
+           IF ^               EQUALS  14 ^    ^                                    ^   7_606.61,  8_177.11,  8_790.39,  9_449.67, 10_158.39, 10_920.27, 10_920.27, 10_920.27, 10_920.27
+           IF ^               EQUALS  15 ^    ^                                    ^   7_682.68,  8_258.88,  8_878.29,  9_544.17, 10_259.98, 11_029.48, 11_029.48, 11_029.48, 11_029.48
+           IF ^               EQUALS  16 ^    ^                                    ^   7_759.50,  8_341.47,  8_967.08,  9_639.61, 10_362.58, 11_139.77, 11_139.77, 11_139.77, 11_139.77
+           IF ^               EQUALS  17 ^    ^                                    ^   7_837.10,  8_424.88,  9_056.75,     9_736, 10_466.20, 11_251.17, 11_251.17, 11_251.17, 11_251.17
+           IF ^               EQUALS  18 ^    ^                                    ^   7_915.47,  8_509.13,  9_147.31,  9_833.36, 10_570.87, 11_363.68, 12_215.96, 12_215.96, 12_215.96
+           IF ^               EQUALS  19 ^    ^                                    ^   7_994.62,  8_594.22,  9_238.79,  9_931.70, 10_676.57, 11_477.32, 12_338.12, 12_338.12, 12_338.12
+           IF ^               EQUALS  20 ^    ^                                    ^   8_074.57,  8_680.16,  9_331.18, 10_031.01, 10_783.34, 11_592.09, 12_461.50, 12_461.50, 12_461.50
+           IF ^               EQUALS  21 ^    ^                                    ^   8_155.32,  8_766.97,  9_424.49, 10_131.32, 10_891.17, 11_708.01, 12_586.11, 12_586.11, 12_586.11
+           IF ^               EQUALS  22 ^    ^                                    ^   8_236.87,  8_854.63,  9_518.73, 10_232.64, 11_000.09, 11_825.09, 12_711.97, 13_665.37, 13_665.37
+           IF ^               EQUALS  23 ^    ^                                    ^   8_319.24,  8_943.18,  9_613.92, 10_334.96, 11_110.09, 11_943.34, 12_839.09, 13_802.03, 13_802.03
+           IF ^               EQUALS  24 ^    ^                                    ^   8_402.43,  9_032.61,  9_710.06, 10_438.31, 11_221.19, 12_062.78, 12_967.48, 13_940.05, 13_940.05
+           IF ^               EQUALS  25 ^    ^                                    ^   8_486.45,  9_122.94,  9_807.16, 10_542.70, 11_333.40, 12_183.40, 13_097.16, 14_079.45, 14_079.45
+           IF ^               EQUALS  26 ^    ^                                    ^   8_571.32,  9_214.17,  9_905.23, 10_648.12, 11_446.73, 12_305.24, 13_228.13, 14_220.24, 15_286.76
+           IF ^               EQUALS  27 ^    ^                                    ^   8_657.03,  9_306.31, 10_004.28, 10_754.60, 11_561.20, 12_428.29, 13_360.41, 14_362.44, 15_439.63
+           IF ^               EQUALS  28 ^    ^                                    ^   8_743.60,  9_399.37, 10_104.33, 10_862.15, 11_676.81, 12_552.57, 13_494.02, 14_506.07, 15_594.02
+           IF ^               EQUALS  29 ^    ^                                    ^   8_831.04,  9_493.37, 10_205.37, 10_970.77, 11_793.58, 12_678.10, 13_628.96, 14_651.13, 15_749.96
+           IF ^               EQUALS  30 ^    ^                                    ^   8_919.35,  9_588.30, 10_307.42, 11_080.48, 11_911.52, 12_804.88, 13_765.25, 14_797.64, 15_907.46
+           IF ^               EQUALS  31 ^    ^                                    ^   9_008.54,  9_684.18, 10_410.50, 11_191.28, 12_030.63, 12_932.93, 13_902.90, 14_945.62, 16_066.54
+           IF ^               EQUALS  32 ^    ^                                    ^   9_098.63,  9_781.03, 10_514.60, 11_303.20, 12_150.94, 13_062.26, 14_041.93, 15_095.07, 16_227.20
+           IF ^               EQUALS  33 ^    ^                                    ^   9_189.61,  9_878.84, 10_619.75, 11_416.23, 12_272.45, 13_192.88, 14_182.35, 15_246.02, 16_389.47
+           IF ^               EQUALS  34 ^    ^                                    ^   9_281.51,  9_977.62, 10_725.95, 11_530.39, 12_395.17, 13_324.81, 14_324.17, 15_398.48, 16_553.37
+           IF ^               EQUALS  35 ^    ^                                    ^   9_374.33, 10_077.40, 10_833.21, 11_645.70, 12_519.12, 13_458.06, 14_467.41, 15_552.47, 16_718.90
+           OTHERWISE                          ^                                    ^   9_468.07, 10_178.17, 10_941.54, 11_762.15, 12_644.31, 13_592.64, 14_612.09, 15_707.99, 16_886.09
+
+§§ `Appendix alef-2 — the MA table, rating code 102`
+
+GIVEN `the seniority` IS A NUMBER
+GIVETH A `a row of the combined salary table`
+`the MA table row at seniority` `the seniority`
+    @nlg the row of the MA (rating code 102) table at the given seniority
+    MEANS
+    --                                                                                   rank 1,    rank 2,    rank 3,    rank 4,    rank 5,    rank 6,    rank 7,    rank 8,    rank 9
+    BRANCH IF `the seniority` AT MOST  1 THEN `a row of the combined salary table` OF     6_615,     6_615,     6_615,     6_615,     6_615,     6_615,     6_615,     6_615,     6_615
+           IF ^               EQUALS   2 ^    ^                                    ^   6_747.30,  6_747.30,  6_747.30,  6_747.30,  6_747.30,  6_747.30,  6_747.30,  6_747.30,  6_747.30
+           IF ^               EQUALS   3 ^    ^                                    ^   6_882.25,  7_398.41,  7_398.41,  7_398.41,  7_398.41,  7_398.41,  7_398.41,  7_398.41,  7_398.41
+           IF ^               EQUALS   4 ^    ^                                    ^   7_019.89,  7_546.38,  7_546.38,  7_546.38,  7_546.38,  7_546.38,  7_546.38,  7_546.38,  7_546.38
+           IF ^               EQUALS   5 ^    ^                                    ^   7_160.29,  7_697.31,  7_697.31,  7_697.31,  7_697.31,  7_697.31,  7_697.31,  7_697.31,  7_697.31
+           IF ^               EQUALS   6 ^    ^                                    ^   7_303.49,  7_851.26,  8_440.10,  8_440.10,  8_440.10,  8_440.10,  8_440.10,  8_440.10,  8_440.10
+           IF ^               EQUALS   7 ^    ^                                    ^   7_449.56,  8_008.28,  8_608.90,  8_608.90,  8_608.90,  8_608.90,  8_608.90,  8_608.90,  8_608.90
+           IF ^               EQUALS   8 ^    ^                                    ^   7_524.06,  8_088.36,  8_694.99,  9_347.12,  9_347.12,  9_347.12,  9_347.12,  9_347.12,  9_347.12
+           IF ^               EQUALS   9 ^    ^                                    ^   7_599.30,  8_169.25,  8_781.94,  9_440.59,  9_440.59,  9_440.59,  9_440.59,  9_440.59,  9_440.59
+           IF ^               EQUALS  10 ^    ^                                    ^   7_675.29,  8_250.94,  8_869.76,  9_534.99,  9_534.99,  9_534.99,  9_534.99,  9_534.99,  9_534.99
+           IF ^               EQUALS  11 ^    ^                                    ^   7_752.05,  8_333.45,  8_958.46,  9_630.34, 10_352.62, 10_352.62, 10_352.62, 10_352.62, 10_352.62
+           IF ^               EQUALS  12 ^    ^                                    ^   7_829.57,  8_416.78,  9_048.04,  9_726.65, 10_456.15, 10_456.15, 10_456.15, 10_456.15, 10_456.15
+           IF ^               EQUALS  13 ^    ^                                    ^   7_907.86,  8_500.95,  9_138.52,  9_823.91, 10_560.71, 10_560.71, 10_560.71, 10_560.71, 10_560.71
+           IF ^               EQUALS  14 ^    ^                                    ^   7_986.94,  8_585.96,  9_229.91,  9_922.15, 10_666.31, 11_466.29, 11_466.29, 11_466.29, 11_466.29
+           IF ^               EQUALS  15 ^    ^                                    ^   8_066.81,  8_671.82,  9_322.21, 10_021.37, 10_772.98, 11_580.95, 11_580.95, 11_580.95, 11_580.95
+           IF ^               EQUALS  16 ^    ^                                    ^   8_147.48,  8_758.54,  9_415.43, 10_121.59, 10_880.71, 11_696.76, 11_696.76, 11_696.76, 11_696.76
+           IF ^               EQUALS  17 ^    ^                                    ^   8_228.95,  8_846.13,  9_509.58, 10_222.80, 10_989.51, 11_813.73, 11_813.73, 11_813.73, 11_813.73
+           IF ^               EQUALS  18 ^    ^                                    ^   8_311.24,  8_934.59,  9_604.68, 10_325.03, 11_099.41, 11_931.86, 12_826.75, 12_826.75, 12_826.75
+           IF ^               EQUALS  19 ^    ^                                    ^   8_394.36,  9_023.93,  9_700.73, 10_428.28, 11_210.40, 12_051.18, 12_955.02, 12_955.02, 12_955.02
+           IF ^               EQUALS  20 ^    ^                                    ^   8_478.30,  9_114.17,  9_797.73, 10_532.56, 11_322.51, 12_171.69, 13_084.57, 13_084.57, 13_084.57
+           IF ^               EQUALS  21 ^    ^                                    ^   8_563.08,  9_205.31,  9_895.71, 10_637.89, 11_435.73, 12_293.41, 13_215.42, 13_215.42, 13_215.42
+           IF ^               EQUALS  22 ^    ^                                    ^   8_648.71,  9_297.37,  9_994.67, 10_744.27, 11_550.09, 12_416.35, 13_347.57, 14_348.64, 14_348.64
+           IF ^               EQUALS  23 ^    ^                                    ^   8_735.20,  9_390.34, 10_094.62, 10_851.71, 11_665.59, 12_540.51, 13_481.05, 14_492.13, 14_492.13
+           IF ^               EQUALS  24 ^    ^                                    ^   8_822.55,  9_484.24, 10_195.56, 10_960.23, 11_782.25, 12_665.91, 13_615.86, 14_637.05, 14_637.05
+           IF ^               EQUALS  25 ^    ^                                    ^   8_910.78,  9_579.09, 10_297.52, 11_069.83, 11_900.07, 12_792.57, 13_752.02, 14_783.42, 14_783.42
+           IF ^               EQUALS  26 ^    ^                                    ^   8_999.89,  9_674.88, 10_400.49, 11_180.53, 12_019.07, 12_920.50, 13_889.54, 14_931.25, 16_051.10
+           IF ^               EQUALS  27 ^    ^                                    ^   9_089.88,  9_771.63, 10_504.50, 11_292.33, 12_139.26, 13_049.70, 14_028.43, 15_080.56, 16_211.61
+           IF ^               EQUALS  28 ^    ^                                    ^   9_180.78,  9_869.34, 10_609.54, 11_405.26, 12_260.65, 13_180.20, 14_168.72, 15_231.37, 16_373.72
+           IF ^               EQUALS  29 ^    ^                                    ^   9_272.59,  9_968.04, 10_715.64, 11_519.31, 12_383.26,    13_312, 14_310.40, 15_383.68, 16_537.46
+           IF ^               EQUALS  30 ^    ^                                    ^   9_365.32, 10_067.72, 10_822.79, 11_634.50, 12_507.09, 13_445.12, 14_453.51, 15_537.52, 16_702.83
+           IF ^               EQUALS  31 ^    ^                                    ^   9_458.97, 10_168.39, 10_931.02, 11_750.85, 12_632.16, 13_579.57, 14_598.04, 15_692.90, 16_869.86
+           IF ^               EQUALS  32 ^    ^                                    ^   9_553.56, 10_270.08, 11_040.33, 11_868.36, 12_758.48, 13_715.37, 14_744.02, 15_849.83, 17_038.56
+           IF ^               EQUALS  33 ^    ^                                    ^   9_649.10, 10_372.78, 11_150.74, 11_987.04, 12_886.07, 13_852.52, 14_891.46, 16_008.32, 17_208.95
+           IF ^               EQUALS  34 ^    ^                                    ^   9_745.59, 10_476.51, 11_262.24, 12_106.91, 13_014.93, 13_991.05, 15_040.38, 16_168.41, 17_381.04
+           IF ^               EQUALS  35 ^    ^                                    ^   9_843.04, 10_581.27, 11_374.87, 12_227.98, 13_145.08, 14_130.96, 15_190.78, 16_330.09, 17_554.85
+           OTHERWISE                          ^                                    ^   9_941.47, 10_687.08, 11_488.61, 12_350.26, 13_276.53, 14_272.27, 15_342.69, 16_493.39, 17_730.40
+§§ `Reading a cell`
+
+-- Seniority beyond 36 reads the last row: the table stops at 36 and prints no
+-- further step. NOTES.md § 5 records that no instrument says so in terms, and
+-- that this is the encoding's reading of a table that ends.
+GIVEN `the table` IS A `a salary table`
+      `the seniority` IS A NUMBER
+      `the rank` IS A NUMBER
+GIVETH A NUMBER
+`the combined salary for a full post` `the table` `the seniority` `the rank`
+    @nlg the combined salary for a full post at the given seniority and rank
+    MEANS
+    CONSIDER `the table`
+    WHEN `the BA table — rating code 101` THEN
+        `the amount in the row at rank` (`the BA table row at seniority` `the seniority`) `the rank`
+    WHEN `the MA table — rating code 102` THEN
+        `the amount in the row at rank` (`the MA table row at seniority` `the seniority`) `the rank`
+
+§§ `The frontier the table actually separates`
+
+-- The table separates only so many ranks at a given seniority; the rest of
+-- the row is the repeat described in the header. This is that staircase, read
+-- off the printed tables. It is IDENTICAL in the 1.1.2015, the 1.9.2016, the
+-- 1.9.2022 and the corrected agorot printings, which is evidence that it is a
+-- designed feature and not an artefact of one typesetting.
+GIVEN `the seniority` IS A NUMBER
+GIVETH A NUMBER
+`the highest rank the table separates at seniority` `the seniority`
+    @nlg the highest rank the table separates at the given seniority
+    MEANS
+    BRANCH IF `the seniority` AT MOST 1  THEN 1
+           IF `the seniority` EQUALS 2    THEN 1
+           IF `the seniority` EQUALS 3    THEN 2
+           IF `the seniority` EQUALS 4    THEN 2
+           IF `the seniority` EQUALS 5    THEN 2
+           IF `the seniority` EQUALS 6    THEN 3
+           IF `the seniority` EQUALS 7    THEN 3
+           IF `the seniority` EQUALS 8    THEN 4
+           IF `the seniority` EQUALS 9    THEN 4
+           IF `the seniority` EQUALS 10   THEN 4
+           IF `the seniority` EQUALS 11   THEN 5
+           IF `the seniority` EQUALS 12   THEN 5
+           IF `the seniority` EQUALS 13   THEN 5
+           IF `the seniority` EQUALS 14   THEN 6
+           IF `the seniority` EQUALS 15   THEN 6
+           IF `the seniority` EQUALS 16   THEN 6
+           IF `the seniority` EQUALS 17   THEN 6
+           IF `the seniority` EQUALS 18   THEN 7
+           IF `the seniority` EQUALS 19   THEN 7
+           IF `the seniority` EQUALS 20   THEN 7
+           IF `the seniority` EQUALS 21   THEN 7
+           IF `the seniority` EQUALS 22   THEN 8
+           IF `the seniority` EQUALS 23   THEN 8
+           IF `the seniority` EQUALS 24   THEN 8
+           IF `the seniority` EQUALS 25   THEN 8
+           IF `the seniority` EQUALS 26   THEN 9
+           IF `the seniority` EQUALS 27   THEN 9
+           IF `the seniority` EQUALS 28   THEN 9
+           IF `the seniority` EQUALS 29   THEN 9
+           IF `the seniority` EQUALS 30   THEN 9
+           IF `the seniority` EQUALS 31   THEN 9
+           IF `the seniority` EQUALS 32   THEN 9
+           IF `the seniority` EQUALS 33   THEN 9
+           IF `the seniority` EQUALS 34   THEN 9
+           IF `the seniority` EQUALS 35   THEN 9
+           OTHERWISE                          9
+
+-- Equivalently, and this is the form the 14 January 2025 decision itself uses
+-- when it describes the grids: rank d is first separated at seniority
+-- 1 / 3 / 6 / 8 / 11 / 14 / 18 / 22 / 26.
+GIVEN `the rank` IS A NUMBER
+GIVETH A NUMBER
+`the seniority at which rank is first separated` `the rank`
+    @nlg the seniority at which the given rank is first separated
+    MEANS
+    BRANCH IF `the rank` AT MOST 1 THEN 1
+           IF `the rank` EQUALS 2  THEN 3
+           IF `the rank` EQUALS 3  THEN 6
+           IF `the rank` EQUALS 4  THEN 8
+           IF `the rank` EQUALS 5  THEN 11
+           IF `the rank` EQUALS 6  THEN 14
+           IF `the rank` EQUALS 7  THEN 18
+           IF `the rank` EQUALS 8  THEN 22
+           OTHERWISE                   26
+
+§§ `The steps the table prints in its own margins`
+
+-- The shekel printing of the table does not only give amounts. Its left
+-- margin prints a PERCENTAGE against each seniority row, and its top margin
+-- prints one against each rank column. Those percentages are the table's own
+-- account of how it was built, and § 35(b)(2) contemplates the table being
+-- updated "at the dates and by the rates" set out — so the rates are
+-- operative text, not decoration. (The corrected agorot printing carries the
+-- grids alone and prints no margins, which is why they are cited to the
+-- shekel printing.)
+--
+-- This encoding therefore carries BOTH: the amounts above, and the steps
+-- below, and asserts that the second generates the first.
+
+GIVEN `the seniority` IS A NUMBER
+GIVETH A NUMBER
+`the seniority step at` `the seniority`
+    @nlg the seniority step printed against the given row
+    MEANS
+    -- Read from the table's left margin: 2% for rows 2 to 7, 1% from row 8.
+    -- Row 1 prints no step, being the base.
+    BRANCH IF `the seniority` AT MOST 1 THEN 0%
+           IF `the seniority` AT MOST 7 THEN 2%
+           OTHERWISE                         1%
+
+`the rank step` MEANS 7.5%
+    -- Printed once across the top of both 2022 tables. The tables in force
+    -- from 1.1.2015 print 8.5% over the three highest columns instead; that
+    -- earlier vintage is not encoded here (NOTES.md § 4).
+
+§§ `The table agrees with the steps it prints`
+
+-- Two helpers, so that each assertion below fits the single line a directive
+-- must occupy. They add nothing: each is the lookup above with its table
+-- already chosen.
+GIVEN `the seniority` IS A NUMBER, `the rank` IS A NUMBER
+GIVETH A NUMBER
+`BA cell` `the seniority` `the rank`
+    MEANS `the combined salary for a full post` `the BA table — rating code 101` `the seniority` `the rank`
+
+GIVEN `the seniority` IS A NUMBER, `the rank` IS A NUMBER
+GIVETH A NUMBER
+`MA cell` `the seniority` `the rank`
+    MEANS `the combined salary for a full post` `the MA table — rating code 102` `the seniority` `the rank`
+
+-- THE TOLERANCE IS HALF AN AGORA, AND IT IS TIGHT. Applying a printed step to
+-- a printed cell lands within 0.005 of the next printed cell — which is
+-- exactly the rounding of a figure printed to two decimals, and no more.
+-- Measured over the corrected tables: 188 rank steps and 215 seniority steps
+-- in each, worst deviation 0.0102 for a single step and 0.0050 for the whole
+-- grid generated from its base. The shekel printing needs a tolerance two
+-- hundred times larger (1.00) for the same claim, which is itself the
+-- evidence that the shekel figures are roundings of these and not a
+-- separately-computed table.
+GIVEN `the computed amount` IS A NUMBER, `the printed amount` IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `agrees to the agora` `the computed amount` `the printed amount` IF
+        `the computed amount` MINUS `the printed amount` AT MOST 0.011
+    AND `the printed amount` MINUS `the computed amount` AT MOST 0.011
+
+-- The seniority step, down the first rank column: 2% up to row 7, 1% from
+-- row 8. Each assertion takes a printed cell, applies the step printed in the
+-- margin of the row below it, and meets the cell printed there.
+#ASSERT `agrees to the agora` (`BA cell` 1 1 TIMES (1 PLUS `the seniority step at` 2)) (`BA cell` 2 1)
+#ASSERT `agrees to the agora` (`BA cell` 6 1 TIMES (1 PLUS `the seniority step at` 7)) (`BA cell` 7 1)
+#ASSERT `agrees to the agora` (`BA cell` 7 1 TIMES (1 PLUS `the seniority step at` 8)) (`BA cell` 8 1)
+#ASSERT `agrees to the agora` (`BA cell` 20 3 TIMES (1 PLUS `the seniority step at` 21)) (`BA cell` 21 3)
+#ASSERT `agrees to the agora` (`BA cell` 35 1 TIMES (1 PLUS `the seniority step at` 36)) (`BA cell` 36 1)
+#ASSERT `agrees to the agora` (`MA cell` 1 1 TIMES (1 PLUS `the seniority step at` 2)) (`MA cell` 2 1)
+#ASSERT `agrees to the agora` (`MA cell` 7 1 TIMES (1 PLUS `the seniority step at` 8)) (`MA cell` 8 1)
+#ASSERT `agrees to the agora` (`MA cell` 26 6 TIMES (1 PLUS `the seniority step at` 27)) (`MA cell` 27 6)
+#ASSERT `agrees to the agora` (`MA cell` 35 1 TIMES (1 PLUS `the seniority step at` 36)) (`MA cell` 36 1)
+
+-- The rank step, across a row, within the frontier. At seniority 26 the table
+-- separates all nine ranks, so every step across that row is a printed one.
+#ASSERT `agrees to the agora` (`BA cell` 26 1 TIMES (1 PLUS `the rank step`)) (`BA cell` 26 2)
+#ASSERT `agrees to the agora` (`BA cell` 26 2 TIMES (1 PLUS `the rank step`)) (`BA cell` 26 3)
+#ASSERT `agrees to the agora` (`BA cell` 26 5 TIMES (1 PLUS `the rank step`)) (`BA cell` 26 6)
+#ASSERT `agrees to the agora` (`BA cell` 26 8 TIMES (1 PLUS `the rank step`)) (`BA cell` 26 9)
+#ASSERT `agrees to the agora` (`MA cell` 26 1 TIMES (1 PLUS `the rank step`)) (`MA cell` 26 2)
+#ASSERT `agrees to the agora` (`MA cell` 26 8 TIMES (1 PLUS `the rank step`)) (`MA cell` 26 9)
+
+-- And lower down the table, where fewer ranks are separated but the step is
+-- the same one.
+#ASSERT `agrees to the agora` (`BA cell` 11 1 TIMES (1 PLUS `the rank step`)) (`BA cell` 11 2)
+#ASSERT `agrees to the agora` (`BA cell` 11 4 TIMES (1 PLUS `the rank step`)) (`BA cell` 11 5)
+#ASSERT `agrees to the agora` (`MA cell` 14 5 TIMES (1 PLUS `the rank step`)) (`MA cell` 14 6)
+#ASSERT `agrees to the agora` (`MA cell` 3 1 TIMES (1 PLUS `the rank step`)) (`MA cell` 3 2)
+
+§§ `The merged cells are repeats, not steps`
+
+-- Beyond the frontier the value repeats. This is the observable difference
+-- between the two readings NOTES.md § 5 sets out, stated as a test rather
+-- than as prose: if these were genuine rank steps they would differ by 7.5%,
+-- and they do not differ at all.
+#ASSERT `BA cell` 3 2 EQUALS `BA cell` 3 9
+#ASSERT `BA cell` 1 1 EQUALS `BA cell` 1 9
+#ASSERT `MA cell` 6 3 EQUALS `MA cell` 6 9
+
+-- And the frontier is where the repeats begin.
+#ASSERT `the highest rank the table separates at seniority` 1  EQUALS 1
+#ASSERT `the highest rank the table separates at seniority` 3  EQUALS 2
+#ASSERT `the highest rank the table separates at seniority` 6  EQUALS 3
+#ASSERT `the highest rank the table separates at seniority` 11 EQUALS 5
+#ASSERT `the highest rank the table separates at seniority` 18 EQUALS 7
+#ASSERT `the highest rank the table separates at seniority` 26 EQUALS 9
+#ASSERT `the highest rank the table separates at seniority` 36 EQUALS 9
+
+-- The two statements of the frontier are the same staircase read from its two
+-- ends, so they must agree at every rank.
+#ASSERT `the seniority at which rank is first separated` 1 EQUALS 1
+#ASSERT `the seniority at which rank is first separated` 2 EQUALS 3
+#ASSERT `the seniority at which rank is first separated` 3 EQUALS 6
+#ASSERT `the seniority at which rank is first separated` 4 EQUALS 8
+#ASSERT `the seniority at which rank is first separated` 5 EQUALS 11
+#ASSERT `the seniority at which rank is first separated` 6 EQUALS 14
+#ASSERT `the seniority at which rank is first separated` 7 EQUALS 18
+#ASSERT `the seniority at which rank is first separated` 8 EQUALS 22
+#ASSERT `the seniority at which rank is first separated` 9 EQUALS 26
+
+§§ `Spot checks against the printed page`
+
+-- The four corners and the running examples' own cells, so that a reader can
+-- open the scan and check this encoding without reading any L4.
+#ASSERT `BA cell` 1  1 EQUALS 6_300
+#ASSERT `BA cell` 36 9 EQUALS 16_886.09
+#ASSERT `MA cell` 1  1 EQUALS 6_615
+#ASSERT `MA cell` 36 9 EQUALS 17_730.40
+#ASSERT ROUND (`BA cell` 11 4) EQUALS 9_172
+#ASSERT ROUND (`MA cell` 30 8) EQUALS 15_538
+#ASSERT ROUND (`MA cell` 6  3) EQUALS 8_440
+
+-- Seniority past the end of the table reads the last row, and seniority
+-- before its start reads the first.
+#ASSERT `BA cell` 40 9 EQUALS `BA cell` 36 9
+#ASSERT `BA cell` 0  1 EQUALS `BA cell` 1  1

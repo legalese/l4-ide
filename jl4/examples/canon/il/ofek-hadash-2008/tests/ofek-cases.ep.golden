@@ -1,0 +1,269 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `ofek-domain`
+IMPORT `ofek-salary-table`
+IMPORT `ofek-placement`
+IMPORT `ofek-worktime`
+IMPORT `ofek-supplements`
+IMPORT `ofek-fiscal-2025`
+IMPORT `ofek-pay`
+
+§ `Worked payslips`
+
+-- ===========================================================================
+-- Three teachers, computed end to end, with every figure traced back to the
+-- article that produces it. These are the cases NOTES.md § 6 walks through in
+-- prose; here they are as arithmetic that runs.
+--
+-- Every amount below was obtained by EVALUATING this encoding and then
+-- written down, not computed by hand and hoped for. Where a figure looks
+-- surprising — and the half-post case is designed to — the surprise is in the
+-- instruments, not in the encoding.
+-- ===========================================================================
+
+§§ `The dates the answers turn on`
+
+`a month in the 2024 school year` MEANS YMD 2024 9 1
+`a month in the first reduction period` MEANS YMD 2025 11 1
+`a month in the second reduction period` MEANS YMD 2026 3 1
+`a month after the school-role supplement begins` MEANS YMD 2026 10 1
+
+§§ `Yael — a junior-high homeroom teacher, eleven years in`
+
+-- BA, seniority 11, rank 4, a full post, homeroom teacher of a class other
+-- than the first grade. She is the plainest case in the encoding, and every
+-- later contrast is drawn against her.
+--
+--   combined salary        BA table, seniority 11, rank 4      9,171.76
+--   Tosefet Ofek 2022      BA, rank 4, from 1.9.2023             835.54
+--                                            the § 39 base    10,007.30
+--   homeroom supplement    10% of that, being above the
+--                          1,000 floor of 2022 § 10.1.1.2      1,000.73
+--                                                             ---------
+--                          before the reduction               11,008.03
+
+#ASSERT `BA cell` 11 4 EQUALS 9_171.76
+#ASSERT `the full-post percentage base for` `Yael` `a month in the 2024 school year` EQUALS 10_007.3
+#ASSERT `the role supplements payable to` `Yael` `a month in the 2024 school year` EQUALS 1_000.73
+#ASSERT `the monthly pay before the reduction for` `Yael` `a month in the 2024 school year` EQUALS 11_008.03
+
+-- The floor of 2022 § 10.1.1.2 is only just idle here: 10% of her base is
+-- 1,000.73 against a floor of 1,000. Seventy-three agora is the whole of the
+-- margin, and a teacher one rank below her is inside the floor.
+#ASSERT `the role supplements payable to` `Yael` `a month in the 2024 school year` GREATER THAN `the floor under the homeroom supplement`
+
+-- The reduction, in each of its two periods. § 9(a) takes 0.95% and § 9(b)
+-- takes 1.2%, and the difference between the two months is 27.52 a month.
+#ASSERT `the monthly pay of` `Yael` `a month in the first reduction period` 0 EQUALS 10_903.453715
+#ASSERT `the monthly pay of` `Yael` `a month in the second reduction period` 0 EQUALS 10_875.93364
+#ASSERT `the monthly pay of` `Yael` `a month in the 2024 school year` 0 EQUALS 11_008.03
+
+-- 2026 § 16, stacked on § 9. Had Yael advanced a seniority step worth 130 in
+-- the September 2025 salary, she would have kept her new place in the table
+-- and lost the whole cash value of it for four months, ON TOP of the 0.95%.
+#ASSERT `the monthly pay of` `Yael` `a month in the first reduction period` 130 EQUALS 10_773.453715
+
+-- And the withholding ends with 2025: the same step is hers to keep from
+-- January 2026, when only the 1.2% is taken.
+#ASSERT `the monthly pay of` `Yael` `a month in the second reduction period` 130 EQUALS 10_875.93364
+
+§§ `Dvora — a primary-school teacher at the top of the table`
+
+-- MA, seniority 30, rank 8, a full post, an existing teacher who converted.
+-- She holds two role supplements, which is the § 39(c) maximum without the
+-- district director, and three units of the 2022 § 22 school-role supplement.
+--
+--   combined salary        MA table, seniority 30, rank 8     15,537.52
+--   Tosefet Ofek 2022      MA, rank 8, from 1.9.2023              37.37
+--                                            the § 39 base    15,574.89
+--   first-grade homeroom   11.5% of that                       1,791.11
+--   subject coordinator    6% of that, primary school            934.49
+--                                                             ---------
+--                          before 1.9.2026                    18,300.50
+--   school-role supplement 3 units at 200, flat                   600.00
+--                                                             ---------
+--                          from 1.9.2026                      18,900.50
+
+#ASSERT `MA cell` 30 8 EQUALS 15_537.52
+#ASSERT `the full-post percentage base for` `Dvora` `a month in the 2024 school year` EQUALS 15_574.89
+#ASSERT `the monthly pay before the reduction for` `Dvora` `a month in the 2024 school year` EQUALS 18_300.49575
+#ASSERT `the monthly pay before the reduction for` `Dvora` `a month after the school-role supplement begins` EQUALS 18_900.49575
+#ASSERT `the monthly pay of` `Dvora` `a month after the school-role supplement begins` 0 EQUALS 18_673.689801
+
+-- At rank 8 Tosefet Ofek 2022 has almost run out — 37.37 against the 1,585.54
+-- a rank-1 BA teacher receives. That is the levelling § 5 was for, and it is
+-- worth seeing as a ratio: the payment at the bottom of the table is more
+-- than forty times the payment at the top of it.
+#ASSERT `tosefet ofek 2022 from september 2023 in` `the BA table — rating code 101` 1 GREATER THAN (40 TIMES (`tosefet ofek 2022 from september 2023 in` `the MA table — rating code 102` 8))
+
+-- The § 22 supplement is worth exactly 600 to her whatever else changes,
+-- because it is neither a percentage nor pro-rated.
+#ASSERT (`the monthly pay before the reduction for` `Dvora` `a month after the school-role supplement begins`) MINUS (`the monthly pay before the reduction for` `Dvora` `a month in the 2024 school year`) EQUALS 600
+
+§§ `Noa — a doctorate on half a post`
+
+-- MA table (§ 36(d)(1) places a doctorate there), seniority 6, rank 3, a new
+-- teacher on half a post, no roles.
+--
+--   combined salary        MA table 6/3 = 8,440.10, halved      4,220.05
+--   Tosefet Ofek 2022      MA rank 3 = 1,139.87, halved
+--                          (2022 § 5.3 pro-rates it)              569.94
+--   doctorate supplement   5% of her combined salary (§ 36(d)(2)) 211.00
+--                                                             ---------
+--                          before the reduction                5,000.99
+
+#ASSERT `MA cell` 6 3 EQUALS 8_440.1
+#ASSERT `the combined salary payable to` `Noa` `a month in the 2024 school year` EQUALS 4_220.05
+#ASSERT `the tosefet ofek payable to` `Noa` `a month in the 2024 school year` EQUALS 569.935
+#ASSERT `the doctorate supplement payable to` `Noa` `a month in the 2024 school year` EQUALS 211.0025
+#ASSERT `the monthly pay before the reduction for` `Noa` `a month in the 2024 school year` EQUALS 5_000.9875
+
+§§ `Half a post is not half the pay`
+
+-- THE RESULT THIS ENCODING EXISTS TO MAKE VISIBLE. Take Yael and change one
+-- field: half a post instead of a whole one. Nothing else about her moves.
+`Yael on half a post` MEANS `a teacher` WITH
+    `qualification`                IS `academic — holds a recognised first degree`
+    `seniority in years`           IS 11
+    `rank`                         IS 4
+    `stage of education`           IS `a junior high school`
+    `how they entered`             IS `a new teacher placed under section 36`
+    `fraction of a full post`      IS 50%
+    `roles`                        IS LIST `homeroom teacher of a class other than the first grade`
+    `classes in the coordinated grade level` IS 0
+    `units of the school-role supplement`    IS 0
+    `teaches special education`    IS FALSE
+    `special education percentage` IS 0
+
+--   combined salary        halved                              4,585.88
+--   Tosefet Ofek 2022      halved (2022 § 5.3)                   417.77
+--   homeroom supplement    NOT halved (2008 § 39(b): the
+--                          full-post figure, the post being
+--                          at least a third)                   1,000.73
+--                                                             ---------
+--                                                              6,004.38
+#ASSERT `the monthly pay before the reduction for` `Yael on half a post` `a month in the 2024 school year` EQUALS 6_004.38
+
+-- 6,004.38 against 11,008.03 is 54.5% of the pay for 50% of the work. The
+-- gap is the whole of the homeroom supplement, which § 39(b) directs be paid
+-- at its full-post value to anybody employed for a third of a post or more.
+#ASSERT (`the monthly pay before the reduction for` `Yael on half a post` `a month in the 2024 school year`) GREATER THAN ((50%) TIMES (`the monthly pay before the reduction for` `Yael` `a month in the 2024 school year`))
+
+-- Stated exactly: the excess over half is the supplement, halved.
+#ASSERT (`the monthly pay before the reduction for` `Yael on half a post` `a month in the 2024 school year`) MINUS ((50%) TIMES (`the monthly pay before the reduction for` `Yael` `a month in the 2024 school year`)) EQUALS ((50%) TIMES (`the role supplements payable to` `Yael` `a month in the 2024 school year`))
+
+-- The same teacher just below the § 39(b) floor loses the supplement outright
+-- and drops BELOW a proportionate share. A third of a post keeps it; a
+-- thirtieth of a percent less loses it.
+`Yael on just under a third of a post` MEANS `a teacher` WITH
+    `qualification`                IS `academic — holds a recognised first degree`
+    `seniority in years`           IS 11
+    `rank`                         IS 4
+    `stage of education`           IS `a junior high school`
+    `how they entered`             IS `a new teacher placed under section 36`
+    `fraction of a full post`      IS 0.33
+    `roles`                        IS LIST `homeroom teacher of a class other than the first grade`
+    `classes in the coordinated grade level` IS 0
+    `units of the school-role supplement`    IS 0
+    `teaches special education`    IS FALSE
+    `special education percentage` IS 0
+
+#ASSERT `the role supplements payable to` `Yael on just under a third of a post` `a month in the 2024 school year` EQUALS 0
+#ASSERT NOT `the post carries the role supplements` 0.33
+#ASSERT `the post carries the role supplements` (1 DIVIDED BY 3)
+
+§§ `The value of an hour, and why the purpose matters`
+
+-- 2008 § 31(a) prices a substitution hour off the combined salary alone, and
+-- a school activity off the combined salary WITH the role supplements. For
+-- Yael that is a difference of 6.42 an hour — a tenth of the hour's value —
+-- turning only on which article the hour is worked under.
+#ASSERT ROUND ((`the value of an hour for` `Yael` `a month in the 2024 school year` `a substitution hour`) TIMES 100) EQUALS 6420
+#ASSERT ROUND ((`the value of an hour for` `Yael` `a month in the 2024 school year` `a school activity`) TIMES 100) EQUALS 7062
+#ASSERT (`the value of an hour for` `Yael` `a month in the 2024 school year` `a school activity`) GREATER THAN (`the value of an hour for` `Yael` `a month in the 2024 school year` `a substitution hour`)
+
+-- § 30(a) then pays a school activity at 125% of that, capped at 18 hours in
+-- each half of the school year — so the most a school activity can add to
+-- Yael's half-year is 1,588.92.
+#ASSERT ROUND ((`the value of an hour for` `Yael` `a month in the 2024 school year` `a school activity`) TIMES `the rate for a school activity` TIMES `the school activity hours allowed in a half year` TIMES 100) EQUALS 158_892
+
+-- And the 2026 agreement's additional hour is paid at a QUARTER of the hour's
+-- value: 16.05 for an hour of teaching, against the 80.25 the same hour would
+-- earn as an ordinary substitution.
+#ASSERT ROUND ((`the pay for the section 25 additional hour` (`the value of an hour for` `Yael` `a month in the 2024 school year` `a substitution hour`) FALSE) TIMES 100) EQUALS 1605
+#ASSERT ROUND ((`the value of an hour for` `Yael` `a month in the 2024 school year` `a substitution hour`) TIMES `the rate for a substitution hour` TIMES 100) EQUALS 8025
+
+§§ `The reduction reaches a teacher's savings too`
+
+-- 2026 § 12 reduces the study-fund base by the same rate, so the 1.2% is not
+-- only taken from take-home pay.
+#ASSERT ROUND ((`the study fund base after the reduction` (`the monthly pay before the reduction for` `Yael` `a month in the second reduction period`) `a month in the second reduction period`) TIMES 100) EQUALS 1_087_593
+
+-- But § 18 keeps it out of the pension: an employer contribution is computed
+-- as though nothing had been reduced.
+#ASSERT `the reduction is ignored in computing` `an employer contribution to a pension fund`
+#ASSERT `the reduction is ignored in computing` `the determining salary for a budgetary pension`
+
+§§ `Promotion, on the same facts`
+
+-- Yael is at rank 4. § 38(b)(4) asks three years' standing to reach rank 5,
+-- and rank 5 is not rationed, so the ministry's criteria are the only other
+-- condition.
+`Yael applying for rank 5` MEANS `an application for promotion in rank` WITH
+    `the current rank`                      IS 4
+    `years of standing in the current rank` IS 3
+    `the ministry criteria are met`         IS TRUE
+    `the evaluations recommend promotion`   IS FALSE
+    `the posts already at the rank sought`  IS 0
+    `all teaching posts`                    IS 100_000
+    `years already waited having qualified` IS 0
+
+#ASSERT `the teacher may be promoted` `Yael applying for rank 5`
+#ASSERT NOT (`the rank is rationed by quota` (`the rank sought by` `Yael applying for rank 5`))
+
+-- Dvora is at rank 8 and applying for rank 9, which § 38(g) rations to 3% of
+-- all posts. With 3,000 of 100,000 posts already at rank 9 there is no room,
+-- however well she has been evaluated.
+`Dvora applying for rank 9` MEANS `an application for promotion in rank` WITH
+    `the current rank`                      IS 8
+    `years of standing in the current rank` IS 4
+    `the ministry criteria are met`         IS TRUE
+    `the evaluations recommend promotion`   IS TRUE
+    `the posts already at the rank sought`  IS 3_000
+    `all teaching posts`                    IS 100_000
+    `years already waited having qualified` IS 5
+
+#ASSERT `the teacher meets the conditions for promotion` `Dvora applying for rank 9`
+#ASSERT NOT `the quota admits the promotion` `Dvora applying for rank 9`
+#ASSERT NOT `the teacher may be promoted` `Dvora applying for rank 9`
+
+-- § 38(i)(3) says she may not be kept waiting more than five years having
+-- qualified, and she has waited five. Both propositions hold at once, and the
+-- agreement does not resolve them: NOTES.md § 5 records the tension.
+#ASSERT `the teacher has waited as long as section 38(i) allows` `Dvora applying for rank 9`
+
+-- One post fewer at rank 9 and the promotion goes through unchanged.
+`Dvora applying for rank 9 with room` MEANS `an application for promotion in rank` WITH
+    `the current rank`                      IS 8
+    `years of standing in the current rank` IS 4
+    `the ministry criteria are met`         IS TRUE
+    `the evaluations recommend promotion`   IS TRUE
+    `the posts already at the rank sought`  IS 2_999
+    `all teaching posts`                    IS 100_000
+    `years already waited having qualified` IS 5
+
+#ASSERT `the teacher may be promoted` `Dvora applying for rank 9 with room`
+
+§§ `The week, on the same facts`
+
+-- Yael teaches in a junior high, so her full post is 23 frontal, 4 individual
+-- and 9 presence hours (§ 17). Dvora's primary-school post is 26/5/5 (§ 15).
+-- Both are 36 hours.
+#ASSERT (`the ordinary full-post week in` (`Yael`'s `stage of education`))'s `frontal hours` EQUALS 23
+#ASSERT (`the ordinary full-post week in` (`Dvora`'s `stage of education`))'s `frontal hours` EQUALS 26
+#ASSERT `the hours in` (`the ordinary full-post week in` (`Yael`'s `stage of education`)) EQUALS `the hours in` (`the ordinary full-post week in` (`Dvora`'s `stage of education`))
+
+-- Dvora converted from the pre-reform system, so at 56 she takes the larger
+-- § 26(b) reduction. A new teacher of the same age takes the smaller one.
+#ASSERT `the hours in` (`the week after the age reduction for` `Dvora` 56 (`the ordinary full-post week in` `a primary school`)) EQUALS 32
+#ASSERT `the hours in` (`the week after the age reduction for` `Yael` 56 (`the ordinary full-post week in` `a junior high school`)) EQUALS 34
