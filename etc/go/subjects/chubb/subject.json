@@ -85,6 +85,16 @@
     "  p7-mcp    declared. Each module carries exactly one @export, so there is a",
     "            deployable surface. With no JL4_GO_SERVICE_URL the leg reports",
     "            SKIPPED and still records the zip.",
+    "  p7-catala declared 2026-09-21. MEASURED THE SAME DAY: it reports",
+    "            DEGRADED, and that is a finding about this encoding rather than a",
+    "            configuration problem. `l4 catala` refuses the module, naming five",
+    "            helpers with no GIVETH (chubb.l4:104, 108, 112, 115, 119) -- a",
+    "            Catala toplevel declaration has to state its result type, and",
+    "            `l4 check` is clean on all five, so nothing but this lowering",
+    "            notices. NOTES.md carries the message verbatim and the remedy. The",
+    "            leg stays declared because undeclaring it would make the finding",
+    "            disappear, which is the one thing it exists to prevent; the fix",
+    "            belongs in legalese/canon, not in the vendored mirror here.",
     "",
     "  p7-bpmn and p7-lts are NOT declared: BOTH modules are entirely",
     "  CONSTITUTIVE. `l4 export --to bpmn` answers 'No regulative rules found in",
@@ -134,6 +144,7 @@
     "p7-tnr": {
       "golden": "jl4/examples/canon/us/chubb-hospital-cash/blind-inert/tests/chubb.nlg.golden"
     },
-    "p7-akn": {}
+    "p7-akn": {},
+    "p7-catala": {}
   }
 }

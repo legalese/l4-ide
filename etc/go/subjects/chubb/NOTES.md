@@ -291,6 +291,36 @@ well-formedness is its only oracle, so it cannot raise the run verdict), **p7-mc
 carries exactly one `@export`, so there is a deployable surface; with no `JL4_GO_SERVICE_URL` the leg
 SKIPs and still records the zip).
 
+**p7-catala**, declared 2026-09-21, is the one whose current answer is worth reading before you run
+it: it reports **DEGRADED**, and that is a live finding about this encoding rather than a
+configuration problem.
+
+`l4 catala` REFUSES the module. It names five helper definitions with no `GIVETH`, each with its
+line:
+
+```
+l4 catala: cannot compile these decisions to Catala:
+  - in `the length of the policy term in months`: helper … has no GIVETH; a Catala toplevel
+    declaration needs its result type stated (chubb.l4:112:1-51)
+  - in `the excluded age in years`:                                       (chubb.l4:115:1-37)
+  - in `the 7th month anniversary of the effective date`:                 (chubb.l4:108:1-58)
+  - in `the months within which arbitration must be commenced`:           (chubb.l4:119:1-64)
+  - in `the 6th month anniversary of the effective date`:                 (chubb.l4:104:1-58)
+```
+
+Catala emits a private helper as a toplevel `declaration … equals`, and a Catala toplevel has to
+state its result type, so an L4 helper that leaves `GIVETH` to inference has nothing to lower it
+into. `l4 check` is clean on all five; nothing but this lowering notices, which is the same shape as
+the `@export` chain condition (R1, §8.1) and the reason a leg with an external oracle is worth
+having at all.
+
+**The remedy is an encoding change and this repository may not make it.** The five sit in
+`jl4/examples/canon/us/chubb-hospital-cash/blind-inert/chubb.l4`, inside the VENDORED canon mirror —
+edit in `legalese/canon`, re-bless there, then `node etc/sync-canon.mjs --bump <sha>`. Adding the
+five `GIVETH` lines would also move the HG1 digest and the `.nlg.golden`, so it is a change with its
+own review, not a drive-by. Until then the leg's DEGRADED is the correct reading and must not be
+made green by undeclaring it.
+
 Not declared, and each for a stated reason:
 
 - **p7-bpmn and p7-lts — the corpus is entirely constitutive.** It decides whether a claim survives

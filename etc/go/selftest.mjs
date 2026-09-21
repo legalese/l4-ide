@@ -5452,6 +5452,52 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     );
   }
 
+  // --- 7c. p7-catala: the clock is a digest contributor, and the leg cannot
+  // lose its receipt to `set -e` -------------------------------------------
+  //
+  // Two hazards, both measured on the leg's first live run (2026-09-21), and
+  // neither reachable by running the stage in CI: the oracle is the external
+  // Catala toolchain, which no runner has.
+  {
+    const inputsOf = (over = {}) =>
+      spawnSync(resolve(HERE, "phases/p7-catala.sh"), ["--inputs"], {
+        encoding: "utf8",
+        shell: false,
+        env: {
+          ...process.env,
+          GO_ROOT: REPO,
+          GO_MODULES: "probe.l4",
+          ...over,
+        },
+      }).stdout ?? "";
+    const a = inputsOf({ GO_FIXED_NOW: "2025-01-31T00:00:00Z" });
+    const b = inputsOf({ GO_FIXED_NOW: "2026-01-31T00:00:00Z" });
+    check(
+      "p7-catala's --inputs carries the pinned clock, so two runs at different legal times cannot replay each other's answer",
+      a.includes("text:fixed_now=2025-01-31T00:00:00Z") &&
+        b.includes("text:fixed_now=2026-01-31T00:00:00Z") &&
+        a !== b,
+    );
+    check(
+      "…and it declares etc/validate-catala.mjs, which IS its oracle: an edit to what that enforces must re-run the stage",
+      a.includes("etc/validate-catala.mjs"),
+    );
+
+    // THE SILENT NO-RECEIPT. `read` returns 1 on empty input, and the phase
+    // script runs under `set -e`, so an unguarded `read` of clerk's summary
+    // aborts the stage BEFORE any go_receipt — leaving no row at all, and a
+    // phase exit of 1 that is indistinguishable from GO_EXIT_FINDING. The
+    // input is empty exactly when clerk never ran, which is the commonest
+    // failure the leg reports. Measured: a layer-1 typecheck rejection wrote
+    // an empty journal.
+    const src = readFileSync(resolve(HERE, "phases/p7-catala.sh"), "utf8");
+    const reads = src.match(/^\s*read -r .*$/gm) ?? [];
+    check(
+      "every `read` in p7-catala.sh is guarded against empty input, so a stage that reaches it still writes a receipt",
+      reads.length > 0 && reads.every((l) => /\|\|\s*true\s*$/.test(l)),
+    );
+  }
+
   // --- 8. the plan stops refusing -------------------------------------------
   {
     const r = spawnSync(
