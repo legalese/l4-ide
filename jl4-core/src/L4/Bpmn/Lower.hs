@@ -312,8 +312,21 @@ stateGraphToBpmn opts sg =
       _ -> []
 
     quantifierFindings = case (obligation, taskNodes) of
-      (Just t, tn : _) -> quantifierNotes tn t.transLabel
+      (Just t, tn : _) -> quantifierNotes lestBreachEnd tn t.transLabel
       _ -> []
+
+    -- The end event this state's LEST arm reaches, when that arm ends in BREACH
+    -- rather than in another obligation. 'endNodes' names a terminal
+    -- @End_\<state id\>@, so the id is derivable and needs no search.
+    --
+    -- Used by @F6@, which has to name the element a reader can click on. It is
+    -- computed here rather than in 'quantifierNotes' because that function takes
+    -- a label and a node, and this is a fact about the STATE.
+    lestBreachEnd :: Maybe Text
+    lestBreachEnd = do
+      t <- lestOf sid
+      guard (typeOfState t.transTo == Just TerminalBreach)
+      pure ("End_" <> Text.pack (show t.transTo))
 
     -- The @IF@ that chose between arms. This is the branch-edge counterpart of
     -- @F4@: @F4@ accounts for a @PROVIDED@ on one obligation, this accounts
@@ -2512,11 +2525,64 @@ numberWithUnit t = do
 -- Findings raised while building nodes
 --------------------------------------------------------------------------------
 
--- TODO (owed by the lts-diagrams session, on the blame set's merge;
--- EVERY-EACH-QUANTIFIER-SPEC §6.1.1, LTS-VISUALISER.md §4.9): an F-class
--- note that a barrier's error end event names NO party — every breach ends in
--- the one shared Error_breach, <endEvent name="Breach"> (L4.Bpmn.Emit) — where
--- the source now names the set of members who failed (R-T3).
+-- | What a quantified breach costs: BUILT 2026-09-21, discharging the TODO this
+-- comment replaced (owed by the lts-diagrams session on the blame set's merge;
+-- @EVERY-EACH-QUANTIFIER-SPEC.md@ §6.1.1, @LTS-VISUALISER.md@ §4.9).
+--
+-- A barrier's @LEST@ fires ONCE, for the group
+-- (@barrierFinish@, @L4.EvaluateLazy.Machine@), and since R-T3 the runtime hands
+-- that firing a NON-EMPTY LIST of failures rather than one party: one entry per
+-- failed obligation, undeduplicated, each entry naming what was failed and not
+-- merely who (@Failure@, @Blame@ and @ReasonForBreach@ in
+-- @L4.Evaluate.ValueLazy@). The
+-- diagram has ONE end event for the whole group. BPMN has no shape for a set of
+-- parties on an end event, so this is a loss of the notation — an @F@ code —
+-- rather than something more Haskell could recover.
+--
+-- 'Lossy', not 'Blocking': the breach itself IS drawn, and drawn in the right
+-- place. What is gone is who caused it.
+--
+-- __Scoped to the barrier, deliberately.__ A fork's @LEST@ fires per member, so
+-- at each firing the blame is a singleton and the loss is a different one —
+-- WHICH member, not which set. That loss is currently stated in prose rather
+-- than as a note: 'escalationCatchName' names the boundary \"a member breached\"
+-- precisely because it cannot say which, and the caption's own comment says so.
+-- Whether it also deserves a note is a ruling nobody has made; filing @F6@ on a
+-- fork would claim a set-shaped loss the fork does not have.
+quantifiedBreachNote :: Maybe Text -> TransitionLabel -> [FidelityNote]
+quantifiedBreachNote mBreachEnd l =
+  [ MkFidelityNote
+      { code = "F6"
+      , severity = Lossy
+      , element = breachEnd
+      , range = Nothing
+      , message =
+          "This is where the whole group's breach arrives, however it arose and \
+          \whoever caused it. The rule can be more specific: when a group \
+          \obligation fails, the run works out which members failed and lists \
+          \them \8212 one entry for each failure, so a member who failed in two \
+          \ways is named twice, and each entry says what that member owed and \
+          \when it was due. BPMN has no way to put a list of parties on an end \
+          \event, so this diagram records that the group breached and stops \
+          \there."
+      , lost =
+          "which members breached, and how each of them did. This event looks \
+          \the same whether one member fell short or all of them, so a reader \
+          \of the diagram cannot tell who to chase; only the rule's own run \
+          \can answer that."
+      }
+  | Just breachEnd <- [mBreachEnd]
+  , isBarrierLabel l
+  ]
+
+-- | Is this label a quantified obligation whose join is a BARRIER?
+--
+-- Not the negation of 'isForkLabel': that one answers False for a label with no
+-- join at all, which is right for its callers and wrong here.
+isBarrierLabel :: TransitionLabel -> Bool
+isBarrierLabel l = case l.labelQuantifier >>= (.quantJoin) of
+  Just j -> case j.joinKind of Barrier _ -> True; Fork -> False
+  Nothing -> False
 
 -- | What an @EVERY@ costs in BPMN, in notes that fire independently.
 --
@@ -2551,8 +2617,8 @@ numberWithUnit t = do
 -- @UPON EACH WITHIN 3@ and a last act on day 20 is FULFILLED): nothing is
 -- lost between source and diagram, but the clause is dead in both, and the
 -- reader should learn that rather than be told BPMN dropped it.
-quantifierNotes :: FlowNode -> TransitionLabel -> [FidelityNote]
-quantifierNotes n l = case l.labelQuantifier of
+quantifierNotes :: Maybe Text -> FlowNode -> TransitionLabel -> [FidelityNote]
+quantifierNotes mBreachEnd n l = case l.labelQuantifier of
   Nothing -> []
   Just q ->
     [ MkFidelityNote
@@ -2703,6 +2769,7 @@ quantifierNotes n l = case l.labelQuantifier of
          , Just jd <- [j.joinDeadline]
          , Just ad <- [l.labelDeadline]
          ]
+      <> quantifiedBreachNote mBreachEnd l
 
 modalityFinding :: FlowNode -> TransitionLabel -> [FidelityNote]
 modalityFinding n l =

@@ -270,8 +270,10 @@ Each fixture produces two goldens under `expected/`:
 - `<name>.fidelity.txt` — what BPMN could not carry, naming the specific element
   that lost it. The report type is `L4.Interchange.Fidelity`, shared with every
   other interchange backend so the CLI has one shape to render rather than one
-  per target. Codes `F1`–`F5` are losses of the notation and cannot be fixed by
-  writing more Haskell; codes `P-…` are this exporter's own doing — an
+  per target. Codes `F1`–`F6` are losses of the notation and cannot be fixed by
+  writing more Haskell — `F6`, added 2026-09-21, is the newest: a barrier's breach
+  end event cannot carry the LIST of members the rule blames; codes `P-…` are this
+  exporter's own doing — an
   approximation it made (`P-DEADLINE-UNIT`), a gateway it declined to invent
   (`P-NOJOIN`), a guard it could only write as opaque text (`P-BRANCHGUARD`), a
   guard it handed to DMN instead (`P-DMNWIRED`) or could not (`P-NODMN`), or a

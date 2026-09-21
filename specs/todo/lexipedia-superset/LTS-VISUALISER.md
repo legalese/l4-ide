@@ -2443,6 +2443,23 @@ working while it did — it produced a deadlock witness naming real flows. Fixed
 "instance finished" gateway per copy; pinned by `jl4/examples/bpmn/sound/mi-subprocess-two-ways-to-done.bpmn`,
 which was verified by reverting the fix and watching it fail.
 
+#### LANDED 2026-09-21: the blame set, declared as `F6`
+
+The dated line `EVERY-EACH-QUANTIFIER-SPEC` §6.1.1 asked this section for, under _"Owed downstream, not done here"_.
+
+**A barrier's breach end event names no member, and now says so.**
+Since R-T3 (built 2026-09-15, §6.1.1) a failed barrier's `LEST` is handed a non-empty LIST of failures rather than one party — one entry per failed obligation, undeduplicated, each entry naming what was failed and not merely who (`Failure`/`Blame`/`ReasonForBreach`, `jl4-core/src/L4/Evaluate/ValueLazy.hs`).
+The diagram has one end event for the whole group, and BPMN has no shape for a set of parties on an end event, so the loss is a loss of the notation: `F6`, `Lossy`, filed on the breach end event by `quantifiedBreachNote` in `jl4-core/src/L4/Bpmn/Lower.hs`.
+
+Measured: it moves **three** of the sixteen BPMN goldens and no others — `tenancy-barrier` (`End_3`), `modals-shant-barrier` (`End_2`) and `modals-must-barrier-both-deadlines` (`End_2`).
+The fourth barrier golden, `modals-may-barrier`, does **not** gain it, and that is the check that the guard discriminates: its `EVERY` is a `MAY` with a `HENCE` and no `LEST`, so the group has no breach terminal at all — the `End_3 "Breach"` in that file belongs to the chair's own `PARTY` obligation.
+`modals-must-barrier-both-deadlines` does gain it despite having no written `LEST`, because a `MUST` whose deadline passes breaches and the state graph builds the arm.
+
+**Scoped to the barrier, deliberately, and the fork is still owed a ruling.**
+A fork's `LEST` fires per member, so at each firing the blame is a singleton: the loss there is WHICH member, not which set, and filing `F6` on a fork would claim a set-shaped loss the fork does not have.
+That per-member loss is today stated in prose rather than as a note — `escalationCatchName` (`Lower.hs`) captions the boundary "a member breached" precisely because it cannot say which, and its own comment says so.
+Whether it also deserves a note is a ruling nobody has made.
+
 #### What follows for P2
 
 **This is P2's problem before it is P1's.** §5.1's division of labour gives P1 the shape and P2 the

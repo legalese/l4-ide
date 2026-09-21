@@ -156,6 +156,16 @@ The notes that go with a quantified rule:
   breach arm — so the diagram ends breached with nobody having done anything, where the rule says
   an empty group is fulfilled because nobody is bound. Reachable rather than theoretical: jBPM runs
   the file that way if you supply no list.
+- `F6` (lossy): **the breach does not say who breached it.** A group obligation that fails under
+  `ONCE ALL HAVE` fails once, for the group, and the run works out which members failed and lists
+  them — one entry per failure, so a member who failed in two ways is named twice, each entry saying
+  what that member owed and when it was due. The diagram has one end event for the whole group, and
+  BPMN has nowhere to put a list of parties on an end event, so it records that the group breached
+  and stops there. That end event looks the same whether one member fell short or all of them.
+  Filed only where the group really can breach: a `MAY` group with a `HENCE` and no `LEST` has no
+  breach of its own, and does not get the note. It is not filed on a fork either, where each
+  member's breach is its own event — what a fork loses is which member reached it, and the boundary
+  event it goes through says "a member breached" for exactly that reason.
 
 **A breach by one member does not end the others**, and getting that right takes two things, not
 one. Inside the box a breach is an _escalation_ thrown out to a non-interrupting event on the
