@@ -1,0 +1,626 @@
+[
+  {
+    "contract": "contracts",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 0,
+    "answers": [
+      "B must return, due by 14 (4 from now).",
+      "B doing anything now (at time 10) would discharge the obligation; the obligation's pattern matches any act by B.",
+      "If nothing happens by the deadline of 14 (the clock reaches 15), B is in breach of the MUST return obligation.",
+      "The contract is in progress at time 10, after the WAIT UNTIL OF 10 condition.",
+      "Cannot tell from this."
+    ]
+  },
+  {
+    "contract": "contracts",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 1,
+    "answers": [
+      "B must return, due by 14 (4 from now).",
+      "B does anything now (at 10).",
+      "Nothing happens by 14 (the clock reaches 15) \u2014 B is in breach, since MUST return was due by 14 and the clock reached 15 without it.",
+      "In progress.",
+      "Cannot tell from this."
+    ]
+  },
+  {
+    "contract": "contracts",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 0,
+    "answers": [
+      "Right now, B owes a duty to \"return,\" which is due by 14 (four time units from the current clock value of 10).",
+      "The document says any act by B, performed now (at the current time of 10), would discharge the obligation and the contract would end fulfilled \u2014 because the rule binds the act \"return\" broadly rather than naming a specific act, so any act B does now satisfies it.",
+      "If nothing happens by the deadline of 14 (i.e., the clock reaches 15 without B having acted), B would be in breach, since the MUST-return obligation was due by 14.",
+      "We are currently in the state described as \"Standing: in progress,\" after 3 events have occurred, with the clock at 10; the next deadline is 14, at which B's \"return\" obligation is due.",
+      "The document indicates that once the discharging event occurs (B doing anything now, at 10), the contract ends fulfilled; it does not say anything further about what happens afterward, so beyond \"ends fulfilled\" \u2014 cannot tell from this."
+    ]
+  },
+  {
+    "contract": "contracts",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 1,
+    "answers": [
+      "Right now, B owes an obligation to return, which is due by 14 (4 time units from the current point).",
+      "What would discharge it is B doing anything at all at the current moment (at 10); the document notes the obligation's pattern matches any act by B rather than naming a specific act, so any action by B fulfills it (though it adds that this verdict is for one particular act \u2014 a replayed delivery counted as 'return' \u2014 and another member of the set of acts might end differently).",
+      "Breach would occur if nothing happens by the deadline of 14 \u2014 that is, if the clock reaches 15 without B having acted, B is in breach of the MUST-return obligation.",
+      "The contract is in the 'in progress' standing: three events have occurred (S delivery at 2, B payment of 21 at 4, and a WAIT UNTIL 10), and the clock currently stands at 10, with B's return obligation live and its deadline at 14 the next thing to watch.",
+      "Cannot tell from this \u2014 the document states that a discharging event (B acting at 10) ends the contract as fulfilled, but it does not say what, if anything, happens after that fulfilled ending."
+    ]
+  },
+  {
+    "contract": "contracts",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 0,
+    "answers": [
+      "B must return something, and this obligation arose after B's payment of 21 satisfied the condition \"B MUST payment ... IF price AT LEAST 20\", which led to the decision branch \"IF NOT (price EQUALS 20)\", placing B in the \"B must return\" state.",
+      "B performing a return action would discharge the obligation. The diagram shows the edge labeled \"B MUST return [10]\" leading from the \"B must return\" state to the Fulfilled state.",
+      "A timeout on the \"B must return\" obligation would put someone in breach. The diagram shows a timeout edge from the \"B must return\" state leading to the Breach state, with a deadline of 10 days from when the return obligation became live.",
+      "We are in the \"B must return\" state, which was reached via the \"IF NOT (price EQUALS 20)\" branch of the \"next ONE OF\" decision node, after the payment of 21 satisfied the minimum price condition of at least 20.",
+      "After B performs the next discharging event (the return), the contract reaches the Fulfilled state, which is a terminal success state."
+    ]
+  },
+  {
+    "contract": "contracts",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 1,
+    "answers": [
+      "B owes a return. The price paid was 21, which is not exactly 20, so the contract flows to state 4 where B must return within 10 days.",
+      "B doing `return` would discharge what is owed and satisfy the obligation.",
+      "If B does not return within the 10-day deadline from entering state 4, the timeout transition would trigger, putting B in breach and reaching state 5 (Breach).",
+      "We are at state 4 ('B must return [10]'), which is where the contract flows when the price does not equal exactly 20.",
+      "After B returns (the discharging event), we transition to state 3 (Fulfilled), which is a final state representing successful completion of the contract."
+    ]
+  },
+  {
+    "contract": "contracts",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 0,
+    "answers": [
+      "Right now B owes the \"return\" action to S. Tracing the document's own event log through the graph: S delivered on day 2 (satisfying \"S MUST delivery [3]\", moving from state 0 to state 1); B then paid 21 on day 4, which is \"at least 20\" so the payment condition is satisfied (moving from state 1 to the ONE OF branch, state 2); since the price (21) is not exactly 20, the \"IF NOT (price EQUALS 20)\" edge fires, landing on state 4, labeled \"B must return.\" So the party currently owing something is B; the document does not spell out what exactly is being \"returned\" (e.g. an amount), so that detail cannot be told from this.",
+      "The event that discharges what is owed is B performing \"return\" (edge 4 -> 3, \"B MUST return [10]\"), which moves the contract into the Fulfilled state. No other event is shown as discharging the current obligation.",
+      "Two things would put someone in breach from where we are now: (1) if S had not delivered within its deadline, but that already happened safely (day 2, within \"[3]\"), so that path is closed; (2) from the current state 4, if B fails to perform \"return\" before its deadline elapses (edge 4 -> 5, timeout), that triggers Breach. Based on the pattern of the other deadlines in this document (S's \"[3]\" deadline was measured from contract start and satisfied by day 2, and B's payment \"[3]\" deadline was evidently measured from entering state 1 on day 2, satisfied by day 4), B's \"[10]\" deadline for returning appears to run from when state 4 was entered (day 4), i.e. day 14 \u2014 and since the clock is only at day 10, that deadline has not yet passed. But the document does not explicitly state the deadline's reference point, so the exact breach date cannot be told with certainty from this alone.",
+      "We are at state 4, labeled \"B must return.\" This was reached via: state 0 (initial) -> state 1 via \"S MUST delivery,\" satisfied when S delivered on day 2 -> state 2 (the \"next ONE OF\" branch) via \"B MUST payment ... IF price AT LEAST 20,\" satisfied when B paid 21 on day 4 -> state 4 via the \"IF NOT (price EQUALS 20)\" branch, since the agreed price of 21 is not exactly 20. So the live branch is the \"B must return\" obligation awaiting B's action, with Breach (state 5) as the only other live possibility if B times out.",
+      "After the next discharging event (B performing \"return,\" edge 4 -> 3), the contract reaches state 3, labeled \"Fulfilled,\" which is drawn as a doublecircle (a terminal/accepting state) with no outgoing edges shown. The document does not describe anything happening after Fulfilled is reached, so beyond \"the contract is fulfilled and the diagram shows no further transitions,\" what happens next cannot be told from this."
+    ]
+  },
+  {
+    "contract": "contracts",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 1,
+    "answers": [
+      "Right now B owes a \"return\" obligation. Because S delivered on day 2 (before the delivery deadline) and B paid 21 on day 4 (before the payment deadline, since 21 is at least 20), the contract moved through state 1 into state 2's \"ONE OF\" branch; since the price (21) does not equal 20, the branch to node 4 (\"B must return\") was taken, and that is the live obligation, owed by B.",
+      "The event that would discharge what is owed is B performing \"return\" (the edge labelled \"B MUST return [10]\" from node 4 to node 3, Fulfilled). That is the only discharging event shown from the current state.",
+      "The timeout edge from node 4 to node 5 (Breach) would put someone (B) in breach: if B fails to perform \"return\" before its deadline elapses, the contract moves to the Breach state. The document labels this deadline \"[10]\" but does not state clearly from this text alone the exact calendar day that deadline falls on, so the precise day cannot be told from this document with certainty.",
+      "We are at node 4, \"B must return\" \u2014 i.e., past the initial delivery (node 0\u21921), past B's payment (node 1\u21922), and past the \"ONE OF\" decision at node 2 where the NOT-price-equals-20 branch was taken (node 2\u21924) because the paid price of 21 is not equal to 20. The live rule/branch is the edge \"B MUST return [10]\" from node 4, with the clock at day 10 and nothing else having happened.",
+      "After the next discharging event (B performing \"return\", edge 4\u21923), the contract reaches node 3, labelled \"Fulfilled\" (a doublecircle/terminal state), and the diagram shows no further outgoing edges from that node."
+    ]
+  },
+  {
+    "contract": "contracts",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 0,
+    "answers": [
+      "B owes a return action that must be completed within 10 days. This obligation became active after B's payment on day 4 discharged the payment requirement.",
+      "B performing the return action would discharge the obligation currently owed. This would direct the flow to End_3 (Fulfilled).",
+      "If B does not perform the return action within 10 days of when it became obligatory (by day 14), the boundary event on Task_4 triggers, leading to End_5 (Breach).",
+      "We are in an active state where Task_4 (B must return) is live. The contract has completed Task_0 (S's delivery) and Task_1 (B's payment of 21), passed through Split_2's branch for NOT (price EQUALS 20), and is now waiting for Task_4 to be discharged before reaching the Fulfilled end state.",
+      "After B completes the return action, the contract flows to End_3 (Fulfilled), which is the successful completion state of the contract."
+    ]
+  },
+  {
+    "contract": "contracts",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 1,
+    "answers": [
+      "B must return within 10 days from when Task_4 became active.",
+      "Completion of the return action by B would discharge Task_4.",
+      "Failure to complete the return within 10 days (Boundary_4) would trigger a breach state (End_5).",
+      "The contract is at Task_4, which was reached after taking the \"NOT (price EQUALS 20)\" branch when the payment price was determined to be 21.",
+      "After the return is completed, the process flows to End_3 (Fulfilled)."
+    ]
+  },
+  {
+    "contract": "contracts",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 0,
+    "answers": [
+      "Right now, B owes the \"return\" obligation (Task_4, in B's lane): S's delivery obligation was discharged on day 2 (within the 3-day window) and B's payment obligation was discharged on day 4 with an amount of 21, which satisfies \"price AT LEAST 20\" so the flow passed through the Split_2 gateway; since the price (21) is not exactly 20, the \"NOT (price EQUALS 20)\" branch was taken, landing on Task_4, \"PARTY B MUST return WITHIN 10,\" which is the currently live, undischarged obligation.",
+      "The event that would discharge what is currently owed is B performing \"return\" (completing Task_4); the sequence flow Flow_Task_4__End_3 shows that completing this task leads directly to End_3, the \"Fulfilled\" end event.",
+      "The deadline that would put someone in breach is Boundary_4, the timer boundary event attached to Task_4: if the return obligation is not discharged within P10D (10 days) of Task_4 becoming active, the timer fires and flow Flow_Boundary_4__End_5 routes to End_5, the \"Breach\" end event (with error code BREACH). The document does not state the exact absolute day this 10-day window expires, since it does not specify whether the WITHIN-10 clock starts at contract inception or at the moment Task_4 was entered, so the precise breach date cannot be told from this document alone.",
+      "We are in B's lane, at Task_4 (\"MUST return WITHIN 10\"), having already passed through Task_0 (S's delivery, discharged), Task_1 (B's payment, discharged, satisfying \"price AT LEAST 20\"), and the Split_2 exclusive gateway via its \"NOT (price EQUALS 20)\" branch (since price 21 \u2260 20); Task_4's Boundary_4 timer is pending and has not yet fired as of the stated clock.",
+      "After the next discharging event \u2014 B performing \"return,\" which discharges Task_4 \u2014 the process proceeds along Flow_Task_4__End_3 to End_3, the \"Fulfilled\" end event, meaning the contract concludes in a fulfilled state with no further obligations shown in this document."
+    ]
+  },
+  {
+    "contract": "contracts",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 1,
+    "answers": [
+      "Right now B owes the \"return\" obligation (Task_4, \"PARTY B MUST return WITHIN 10\"): S already discharged its delivery obligation on day 2 (within the 3-day window), B already discharged its payment obligation on day 4 (within the 3-day window, and since the paid price of 21 is at least 20 the PROVIDED condition on that obligation was satisfied), and because that price is not exactly 20 the exclusive gateway routed the contract onto the branch requiring B to return, which is still open at day 10.",
+      "B performing the \"return\" action would discharge the currently-live Task_4 obligation, and the sequence flow Flow_Task_4__End_3 shows that discharging it leads to the End_3 \"Fulfilled\" end event.",
+      "The boundary event Boundary_4 (attached to Task_4, a 10-day timer) firing would put B in breach: its timeout leads via Flow_Boundary_4__End_5 to End_5, the error end event named \"Breach\". The earlier deadlines that could have caused breach (Boundary_0 on delivery, Boundary_1 on payment) are no longer live, since both underlying obligations were already discharged on time.",
+      "We are at Task_4, \"MUST return,\" in B's lane: delivery (Task_0) and payment (Task_1) are both discharged, the Split_2 exclusive gateway has already resolved onto the \"NOT (price EQUALS 20)\" branch (since price is 21, not 20), and Task_4's own boundary timer (P10D) has not yet elapsed at day 10.",
+      "The document does not say what happens after B's return beyond reaching the process's end \u2014 the sequence flow Flow_Task_4__End_3 leads directly to End_3, named \"Fulfilled,\" with no further tasks, branches, or obligations shown after it, so cannot tell from this whether anything further occurs beyond that end event."
+    ]
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 0,
+    "answers": [
+      "All three tenants\u2014Alice, Bob, and Carol\u2014each owe an unspecified amount to the Landlord, due by time 7.",
+      "Cannot tell from this.",
+      "If nothing happens by time 7 (the clock reaches 8), all three tenants\u2014Alice, Bob, and Carol\u2014are in breach.",
+      "We are in the initial state before anything has happened, with the clock at time 0. The status is in progress.",
+      "Cannot tell from this."
+    ]
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 1,
+    "answers": [
+      "Tenant OF \"Alice\" must pay the landlord an amount due by time 7; Tenant OF \"Bob\" must pay the landlord an amount due by time 7; and Tenant OF \"Carol\" must pay the landlord an amount due by time 7.",
+      "Cannot tell from this.",
+      "If nothing happens by the deadline of 7 (the clock reaches 8), then the tenants will be in breach.",
+      "We are at the beginning of the receipts state, at clock time 0, with standing in progress.",
+      "Cannot tell from this."
+    ]
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 0,
+    "answers": [
+      "Right now, three separate payment obligations are owed: Tenant Alice must pay theLandlord an amount, Tenant Bob must pay theLandlord an amount, and Tenant Carol must pay theLandlord an amount \u2014 each due by day 7 (7 from now); the clock currently stands at 0 and the contract is in progress.",
+      "Cannot tell from this. The document lists what would 'move things along' if Alice, Bob, or Carol pays \u2014 each payment triggers a receipt obligation on the landlord and leaves the other two tenants' payment obligations still owed \u2014 but the document itself explicitly labels these payment events as ones that 'neither end nor breach it,' so it does not say what event(s) would actually discharge what is owed.",
+      "If nothing happens by day 7 (i.e. the clock reaches 8), Tenant Alice is in breach, and the breach names Alice, Bob, and Carol in that order \u2014 so that single deadline (7) is what puts all three in breach.",
+      "We are at the very outset of the 'receipts' contract: before anything has happened, the clock stands at 0, and the standing is 'in progress.' The document does not name any more specific rule or branch beyond this starting state.",
+      "The document does not identify any event as a 'discharging' one \u2014 the payment events it lists explicitly 'neither end nor breach' the contract, so cannot tell from this. The closest documented next step is that if one of the three tenants (say Alice) pays, the landlord then must issue a receipt within 5 from that time, while the other two tenants' payment obligations (due by 7) continue unchanged."
+    ]
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 1,
+    "answers": [
+      "Right now (at time 0), three separate obligations are owed to theLandlord, each due by time 7: Tenant \"Alice\" must pay theLandlord an amount, Tenant \"Bob\" must pay theLandlord an amount, and Tenant \"Carol\" must pay theLandlord an amount.",
+      "Any one tenant performing their own Pay act (Alice paying, or Bob paying, or Carol paying, for any amount) discharges that tenant's payment obligation and moves things along without ending or breaching the contract; each such payment in turn creates a new obligation for theLandlord to issue a Receipt within 5 from that payment, while the other two tenants' obligations to pay by time 7 remain outstanding.",
+      "If nothing happens by time 7 (i.e. the clock reaches 8 with no payment made), Tenant \"Alice\" is put in breach, and the breach names Alice, Bob, and Carol in that order.",
+      "The document describes the initial state, labelled \"receipts,\" at clock time 0, before anything has happened; its standing is \"in progress,\" with the three payment obligations pending and none of the payment or breach branches yet taken.",
+      "After the next discharging event (one tenant's payment), theLandlord comes under a MUST to issue a Receipt for that tenant's payment within 5 from then, and the two tenants who have not yet paid remain obligated to pay theLandlord by time 7, each still with its own next step; the document notes this described outcome is for that one act only (amount = 0 was the value replayed), not necessarily for every possible amount."
+    ]
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 0,
+    "answers": [
+      "At day 0, nothing is owed \u2014 the contract has just begun and no obligations have been triggered.",
+      "When each tenant pays, that discharges the requirement for that tenant. When the landlord provides receipts to all tenants who paid, that discharges the landlord's obligation and leads to fulfillment.",
+      "Missing the deadline to pay would put a tenant in breach; missing the deadline to provide receipts would put the landlord in breach.",
+      "We are at the initial state (state 0), where the contract has just begun and the clock stands at day 0.",
+      "After a tenant pays, the system moves to state 1 where the landlord must provide receipts for all tenants who have paid; once all receipts are issued, the contract reaches fulfillment."
+    ]
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 1,
+    "answers": [
+      "Each of the three tenants (Alice, Bob, and Carol) must pay the landlord (Ms Ng). Each tenant who pays is then owed a receipt by the landlord.",
+      "Each tenant paying would discharge that tenant's payment obligation. The landlord issuing receipts would discharge the landlord's obligation to provide receipts.",
+      "Timeout deadlines in both state 0 and state 1 would put someone in breach; the diagram shows timeout transitions (dashed red lines) leading to the Breach state from both states.",
+      "The contract has just begun at day 0 and no events have occurred yet; we are at the initial state (state 0).",
+      "After each tenant pays, the contract moves to state 1, where the active obligation becomes that the landlord must issue receipts."
+    ]
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 0,
+    "answers": [
+      "Right now nothing has happened (the clock is at day 0, and we are in the initial state), so what is owed is the tenants' payment obligation: each of the three tenants \u2014 Alice, Bob and Carol \u2014 owes a payment to the landlord, Ms Ng. Nothing is yet owed by the landlord, since no tenant has paid and the landlord's duty to issue a receipt only arises after a payment.",
+      "A tenant's act of paying (the \"Pay\" event) discharges that tenant's payment obligation and moves the contract from the initial state into the state where the landlord must issue a receipt; the landlord's act of issuing the receipt (the \"Receipt\" event) then discharges the landlord's obligation and moves the contract into the Fulfilled state.",
+      "Two timeout deadlines can trigger breach: a timeout from the initial state (before a tenant pays) puts the contract into Breach, and a timeout from the \"landlord must Receipt\" state (after a tenant has paid but before the landlord issues the receipt) also puts the contract into Breach.",
+      "We are at the initial state (node 0) \u2014 day 0, before any tenant has paid and before the landlord owes any receipt; the live rule is the one requiring every tenant to pay, which has not yet fired.",
+      "Cannot tell from this \u2014 the diagram shows that after a tenant pays, the contract moves to a state where the landlord must issue a receipt, and after the landlord issues that receipt the contract reaches Fulfilled, but the document does not say how this resolves when there are three separate tenants (e.g. whether each tenant's payment/receipt pair is tracked independently or the diagram is showing one representative cycle)."
+    ]
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 1,
+    "answers": [
+      "Right now, at day 0, nothing is yet owed by anyone \u2014 the contract has just begun and no obligation has yet matured. The diagram shows the process sitting at the initial state (node 0), before any tenant's payment obligation has fired.",
+      "According to the diagram, the event that discharges an obligation is the landlord (Ms Ng) issuing a Receipt: the edge from state 1 (\"theLandlord must Receipt...\") to state 2 (Fulfilled) is labeled \"theLandlord MUST Receipt ... [5]\", which is the discharging event once it occurs.",
+      "Two things can put someone in breach according to the diagram: a timeout from the initial state (0 -> 3, labeled \"timeout\"), and a timeout from the state where the landlord must issue a receipt (1 -> 3, also labeled \"timeout\"). The document does not say what the deadlines actually are in days, so cannot tell from this.",
+      "We are at state 0, labeled \"initial\" \u2014 the starting point of the process, before the EVERY-tenant-must-pay branch (0 -> 1) has been triggered.",
+      "Cannot tell from this \u2014 the document shows that reaching state 2 (Fulfilled) is a doublecircle end state, but it does not describe what happens after Fulfilled is reached (e.g., whether the process continues for other tenants or ends entirely)."
+    ]
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 0,
+    "answers": [
+      "Nothing is owed right now, because the contract has just begun at day 0 and nothing has happened yet. The obligations that will arise are: each tenant must pay the landlord, and each tenant who pays is then owed a receipt by the landlord.",
+      "An obligation would be discharged when a tenant pays (Task_0), or when the landlord provides a receipt (Task_1).",
+      "A tenant would be in breach if they do not pay within 7 days (boundary event after P7D). The landlord would be in breach if the landlord does not receipt within 5 days of the payment (boundary event after P5D).",
+      "We are at the start of the contract (Start_0), about to enter the multi-instance subprocess Scope_0, where one instance per member of the cast (each tenant) will run in parallel.",
+      "After a tenant pays (Task_0), the sequence flows to Task_1, where the landlord must provide a receipt within 5 days."
+    ]
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 1,
+    "answers": [
+      "Each of the three tenants (Alice, Bob, and Carol) must pay the landlord (Ms Ng). After a tenant pays, that tenant is owed a receipt from the landlord for that payment. No payments have been made yet since the contract just began at day 0.",
+      "A tenant paying discharges that tenant's payment obligation. The landlord providing a receipt discharges the landlord's obligation to receipt that payment.",
+      "A tenant breaches if they do not pay within 7 days (after which Boundary_0 triggers). The landlord breaches if a receipt is not provided within 5 days of payment (after which Boundary_1 triggers).",
+      "The contract is at the start (day 0), with each of the three tenant instances about to begin or at the start of the payment task (Task_0), as shown by the flow from Start_0 through Scope_0 to StartScope_0 to Task_0.",
+      "After a tenant pays (completing Task_0), that tenant's instance moves to the obligation for the landlord to provide a receipt (Task_1), which must be completed within 5 days."
+    ]
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 0,
+    "answers": [
+      "Right now, at day 0, nothing has been paid or received yet: each of the three tenants (Alice, Bob and Carol) owes the landlord (Ms Ng) a payment (the 'MUST Pay' obligation), and no receipt obligation has arisen for any of them yet since a receipt is only owed after a tenant pays.",
+      "For each tenant, paying (completing the 'MUST Pay ...' task) discharges that tenant's payment obligation and triggers the landlord's 'MUST Receipt ...' obligation to that tenant; the landlord issuing the receipt then discharges that receipt obligation, ending that tenant's instance in the 'Fulfilled' end state.",
+      "A tenant who does not pay within 7 days (the P7D boundary timer on the 'MUST Pay' task) is put in breach; a landlord who, having received a given tenant's payment, does not issue that tenant's receipt within 5 days (the P5D boundary timer on the 'MUST Receipt' task) is likewise put in breach for that tenant.",
+      "We are at the very start: for each of the three tenants (one instance per tenant, all running concurrently under 'EVERY Tenant t IN tenants'), the process has just entered the 'MUST Pay ...' task (Task_0) from that tenant's StartScope, with the 7-day payment deadline just beginning to run and no payment yet made by any tenant.",
+      "After a tenant's next discharging event (that tenant paying), the flow for that tenant instance moves to the 'MUST Receipt ...' task (Task_1), starting the landlord's 5-day deadline to issue that tenant's receipt; once the receipt is issued, that tenant's instance reaches the 'Fulfilled' end event, while the other tenants' instances continue independently and unaffected."
+    ]
+  },
+  {
+    "contract": "tenancy",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 1,
+    "answers": [
+      "Right now, at day 0, each of the three tenants (Alice, Bob and Carol) owes payment to the landlord (Ms Ng): the contract has just begun, each tenant's instance is at the \"MUST Pay ...\" task, and no payment or receipt has yet occurred for anyone.",
+      "For each tenant, that tenant paying (completing Task_0, \"MUST Pay ...\") discharges that tenant's payment obligation and triggers the landlord's obligation to issue a receipt; the landlord then issuing that receipt (completing Task_1, \"MUST Receipt ...\") discharges the receipt obligation for that tenant.",
+      "A tenant is put in breach if their payment is not made within 7 days (the Boundary_0 timer, P7D, attached to \"MUST Pay ...\"); the landlord is put in breach if a receipt for a paid tenant is not issued within 5 days (the Boundary_1 timer, P5D, attached to \"MUST Receipt ...\"). Either breach is raised as an escalation (Breach) rather than an error, so it does not cancel the other tenants' instances.",
+      "We are at the very start: Start_0 has fired into the \"each Tenant\" multi-instance sub-process (Scope_0), and each of the three tenant instances (one per member of the cast, per EVERY Tenant t IN tenants) is at its StartScope_0, entering Task_0 (\"MUST Pay ...\") with its 7-day deadline running; no tenant has yet reached Task_1 or either end event.",
+      "After the next discharging event \u2014 a tenant paying \u2014 that tenant's instance moves from Task_0 to Task_1 (\"MUST Receipt ...\"), starting the landlord's 5-day deadline to issue that tenant's receipt; once the receipt is issued that instance reaches EndScope_0 (\"Fulfilled\") for that tenant, while the other tenants' instances continue independently. What happens for the group as a whole after that (e.g., whether all three must be fulfilled before EndGroup_0) is cannot tell from this."
+    ]
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 0,
+    "answers": [
+      "Commercial Borrower (Jane Dough Pte Ltd) owes a monthly installment payment to Individual Lender (John Doe) in the amount specified as Amount Transferred (USD 2369.28), due by day 739752 (44 days from now).",
+      "The Commercial Borrower making the monthly installment payment to the Individual Lender with an Amount Transferred of at least USD 2369.2806990603694 would discharge the obligation.",
+      "The document states that if nothing happens by day 739752, the clock reaches 739753 and a new obligation arises with no deadline, but the document does not explicitly state which events or deadlines would constitute a breach.",
+      "The contract is in the Payment Obligations section of Total Repayment Amount; standing is in progress after 1 event, with the clock at 739708.",
+      "The document does not describe what happens after a discharging event, beyond stating that it would result in the contract being fulfilled."
+    ]
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 1,
+    "answers": [
+      "Jane Dough Pte Ltd (the Commercial Borrower) must pay an Amount Transferred to John Doe (the Individual Lender), due by deadline 739752.",
+      "Payment by the Commercial Borrower to the Individual Lender of an Amount Transferred equal to at least USD 2,369.28 would discharge the obligation.",
+      "If the payment is not made by the deadline 739752 (when the clock reaches 739753), the Commercial Borrower would be in breach.",
+      "The contract state is in progress, currently at the Payment Obligations stage of the Total Repayment Amount, after the first monthly installment event.",
+      "Cannot tell from this."
+    ]
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 0,
+    "answers": [
+      "Right now, the Commercial Borrower, Jane Dough Pte Ltd, owes an Amount Transferred as a monthly installment payment to the Individual Lender, John Doe, due by clock time 739752 (44 units from now).",
+      "The obligation is discharged if Jane Dough Pte Ltd pays an Amount Transferred that is money at least equal (within error) to USD 2369.2806990603694 to John Doe; the document shows one such payment (of that same amount) already replayed and treated as fulfilling.",
+      "Cannot tell from this \u2014 the document only describes what happens if nothing occurs by the deadline (739752), namely that the same payment obligation continues to be owed with no further deadline; it does not identify any event or deadline that would constitute a breach.",
+      "We are in the 'Payment Obligations' rule under 'Total Repayment Amount', after 1 event has occurred, with the clock at 739708; the contract's standing is 'in progress'.",
+      "After the next discharging event (the qualifying payment), the contract ends in a fulfilled state."
+    ]
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 1,
+    "answers": [
+      "Right now, the Commercial Borrower (Jane Dough Pte Ltd) owes the payment obligation: it must pay a monthly installment (an Amount Transferred) to the Individual Lender, John Doe, with that payment due by clock time 739752 (44 units from the current clock reading of 739708).",
+      "The obligation is discharged if the Commercial Borrower pays the Individual Lender an Amount Transferred that is at least equal (within error) to Money of USD 2369.2806990603694 \u2014 once such a payment is made, the contract ends fulfilled.",
+      "Cannot tell from this \u2014 the document only describes what happens if nothing occurs by the deadline (739752): the same 'pay monthly installment to' obligation simply continues with no new deadline, which it explicitly says 'neither ends nor breaches it.' No condition described in this document results in breach.",
+      "The contract is in the 'in progress' state, at the branch where the Commercial Borrower's obligation to pay the monthly installment to the Individual Lender is currently owed and outstanding, with the clock at 739708 and the next deadline at 739752.",
+      "Cannot tell from this \u2014 the document shows the discharging payment event leads to the contract ending in the 'fulfilled' state, but it does not describe anything that happens afterward."
+    ]
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 0,
+    "answers": [
+      "The Borrower (Jane Dough Pte Ltd) owes the Lender (John Doe) USD 24,821.03, which is the original outstanding amount of USD 27,077.49 minus the USD 2256.46 payment made on 3 April 2025.",
+      "A payment equal to the required monthly installment amount (or penalty-adjusted amount if applicable, or all outstanding debts depending on the stage) would discharge what is owed.",
+      "Failure to make a payment by the deadline (the timeouts shown on the state diagram) would put the Borrower in breach, specifically leading to a state with no valid discharge path.",
+      "We are at the state waiting for the second monthly installment payment; the first deadline passed on 17 March 2025, but payment was made late on 3 April 2025, and we have now returned to the initial obligation state since outstanding payment amount remains greater than zero.",
+      "After the next payment is received, if all remaining eleven installments are eventually paid, the contract transitions to the Fulfilled state; if any deadline is missed without payment, the contract transitions to Breach."
+    ]
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 1,
+    "answers": [
+      "USD 24,821.03 remains outstanding, owed by Jane Dough Pte Ltd (the Borrower) to John Doe (the Lender).",
+      "A payment by the Borrower that satisfies the condition of being at least equal to the required amount, with the specific amount depending on the contract state (plain installment, with penalty, or all outstanding debts).",
+      "Missing the deadline of 17 March 2025 or the 10-day grace period following it would put the Borrower in breach; timeout conditions from later states also lead to breach.",
+      "Cannot tell from this.",
+      "Cannot tell from this."
+    ]
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 0,
+    "answers": [
+      "The Borrower, Jane Dough Pte Ltd, owes the Lender, John Doe. The exact amount currently outstanding as of 3 April 2025 cannot be told from this document, because it does not say whether the USD 2256.46 payment made that day (described as \"the plain installment amount,\" not the penalty-adjusted amount) was enough to satisfy a payment made after the 17 March deadline.",
+      "According to the diagram, the obligation is discharged whenever the Borrower pays an amount at least equal to whatever is currently due: the plain \"Next Payment Due\" amount (before the grace-period timeout), the higher \"Next Payment Due Amount With Penalty\" (after that timeout), or, after a further timeout, \"All Outstanding Debts\" in full. Any of these payments moves the process to the \"Fulfilled\" state.",
+      "The diagram shows only one path to a \"Breach\" state, reached after a second timeout following the penalty stage, but that edge is explicitly labeled \"unreachable: no WITHIN\" -- meaning, as modeled in this document, no deadline actually results in breach. The document does not identify any other event or deadline that would put someone in breach.",
+      "As of 3 April 2025 (day 739708), the first installment's deadline of 17 March 2025 (day 739691) had already passed without payment, which per the diagram would move the process into the penalty stage (the state requiring payment of the \"Next Payment Due Amount With Penalty\"). Whether the 3 April payment -- which the document says was only the plain installment amount, not the penalty-inclusive amount -- was sufficient to discharge that stage and advance to \"Fulfilled\" cannot be told from this document.",
+      "Per the diagram, once a discharging payment is made (the plain amount, the penalty amount, or all outstanding debts), the process moves to the \"Fulfilled\" state, shown as a terminal (doublecircle) node with no further outgoing transitions shown in this document."
+    ]
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 1,
+    "answers": [
+      "Right now (3 April 2025 / day 739708) the Borrower, Jane Dough Pte Ltd, owes the Lender, John Doe, the next monthly installment amount together with a penalty (the 'Next Payment Due Amount With Penalty'); the document does not give the numeric value of that penalty-inclusive figure, so the exact sum owed cannot be told from this document, though it is at least the plain installment of USD 2256.46.",
+      "Discharge of the current installment obligation happens if the Borrower pays an amount at least equal (within error) to the 'Next Payment Due Amount With Penalty' while in the post-first-deadline state; more generally, whenever the 'Outstanding Payment Amount' is not greater than 0, the whole obligation is marked Fulfilled.",
+      "Per the diagram, the only path that leads to a Breach state is the edge from the post-second-deadline state, and it is explicitly labeled 'unreachable: no WITHIN' \u2014 meaning no timeout clock is actually defined for it. So on this document, no deadline or event is shown that can actually put the Borrower in breach.",
+      "The Borrower missed the first payment deadline of 17 March 2025 (day 739691), which timed out into the second state (where payment with penalty is required). On 3 April 2025 the Borrower paid USD 2256.46, described as 'the plain installment amount' rather than the penalty-inclusive amount; whether that payment satisfies the 'is money at least equal within error' test for this state \u2014 and thus whether we have already moved on to Fulfilled \u2014 is cannot tell from this, since the required penalty amount is not stated.",
+      "After the next discharging (Fulfilled) event, the document's diagram shows that if the 'Outstanding Payment Amount' is still greater than 0 (which it will be, since only 1 of 12 installments has been addressed), the process loops back to the initial monthly-installment-due state, i.e. the cycle restarts for the next month's payment obligation."
+    ]
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 0,
+    "answers": [
+      "The Borrower (Jane Dough Pte Ltd) owes the Lender (John Doe) USD 24,821.03, which is the original debt of USD 27,077.49 minus the one payment of USD 2256.46 made on 3 April 2025.",
+      "Payment of the required monthly installments discharges the debt. According to the BPMN diagram, once the money transferred equals or exceeds the amount owed, the process reaches the \"Fulfilled\" endpoint (End_3).",
+      "Breach occurs if the Borrower fails to pay by the Next Payment Due Date (which triggers a shift to Task_2 with a penalty), or if the Borrower fails to pay by the Default After Days Beyond Commencement deadline (which triggers Task_4). If Task_4 is not satisfied, the process ends in Breach (End_5).",
+      "The document does not explicitly state which rule, branch, or state is currently live. The timeline shows payment was made on 3 April 2025, after the first deadline of 17 March 2025, but the document does not specify whether the process is in Task_2, Task_4, or has reached an endpoint.",
+      "After the next discharging event (full payment of all outstanding debts), the process reaches the \"Fulfilled\" endpoint (End_3), and the contract obligations are completed."
+    ]
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 1,
+    "answers": [
+      "Jane Dough Pte Ltd owes John Doe approximately USD 24,821.03 (the initial USD 27,077.49 outstanding as of 4 February 2025, minus the USD 2256.46 payment made on 3 April 2025).",
+      "Based on the BPMN process diagram, discharge occurs by: paying the monthly installment by the Next Payment Due Date, paying the monthly installment with penalty by the Default After Days Beyond Commencement deadline, or paying all outstanding debts.",
+      "The first payment deadline was 17 March 2025. The document shows a Default After Days Beyond Commencement deadline and a Breach end state, but does not explicitly state the specific date or event that triggers breach.",
+      "As of 3 April 2025, the Borrower has made one payment of USD 2256.46 (the plain installment amount) after the 17 March deadline. The document does not explicitly state which BPMN state or branch is currently active.",
+      "The BPMN diagram shows that after reaching End_3 (Fulfilled), the process concludes, but the document does not describe what happens after that."
+    ]
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 0,
+    "answers": [
+      "As of 3 April 2025 (day 739708), the Borrower (Jane Dough Pte Ltd) owes the Lender (John Doe) under the promissory note. The 17 March 2025 deadline for the first installment was missed, so the process moved to the penalty branch (Task_2), which requires paying the \"Next Payment Due Amount With Penalty\" within \"Default After Days Beyond Commencement\" of that missed deadline. The Borrower's 3 April payment of USD 2256.46 was only the plain installment amount, with no indication it included any penalty; the document does not state the numeric value of \"Next Payment Due Amount With Penalty,\" so whether the amount currently owed on this installment has been fully discharged cannot be told from this document.",
+      "Per the BPMN model, what is owed is discharged by a payment (\"Amount Transferred\") that is at least equal, within error, to the amount currently due on the live branch: while in Task_1 it is the plain \"Next Payment Due\" amount; having missed that, the live branch is Task_2, which discharges when the transferred amount is at least equal to \"Next Payment Due Amount With Penalty\" (leading to the \"Fulfilled\" end event). A further branch, Task_4, discharges by paying \"All Outstanding Debts\" in full. The document does not give the numeric penalty or total-outstanding figures needed to say exactly what payment amount would discharge the debt right now.",
+      "The document shows a deadline/timeout structure: Boundary_1 already fired because the 17 March 2025 (\"Next Payment Due Date\") deadline passed without payment, moving the process into the penalty task (Task_2). The next boundary, Boundary_2 (\"Default After Days Beyond Commencement\"), would put the Borrower further into default if the penalty-branch payment is not made in time, moving the process to Task_4 (pay \"All Outstanding Debts\"). However, the document explicitly annotates the final boundary, Boundary_4, as \"unreachable: no WITHIN\" -- Task_4 sets no deadline, so on this model nothing currently leads to the \"Breach\" end event (End_5); cannot tell from this document what real-world event would actually trigger breach.",
+      "We are past the first deadline (17 March 2025, day 739691) which was missed, so the timeout Boundary_1 fired and the flow moved into Task_2, \"MUST pay monthly installment ... WITHIN Default After Days Beyond Commencement PROVIDED [payment] >= Next Payment Due Amount With Penalty.\" The Borrower's payment on 3 April 2025 (day 739708) of USD 2256.46 is the plain installment amount; the document does not state whether that amount satisfies the penalty-inclusive condition of Task_2, so it cannot be told from this document whether we are still inside Task_2 (awaiting a sufficient payment) or have already reached the \"Fulfilled\" end event (End_3) via that payment.",
+      "According to the flow, if Task_2's condition is met (payment at least equal to \"Next Payment Due Amount With Penalty\"), the process proceeds directly to the end event named \"Fulfilled\" (End_3). The document describes a note with twelve monthly installments in total, but this BPMN fragment and narrative do not show what happens after that \"Fulfilled\" end event with respect to any subsequent (e.g. second) installment, so whether or how the cycle continues for the remaining installments cannot be told from this document."
+    ]
+  },
+  {
+    "contract": "promissory-note",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 1,
+    "answers": [
+      "Right now the Borrower, Jane Dough Pte Ltd, owes money to the Lender, John Doe. The document does not state the exact amount currently outstanding: the note began at USD 27,077.49 and a payment of USD 2,256.46 was made on 3 April 2025, but the document does not say whether that payment was enough to satisfy the penalty-inclusive amount then required, so the precise sum owed cannot tell from this.",
+      "According to the process, what is owed is discharged either by the Borrower paying at least the 'Next Payment Due Amount With Penalty' within the 'Default After Days Beyond Commencement' deadline (the second payment task), or, failing that, by paying at least 'All Outstanding Debts' (the third payment task) with no stated deadline. Either of those payments routes the process to the 'Fulfilled' end event.",
+      "Breach (the 'Breach' end event) is reached only if the obligation to pay 'All Outstanding Debts' is not discharged within its deadline \u2014 but the document's own annotation says that boundary event is 'unreachable: no WITHIN,' because that task sets no deadline at all, so as described here no event or deadline currently reachable would put the Borrower in breach.",
+      "We are at the second payment obligation (Task_2): the first installment's deadline of 17 March 2025 (day 739691) passed with no payment, which triggered the timeout and moved the process into the obligation to pay 'monthly installment ... within Default After Days Beyond Commencement.' On 3 April 2025 (day 739708) the Borrower paid USD 2,256.46, described as the plain installment amount rather than an amount inclusive of penalty. Whether this payment was sufficient to satisfy this task's condition (which requires an amount at least equal to the 'Next Payment Due Amount With Penalty') and thus move the process on to 'Fulfilled' cannot tell from this document.",
+      "Once a discharging payment is accepted (i.e., the condition on either the second or third payment task is satisfied), the process flow leads to the end event labeled 'Fulfilled' (End_3), meaning the process ends there. The document does not describe any further obligations or events after that Fulfilled state."
+    ]
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 0,
+    "answers": [
+      "Tenant OF \"Carol\" MUST Sign OF (Tenant OF \"Carol\"), owed by the Tenant of \"Carol\", due by 14.",
+      "Tenant OF \"Carol\" does Sign OF (Tenant OF \"Carol\").",
+      "The deadline is 14 (when the clock reaches 15); if nothing happens by then, the contract is in breach, though no party is named in the breach condition.",
+      "Cannot tell from this document which specific rule, branch or state is live; the document states the standing is \"in progress\" and references \"the tenancy\" and a #TRACE on line 85, but does not explicitly name the rule or state.",
+      "After Tenant OF \"Carol\" signs, Landlord OF \"Ms Ng\" MUST Deliver theLandlord, due by 7 (5 from now)."
+    ]
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "A",
+    "model": "haiku",
+    "repeat": 1,
+    "answers": [
+      "Tenant OF \"Carol\" must sign (due by time 14), and this is one of 3 who must all act before the next step; 2 of the 3 have already completed their obligations.",
+      "Tenant OF \"Carol\" signing at time 2 would discharge that obligation and move things along.",
+      "If nothing happens by the deadline of time 14 (the clock reaches 15), the contract is in breach.",
+      "Cannot tell from this.",
+      "Landlord OF \"Ms Ng\" must deliver theLandlord, with a deadline of time 7 (5 time units from the current position)."
+    ]
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 0,
+    "answers": [
+      "Right now, Tenant OF \"Carol\" is the one owing something: they MUST Sign OF (Tenant OF \"Carol\"), due by 14 (12 from now). This is one of three required actors who must all act before the next step can proceed, and 2 of 3 have acted so far.",
+      "The discharging event is Tenant OF \"Carol\" doing Sign OF (Tenant OF \"Carol\"). Performing that Sign now (at clock 2) discharges what is owed and triggers the next obligation (Landlord OF \"Ms Ng\" MUST Deliver theLandlord, due by 7).",
+      "Breach occurs if nothing happens by the deadline of 14 \u2014 i.e. once the clock reaches 15 with no action taken, the contract is in breach. The document does not name which party is held in breach.",
+      "The document states the contract is standing 'in progress,' at clock value 2, within a stage where 2 of 3 required parties have signed (Alice at 1, Bob at 2, Carol still outstanding) and the next step is being held back until all three have acted. It does not give a specific rule or branch name/identifier beyond this description, so beyond 'in progress' at this multi-party signing stage, cannot tell from this.",
+      "After the next discharging event (Carol's Sign), Landlord OF \"Ms Ng\" MUST Deliver theLandlord, due by 7 (5 from then)."
+    ]
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "A",
+    "model": "sonnet",
+    "repeat": 1,
+    "answers": [
+      "Right now, Tenant OF \"Carol\" owes a duty: Tenant OF \"Carol\" MUST Sign OF (Tenant OF \"Carol\"), due by clock time 14 (12 from now). This is one of 3 parties who must all act before the next step, and so far 2 of 3 have acted (Alice signed at 1, Bob signed at 2).",
+      "Tenant OF \"Carol\" doing Sign OF (Tenant OF \"Carol\") would discharge what is owed. The document shows this happening now (at 2), after which a new obligation arises: Landlord OF \"Ms Ng\" MUST Deliver theLandlord, due by 7.",
+      "If nothing happens by 14 (i.e. the clock reaches 15), the contract is in breach. The document notes that no party is named as the one in breach in that case.",
+      "The contract is in the 'in progress' standing state, at a point where 2 of 3 required parties (Alice and Bob) have signed and the next step is being held back pending the third (Carol)'s signature; the next deadline is 14, tied to Tenant OF \"Carol\": Sign OF (Tenant OF \"Carol\").",
+      "After the next discharging event (Carol's signature), Landlord OF \"Ms Ng\" MUST Deliver theLandlord, due by clock time 7 (5 from then)."
+    ]
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 0,
+    "answers": [
+      "Carol (the remaining tenant) must sign; the contract requires all three tenants to sign before the landlord's delivery obligation is triggered.",
+      "Carol signing would discharge the current obligation requiring all tenants to sign.",
+      "A timeout would put someone in breach; the graph shows timeout transitions from both the initial state and from the \"landlord must deliver\" state leading to a Breach state.",
+      "We are in the initial state, under the rule \"EVERY Tenant t IN tenants MUST Sign ... [14]\" which is active until all tenants have signed.",
+      "After Carol signs (the next discharging event), the state transitions to where \"theLandlord must Deliver\" (rule [5]) becomes the active obligation."
+    ]
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "B",
+    "model": "haiku",
+    "repeat": 1,
+    "answers": [
+      "Nothing is owed right now. We are in the initial state (state 0) where all three tenants must sign before any obligation arises; since Carol has not yet signed, the trigger condition is not met.",
+      "Carol signing would be the event that transitions the contract to state 1, where the landlord must deliver. Once the landlord delivers, the contract moves to the Fulfilled state and the obligation is discharged.",
+      "A timeout would put someone in breach. The digraph shows timeout transitions from both the initial state and from state 1 leading to the Breach state.",
+      "We are in the initial state (state 0) of the state machine diagram. This is confirmed by the fact that Carol has not signed, so the condition for transition (\"EVERY Tenant t IN tenants MUST Sign ... ONCE ALL HAVE\") has not been satisfied.",
+      "After Carol signs, the contract transitions to state 1 where the landlord must deliver. Once the landlord delivers, the contract transitions to the Fulfilled state."
+    ]
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 0,
+    "answers": [
+      "Right now, Carol owes a signature: under \"EVERY Tenant t IN tenants MUST Sign,\" Alice and Bob have each signed (day 1 and day 2), but Carol has not, so the contract remains in the initial state and Carol is the party with an outstanding obligation. The landlord's duty to deliver has not yet arisen, since it only becomes live \"ONCE ALL HAVE\" signed.",
+      "Carol doing `Sign` would discharge her outstanding obligation and, because she is the last tenant, would also complete the \"ONCE ALL HAVE\" condition, moving the contract into the state where the landlord must Deliver. A subsequent `Deliver` by the landlord (Ms Ng) would then discharge that obligation and bring the contract to Fulfilled.",
+      "A timeout would put someone in breach: a timeout while still in the initial state (before all tenants have signed) moves the contract to Breach, and a timeout after all tenants have signed but before the landlord delivers also moves it to Breach. The document does not state what the actual deadline/duration is, so cannot tell from this what date or day count triggers either timeout.",
+      "We are at the initial state (node 0), on the branch \"EVERY Tenant t IN tenants MUST Sign ... ONCE ALL HAVE\" \u2014 Alice and Bob have satisfied their individual Sign obligations, but the transition to the \"landlord must Deliver\" state (node 1) has not fired because Carol has not yet signed.",
+      "Cannot tell from this \u2014 the document shows that reaching Fulfilled requires the landlord's Deliver after all tenants have signed, and shows the timeout/breach edges, but it does not state what happens procedurally (e.g., next deadlines, notices, or further obligations) after that discharging event beyond arriving at the \"Fulfilled\" node."
+    ]
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "B",
+    "model": "sonnet",
+    "repeat": 1,
+    "answers": [
+      "Right now, Carol owes the duty to sign the tenancy; the landlord owes nothing yet because the landlord's obligation to deliver only arises \"ONCE ALL HAVE\" signed, and Carol has not signed.",
+      "Carol signing (doing Sign) would discharge what is currently owed: it completes the \"EVERY Tenant t IN tenants MUST Sign ... ONCE ALL HAVE\" condition, moving the contract to the state where the landlord must Deliver; the landlord's subsequent Deliver would then discharge that obligation.",
+      "A timeout would put someone in breach \u2014 either a timeout from the initial state (before all tenants have signed) or a timeout from the \"landlord must Deliver\" state. The document does not say what the actual deadline/date is, so cannot tell from this exactly when that timeout occurs.",
+      "We are at the initial state (node 0): the rule live is \"EVERY Tenant t IN tenants MUST Sign ... ONCE ALL HAVE\", because Alice and Bob have signed but Carol has not, so the transition to the \"landlord must Deliver\" state has not yet fired.",
+      "After the next discharging event (Carol signing), the contract moves to the state where the landlord must Deliver (node 1); from there it either becomes Fulfilled (if the landlord delivers) or Breach (on timeout) \u2014 the document does not say which of these occurs next, so cannot tell from this."
+    ]
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 0,
+    "answers": [
+      "Carol must sign. That is the outstanding obligation; Alice and Bob have already signed, and Carol's signature is what remains to discharge the tenants' obligation under Task_0.",
+      "Carol's signature would discharge what is owed. Once all three tenants have signed (the ONCE ALL HAVE condition fires), the parallel multi-instance activity completes and the flow moves to Task_1.",
+      "If all tenants do not sign within 14 days from when the signing task began, the boundary timer on Task_0 fires and leads to Breach (End_3). If the landlord does not deliver within 5 days after all tenants have signed, the boundary timer on Task_1 fires and leads to Breach (End_3).",
+      "We are currently in Task_0, waiting for Carol to sign. We have not yet reached the delivery obligation phase (Task_1). The process is suspended at the multi-instance signing activity.",
+      "After Carol signs, the flow moves from Task_0 to Task_1, where the landlord (Ms Ng) must deliver within 5 days. Once the landlord delivers, the process reaches End_2 (Fulfilled)."
+    ]
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "C",
+    "model": "haiku",
+    "repeat": 1,
+    "answers": [
+      "Carol must sign. The tenants (collectively, with Carol being the only one remaining) must complete the signing obligation. This is owed by the tenants.",
+      "Carol signing would discharge the current signing obligation. When Carol signs, all three tenants will have signed, completing the multi-instance task (Task_0) and triggering the flow to the landlord's delivery obligation.",
+      "If Carol does not sign within 14 days from the start (14-day deadline from the start of Task_0), breach occurs via Boundary_0. Separately, if the landlord fails to deliver within 5 days after the signing is complete, breach occurs via Boundary_1.",
+      "We are in the MUST Sign phase (Task_0), waiting for Carol to sign. The process is in the multi-instance signing task lane, with the tenants' obligation active and the landlord's obligation not yet triggered.",
+      "After Carol signs, the process flows to Task_1, where the landlord (Ms Ng) must deliver within 5 days. If the landlord delivers within 5 days, the contract is fulfilled (End_2). If the landlord fails to deliver within 5 days, breach occurs (End_3)."
+    ]
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 0,
+    "answers": [
+      "Right now, at day 2, what is owed is Carol's obligation to Sign the tenancy: she is the one member of the EVERY Tenant t IN tenants cast (alongside Alice and Bob, who have both already signed on day 1 and day 2 respectively) who has not yet discharged her Sign obligation. The landlord (Ms Ng) owes nothing yet, because her MUST Deliver obligation only begins once ALL tenants have signed, which has not happened.",
+      "Carol doing Sign would discharge her own outstanding obligation, and because she is the last of the three tenants to sign, it would also satisfy the 'ONCE ALL HAVE' barrier on the whole EVERY Tenant Sign activity, which in turn triggers (discharges into) the landlord's MUST Deliver obligation becoming live. Later, the landlord doing Deliver would discharge that obligation in turn.",
+      "Two deadline-triggered breach paths are shown via the boundary timer events: (1) the P14D boundary on the tenants' Sign task \u2014 if the 'ALL HAVE' condition (i.e., Carol signing) is not met within 14 days of that task becoming active, it goes to the Breach end event; (2) the P5D boundary on the landlord's Deliver task \u2014 if the landlord does not deliver within 5 days of that task becoming active (which only starts after all tenants have signed), it likewise goes to Breach. Since Task_1/Boundary_1 has not started yet (not all tenants have signed), only the P14D tenant-signing deadline is currently 'live' as a breach risk.",
+      "We are at Task_0, 'MUST Sign ... WITHIN 14 ONCE ALL HAVE', specifically in the multi-instance branch bound to Carol (Alice's and Bob's instances are already complete). The clock stands at day 2, so we are within the 14-day window for that task (the document does not state exactly when the 14-day clock started, so the precise remaining time cannot be told from this alone). Task_1 (the landlord's Deliver obligation) has not yet become live, since the ONCE-ALL-HAVE barrier has not fired.",
+      "After the next discharging event \u2014 Carol signing, which completes the 'ONCE ALL HAVE' barrier on Task_0 \u2014 the process flow moves via Flow_Task_0__Task_1 into Task_1, where the landlord (Ms Ng) becomes obligated to MUST Deliver ... WITHIN 5. That task carries its own P5D boundary timer (Boundary_1), so if delivery is not discharged within 5 days of that point, the flow proceeds to the Breach end event; if delivery does occur, the flow proceeds to the Fulfilled end event."
+    ]
+  },
+  {
+    "contract": "every-run-example",
+    "artifact": "C",
+    "model": "sonnet",
+    "repeat": 1,
+    "answers": [
+      "Right now, Carol owes her Sign obligation. The task \"MUST Sign ...\" runs once per tenant (EVERY Tenant t IN tenants), and Alice and Bob have already signed (day 1 and day 2 respectively), but Carol has not, so her per-tenant Sign instance is still outstanding. The landlord's \"MUST Deliver ...\" obligation has not yet begun, since it only starts after the Sign task completes (ONCE ALL HAVE \u2014 i.e., once every tenant's instance is done), which has not happened yet.",
+      "Carol doing Sign would discharge what is currently owed: since Alice and Bob have already signed, Carol's signature would complete the last outstanding instance of the multi-instance Sign task, satisfying the \"ONCE ALL HAVE\" condition and causing the flow to proceed from Task_0 to Task_1 (the landlord's Deliver obligation).",
+      "The document shows two deadline/boundary events that would produce a breach. First, Boundary_0 (\"after P14D\", attached to the Sign task) fires if the Sign obligation is not discharged within 14 days, leading to the Breach end event. Second, Boundary_1 (\"after P5D\", attached to the Deliver task) fires if the landlord's Delivery obligation is not discharged within 5 days of that task starting, also leading to Breach. Since the clock is only at day 2 and the Sign task has a 14-day window, no breach has occurred yet, but the document does not give an explicit start date for the 14-day clock beyond \"day 0,\" so whether day 2 is within the window can be confirmed (yes, 2 < 14).",
+      "We are inside Task_0, \"MUST Sign ...\" \u2014 specifically, within the multi-instance activity where Alice's and Bob's per-tenant Sign instances have completed and Carol's instance is still pending, with the Boundary_0 14-day timer still running and not yet expired (clock at day 2).",
+      "After the next discharging event (Carol signing, completing the Sign task for all tenants), the process flow moves from Task_0 to Task_1, where the landlord (Ms Ng) must Deliver within 5 days, with a corresponding Boundary_1 timer (P5D) running; if the landlord delivers in time, the process reaches End_2 (\"Fulfilled\"), and if not, Boundary_1 fires and the process reaches End_3 (\"Breach\")."
+    ]
+  }
+]
