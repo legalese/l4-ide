@@ -2,8 +2,9 @@
 
 Generated array: `D.generated.js`, built by `gen-d.mjs` from `scenarios.json` and the L4 encoding.
 Hand-edited array: the `const D=[…]` in `docs/projects/miles-card/app/which-card.html` in the
-homelab checkout. That file is Alexis's, is read-only to us, and is **not** copied into this
-repository; the generator reads it only when given `--reference`.
+homelab checkout, Meng's fork of the app (Alexis's original sits beside it as
+`which-card.alexis-original.html` and is not touched). Neither is copied into this repository; the
+generator reads a copy only when given `--reference`.
 
 Taken against the copy at homelab commit `48c1bcc` ("docs(miles-card): spec + primary T&C corpus
 for the L4 encoding", 2026-09-21), which was that path's current content when this was written.

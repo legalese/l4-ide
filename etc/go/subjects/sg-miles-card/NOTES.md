@@ -179,7 +179,11 @@ branch — category (d), an honest gap, to be triaged).
 assertions, 129 satisfied, **55 failed**, over the string-free second-pass modules. Re-run on the final tree `1dd165f9c` as `2026-09-21-2e987f68-002` (receipt `sha256:e4c08e1b0c2691da470c567c4c8b0d8c3e538408c7311a2b4e9fd8bce97176cd`): the same 184/129/55, the `p6-assertions.txt` artifact byte-identical to the first run's, and the same 55 failing lines. HG1 was waived
 for that run with the reason on its journal (the module under test is the cheat sheet, not an
 encoding for a domain expert to certify). The primary encoding's run is `2026-09-21-41fa285f-001`,
-`p6-tests` PASS (731 assertions at the first run; 848 after `miles-card-disputed.l4`, the yuu witness and the composer's four assertions landed at `1dd165f9c`, 0 failed), HG1 requested from Meng and not waived. Its `p7-catala` leg first reported DEGRADED for a leg defect (the emitter refused a hyphenated output basename; fixed at `go/p7-catala` `b96356ec1`, which strips the basename to `[A-Za-z0-9_]` and logs the mapping), then, re-run on the same run id after the fix and the `the sources for` rename in §3, **PASS**: 8 exporting modules, all typecheck, overlap proof clean, `clerk test` 1218 of 1218. The run for HG1 is `2026-09-21-430aa01d-001` (started on `1dd165f9c`; every stage replayed from `41fa285f-001` with inputs unchanged), whose `HG1.payload.txt` digest is `sha256:f196078d4df3e9426265e760884b3ad03b0529417daae0e1877ad8b05e5e0cbd`. The triage of
+`p6-tests` PASS (731 assertions at the first run; 848 after `miles-card-disputed.l4`, the yuu witness and the composer's four assertions landed at `1dd165f9c`, 0 failed), HG1 requested from Meng and not waived. Its `p7-catala` leg first reported DEGRADED for a leg defect (the emitter refused a hyphenated output basename; fixed at `go/p7-catala` `b96356ec1`, which strips the basename to `[A-Za-z0-9_]` and logs the mapping), then, re-run on the same run id after the fix and the `the sources for` rename in §3, **PASS**: 8 exporting modules, all typecheck, overlap proof clean, `clerk test` 1218 of 1218. The run for HG1 is `2026-09-21-430aa01d-001` (started on `1dd165f9c`; every stage replayed from `41fa285f-001` with inputs unchanged), whose `HG1.payload.txt` digest is `sha256:f196078d4df3e9426265e760884b3ad03b0529417daae0e1877ad8b05e5e0cbd`. **HG1 was waived by Meng on 2026-09-21**, reason on the receipt: "does not have time to
+review; corpus PASS on p6-tests (848/848), p7-catala PASS, p8-verify's four findings dispositioned
+in NOTES §6.1, no self-review substitute intended." This is Meng's own decision to waive his review,
+not a self-waiver by the encoding session — the distinction the go pipeline's gate exists to
+preserve. Re-run under the waiver as `2026-09-21-430aa01d-002`: `go: VERDICT: COMPLETE`. The triage of
 the 55, one line per failure, is `miles-card-disputed.l4`. The triage report itself, with the evaluation method (every failing expression re-evaluated on the branch binary, 430 evaluations) and the per-cluster reasoning, is `jl4/examples/legal/miles-card/ACCEPTANCE-TRIAGE.md`. Its classification of the 55: (a) the cheat sheet is wrong on the text, 9; (b) the encoding is wrong, **0**; (c) genuinely conditional on the merchant indicator, 18; (d) unheld document, expired document, or rounding, 28. The Woman's World wallet-tap row is (c), predicted by fork-register entry `F-womans-online-definition`; the Citi wallet rows are (a), because all four reach cl.6(i) by MCC, where no wallet language exists. Two cosmetic module defects found in passing (a condition sentence in `dbs-yuu.l4` that said 9 where SimplyGo's cl.7(a) figure is 9.5, and a comment on `Cap`'s `capped` in the domain module that described a narrower meaning than the modules use) were fixed the same day.
 
 The committed corpus stays green: rows the test proved unsupported are restated in
@@ -236,8 +240,15 @@ None changed a rule; two produced a witness, and the table below is the disposit
 
 ## 7. Ownership
 
-The cheat sheet (`[S5]`) and the original `which-card.html` belong to Alexis and are read-only;
+The cheat sheet (`[S5]`) and the original app (`which-card.alexis-original.html` in homelab) belong to Alexis and are read-only; Meng's fork `which-card.html` beside it takes the generated `D[]`;
 neither is committed here.
 The T&C PDFs are the issuers' published documents, mirrored for versioning.
-The L4 is Meng's, and moves to `legalese/canon` under `subjects/sg/miles-card/` once it lands
-here (spec: correct the canonical-copy line in both places when that happens).
+The L4 is Meng's. **Deposited in `legalese/canon` on 2026-09-21**, at
+`subjects/contracts/payments/sg-miles-card/encodings/legalese/`, commit `0bec622` on
+branch `mengwong/drafts` — NOT `subjects/sg/miles-card/` as this paragraph used to say.
+`sg/` is for enacted law (docs/directory-conventions.md §2); eight private issuers' T&C
+are not that. `contracts/` is the genre tree, and none of its four seed genres held a
+card's rewards programme, so `payments/` was added alongside this deposit. The bundling
+of eight issuers under one leaf is itself a departure from that document's §3, argued in
+full in the canon row's own `NOTES.md` §0 — read it before assuming this file's shape is
+the template for the next subject filed there.
