@@ -109,18 +109,27 @@ fi
 #
 # THE EXIT CODE IS NOT THE PROBE, and this is the trap. `l4`'s bare form is
 # `l4 FILE`, so an unrecognised first word is read as a FILENAME rather than
-# refused as an unknown subcommand: MEASURED on this binary, `l4 bogusverb
-# --help` prints the TOP-LEVEL help and exits 0. A missing subcommand would
-# therefore pass an exit-code check silently, which is the one thing this probe
-# exists to catch. What distinguishes them is the Usage line: the subcommand's
-# own help opens `Usage: l4 catala FILE …`, the top-level help opens
-# `Usage: l4 (COMMAND | FILE …)`.
+# refused as an unknown subcommand: MEASURED, `l4 bogusverb --help` prints the
+# TOP-LEVEL help and exits 0. A missing subcommand would therefore pass an
+# exit-code check silently, which is the one thing this probe exists to catch.
+# What distinguishes them is the Usage line: the subcommand's own help opens
+# `… catala FILE …`, the top-level help opens `… (COMMAND | FILE …)`.
+#
+# THE PROGRAM NAME IS NOT PART OF THE PATTERN, and anchoring on it was a defect
+# here. optparse-applicative prints `Usage: <argv0> catala …` from the
+# binary's own basename, so a probe matching the literal `Usage: l4 catala `
+# reports BROKEN — which STOPS THE WHOLE RUN — for any `l4` that is not named
+# exactly `l4`. That is not an exotic configuration: CLAUDE.md §3.2.1 tells you
+# to copy the binary somewhere unique before probing with it, and §3.1 has
+# people pointing `L4` at whatever build they need. Measured 2026-09-21 on a
+# snapshot named `l4-milescard-snapshot`, which printed
+# `Usage: l4-milescard-snapshot catala ` and was called broken.
 set +e
 "$L4" catala --help >"$GO_OUT/p7-catala.help.txt" 2>&1
 HELP_RC=$?
 set -e
-if [[ $HELP_RC -ne 0 ]] || ! grep -q '^Usage: l4 catala ' "$GO_OUT/p7-catala.help.txt"; then
-  go_broken "the l4 binary at $L4 has no usable 'catala' subcommand: \`l4 catala --help\` exited $HELP_RC and did not print a 'Usage: l4 catala …' line — it printed \"$(head -1 "$GO_OUT/p7-catala.help.txt" 2>/dev/null)\". An unknown first word is parsed as a FILENAME by this CLI, so the exit code alone would not have shown this. Leg legs['p7-catala'] is declared for subject '$GO_S_ID', so either the binary predates the emitter or the subcommand was renamed; rebuild, or undeclare the leg."
+if [[ $HELP_RC -ne 0 ]] || ! grep -qE '^Usage: [^ ]+ catala ' "$GO_OUT/p7-catala.help.txt"; then
+  go_broken "the l4 binary at $L4 has no usable 'catala' subcommand: \`l4 catala --help\` exited $HELP_RC and did not print a 'Usage: <program> catala …' line — it printed \"$(head -1 "$GO_OUT/p7-catala.help.txt" 2>/dev/null)\". An unknown first word is parsed as a FILENAME by this CLI, so the exit code alone would not have shown this. Leg legs['p7-catala'] is declared for subject '$GO_S_ID', so either the binary predates the emitter or the subcommand was renamed; rebuild, or undeclare the leg."
 fi
 
 # --- emit, one module at a time ---------------------------------------------
@@ -143,22 +152,68 @@ for m in "${MODULES[@]}"; do
   fi
 
   STEM="$(basename "$m" .l4)"
-  OUT="$GO_OUT/$STEM.catala_en"
-  # Two modules in different directories may share a basename; the validator
-  # stages each emission in a directory named after this file, so a collision
-  # would have one silently overwrite the other.
+  # THE OUTPUT BASENAME IS NOT FREE: IT BECOMES THE CATALA MODULE NAME.
+  #
+  # `l4 catala -o FILE` derives the emitted `> Module X` from FILE's basename,
+  # and Catala identifiers admit only letters, digits and `_`, starting with a
+  # letter. So `-o dbs-yuu.catala_en` is REFUSED outright — "`dbs-yuu` cannot be
+  # a Catala module name … e.g. `dbsyuu.catala_en`" — and the emitter exits 1
+  # before writing anything.
+  #
+  # Naming the emission after the L4 stem was therefore a defect in THIS LEG,
+  # not a finding about any encoding, and it presented as one: the first
+  # hyphenated module in the set failed with `modules_emitted=0` and the
+  # toolchain gate never ran. It survived the leg's first review because every
+  # module the controls used happened to have a hyphen-free stem. Measured
+  # 2026-09-21 on `sg-miles-card` (13 modules, every issuer stem hyphenated) and
+  # reproduced in this repo on `jl4/examples/catala/flat-tax.l4`.
+  #
+  # Strip rather than substitute, because that is what the emitter's own remedy
+  # line suggests, and record the mapping below so an artifact can still be
+  # traced back to the module it came from.
+  SAFE="${STEM//[^A-Za-z0-9_]/}"
+  # A stem of punctuation alone strips to nothing, and a leading digit is as
+  # invalid as a hyphen. Both get a prefix rather than a silent empty name.
+  [[ -z "$SAFE" ]] && SAFE="m_${#EMITTED[@]}"
+  [[ "$SAFE" =~ ^[0-9] ]] && SAFE="m_$SAFE"
+  OUT="$GO_OUT/$SAFE.catala_en"
+  # Two modules in different directories may share a basename, and STRIPPING
+  # CREATES COLLISIONS THAT DID NOT EXIST — `dbs-yuu.l4` and `dbsyuu.l4` both
+  # land on `dbsyuu`. The validator stages each emission in a directory named
+  # after this file, so a collision would have one silently overwrite the other.
+  # The disambiguator is `_2`, not `-2`: a hyphen here would reintroduce exactly
+  # the refusal this block exists to avoid.
   N=1
   while [[ -e "$OUT" ]]; do
     N=$((N + 1))
-    OUT="$GO_OUT/$STEM-$N.catala_en"
+    OUT="$GO_OUT/${SAFE}_$N.catala_en"
   done
-
-  echo "=== $REL" >>"$LOG"
+  # THE MAPPING LINE, and WHY the name moved. There are two different reasons
+  # and they must not print the same sentence: `dbsyuu` IS a valid Catala module
+  # name, so saying it is not — which an earlier draft of this line did, because
+  # it tested only whether the name had changed — is a false statement in the
+  # artifact a reader traces the emission through.
+  WHY=""
+  [[ "$SAFE" != "$STEM" ]] && WHY="'$STEM' is not a Catala module name"
+  if [[ $N -gt 1 ]]; then
+    [[ -n "$WHY" ]] && WHY="$WHY, and "
+    WHY="${WHY}another module in this set already emitted as '$SAFE.catala_en'"
+  fi
+  if [[ -n "$WHY" ]]; then
+    RENAMED=$((${RENAMED:-0} + 1))
+    echo "=== $REL -> $(basename "$OUT")  [renamed: $WHY]" >>"$LOG"
+  else
+    echo "=== $REL -> $(basename "$OUT")" >>"$LOG"
+  fi
   # Per module, into its own file. The combined log is an artifact and is
   # useful; it is NOT something to slice a diagnostic out of, because `l4`
   # prints a long `Info | updateFileDiagnostics` dump of every satisfied
   # assertion before it says anything about Catala.
-  MOUT="$GO_OUT/p7-catala.emit-$(basename "$m" .l4).txt"
+  # Named after the EMISSION, not the module: the emission's basename is
+  # already unique within this run (the loop above made it so), and a log named
+  # after the module would collide for exactly the pairs the loop just
+  # disambiguated.
+  MOUT="$GO_OUT/p7-catala.emit-$(basename "$OUT" .catala_en).txt"
   set +e
   "$L4" catala "$m" -o "$OUT" --fixed-now "$GO_FIXED_NOW" >"$MOUT" 2>&1
   RC=$?
@@ -185,6 +240,7 @@ for m in "${MODULES[@]}"; do
       --metric "modules_total=$MODULES_TOTAL" \
       --metric "modules_emitted=${#EMITTED[@]}" \
       --metric "modules_without_export=${#NO_EXPORT[@]}" \
+      --metric "basenames_rewritten=${RENAMED:-0}" \
       --metric "emitter_exit=$RC" \
       --metric "emitter_refusals=${NBULLETS:-0}"
     exit "$GO_EXIT_FINDING"
@@ -237,6 +293,7 @@ METRICS=(
   --metric "modules_total=$MODULES_TOTAL"
   --metric "modules_emitted=${#EMITTED[@]}"
   --metric "modules_without_export=${#NO_EXPORT[@]}"
+  --metric "basenames_rewritten=${RENAMED:-0}"
   --metric "test_blocks_emitted=$BLOCKS_TOTAL"
 )
 
