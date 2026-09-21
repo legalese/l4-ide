@@ -5452,6 +5452,125 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     );
   }
 
+  // --- 7c. p7-catala: the clock is a digest contributor, and the leg cannot
+  // lose its receipt to `set -e` -------------------------------------------
+  //
+  // Two hazards, both measured on the leg's first live run (2026-09-21), and
+  // neither reachable by running the stage in CI: the oracle is the external
+  // Catala toolchain, which no runner has.
+  {
+    const inputsOf = (over = {}) =>
+      spawnSync(resolve(HERE, "phases/p7-catala.sh"), ["--inputs"], {
+        encoding: "utf8",
+        shell: false,
+        env: {
+          ...process.env,
+          GO_ROOT: REPO,
+          GO_MODULES: "probe.l4",
+          ...over,
+        },
+      }).stdout ?? "";
+    const a = inputsOf({ GO_FIXED_NOW: "2025-01-31T00:00:00Z" });
+    const b = inputsOf({ GO_FIXED_NOW: "2026-01-31T00:00:00Z" });
+    check(
+      "p7-catala's --inputs carries the pinned clock, so two runs at different legal times cannot replay each other's answer",
+      a.includes("text:fixed_now=2025-01-31T00:00:00Z") &&
+        b.includes("text:fixed_now=2026-01-31T00:00:00Z") &&
+        a !== b,
+    );
+    check(
+      "…and it declares etc/validate-catala.mjs, which IS its oracle: an edit to what that enforces must re-run the stage",
+      a.includes("etc/validate-catala.mjs"),
+    );
+
+    // THE SILENT NO-RECEIPT. `read` returns 1 on empty input, and the phase
+    // script runs under `set -e`, so an unguarded `read` of clerk's summary
+    // aborts the stage BEFORE any go_receipt — leaving no row at all, and a
+    // phase exit of 1 that is indistinguishable from GO_EXIT_FINDING. The
+    // input is empty exactly when clerk never ran, which is the commonest
+    // failure the leg reports. Measured: a layer-1 typecheck rejection wrote
+    // an empty journal.
+    const src = readFileSync(resolve(HERE, "phases/p7-catala.sh"), "utf8");
+    const reads = src.match(/^\s*read -r .*$/gm) ?? [];
+    check(
+      "every `read` in p7-catala.sh is guarded against empty input, so a stage that reaches it still writes a receipt",
+      reads.length > 0 && reads.every((l) => /\|\|\s*true\s*$/.test(l)),
+    );
+  }
+
+  // --- 7d. p7-catala: the emitted basename IS the Catala module name --------
+  //
+  // `l4 catala -o FILE` derives the emitted `> Module X` from FILE's basename,
+  // and a Catala identifier admits only letters, digits and `_`, starting with
+  // a letter. Naming the emission after the L4 stem therefore REFUSES on any
+  // hyphenated module — `l4 catala: -o dbs-yuu: … cannot be a Catala module
+  // name` — with the emitter exiting 1 before writing anything, which the leg
+  // then reports as a finding about the encoding. It is not one; it is a leg
+  // defect. It shipped because every module in the leg's own controls happened
+  // to have a hyphen-free stem, and it surfaced on the first real subject
+  // (sg-miles-card, 13 modules, every issuer stem hyphenated).
+  //
+  // Run against a STUB `l4` and a switch name no opam switch has, so this needs
+  // neither a built binary nor the Catala toolchain: the stage reaches its
+  // absent-toolchain SKIP, and the emissions it hashed on the way are what is
+  // asserted.
+  {
+    const stub = resolve(T, "l4-catala-basename-stub.sh");
+    wr(
+      stub,
+      '#!/usr/bin/env bash\nif [ "$1" = "catala" ] && [ "$2" = "--help" ]; then\n  echo "Usage: $(basename \\"$0\\") catala FILE [-o|--output FILE] [--boolean-only] [--fixed-now ISO8601]"\n  exit 0\nfi\nout=""; prev=""\nfor a in "$@"; do\n  if [ "$prev" = "-o" ]; then out="$a"; fi\n  prev="$a"\ndone\n[ -n "$out" ] || exit 9\nprintf \'> Module Stub\\n\' > "$out"\nexit 0\n',
+    );
+    spawnSync("chmod", ["+x", stub]);
+    // `dbsyuu` collides with what `dbs-yuu` strips to, which is a collision the
+    // sanitiser CREATES rather than one the tree had; `9lives` is invalid for a
+    // different reason than a hyphen. All three must land on distinct, legal
+    // names, and the disambiguator must not itself be a hyphen.
+    const mods = ["dbs-yuu", "dbsyuu", "9lives"].map((n) => {
+      const f = resolve(DEP, `${n}.l4`);
+      wr(f, "@export\n");
+      return f;
+    });
+    const s = stage("p7-catala", {
+      GO_MODULES: mods.join(" "),
+      L4: stub,
+      CATALA_EXE: "",
+      CLERK_EXE: "",
+      CATALA_OPAM_SWITCH: "no-such-switch-selftest",
+    });
+    // THE STUB IS NOT NAMED `l4`, AND IT PRINTS ITS OWN BASENAME, as
+    // optparse-applicative does. That makes this fixture cover a second defect
+    // for free: the subcommand probe used to anchor on the literal string
+    // `Usage: l4 catala `, so it called BROKEN — which stops the whole run —
+    // on any binary not named exactly `l4`. Snapshotting the binary under a
+    // unique name is what CLAUDE.md §3.2.1 tells you to do before probing with
+    // it, so that is a normal configuration and not an exotic one.
+    check(
+      "p7-catala accepts an l4 binary that is not NAMED `l4` — the probe reads the subcommand, not the program name",
+      s.row?.status !== "BROKEN",
+    );
+    const emitted = (s.row?.artifacts ?? [])
+      .map((a) => a.rel ?? "")
+      .filter((r) => r.endsWith(".catala_en"))
+      .map((r) => r.replace(/\.catala_en$/, ""));
+    check(
+      "p7-catala names every emission after a LEGAL Catala module name, not after the L4 stem",
+      s.row?.status === "SKIPPED" &&
+        emitted.length === 3 &&
+        emitted.every((n) => /^[A-Za-z][A-Za-z0-9_]*$/.test(n)) &&
+        new Set(emitted).size === 3,
+    );
+    const legLog = (s.row?.artifacts ?? []).find(
+      (a) => (a.rel ?? "") === "p7-catala.txt",
+    );
+    check(
+      "…and the run log maps each module path to the file it emitted, so a renamed artifact is still traceable",
+      !!legLog &&
+        /dbs-yuu\.l4 -> \S+\.catala_en {2}\[renamed: /.test(
+          rd(legLog.path, "utf8"),
+        ),
+    );
+  }
+
   // --- 8. the plan stops refusing -------------------------------------------
   {
     const r = spawnSync(
