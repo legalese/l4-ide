@@ -243,5 +243,12 @@ None changed a rule; two produced a witness, and the table below is the disposit
 The cheat sheet (`[S5]`) and the original app (`which-card.alexis-original.html` in homelab) belong to Alexis and are read-only; Meng's fork `which-card.html` beside it takes the generated `D[]`;
 neither is committed here.
 The T&C PDFs are the issuers' published documents, mirrored for versioning.
-The L4 is Meng's, and moves to `legalese/canon` under `subjects/sg/miles-card/` once it lands
-here (spec: correct the canonical-copy line in both places when that happens).
+The L4 is Meng's. **Deposited in `legalese/canon` on 2026-09-21**, at
+`subjects/contracts/payments/sg-miles-card/encodings/legalese/`, commit `0bec622` on
+branch `mengwong/drafts` — NOT `subjects/sg/miles-card/` as this paragraph used to say.
+`sg/` is for enacted law (docs/directory-conventions.md §2); eight private issuers' T&C
+are not that. `contracts/` is the genre tree, and none of its four seed genres held a
+card's rewards programme, so `payments/` was added alongside this deposit. The bundling
+of eight issuers under one leaf is itself a departure from that document's §3, argued in
+full in the canon row's own `NOTES.md` §0 — read it before assuming this file's shape is
+the template for the next subject filed there.
