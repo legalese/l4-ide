@@ -904,6 +904,21 @@ its annotations.** The file that exists to test `@nlg` renders none of its own. 
 sampled files, 11 of 116 annotations sit on a builtin type name; `prelude.l4` has 0 of 67, so
 the idiomatic style avoids it by habit rather than by construction.
 
+**RULED 2026-09-19 (Meng), and implemented.** Trailing a line, an annotation describes what is
+on that line; starting a line of its own, it describes what follows — with ONE exception, ruled
+separately the same day: inside a record-field list, an annotation on its own line describes the
+field ABOVE it. A field list is a column of things rather than a sequence of declarations, and
+the evidence is that authors write it that way: across three independently generated Hebrew
+encodings, field and parameter heralds are the largest single category — 100 of 334 — and every
+one is written below its field (measured by the `ofek` session; our own corpus contains
+essentially none of that shape, so no golden of ours would ever have raised the question).
+
+The field name therefore claims two disjoint regions: everything before its type, which is its
+own trailing gloss, and everything on a later line. What falls between — trailing the TYPE on
+the field's own line — stays with the type, which is what keeps `ok/nlg_declare1.l4`'s
+deliberate `head [Get First Element] IS AN a [Start Element]` working. Giving the name the whole
+line instead makes those two collide and loses both; that was measured before it was narrowed.
+
 There is precedent for the fix inside the same pass: a **leading `@ref` already attaches
 FORWARD**, to the declaration that follows it, and `RefAnnotationSpec` pins that specifically
 ("attaches a leading `@ref` to the first declaration, not the Module"). `@nlg` attaching

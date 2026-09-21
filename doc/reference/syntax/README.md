@@ -275,6 +275,22 @@ output rather than leave it alone. L4 drops it and warns instead.
 glosses the field and its type separately, because each annotation sits with
 the token it follows.
 
+**And a field list is the one exception to "own line describes what
+follows".** Underneath a field, an annotation describes _that_ field — the one
+above it — not the next one:
+
+```l4
+DECLARE Employee
+  HAS `full name`  IS A STRING
+      @nlg the employee's full name     -- describes `full name`
+      `start date` IS A DATE
+```
+
+A field list is a column of things rather than a sequence of declarations, and
+writing the gloss under the field it belongs to is what authors do. The
+exception is confined to field lists: above a `DECIDE`, an annotation on its
+own line still describes the rule below it.
+
 **The bare inline form cannot be tagged.** `[…]` has nowhere to put a subtag —
 the annotation is just brackets around prose — so a language is available only
 on the heralded form. Two consequences worth knowing: an inline gloss can only

@@ -123,3 +123,66 @@ spec = describe "which node an @nlg attaches to" $ do
       \DECIDE who IS `the buyer`\n"
     attachments m `shouldBe` []
     [ nameToText n | EmptyNlg n _ <- ws ] `shouldBe` ["the buyer"]
+
+  -- The one exception to "own line describes what follows", ruled 2026-09-19.
+  -- A field list is a column of things rather than a sequence of
+  -- declarations, and an annotation written UNDERNEATH a field describes that
+  -- field. All three independently generated Hebrew encodings measured in
+  -- 2026-09 annotate fields this way — 100 heralds, every one below its field
+  -- — so it is the shape authors actually reach for.
+  --
+  -- These carry the whole ruling on their own: our corpus contains
+  -- essentially none of this shape, so no golden moves and nothing else in
+  -- the suite would notice if it regressed.
+  describe "inside a field list, an annotation on its own line describes the field ABOVE" $ do
+    it "attaches to the field above, not to its type and not to the next field" $ do
+      (m, ws) <- parsed
+        "DECLARE Employee\n\
+        \  HAS `full name`  IS A STRING\n\
+        \      @nlg the employee's full name\n\
+        \      `start date` IS A DATE\n"
+      attachments m `shouldBe` [("full name", "the employee's full name")]
+      [ () | EmptyNlg{} <- ws ] `shouldBe` []
+
+    it "still gives a field and its TYPE separate trailing glosses" $ do
+      -- `ok/nlg_declare1.l4`. This is why the field name claims two disjoint
+      -- regions rather than simply everything: before its type (its own
+      -- trailing gloss) and below its line. What falls between — trailing the
+      -- TYPE on the field's own line — stays with the type. Giving the name
+      -- the whole line instead makes these two collide and loses both.
+      (m, ws) <- parsed
+        "DECLARE List [The List] OF a [Elements]\n\
+        \  IS ONE OF\n\
+        \    Nil [Empty Case]\n\
+        \    Cons [Followed By] HAS\n\
+        \      head [Get First Element] IS AN a [Start Element]\n"
+      attachments m
+        `shouldBe` [ ("List", "The List")
+                   , ("a", "Elements")
+                   , ("Nil", "Empty Case")
+                   , ("Cons", "Followed By")
+                   , ("head", "Get First Element")
+                   , ("a", "Start Element")
+                   ]
+      [ () | Ambiguous{} <- ws ] `shouldBe` []
+
+    it "handles both shapes on adjacent fields without either stealing the other" $ do
+      (m, ws) <- parsed
+        "DECLARE Employee\n\
+        \  HAS `full name` [the name] IS A STRING\n\
+        \      `start date` IS A DATE\n\
+        \      @nlg when they started\n"
+      attachments m
+        `shouldBe` [("full name", "the name"), ("start date", "when they started")]
+      [ () | Ambiguous{} <- ws ] `shouldBe` []
+
+    it "does NOT change the rule case: own line above a DECIDE still means the rule" $ do
+      -- The exception is scoped to field lists. Stated as a test because the
+      -- two conventions point in opposite directions and a later edit that
+      -- "unified" them would silently break one of the two.
+      (m, _) <- parsed
+        "GIVEN amount IS A NUMBER\n\
+        \GIVETH A BOOLEAN\n\
+        \@nlg 5% with %amount%\n\
+        \DECIDE `over threshold` IF amount GREATER THAN 100\n"
+      attachments m `shouldBe` [("over threshold", "5% with `amount`")]
