@@ -44,6 +44,7 @@ result*
 # `result*` is for nix build symlinks; the LTS reader-proxy evidence files are not those.
 !etc/lts-reader-proxy/RESULTS.md
 !etc/lts-reader-proxy/results.json
+!etc/lts-reader-proxy/results-run2.json
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 **/.svelte-kit/
 # Testing

@@ -1,0 +1,241 @@
+Document
+
+The contract is `aContract` from jl4/examples/ok/contracts.l4. Two parties: S (a seller) and B (a buyer). Time is counted in whole days from day 0.
+
+What has happened so far, in order:
+  1. On day 2, S delivered (S did `delivery`).
+  2. On day 4, B paid 21 (B did `payment` with amount 21). The agreed price was 21, which is at least 20, and is not exactly 20.
+  3. Nothing else has happened; the clock now stands at day 10.
+
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_aContract"
+                  targetNamespace="https://l4.legalese.com/bpmn"
+                  exporter="jl4 (L4.Bpmn)"
+                  exporterVersion="1">
+  <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
+  <bpmn:collaboration id="Collaboration_aContract">
+    <bpmn:participant id="Participant_aContract" name="aContract" processRef="Process_aContract" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_aContract" name="aContract" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_1_S" name="S">
+        <bpmn:flowNodeRef>Task_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_0</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_2_B" name="B">
+        <bpmn:flowNodeRef>Task_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_6</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_6</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_unassigned" name="(unassigned)">
+        <bpmn:flowNodeRef>Start_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Split_2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_5</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_0" />
+    <bpmn:task id="Task_0" name="MUST delivery">
+      <bpmn:documentation>PARTY S MUST delivery WITHIN 3</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:boundaryEvent id="Boundary_0" name="after P3D" attachedToRef="Task_0" cancelActivity="true">
+      <bpmn:documentation>LEST: the obligation is not discharged within 3</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Boundary_0">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P3D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:task id="Task_1" name="MUST payment ...">
+      <bpmn:documentation>PARTY B MUST payment ... WITHIN 3 PROVIDED price AT LEAST 20</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:boundaryEvent id="Boundary_1" name="after P3D" attachedToRef="Task_1" cancelActivity="true">
+      <bpmn:documentation>LEST: the obligation is not discharged within 3</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Boundary_1">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P3D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:exclusiveGateway id="Split_2" name="one of" gatewayDirection="Diverging">
+      <bpmn:documentation>ROR: exactly one branch is entered</bpmn:documentation>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_3" name="Fulfilled" />
+    <bpmn:task id="Task_4" name="MUST return">
+      <bpmn:documentation>PARTY B MUST return WITHIN 10</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:boundaryEvent id="Boundary_4" name="after P10D" attachedToRef="Task_4" cancelActivity="true">
+      <bpmn:documentation>LEST: the obligation is not discharged within 10</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Boundary_4">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P10D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="End_5" name="Breach">
+      <bpmn:errorEventDefinition id="ErrorDef_End_5" errorRef="Error_breach" />
+    </bpmn:endEvent>
+    <bpmn:task id="Task_6" name="MUST payment ...">
+      <bpmn:documentation>PARTY B MUST payment ... WITHIN 3</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:boundaryEvent id="Boundary_6" name="after P3D" attachedToRef="Task_6" cancelActivity="true">
+      <bpmn:documentation>LEST: the obligation is not discharged within 3</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Boundary_6">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P3D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_Start_0__Task_0" sourceRef="Start_0" targetRef="Task_0" />
+    <bpmn:sequenceFlow id="Flow_Task_0__Task_1" sourceRef="Task_0" targetRef="Task_1" />
+    <bpmn:sequenceFlow id="Flow_Boundary_0__End_5" sourceRef="Boundary_0" targetRef="End_5" />
+    <bpmn:sequenceFlow id="Flow_Task_1__Split_2" sourceRef="Task_1" targetRef="Split_2">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">price AT LEAST 20</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Boundary_1__Task_6" sourceRef="Boundary_1" targetRef="Task_6" />
+    <bpmn:sequenceFlow id="Flow_Split_2__End_3" sourceRef="Split_2" targetRef="End_3">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">price EQUALS 20</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Split_2__Task_4" sourceRef="Split_2" targetRef="Task_4">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">NOT (price EQUALS 20)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Task_4__End_3" sourceRef="Task_4" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Boundary_4__End_5" sourceRef="Boundary_4" targetRef="End_5" />
+    <bpmn:sequenceFlow id="Flow_Task_6__End_3" sourceRef="Task_6" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Boundary_6__End_5" sourceRef="Boundary_6" targetRef="End_5" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_aContract">
+      <bpmndi:BPMNShape id="Shape_Participant_aContract" bpmnElement="Participant_aContract" isHorizontal="true">
+        <dc:Bounds x="130" y="80" width="1130" height="600" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_1_S" bpmnElement="Lane_1_S" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="1100" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_2_B" bpmnElement="Lane_2_B" isHorizontal="true">
+        <dc:Bounds x="160" y="240" width="1100" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_unassigned" bpmnElement="Lane_unassigned" isHorizontal="true">
+        <dc:Bounds x="160" y="400" width="1100" height="280" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Start_0" bpmnElement="Start_0">
+        <dc:Bounds x="232" y="442" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_0" bpmnElement="Task_0">
+        <dc:Bounds x="380" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Boundary_0" bpmnElement="Boundary_0">
+        <dc:Bounds x="434" y="162" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_1" bpmnElement="Task_1">
+        <dc:Bounds x="560" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Boundary_1" bpmnElement="Boundary_1">
+        <dc:Bounds x="614" y="322" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Split_2" bpmnElement="Split_2">
+        <dc:Bounds x="765" y="435" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_3" bpmnElement="End_3">
+        <dc:Bounds x="1132" y="442" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_4" bpmnElement="Task_4">
+        <dc:Bounds x="920" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Boundary_4" bpmnElement="Boundary_4">
+        <dc:Bounds x="974" y="322" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_5" bpmnElement="End_5">
+        <dc:Bounds x="1132" y="562" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_6" bpmnElement="Task_6">
+        <dc:Bounds x="740" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Boundary_6" bpmnElement="Boundary_6">
+        <dc:Bounds x="794" y="322" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Task_0" bpmnElement="Flow_Start_0__Task_0">
+        <di:waypoint x="268" y="460" />
+        <di:waypoint x="314" y="460" />
+        <di:waypoint x="314" y="140" />
+        <di:waypoint x="380" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_0__Task_1" bpmnElement="Flow_Task_0__Task_1">
+        <di:waypoint x="480" y="140" />
+        <di:waypoint x="494" y="140" />
+        <di:waypoint x="494" y="300" />
+        <di:waypoint x="560" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_0__End_5" bpmnElement="Flow_Boundary_0__End_5">
+        <di:waypoint x="452" y="198" />
+        <di:waypoint x="504" y="198" />
+        <di:waypoint x="504" y="200" />
+        <di:waypoint x="1044" y="200" />
+        <di:waypoint x="1044" y="580" />
+        <di:waypoint x="1132" y="580" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_1__Split_2" bpmnElement="Flow_Task_1__Split_2">
+        <di:waypoint x="660" y="300" />
+        <di:waypoint x="674" y="300" />
+        <di:waypoint x="674" y="460" />
+        <di:waypoint x="765" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_1__Task_6" bpmnElement="Flow_Boundary_1__Task_6">
+        <di:waypoint x="632" y="358" />
+        <di:waypoint x="684" y="358" />
+        <di:waypoint x="684" y="300" />
+        <di:waypoint x="740" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Split_2__End_3" bpmnElement="Flow_Split_2__End_3">
+        <di:waypoint x="815" y="460" />
+        <di:waypoint x="854" y="460" />
+        <di:waypoint x="854" y="520" />
+        <di:waypoint x="1034" y="520" />
+        <di:waypoint x="1034" y="460" />
+        <di:waypoint x="1132" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Split_2__Task_4" bpmnElement="Flow_Split_2__Task_4">
+        <di:waypoint x="815" y="460" />
+        <di:waypoint x="864" y="460" />
+        <di:waypoint x="864" y="300" />
+        <di:waypoint x="920" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_4__End_3" bpmnElement="Flow_Task_4__End_3">
+        <di:waypoint x="1020" y="300" />
+        <di:waypoint x="1054" y="300" />
+        <di:waypoint x="1054" y="460" />
+        <di:waypoint x="1132" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_4__End_5" bpmnElement="Flow_Boundary_4__End_5">
+        <di:waypoint x="992" y="358" />
+        <di:waypoint x="1064" y="358" />
+        <di:waypoint x="1064" y="580" />
+        <di:waypoint x="1132" y="580" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_6__End_3" bpmnElement="Flow_Task_6__End_3">
+        <di:waypoint x="840" y="300" />
+        <di:waypoint x="894" y="300" />
+        <di:waypoint x="894" y="360" />
+        <di:waypoint x="1074" y="360" />
+        <di:waypoint x="1074" y="460" />
+        <di:waypoint x="1132" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_6__End_5" bpmnElement="Flow_Boundary_6__End_5">
+        <di:waypoint x="812" y="358" />
+        <di:waypoint x="904" y="358" />
+        <di:waypoint x="904" y="360" />
+        <di:waypoint x="1084" y="360" />
+        <di:waypoint x="1084" y="580" />
+        <di:waypoint x="1132" y="580" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
+
+Q1. What is owed right now, and by whom?
+Q2. Which event(s) would discharge what is owed?
+Q3. Which event(s) or deadline(s) would put someone in breach?
+Q4. Where in the contract are we — which rule, branch or state is live?
+Q5. What happens after the next discharging event?
+
+Answer each question from this document alone. If it does not say, answer 'cannot tell from this' rather than guess.
