@@ -407,38 +407,40 @@ with _itself_ across two runs. Eight more files exit non-zero on both sides by d
 It is deliberately **not** a test: it is slow, and the clock-dependent files would need exactly the
 known-failure list §3.2 forbids. It is a tool you run by hand.
 
-#### 3.2.2 The one thing `prettyLayout` still cannot render
+#### 3.2.2 Mixfix names, and the head-keyword collision that used to break them
 
-Two mixfix operators that share a **head keyword, an arity and an argument type vector** print to
-the same text, because a call site is resolved to the canonical pattern (`_ tax on _ …`) and the
-printer can only re-emit the head keyword — no definition can be spelled any other way. The witness
-is `ok/mixfix-garden-path.l4`, whose own comment predicted it: `tax on _ item costing _ as GST in _`
-beside `… as VAT in _`. It fails **loudly** ("multiple definitions for the identifier"), and only
-via the unfiltered print — `l4 batch` strips `#EVAL`, which is where both call sites live.
+**Fixed 2026-09-21 (smucclaw/l4-ide#967); this section is kept because the failure mode is instructive and because one case remains.**
 
-**Footnote, 2026-09-19: "loudly" is right, but the diagnostic is not always that one, and the
-trigger is narrower than "is mixfix".** Where the colliding definitions are DISTINGUISHABLE —
-sharing a head keyword but not an arity or an argument type vector — resolution reports no
-ambiguity at all. The printed module parses, type-checks, and then fails to TERMINATE:
-`canon/sg/succession/sg-wills.l4` stack-overflows on 4 of its 62 assertions, and the
-round-trip property is green throughout because it asks about parsing, not running
-(smucclaw/l4-ide#967).
+Two mixfix operators that share a **head keyword** used to print to the same text, because a call site is resolved to the canonical pattern (`_ tax on _ …`) and the printer could only re-emit the head keyword.
+`l4 batch` and the REPL re-print a module and re-run it, so that was a correctness path, not a cosmetic one: `canon/sg/succession/sg-wills.l4` printed to a module that **stack-overflowed on 4 of its 62 assertions**, and `ok/mixfix-garden-path.l4` — whose own comment predicted the limitation — printed to one that would not resolve.
 
-The trigger is head-keyword COLLISION, not mixfix density, and that is measured rather than
-supposed: `sg-wills.l4` has 79 mixfix-shaped definition heads and 75 distinct ones — `the will`
-three times, two others twice — while the nine `canon/il/ofek-hadash-2008` modules have 160
-heads, 160 distinct, zero collisions, and a full evaluation differential over them is clean
-(263 `Result:` blocks identical, positive-controlled). So the cheap risk check on a file is
-one line:
+Both now round-trip.
+`L4.Print.restoreMixfixPatterns` stamps each mixfix application and definition with its canonical pattern from the typechecker's `MixfixRegistry`, keyed by `Unique`, and the printer re-emits the full surface form on both sides.
+Run it wherever you print a whole module; `l4 batch`, the REPL and the round-trip harness already do.
+
+**Three things a future reader should not have to rediscover.**
+
+_The pattern really is gone from the AST, not merely suppressed._
+Removing the `mixfixHeadKeyword` reduction from `LayoutPrinter RawName` produces byte-identical output — measured.
+The registry is the only thing that still has it, which is why a pass is needed at all.
+An earlier note here proposed threading `MixfixRegistry` through `LayoutPrinter`; stamping the `Anno` instead avoids touching ~100 instances.
+
+_Both sides must change together._
+Re-emitting the surface form at the CALL SITE alone was built and measured and breaks `fixity-nary-guard.l4`: definitions print from their restructured `AppForm`, so the printed module has no later keywords to match.
+
+_Only mixfixes DEFINED IN THE MODULE get the surface form._
+The infix spelling parses only where the parser can see the definition, because the mixfix hint registry is built from definitions; the `OF` fallback needs no hint.
+Including imported operators made `ok/closing-the-loop/fristberechnung.l4` print text that checked fine in place and failed to re-parse standing alone.
+The residue — two IMPORTED operators sharing a head keyword — is **smucclaw/l4-ide#968**, and it fails LOUDLY ("multiple definitions for the identifier"), unlike the in-module case it replaces.
+
+**The risk check on a file is one line**, and still worth running before trusting printed output from anything this section does not cover:
 
 ```
 grep -oE '^`[^`]+`' <file> | sort | uniq -d
 ```
 
-Re-emitting the surface form instead (`` `tax on` c `item costing` p ``) was built and measured and
-**does not work**: definitions print from their restructured AppForm (`DECIDE andop a b c IS …`), so
-the printed module has no later keywords to match, and `fixity-nary-guard.l4`'s `1 andop 2 hadop 3`
-stopped resolving. A real fix has to thread `L4.Mixfix.MixfixRegistry` into the printer.
+**No golden captures `prettyLayout` output**, which is how this survived for as long as it did — `sg-wills.l4` was green on every golden it has while printing to a module that could not run.
+The guard is therefore a CLI test (`l4 batch` over `tests-cli/fixtures/batch-mixfix-shared-head.l4`) plus the §3.2.1 differential, not a golden.
 
 ---
 

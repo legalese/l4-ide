@@ -1,0 +1,20 @@
+-- Two mixfix operators sharing the head keyword `the will`, distinguishable
+-- only by their LATER keywords. `l4 batch` re-prints this module through
+-- `prettyLayout` and re-runs it once per input row, so if the printer drops
+-- the interior keywords the two calls below collapse into the same text and
+-- the rule becomes `P AND NOT P` (smucclaw/l4-ide#967).
+GIVEN w IS A NUMBER
+      n IS A NUMBER
+GIVETH A BOOLEAN
+`the will` w `is duly executed without` n MEANS w GREATER THAN n
+
+GIVEN w IS A NUMBER
+      n IS A NUMBER
+GIVETH A BOOLEAN
+`the will` w `is revoked counting` n MEANS w LESS THAN n
+
+@export
+GIVEN w IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `gift stands` w IS
+  (`the will` w `is duly executed without` 3) AND NOT (`the will` w `is revoked counting` 3)

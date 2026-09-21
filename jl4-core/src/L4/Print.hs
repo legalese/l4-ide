@@ -342,27 +342,30 @@ mixfixSurface canonical args = do
 -- reason, and indeed does not type-check today: @`mag` n `stop` MEANS …@ is
 -- read as a one-argument @mag@ applied to two arguments.
 --
--- KNOWN BOUND. Two operators that share a head keyword, an arity and an
--- argument type vector print to the same text and the module then fails to
--- re-check with "There are multiple definitions for the identifier". The corpus
--- witness is @ok/mixfix-garden-path.l4@ — @tax on _ item costing _ as GST in _@
--- beside @tax on _ item costing _ as VAT in _@ — and it only stays green
--- because both call sites live in @#EVAL@ directives, which
--- 'L4.DirectiveFilter.filterIdeDirectives' strips before @l4 batch@ prints. It
--- is a LOUD failure, and it is not a regression: before the head-keyword repair
--- the same file printed @`_ tax on _ item costing _ as VAT in _`@, an
--- identifier defined nowhere.
+-- WHAT THIS IS STILL FOR, now that 'restoreMixfixPatterns' exists. Two
+-- operators that share a head keyword, an arity and an argument type vector
+-- used to print to the same text, and the module then failed to re-check with
+-- "There are multiple definitions for the identifier". That is fixed
+-- (smucclaw\/l4-ide#967): a pass stamps each call site and definition with its
+-- canonical pattern from the 'L4.Mixfix.MixfixRegistry' and the printer emits
+-- the full surface form on both sides. This function is the FALLBACK, taken
+-- for any name the pass did not stamp — an operator imported from another
+-- module, chiefly, where the surface form would not re-parse standing alone
+-- because the importing module has no hint for it.
 --
--- Re-emitting the SURFACE form instead (interleaving the arguments back into
--- the pattern, @`tax on` c `item costing` p `as GST in` k@) was built and
--- MEASURED, and it does not work: a DEFINITION prints from its restructured
--- AppForm, i.e. @DECIDE andop a b c IS …@, so the printed module registers a
--- plain n-ary function and no longer has the later keywords to match against.
--- @ok/fixity-nary-guard.l4@'s @1 andop 2 hadop 3@ went from evaluating to 1006
--- to failing resolution outright. Call sites and definitions have to agree, and
--- the head keyword is the only spelling both can produce. A real fix needs the
--- mixfix registry ('L4.Mixfix.MixfixRegistry', already threaded into
--- 'L4.Export.Document' by 'mixfixHeadingsFromRegistry') to reach the printer.
+-- Two findings from building the fix, kept because each cost a measured
+-- attempt. Re-emitting the surface form at the CALL SITE alone does not work:
+-- a DEFINITION prints from its restructured AppForm, @DECIDE andop a b c IS …@,
+-- so the printed module registers a plain n-ary function with no later
+-- keywords to match, and @ok\/fixity-nary-guard.l4@'s @1 andop 2 hadop 3@ went
+-- from evaluating to 1006 to failing resolution outright. Call sites and
+-- definitions have to agree. And the pattern is genuinely absent from the AST
+-- rather than merely suppressed here: deleting this reduction entirely leaves
+-- the printed corpus byte-identical.
+--
+-- The residue is two IMPORTED operators sharing a head keyword, which this
+-- fallback still collapses — smucclaw\/l4-ide#968. It fails LOUDLY, with the
+-- message above.
 mixfixHeadKeyword :: Text -> Maybe Text
 mixfixHeadKeyword t = case mixfixSlots t of
   Just ws | kws@(_ : _) <- takeWhile (/= "_") (dropWhile (== "_") ws)
