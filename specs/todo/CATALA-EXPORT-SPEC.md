@@ -82,8 +82,17 @@ replaces. (b) R11's elision can empty a structure outright, and catala
 itself, along with the fields of other structures that carry it, and naming or building one is a
 refusal (§8.11 addendum, R11.1). Both defects are pinned by exhibits
 (`jl4/examples/catala/{imports,all-string-record}.l4`) that the R9 harness runs through catala
-1.2.1: 11 goldens, `catala typecheck` green ×11, `catala proof` green ×11, `clerk test` 75/75. The
-nine pre-existing goldens are byte-identical across the change._
+1.2.1. The nine pre-existing goldens are byte-identical across the change._
+
+_Directive-reachability round, 2026-09-21 (same day, follow-up). A third defect the corpus found on
+the fixed binary: R1 rooted its reachability at the `@export`s alone, so a fixture value named only
+in a `#EVAL`/`#ASSERT`'s arguments was never collected and the directive was dropped — only
+literal-argument directives became test scopes, which costs a corpus every assertion that names its
+test data (§8.1.3, R1.3). Fixing it surfaced a fourth defect in the same function: a skip note's
+number counted emitted tests rather than directives, so the second and later skips were mislabelled
+and then deduplicated out of existence. Both are pinned by `jl4/examples/catala/fixtures.l4`, whose
+last two directives are skipped deliberately. Twelve goldens now: `catala typecheck` green ×12,
+`catala proof` green ×12, `clerk test` 83/83; the eleven earlier goldens are byte-identical._
 
 **One-line summary.** Just as an `@export`-annotated `DECIDE`/`MEANS` over a subject record is
 exactly an OpenFisca variable, it is exactly a Catala scope; L4's helper functions are exactly
@@ -111,6 +120,7 @@ way when P4 needs it.
 | R1     | **ANSWERED** | as proposed: scopes for `@export`, toplevels, §8.1      |
 | R1.1   | **ANSWERED** | 2026-09-08: refuse a scope call from a toplevel, §8.1.1 |
 | R1.2   | **ANSWERED** | 2026-09-21: the import closure is scanned, §8.1.2       |
+| R1.3   | **ANSWERED** | 2026-09-21: directives are reachability roots, §8.1.3   |
 | R2     | **ANSWERED** | as proposed: `decimal`; `money` never inferred, §8.2    |
 | R3     | **ANSWERED** | as proposed: `YMD` native, `Date` emitted, §8.3         |
 | R4     | **ANSWERED** | **REVERSED**: Mode B primary, hardened gate, §8.4       |
@@ -830,6 +840,51 @@ refusing that would make importing a module a liability. Pinned by
 a scope here rather than a toplevel. Today only the entry module's exports become scopes, which
 keeps §8.1.1's composition condition satisfiable without the author having to re-export a chain
 across a module boundary.
+
+#### 8.1.3 R1's reachability includes the directives — ANSWERED 2026-09-21
+
+R1 prunes: "unreachable code is not emitted at all". It named one root, the `@export` set, and the
+implementation rooted there and nowhere else. But R7 (§8.7) turns every `#EVAL`/`#ASSERT` into a
+`#[test]` scope, and a test scope is emitted code. A definition named only in a directive's
+**arguments** — a fixture value — was therefore never collected as a helper, and the directive was
+dropped with the emitter's own internal-error text:
+
+```
+directive 3 did not become a Catala `#[test]` scope:
+  `the ordinary household` is defined in this module but was not collected as
+  a helper; that is a lowering bug, please report it
+```
+
+accurate about the symptom, useless about the cause. **Only directives whose arguments were
+literals became test scopes.**
+
+That is the wrong half to keep. Naming test data is how a rule over a record with a dozen fields is
+tested at all — the alternative is writing the construction out again in every assertion, and a
+corpus that did so would trade its fixture table for its tests. The miles-card corpus lost every
+assertion that used one.
+
+**Ruling.** The reachable set is rooted at the `@export`s **and** at the definitions named by the
+directives R7 builds a scope from — `#EVAL`, `#EVAL TRACE` and `#ASSERT`. A `#CHECK`, a
+`#TRACE`/contract and a `#ASSERT REFUSED` are skipped with a note, so they are not roots; rooting
+there would emit toplevels nothing in the artifact references. Directives are read from the entry
+module only, as R7 reads them: an imported module's directives are not this module's tests. A
+fixture so collected is lowered as an ordinary R1 toplevel, whatever its arity — nothing new is
+invented for test data, it was simply never collected. Only the entry module's exports become
+scopes, so §8.1.1's refusal still applies inside a fixture: a fixture may take an exported
+decision's result as a parameter, and may not call the scope itself.
+
+The two closures are concatenated rather than rooted together, so that the export closure keeps the
+order it had; `reach` fixes the order helpers are emitted in, and every existing golden depends on
+it. Measured: all nine pre-existing goldens byte-identical.
+
+**A second defect in the same code, found while fixing this one.** The skip note above quotes a
+number, and that number counted the **emitted tests** rather than the directives — so every skip
+after the first was labelled with the previous one's number, and because identical notes are
+deduplicated before emission, the second such skip then **vanished** rather than appearing under
+the wrong number. Measured on a five-directive probe: two skips, one note, and it named neither.
+The wrong number is the visible half; a directive silently untested is the expensive one. The two
+counters are now separate, and `fixtures.l4`'s last two directives are skipped on purpose so the
+golden pins both halves.
 
 ### 8.2 R2 — `NUMBER` lowers to `decimal`; `integer` only where forced; `money` never inferred
 

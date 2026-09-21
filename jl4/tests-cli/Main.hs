@@ -5020,6 +5020,46 @@ spec bin = do
       length (filter ("declaration structure " `isPrefixOf`) (lines sout)) `shouldBe` 1
       length (filter ("declaration enumeration " `isPrefixOf`) (lines sout)) `shouldBe` 1
 
+    -- R1 prunes to what an `@export` reaches, and a directive reaches things
+    -- too: R7 makes each `#EVAL`/`#ASSERT` a `#[test]` scope, so a fixture
+    -- named only in a directive's arguments is emitted code. Before 2026-09-21
+    -- it was not collected and the directive was dropped, so only directives
+    -- with literal arguments became tests.
+    it "collects a fixture reached only from a directive and tests against it" $
+      expectGolden bin ["catala", "examples/catala/fixtures.l4"]
+                       "examples/catala/expected/fixtures.catala_en"
+
+    it "emits every directive as a test scope when its arguments name fixtures" $ do
+      Output code sout _ <- runL4 bin ["catala", "examples/catala/fixtures.l4"]
+      code `shouldBe` ExitSuccess
+      -- The three fixture-argument directives convert. The file's last two are
+      -- skipped on purpose, so this asserts the absence of the CAUSE rather
+      -- than of every skip note — which the numbering test below covers, and
+      -- which a blanket absence test would contradict.
+      sout `shouldSatisfy` (not . ("that is a lowering bug" `isInfixOf`))
+      sout `shouldSatisfy` (not . ("was not collected as a helper" `isInfixOf`))
+      for_ ["Test1", "Test2", "Test3"] $ \n ->
+        sout `shouldSatisfy` (("#[test] declaration scope " ++ n ++ ":") `isInfixOf`)
+      -- Nullary, unary, and a helper wrapping an exported call: all three are
+      -- ordinary R1 toplevels, not a new emission kind for test data.
+      sout `shouldSatisfy` ("declaration the_ordinary_household content Household" `isInfixOf`)
+      sout `shouldSatisfy` ("declaration a_household_of content Household" `isInfixOf`)
+      sout `shouldSatisfy` ("declaration in_tens content decimal" `isInfixOf`)
+
+    -- A skip note quotes the DIRECTIVE's position, not the number of the test
+    -- it would have been. Sharing one counter mislabelled every skip after the
+    -- first — and because identical notes are deduplicated, the second one then
+    -- vanished rather than appearing under the wrong number. The last two
+    -- directives of `fixtures.l4` are both skipped, so this catches either half.
+    it "numbers a skipped directive by its own position, and reports every one" $ do
+      Output code sout _ <- runL4 bin ["catala", "examples/catala/fixtures.l4"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("- directive 4 did not become a Catala" `isInfixOf`)
+      sout `shouldSatisfy` ("- directive 5 did not become a Catala" `isInfixOf`)
+      -- Three converted, so no note may claim a number a test scope also holds.
+      for_ ["1", "2", "3"] $ \n ->
+        sout `shouldSatisfy` (not . (("- directive " ++ n ++ " did not become") `isInfixOf`))
+
     -- R11 addendum, 2026-09-21: a structure every one of whose fields was
     -- elided cannot be emitted at all — catala 1.2.1 refuses a fieldless
     -- `declaration structure` AND the value `P { }`. The golden pins that the

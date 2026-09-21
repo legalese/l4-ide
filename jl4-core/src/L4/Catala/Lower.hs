@@ -347,9 +347,48 @@ buildModule opts imports mod' efs =
   -- structures that carry one, which is why this is a fixpoint.
   emptyL4 = emptyRecords rawRecords
 
-  -- R1: only what an @export decision reaches is emitted at all.
-  reach    = reachableFrom decides exportUs
+  -- R1: only what an @export decision reaches is emitted at all — and what a
+  -- DIRECTIVE reaches, which R1 did not say and the implementation did not do.
+  -- R7 turns each `#EVAL`/`#ASSERT` into a `#[test]` scope, so that scope is
+  -- emitted code like any other and the definitions its arguments name are
+  -- reachable through it. Rooting only at the exports meant a fixture value
+  -- used solely by a directive was never collected, and the directive was then
+  -- dropped with the "defined in this module but was not collected as a helper;
+  -- that is a lowering bug" message — which was accurate: only directives whose
+  -- arguments are literals became test scopes, and a corpus that keeps its test
+  -- data in named fixtures (the ordinary way to test a fifteen-field record)
+  -- lost every one of them.
+  --
+  -- The two closures are concatenated rather than rooted together so that the
+  -- export closure keeps the order it had; `reach` fixes the order helpers are
+  -- emitted in, and every existing golden depends on it.
+  reach    = exportReach <> [ u | u <- directiveReach, u `notElem` exportReach ]
+  exportReach    = reachableFrom decides exportUs
+  directiveReach = reachableFrom decides directiveRoots
   helpers  = mapMaybe (`Map.lookup` decides) [ u | u <- reach, u `notElem` exportUs ]
+
+  -- The module-local definitions a testable directive's expression names.
+  --
+  -- Only the three directive forms R7 actually builds a scope from are roots. A
+  -- `#CHECK`, a `#TRACE`/contract and a `#ASSERT REFUSED` are skipped with a
+  -- note (Catala models no deontic layer and has no notion of a refusal), so
+  -- treating those as roots would emit toplevel definitions that nothing in the
+  -- artifact references.
+  --
+  -- Directives are read from the entry module only, as 'collectTests' reads
+  -- them: an imported module's own directives are not this module's tests.
+  directiveRoots =
+    [ u
+    | Directive _ d <- topDecls mod'
+    , e <- case d of
+        LazyEval _ x      -> [x]
+        LazyEvalTrace _ x -> [x]
+        Assert _ x        -> [x]
+        _                 -> []
+    , r <- toList e
+    , let u = getUnique r
+    , Map.member u decides
+    ]
 
   -- R11: string-shaped parameters and ASSUMEs are elided, with a per-site note.
   elided = Map.fromList $
@@ -898,7 +937,8 @@ data TestUnit = TestUnit
 -- than failing the emission: a module's testability is not a precondition for
 -- its compilation.
 collectTests :: Ctx -> Map Unique DecideInfo -> Module Resolved -> ([TestUnit], [Text])
-collectTests modCtx decides mod' = go (1 :: Int) [ d | Directive _ d <- topDecls mod' ] [] []
+collectTests modCtx decides mod' =
+  go (1 :: Int) (1 :: Int) [ d | Directive _ d <- topDecls mod' ] [] []
  where
   -- Everything a directive lowers to is emitted inside a @#[test]@ scope, and
   -- that is a Catala scope like any other: calling an exported decision from it
@@ -906,16 +946,24 @@ collectTests modCtx decides mod' = go (1 :: Int) [ d | Directive _ d <- topDecls
   -- inputs, so 'cxAssumeOK' stays 'False' — see the note on 'cxInScope'.
   ctx = modCtx { cxInScope = True }
 
-  go _ [] us ns = (reverse us, reverse ns)
-  go i (d : ds) us ns = case plan i d of
-    Right made     -> go (i + 1) ds (reverse made <> us) ns
-    Left Nothing   -> go i ds us ns
-    Left (Just n)  -> go i ds us (n : ns)
+  -- TWO counters, and they answer different questions. @i@ names the emitted
+  -- scope (@Test3@) and so counts only the directives that became one; @dn@ is
+  -- the directive's own position in the source, and is what a skip note must
+  -- quote. Sharing one counter made a note say "directive 2" about the third
+  -- directive whenever an earlier one had been skipped — and because identical
+  -- notes are deduplicated before emission, the second such skip then vanished
+  -- entirely rather than being reported under the wrong number. Measured on a
+  -- four-directive probe: two skips, one note, and it named neither of them.
+  go _ _ [] us ns = (reverse us, reverse ns)
+  go dn i (d : ds) us ns = case plan dn i d of
+    Right made     -> go (dn + 1) (i + 1) ds (reverse made <> us) ns
+    Left Nothing   -> go (dn + 1) i ds us ns
+    Left (Just n)  -> go (dn + 1) i ds us (n : ns)
 
-  plan i d = case d of
-    LazyEval ann e      -> build i (rangeOf ann) e (resultType e)
-    LazyEvalTrace ann e -> build i (rangeOf ann) e (resultType e)
-    Assert ann e        -> build i (rangeOf ann) e (Just TBool)
+  plan dn i d = case d of
+    LazyEval ann e      -> build dn i (rangeOf ann) e (resultType e)
+    LazyEvalTrace ann e -> build dn i (rangeOf ann) e (resultType e)
+    Assert ann e        -> build dn i (rangeOf ann) e (Just TBool)
     -- A refusal assertion has no Catala counterpart: Catala has no notion of a
     -- declined answer, so there is nothing to test against. Skipped with a note
     -- rather than rejected, exactly as a #TRACE directive is.
@@ -931,11 +979,11 @@ collectTests modCtx decides mod' = go (1 :: Int) [ d | Directive _ d <- topDecls
     "a `#TRACE`/contract directive has no Catala counterpart (Catala models no deontic layer, \
     \§5.1), so no test scope was emitted for it"
 
-  build i rng e mty = case mty of
-    Nothing -> Left (Just (skipNote i "its result type could not be determined — a test scope \
-                                      \wraps a call to an @export decision (§8.7)"))
+  build dn i rng e mty = case mty of
+    Nothing -> Left (Just (skipNote dn "its result type could not be determined — a test scope \
+                                       \wraps a call to an @export decision (§8.7)"))
     Just ty -> case runV (lowerExpr ctx e) of
-      Left errs -> Left (Just (skipNote i (Text.intercalate "; " [ x.errMsg | x <- errs ])))
+      Left errs -> Left (Just (skipNote dn (Text.intercalate "; " [ x.errMsg | x <- errs ])))
       Right ce  -> Right (unit name desc ty ce : defaultTwin i rng ty ce e)
      where
       name = "Test" <> tshow i

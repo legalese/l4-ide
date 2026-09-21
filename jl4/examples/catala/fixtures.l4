@@ -1,0 +1,79 @@
+IMPORT prelude
+
+§ `Directives that test against named fixtures`
+
+-- REGRESSION EXHIBIT. R1 emits "every reachable non-exported helper" as a
+-- private toplevel, and until 2026-09-21 "reachable" meant reachable from an
+-- `@export`. A `#EVAL`/`#ASSERT` is emitted code too — R7 turns each one into a
+-- `#[test]` scope — so a definition named only in a directive's ARGUMENTS was
+-- never collected, and the directive was dropped with
+--
+--     directive 3 did not become a Catala `#[test]` scope:
+--       `the ordinary household` is defined in this module but was not
+--       collected as a helper; that is a lowering bug, please report it
+--
+-- which was accurate about the symptom and useless about the cause. Only
+-- directives whose arguments were literals became test scopes.
+--
+-- That is the wrong half to keep. Naming your test data is how a rule over a
+-- record with a dozen fields gets tested at all; the alternative is writing the
+-- whole construction out again in every assertion, and a corpus that did so
+-- would trade its fixture table for its tests. The three shapes below are the
+-- ones a fixture table is made of, and each is reached ONLY from a directive:
+--
+--   * `the ordinary household`   — a nullary constant;
+--   * `a household of`           — a unary builder, applied to a literal;
+--   * `the rounded rate for`     — a helper wrapped around an exported call.
+--
+-- What is emitted for them is what R1 emits for any other helper: a private
+-- toplevel `declaration … depends on … equals`. Nothing new is invented for
+-- test data; it was simply never collected.
+
+DECLARE Household
+    HAS `adults`   IS A NUMBER
+        `children` IS A NUMBER
+
+@export The per-head allowance a household is entitled to.
+GIVEN h IS A Household
+GIVETH A NUMBER
+`allowance for` h MEANS
+    IF h's `children` GREATER THAN 0
+    THEN 120 PLUS (40 TIMES h's `children`)
+    ELSE 120
+
+-- A nullary fixture. Nothing reachable from the `@export` above mentions it.
+GIVETH A Household
+`the ordinary household` MEANS Household WITH `adults` IS 2, `children` IS 2
+
+-- A unary builder, so one fixture covers a family of cases.
+GIVEN c IS A NUMBER
+GIVETH A Household
+`a household of` c MEANS Household WITH `adults` IS 2, `children` IS c
+
+-- A helper that wraps the exported decision. It is reached only from a
+-- directive, and it calls a scope — which is legal here because a `#[test]`
+-- scope IS a Catala scope, and illegal from the toplevel this helper compiles
+-- to, so it takes the allowance as a parameter rather than computing it.
+GIVEN a IS A NUMBER
+GIVETH A NUMBER
+`in tens` a MEANS a DIVIDED BY 10
+
+#ASSERT `allowance for` `the ordinary household` EQUALS 200
+
+#ASSERT `allowance for` (`a household of` 0) EQUALS 120
+
+#EVAL `in tens` (`allowance for` (`a household of` 3))
+
+-- The last two convert to nothing, and they are here for the note rather than
+-- for the arithmetic: a test scope wraps a call to an `@export` decision, and
+-- neither of these calls one.
+--
+-- Two skips, so the golden pins that BOTH are reported and that each quotes its
+-- own position. The number used to count emitted TESTS rather than directives,
+-- so the second skip was labelled with the first one's number — and identical
+-- notes are deduplicated before emission, so it then disappeared altogether
+-- instead of being reported wrongly. One directive silently untested is the
+-- expensive half; the misleading number is what made it hard to see.
+#EVAL 1 PLUS 1
+
+#EVAL 2 PLUS 2
