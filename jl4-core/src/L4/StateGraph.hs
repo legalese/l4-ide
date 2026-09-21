@@ -1207,11 +1207,50 @@ subjectText = \case
     <> maybe [] (\r -> [ "IN", prettyLayout r ]) mRoll
     <> maybe [] (\f -> [ "WHO", prettyLayout f ]) mFilter
 
--- | Pretty-print a pattern to text
+-- | Pretty-print an act pattern to text.
+--
+-- The arguments are PRINTED. Until 2026-09-21 a 'PatApp' with arguments drew
+-- as @f ...@ and a 'PatCons' as @h ...@, which is not an abbreviation of the
+-- act so much as a deletion of it: every obligation over the same verb then
+-- drew the SAME label. Three of the six states of
+-- @jl4\/examples\/legal\/promissory-note.l4@ were the one string
+-- @\`The Borrower\` must pay monthly installment to ...@, so the picture could
+-- not say which of the three the contract was in — and the same elision rode
+-- into the BPMN task names and into @l4 lts@.
+--
+-- A 'PatCons' is un-elided too, in the source\'s own keyword: @L4.Print@
+-- spells it @FOLLOWED BY@ (@L4.Print@, the 'PatCons' arms of its pattern and
+-- act printers), so the label is the form the drafter wrote. Keeping @ ...@
+-- there would have left exactly the defect above for list-shaped acts.
 prettyPattern :: Pattern Resolved -> Text
 prettyPattern = \case
-  PatVar _ n      -> resolvedToText n
-  PatApp _ n args -> resolvedToText n <> if null args then "" else " ..."
-  PatCons _ h _   -> prettyPattern h <> " ..."
-  PatExpr _ e     -> prettyLayout e
-  PatLit _ lit    -> prettyLayout lit
+  PatVar _ n       -> resolvedToText n
+  PatApp _ n args  -> Text.unwords (resolvedToText n : map patternArg args)
+  PatCons _ h t    -> patternArg h <> " FOLLOWED BY " <> patternArg t
+  PatExpr _ e      -> prettyLayout e
+  PatLit _ lit     -> prettyLayout lit
+
+-- | An act pattern in ARGUMENT position.
+--
+-- A 'PatVar' here is a BINDER — the name the act binds whatever was done to,
+-- not a name the reader can look up — so it is back-quoted, which is how L4
+-- spells a name and how the reader tells the two apart at a glance.
+--
+-- The spelling is chosen to match @binderText@, which is NOT in this tree: as
+-- of 2026-09-21 it lives only on the local, unpushed branch
+-- @lts\/whatif-bound-values@, in @jl4-core\/src\/L4\/Lts\/WhatIf.hs@, where it
+-- reads @\"\`\" <> unqualifiedNameToText (getOriginal r) <> \"\`\"@ — which is
+-- 'resolvedToText' back-quoted, the same string this produces. Matching it
+-- ahead of time is the point: if that branch lands, the picture and the what-if
+-- answer will name one binder one way, rather than asking a reader moving
+-- between them to believe that @\`amount\`@ and @amount@ are the same thing.
+--
+-- A nested application WITH arguments is bracketed, because @pay f x y@ cannot
+-- otherwise be told from @pay (f x) y@; a bare constructor, a literal and an
+-- expression print as 'prettyPattern' already prints them.
+patternArg :: Pattern Resolved -> Text
+patternArg = \case
+  PatVar _ n            -> "`" <> resolvedToText n <> "`"
+  p@(PatApp _ _ (_ : _)) -> "(" <> prettyPattern p <> ")"
+  p@(PatCons _ _ _)      -> "(" <> prettyPattern p <> ")"
+  p                      -> prettyPattern p

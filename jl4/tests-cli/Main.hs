@@ -1607,7 +1607,7 @@ spec bin = do
         , "  Every path to FULFILLED passes through: nothing in particular (there is more than one route)."
         , "  Every path to BREACH passes through:"
         , "    - the deadline passing on PARTY S delivery (MUST, WITHIN 3)"
-        , "    - the deadline passing on PARTY B payment ... (MUST, WITHIN 5)"
+        , "    - the deadline passing on PARTY B payment n (MUST, WITHIN 5)"
         , "a"
         , "  Every path to FULFILLED passes through: nothing in particular (there is more than one route)."
         , "  Every path to BREACH passes through: nothing in particular (there is more than one route)."
@@ -1621,7 +1621,7 @@ spec bin = do
       sout `shouldSatisfy` (unlines
         [ "  Every path to \"B must return\" passes through:"
         , "    - PARTY S delivery (MUST, WITHIN 3)"
-        , "    - PARTY B payment ... (MUST, WITHIN 3, PROVIDED price AT LEAST 20)"
+        , "    - PARTY B payment `price` (MUST, WITHIN 3, PROVIDED price AT LEAST 20)"
         , "    - the arm IF NOT (price EQUALS 20)"
         ] `isInfixOf`)
 
