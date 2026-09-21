@@ -38,7 +38,7 @@ digraph {
       ,style=filled
       ,shape=doublecircle
       ,fillcolor="#f8d7da"];
-    6 [label="B must payment OF fine"
+    6 [label="B must payment ..."
       ,fillcolor=white
       ,style=filled
       ,shape=ellipse
@@ -67,7 +67,7 @@ digraph {
     4 -> 5 [label=timeout
            ,color="#dc3545"
            ,style=dashed];
-    6 -> 3 [label="B MUST payment OF fine [3]"
+    6 -> 3 [label="B MUST payment ... [3]"
            ,color="#28a745"
            ,style=solid];
     6 -> 5 [label=timeout

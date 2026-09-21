@@ -3,8 +3,16 @@
   "breaching": [
     {
       "breach": {
+        "anchor": 0,
         "due": 14,
         "missed": "MUST return",
+        "names": [
+          {
+            "due": 14,
+            "missed": "MUST return",
+            "party": "B"
+          }
+        ],
         "party": "B",
         "reason": "revealed when the clock ran on with nothing happening",
         "seenAt": 15
@@ -26,7 +34,24 @@
   "clock": 10,
   "contract": "aContract",
   "deadlineNotKnown": [],
-  "discharging": [],
+  "discharging": [
+    {
+      "action": "return",
+      "at": 10,
+      "bound": {
+        "binds": ["return"],
+        "scope": "wholeAction",
+        "witness": [
+          {
+            "name": "return",
+            "value": "delivery"
+          }
+        ]
+      },
+      "kind": "act",
+      "party": "B"
+    }
+  ],
   "events": [
     "PARTY S DOES delivery AT 2",
     "PARTY B DOES payment OF 21 AT 4",
@@ -58,14 +83,5 @@
   "standing": {
     "status": "inProgress"
   },
-  "untried": [
-    {
-      "event": {
-        "action": "return",
-        "kind": "act",
-        "party": "B"
-      },
-      "why": "the action binds `return`, which the what-if cannot choose"
-    }
-  ]
+  "untried": []
 }
