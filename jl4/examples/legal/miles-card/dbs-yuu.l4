@@ -1028,7 +1028,7 @@ GIVETH A `Rate answer`
                  ELSE LIST "this month has met the Minimum Spend Requirement: S$800 of Eligible Spend and 4 Participating Merchants (cl.7(b))")
                 -- The additive reading, carried wherever it is load-bearing.
                 (IF   `the answer depends on the additive reading` card month txn
-                 THEN LIST "this rate adds cl.7(a)'s 9 points to cl.7(b)'s 26; the T&C says neither that they add nor that cl.7(b) replaces cl.7(a)"
+                 THEN LIST "this rate adds cl.7(a)'s bonus (9 points, or 9.5 at SimplyGo) to cl.7(b)'s 26; the T&C says neither that they add nor that cl.7(b) replaces cl.7(a)"
                  ELSE EMPTY)
                 -- cl.11 and cl.17: linkage governs crediting, never earning.
                 (IF   NOT (cardholder's `yuu account linked to the card`)
@@ -1278,6 +1278,21 @@ GIVETH A Transaction
 #ASSERT (`DBS yuu earns on` `DBS yuu American Express` `a linked cardholder` `a month above the threshold` `a 7-Eleven run on 13 August 2026`)'s `points per dollar` EQUALS 36
 -- The Visa is unaffected on both dates.
 #ASSERT (`DBS yuu earns on` `DBS yuu Visa` `a linked cardholder` `a month above the threshold` `a 7-Eleven run before 13 August 2026`)'s `points per dollar` EQUALS 36
+
+-- THE AMERICAN EXPRESS IS DENIED AT 7-ELEVEN AND AT Charge+, NOT EVERYWHERE.
+-- An Amex purchase at another yuu merchant, dated before 13 Aug 2026 so that
+-- the 7-Eleven date limb is live, still earns the full 36. This is the
+-- witness that the merchant conjuncts of `Appendix 1 denies Bonus Rewards` do
+-- work: drop `the transaction is at txn 7-Eleven` from that rule's first arm,
+-- or `the transaction is at txn Charge+` from its second, and this assertion
+-- falls to 1. `l4 verify` reports both of those conjuncts as vacuous guards;
+-- they are not, and this line is the executable form of that argument. See
+-- the note under the defeasibility sites for why the report is an artefact of
+-- the checker's conjunctive normal form.
+GIVETH A Transaction
+`a groceries run at Cold Storage before 13 August 2026` MEANS
+    `a purchase at` "Cold Storage Great World" `Cold Storage` 5411 "COLD STORAGE GREAT WORLD" EMPTY (YMD 2026 8 12)
+#ASSERT (`DBS yuu earns on` `DBS yuu American Express` `a linked cardholder` `a month above the threshold` `a groceries run at Cold Storage before 13 August 2026`)'s `points per dollar` EQUALS 36
 
 -- Appendix 1, Charge+: bonus denied on the American Express with no end date.
 GIVETH A Transaction
@@ -1633,6 +1648,58 @@ GIVETH A Transaction
 --   the property spec section 2 wants from Catala's default calculus -- rather
 --   than resolving it by fiat inside a BRANCH and reporting the fact in prose.
 -- ===========================================================================
+
+--
+-- A NOTE ON `l4 verify`, WHICH REPORTS THREE VACUOUS GUARDS ON
+-- `Appendix 1 denies Bonus Rewards`. They are an artefact of the checker's
+-- normal form, not a defect in the rule, and nothing was changed for them.
+-- Written down here because the next reader will meet the same three findings
+-- and should not spend the afternoon on them that this one did.
+--
+--   WHAT IT SAYS. Three `vacuous-guard` findings at `body.and[1]`, `and[2]`
+--   and `and[5]`: "this condition is already entailed by the ones it is
+--   conjoined with, so it excludes nothing."
+--
+--   WHAT IS ACTUALLY REDUNDANT. The rule is a four-arm disjunction:
+--     (at 7-Eleven AND is Amex AND before 13 Aug) OR (at Charge+ AND is Amex)
+--     OR at Cold Storage On The Go OR denies Base.
+--   The checker distributes that into a CONJUNCTIVE normal form -- its own
+--   footer says so, "reaching it MANUFACTURES clauses the draftsman never
+--   wrote" -- which gives six clauses. Because `is Amex` appears in BOTH
+--   conjunctive arms, one manufactured clause is (isAmex OR atCSOTG OR
+--   deniesBase), and that clause is a SUBSET of three others, so it subsumes
+--   them. The three subsumed clauses are exactly the three reported. The
+--   finding is true OF THE CNF; the site label `body.and[i]` names a clause
+--   of the checker's normal form, not a guard anyone wrote.
+--
+--   WHY IT IS NOT A REAL REDUNDANCY. Drop any reported conjunct and the rule
+--   changes meaning. Drop `at 7-Eleven` from the first arm and every American
+--   Express transaction before 13 Aug 2026 loses its bonus at every merchant;
+--   drop `at Charge+` from the second and it loses it on every date. There is
+--   an executable witness for both: the assertion on a Cold Storage purchase
+--   on the Amex dated 12 Aug 2026, which earns 36 and would earn 1.
+--
+--   MEASURED, NOT ARGUED. A three-shape probe outside the corpus settles it.
+--   Two conjunctive arms sharing a conjunct, plus two bare arms, reproduces
+--   the yuu rule's counts exactly -- 6 atoms from 24 occurrences, 31 ladder
+--   nodes, 3 findings. The SAME shape with no shared conjunct: 0 findings.
+--   The shape WITH the shared conjunct but WITHOUT the `denies Base` arm:
+--   still 3 findings. So the cause is the shared `is Amex` conjunct, and the
+--   closing-sentence arm is not implicated at all.
+--
+--   NOT COALESCING. The checker had not merged the three merchants into one
+--   atom: the findings list `at 7-Eleven`, `at Charge+` and `at Cold Storage
+--   On The Go` as three separate atoms.
+--
+--   THE ONE REAL REDUNDANCY IS ELSEWHERE, AND IS KEPT ON PURPOSE. The
+--   `OR denies Base` arm cannot fire through `the Bonus Rewards points per
+--   dollar`, because that rule tests the base for zero FIRST and a denied
+--   base is zero. It is belt and braces at that call site. It stays because
+--   `Appendix 1 denies Bonus Rewards` also has to be right read on its own:
+--   the foodpanda and SimplyGo rows are headed "Base and Bonus", so they deny
+--   the bonus in their own right and not only through the closing sentence.
+--   Removing the arm would make the predicate quietly wrong for any future
+--   caller that asks it directly.
 
 
 -- ===========================================================================

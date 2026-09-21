@@ -344,6 +344,43 @@ GIVETH A BOOLEAN
 -- It cannot be encoded at all: there is no fact about a transaction that
 -- decides it. It does not bite here, and every answer that grants the online
 -- bonus says that DBS may still withdraw it.
+--
+-- `l4 verify` FLAGS THIS RULE, AND IS RIGHT TO. It is the module's only
+-- propositional finding:
+--
+--   `clause 11 viii, DBS has otherwise determined the transaction to be
+--   excluded`  (0 atoms, 1 ladder nodes) -- 1 finding(s)
+--       [unsat] at body
+--         the decision is TRUE for no assignment of its atoms: as drafting,
+--         a requirement nobody can meet.
+--         atoms: (none)
+--
+-- THE FALSE IS DELIBERATE, and the finding is not a defect in the encoding.
+-- What the verifier has found is a property of the CLAUSE. cl.11(viii) is
+-- satisfied by DBS's say-so and by nothing else, so there is no fact about a
+-- transaction that can meet it -- which is exactly what "TRUE for no
+-- assignment of its atoms, zero atoms" says. The encoding is faithful, and
+-- the unsatisfiability is the text's.
+--
+-- WHY A NAMED RULE AT ALL, rather than just leaving the limb out. The eight
+-- limbs of cl.11 are the document's own list, and a reader auditing this file
+-- against the clause should find all eight. A limb that is present and inert
+-- says "we read this and it decides nothing"; a limb that is absent says
+-- nothing at all, and cannot be told from an oversight.
+--
+-- WHERE THE DISCRETION ACTUALLY TRAVELS. Not here -- it rides on every answer
+-- that grants the online bonus, as the condition string "DBS may exclude any
+-- other transaction from online spend from time to time (cl.11(viii))", and
+-- it is defeasibility SITE 3 in the block at the end of this file, together
+-- with cl.3, cl.5 and cl.7. A defeasibility construct would let the answer
+-- carry "defeasible by cl.11(viii)" in its TYPE instead, and that rule would
+-- then have atoms and would not be unsat.
+--
+-- A NOTE FOR THE NEXT VERIFY RUN. This is the only rule of this shape left.
+-- The first pass had three -- cl.11(iii) and cl.11(iv) were `MEANS FALSE` too,
+-- because the facts then recorded could not decide them. Both now read the
+-- posting's `charge kind` and have atoms. If a future run reports more than
+-- one unsat here, something regressed; one is the expected count.
 GIVEN txn IS A Transaction
 GIVETH A BOOLEAN
 `clause 11 viii, DBS has otherwise determined the transaction to be excluded` txn MEANS FALSE
@@ -553,7 +590,7 @@ GIVETH A Provenance
 GIVEN txn IS A Transaction
       `the online bonus is in play` IS A BOOLEAN
 GIVETH A LIST OF Provenance
-`the sources for` txn `the online bonus is in play` MEANS
+`the Woman's World sources for` txn `the online bonus is in play` MEANS
     append (LIST `clause 11 as provenance`, `clause 13 as provenance`, `clause 15 as provenance`, `clause 17 as provenance`)
       (append (IF `the transaction is overseas spend` txn THEN LIST `clause 12 as provenance`, `clause 18 as provenance` ELSE EMPTY)
               (IF `the online bonus is in play` THEN LIST `clause 19 a as provenance`, `clause 19 b as provenance`, `clause 19 c as provenance`, `clause 14 as provenance` ELSE EMPTY))
@@ -609,7 +646,7 @@ GIVETH A `Rate answer`
                             (append (IF `the transaction is overseas spend` txn THEN LIST "Overseas spend is decided by the currency the transaction posted in, not by where you were (cl.12).", "cl.12 excludes whatever the DBS Rewards Programme Terms and Conditions exclude, and those are not held here." ELSE EMPTY)
                                     (append (IF `the indicator is unknown` THEN LIST "The merchant's online indicator is not known, so both outcomes are shown and the headline figure is the lower one." ELSE EMPTY)
                                             (IF `clause 11 excludes the transaction from online spend` txn THEN LIST "Clause 11 excludes this transaction from online spend, so it earns the base rate even if the merchant flags it online." ELSE EMPTY)))))
-        `sources`                                             IS (`the sources for` txn `the online bonus is in play`)
+        `sources`                                             IS (`the Woman's World sources for` txn `the online bonus is in play`)
         `status`                                              IS Verified
     WHERE
         `the headline points per S$5` MEANS `the DBS Points awarded per S$5 on` txn `the online bonus applies`
@@ -1122,6 +1159,10 @@ GIVETH A Transaction
 --     to be excluded` returns FALSE, plus condition strings on the answer.
 --     The discretion is visible in the rule list but has no effect, which is
 --     the most honest thing a total function can do with it.
+--     `l4 verify` reports that rule `[unsat]` -- "a requirement nobody can
+--     meet" -- and it is the module's only finding. That is the clause's
+--     property, not the encoding's, and the reasoning is written out in full
+--     at the rule itself.
 --   A NATIVE CONSTRUCT WOULD HAVE BOUGHT: a defeater that is DECLARED and
 --     UNDISCHARGED -- an answer stamped "defeasible by cl.11(viii), cl.3,
 --     cl.5, cl.7" as a first-class part of its type, rather than as prose in

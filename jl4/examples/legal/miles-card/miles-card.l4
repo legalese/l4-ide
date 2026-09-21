@@ -91,3 +91,10 @@ GIVETH A Transaction
 #EVAL (`the rate on` `UOB Lady's Solitaire` `the household` `mid-month, yuu unlocked` `groceries at Cold Storage by phone tap`)'s `miles per dollar`
 #EVAL (`the rate on` `DBS Woman's World` `the household` `mid-month, yuu unlocked` `groceries at Cold Storage by phone tap`)'s `depends on the merchant indicator`
 #EVAL (`the rate on` `HSBC Revolution` `the household` `mid-month, yuu unlocked` `groceries at Cold Storage by phone tap`)'s `miles per dollar`
+
+-- The same four answers as assertions, so the Catala projection of this module carries test scopes:
+-- a bare #EVAL lowers to nothing a `clerk test` can run, and an emitted module with no tests proves nothing.
+#ASSERT (`the rate on` `DBS yuu Visa` `the household` `mid-month, yuu unlocked` `groceries at Cold Storage by phone tap`)'s `miles per dollar` EQUALS 10.08
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `the household` `mid-month, yuu unlocked` `groceries at Cold Storage by phone tap`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `DBS Woman's World` `the household` `mid-month, yuu unlocked` `groceries at Cold Storage by phone tap`)'s `depends on the merchant indicator`
+#ASSERT (`the rate on` `HSBC Revolution` `the household` `mid-month, yuu unlocked` `groceries at Cold Storage by phone tap`)'s `miles per dollar` EQUALS 0.4

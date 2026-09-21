@@ -306,8 +306,10 @@ DECLARE Attribution IS ONE OF
     `Unconfirmed attribution`
 
 -- A monthly bonus cap as the T&C states it, converted to the dollars of
--- bonus-earning spend it admits. `capped` FALSE means the T&C states no cap
--- and the dollar figure is meaningless. `pool` names WHICH pot the
+-- bonus-earning spend it admits. `capped` FALSE means this transaction does
+-- not run against any pool, whether because the T&C states no cap or because
+-- the cap does not reach this transaction (PAssion and HSBC answer FALSE on
+-- documents that do state a cap), and the dollar figure is meaningless. `pool` names WHICH pot the
 -- transaction runs against, because one card may keep several (UOB cl.6(b):
 -- each Preferred Rewards Category capped separately; HSBC cl.7.2: one pool
 -- for contactless and online together) and the cheat sheet's claim that two

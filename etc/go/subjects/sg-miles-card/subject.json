@@ -74,7 +74,7 @@
   },
   "checks": {
     "min_dated_arms": 0,
-    "min_assertions": 731
+    "min_assertions": 848
   },
   "legs": {
     "p7-catala": {},

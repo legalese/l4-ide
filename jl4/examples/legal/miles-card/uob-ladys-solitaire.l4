@@ -72,10 +72,12 @@ IMPORT `miles-card-domain`
 -- ISOMORPHISM, AND WHERE IT STOPS. Clauses 32, 34 and 35 are three separate
 -- withholding lists and are encoded as three separate rules, in the document's
 -- order, so a reviewer can read each against its clause. ALL THREE NOW FIRE.
--- cl.34's MCC table is still a generated ditto block (scratchpad
--- `gen_tables.py`), because ditto (^) resolves by exact start column and that
--- is not a thing to hand-align; cl.35 is no longer a table at all, for the
--- reason in the next paragraph.
+-- cl.34's MCC table is still a generated ditto block, because ditto (^)
+-- resolves by exact start column and that is not a thing to hand-align. The
+-- script that emitted it was not preserved (it lived in a scratchpad and was
+-- overwritten), so the block below is now the source of record; to regenerate
+-- it, follow the pattern of `source/gen-hsbc-mcc.py`, which is the same shape.
+-- cl.35 is no longer a table at all, for the reason in the next paragraph.
 --
 -- A RULE HERE NEVER COMPARES A STRING, and that is what the second pass over
 -- this module changed. The first draft read `merchant name` and

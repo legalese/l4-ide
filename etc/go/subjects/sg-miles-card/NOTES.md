@@ -124,6 +124,8 @@ as priority-ordered `BRANCH` guards. Every site where a native construct would h
 several rules into one is listed in `jl4/examples/legal/miles-card/DEFEASIBILITY-SITES.md`,
 written as the modules were, not reconstructed afterwards.
 
+**Same-named private helpers in two imported modules collide in the composer's emission, and `l4 catala` exits 0 on it.** The exporter flattens every imported module into one Catala module without namespacing, so `dbs-yuu.l4`'s `` `the sources for` card month txn `` and `dbs-womans-world.l4`'s `` `the sources for` txn flag `` became two `declaration the_sources_for` lines in `miles-card.l4`'s emission, and `catala typecheck` refused it with "Conflicting type definitions for `the_sources_for`". Each issuer module lowers clean on its own, so the module-level gates in §6 cannot see this; only the leg's run over the composer can. Fixed by renaming the Woman's World helper. A helper that is private to its module in L4 is global in the emission, so name helpers with the issuer in them.
+
 ---
 
 ## 4. Two axes for "contactless", and a value called Unknown
@@ -171,8 +173,14 @@ Cheers (MCC 5411 is not on HSBC's list), the PAssion MYR row (cl.7(d) excludes f
 and every "online" Woman's World row (the indicator is Unknown, so the headline is the lower
 branch — category (d), an honest gap, to be triaged).
 
-**Formal result: NOT YET RUN.** This paragraph is replaced by the receipt hash and the failing rows
-when `p6-tests` has run over `cheatsheet-2026-06`.
+**Formal result (2026-09-21):** run `2026-09-21-2e987f68-001`, `p6-tests` **DEGRADED**, receipt
+`sha256:8894658530171acc57ac6e2f2e461f865db8afd1fccbd0af39b2340139639557`, artifact
+`p6-assertions.txt` `sha256:82888c4dbd944cf095da1d74f37c1f8aba11d43ddeff1d6927e54a5745d12c69`: 184
+assertions, 129 satisfied, **55 failed**, over the string-free second-pass modules. HG1 was waived
+for that run with the reason on its journal (the module under test is the cheat sheet, not an
+encoding for a domain expert to certify). The primary encoding's run is `2026-09-21-41fa285f-001`,
+`p6-tests` PASS (731 assertions, 0 failed), HG1 requested from Meng and not waived. Its `p7-catala` leg first reported DEGRADED for a leg defect (the emitter refused a hyphenated output basename; fixed at `go/p7-catala` `b96356ec1`, which strips the basename to `[A-Za-z0-9_]` and logs the mapping), then, re-run on the same run id after the fix and the `the sources for` rename in §3, **PASS**: 8 exporting modules, all typecheck, overlap proof clean, `clerk test` 1218 of 1218. The triage of
+the 55, one line per failure, is `miles-card-disputed.l4`. The triage report itself, with the evaluation method (every failing expression re-evaluated on the branch binary, 430 evaluations) and the per-cluster reasoning, is `jl4/examples/legal/miles-card/ACCEPTANCE-TRIAGE.md`. Its classification of the 55: (a) the cheat sheet is wrong on the text, 9; (b) the encoding is wrong, **0**; (c) genuinely conditional on the merchant indicator, 18; (d) unheld document, expired document, or rounding, 28. The Woman's World wallet-tap row is (c), predicted by fork-register entry `F-womans-online-definition`; the Citi wallet rows are (a), because all four reach cl.6(i) by MCC, where no wallet language exists. Two cosmetic module defects found in passing (a condition sentence in `dbs-yuu.l4` that said 9 where SimplyGo's cl.7(a) figure is 9.5, and a comment on `Cap`'s `capped` in the domain module that described a narrower meaning than the modules use) were fixed the same day.
 
 The committed corpus stays green: rows the test proved unsupported are restated in
 `miles-card-disputed.l4` as `#ASSERT NOT (...)` with `Disputed by source` status and both
@@ -190,14 +198,16 @@ re-running the emitted module against values L4 computed).
 
 | module                                       | assertions | Catala refusals | `clerk` tests agreeing |
 | -------------------------------------------- | ---------- | --------------- | ---------------------- |
-| `dbs-yuu.l4`                                 | 55         | 0               | 112                    |
+| `dbs-yuu.l4`                                 | 56         | 0               | 114                    |
 | `dbs-womans-world.l4`                        | 88         | 0               | 178                    |
 | `citi-rewards.l4`                            | 127        | 0               | 230                    |
 | `hsbc-revolution.l4`                         | 123        | 0               | 250                    |
 | `uob-ladys-solitaire.l4`                     | 125        | 0               | 242                    |
-| `posb-passion.l4`                            | 67         | 0               | 128                    |
+| `posb-passion.l4`                            | 71         | 0               | 136                    |
 | `flat-cards.l4`                              | 29         | 0               | 60                     |
+| `miles-card.l4` (the composer)               | 4          | 0               | 8                      |
 | `miles-card-cases.l4` (through the composer) | 102        | —               | —                      |
+| `miles-card-disputed.l4` (the 55 restated)   | 112        | —               | —                      |
 
 Two limits of that evidence, stated so the numbers are not over-read.
 A directive that reads an elided `STRING` field (`conditions`, `pool`) passes under `l4 run` and
@@ -213,6 +223,16 @@ names HSBC's own Tax Payment Facility (cl.4 bullet 10's carve-back, now unreacha
 payment through it answers zero); UOB cl.35's `NORWDS*` prefix and Citi's `SPL AUTO*`/`TL-ABT`
 descriptions likewise have no family. Each is pinned by an assertion that will fail when the
 constructor arrives.
+
+### 6.1 What `p8-verify` found on the primary run, and what each finding turned out to be
+
+Run `2026-09-21-41fa285f-001` reported `p8-verify` DEGRADED with four findings.
+None changed a rule; two produced a witness, and the table below is the disposition so the next run's identical report is not re-triaged.
+
+| finding                                                         | module                | disposition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| three "vacuous guard" rows in `Appendix 1 denies Bonus Rewards` | `dbs-yuu.l4`          | **checker artefact.** The checker distributes the four-arm disjunction into conjunctive normal form, and because `the card is the American Express` sits in two arms, one manufactured clause subsumes three siblings. A three-shape probe outside the corpus reproduces the counts to the digit (3 findings, 6 atoms, 31 ladder nodes) and shows the finding survives removing the closing-sentence arm, so neither atom coalescing nor that arm is the cause. Witness added: a Cold Storage purchase on the American Express dated 12 August 2026 earns 36 and falls to 1 if either reported merchant conjunct is dropped. The checker already suppresses one artefact of distribution (the exclusive-or clause) but not this one; suppressing clauses subsumed by a sibling of the same normal form would remove the class corpus-wide. |
+| `clause 11 viii` unsatisfiable                                  | `dbs-womans-world.l4` | **the clause's property, kept as `FALSE` on purpose.** 11(viii) is satisfied by DBS's say-so and by no fact about a transaction, so no fixture can make it true. An inert named limb is auditable where an absent one is not; the rule carries the reasoning, the finding quoted, and the expected count of one (11(iii) and 11(iv) read the posting's charge kind and have atoms). Back-referenced from defeasibility site 3.                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## 7. Ownership
 
