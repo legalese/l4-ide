@@ -674,8 +674,7 @@ step log, the marking, the enabled set **and the rank/lane assignment** (§4.7) 
   `WAIT UNTIL`, the machine's own no-party event, stamped by `tickPast` (`:277`: one unit past, or
   half-way to the next live deadline when nearer, because the machine expires on `stamp >
 deadline` and a tick AT the deadline reveals nothing); and a listed refusal, when the shape
-  cannot be instantiated — an action pattern that BINDS (`payment price`: "the action binds
-  `price`, which the what-if cannot choose"), a `WITHIN` that was never evaluated and is not a
+  cannot be instantiated — a `WITHIN` that was never evaluated and is not a
   literal (`deadlineOf`, `:264`). Refusals are listed, not dropped: an enabled set that omitted
   them would say "nothing else can happen". **Amended 2026-09-19 (every-each round 2, O2; the
   proxy's one actionable finding, §7.7):** an action that NAMES a local the residual holds
@@ -696,11 +695,46 @@ deadline` and a tick AT the deadline reveals nothing); and a listed refusal, whe
   so the refused receipt is still named `Receipt OF (Landlord OF "Ms Ng"), (Tenant OF "Alice"),
   amount` — the member known, the sum open — where a `PatVar` pattern, which has no expression
   form, is still named as the pattern. Pinned in `LtsWhatIfSpec` cases 10 and 10'. Each
-  candidate's `LiveNorm` is rendered by
-  `renderLive` (`Marking.hs:354`) from the very `RawObligation` its act is built from — the
-  first cut paired `liveObligations` with the marking's `InEffect` list by `zip`, on the
-  unguarded assumption that two walks agree in order; review 2026-09-15 replaced that with one
-  walk.
+  candidate's `LiveNorm` is rendered by `renderLive` (`Marking.hs:354`) from the very
+  `RawObligation` its act is built from — the first cut paired `liveObligations` with the
+  marking's `InEffect` list by `zip`, on the unguarded assumption that two walks agree in order;
+  review 2026-09-15 replaced that with one walk.
+- **A pattern that BINDS is a SET of acts, and the what-if answers for the set — AMENDED
+  2026-09-21** (`BoundAct`, `boundActOf`, `confirmBound`; `LtsWhatIfSpec` cases 4/13, 11, 11',
+  12, 12'). Until this date an action pattern that bound a variable was refused outright, with
+  the same sentence as the unforced-local case above — "the action binds `price`, which the
+  what-if cannot choose". §7.7 point 2 measured what that cost: **all eight** of the list's Q2
+  misses were on the three contracts whose `A.txt` printed it, and on the one contract where the
+  act could be tried the list was 4/4. It is now repaired, and the repair keeps two claims
+  apart, which is the whole of its honesty:
+  - **asserted, from the rule's own text** — that the binder matches whatever the event carries.
+    That is the language's PATTERN semantics (`PatVar` binds, it does not test), not a second
+    reading of the deontic machine, so it is not the re-derivation this section forbids. A
+    `PROVIDED` guard that names the binder does test it, and then the assertion narrows to "any
+    value for which this holds", the guard printed as the rule wrote it with whatever the
+    residual has already computed read back into it (`reifyExpr`), so the promissory note's
+    threshold prints as the number rather than as the name of the expression that computes it.
+  - **checked, by the replay, exactly as any other candidate is** — that ONE act drawn from the
+    set is taken, and what the machine then does with the whole contract. The value is never
+    invented: it is the guard's own other operand where there is one (`price >= 20` → 20), else
+    the simplest value of the type the rule declares for that place (`0` for a `NUMBER`, `""`
+    for a `STRING`, the first field-less constructor of a declared type), else — for a binder
+    that IS the whole action, which has no declared type to read — an act the `#TRACE` itself
+    writes (`authoredAct`; a `#TRACE` is type-checked against its contract, so such an act is an
+    act of the contract's own action type).
+    A witness the contract PASSES OVER proves nothing about the rest of the set, so `confirmBound`
+    turns that outcome into an `Untried` naming the witness — the same shape of guard as
+    `confirmTick` and `confirmAct`, and for the same reason. So does a set no witness could be
+    built for. Both keep their own wording; the unforced-local refusal above keeps `cannotChoose`
+    unchanged, because there the what-if cannot say even what the set is, and the list's consumers
+    key on that sentence.
+    **Measured** (the binder's type): a pattern binder reaches NEITHER the module-level
+    `EntityInfo` the rig carries (`doCheckProgram` returns the top-level environment, not the
+    reader-local scope `inferPatternVar`'s `makeKnown` opens) NOR its own annotation
+    (`inferPatternVar` builds the `PatVar` with a bare `mkAnno`; only `PatApp` and `PatCons` are
+    stamped by `setAnnResolvedType`). Both were tried and both came back empty, which is why
+    `binderTypes` reads the ENCLOSING CONSTRUCTOR's declared field types instead — and why a
+    whole-action binder has no type to read at all.
 - **The tick is held to the machine's word** (`tryCandidate`, `:335`; `confirmTick`, `:423`).
   A tick's stamp is derived here from the machine's timing rule (`deadlineOf`: anchor plus
   `WITHIN`; `tickPast`: expiry on `stamp > deadline`), which §2.4 forbids trusting unconfirmed.
@@ -753,13 +787,23 @@ deadline` and a tick AT the deadline reveals nothing); and a listed refusal, whe
   `EnabledSet` (`enabledSet`, `:470`), i.e. endpoints 19 and 20 are a classification of 22's
   result and not a projection of their own.
 
-**Measured** (`jl4-core/test/LtsWhatIfSpec.hs`, 13 examples): a `MUST` at the start — the act
+**Measured** (`jl4-core/test/LtsWhatIfSpec.hs`, 21 examples): a `MUST` at the start — the act
 advances into the `HENCE`, the tick past 10 breaches; one event in — the clock is the last stamp,
 Bob's act discharges, the tick past 3 + 5 breaches. A `SHANT` with no `LEST` — the act
 **breaches** and the tick **discharges**, which is the polarity the machine routes and this module
 never states. A `MAY` with a `HENCE` — the act advances, the tick discharges (`LEST` defaulting to
-`FULFILLED`). `contracts.l4`'s `aContract` one event in — `payment price` is listed `Untried`
-naming the binder; the tick past 2 + 3 advances to the `LEST`'s `EXACTLY payment OF fine`. A
+`FULFILLED`). `contracts.l4`'s `aContract` one event in — `payment price PROVIDED price >= 20`
+is tried with the guard's own threshold, 20, and **discharges** (the `HENCE` is
+`IF price = 20 THEN FULFILLED`); the tick past 2 + 3 advances to the `LEST`'s
+`EXACTLY payment OF fine`. _(Until 2026-09-21 that first row was `Untried` naming the binder;
+case 4 is now case 4/13 and pins the guard's printed form, the witness and the act replayed.)_
+The same file at its own first `#TRACE` — `PARTY B MUST return`, a binder that IS the whole
+action — B does **anything** and the contract is fulfilled, checked on `delivery`, the first act
+the `#TRACE` writes (case 11); the same shape with nothing authored to draw from stays refused,
+in its own words and not the unforced-local one (case 11'); an argument binder with no guard is
+tried with `0`, the simplest value of its declared type (case 12); and a guard the witness does
+not satisfy (`amount GREATER THAN 20`, witness 20) is reported `Untried` naming the witness,
+never as the contract's answer for every amount (case 12'). A
 fork's `HENCE` naming the member's open `amount` (`run-fork.l4`) and a rule `GIVEN` at its
 outset — refused before the replay, `ocSteps` empty, no verdict text containing "not in scope";
 the same `GIVEN` once a comparison has forced it — read through a projection and discharging
@@ -767,8 +811,9 @@ the same `GIVEN` once a comparison has forced it — read through a projection a
 barrier of three with nobody acted — each member's act is **`Advancing`** with the `Awaiting` at
 1 of 3, the tick breaches; with two acted — the last member's act is **`Discharging`** (the
 `HENCE` is `FULFILLED`), the tick breaches. A fork — each member's act advances its **own**
-continuation and leaves the others at `WITHIN 7`. Corpus goldens: `cabal test jl4-test`, see the
-commit message — no `.l4` file and no printer changed, so none moves.
+continuation and leaves the others at `WITHIN 7`. Corpus goldens: `cabal test jl4-test` — no
+`.l4` file and no printer changed, so no corpus golden moves; the two `l4 lts` goldens that the
+bound-variable repair does move (`contracts`, `tenancy`) are named in the commit message.
 
 **Not built.** No CLI verb, no service endpoint, no `doc/` page: nothing a user can invoke
 changed, and P2a′ (the list) is the deliverable that will need the page _(P2a′ landed the same
@@ -2830,8 +2875,11 @@ in a column of sixteen is inside what a rerun could reverse.
    they all sit on the three contracts whose `A.txt` prints _"the action binds `return` /
    `amount` / `Amount Transferred`, which the what-if cannot choose"_, and on
    `every-run-example` — the one contract where the act could be tried — the list is 4/4. That
-   is a gap in this list, not a fact about lists. **The repair is in this same PR**, in the
-   commits that follow this ruling, and it is cheaper than P2d + P2e by an order of magnitude.
+   is a gap in this list, not a fact about lists. **The repair landed in this same PR**
+   (2026-09-21, §2.4's bound-variable block), and it is cheaper than P2d + P2e by an order of
+   magnitude. It is a repair to the list, not to the run: the 48 readings were taken against the
+   old output and no number in §7.7 has moved, so **nothing here is yet evidence that the Q2
+   column changes**. What would settle that is the rerun §7.7's cost-order list puts first.
 
 3. **P2a's half of the condition IS met — and more strongly than when this gate was written.**
    Run 4 (2026-09-18 23:23 UTC, 2026-09-19 SGT; harness `etc/bpmn-token-sim`, report
@@ -3043,11 +3091,13 @@ aContract — after 3 events, the clock stands at 10 (the #TRACE on line 23)
   Owed now:
     - B MUST return — due by 14 (4 from now)
 
+  What would discharge it (the contract ends fulfilled):
+    - B does anything now (at 10) → fulfilled
+      any act by B counts: the rule binds `return` rather than naming an act
+      checked by replaying one act from that set, with `return` = delivery
+
   What would put someone in breach:
     - nothing happens by 14 (the clock reaches 15) → B is in breach: MUST return was due by 14; the clock reached 15 without it
-
-  What could not be tried:
-    - B does return — the action binds `return`, which the what-if cannot choose
 
   Next deadline: 14 (B: return)
 
@@ -3058,8 +3108,17 @@ aContract — after 3 events, the clock stands at 10 (the #TRACE on line 23)
     at 10: B MUST — no more events; still waiting
 ```
 
-(`return` is a variable pattern in that corpus file — there is no `return` constructor — which
-is why the act cannot be tried; the list says so rather than dropping it.)
+(`return` is a variable pattern in that corpus file — there is no `return` constructor — so what
+discharges the obligation is a SET of acts, not one. **Amended 2026-09-21 (§2.4's bound-variable
+block).** Until then this block read
+
+```
+  What could not be tried:
+    - B does return — the action binds `return`, which the what-if cannot choose
+```
+
+and that refusal, across three of the proxy's four contracts, was the whole of the list's Q2
+deficit — §7.7 point 2.)
 
 **Vocabulary.** The default output names no constructor, and `jl4/tests/LtsList.hs`
 (`constructorNames`, `:111`) asserts it over all three corpus outputs: `Matched ToHence` is "done;
@@ -3245,6 +3304,13 @@ loud failure was invited and its size is partly the prompt's (RESULTS.md §3).
    be tried_); on `every-run-example`, the one contract where the act could be tried, the list
    is 4/4. The readers who scored 1 inferred what the list did not print. This points at a
    list-side repair, re-measurable with the same materials, before any picture.
+   **REPAIRED 2026-09-21** (§2.4's bound-variable block): all three now print what discharges
+   the obligation — `contracts` "B does anything now (at 10) → fulfilled"; `tenancy` each
+   tenant's payment "with any `amount`", checked at 0; `promissory-note` "with any
+   `Amount Transferred` for which `is money at least equal within error` … (Money OF "USD",
+   2369.2806990603694) holds → fulfilled". **The 48 readings above were taken against the OLD
+   output and none of them has been rerun**, so every number in this section still describes the
+   refusing list. Rerunning them is the first item in the cost-order list below.
 3. **On Q4–Q5 the list loses badly (11/32 vs 30/32 and 24/32), in §1.1a's direction — and
    §1.1a's reason is only half right.** All four of the list's Q5 hits are `every-run-example`,
    where the list itself prints the `→ then:` continuation one step deep (§7.6); it printed
@@ -3278,8 +3344,9 @@ questions have opposite answers on this data. (vi) Four contracts, two models, t
 intervals: a one- or two-answer difference in a column of sixteen is within what a rerun could
 reverse. **Nothing here passes or fails §7.3.** The §7.2 P2a′ row records this run and says the same.
 
-_What would move it, in cost order — statuses added 2026-09-21, when §7.3 was ruled:_ **IN
-PROGRESS, in this PR** — repair the open-binder what-if and rerun the same 48 readings; **open**
+_What would move it, in cost order — statuses added 2026-09-21, when §7.3 was ruled:_ **repair
+LANDED 2026-09-21, rerun OPEN** — the open-binder what-if is repaired (point 2 above, §2.4);
+the same 48 readings have NOT been rerun, so no number in this section has moved; **open**
 — equalise the note's calendar conversion across A/B/C; **open** — rerun outside the harness
 with a bare API call and a fixed system prompt; **open** — a vision run with B and C rendered, to
 separate content from drawing; **open** — and then the reader experiment §7.3 actually asks for.

@@ -87,6 +87,14 @@ done). It rewrites A/B/C, `lts.json`, `probes.out` and
 `tenancy-barrier` golden. `truth.json` and `history.txt` are hand-written and are **not**
 regenerated: after a rerun, diff `lts.json` and `probes.out` and re-read the answers.
 
+**A rerun now moves A substantially, on purpose.** On 2026-09-21 the what-if stopped refusing a
+bound pattern variable and began answering for the SET of acts it describes (LTS-VISUALISER.md
+§2.4, the bound-variable block) — which is §7.7 point 2's repair, and which changes the one line
+on three of these four contracts that the proxy traced all eight of the list's Q2 misses to. The
+committed `A.txt` files are still the run's: **they are what the readers were shown, and the
+numbers in RESULTS.md describe them.** Re-cutting them without rerunning the 48 readings would
+leave the inputs and the scores describing different artifacts.
+
 None of the `.l4` files here is under a goldened glob (`CLAUDE.md` §3.1), so they carry no
 `tests/` goldens; `probes.l4` is type-checked by hand with `l4 check` before committing.
 

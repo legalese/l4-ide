@@ -97,6 +97,12 @@ second reader of `results.json` could shift a case or two between "incomplete" a
 Q2 (_what discharges it_) is where the list loses to both pictures pooled: 8/16 against 15/16 and
 14/16. Every one of the eight misses is on a contract where the list **refused the what-if**:
 
+> **Repaired 2026-09-21, not yet re-measured.** The refusal this section traces the Q2 deficit
+> to is gone: the what-if now answers for the SET of acts a bound pattern variable describes,
+> and all three contracts below print what discharges the obligation (LTS-VISUALISER.md §2.4,
+> the bound-variable block; §7.7 point 2). **Every number in this file was scored against the
+> output quoted below**, which is what the readers were shown; nothing here has been rerun.
+
 - `contracts/A.txt` — _"B does return — the action binds `return`, which the what-if cannot choose"_
 - `tenancy/A.txt` — _"… the action binds `amount`, which the what-if cannot choose"_ (three times)
 - `promissory-note/A.txt` — _"… the action binds `Amount Transferred`, which the what-if cannot choose"_
