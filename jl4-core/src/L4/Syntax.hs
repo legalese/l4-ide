@@ -872,16 +872,19 @@ data Extension = Extension
   , ref          :: Maybe Ref
   , fixityAnn    :: Maybe Fixity
   , pmMatrix     :: Maybe PmMatrix
+  , mixfixCanonical :: Maybe RawName
+    -- ^ The CANONICAL mixfix pattern of the name this node applies, e.g.
+    -- @the will _ is duly executed without _@. See 'annMixfixCanonical'.
   }
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Semigroup Extension where
-  Extension i1 nlg1 alts1 desc ref1 fix1 pm1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 pm2 =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2) (pm1 <|> pm2)
+  Extension i1 nlg1 alts1 desc ref1 fix1 pm1 mx1 <> Extension i2 nlg2 alts2 desc' ref2 fix2 pm2 mx2 =
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (alts1 <> alts2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2) (pm1 <|> pm2) (mx1 <|> mx2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing Nothing
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -891,7 +894,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing
+  def = Extension Nothing Nothing [] Nothing Nothing Nothing Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -948,6 +951,22 @@ annFixity = #extra % #fixityAnn
 
 annPmMatrix :: Lens' Anno (Maybe PmMatrix)
 annPmMatrix = #extra % #pmMatrix
+
+-- | The canonical mixfix pattern of the name a node applies.
+--
+-- __Why this is on the Anno and not looked up at print time.__ Name
+-- resolution discards the mixfix pattern from the AST the printer sees — a
+-- call to @\`the will\` w \`is duly executed without\` n@ arrives as an
+-- application of the bare head keyword @the will@, with the interior keyword
+-- gone. The typechecker's 'MixfixRegistry' still has it, but the printer is a
+-- class with no environment to thread a registry through, and adding one
+-- means touching every instance.
+--
+-- So a pass stamps the pattern onto the nodes that need it before printing,
+-- and the printer reads it from the node it is already holding. Same shape as
+-- 'annNlg': a fact about a node, recorded on the node.
+annMixfixCanonical :: Lens' Anno (Maybe RawName)
+annMixfixCanonical = #extra % #mixfixCanonical
 
 setNlg :: Nlg -> Anno -> Anno
 setNlg n a = a & annNlg ?~ n

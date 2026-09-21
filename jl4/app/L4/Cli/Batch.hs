@@ -79,7 +79,7 @@ import L4.EvaluateLazy
   , prettyRefusal
   )
 import L4.Lexer (showStringLit)
-import L4.Print (prettyLayout)
+import L4.Print (prettyLayout, restoreMixfixPatterns)
 import qualified Data.Set as Set
 import L4.Syntax
   ( AppForm(..), Assume(..), Decide(..), GivenSig(..), Module, Resolved
@@ -235,7 +235,12 @@ batchCmd opts = do
       unbindRead (MkAssume _ _ (MkAppForm _ r _ _) _ _)
         | getUnique r `Set.member` readAssumes = DropAssume
         | otherwise                            = KeepAssume
-      filteredModule = rewriteModuleAssumes unbindRead (filterIdeDirectives tcRes.module')
+      -- restoreMixfixPatterns BEFORE filtering and printing: the printer can
+      -- otherwise emit only a mixfix name's head keyword, and a module with two
+      -- operators sharing one comes back resolving to the wrong operator
+      -- (smucclaw/l4-ide#967). `l4 batch` re-runs what it prints, so this is a
+      -- correctness path and not a cosmetic one.
+      filteredModule = rewriteModuleAssumes unbindRead (filterIdeDirectives (restoreMixfixPatterns tcRes.mixfixRegistry tcRes.module'))
       filteredSource = prettyLayout filteredModule
       schema         = exportFn.exportParams
 
