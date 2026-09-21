@@ -167,6 +167,14 @@ The notes that go with a quantified rule:
   member's breach is its own event — what a fork loses is which member reached it, and the boundary
   event it goes through says "a member breached" for exactly that reason.
 
+  **And it says one more thing when the end event is not only the group's.** A breach terminal is
+  shared: a group obligation beside another promise sends both breaches to one end event, and so
+  does a group whose `HENCE` obliges somebody who can then breach in turn. `tenancy-barrier` is the
+  second shape — `End_3` there is reached from the tenants' deadline and from the landlord's — so
+  the note adds that other promises in the same rule end at that event too, and a reader clicking it
+  cannot tell even that it was the group. Without that sentence the note was telling the reader the
+  event was the group's when it was also somebody else's.
+
 **A breach by one member does not end the others**, and getting that right takes two things, not
 one. Inside the box a breach is an _escalation_ thrown out to a non-interrupting event on the
 boundary, because BPMN's error events always interrupt and an error thrown inside one member's run

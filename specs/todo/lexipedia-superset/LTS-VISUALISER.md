@@ -2455,6 +2455,13 @@ Measured: it moves **three** of the sixteen BPMN goldens and no others — `tena
 The fourth barrier golden, `modals-may-barrier`, does **not** gain it, and that is the check that the guard discriminates: its `EVERY` is a `MAY` with a `HENCE` and no `LEST`, so the group has no breach terminal at all — the `End_3 "Breach"` in that file belongs to the chair's own `PARTY` obligation.
 `modals-must-barrier-both-deadlines` does gain it despite having no written `LEST`, because a `MUST` whose deadline passes breaches and the state graph builds the arm.
 
+**Repaired the same day, after review, in two places where the note was wrong about its ELEMENT rather than about the loss.**
+It is keyed on the terminal and built once per state that reaches it, so two barriers whose `LEST` arms converge on one breach end filed it twice, byte for byte — fixed by an exact-repeat dedup over the whole note list (`dedupNotes`, `stateGraphToBpmn`), which is where "file it once" belongs, the note itself being right.
+And a breach terminal is not private to the group: under `RAND` one operand's breach is the whole contract's, and a barrier whose `HENCE` obliges somebody who can breach in turn shares the terminal too.
+That second one was live in a committed golden — `tenancy-barrier`'s `End_3` is reached from `Boundary_0` (the tenants' deadline) and from `Boundary_1` (the landlord's), and the note told a reader the event was the group's.
+It now adds a sentence when the terminal is shared, and `tenancy-barrier` is the one golden of the three that gains it.
+Both are pinned by tests in `jl4/tests/BpmnExport.hs` under "F6, the blame set, on a breach end two things can reach", including the control that a lone barrier's note claims no more than it should.
+
 **Scoped to the barrier, deliberately, and the fork is still owed a ruling.**
 A fork's `LEST` fires per member, so at each firing the blame is a singleton: the loss there is WHICH member, not which set, and filing `F6` on a fork would claim a set-shaped loss the fork does not have.
 That per-member loss is today stated in prose rather than as a note — `escalationCatchName` (`Lower.hs`) captions the boundary "a member breached" precisely because it cannot say which, and its own comment says so.

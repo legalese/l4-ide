@@ -204,6 +204,30 @@ shantForkSrc = modalJoinSrc "SHANT notify" "UPON EACH"
 mayBarrierSrc = modalJoinSrc "MAY pay" "ONCE ALL HAVE"
 mayForkSrc = modalJoinSrc "MAY pay" "UPON EACH"
 
+-- | Two barriers side by side, whose @LEST@ arms converge on ONE breach
+-- terminal, and a barrier beside a single-party obligation, where they converge
+-- for a different reason. Both are @F6@'s hazards and neither was covered by any
+-- golden: no committed fixture has two barriers in one rule, and none has a
+-- barrier sharing its breach end with a @PARTY@ duty.
+--
+-- 'loneBarrierSrc' is the control. It is 'everyBarrierSrc' spelled on one line so
+-- the three read as a family; the only arm to @BREACH@ is the barrier's own.
+twoBarriersSrc, barrierBesidePartySrc, loneBarrierSrc :: [Text]
+twoBarriersSrc =
+  [ "`group` MEANS"
+  , "      (EVERY p MUST pay WITHIN 3 ONCE ALL HAVE HENCE FULFILLED LEST BREACH)"
+  , "  RAND (EVERY q MUST deliver WITHIN 5 ONCE ALL HAVE HENCE FULFILLED LEST BREACH)"
+  ]
+barrierBesidePartySrc =
+  [ "`group` MEANS"
+  , "      (EVERY p MUST pay WITHIN 3 ONCE ALL HAVE HENCE FULFILLED LEST BREACH)"
+  , "  RAND (PARTY Bob MUST deliver WITHIN 5 HENCE FULFILLED LEST BREACH)"
+  ]
+loneBarrierSrc =
+  [ "`group` MEANS"
+  , "  EVERY p MUST pay WITHIN 3 ONCE ALL HAVE HENCE FULFILLED LEST BREACH"
+  ]
+
 -- | A single-party permission whose @HENCE@ is somebody else's OBLIGATION: the
 -- shape in which the lapse arm and the HENCE arm have different destinations.
 -- Exercising it obliges Bob; letting it expire obliges nobody. The exporter
@@ -2109,6 +2133,71 @@ spec = do
 
     it "and with both written, the act's is the one on the timer" $
       map (.nodeKind) (boundaries both) `shouldBe` [Boundary "Task_0" (TimerAfter "P3D")]
+
+    -- F6 says what a barrier's breach end event cannot: WHICH members failed.
+    -- Both of these are ways the note can be wrong about the element it names
+    -- rather than about the loss, and both were found by review on 2026-09-21
+    -- with no golden covering either shape.
+    describe "F6, the blame set, on a breach end two things can reach" $ do
+      let twoBarriers = exportOf defaultBpmnOptions "group" twoBarriersSrc
+          besideParty = exportOf defaultBpmnOptions "group" barrierBesidePartySrc
+          lone = exportOf defaultBpmnOptions "group" loneBarrierSrc
+          endEventsNamed nm bx =
+            [ n.nodeId
+            | n <- bx.bxProcess.procNodes
+            , EndEvent _ <- [n.nodeKind]
+            , n.nodeName == nm
+            ]
+
+      -- The note is keyed on the TERMINAL, and it is built once per state that
+      -- reaches it, so two barriers filed it twice — byte for byte, against an
+      -- element that exists once. A reader counting the notes was told there
+      -- were two losses here.
+      it "two barriers converging on one breach end file it ONCE, not twice" $ do
+        length (endEventsNamed "Breach" twoBarriers) `shouldBe` 1
+        case findingsFor "F6" twoBarriers of
+          [f] -> f.element `shouldBe` "End_3"
+          other ->
+            expectationFailure
+              ("expected one F6, got " <> show (length other) <> ": " <> show other)
+
+      -- And the dedup is EXACT-REPEAT only, not one-note-per-code: this same
+      -- file has two barriers and therefore two P-CAST notes, on two different
+      -- elements, and both survive. A dedup keyed on the code would have eaten
+      -- one of them and told the reader one activity was unseeded.
+      it "and it does not collapse two notes that differ: P-CAST stays twice" $ do
+        map (.element) (findingsFor "P-CAST" twoBarriers)
+          `shouldBe` ["Task_1", "Task_4"]
+
+      -- Under RAND one operand's breach is the whole contract's, so a barrier
+      -- beside a PARTY duty sends both breaches to one end event. Measured: the
+      -- group's boundary and the party's boundary both flow to it.
+      it "a barrier beside a PARTY duty shares the end event, and the note says so" $ do
+        case findingsFor "F6" besideParty of
+          [f] -> do
+            f.element `shouldBe` "End_3"
+            f `shouldSatisfy` mentions "other promises in this same rule"
+            f.lost `shouldSatisfy` Text.isInfixOf "another promise's in this rule"
+          other -> expectationFailure ("expected one F6, got " <> show (length other))
+
+      -- `End_2`, not `End_3`: with no sibling operand this rule has one fewer
+      -- state, and the terminal is numbered accordingly. Pinned rather than
+      -- wildcarded, because "the note names the right element" is half of what
+      -- F6 is for.
+      it "the control: a lone barrier owns its breach end, and the note claims no more" $ do
+        case findingsFor "F6" lone of
+          [f] -> do
+            f.element `shouldBe` "End_2"
+            f `shouldSatisfy` (not . mentions "other promises in this same rule")
+            f.lost `shouldSatisfy` (not . Text.isInfixOf "another promise's in this rule")
+          other -> expectationFailure ("expected one F6, got " <> show (length other))
+
+      -- The shared/not-shared split must be about the SHARING and not about
+      -- having two barriers: `twoBarriers` shares its end event too, so its note
+      -- carries the same extra sentence.
+      it "two barriers also share, so the two reports agree on that sentence" $
+        map (.message) (findingsFor "F6" twoBarriers)
+          `shouldBe` map (.message) (findingsFor "F6" besideParty)
 
   -- The same rule for a permission that has no quantifier at all. Until
   -- 2026-09-17 L4.StateGraph drew no LEST arm for a single-party MAY, so this

@@ -316,17 +316,33 @@ stateGraphToBpmn opts sg =
       _ -> []
 
     -- The end event this state's LEST arm reaches, when that arm ends in BREACH
-    -- rather than in another obligation. 'endNodes' names a terminal
-    -- @End_\<state id\>@, so the id is derivable and needs no search.
+    -- rather than in another obligation — paired with whether anything ELSE in
+    -- the rule ends there too. 'endNodes' names a terminal @End_\<state id\>@, so
+    -- the id is derivable and needs no search.
     --
-    -- Used by @F6@, which has to name the element a reader can click on. It is
-    -- computed here rather than in 'quantifierNotes' because that function takes
-    -- a label and a node, and this is a fact about the STATE.
-    lestBreachEnd :: Maybe Text
+    -- Used by @F6@, which has to name the element a reader can click on, and has
+    -- to not overclaim about it. Computed here rather than in 'quantifierNotes'
+    -- because that function takes a label and a node, and both of these are facts
+    -- about the STATE.
+    --
+    -- The @Bool@ is SHARED. A breach terminal is not private to the state whose
+    -- arm reaches it: under @RAND@ one operand's breach is the whole contract's
+    -- (see the header of @jl4\/examples\/bpmn\/tenancy.l4@), so a barrier beside a
+    -- @PARTY@ obligation sends both breaches to ONE end event, and so does a
+    -- barrier whose @HENCE@ obliges somebody who can then breach. Measured
+    -- 2026-09-21 on a probe: @Boundary_1@ (the group's task) and @Boundary_4@ (the
+    -- chair's) both flow to @End_3@. @F6@ told the reader that event was the
+    -- group's; in that file it is not only the group's, and the note now says so.
+    lestBreachEnd :: Maybe (Text, Bool)
     lestBreachEnd = do
       t <- lestOf sid
       guard (typeOfState t.transTo == Just TerminalBreach)
-      pure ("End_" <> Text.pack (show t.transTo))
+      pure
+        ( "End_" <> Text.pack (show t.transTo)
+        , any
+            (\u -> u.transTo == t.transTo && u.transFrom /= sid)
+            sg.sgTransitions
+        )
 
     -- The @IF@ that chose between arms. This is the branch-edge counterpart of
     -- @F4@: @F4@ accounts for a @PROVIDED@ on one obligation, this accounts
@@ -1613,6 +1629,29 @@ stateGraphToBpmn opts sg =
       <> [ruleVersionFinding]
       <> scopeFindings
       & retargetToScope
+      & dedupNotes
+
+  -- Two notes that are equal in every field render as two IDENTICAL blocks in
+  -- the report, which tells a reader nothing the first one did not, and makes a
+  -- count of the notes wrong. They are not hypothetical: a note keyed on a
+  -- TERMINAL rather than on the state that reaches it is filed once per reaching
+  -- state, so two barriers whose @LEST@ arms converge on one breach end used to
+  -- file @F6@ twice, byte for byte (measured 2026-09-21 on a probe:
+  -- @grep -c '\[F6\] lossy — End_3'@ was 2, against exactly one
+  -- @endEvent id=\"End_3\"@ in the XML).
+  --
+  -- Deduplicating on the WHOLE note, not on @(code, element)@: two notes that
+  -- differ in a word are two different things to tell the reader, and collapsing
+  -- them would be a silent edit. Only an exact repeat is dropped, which by
+  -- construction cannot change what the report says. First occurrence wins, so
+  -- emission order — the thing 'addNote' is careful about — is preserved.
+  dedupNotes :: [FidelityNote] -> [FidelityNote]
+  dedupNotes = go []
+   where
+    go _ [] = []
+    go seen (n : ns)
+      | n `elem` seen = go seen ns
+      | otherwise = n : go (n : seen) ns
 
   -- A note about the multi-instance activity has to name the element that
   -- carries the marker. @P-CAST@ is built in the chain pass, against the task,
@@ -2542,6 +2581,21 @@ numberWithUnit t = do
 -- 'Lossy', not 'Blocking': the breach itself IS drawn, and drawn in the right
 -- place. What is gone is who caused it.
 --
+-- __Two ways this note can be wrong about its ELEMENT rather than about the
+-- loss__, both found by review on 2026-09-21 with no golden covering either:
+--
+--  * it is keyed on the TERMINAL and built once per state that reaches it, so two
+--    barriers whose @LEST@ arms converge on one breach end filed it TWICE, byte
+--    for byte. Fixed by 'dedupNotes' in 'stateGraphToBpmn', not here: the note is
+--    right, and filing it once is a property of the report.
+--  * a breach terminal is not private to the group. Under @RAND@ one operand's
+--    breach is the whole contract's, and a barrier whose @HENCE@ obliges somebody
+--    who can breach in turn shares the terminal too — which is
+--    @tenancy-barrier@'s own shape, where @End_3@ is reached from the tenants'
+--    deadline AND from the landlord's. Saying "this is where the whole group's
+--    breach arrives" and stopping there told the reader that event was the
+--    group's. The 'Bool' in the argument is that, and the note adds a sentence.
+--
 -- __Scoped to the barrier, deliberately.__ A fork's @LEST@ fires per member, so
 -- at each firing the blame is a singleton and the loss is a different one —
 -- WHICH member, not which set. That loss is currently stated in prose rather
@@ -2549,7 +2603,7 @@ numberWithUnit t = do
 -- precisely because it cannot say which, and the caption's own comment says so.
 -- Whether it also deserves a note is a ruling nobody has made; filing @F6@ on a
 -- fork would claim a set-shaped loss the fork does not have.
-quantifiedBreachNote :: Maybe Text -> TransitionLabel -> [FidelityNote]
+quantifiedBreachNote :: Maybe (Text, Bool) -> TransitionLabel -> [FidelityNote]
 quantifiedBreachNote mBreachEnd l =
   [ MkFidelityNote
       { code = "F6"
@@ -2565,13 +2619,25 @@ quantifiedBreachNote mBreachEnd l =
           \when it was due. BPMN has no way to put a list of parties on an end \
           \event, so this diagram records that the group breached and stops \
           \there."
+            <> if shared
+              then
+                " And in this diagram it is not even only the group's: other \
+                \promises in this same rule end at this very event too, so a \
+                \reader who clicks here cannot tell that it was the group at \
+                \all."
+              else ""
       , lost =
           "which members breached, and how each of them did. This event looks \
           \the same whether one member fell short or all of them, so a reader \
           \of the diagram cannot tell who to chase; only the rule's own run \
           \can answer that."
+            <> if shared
+              then
+                " Here it also looks the same whether the shortfall was the \
+                \group's or another promise's in this rule."
+              else ""
       }
-  | Just breachEnd <- [mBreachEnd]
+  | Just (breachEnd, shared) <- [mBreachEnd]
   , isBarrierLabel l
   ]
 
@@ -2617,7 +2683,7 @@ isBarrierLabel l = case l.labelQuantifier >>= (.quantJoin) of
 -- @UPON EACH WITHIN 3@ and a last act on day 20 is FULFILLED): nothing is
 -- lost between source and diagram, but the clause is dead in both, and the
 -- reader should learn that rather than be told BPMN dropped it.
-quantifierNotes :: Maybe Text -> FlowNode -> TransitionLabel -> [FidelityNote]
+quantifierNotes :: Maybe (Text, Bool) -> FlowNode -> TransitionLabel -> [FidelityNote]
 quantifierNotes mBreachEnd n l = case l.labelQuantifier of
   Nothing -> []
   Just q ->

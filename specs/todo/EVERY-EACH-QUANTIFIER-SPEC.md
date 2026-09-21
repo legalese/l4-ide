@@ -3436,7 +3436,10 @@ event of a barrier whose `LEST` reaches `BREACH`, and the dated line is in
 `specs/todo/lexipedia-superset/LTS-VISUALISER.md` §4.9 under "LANDED 2026-09-21". Measured: three of
 the sixteen BPMN goldens move and no others (`tenancy-barrier`, `modals-shant-barrier`,
 `modals-must-barrier-both-deadlines`); `modals-may-barrier` does not, its `EVERY` being a `MAY` with
-no `LEST` and so no group breach terminal. The FORK is deliberately not covered — its `LEST` fires
+no `LEST` and so no group breach terminal. Repaired after review the same day: the note was filed
+twice where two barriers' `LEST` arms converge on one terminal, and it claimed the shared
+`tenancy-barrier` terminal was the group's when it is also the landlord's — see LTS-VISUALISER §4.9
+for both. The FORK is deliberately not covered — its `LEST` fires
 per member, so the loss there is which member and not which set — and whether that deserves a note
 of its own is undecided. The paragraph below is left as it was written, because it is the assignment
 this discharges. The BPMN export's barrier `LEST` arm is a bare
