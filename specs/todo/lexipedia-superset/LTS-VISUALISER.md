@@ -3423,6 +3423,17 @@ the three things that would reopen them._
 
 ### 7.7 The §7.3 gate — an LLM-reader proxy, RUN 2026-09-16 and RERUN 2026-09-21
 
+**THE B COLUMN OF §7.7 AND §7.7a IS ABOUT A PICTURE THAT NO LONGER EXISTS: `lts/draw-what-it-means` redrew it after both runs.**
+Both runs read the B artifacts cut before that branch: the elided act (`payment ...`, so two obligations over one verb drew one label), the party and modal restated on an edge whose own node already carried them, a junction called `next`, a bare `timeout` naming no deadline, and no wrap — the promissory note's canvas was 28.463 inches wide and three of its six nodes were byte-identical.
+None of that is true of the B artifacts in `etc/lts-reader-proxy/` today.
+
+**A and C did not move, and the scope matters, so it is stated rather than left to be inferred.**
+Measured on this branch: `git diff --stat origin/unstable...HEAD -- etc/lts-reader-proxy/` touches the four `B.dot`, `README.md` and `RESULTS.md`, and nothing else — every `A.txt` and every `C.bpmn` is byte-identical, because `l4 lts` prints through `L4.Print.printActionPattern` and the BPMN task names were already re-blessed with the branch's own spelling.
+So A's and C's rows still describe the artifacts that ship today; only B's do not.
+That is what keeps §7.3's ruling standing on its own evidence, since the gate asks whether the LIST suffices and the list is unchanged — but B's 40/48 on Q1–Q3 is now a fact about a superseded picture and must not be quoted as one about this one, in either direction.
+**The only thing that would make it evidence again is running the experiment again**, which has not been done — the branch changed the artifact and left the readings, deliberately, because re-cutting the packets would put 48 committed readings against materials that no longer exist (§7.3's PREPARED block and `etc/lts-reader-proxy/README.md` say which half of that directory is frozen and why).
+That re-run is the first of §7.3's three reopen conditions in everything but name, and it is cheaper now than it was: the harness, the judges and the answer keys all exist.
+
 **RUN 2026-09-16, on `lts/p2a-prime-proxy`, as a PROXY. This section decides nothing about the
 gate.** Full write-up, per-reading rationales and the raw scored rows:
 `etc/lts-reader-proxy/RESULTS.md` and `results.json`; every number here is computed from that
