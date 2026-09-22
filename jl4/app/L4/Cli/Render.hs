@@ -36,6 +36,7 @@ import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 import L4.Export.Document
 import L4.Lexer (LangTag (..))
 import qualified L4.Nlg as Nlg
+import qualified L4.Parser as Parser
 import L4.Export.Render (RenderConfig(..), renderAkn, renderHtml, renderText)
 import L4.Syntax
 
@@ -105,13 +106,7 @@ renderOptionsParser = RenderOptions
         ( long "toc"
        <> help "Prepend a linked table of contents (HTML only)"
         )
-  <*> optional
-        ( MkLangTag <$> strOption
-            ( long "lang"
-           <> metavar "SUBTAG"
-           <> help "Render using the @nlg:SUBTAG annotations, e.g. --lang he. A rule with no rendering in that language falls back to its default one, so a partial translation still produces a whole document."
-            )
-        )
+  <*> langOption "rule"
   <*> fixedNowParser
 
 ----------------------------------------------------------------------------
@@ -121,10 +116,16 @@ renderOptionsParser = RenderOptions
 renderCmd :: RenderOptions -> IO ()
 renderCmd opts = do
   evalConfig <- makeEvalConfig opts.renderFixedNow
-  (errs, mTc) <- runOneshot evalConfig opts.renderFile \nfp -> do
+  -- The token stream as well as the type-check result: the document's language
+  -- falls back to the module's own @\@lang@, and that is a declaration in the
+  -- token stream (see 'Parser.declaredModuleLang') rather than anything the
+  -- resolved AST keeps. 'Rules.GetLexTokens' is what the parse rule itself
+  -- consumed, so this re-reads nothing.
+  (errs, (mTc, mToks)) <- runOneshot evalConfig opts.renderFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
-    Shake.use Rules.SuccessfulTypeCheck uri
+    (,) <$> Shake.use Rules.SuccessfulTypeCheck uri
+        <*> Shake.use Rules.GetLexTokens uri
 
   case mTc of
     Nothing -> do
@@ -138,10 +139,41 @@ renderCmd opts = do
                   { dropUnused = not opts.renderIncludeUnused
                   , mixfixHeadings = mixfixHeadingsFromRegistry tc.mixfixRegistry
                   }
+          -- The language the document SAYS it is in, in one place: the one
+          -- asked for, else the one the module declares, else @en@ (R-M2). The
+          -- same order 'localise' below effectively applies to the renderings
+          -- themselves — @--lang@ promotes a tagged herald, and with no flag the
+          -- default herald is the one @\@lang@ stamped.
+          declaredLanguage = fromMaybe defaultModuleLang
+                               (Parser.declaredModuleLang . fst =<< mToks)
+
+          -- __A label the document cannot support is not taken.__ A partial
+          -- translation is fine and is the point of the flag — a rule with no
+          -- rendering in the asked-for language keeps its default one, so a
+          -- mostly-Hebrew document is honestly @lang="he"@. But when NOTHING in
+          -- the module (or its imports) renders in that language, every sentence
+          -- in the body is the fallback, and @lang@ would be a claim with no
+          -- support: with @--lang he@ on an all-English encoding, @dir="rtl"@
+          -- would then lay English out right to left, moving its full stops to
+          -- the wrong end of the line. So the document keeps the language it
+          -- declares, and stderr says so.
+          --
+          -- @want == declaredLanguage@ is checked first and separately: a module
+          -- that declares @\@lang he@ and carries no @\@nlg@ at all renders no
+          -- Hebrew prose, and asking it for Hebrew is still not a mislabelling.
+          carriesRequested want =
+            want == declaredLanguage
+              || any (Nlg.carriesLanguage want) (tc.module' : rawDeps)
+          (docLanguage, unsupportedRequest) = case opts.renderLang of
+            Nothing -> (declaredLanguage, Nothing)
+            Just want
+              | carriesRequested want -> (want, Nothing)
+              | otherwise             -> (declaredLanguage, Just want)
           rcfg = MkRenderConfig
                    { numberSections = opts.renderNumberSections
                    , numberClauses  = opts.renderNumberClauses
                    , toc            = opts.renderToc
+                   , docLang        = docLanguage
                    }
           -- Choose the language BEFORE building the document, not inside it.
           -- 'selectLanguage' moves the requested rendering into the slot
@@ -157,16 +189,39 @@ renderCmd opts = do
           -- 'selectLanguage' 'Nothing' is the identity, so with no --lang the
           -- output is byte-for-byte what it was.
           localise = Nlg.selectLanguage opts.renderLang
+          rawDeps = dedupModules (transitiveDeps tc)
           mainModule = localise tc.module'
-          depModules = map localise (dedupModules (transitiveDeps tc))
+          depModules = map localise rawDeps
           doc = buildDocument cfg mainModule depModules
+      -- Said only for the formats that carry a document language, so that
+      -- `--format text --lang zz` stays byte-identical on BOTH streams.
+      case (unsupportedRequest, formatLabelsLanguage opts.renderFormat) of
+        (Just (MkLangTag want), True) ->
+          let MkLangTag label = docLanguage
+          in hPutStrLn stderr $ Text.unpack $
+               "l4 render: no renderings in \"" <> want <> "\"; document labelled \""
+                 <> label <> "\" instead."
+        _ -> pure ()
       case opts.renderFormat of
         FmtJson -> emitBytes opts (Aeson.encode doc)
         FmtPlan -> emitBytes opts (Aeson.encode (buildPlan cfg mainModule depModules))
         FmtText -> emitText opts (renderText rcfg doc)
         FmtHtml -> emitText opts (renderHtml rcfg doc)
-        FmtAkn  -> emitText opts (renderAkn doc)
+        FmtAkn  -> emitText opts (renderAkn rcfg doc)
       exitSuccess
+
+-- | Does this format put the document's language in its output?
+--
+-- HTML as @\<html lang="…"\>@, Akoma Ntoso as the language component of its
+-- Expression-level FRBR URIs. @text@, @json@ and @plan@ carry the chosen
+-- WORDINGS but say nothing about which language they are.
+formatLabelsLanguage :: RenderFormat -> Bool
+formatLabelsLanguage = \ case
+  FmtHtml -> True
+  FmtAkn  -> True
+  FmtJson -> False
+  FmtPlan -> False
+  FmtText -> False
 
 ----------------------------------------------------------------------------
 -- Output dispatch

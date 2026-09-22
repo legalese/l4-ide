@@ -79,13 +79,7 @@ nlgOptionsParser = NlgOptions
            <> help "Write to FILE instead of stdout"
             )
         )
-  <*> optional
-        ( MkLangTag <$> strOption
-            ( long "lang"
-           <> metavar "SUBTAG"
-           <> help "Render using the @nlg:SUBTAG annotations, e.g. --lang he. A node with no rendering in that language falls back to its default one, so a partial translation still produces a whole document."
-            )
-        )
+  <*> langOption "node"
   <*> fixedNowParser
 
 ----------------------------------------------------------------------------

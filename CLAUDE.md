@@ -222,7 +222,7 @@ will not see it: no paths filter matches a `.l4` under `jl4/examples/`, so the H
 run on your PR, and the failure surfaces on the next person's branch instead.
 
 **Which globs, exactly** (`jl4/tests/Main.hs:78-90`, kept in step by `etc/check-corpus-goldens.mjs:32-43`):
-`ok/**`, `legal/**`, `canon/**`, `not-ok/tc/**`, `not-ok/nlg/**`, `not-ok/export-*.l4`,
+`ok/**`, `legal/**`, `canon/**`, `not-ok/tc/**`, `not-ok/nlg/**`, `not-ok/export-*.l4`, `not-ok/import/unresolved-*.l4`,
 `lsp/semantic-tokens/**`, `lsp/hover/**`, and `jl4-core/libraries/*.l4`. **`jl4/examples/docassemble/` and
 `jl4/examples/openfisca/` are in NO glob**, which is why their `.l4` files carry no `tests/`
 directory and adding one there needs no goldens. State this rule with its scope: an earlier

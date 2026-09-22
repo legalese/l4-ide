@@ -34,6 +34,17 @@ IMPORT `legal-persons`
 IMPORT `excel-date`
 ```
 
+### Importing Names That Are Not Plain ASCII
+
+Backticks also cover a basename with spaces or non-ASCII letters:
+
+```l4
+IMPORT `my helpers`
+IMPORT `hvac-law-he`
+```
+
+On a build older than the fix for [smucclaw/l4-ide#971](https://github.com/smucclaw/l4-ide/issues/971) these resolved to nothing, and said nothing about it — see [Library Resolution](resolution.md#module-names-that-are-not-plain-ascii).
+
 ### Importing Local Files
 
 ```l4
@@ -65,6 +76,11 @@ L4 includes several standard libraries:
 L4 looks in more places than those two, and in a fixed order — a copy sitting beside your file
 outranks the copy built into the compiler, for instance. [Library Resolution](resolution.md)
 sets out the whole order and when each step matters.
+
+An `IMPORT` that resolves to nothing is an error, even if your file never uses anything from it: the
+message names the module and every location that was searched. It fails `l4 check` and `l4 run`;
+other commands print it and still exit 0. See
+[When nothing resolves](resolution.md#when-nothing-resolves).
 
 ## See Also
 

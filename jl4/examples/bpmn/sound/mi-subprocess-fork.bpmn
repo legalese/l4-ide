@@ -64,6 +64,7 @@
     </bpmn:boundaryEvent>
     <bpmn:endEvent id="End_2" name="Fulfilled" />
     <bpmn:endEvent id="End_3" name="Breach">
+      <bpmn:documentation>Reaching this end stops the run for every member, including the members who did nothing wrong: an error end here ends every active thread in the process, so the instances still going are cancelled along with the one that breached. This fixture keeps that shape on purpose — the exporter stopped emitting it on 2026-09-19 and now gives a fork its own plain breach end instead (see P-FORK-BREACH-UNMARKED) — because what this file pins is how the soundness checker plays a multi-instance scope, not how the exporter draws one.</bpmn:documentation>
       <bpmn:errorEventDefinition id="ErrorDef_End_3" errorRef="Error_breach" />
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_t0" sourceRef="Start_0" targetRef="Sub_0" />

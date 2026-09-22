@@ -6,6 +6,7 @@ module L4.Nlg (
   decideNlg,
   decideNlgSite,
   promoteHeadInputNlg,
+  carriesLanguage,
   Linearize (..),
   lin,
   unescapeNlgText,
@@ -298,6 +299,33 @@ linearizeDirectives mlang mod'' =
   fmap simpleLinearizer (toListOf (gplate @(Directive Resolved)) mod')
  where
   mod' = selectLanguage mlang (promoteHeadInputNlg mod'')
+-- | Does any rendering in this module name this language?
+--
+-- __The question 'selectLanguage' cannot be asked afterwards.__ Selection
+-- promotes a rendering where there is one and leaves the node alone where there
+-- is not, so a request for a language the module carries nothing for produces
+-- exactly the module a request for nothing would: the two are indistinguishable
+-- from the result. A caller that has to LABEL the document with the language —
+-- @\<html lang="…"\>@, an Akoma Ntoso FRBR URI — needs to tell them apart, or it
+-- labels an all-English document Hebrew and lays it out right to left.
+--
+-- Untagged renderings in a module that declares @\@lang he@ count as Hebrew
+-- here: the parser stamps the module's language onto them
+-- ('L4.Syntax.withDefaultLang', applied at 'L4.Parser' before anything
+-- downstream sees an annotation), so no separate declaration check is needed for
+-- a module that has any @\@nlg@ at all. A module that declares a language and
+-- carries no annotations is the one case this returns 'False' on — the
+-- declaration is the caller's to consult, and 'L4.Cli.Render' does.
+--
+-- Same traversal as 'selectLanguage', for the same reason: an @\@nlg@ only ever
+-- lands on a 'Name'.
+carriesLanguage :: LangTag -> Module Resolved -> Bool
+carriesLanguage want m = any nodeCarries (toListOf (gplate @Name) m)
+ where
+  nodeCarries n =
+    let a = getAnno n
+    in any ((== Just want) . nlgLangTag)
+           (toList (view annNlg a) <> view annNlgAlts a)
 
 -- | Translate an 'a' to something that can be linearized.
 class Linearize a where

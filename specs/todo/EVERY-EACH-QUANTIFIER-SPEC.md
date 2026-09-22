@@ -3430,7 +3430,21 @@ anchor of §5.2 is not built on this branch. (Built 2026-09-16 on `every/lest-an
 anchor's VALUE is now the failure time itself — the missed deadline for `MUST`/`DO`/`MAY`, the
 violating stamp for `SHANT`; invariant (1) stands.)
 
-**Owed downstream, not done here.** The BPMN export's barrier `LEST` arm is a bare
+**Owed downstream, not done here. DISCHARGED 2026-09-21** on `lts/owed-fidelity-notes`: the note is
+`F6` (`Lossy`), filed by `quantifiedBreachNote` in `jl4-core/src/L4/Bpmn/Lower.hs` on the breach end
+event of a barrier whose `LEST` reaches `BREACH`, and the dated line is in
+`specs/todo/lexipedia-superset/LTS-VISUALISER.md` §4.9 under "LANDED 2026-09-21". Measured: three of
+the sixteen BPMN goldens move and no others (`tenancy-barrier`, `modals-shant-barrier`,
+`modals-must-barrier-both-deadlines`); `modals-may-barrier` does not, its `EVERY` being a `MAY` with
+no `LEST` and so no group breach terminal. Repaired twice after two rounds of review the same day, all three defects being about the ELEMENT
+the note names rather than about the loss: it was filed twice where two barriers' `LEST` arms
+converge on one terminal; it claimed the shared `tenancy-barrier` terminal was the group's when it is
+also the landlord's; and it named `End_<state id>`, which is not in the file at all when the barrier
+sits inside a fork's scope. It is now built in the findings pass, from the emitted file — see
+LTS-VISUALISER §4.9 for all three and their tests. The FORK is deliberately not covered — its `LEST` fires
+per member, so the loss there is which member and not which set — and whether that deserves a note
+of its own is undecided. The paragraph below is left as it was written, because it is the assignment
+this discharges. The BPMN export's barrier `LEST` arm is a bare
 `<endEvent errorRef="Error_breach">` (`L4.Bpmn.Emit`'s `sharedErrorId`, wired from
 `L4.Bpmn.Lower`). Its concurrency review of 2026-09-15 called that acceptable BECAUSE R-T3 was
 unbuilt; now that the runtime names the set of failed members, that error end drops something the

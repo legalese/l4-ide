@@ -156,6 +156,29 @@ The notes that go with a quantified rule:
   breach arm — so the diagram ends breached with nobody having done anything, where the rule says
   an empty group is fulfilled because nobody is bound. Reachable rather than theoretical: jBPM runs
   the file that way if you supply no list.
+- `F6` (lossy): **the breach does not say who breached it.** A group obligation that fails under
+  `ONCE ALL HAVE` fails once, for the group, and the run works out which members failed and lists
+  them — one entry per failure, so a member who failed in two ways is named twice, each entry saying
+  what that member owed and when it was due. The diagram has one end event for the whole group, and
+  BPMN has nowhere to put a list of parties on an end event, so it records that the group breached
+  and stops there. That end event looks the same whether one member fell short or all of them.
+  Filed only where the group really can breach: a `MAY` group with a `HENCE` and no `LEST` has no
+  breach of its own, and does not get the note. It is not filed on a fork either, where each
+  member's breach is its own event — what a fork loses is which member reached it, and the boundary
+  event it goes through says "a member breached" for exactly that reason.
+
+  **And it says more when the end event is not only the group's** — naming the other arms, and whose
+  lane each sits in, rather than saying so in general terms. A breach terminal is shared two ways. A
+  group obligation beside another promise sends both breaches to one end event, and so does a group
+  whose `HENCE` obliges somebody who can then breach in turn: `tenancy-barrier` is the second shape,
+  where `End_3` is reached from the tenants' deadline and from the landlord's, and the note reads
+  "`Boundary_1` (theLandlord) also ends at this very event". Its `lost:` line says what that costs,
+  which is more than the note's first version admitted: not just which member fell short, but
+  **whether a member fell short at all** rather than the landlord.
+
+  Two group obligations can also converge on one end event, and then the note says it does not even
+  say **which group** — naming both arms. That is one note, not two: it is filed once per end event,
+  because an event two groups reach is one loss with two causes.
 
 **A breach by one member does not end the others**, and getting that right takes two things, not
 one. Inside the box a breach is an _escalation_ thrown out to a non-interrupting event on the
@@ -212,6 +235,87 @@ that rule since 2026-09-16 (before, the flow stopped at a dangling end, and the 
   drawing, not a property of the rule, and no released export ever drew it.)
 
 If you have a `.bpmn` of a rule that hands over by name from before 2026-09-16, re-export it.
+
+## A terminating end beside concurrency has to be declared
+
+One kind of loss is checked mechanically rather than left to the report, because it is the kind a
+reader of the diagram cannot see and will not think to look for.
+
+Some end events **stop the whole run**, not just the path that reached them. An uncaught error end
+is one, and so is a terminate end. If the diagram also has more than one thing happening at once —
+two branches of a `RAND`, or several members of an `EVERY` — then reaching that end throws away
+whatever the others still had to do. A duty one party had already earned disappears from the
+diagram, one flow after it was drawn.
+
+So: **where an exported diagram has an end event that stops the run and really can throw away a
+token somebody else was still holding, the fidelity report has to say so.** If it does not,
+`etc/check-bpmn-soundness.mjs` fails the file — it is a `FIDELITY` finding, distinct from the four
+liveness properties, and the four will all say PASS above it.
+
+**"Really can" is measured, not assumed**, and the distinction is the whole difference between a
+useful check and one nobody can satisfy. The checker plays the token game, and for each such end
+event it asks: over every state in which this end event can fire, how many tokens were in flight
+besides the one it consumed? If the answer is none, the end event forfeits nothing and nothing is
+owed — a breach deadline hanging off a task that runs _before_ a split is exactly that case, and the
+checker says so out loud rather than staying silent:
+
+```
+info  End_6 "Breach" can only fire while it holds the last token in flight, so it
+      discards nothing and owes no declaration
+```
+
+An earlier version of this rule asked only whether the diagram was ever concurrent _anywhere_, which
+failed that file with nothing its author could have written to fix it. The witness is committed as
+`jl4/examples/bpmn/sound/terminate-upstream-of-split.bpmn`.
+
+**What counts as saying so** is a `lossy` or `blocking` note in the `<name>.fidelity.txt` beside the
+file, filed **on the end event itself, or on the junction that made the discarded tokens concurrent
+with it** — the parallel split, or the multi-instance sub-process whose copies run side by side. Any
+other element is refused, including ones the loss passes through.
+
+That sounds like a technicality and is the opposite of one, because **a note about a neighbouring
+loss is not a declaration of this one.** `tenancy-fork-beside-party` is the case that proves it. It
+draws a cast of tenants inside one branch of a `RAND`, so its report carries a true `P-NOJOIN` on the
+split: the two branches were not joined, and one of them reaching BREACH abandons the other. That note
+declares the loss of _the other branch_, and it is accepted for exactly that. Give the cast's own
+breach end an error marking, though, and a second loss appears which the split cannot see: one member
+of the cast cancelling **another member**. The junction there is the sub-process's multiplicity, and
+since no element in a BPMN file names one member's run, the only place that loss can be declared is
+the end event. Two earlier versions of this rule accepted the `P-NOJOIN` for it and scored the file
+sound — which is the very defect the rule exists to catch, so the file is committed as
+`jl4/examples/bpmn/unsound/refork-beside-party-cross-instance.bpmn` and the gate now fails it.
+
+The severity matters for a different reason: an `advisory` note is by definition one that forfeits
+nothing, and the exporter has a note that is filed on precisely the right element, matches the
+wording, and is advisory — `P-FORK-BREACH-UNMARKED`, which describes an error marking the end event
+does _not_ carry.
+
+What the check does not do, so that nobody has to find out the hard way: it does not judge whether a
+note's prose is _about_ this loss. No text test can. It insists on the two things it can check — the
+element and the severity — and then, as a courtesy filter, that the note states the loss in one of a
+short list of recognised forms. That list is no longer what decides anything: with the element test
+structural, removing the list entirely moves no verdict in the corpus.
+
+**A diagram with no fidelity report beside it cannot be judged, and says so** — in those words, with
+exit 0, because the rule was not run rather than passed. That is deliberate: `--fidelity-report` is
+optional, so the same XML would otherwise be sound or unsound depending on whether somebody passed the
+flag, and anyone checking a diagram they were handed — from Camunda Modeler, from a counterparty —
+would get a failure about a missing file rather than about their diagram. Emitting with
+`--fidelity-report` is what puts the file under the rule; for a hand-written diagram you can write the
+sidecar by hand, which is what the two `jl4/examples/bpmn/sound/` fixtures with a real loss now do.
+
+Today the report says it as `P-NOJOIN`, whose wording is the one the rule was written from: a branch
+here can reach BREACH, "whose error end abandons its siblings rather than waiting for them", filed
+against the split that forked the branches. Of the sixteen committed BPMN goldens, two are that
+shape — `offering` (up to 3 tokens thrown away) and `tenancy-fork-beside-party` (up to 4, at two
+members). Eight more have such an end event and measurably discard nothing; the remaining six run
+several things at once and have no run-stopping end event at all.
+
+Why this is a hard check and not another note: the gate had been **printing the evidence on every
+run**, as `121 marking(s) can reach completion ONLY by terminating`, and scoring the file sound —
+correctly, because terminating is a legitimate way to finish. The defect it was describing went
+unnoticed for four days and was found by a reader, not by the gate. A number reported in a severity
+class nobody triages is not a check.
 
 ## When a decision can refuse
 

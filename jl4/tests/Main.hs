@@ -30,11 +30,13 @@ import qualified Paths_jl4_core
 
 import qualified Base.Text as Text
 import qualified LSP.Core.Shake as Shake
-import LSP.L4.Oneshot (oneshotL4ActionAndErrors)
+import LSP.Core.Types.Diagnostics (FileDiagnostic (..))
+import LSP.L4.Oneshot (oneshotL4ActionAndDiagnostics, oneshotL4ActionAndErrors)
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types
 import Optics
-import System.Environment (lookupEnv, setEnv)
+import System.Directory (XdgDirectory (XdgData), getXdgDirectory)
+import System.Environment (getExecutablePath, lookupEnv, setEnv)
 import System.FilePath
 import System.FilePath.Glob
 import System.IO.Silently
@@ -105,6 +107,11 @@ main = do
   -- name rather than one that takes the whole directory. The library beside it
   -- is deliberately in no glob at all.
   importRefusalFiles <- sort <$> globDir1 (compile "not-ok/import/*-refused.l4") examplesRoot
+  -- The unresolvable-IMPORT diagnostic (smucclaw/l4-ide#971). Its own glob
+  -- rather than the whole directory, for the reason above: the *-refused pair's
+  -- library must stay out of every glob. These two import a module that exists
+  -- nowhere, so they need no neighbour at all.
+  importUnresolvedFiles <- sort <$> globDir1 (compile "not-ok/import/unresolved-*.l4") examplesRoot
   hspec do
     describe "corpus sanity (every glob matched something)" $ do
       let corpusNonEmpty nm xs = it (nm <> " corpus is non-empty") $ xs `shouldSatisfy` (not . null)
@@ -118,6 +125,7 @@ main = do
       corpusNonEmpty "hover"           hoverFiles
       corpusNonEmpty "export-placement" exportPlacementFiles
       corpusNonEmpty "import-refusal"   importRefusalFiles
+      corpusNonEmpty "import-unresolved" importUnresolvedFiles
     -- ONE name for the corpus these three blocks share. It was written out
     -- three times, and adding canon/** would have made that four places to keep
     -- in step -- the exact shape of drift CLAUDE.md warns about, and invisible
@@ -150,6 +158,8 @@ main = do
     describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
     describe "import refusal (@export whose read-set crosses an IMPORT)" $
       tests evalConfig (False, True) importRefusalFiles examplesRoot
+    describe "unresolvable IMPORT (#971)" $
+      tests evalConfig (False, True) importUnresolvedFiles examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
     describe "export placement (typechecks; no default export)" $
       tests evalConfig (True, True) exportPlacementFiles examplesRoot
@@ -211,17 +221,54 @@ l4Golden evalConfig isOk examplesRoot dir inputFile = do
 --     local run is structurally unable to catch this, so the scrub belongs
 --     here rather than in a reviewer\'s eye.
 --
+--   * the XDG data store and the executable's own directory, for a module that
+--     resolves NOWHERE. The not-found diagnostic lists every tier it probed, and
+--     two of those tiers are machine-global: @$XDG_DATA_HOME\/jl4\/libraries@ and
+--     @<exeDir>\/..\/..\/libraries@ (the VSCode bundle). So the moment a golden
+--     captures an unresolvable IMPORT it captures a home directory and a
+--     dist-newstyle path -- which is why nothing could be goldened for
+--     smucclaw\/l4-ide#971 until these two were scrubbed. Both are computed here
+--     exactly as 'LSP.L4.Rules.resolveLibrary' computes them, in this same
+--     process, so they cannot drift from what the resolver printed.
+--
 -- Each replacement is a no-op when its prefix is empty.
 mkPathScrubber :: String -> IO (String -> String)
 mkPathScrubber examplesRoot = do
   mp <- lookupEnv "JL4_LIBRARY_PATH"
+  xdgJl4 <- getXdgDirectory XdgData "jl4"
+  exeDir <- takeDirectory <$> getExecutablePath
   let sub prefix token
         | null prefix = id
         | otherwise = Text.unpack . Text.replace (Text.pack prefix) token . Text.pack
-      libScrub = case mp of
-        Just p | not (null p) -> sub p "$JL4_LIBRARY_PATH"
-        _ -> id
-  pure (sub examplesRoot "$JL4_EXAMPLES" . libScrub)
+      -- TWO SPELLINGS of each directory are scrubbed, because two reach the
+      -- output. The candidate paths the resolver builds from its root directory
+      -- keep whatever spelling 'examplesRoot' has; the importer-relative
+      -- candidate is built from 'fromNormalizedFilePath', which is
+      -- 'System.FilePath.normalise'. The not-found diagnostic lists every tier,
+      -- so it prints both -- and a scrubber that knew only one of them left the
+      -- other absolute. Measured 2026-09-21: the first golden ever to capture an
+      -- unresolvable IMPORT came out with "$JL4_EXAMPLES/not-ok/import/..." on
+      -- one line and the developer's own "/Users/.../jl4/examples/not-ok/..." on
+      -- the next, which is CLAUDE.md §3.1.1's forever-green-here,
+      -- forever-red-in-CI trap. The two spellings differed by a "/./" that
+      -- `normalise` removes, which is why scrubbing both fixes it.
+      --
+      -- 'null' is checked before 'normalise', which turns "" into "." -- a
+      -- prefix that would match a dot anywhere in the output.
+      spellings p
+        | null p = []
+        | otherwise = List.nub [p, normalise p]
+      -- Longest prefix first. None of these nests inside another on any layout we
+      -- build in today, but if one ever does, substituting the shorter one first
+      -- would leave the longer one half-replaced -- and a half-scrubbed golden is
+      -- machine-specific again while looking scrubbed.
+      subs = List.sortOn (negate . length . fst) $ concat
+        [ [ (p, "$JL4_LIBRARY_PATH") | p <- spellings (fromMaybe "" mp) ]
+        , [ (p, "$JL4_EXAMPLES")     | p <- spellings examplesRoot ]
+        , [ (p, "$EXE_DIR")          | p <- spellings exeDir ]
+        , [ (p, "$XDG_DATA_JL4")     | p <- spellings xdgJl4 ]
+        ]
+  pure $ \ txt -> foldl' (\ acc (prefix, token) -> sub prefix token acc) txt subs
 
 jl4ExactPrintGolden :: JL4Lazy.EvalConfig -> String -> String -> IO (Golden Text)
 jl4ExactPrintGolden evalConfig dir inputFile = do
@@ -570,7 +617,7 @@ normalizeWhitespaceString = unlines . map normalizeLine . lines
 
 checkFile :: JL4Lazy.EvalConfig -> Bool -> FilePath -> IO ()
 checkFile evalConfig isOk file = do
-  (errs, isJust ->  success) <- oneshotL4ActionAndErrors evalConfig file \nfp -> runMaybeT do
+  (errs, diags, isJust -> typechecked) <- oneshotL4ActionAndDiagnostics evalConfig file \nfp -> runMaybeT do
       let uri = normalizedFilePathToUri nfp
       _        <- lift   $ Shake.addVirtualFileFromFS nfp
       _        <- MaybeT $ Shake.use GetParsedAst uri        <* liftIO (Text.putStrLn "Parsing successful")
@@ -582,11 +629,28 @@ checkFile evalConfig isOk file = do
           formatted = foldMap (sanitizeFilePaths . renderMessage) $ sortOn fst msgs
       liftIO $ Text.putStr formatted
   -- NOTE: if we're okay, we don't expect any errors, if we are not, we do expect them
+  --
+  -- 'typechecked' alone is not the whole verdict: a rule OTHER than the
+  -- typechecker can publish an Error that 'SuccessfulTypeCheck' does not gate.
+  -- 'Rules.GetImports''s unresolvable-IMPORT error is the case that forced this
+  -- (smucclaw/l4-ide#971): a module that imports a module existing nowhere, and
+  -- happens to reference nothing from it, typechecks -- so this suite passed it
+  -- while @l4 check@ on the same file exited 1. A test harness that cannot see a
+  -- whole class of error is worse than no harness for that class, because it
+  -- reads as coverage.
+  let success = typechecked && not (any isStructuralError diags)
   success `shouldBe` isOk
   unless success do
     Text.putStr $ foldMap sanitizeFilePaths errs
 
  where
+  -- The same partition 'L4.Cli.Common.hasBlockingError' makes, and for the same
+  -- reason: a diagnostic whose source is @eval@ is an #EVAL directive's outcome,
+  -- which several corpus files deliberately expect to fail, not a structural
+  -- error in the module.
+  isStructuralError FileDiagnostic{fdLspDiagnostic = Diagnostic{_severity, _source}} =
+    _severity == Just DiagnosticSeverity_Error && _source /= Just "eval"
+
   typeErrorToMessage err = (JL4.rangeOf err, JL4.prettyCheckErrorWithContext err)
   evalLazyDirectiveResultToMessage res@(JL4Lazy.MkEvalDirectiveResult r _ _ _ _) =
     (r, Text.lines (JL4Lazy.prettyEvalDirectiveResult res))

@@ -62,6 +62,15 @@ const ROOTS = [
     recursive: false,
     only: (n) => n.endsWith("-refused.l4"),
   },
+  {
+    // The unresolvable-IMPORT fixtures (smucclaw/l4-ide#971). Same directory,
+    // its own glob, for the same reason: everything else in there is either an
+    // importer meant to fail or a library deliberately in no glob at all.
+    label: "import-unresolved",
+    dir: join(examples, "not-ok", "import"),
+    recursive: false,
+    only: (n) => n.startsWith("unresolved-"),
+  },
 ];
 const SUFFIXES = ["golden", "ep.golden", "nlg.golden", "schema.golden"];
 
