@@ -1,4 +1,4 @@
--- Seven shapes an `l4 state-graph` caption has to survive. Each of them drew a
+-- Eight shapes an `l4 state-graph` caption has to survive. Each of them drew a
 -- caption that said something false in September 2026, and no golden could
 -- have caught any of them: NO golden captures state-graph DOT output at all
 -- (measured 2026-09-22: `grep -rl digraph jl4/examples --include=*.golden` is
