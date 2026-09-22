@@ -161,6 +161,7 @@ have.
 | [`fristbeginn-nonexhaustive-control.l4`](../../jl4/examples/ok/closing-the-loop/fristbeginn-nonexhaustive-control.l4) | the control fixture that makes a clean run mean something                 |
 | [`REPRODUCE.md`](REPRODUCE.md)                                                                                        | every computational claim above, mapped to the command that produces it   |
 | [`reproduce.sh`](reproduce.sh)                                                                                        | runs them                                                                 |
+| [`SIDEBAR-intuitionism.md`](SIDEBAR-intuitionism.md)                                                                  | why a trace is the answer rather than a report about it — conceptual, unsourced |
 
 These are linked, not copied. A second copy of a model is a claim with no way to learn it was
 corrected.
