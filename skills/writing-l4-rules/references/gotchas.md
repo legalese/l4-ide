@@ -420,6 +420,14 @@ depends on what comes next, and only one of the two outcomes is loud:
   trailing `@nlg SHOULD-BE-ON-RULE` rendered as `SHOULD-BE-ON-RULE where `x` is 1` on the
   record declared beneath it, with a clean typecheck and no diagnostic. This is the silent one.
 
+**The same loud diagnostic also fires on a correctly-placed own-line herald**, when the rule it
+sits above is immediately preceded by another bare `GIVEN`-headed rule with nothing between them —
+no `§§` heading, no `DECLARE`, nothing (smucclaw/l4-ide#976). Two rules stacked with only a blank
+line between them is rare in a real encoding — almost everything sits under a section heading —
+which is why this surfaces as one warning in hundreds of heralds rather than a pattern. A `§§`
+heading between the two rules fixes it, and is usually also the more honest structure: two rules
+with nothing marking a boundary between them are rarely actually the same topic.
+
 **A parameter's herald trails its own line.** `GIVEN n IS A NUMBER @nlg the count` describes `n`
 (`#433`; before it, the `NUMBER`). It describes the parameter, not the rule — a rule whose only
 herald is on a parameter line still renders as a bare name.
