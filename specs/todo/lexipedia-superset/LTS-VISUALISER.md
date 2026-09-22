@@ -1986,13 +1986,18 @@ single most under-costed item in this document.
 > **The coordinate-ownership argument is not retracted.**
 > It is untouched by this, and it is still the reason to build B3 if and when a consumer needs coordinates rather than a picture: nothing on this branch computes a rank, a band or a feedback edge, and GraphViz still owns every position the shipped renderer draws.
 >
-> **Measured 2026-09-23, before (`392ba5aa9`) and after (`ab6ecc4af`).**
+> **Measured 2026-09-23, before (`392ba5aa9`) and after (`3bf06b33e`).**
+>
+> The `contracts` after-row was first written at `ab6ecc4af` as 29 / 42 / 7.849 × 6.4818 and is corrected here, because a later commit on this same branch moved it.
+> `3bf06b33e` rewrote one caption in that graph — `` the rule binds `return` `` (22 characters, one line) became `any act by this party would match / this obligation` (33 characters over two) — and a taller, wider box moved the canvas.
+> The other three rows reproduce to the digit at both commits; only `contracts` contains a whole-act binder, so only `contracts` could move.
+> Noted rather than silently replaced, because the first figure was published in this spec and in the pull request before it was re-measured, and a reader meeting the two numbers is owed the reason they differ.
 > "Longest line" is the longest single rendered line of any label in the file, which is what GraphViz sizes a box by; "whole" is the same label with its `\n` removed; the canvas is `dot -Tplain`'s first line.
 >
 > | `etc/lts-reader-proxy/<c>/B.dot` | longest line | whole | canvas (in)         |
 > | -------------------------------- | ------------ | ----- | ------------------- |
 > | `contracts` before               | 43           | 43    | 6.1379 × 6.3256     |
-> | `contracts` after                | 29           | 42    | 7.849 × 6.4818      |
+> | `contracts` after                | 33           | 48    | 7.8752 × 6.6381     |
 > | `every-run-example` before       | 44           | 57    | 4.7335 × 3.7804     |
 > | `every-run-example` after        | 36           | 54    | 5.3253 × 4.2215     |
 > | `tenancy` before                 | 42           | 51    | 4.7032 × 3.7804     |

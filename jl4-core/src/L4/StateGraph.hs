@@ -1572,12 +1572,30 @@ patternBinders = \ case
 
 -- | The binders as the picture says them, or 'Nothing' where there are none.
 --
--- The words are @L4.Lts.WhatIf.bindsClause@\'s, to the separator: it reads
--- @"the rule binds " <> intercalate " and " (map binderText b.baBinders)@ with
--- @binderText r = "\`" <> unqualifiedNameToText (getOriginal r) <> "\`"@, which
--- is 'resolvedToText' back-quoted. A reader moving between the picture and the
--- what-if answer for one act then meets ONE sentence, which is what M1 was
--- for; two spellings of it would make them look like two facts.
+-- __The picture and @l4 lts@ carry the same DISTINCTION, not the same
+-- sentence, and an earlier version of this note claimed otherwise.__ It said a
+-- reader moving between the two "meets ONE sentence". They do not, and the
+-- claim was measured false on 2026-09-23 against the merged what-if (#452),
+-- which prints, for @jl4\/examples\/ok\/contracts.l4@ and
+-- @jl4\/examples\/legal\/promissory-note.l4@ respectively:
+--
+-- > this obligation's pattern matches any act by B: the rule binds \`return\`
+-- >   rather than naming an act
+-- > this obligation's pattern matches any \`Amount Transferred\` the condition
+-- >   accepts: the rule binds it and tests it only through that condition
+--
+-- Ninety-seven and one hundred and thirty characters. A caption cannot carry
+-- either: it is wrapped at 'L4.StateGraph.Dot.labelWidth' (36 columns) inside a
+-- box GraphViz sizes to it, and a 97-character sentence on an arrow is the
+-- defect this whole branch exists to remove. So the picture says the short
+-- form — @the rule binds \`price\`@, or @any act by this party would match this
+-- obligation@ where the act itself is open — and the list says the long one.
+--
+-- What must NOT drift is the distinction: both surfaces separate an open
+-- ARGUMENT from an open ACT, and they must never disagree about which a given
+-- obligation is. The shared vocabulary is "binds" and the back-quoted name;
+-- the sentences around it are free to differ, because one has a line and the
+-- other has a box. Do not "fix" this by lengthening the caption.
 --
 -- The back quotes are the picture\'s, not the act\'s: they are here, in a
 -- clause "L4.StateGraph.Dot" renders and no machine parses, and never inside
