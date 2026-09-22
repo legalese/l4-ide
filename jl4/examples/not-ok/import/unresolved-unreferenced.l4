@@ -1,0 +1,18 @@
+-- The same unresolvable IMPORT as `unresolved-referenced.l4`, with nothing in
+-- this module reading anything from it.
+--
+-- This is the half that was silent (smucclaw/l4-ide#971). The module typechecks
+-- -- an unresolvable IMPORT does not stop it -- so the only thing that can fail
+-- this fixture is the IMPORT diagnostic being believed on its own. `l4 check`
+-- has always believed it and exited 1; `jl4-test` did not, because its verdict
+-- was the entry module's typecheck alone, and it scored this shape a PASS. See
+-- `isStructuralError` in checkFile, jl4/tests/Main.hs.
+--
+-- So: if this file ever goes green while its golden still shows the IMPORT
+-- error, the harness has stopped looking at published diagnostics again.
+
+IMPORT `zz-no-such-module-971`
+
+GIVEN amount IS A NUMBER
+GIVETH A NUMBER
+`double` amount MEANS amount TIMES 2

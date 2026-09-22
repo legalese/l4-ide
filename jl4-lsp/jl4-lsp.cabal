@@ -159,6 +159,8 @@ test-suite jl4-lsp-test
   main-is: Spec.hs
   other-modules:
     HoverDisplaySpec
+    ImportDiagnosticSpec
+    ImportUriSpec
     LibraryResolutionSpec
     OutOfScopeGivenFixSpec
     StateGraphLensSpec

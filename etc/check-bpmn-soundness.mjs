@@ -71,6 +71,55 @@
 // properly now, and reported: because completion can then be reached by
 // terminating, the report says how many markings can complete ONLY that way.
 //
+// A TERMINATING END BESIDE CONCURRENCY OWES A FIDELITY NOTE. This is the third
+// class of finding, reported as `FIDELITY`, and it is the mechanised form of a
+// lesson this script learned the hard way. Terminating is a legitimate way to
+// complete, so S1-S4 all pass on a file where one branch's BREACH throws away
+// duties its siblings had already earned — and for four goldens they did, for
+// four days, while this script printed the evidence on every run under `info`:
+//
+//     info  121 marking(s) can reach completion ONLY by terminating
+//
+// A severity class nobody triages is not a gate. So: where a terminating end
+// event can fire in a marking that holds tokens BESIDES the one it consumes, the
+// discarding is real and the file must SAY SO — in the fidelity report beside it
+// (`l4 export --fidelity-report` writes `<stem>.fidelity.txt`), which is the one
+// channel. See `declaresSiblingLoss` for exactly what counts, and
+// doc/exports/dmn-bpmn.md for the reader-facing statement of the rule.
+//
+// WHAT "SAY SO" MEANS IS THE WHOLE DIFFICULTY, and it is settled structurally: the
+// note has to be filed on the terminating end event, or on the junction that made
+// the discarded tokens concurrent with it in the first place — never merely
+// somewhere the loss passes through. See `forkAnalysis`.
+//
+// THREE THINGS HERE WERE REPAIRED ON 2026-09-21, all three found by review, and
+// all three are worth knowing before editing this:
+//
+//  * the trigger is per end event and MEASURED (`explore`'s `discards`), not the
+//    net's `peak`. Peak concurrency does not ask whether the concurrency and the
+//    terminate ever meet, and a breach boundary upstream of a split fails it while
+//    losing nothing — with nothing an author could write to satisfy it.
+//  * a `<documentation>` on the end event USED to be a second channel, and was
+//    removed: the exporter puts a counterfactual about error ends on exactly that
+//    element, so the channel green-lit the very defect this rule mechanises
+//    against. A file with no report is NOT EVALUATED rather than failed, which is
+//    also what stops the verdict depending on whether `--fidelity-report` was
+//    passed.
+//  * WHICH NOTE COUNTS is now a structural question and not a textual one. Twice
+//    it was not, and twice the rule went green on the very defect it was written
+//    from. What counts is `forkAnalysis`: a note must be filed on the terminating
+//    end event, or on a junction that made EVERY discarded token concurrent with
+//    it. A true note about a neighbouring loss no longer exempts anything — see
+//    `unsound/refork-beside-party-cross-instance.bpmn`, where a real `P-NOJOIN`
+//    about an unjoined RAND used to exempt a member of a cast cancelling another
+//    member.
+//
+// Like a STRUCTURE finding this makes the file UNSOUND and exits 1, and for the
+// same reason: the verdict is "may this ship", and a diagram that silently
+// cancels a duty is not one a reader should be handed. It is NOT a claim that
+// van der Aalst soundness fails — the S1-S4 lines say PASS right above it, which
+// is how a reader tells the two apart.
+//
 // ZERO INSTALL, ZERO DEPENDENCIES. Node only, no network:
 //
 //   node etc/check-bpmn-soundness.mjs jl4/examples/bpmn/expected/*.bpmn
@@ -222,6 +271,22 @@ function readBpmn(xml) {
     ) {
       openEnd.terminating = true;
       openEnd.terminatingVia = name;
+      continue;
+    }
+
+    // The end event's own <documentation>. NOT read by any check: it was a
+    // channel of the declaration rule until 2026-09-21 and is not one now, for
+    // the reason in the header. Still parsed, because a diagnostic that can quote
+    // what the element says about itself is worth more than one that cannot, and
+    // because deleting a reader is not how you retire a channel. The content is
+    // plain text with no child elements, so the next '<' after the open tag is
+    // the closing tag.
+    if (openEnd && name === "documentation" && !isLeaf) {
+      const from = m.index + m[0].length;
+      const to = text.indexOf("<", from);
+      openEnd.doc =
+        (openEnd.doc ?? "") +
+        (to === -1 ? text.slice(from) : text.slice(from, to));
       continue;
     }
 
@@ -435,6 +500,7 @@ function expandScopes(proc, n) {
       notes,
       sourceOf,
       fanIn: new Set(),
+      instanceSplits: new Set(),
       expanded: false,
     };
 
@@ -758,6 +824,10 @@ function expandScopes(proc, n) {
     notes,
     sourceOf,
     fanIn,
+    // The gateways that ARE a scope's multiplicity. A fork here separates one
+    // member's run from another's, and the fidelity rule treats that differently
+    // from an ordinary split: see `coverOf`.
+    instanceSplits: new Set([...rewritten.values()].map((r) => r.split)),
     expanded: true,
   };
 }
@@ -1035,6 +1105,18 @@ function explore(net) {
   const fired = new Set(); // transition ids
   const firedNodes = new Set();
   let peak = 0;
+  // Per terminating end event: the largest number of tokens a firing of it
+  // actually throws away, the union of the places those tokens sat on, and the
+  // (place it consumed, place it discarded) PAIRS. This is the measurement the
+  // declaration rule reads, and it is exact within the explored state space —
+  // `peak` is not, because it does not ask whether the concurrency and the
+  // terminate ever meet.
+  //
+  // The pairs are what `forkAnalysis` needs. Which construct made a discarded
+  // token concurrent with this terminate is a question about the two places, not
+  // about the end event: the same end event reached down two different flows can
+  // be on the far side of a split in one firing and on the near side in another.
+  const discards = new Map(); // node id -> { lost, places: Set, pairs: Set }
   let unsafePlaces = new Set();
   let overflowed = false;
   const queue = [t0];
@@ -1058,6 +1140,29 @@ function explore(net) {
       enabled++;
       fired.add(t.id);
       firedNodes.add(t.node);
+
+      // What reaching this end event costs, here: every token in this marking
+      // except the one it consumes is discarded. Recorded for every marking the
+      // transition is enabled in, so the worst case is a maximum over real
+      // firings rather than an over-approximation.
+      if (t.clears) {
+        const lost = total - 1;
+        let rec = discards.get(t.node);
+        if (!rec) {
+          rec = { lost: 0, places: new Set(), pairs: new Set() };
+          discards.set(t.node, rec);
+        }
+        if (lost > rec.lost) rec.lost = lost;
+        if (lost > 0) {
+          const rest = new Map(marking);
+          rest.set(t.consume[0], (rest.get(t.consume[0]) ?? 0) - 1);
+          for (const [pl, c] of rest)
+            if (c > 0) {
+              rec.places.add(pl);
+              rec.pairs.add(`${t.consume[0]}\u0000${pl}`);
+            }
+        }
+      }
 
       const next = new Map(marking);
       for (const p of t.consume) next.set(p, next.get(p) - 1);
@@ -1127,6 +1232,7 @@ function explore(net) {
     fired,
     firedNodes,
     peak,
+    discards,
     unsafePlaces,
     overflowed,
     deadlocks,
@@ -1166,6 +1272,260 @@ function explainStuck(net, marking) {
 }
 
 // ---------------------------------------------------------------------------
+// WHICH CONSTRUCT MADE TWO TOKENS CONCURRENT
+// ---------------------------------------------------------------------------
+//
+// A loss is a terminate throwing away a token that was in flight beside it, and
+// the reason those two tokens were in flight at once is always one specific
+// construct: a parallel split, a non-interrupting boundary, or the expansion of a
+// multi-instance scope into its copies. Whichever it is, THAT is the element a
+// fidelity note about this loss has to be filed on — it is the junction a reader
+// clicks to find out why there was a second token at all.
+//
+// Nothing else works as a discriminator. A note filed anywhere the loss merely
+// TOUCHES is not about this loss: `P-NOJOIN` on the top-level split of
+// tenancy-fork-beside-party is a true note about that split's two branches
+// abandoning each other, and it says nothing whatever about one member of a cast
+// cancelling another member — yet re-marking the fork's breach end as an error
+// end is exactly the defect of pre-fcd7ecb2c, and the reviews of 2026-09-21 found
+// it passing SOUND "declared" by that note. See
+// `unsound/refork-beside-party-cross-instance.bpmn`, which is that mutation,
+// committed.
+//
+// In the net a construct that makes tokens concurrent is a transition producing
+// more than one place at once, and its BRANCHES are those places. So: a fork
+// SEPARATES a discarded place from the place the terminate consumed when the two
+// are reachable from two DIFFERENT branches of it. The elements that could
+// declare a whole loss are the forks that separate EVERY one of its
+// (consumed, discarded) pairs — and when no fork does, no junction accounts for
+// the loss and the only element left is the end event itself.
+//
+// Exact within the explored state space, and computed from the net that was
+// played rather than from the file: a scope's copies are separated by its
+// expansion split, whose `sourceOf` is the scope, which is the id a note can
+// name.
+function forkAnalysis(net) {
+  const succ = new Map(); // place -> places one transition away
+  const touch = (p) => {
+    if (!succ.has(p)) succ.set(p, new Set());
+    return succ.get(p);
+  };
+  for (const p of net.initial.keys()) touch(p);
+  for (const tr of net.transitions) {
+    for (const q of tr.produce) touch(q);
+    for (const c of tr.consume) {
+      const s = touch(c);
+      for (const q of tr.produce) s.add(q);
+    }
+  }
+  const reach = new Map();
+  for (const p of succ.keys()) {
+    const seen = new Set([p]);
+    const stack = [p];
+    while (stack.length) {
+      const x = stack.pop();
+      for (const y of succ.get(x) ?? [])
+        if (!seen.has(y)) seen.add(y), stack.push(y);
+    }
+    reach.set(p, seen);
+  }
+  const forks = net.transitions
+    .filter((tr) => tr.produce.length > 1)
+    .map((tr) => ({ node: tr.node, branches: tr.produce }));
+  const branchesHolding = (f, place) =>
+    f.branches
+      .map((b, i) => ((reach.get(b) ?? new Set([b])).has(place) ? i : -1))
+      .filter((i) => i >= 0);
+  // The forks that separate `discarded` from `consumed`.
+  const separators = (consumed, discarded) => {
+    const out = new Set();
+    for (const f of forks) {
+      const di = branchesHolding(f, discarded);
+      if (di.length === 0) continue;
+      const ci = branchesHolding(f, consumed);
+      if (ci.some((j) => di.some((i) => i !== j))) out.add(f.node);
+    }
+    return out;
+  };
+  return { separators };
+}
+
+// ---------------------------------------------------------------------------
+// FIDELITY: a terminating end beside concurrency has to be declared
+// ---------------------------------------------------------------------------
+
+// The phrases that COUNT as declaring the loss. This list is the contract, not
+// a heuristic: adding to it is a deliberate act, and the reason it can be a
+// short list of fixed shapes is that the thing being declared is one specific
+// fact — reaching this end throws away the tokens still in flight.
+//
+// Every entry was read off text already in the tree rather than invented, and
+// the gloss is what the checker prints when it has to say what it was looking
+// for.
+//
+// A PHRASE IS NEVER ENOUGH ON ITS OWN, and the review of 2026-09-21 is why.
+// Measured over every `.fidelity.txt` in jl4/examples/bpmn/expected/ and every
+// `<documentation>` in every `.bpmn` under jl4/examples/bpmn/, BEFORE any
+// narrowing: these phrases match in three places, and only the first is a
+// declaration.
+//
+//  * `P-NOJOIN` (`lossy`) on `offering` and on `tenancy-fork-beside-party` —
+//    the two goldens that owe one;
+//  * `P-FORK-BREACH-UNMARKED` (`advisory`) on all four fork goldens, where the
+//    wording is about the errorEventDefinition the end event does NOT carry;
+//  * the exporter's own `<documentation>`, which reads "A plain end and not an
+//    error end: an error end event ends every active thread in the process, so it
+//    would cancel the instances of the members who did not breach."
+//
+// That third one is a COUNTERFACTUAL — it exists to say this end is NOT an error
+// end — and it matches the fourth phrase below. Measured 2026-09-21 by reading
+// the enclosing tag at every occurrence — eight of them, being the six named here
+// and the two copies of them under `unsound/` — it sits on an `endEvent` and
+// never on a boundary event: `EndBreach_0` in modals-may-fork,
+// modals-must-fork-join-deadline, modals-shant-fork and tenancy-fork,
+// `EndBreach_1` in tenancy-fork-beside-party, and `End_3` in
+// sound/mi-subprocess-fork. An earlier version of this comment called it "the
+// escalation boundary's", which was wrong, and the error mattered: a per-element
+// channel reading the TERMINATING END EVENT's own documentation therefore did not
+// exclude it, and re-marking a fork's breach end as an error end passed SOUND,
+// "declared" by a sentence saying the opposite. The witness is committed as
+// `unsound/refork-counterfactual-documentation.bpmn`.
+//
+// So the rule reads the exporter's fidelity report and nothing else, and what it
+// gates on is the ELEMENT the note is filed against and the note's SEVERITY, in
+// that order of importance. Both live in `declaresSiblingLoss`; the phrase list is
+// the third and weakest filter, and the paragraph above `declaresSiblingLoss` has
+// the measurement showing it no longer decides anything on its own.
+const SIBLING_LOSS_PHRASES = [
+  // P-NOJOIN, jl4-core/src/L4/Bpmn/Lower.hs — the exporter's own wording.
+  [/abandons?\s+(?:its|their)\s+siblings/i, '"abandons its siblings"'],
+  [
+    /without\s+waiting\s+for\s+(?:its|their)\s+siblings/i,
+    '"without waiting for its siblings"',
+  ],
+  // This script's own `info` line, and jl4/examples/bpmn/sound/README.md.
+  [
+    /discards?\s+every\s+(?:remaining|other)\s+token/i,
+    '"discards every remaining token"',
+  ],
+  [
+    /ends?\s+every\s+(?:active\s+)?(?:thread|branch|instance)/i,
+    '"ends every active thread"',
+  ],
+  [
+    /cancel(?:s|led|ling)?\s+the\s+(?:live\s+)?instances/i,
+    '"cancels the live instances"',
+  ],
+];
+
+// One note of a rendered fidelity report, as `L4.Interchange.Fidelity.renderNote`
+// writes it:
+//
+//     "  [P-NOJOIN] lossy — Split_1"
+//     "      <message>"
+//     "      lost: <what>"
+//
+// Read independently of the exporter, on purpose and for the same reason this
+// script does not use bpmn-moddle: if the two disagree about what the report
+// says, that has to show up as a disagreement.
+function readFidelityReport(bpmnPath) {
+  const path = bpmnPath.replace(/\.bpmn$/, ".fidelity.txt");
+  let text;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch {
+    return { path, present: false, notes: [] };
+  }
+  const notes = [];
+  let cur = null;
+  for (const line of text.split("\n")) {
+    const m = /^ {2}\[([^\]]+)\] (blocking|lossy|advisory) — (.*)$/.exec(line);
+    if (m) {
+      cur = { code: m[1], severity: m[2], element: m[3], text: line };
+      notes.push(cur);
+    } else if (cur && /^ {6}\S/.test(line)) {
+      cur.text += "\n" + line;
+    } else {
+      cur = null;
+    }
+  }
+  return { path, present: true, notes };
+}
+
+// Does this file's fidelity report declare that reaching `t` throws away the
+// tokens still in flight?
+//
+// ONE channel, which is the repair of 2026-09-21. The rule reads the
+// `<stem>.fidelity.txt` the exporter writes beside the file (`--fidelity-report`,
+// rendered by `L4.Interchange.Fidelity.renderNote`) and nothing else. There used
+// to be a second channel — a `<documentation>` on the terminating end event, for
+// a hand-written diagram with no report — and it was unsound, because the
+// exporter puts a counterfactual about error ends on exactly that element; see
+// the note above `SIBLING_LOSS_PHRASES`. A checker that has to tell a declaration
+// from a counterfactual by reading prose is a checker that will be wrong again.
+//
+// A file with no report beside it is now NOT EVALUATED rather than failed, which
+// is also what stops the verdict depending on how the file was emitted:
+// `--fidelity-report` is opt-in, so byte-identical XML used to flip SOUND to
+// UNSOUND on the presence of a sidecar, and anyone checking a diagram they were
+// handed got exit 1 for a missing file rather than for anything wrong with the
+// diagram.
+//
+// TWO narrowings, and the FIRST one is the discriminator:
+//
+//  1. THE ELEMENT, and it is now structural. The note must be filed either on
+//     the terminating end event itself, or on a junction that ACCOUNTS FOR THE
+//     WHOLE LOSS — a fork that separates every one of the (consumed, discarded)
+//     pairs measured for this end event. See `forkAnalysis`. Two earlier versions
+//     of this narrowing were vacuous and both were caught by review on
+//     2026-09-21: the first looked for the end event's id or `name` ANYWHERE in
+//     the note text (every terminating end in this corpus is called "Breach" and
+//     the exporter's prose says "breach" constantly), and the second accepted any
+//     element the loss merely TOUCHED, which on a fork beside an unjoined RAND is
+//     most of the diagram — so one true `P-NOJOIN` about the split's branches
+//     exempted a cross-instance cancellation it says nothing about.
+//
+//  2. SEVERITY. The note must be filed `lossy` or `blocking`. A declared loss IS
+//     a loss, and `advisory` is by its own definition the severity that forfeits
+//     nothing. This is what keeps `P-FORK-BREACH-UNMARKED` from answering the
+//     question — it is filed on exactly the right element and forfeits nothing.
+//
+// A PHRASE IS A THIRD FILTER AND IS NOT THE DISCRIMINATOR. It was, and that was
+// the defect: the element test admitted half the diagram, so the five phrases
+// below were the only thing separating a declaration from an unrelated note.
+// Measured 2026-09-21 after the element test became structural, by replacing
+// `phrase` with a function that always matches and re-running
+// `etc/check-bpmn-soundness.selftest.mjs`: 35 fixtures checked, 0 failures, and no
+// verdict moves on any of the 31 `.bpmn` files under `jl4/examples/bpmn/`. Before
+// that repair the same mutation turned both red FIDELITY fixtures green. So the
+// list is kept as a courtesy filter — it rejects a note that admits a loss at the
+// right element while plainly describing a different one — and NOT as the rule. It
+// has a cost to know about: a genuine declaration worded some other way is
+// refused, so the finding names this list as the place to look, and adding a form
+// to it stays a deliberate act. If this mutation ever fails the self-test again,
+// the element test has been loosened; fix that, not this.
+//
+// WHAT THIS STILL DOES NOT CHECK, said out loud so nobody has to find out: it
+// does not judge whether the note's PROSE is about this loss. No text test can.
+// What it does guarantee is that the note is filed at a severity that admits a
+// loss, on an element that either IS the end event or is the one junction the
+// whole loss came through.
+function declaresSiblingLoss(t, report, accepts) {
+  const phrase = (s) => SIBLING_LOSS_PHRASES.find(([re]) => re.test(s));
+  for (const note of report.notes) {
+    if (note.severity === "advisory") continue;
+    if (!accepts.has(note.element)) continue;
+    const hit = phrase(note.text);
+    if (hit)
+      return {
+        where: `${report.path} [${note.code}] on ${note.element}`,
+        gloss: hit[1],
+      };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Driver
 // ---------------------------------------------------------------------------
 
@@ -1180,6 +1540,9 @@ if (files.length === 0) {
 
 let worst = 0;
 for (const file of files) {
+  // The exporter's own fidelity report, if this file has one beside it. Read
+  // once per file: it is a property of the document, not of an instance count.
+  const report = readFidelityReport(file);
   let parsed;
   try {
     parsed = readBpmn(readFileSync(file, "utf8"));
@@ -1297,7 +1660,150 @@ for (const file of files) {
           [...r.unsafePlaces].every((pl) => ex.fanIn.has(pl)),
         ],
       ];
-      const sound = results.every(([, ok]) => ok) && net.problems.length === 0;
+      // THE RULE. An end event that discards every remaining token is a loss
+      // only when there is ever a token for it to discard, and that is MEASURED
+      // per end event rather than inferred: `r.discards` holds, for each
+      // terminating end, the largest number of tokens any firing of it really
+      // throws away and the union of the places those tokens sat on.
+      //
+      // `r.peak > 1` was the old test and was an over-approximation. It asks
+      // whether the NET is ever concurrent, not whether the concurrency and the
+      // terminate ever meet. A breach boundary strictly upstream of a split trips
+      // it and loses nothing — the exporter emits exactly that from one ordinary
+      // obligation followed by a joinable RAND — and no note could ever have
+      // satisfied the rule there, because there is nothing to declare. Found in
+      // review on 2026-09-21; the witness is committed as
+      // `sound/terminate-upstream-of-split.bpmn`, with its real fidelity report
+      // beside it so the file is checked rather than skipped.
+      const srcId = (id) => ex.sourceOf.get(id) ?? id;
+      const flowById = new Map(proc.flows.map((f) => [f.id, f]));
+      const fa = forkAnalysis(net);
+
+      // WHICH ELEMENTS COULD DECLARE THIS LOSS: the end event itself, plus the
+      // forks that separate EVERY (consumed, discarded) pair of it — the
+      // junctions that made each thrown-away token concurrent with this
+      // terminate in the first place. A fork that separates some pairs and not
+      // others does not account for the loss and is not enough, which is the
+      // whole repair of 2026-09-21: `P-NOJOIN` on a top-level split accounts for
+      // a sibling BRANCH being abandoned and never for a sibling INSTANCE, so a
+      // fork whose breach end has been re-marked as an error end has no
+      // declaring element but the end event.
+      //
+      // Instance copies map back to the ids a reader can find in the file, since
+      // a note can only ever name those.
+      // A CROSS-INSTANCE LOSS CAN ONLY BE DECLARED ON THE END EVENT, and that is
+      // not a policy choice but a fact about the file: when the fork that made
+      // the two tokens concurrent is a scope's own multiplicity, the token thrown
+      // away belongs to ANOTHER MEMBER'S RUN, and no element in the document
+      // names another member's run. The scope's id names the drawn box — which is
+      // what the exporter's own notes on it are about (P-CAST is the cardinality,
+      // P-FORK-JOIN the wait, P-FORK-LANES the bands) — so accepting it would
+      // accept a note about the box as a declaration about one member cancelling
+      // another. Measured 2026-09-21: it did exactly that, and `P-FORK-JOIN` on
+      // the scope was rejected only by its wording.
+      const instanceSplits = ex.instanceSplits ?? new Set();
+      const coverOf = (t, d) => {
+        let cover = null;
+        let crossInstance = false;
+        for (const pair of d.pairs) {
+          const [consumed, discarded] = pair.split("\u0000");
+          const sep = new Set();
+          for (const x of fa.separators(consumed, discarded)) {
+            if (instanceSplits.has(x)) crossInstance = true;
+            else sep.add(srcId(x));
+          }
+          if (cover === null) cover = sep;
+          else for (const x of [...cover]) if (!sep.has(x)) cover.delete(x);
+          if (cover.size === 0) break;
+        }
+        return { cover: cover ?? new Set(), crossInstance };
+      };
+
+      // Named only to say what the loss reaches, in the finding's own words. It
+      // is NOT the set a note may be filed on: see `coverOf`.
+      const touchedBy = (d) => {
+        const ids = new Set();
+        for (const place of d.places) {
+          if (place.startsWith("flow:")) {
+            const f = flowById.get(place.slice(5));
+            if (f) for (const x of [f.source, f.target]) ids.add(srcId(x));
+          } else if (place.startsWith("act:")) ids.add(srcId(place.slice(4)));
+        }
+        return ids;
+      };
+
+      const declared = [];
+      const undeclared = [];
+      const notEvaluated = [];
+      const harmless = [];
+      for (const t of net.terminators) {
+        const d = r.discards.get(t.id);
+        if (!d || d.lost === 0) {
+          // Say that the measurement HAPPENED. A terminate that can only fire
+          // while it holds the last token forfeits nothing, and a reader must be
+          // able to tell that from "the rule did not run".
+          harmless.push(
+            `${describe(t)} can only fire while it holds the last token in ` +
+              `flight, so it discards nothing and owes no declaration`,
+          );
+          continue;
+        }
+        const { cover, crossInstance } = coverOf(t, d);
+        const accepts = new Set([srcId(t.id), ...cover]);
+        const touched = [...touchedBy(d)]
+          .filter((x) => x !== srcId(t.id))
+          .sort();
+        const shown = touched.slice(0, 6);
+        const elems =
+          shown.join(", ") +
+          (touched.length > shown.length
+            ? `, +${touched.length - shown.length} more`
+            : "");
+        const junctions = [...cover].sort();
+        const where = junctions.length
+          ? `on ${describe(t)} itself, or on the junction(s) that made those ` +
+            `tokens concurrent with it (${junctions.join(", ")})`
+          : crossInstance
+            ? `on ${describe(t)} itself, and nowhere else: what it throws away ` +
+              `is another member's run, and no element in this file names one`
+            : `on ${describe(t)} itself: no single junction made every one of ` +
+              `those tokens concurrent with it, so no other element accounts ` +
+              `for this loss`;
+        const cost =
+          `${describe(t)} throws away up to ${d.lost} token(s) still in flight, ` +
+          (crossInstance
+            ? `including the run of a member who did not breach — `
+            : `sibling work that was owed and now never happens; `) +
+          `the loss reaches ${elems}`;
+        const decl = report.present
+          ? declaresSiblingLoss(t, report, accepts)
+          : null;
+        if (decl)
+          declared.push(`${cost}. Declared in ${decl.where} by ${decl.gloss}`);
+        else if (!report.present)
+          notEvaluated.push(
+            `${cost}. CANNOT JUDGE: no fidelity report. There is no ` +
+              `${report.path} beside this file, so nothing here can declare the ` +
+              `loss and the declaration rule is NOT RUN — this is not a pass. ` +
+              `Re-emit with --fidelity-report, or write the report by hand, to ` +
+              `have it checked. A declaration belongs ${where}. See ` +
+              `doc/exports/dmn-bpmn.md, "a terminating end beside concurrency".`,
+          );
+        else
+          undeclared.push(
+            `${cost}. Nothing says so: ${report.path} has ` +
+              `${report.notes.length} note(s) and none of them declares THIS ` +
+              `loss — a declaration has to be a lossy or blocking note filed ` +
+              `${where}, and its text has to state the loss in one of the forms ` +
+              `listed at SIBLING_LOSS_PHRASES in this script. See ` +
+              `doc/exports/dmn-bpmn.md, "a terminating end beside concurrency".`,
+          );
+      }
+
+      const sound =
+        results.every(([, ok]) => ok) &&
+        net.problems.length === 0 &&
+        undeclared.length === 0;
 
       console.log(`${label}: ${sound ? "SOUND" : "UNSOUND"}`);
       for (const [name, ok] of results)
@@ -1320,6 +1826,10 @@ for (const file of files) {
       }
 
       for (const p of net.problems) console.log(`  STRUCTURE  ${p}`);
+      for (const h of harmless) console.log(`  info  ${h}`);
+      for (const d of declared) console.log(`  info  ${d}`);
+      for (const u of notEvaluated) console.log(`  info  ${u}`);
+      for (const u of undeclared) console.log(`  FIDELITY  ${u}`);
 
       if (r.deadlocks.length) {
         console.log(

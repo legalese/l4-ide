@@ -47,6 +47,7 @@
     </bpmn:parallelGateway>
     <bpmn:endEvent id="End_Ok" name="Fulfilled" />
     <bpmn:endEvent id="End_Breach" name="Breach">
+      <bpmn:documentation>Reaching this end stops the run for everybody, not just for the branch that reached it. The branch drawn alongside is not waited for: whatever it still had to do simply never happens, because an uncaught error end discards every remaining token. So one party's breach here cancels work another party still owed.</bpmn:documentation>
       <bpmn:errorEventDefinition id="ErrorDef_End_Breach" errorRef="Error_breach" />
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_Start_0__Split_0" sourceRef="Start_0" targetRef="Split_0" />

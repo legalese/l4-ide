@@ -1596,10 +1596,134 @@ stateGraphToBpmn opts sg =
       <> multiHenceFindings
       <> junctionObligationFindings
       <> cycleFindings
+      -- Before the two process-wide notes, so the element-level notes stay
+      -- together: this one is about an end event, and F2/F5 are about the whole
+      -- diagram. It cannot go back where it was built before — in the chain pass,
+      -- next to its barrier's own notes — because the element it names is not
+      -- known until every node pass has run.
+      <> barrierBreachFindings
       <> [bearerFinding | not (null parties)]
       <> [ruleVersionFinding]
       <> scopeFindings
       & retargetToScope
+      & dedupNotes
+
+  -- @F6@: ONE note per breach end event, built here and not in the chain pass,
+  -- because every fact it needs is a fact about the EMITTED FILE. See
+  -- 'quantifiedBreachNote' for the three ways the earlier version was wrong, all
+  -- of them a consequence of predicting those facts from the state graph instead.
+  --
+  --  * WHICH ELEMENT: read off the flow leaving the @LEST@ arm's own source, so
+  --    it is an id the file really has. Outside a fork that is @End_\<state\>@, as
+  --    before; inside one the terminal has been absorbed and the arm points at
+  --    the scope's throwing end instead.
+  --  * HOW MANY NOTES: one per element. Two barriers whose arms converge on one
+  --    end event are one loss with two causes, not two losses.
+  --  * SHARED WITH WHAT: counted on the flows INTO that element, and the other
+  --    arms are named, with the lane each sits in.
+  barrierBreachFindings :: [FidelityNote]
+  barrierBreachFindings =
+    concat
+      [ quantifiedBreachNote elt own others
+      | (elt, srcs) <- Map.toList barrierBreachArms
+      , let mine = Set.fromList srcs
+      , let (own, others) = armsInto elt mine
+      ]
+
+  -- The barrier states whose @LEST@ reaches @BREACH@, grouped by the end event
+  -- their arms actually reach, each carrying the sources of its own arms so those
+  -- are not reported as somebody else's.
+  barrierBreachArms :: Map Text [Text]
+  barrierBreachArms =
+    Map.fromListWith
+      (<>)
+      [ (elt, [src])
+      | s <- sg.sgStates
+      , let sid = s.stateId
+      , Just ob <- [henceOf sid <|> lestOf sid]
+      , isBarrierLabel ob.transLabel
+      , isJust (taskOf sid)
+      , Just lestT <- [lestOf sid]
+      , typeOfState lestT.transTo == Just TerminalBreach
+      , Just src <- [breachArmSource sid]
+      , Just elt <- [breachArmTarget sid src lestT.transTo]
+      ]
+
+  -- Where a state's @LEST@ arm LEAVES. 'raceArms' is the one place that choice is
+  -- made — a prohibition's breach leaves the task and its compliance the boundary,
+  -- every other modal the other way round — so asking it here is what keeps this
+  -- from disagreeing with the flow that was drawn.
+  breachArmSource :: StateId -> Maybe Text
+  breachArmSource sid =
+    snd
+      ( raceArms
+          ((henceOf sid <|> lestOf sid) >>= (.transLabel.labelModal))
+          (taskOf sid)
+          (boundaryOf sid)
+      )
+
+  -- The element that arm ends at, in the emitted file. One outgoing flow is the
+  -- unambiguous case and is every case in the corpus. Where the source has
+  -- several, the original terminal name settles it if it survived; otherwise this
+  -- returns Nothing and NO note is filed, because a note naming an element the
+  -- file does not have is worse than a missing note — a reader cannot even tell it
+  -- is wrong.
+  breachArmTarget :: StateId -> Text -> StateId -> Maybe Text
+  breachArmTarget _sid src terminal =
+    case nubOrd [f.flowTo | f <- allFlows, f.flowFrom == src] of
+      [sole] -> Just sole
+      targets
+        | orig `elem` targets -> Just orig
+        | otherwise -> Nothing
+   where
+    orig = "End_" <> Text.pack (show terminal)
+
+  -- Every arm into an element, split into this note's own barrier arms and the
+  -- rest, with the lane of each. A boundary event carries its host's lane, so
+  -- this names the party whose promise the arm belongs to.
+  --
+  -- Both halves are reported, and the OWN half is why: two barriers converging on
+  -- one breach end are ONE note, and a note saying \"the whole group's\" over an
+  -- event two groups reach is the same overclaim as saying it over an event a
+  -- single party also reaches. Measured 2026-09-21 on a probe of two RAND'd
+  -- barriers: one element, two arms, both of them a group's.
+  armsInto :: Text -> Set Text -> ([(Text, Maybe Text)], [(Text, Maybe Text)])
+  armsInto elt mine =
+    partition (\(src, _) -> Set.member src mine) $
+      [ (src, laneOf src)
+      | src <- nubOrd [f.flowFrom | f <- allFlows, f.flowTo == elt]
+      ]
+   where
+    laneOf n = listToMaybe [ln | x <- allNodes, x.nodeId == n, Just ln <- [x.nodeLane]]
+
+  -- Two notes that are equal in every field render as two IDENTICAL blocks in
+  -- the report, which tells a reader nothing the first one did not, and makes a
+  -- count of the notes wrong. They were not hypothetical: a note keyed on a
+  -- TERMINAL rather than on the state that reaches it is filed once per reaching
+  -- state, so two barriers whose @LEST@ arms converge on one breach end filed
+  -- @F6@ twice, byte for byte (measured 2026-09-21 on a probe:
+  -- @grep -c '\[F6\] lossy — End_3'@ was 2, against exactly one
+  -- @endEvent id=\"End_3\"@ in the XML).
+  --
+  -- __That is no longer what makes @F6@ single__, and the distinction matters if
+  -- this is ever edited: 'barrierBreachFindings' now files one note per END EVENT,
+  -- so the repeat does not arise. A dedup that HIDES a double emission is a
+  -- backstop, not a fix — it would have gone on hiding the same defect for any
+  -- note whose two copies happened to differ in a word. This stays as the backstop
+  -- it is.
+  --
+  -- Deduplicating on the WHOLE note, not on @(code, element)@: two notes that
+  -- differ in a word are two different things to tell the reader, and collapsing
+  -- them would be a silent edit. Only an exact repeat is dropped, which by
+  -- construction cannot change what the report says. First occurrence wins, so
+  -- emission order — the thing 'addNote' is careful about — is preserved.
+  dedupNotes :: [FidelityNote] -> [FidelityNote]
+  dedupNotes = go []
+   where
+    go _ [] = []
+    go seen (n : ns)
+      | n `elem` seen = go seen ns
+      | otherwise = n : go (n : seen) ns
 
   -- A note about the multi-instance activity has to name the element that
   -- carries the marker. @P-CAST@ is built in the chain pass, against the task,
@@ -2512,11 +2636,149 @@ numberWithUnit t = do
 -- Findings raised while building nodes
 --------------------------------------------------------------------------------
 
--- TODO (owed by the lts-diagrams session, on the blame set's merge;
--- EVERY-EACH-QUANTIFIER-SPEC §6.1.1, LTS-VISUALISER.md §4.9): an F-class
--- note that a barrier's error end event names NO party — every breach ends in
--- the one shared Error_breach, <endEvent name="Breach"> (L4.Bpmn.Emit) — where
--- the source now names the set of members who failed (R-T3).
+-- | What a quantified breach costs: BUILT 2026-09-21, discharging the TODO this
+-- comment replaced (owed by the lts-diagrams session on the blame set's merge;
+-- @EVERY-EACH-QUANTIFIER-SPEC.md@ §6.1.1, @LTS-VISUALISER.md@ §4.9).
+--
+-- A barrier's @LEST@ fires ONCE, for the group
+-- (@barrierFinish@, @L4.EvaluateLazy.Machine@), and since R-T3 the runtime hands
+-- that firing a NON-EMPTY LIST of failures rather than one party: one entry per
+-- failed obligation, undeduplicated, each entry naming what was failed and not
+-- merely who (@Failure@, @Blame@ and @ReasonForBreach@ in
+-- @L4.Evaluate.ValueLazy@). The
+-- diagram has ONE end event for the whole group. BPMN has no shape for a set of
+-- parties on an end event, so this is a loss of the notation — an @F@ code —
+-- rather than something more Haskell could recover.
+--
+-- 'Lossy', not 'Blocking': the breach itself IS drawn, and drawn in the right
+-- place. What is gone is who caused it.
+--
+-- __THREE ways this note was wrong about its ELEMENT rather than about the
+-- loss__, all three found by review on 2026-09-21 with no golden covering any of
+-- them. All three are answered by WHERE it is now built: 'barrierBreachFindings'
+-- in 'stateGraphToBpmn' runs after every node and edge pass, so it reads the
+-- emitted file rather than predicting it.
+--
+--  * it was keyed on the TERMINAL and built once per state that reaches it, so two
+--    barriers whose @LEST@ arms converge on one breach end filed it TWICE, byte
+--    for byte. It is now built once per END EVENT: the arms are collected, the
+--    elements deduplicated, and one note is filed per element. 'dedupNotes' would
+--    also have hidden this, and does not have to.
+--  * a breach terminal is not private to the group. Under @RAND@ one operand's
+--    breach is the whole contract's, and a barrier whose @HENCE@ obliges somebody
+--    who can breach in turn shares the terminal too — which is
+--    @tenancy-barrier@'s own shape, where @End_3@ is reached from the tenants'
+--    deadline AND from the landlord's. Saying "this is where the whole group's
+--    breach arrives" and stopping there told the reader that event was the
+--    group's. Sharing is now counted on the EMITTED FLOWS into the element, and
+--    the note names the other arms and whose lane each sits in, in both its
+--    message and its @lost@ — a reader of the @lost@ line alone was told the only
+--    thing hidden was which members breached, when in that file it is also
+--    hidden whether a member breached at all rather than the landlord.
+--  * the element id was DERIVED as @End_\<state id\>@, which is the terminal's
+--    name only outside a fork's scope. A barrier nested inside a fork's @HENCE@
+--    has its breach terminal absorbed by 'addForkScope' — the arm is re-pointed
+--    to @EscScope_\<root\>@ and the terminal is dropped as an orphan — so the
+--    shipped report named an element that is not in the file, the dangling-
+--    reference class @etc\/check-bpmn-dmn-refs.mjs@ exists for. The element is
+--    now read off the emitted flow leaving the @LEST@ arm's own source
+--    ('raceArms'), so it cannot be a name the file does not have; where that
+--    cannot be identified unambiguously, NO note is filed rather than a wrong
+--    one.
+--
+-- __Scoped to the barrier, deliberately.__ A fork's @LEST@ fires per member, so
+-- at each firing the blame is a singleton and the loss is a different one —
+-- WHICH member, not which set. That loss is currently stated in prose rather
+-- than as a note: 'escalationCatchName' names the boundary \"a member breached\"
+-- precisely because it cannot say which, and the caption's own comment says so.
+-- Whether it also deserves a note is a ruling nobody has made; filing @F6@ on a
+-- fork would claim a set-shaped loss the fork does not have.
+quantifiedBreachNote ::
+  -- | the end event the arms reach, as the emitted file names it
+  Text ->
+  -- | the BARRIER arms that end there: each element and its lane
+  [(Text, Maybe Text)] ->
+  -- | every other arm that ends there: each element and its lane
+  [(Text, Maybe Text)] ->
+  [FidelityNote]
+quantifiedBreachNote breachEnd ownArms others =
+  [ MkFidelityNote
+      { code = "F6"
+      , severity = Lossy
+      , element = breachEnd
+      , range = Nothing
+      , message =
+          "This is where the whole group's breach arrives, however it arose and \
+          \whoever caused it. The rule can be more specific: when a group \
+          \obligation fails, the run works out which members failed and lists \
+          \them \8212 one entry for each failure, so a member who failed in two \
+          \ways is named twice, and each entry says what that member owed and \
+          \when it was due. BPMN has no way to put a list of parties on an end \
+          \event, so this diagram records that the group breached and stops \
+          \there."
+            <> if manyGroups
+              then
+                " It does not even say WHICH group: more than one group \
+                \obligation in this rule ends here ("
+                  <> armList ownArms
+                  <> ")."
+              else ""
+            <> if shared
+              then
+                " And in this diagram it is not even only the group's: "
+                  <> armList others
+                  <> (if length others == 1 then " also ends" else " also end")
+                  <> " at this very event, so a reader who clicks here cannot \
+                     \tell that it was the group at all."
+              else ""
+      , lost =
+          "which members breached, and how each of them did. This event looks \
+          \the same whether one member fell short or all of them, so a reader \
+          \of the diagram cannot tell who to chase; only the rule's own run \
+          \can answer that."
+            <> if manyGroups
+              then
+                " Nor which GROUP: the arms of "
+                  <> armList ownArms
+                  <> " all end here, and the event distinguishes none of them."
+              else ""
+            <> if shared
+              then
+                " And here a larger thing is hidden, which this note used to \
+                \leave out: whether the group breached AT ALL. The same event \
+                \is also reached from "
+                  <> armList others
+                  <> ", so a reader cannot tell a member's shortfall from "
+                  <> whose
+                  <> "."
+              else ""
+      }
+  ]
+ where
+  shared = not (null others)
+  manyGroups = length ownArms > 1
+  -- Named as the reader will find them: the element, and whose band it sits in
+  -- when the diagram has lanes at all. A boundary event takes its host's lane
+  -- ('boundary' in 'stateGraphToBpmn'), so this is the party whose promise the
+  -- arm belongs to.
+  armList as = commaList [describeArm a | a <- as]
+  describeArm (elt, mLane) = elt <> maybe "" (\ln -> " (" <> ln <> ")") mLane
+  whose = case [ln | (_, Just ln) <- others] of
+    [] -> "another promise's in this rule"
+    lns -> "a shortfall of " <> commaList lns
+  commaList [] = ""
+  commaList [x] = x
+  commaList [x, y] = x <> " and " <> y
+  commaList (x : xs) = x <> ", " <> commaList xs
+
+-- | Is this label a quantified obligation whose join is a BARRIER?
+--
+-- Not the negation of 'isForkLabel': that one answers False for a label with no
+-- join at all, which is right for its callers and wrong here.
+isBarrierLabel :: TransitionLabel -> Bool
+isBarrierLabel l = case l.labelQuantifier >>= (.quantJoin) of
+  Just j -> case j.joinKind of Barrier _ -> True; Fork -> False
+  Nothing -> False
 
 -- | What an @EVERY@ costs in BPMN, in notes that fire independently.
 --

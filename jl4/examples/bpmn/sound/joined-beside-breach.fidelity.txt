@@ -1,0 +1,18 @@
+fidelity report — BPMN 2.0
+
+HAND-WRITTEN, not exporter output. This diagram is a checker fixture with no .l4
+source, so there is nothing to run `l4 export --fidelity-report` on; the report is
+written here by hand, in the format `L4.Interchange.Fidelity.renderNote` emits, so
+that the declaration rule in etc/check-bpmn-soundness.mjs is RUN over this file
+rather than skipped for want of a sidecar. The note code is local to this fixture
+for the same reason: no exporter pass emits this shape today.
+
+Filed on the SPLIT, deliberately. The rule accepts a declaration either on the
+terminating end event or on a junction that accounts for the whole loss, and this
+fixture is the hand-written witness for the second of those. Its sibling
+mi-subprocess-fork.fidelity.txt is the witness for the first, where the split is a
+scope's own multiplicity and the end event is the only place left.
+
+  [P-TERMINATE-CANCELS] lossy — Split_0
+      This RAND is joined, so both branches were meant to finish. They do not have to: the lower branch can reach BREACH, and its error end abandons its siblings rather than waiting for them, so whatever the upper branch still owed simply never happens. The join is drawn and is still correct — nothing waits forever — but it is only reached on the runs where nobody breaches.
+      lost: the work the other branch still owed at the moment of the breach, which the diagram shows as begun and does not show as cancelled

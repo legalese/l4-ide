@@ -13,7 +13,7 @@ module Main where
 import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Monad (unless, when)
-import Data.List (findIndex, isInfixOf, isPrefixOf, sort)
+import Data.List (findIndex, isInfixOf, isPrefixOf, nub, sort)
 import Data.Maybe (fromMaybe)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL8
@@ -38,7 +38,7 @@ import System.Directory
   )
 import System.Environment (getEnvironment, lookupEnv)
 import System.Exit (ExitCode(..), exitFailure)
-import System.FilePath ((</>))
+import System.FilePath ((</>), isAbsolute, normalise)
 import System.IO (hClose, hSetBinaryMode)
 import System.Process
   ( CreateProcess(..)
@@ -1489,6 +1489,161 @@ spec bin = do
       Output _ asked _ <- runL4 bin ["render", "--format", "text", "--lang", "zz", bilingualFixture]
       asked `shouldBe` plain
 
+  ----------------------------------------------------------------------------
+  -- The HTML wrapper's own language (smucclaw/l4-ide#970).
+  --
+  -- `<html lang=...>` used to be the literal "en" whatever was rendered, so a
+  -- Hebrew document arrived labelled English and with no `dir`, leaving the
+  -- browser to guess direction from the characters. The label is what a screen
+  -- reader picks a voice from and what `dir` hangs off, so it is not cosmetic.
+  --
+  -- Asserted here rather than as a golden because NO golden captures
+  -- `renderHtml` at all (measured 2026-09-21: its only callers are this CLI
+  -- verb and the LSP export handler), so a black-box CLI assertion is the only
+  -- guard this wrapper has.
+  ----------------------------------------------------------------------------
+  describe "l4 render --format html (document language)" $ do
+    let langModule = "examples/ok/nlg-module-lang.l4"   -- carries `@lang he`
+        -- The `<html>` wrapper ALONE, not the whole document. Asserting "no
+        -- `dir=` anywhere" would also forbid a per-element `dir="auto"` on a
+        -- prose span, which is the natural remedy for a MIXED document and is
+        -- not what any of these cases is about.
+        htmlTag s = unwords [ l | l <- lines s, "<html" `isPrefixOf` l ]
+
+    it "labels a Hebrew rendering he and marks it right-to-left" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "he", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+
+    it "labels the document en when English is asked for, and puts no dir on the wrapper" $ do
+      -- NOT "an English rendering", which is what this case used to be called:
+      -- the fixture's own comment says `is small` has no English herald, so
+      -- asking for English still renders that clause in Hebrew. The document is
+      -- MIXED and the label follows the REQUEST — ruled 2026-09-21 and written
+      -- up on doc/tutorials/natural-language-functions/optimising-natural-language-generation.md.
+      Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "en", langModule]
+      code `shouldBe` ExitSuccess
+      -- The absence of `dir` is half the assertion: `ltr` is the HTML default,
+      -- so the attribute appearing at all is what means "this runs the other way".
+      htmlTag sout `shouldBe` "<html lang=\"en\">"
+      -- … and this is the mixture the label is being honest about.
+      sout `shouldSatisfy` ("קטן מן הסף" `isInfixOf`)
+
+    it "falls back to the module's own @lang when no --lang is given" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+
+    it "falls back to en for a module that declares no language" $ do
+      -- bilingual.l4 tags its heralds individually and declares no `@lang`.
+      Output code sout _ <- runL4 bin ["render", "--format", "html", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"en\">"
+
+    ------------------------------------------------------------------------
+    -- A label the document cannot support.
+    --
+    -- `--lang he` on an all-English encoding used to emit
+    -- `<html lang="he" dir="rtl">`: not merely a wrong label but a layout
+    -- instruction, which moves an English full stop to the left end of its
+    -- line. Measured with fribidi on regcf.l4, which has 0 Hebrew codepoints.
+    -- Ruled 2026-09-21: when NOTHING in the module renders in the asked-for
+    -- language, the document keeps the language it declares and stderr says so.
+    ------------------------------------------------------------------------
+    it "does not relabel a document for a language nothing in it renders" $ do
+      -- clean.l4 carries no @nlg at all and declares no @lang.
+      Output code sout serr <- runL4 bin ["render", "--format", "html", "--lang", "he", cleanFixture]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"en\">"
+      serr `shouldSatisfy` ("no renderings in \"he\"" `isInfixOf`)
+      serr `shouldSatisfy` ("labelled \"en\"" `isInfixOf`)
+
+    it "keeps the module's declared language when the asked-for one is carried by nothing" $ do
+      Output code sout serr <- runL4 bin ["render", "--format", "html", "--lang", "zz", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+      serr `shouldSatisfy` ("no renderings in \"zz\"" `isInfixOf`)
+
+    it "says nothing on stderr for a format that does not label its language" $ do
+      -- `text`, `json` and `plan` carry the chosen WORDINGS and say nothing
+      -- about which language they are, so the note would be noise — and this
+      -- keeps `--format text --lang zz` byte-identical on both streams.
+      Output code _ serr <- runL4 bin ["render", "--format", "text", "--lang", "zz", langModule]
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` ("no renderings" `isInfixOf`)
+
+    ------------------------------------------------------------------------
+    -- The flag's own hygiene. Before this, `--lang` was echoed verbatim into
+    -- the attribute: `--lang 'he '` labelled the document `he ` AND silently
+    -- lost `dir="rtl"`, because the direction lookup compared `"he "` against
+    -- the table and missed. Exit 0, no diagnostic — a trailing space out of a
+    -- shell variable is how it arrives.
+    ------------------------------------------------------------------------
+    it "trims a --lang value, so a trailing space does not cost the direction" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "he ", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+
+    it "lowercases the primary subtag, which also makes --lang HE select the Hebrew heralds" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "html", "--lang", "HE", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+      sout `shouldSatisfy` ("עולה על הסף" `isInfixOf`)
+
+    it "passes a region subtag through unmangled, and falls back because nothing carries it" $ do
+      -- Two things at once, and the name says both because the label alone would
+      -- mislead: the reader keeps `he-IL` as typed (the stderr note quotes it
+      -- back verbatim), and the LABEL is still the module's `he`, because no
+      -- herald in the module is tagged `he-IL`.
+      Output code sout serr <- runL4 bin ["render", "--format", "html", "--lang", "he-IL", langModule]
+      code `shouldBe` ExitSuccess
+      htmlTag sout `shouldBe` "<html lang=\"he\" dir=\"rtl\">"
+      serr `shouldSatisfy` ("no renderings in \"he-IL\"" `isInfixOf`)
+
+    it "rejects an empty or malformed --lang instead of putting it in the markup" $ do
+      -- `he-`, `he--IL` and the over-long subtag are the SHAPE cases: every
+      -- character is legal and the tag is still not one, so a character-class
+      -- check alone would have let them into the attribute.
+      for_ ["", "  ", "-he", "he-", "he--IL", "abcdefghij", "he_IL", "en\"><script>"] \bad -> do
+        Output code _ serr <- runL4 bin ["render", "--format", "html", "--lang", bad, langModule]
+        code `shouldNotBe` ExitSuccess
+        serr `shouldSatisfy` ("Invalid --lang value" `isInfixOf`)
+
+  ----------------------------------------------------------------------------
+  -- The AKN document's own language.
+  --
+  -- Akoma Ntoso identifies an EXPRESSION by `/akn/doc/main/<lang>@<version>`,
+  -- where `<lang>` is an ISO 639-2 code. That literal was `eng` whatever was
+  -- rendered, so a Hebrew act was identified as an English expression — the same
+  -- defect as `<html lang="en">` (smucclaw/l4-ide#970), in the neighbouring
+  -- writer, and equally silent: the XML is well formed either way.
+  ----------------------------------------------------------------------------
+  describe "l4 render --format akn (expression language)" $ do
+    let langModule = "examples/ok/nlg-module-lang.l4"   -- carries `@lang he`
+        frbrOf s = unwords [ l | l <- lines s, "FRBRExpression" `isInfixOf` l ]
+
+    it "identifies a Hebrew expression as heb, from the module's own @lang" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "akn", langModule]
+      code `shouldBe` ExitSuccess
+      frbrOf sout `shouldSatisfy` ("/akn/doc/main/heb@" `isInfixOf`)
+      frbrOf sout `shouldNotSatisfy` ("/akn/doc/main/eng@" `isInfixOf`)
+
+    it "follows --lang, translating the subtag to the ISO 639-2 code" $ do
+      Output _ he _ <- runL4 bin ["render", "--format", "akn", "--lang", "he", langModule]
+      Output _ en _ <- runL4 bin ["render", "--format", "akn", "--lang", "en", langModule]
+      frbrOf he `shouldSatisfy` ("/akn/doc/main/heb@" `isInfixOf`)
+      frbrOf en `shouldSatisfy` ("/akn/doc/main/eng@" `isInfixOf`)
+
+    it "says eng for a module that declares nothing" $ do
+      Output code sout _ <- runL4 bin ["render", "--format", "akn", bilingualFixture]
+      code `shouldBe` ExitSuccess
+      frbrOf sout `shouldSatisfy` ("/akn/doc/main/eng@" `isInfixOf`)
+
+    it "puts the same language in the Manifestation URIs" $ do
+      Output _ sout _ <- runL4 bin ["render", "--format", "akn", langModule]
+      sout `shouldSatisfy` ("/akn/doc/main/heb@.xml" `isInfixOf`)
+      sout `shouldNotSatisfy` ("eng@" `isInfixOf`)
+
   describe "l4 ast" $ do
     it "dumps a parsed AST for a clean file" $ do
       Output code sout _ <- runL4 bin ["ast", cleanFixture]
@@ -2094,6 +2249,141 @@ spec bin = do
     expectEmbeddedImporterSeesOverride
       "...and also when the entry file is named bare"
       (checkFrom shadowImporterDir)
+
+  -- smucclaw/l4-ide#971: an IMPORT that resolves to nothing has to say so, and a
+  -- candidate URI has to read back as the path it was built from.
+  --
+  -- Every fixture here is written at run time and run with a RELATIVE entry path,
+  -- because that is the only regime the URI defect lives in. The CLI takes its
+  -- root directory from `takeDirectory` of the entry path, so `l4 run
+  -- importer.l4` from inside the project makes every candidate path relative --
+  -- and a relative `file:` URI cannot carry a percent-escape without losing it
+  -- (see `roundTrippingFileUri` in LSP.L4.Rules). Handed the very same files by
+  -- an ABSOLUTE path, the bug does not reproduce at all, which is why a suite
+  -- whose fixture paths all carry a directory component could not see it.
+  --
+  -- The basename that triggers it here is ASCII, with a SPACE in it. The defect
+  -- was found with Hebrew module names, but Hebrew is not the cause: any basename
+  -- that percent-escapes is lost the same way, and a space keeps a non-ASCII
+  -- FILENAME out of this suite, where it would depend on the runner's filesystem
+  -- encoding rather than on the code under test. jl4-lsp-test's ImportUriSpec
+  -- covers the non-ASCII spelling directly, at the string level, where no locale
+  -- is involved.
+  describe "l4 IMPORT resolution failures (#971)" $ do
+    let sandbox name files act = do
+          tmp <- getTemporaryDirectory
+          let dir = tmp </> name
+          removePathForcibly dir
+          createDirectoryIfMissing True dir
+          mapM_ (\(nm, body) -> BS.writeFile (dir </> nm) (TE.encodeUtf8 (T.pack body))) files
+          act dir
+        -- A library whose basename percent-escapes. It is ordinary L4 otherwise.
+        doubler = unlines
+          [ "GIVEN n IS A NUMBER"
+          , "GIVETH A NUMBER"
+          , "`double it` n MEANS n TIMES 2"
+          ]
+        runIn dir args = do
+          absDir <- makeAbsolute dir
+          runL4EmbeddedOnlyIn (Just absDir) bin args
+
+    it "resolves an import whose basename needs percent-escaping" $
+      sandbox "l4-971-escaping"
+        [ ("my mod.l4", doubler)
+        , ("importer.l4", "IMPORT `my mod`\n#ASSERT `double it` 3 EQUALS 6\n")
+        ] \dir -> do
+          Output code sout serr <- runIn dir ["run", "importer.l4"]
+          -- Before the fix this exited 1 with "I could not find a definition for
+          -- the identifier `double it`": the file WAS found on disk, and the URI
+          -- handed downstream read back as the literal name "my%20mod.l4".
+          case code of
+            ExitSuccess -> pure ()
+            ExitFailure n -> expectationFailure $
+              "Expected `my mod` to resolve, but l4 exited " ++ show n
+              ++ "\n--- stdout ---\n" ++ sout
+              ++ "\n--- stderr ---\n" ++ serr
+          sout `shouldSatisfy` ("assertion satisfied" `isInfixOf`)
+
+    it "reports an import of such a module that is genuinely broken" $
+      sandbox "l4-971-escaping-broken"
+        [ ("bad mod.l4", "THIS IS NOT L4 @@@\n")
+        , ("importer.l4", "IMPORT `bad mod`\n")
+        ] \dir -> do
+          -- The sharper half of the same defect: the import "resolved", the
+          -- imported module was never read, and nothing complained. Exit 0.
+          Output code sout serr <- runIn dir ["run", "importer.l4"]
+          code `shouldSatisfy` (/= ExitSuccess)
+          -- and the error must name the module that is actually broken
+          (sout ++ serr) `shouldSatisfy` ("bad mod.l4" `isInfixOf`)
+
+    it "fails, naming the module and where it looked, when an import resolves to nothing" $
+      sandbox "l4-971-missing"
+        [ ("importer.l4", "IMPORT `zz no such module 971`\n#ASSERT `double it` 3 EQUALS 6\n") ]
+        \dir -> do
+          Output code _sout serr <- runIn dir ["run", "importer.l4"]
+          code `shouldSatisfy` (/= ExitSuccess)
+          serr `shouldSatisfy`
+            ("could not find a module with this name: zz no such module 971" `isInfixOf`)
+          serr `shouldSatisfy` ("I have tried the following locations" `isInfixOf`)
+          -- The message has to be reachable. Until #971 an unresolved import was
+          -- reported as the importing module's own URI, so this run also said
+          -- "Your module depends on itself" -- TWICE on this fixture, against one
+          -- copy of the message that says what is wrong. (Measured 2026-09-21 on
+          -- a binary built at 57286d988: this fixture 2 under both `run` and
+          -- `check`; the unreferenced fixture below 3 under `run` and 1 under
+          -- `check`. The count is a function of how many rules ask for the
+          -- import, so it is a symptom to read rather than a constant: what is
+          -- asserted is that it is now zero.)
+          serr `shouldSatisfy` (not . ("depends on itself" `isInfixOf`))
+
+    it "fails even when nothing in the module reads the unresolved import" $
+      sandbox "l4-971-missing-unreferenced"
+        [ ("importer.l4", "IMPORT `zz no such module 971`\n") ]
+        \dir -> do
+          -- This is the case the issue is named for: with no reference to the
+          -- import there is no undefined-identifier error to notice, so the exit
+          -- code is the whole signal. It has always been 1 here; the golden suite
+          -- is the harness that could not see it (jl4/tests/Main.hs, checkFile).
+          Output code sout serr <- runIn dir ["run", "importer.l4"]
+          case code of
+            ExitFailure _ -> pure ()
+            ExitSuccess -> expectationFailure $
+              "An IMPORT that resolves to nothing left the module green."
+              ++ "\n--- stdout ---\n" ++ sout
+              ++ "\n--- stderr ---\n" ++ serr
+          serr `shouldSatisfy`
+            ("could not find a module with this name: zz no such module 971" `isInfixOf`)
+
+    it "lists each location it looked in once, not once per tier" $
+      sandbox "l4-971-duplicate-locations"
+        [ ("importer.l4", "IMPORT `zz no such module 971`\n") ]
+        \dir -> do
+          -- The message is a list of places to go and look, so a place listed
+          -- twice is a reader sent somewhere they have already been. It happened
+          -- because the in-memory tier keys a candidate by URI and the
+          -- filesystem tiers key it by path: with the project root at the
+          -- importing file's own directory -- which is what the CLI sets it to,
+          -- from `takeDirectory` of the entry path -- those name one file, and
+          -- the list printed `file://zz no such module 971.l4` above
+          -- `zz no such module 971.l4`. A text-level `nub` cannot see that.
+          --
+          -- So this compares the entries as FILES, not as strings.
+          absDir <- makeAbsolute dir
+          Output _code _sout serr <- runIn dir ["check", "importer.l4"]
+          let listed = locationsTried serr
+              -- `project:` is the web IDE's own scheme and names no path.
+              paths = filter (not . ("project:" `isPrefixOf`)) listed
+              asFile e = normalise (if isAbsolute e then e else absDir </> e)
+          listed `shouldSatisfy` (not . null)
+          -- Every place looked in is named as a PATH. That is the property that
+          -- rules out the same file appearing once as a VFS URI and once as a
+          -- path: there is no URI left for it to appear as. Comparing the two
+          -- spellings instead would mean percent-decoding a `file:` URI and
+          -- resolving /var -> /private/var inside a test, to reach the same
+          -- conclusion.
+          filter ("file:" `isPrefixOf`) paths `shouldBe` []
+          -- ...and no location is listed twice.
+          nub (map asFile paths) `shouldBe` map asFile paths
 
   -- Track S0: `l4 export --to=dmn|dmn-md|bpmn [--fidelity-report]`.
   --
@@ -5263,3 +5553,24 @@ spec bin = do
       expectFail bin ["catala", errorFixture]
   where
     for_ xs f = mapM_ f xs
+
+
+-- | The locations an unresolved-IMPORT diagnostic says it tried, one per entry,
+-- as they appear in @l4@'s stderr. Entries are indented under the message and
+-- separated by a trailing comma; the embedded-stdlib entry is not a path and is
+-- dropped, which is also why a caller cannot just stop reading at it -- it sits
+-- at its own rank in the middle of the list.
+locationsTried :: String -> [String]
+locationsTried serr =
+  case break ("I have tried the following locations" `isInfixOf`) (lines serr) of
+    (_, [])          -> []
+    (_, _hdr : rest) ->
+      [ e
+      | l <- takeWhile ("    " `isPrefixOf`) rest
+      , let e = dropTrailingComma (dropWhile (== ' ') l)
+      , not ("the stdlib embedded" `isPrefixOf` e)
+      ]
+  where
+    dropTrailingComma e
+      | not (null e), last e == ',' = init e
+      | otherwise                   = e
