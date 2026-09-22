@@ -510,6 +510,7 @@ edge src dst ty act =
           { labelParty = Just "Alice"
           , labelModal = Just DMust
           , labelAction = act
+          , labelBinds = Nothing
           , labelOpening = Nothing
           , labelDeadline = Nothing
           , labelGuard = Nothing
@@ -983,8 +984,8 @@ graphWithDeadline due =
         , ContractState 2 "Breach" TerminalBreach Linear Nothing Nothing
         ]
     , sgTransitions =
-        [ Transition 0 1 (TransitionLabel (Just "Alice") (Just DMust) "pay" Nothing (Just due) Nothing Nothing Nothing Nothing) HenceTransition
-        , Transition 0 2 (TransitionLabel Nothing Nothing "timeout" Nothing Nothing Nothing Nothing Nothing Nothing) LestTransition
+        [ Transition 0 1 (TransitionLabel (Just "Alice") (Just DMust) "pay" Nothing Nothing (Just due) Nothing Nothing Nothing Nothing) HenceTransition
+        , Transition 0 2 (TransitionLabel Nothing Nothing "timeout" Nothing Nothing Nothing Nothing Nothing Nothing Nothing) LestTransition
         ]
     , sgInitialState = 0
     }

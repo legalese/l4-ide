@@ -1773,10 +1773,20 @@ spec bin = do
         ["state-graph", "--dominators", "--all-states", "examples/ok/contracts.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("\"initial\" is the start state" `isInfixOf`)
+      -- Two things moved in this block on 2026-09-22 and neither is a change
+      -- to what dominates what. The state NAME carries the obligation\'s
+      -- @WITHIN@ ('L4.StateGraph.describeDeonton'), because without it the
+      -- promissory note drew three of its six states under one string. And
+      -- the act is printed by 'L4.Print.printActionPattern' now, which spells
+      -- a binder bare: @price@ was @`price`@ here for one day, under a
+      -- back-quote mark of the picture\'s own that also reached the BPMN task
+      -- names. Which of @price@ and @n@ BINDS is said in the DOT, in a clause
+      -- beside the act ('L4.StateGraph.labelBinds'); this view has no such
+      -- clause and does not claim one.
       sout `shouldSatisfy` (unlines
-        [ "  Every path to \"B must return\" passes through:"
+        [ "  Every path to \"B must return WITHIN 10\" passes through:"
         , "    - PARTY S delivery (MUST, WITHIN 3)"
-        , "    - PARTY B payment `price` (MUST, WITHIN 3, PROVIDED price AT LEAST 20)"
+        , "    - PARTY B payment price (MUST, WITHIN 3, PROVIDED price AT LEAST 20)"
         , "    - the arm IF NOT (price EQUALS 20)"
         ] `isInfixOf`)
 

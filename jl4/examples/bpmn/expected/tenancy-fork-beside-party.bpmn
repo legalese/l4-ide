@@ -43,8 +43,8 @@
     <bpmn:endEvent id="End_3" name="Breach">
       <bpmn:errorEventDefinition id="ErrorDef_End_3" errorRef="Error_breach" />
     </bpmn:endEvent>
-    <bpmn:task id="Task_4" name="MUST Deliver theLandlord">
-      <bpmn:documentation>PARTY theLandlord MUST Deliver theLandlord WITHIN 14</bpmn:documentation>
+    <bpmn:task id="Task_4" name="MUST Deliver (EXACTLY theLandlord)">
+      <bpmn:documentation>PARTY theLandlord MUST Deliver (EXACTLY theLandlord) WITHIN 14</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_4" name="after P14D" attachedToRef="Task_4" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within 14</bpmn:documentation>
@@ -69,8 +69,8 @@
         <bpmn:loopDataInputRef>DataInput_Scope_1</bpmn:loopDataInputRef>
         <bpmn:inputDataItem id="DataItem_Scope_1" name="t" itemSubjectRef="Item_receipts_and_delivery_t_cast_member" />
       </bpmn:multiInstanceLoopCharacteristics>
-      <bpmn:task id="Task_1" name="MUST Pay t theLandlord `amount`">
-        <bpmn:documentation>EVERY Tenant t IN tenants MUST Pay t theLandlord `amount` WITHIN 7 UPON EACH — one instance per member of the cast, each bound to ‘t’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). UPON EACH: what follows fires once per member, as that member completes. Everything after this act is drawn INSIDE a multi-instance sub-process, so each member gets their own copy of it and their own deadline; the box, not this task, carries the multi-instance marker. What the enclosure adds and the rule does not have is a synchronisation at the end of the box (P-FORK-JOIN).</bpmn:documentation>
+      <bpmn:task id="Task_1" name="MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount">
+        <bpmn:documentation>EVERY Tenant t IN tenants MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount WITHIN 7 UPON EACH — one instance per member of the cast, each bound to ‘t’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). UPON EACH: what follows fires once per member, as that member completes. Everything after this act is drawn INSIDE a multi-instance sub-process, so each member gets their own copy of it and their own deadline; the box, not this task, carries the multi-instance marker. What the enclosure adds and the rule does not have is a synchronisation at the end of the box (P-FORK-JOIN).</bpmn:documentation>
       </bpmn:task>
       <bpmn:boundaryEvent id="Boundary_1" name="after P7D" attachedToRef="Task_1" cancelActivity="true">
         <bpmn:documentation>LEST: the obligation is not discharged within 7</bpmn:documentation>

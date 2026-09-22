@@ -38,8 +38,8 @@
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="Start_0" />
-    <bpmn:task id="Task_0" name="MUST file the offering statement">
-      <bpmn:documentation>PARTY Issuer MUST file the offering statement WITHIN 21</bpmn:documentation>
+    <bpmn:task id="Task_0" name="MUST `file the offering statement`">
+      <bpmn:documentation>PARTY Issuer MUST `file the offering statement` WITHIN 21</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_0" name="after P21D" attachedToRef="Task_0" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within 21</bpmn:documentation>
@@ -50,8 +50,8 @@
     <bpmn:parallelGateway id="Split_1" name="all of" gatewayDirection="Diverging">
       <bpmn:documentation>RAND: every branch is entered</bpmn:documentation>
     </bpmn:parallelGateway>
-    <bpmn:task id="Task_2" name="MUST check the investor limit">
-      <bpmn:documentation>PARTY Intermediary MUST check the investor limit WITHIN 7</bpmn:documentation>
+    <bpmn:task id="Task_2" name="MUST `check the investor limit`">
+      <bpmn:documentation>PARTY Intermediary MUST `check the investor limit` WITHIN 7</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_2" name="after P7D" attachedToRef="Task_2" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within 7</bpmn:documentation>
@@ -63,8 +63,8 @@
     <bpmn:endEvent id="End_4" name="Breach">
       <bpmn:errorEventDefinition id="ErrorDef_End_4" errorRef="Error_breach" />
     </bpmn:endEvent>
-    <bpmn:task id="Task_5" name="SHANT advertise the terms">
-      <bpmn:documentation>PARTY Issuer SHANT advertise the terms WITHIN 30 — completing this activity means the prohibited act was performed, which is the LEST arm</bpmn:documentation>
+    <bpmn:task id="Task_5" name="SHANT `advertise the terms`">
+      <bpmn:documentation>PARTY Issuer SHANT `advertise the terms` WITHIN 30 — completing this activity means the prohibited act was performed, which is the LEST arm</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_5" name="after P30D, not performed" attachedToRef="Task_5" cancelActivity="true">
       <bpmn:documentation>the deadline passes (30) with the prohibited act not performed: the prohibition is respected, so this is the HENCE arm</bpmn:documentation>
@@ -72,8 +72,8 @@
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P30D</bpmn:timeDuration>
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
-    <bpmn:task id="Task_6" name="MUST file the annual report">
-      <bpmn:documentation>PARTY Issuer MUST file the annual report WITHIN 120</bpmn:documentation>
+    <bpmn:task id="Task_6" name="MUST `file the annual report`">
+      <bpmn:documentation>PARTY Issuer MUST `file the annual report` WITHIN 120</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_6" name="after P120D" attachedToRef="Task_6" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within 120</bpmn:documentation>
@@ -81,8 +81,8 @@
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P120D</bpmn:timeDuration>
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
-    <bpmn:task id="Task_7" name="SHANT resell the securities">
-      <bpmn:documentation>PARTY Investor SHANT resell the securities WITHIN 365 — completing this activity means the prohibited act was performed, which is the LEST arm</bpmn:documentation>
+    <bpmn:task id="Task_7" name="SHANT `resell the securities`">
+      <bpmn:documentation>PARTY Investor SHANT `resell the securities` WITHIN 365 — completing this activity means the prohibited act was performed, which is the LEST arm</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_7" name="after P365D, not performed" attachedToRef="Task_7" cancelActivity="true">
       <bpmn:documentation>the deadline passes (365) with the prohibited act not performed: the prohibition is respected, so this is the HENCE arm</bpmn:documentation>

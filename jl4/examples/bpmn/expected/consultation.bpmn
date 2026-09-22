@@ -33,15 +33,15 @@
     <bpmn:parallelGateway id="Split_0" name="all of" gatewayDirection="Diverging">
       <bpmn:documentation>RAND: every branch is entered</bpmn:documentation>
     </bpmn:parallelGateway>
-    <bpmn:task id="Task_1" name="MAY file written comments">
-      <bpmn:documentation>PARTY Resident MAY file written comments</bpmn:documentation>
+    <bpmn:task id="Task_1" name="MAY `file written comments`">
+      <bpmn:documentation>PARTY Resident MAY `file written comments`</bpmn:documentation>
     </bpmn:task>
-    <bpmn:task id="Task_2" name="MAY publish the record">
-      <bpmn:documentation>PARTY Registrar MAY publish the record</bpmn:documentation>
+    <bpmn:task id="Task_2" name="MAY `publish the record`">
+      <bpmn:documentation>PARTY Registrar MAY `publish the record`</bpmn:documentation>
     </bpmn:task>
     <bpmn:endEvent id="End_3" name="Fulfilled" />
-    <bpmn:task id="Task_4" name="MAY file a response">
-      <bpmn:documentation>PARTY Developer MAY file a response</bpmn:documentation>
+    <bpmn:task id="Task_4" name="MAY `file a response`">
+      <bpmn:documentation>PARTY Developer MAY `file a response`</bpmn:documentation>
     </bpmn:task>
     <bpmn:parallelGateway id="Join_0" gatewayDirection="Converging">
       <bpmn:documentation>every branch of the RAND must complete; each delivers exactly one token</bpmn:documentation>

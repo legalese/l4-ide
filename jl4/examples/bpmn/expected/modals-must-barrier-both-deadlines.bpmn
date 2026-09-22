@@ -28,8 +28,8 @@
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="Start_0" />
-    <bpmn:task id="Task_0" name="MUST Approve d">
-      <bpmn:documentation>EVERY Director d IN board MUST Approve d WITHIN 30 ONCE ALL HAVE WITHIN 10 — one instance per member of the cast, each bound to ‘d’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). ONCE ALL HAVE: the outgoing flow fires once, when every instance has completed — which is what a parallel multi-instance activity&apos;s completion means, so this barrier is drawn faithfully.</bpmn:documentation>
+    <bpmn:task id="Task_0" name="MUST Approve (EXACTLY d)">
+      <bpmn:documentation>EVERY Director d IN board MUST Approve (EXACTLY d) WITHIN 30 ONCE ALL HAVE WITHIN 10 — one instance per member of the cast, each bound to ‘d’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). ONCE ALL HAVE: the outgoing flow fires once, when every instance has completed — which is what a parallel multi-instance activity&apos;s completion means, so this barrier is drawn faithfully.</bpmn:documentation>
       <bpmn:ioSpecification id="IoSpec_Task_0">
         <bpmn:dataInput id="DataInput_Task_0" name="quorum_by_ten_d_cast" itemSubjectRef="Item_quorum_by_ten_d_cast" isCollection="true" />
         <bpmn:inputSet id="InputSet_Task_0">

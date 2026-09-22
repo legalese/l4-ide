@@ -259,15 +259,60 @@ oneOfEdgeColor = "#e8850c"
 --
 -- The second argument says the SOURCE state is the entry of this edge's own
 -- obligation, which "L4.StateGraph.Dot"\'s caller settles structurally
--- ('transitionToEdge'). When it holds, the party, the modal and the act are
--- left off: the node carries them, and an edge is worth reading for what is
--- NEW along it — the window, the guard, the join line.
+-- ('transitionToEdge'). When it holds, the party, the modal, the act AND the
+-- window are left off: the node carries all four, and an edge is worth reading
+-- for what is NEW along it — the guard, the opening, the join line.
 --
--- This is a RENDERING choice and nothing more. 'TransitionLabel' keeps all
--- three fields on every edge, because @L4.Bpmn.Lower@ builds its task name and
--- its lane from them, @L4.Lts.List@ prints them, and the DMN wiring resolves
--- through them; a consumer holding one edge must still be able to read the
--- whole obligation off it.
+-- The window joined that list on 2026-09-22, when 'L4.StateGraph.describeDeonton'
+-- began carrying it onto the node. Read the two together: the deadline is not
+-- gone from the drawing, it has moved one step back along the same arrow, and
+-- the count of deadlines around a state is what it was.
+--
+-- Unless there is nothing new. An obligation with none of those has a blank
+-- arm under a plain reading of the paragraph above, and a blank arrow asserts
+-- less than the full one it replaced; see 'suppress' for the count and the
+-- worst case. The restatement is dropped only where something survives it.
+--
+-- The binder clause ('L4.StateGraph.labelBinds') is NOT part of the
+-- restatement and is never suppressed: no node carries it. It says which of
+-- the act\'s names are open, which is the one question the act text cannot
+-- answer, because 'L4.Print.printActionPattern' prints a binder and an
+-- R1-resolved reference alike — rightly, since it is re-emitting source.
+--
+-- This is a RENDERING choice and nothing more. 'TransitionLabel' keeps those
+-- four fields on every edge, because @L4.Bpmn.Lower@ builds its task name and
+-- its lane from them ('L4.Bpmn.Lower.taskName', @nodeLane@) and
+-- 'L4.StateGraph.Dominators.renderTransition' writes its sentence out of them;
+-- a consumer holding one edge must still be able to read the whole obligation
+-- off it.
+--
+-- __Those two are the whole list, measured 2026-09-22.__ An earlier version of
+-- this sentence also named @L4.Lts.List@ and "the DMN wiring". Neither is a
+-- consumer: @jl4-core\/src\/L4\/Lts\/List.hs@ imports nothing from
+-- "L4.StateGraph" (@grep -n \'^import\' … | grep -i stategraph@ is empty) and
+-- @jl4-core\/src\/L4\/Dmn\/@ contains neither @TransitionLabel@ nor
+-- @labelAction@. The true claim it was sharpened from is at
+-- @jl4-core\/src\/L4\/StateGraph.hs:384@, about @L4.Lts.List@ rendering a
+-- THRESHOLD caption from the evaluator\'s marking — a different field and a
+-- different module.
+--
+-- __One clause can still draw two ways in two graphs of one file, and that is
+-- structural rather than a defect of this function.__ In
+-- @jl4\/examples\/bpmn\/tenancy.l4@ the obligation of @receipts@ is the rule\'s
+-- top level, so its entry state is @initial@ and cannot name it and the whole
+-- caption prints on the arrow; the SAME obligation under @receipts and
+-- delivery@ sits in a @RAND@ branch, gets an entry state of its own, and the
+-- restatement is dropped. Measured 2026-09-22:
+-- @0 -> 1 [label="EVERY Tenant t IN tenants MUST Pay\\n(EXACTLY t) (EXACTLY
+-- theLandlord)\\namount [7]\\nthe rule binds \\`amount\\`\\nUPON EACH"]@ against
+-- @1 -> 2 [label="the rule binds \\`amount\\`\\nUPON EACH"]@ over a node reading
+-- @EVERY Tenant t IN tenants must Pay (EXACTLY t) (EXACTLY theLandlord) amount
+-- WITHIN 7@. Node and arrow together say the same thing in both; the split
+-- between them differs because one obligation has a node and the other does
+-- not. Making them identical means either restating always (which is this
+-- function undone) or refusing to stamp a top-level entry (which is renaming
+-- @initial@), so it is left as it is, said here rather than left for the next
+-- reader to find.
 --
 -- It is also not a change to R1, which was closed as \"coexist\": an edge whose
 -- source state does NOT name the obligation still prints its modal, and
@@ -290,17 +335,58 @@ formatTransitionLabel opts sourceNamesTheObligation TransitionLabel{..} =
       -- node does not ("timeout", the branch guard). That is the same
       -- predicate 'L4.StateGraph.Dominators.renderTransition' switches on.
       restated = sourceNamesTheObligation && isJust labelParty
-      dropIfRestated x = if restated then Nothing else x
-      parts = catMaybes
-        [ dropIfRestated labelParty
-        , dropIfRestated modalPart
+      -- The obligation restated: exactly what the node already carries. The
+      -- window is the fourth of these and is appended at 'parts', so that the
+      -- order on a fallen-back edge is still party, modal, act, window.
+      obligationParts = catMaybes
+        [ labelParty
+        , modalPart
         -- A junction's branch edge has an EMPTY action, and emitting it left a
         -- leading space on every guard caption (@" IF price EQUALS 20"@).
-        , dropIfRestated (if Text.null labelAction then Nothing else Just labelAction)
-        , if opts.showDeadlines then fmap (\o -> "[AFTER " <> o <> "]") labelOpening else Nothing
-        , if opts.showDeadlines then fmap (\d -> "[" <> d <> "]") labelDeadline else Nothing
+        , if Text.null labelAction then Nothing else Just labelAction
+        ]
+      -- The obligation's window. It is part of 'obligationParts' and not of
+      -- 'newParts' because 'L4.StateGraph.describeDeonton' puts it on the node:
+      -- under 'restated' this edge and that node are the same obligation, so
+      -- the bracket here is the second copy and goes with the other three.
+      -- Where the node does NOT name the obligation — a top-level rule, whose
+      -- entry is @initial@ — nothing is suppressed and the window prints here
+      -- as it always did.
+      windowPart = if opts.showDeadlines then fmap (\d -> "[" <> d <> "]") labelDeadline else Nothing
+      -- What is NEW along the edge, and is nowhere else on the page.
+      newParts = catMaybes
+        [ if opts.showDeadlines then fmap (\o -> "[AFTER " <> o <> "]") labelOpening else Nothing
         , if opts.showGuards then fmap (\g -> "IF " <> g) labelGuard else Nothing
         ]
+      -- Drop the second copy only where something is LEFT to read. An
+      -- obligation with no window, no opening, no guard, no binder and no
+      -- join line has nothing new along its arm, and suppressing there leaves the arrow
+      -- BLANK rather than uncluttered: measured 2026-09-21 over
+      -- @jl4\/examples@, @doc@ and @jl4-core\/libraries@, 41 green HENCE edges
+      -- across 12 files, of which @doc\/courses\/foundation\/charity-obligation.l4@
+      -- is the worst — one @MAY@ with no @WITHIN@, so its entry state has a
+      -- single outgoing arrow and that arrow said nothing at all. A blank
+      -- caption is also not distinguishable from a junction's branch edge
+      -- except by colour. Where the suppression buys nothing the edge prints
+      -- in full, which is what it did before 2026-09-21.
+      --
+      -- The same guard covers the CLI: with @--no-deadlines@ and
+      -- @--no-guards@ every 'newParts' is empty, so every restated edge falls
+      -- back rather than the whole picture going blank.
+      suppress =
+        restated && not (null newParts && isNothing joinPart && isNothing bindsPart)
+      parts = (if suppress then [] else obligationParts <> catMaybes [windowPart]) <> newParts
+      -- Which of the act\'s names are OPEN, on a line of its own under the
+      -- obligation ('L4.StateGraph.bindsClause'). It is NEW along the edge in
+      -- the sense 'newParts' means — no node carries it — but it is a clause
+      -- and not a word, so it does not go on the obligation\'s line.
+      --
+      -- It is here rather than inside the act because the act is L4\'s own
+      -- spelling of itself and four external parsers read it; see
+      -- 'L4.StateGraph.labelBinds'. What it buys the reader is the one thing
+      -- the act text cannot say: @MUST payment price@ and @MUST payment n@
+      -- print identically, and only the first is discharged by ANY payment.
+      bindsPart = wrapLabel <$> labelBinds
       -- The join line, as the source spells it, on a line of its own under the
       -- obligation — the one place the picture says whether the continuation
       -- fires once or once per member.
@@ -317,13 +403,25 @@ formatTransitionLabel opts sourceNamesTheObligation TransitionLabel{..} =
   -- on a line of its own and re-wrapping the assembled string would fold it
   -- back into the obligation. Same reason 'dominatesNote' is wrapped where it
   -- is made.
-  in wrapLabel (Text.intercalate " " parts) <> maybe "" ("\n" <>) joinPart
+  --
+  -- Two parts can stand alone — the binder clause and the join line — because
+  -- 'suppress' counts each as something left to read, so an obligation with no
+  -- window, no opening and no guard drops its restatement and keeps only
+  -- those. Appending them unconditionally would then open the caption with an
+  -- EMPTY first line: a blank row above the text, which is the blank arrow of
+  -- 'suppress' wearing a hat. So empty lines are dropped rather than joined.
+  in Text.intercalate "\n"
+       [ line
+       | line <- wrapLabel (Text.intercalate " " parts) : catMaybes [bindsPart, joinPart]
+       , not (Text.null line)
+       ]
 
 -- | The column node and edge captions are wrapped at.
 --
 -- Chosen by sweep, not by taste. GraphViz sizes a box to its widest LINE, so
 -- the canvas is a step function of this number AND of the longest token no
--- wrap may break. Measured over the four contracts of the §7.3 reader proxy
+-- wrap may break.
+Measured over the four contracts of the §7.3 reader proxy
 -- (@etc\/lts-reader-proxy@), canvas width in inches:
 --
 -- @

@@ -29,8 +29,8 @@
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="Start_0" />
-    <bpmn:task id="Task_0" name="MAY Exercise theBuyer">
-      <bpmn:documentation>PARTY theBuyer MAY Exercise theBuyer WITHIN 30</bpmn:documentation>
+    <bpmn:task id="Task_0" name="MAY Exercise (EXACTLY theBuyer)">
+      <bpmn:documentation>PARTY theBuyer MAY Exercise (EXACTLY theBuyer) WITHIN 30</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_0" name="after P30D" attachedToRef="Task_0" cancelActivity="true">
       <bpmn:documentation>the permission lapses: it is not exercised within 30, so the rule ends fulfilled</bpmn:documentation>
@@ -38,8 +38,8 @@
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P30D</bpmn:timeDuration>
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
-    <bpmn:task id="Task_1" name="MUST Transfer theSeller theBuyer">
-      <bpmn:documentation>PARTY theSeller MUST Transfer theSeller theBuyer WITHIN 14</bpmn:documentation>
+    <bpmn:task id="Task_1" name="MUST Transfer (EXACTLY theSeller) (EXACTLY theBuyer)">
+      <bpmn:documentation>PARTY theSeller MUST Transfer (EXACTLY theSeller) (EXACTLY theBuyer) WITHIN 14</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_1" name="after P14D" attachedToRef="Task_1" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within 14</bpmn:documentation>
