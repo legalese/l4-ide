@@ -34,6 +34,7 @@ import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
 import L4.Export.Document
 import L4.Lexer (LangTag (..))
+import L4.Syntax (defaultModuleLang)
 import qualified L4.Nlg as Nlg
 import qualified L4.Parser as Parser
 import L4.Export.Render (RenderConfig(..), renderAkn, renderHtml, renderText)

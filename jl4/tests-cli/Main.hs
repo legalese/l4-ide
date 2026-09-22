@@ -3288,13 +3288,14 @@ spec bin = do
       Output code sout _ <- nlgOf
       code `shouldBe` ExitSuccess
       -- Trailing the head (row 5), under the input (row 7), the DECIDE spelling
-      -- (row 8) and the two-input case (row 12). "with 200" is what an App
-      -- linearizes its arguments to, so these pin the sentence as the HEADING
-      -- rather than anywhere on the line.
-      sout `shouldSatisfy` ("row five saw `amount` with 200" `isInfixOf`)
-      sout `shouldSatisfy` ("row seven saw `amount` with 200" `isInfixOf`)
-      sout `shouldSatisfy` ("row eight saw `amount` with 200" `isInfixOf`)
-      sout `shouldSatisfy` ("row twelve saw `amount` over `floor` with 100 and 200" `isInfixOf`)
+      -- (row 8) and the two-input case (row 12). The argument sits in the
+      -- sentence's slot — a heralded call in a directive reads as its sentence
+      -- (`L4.Nlg.substituteNlgDirective`) — so these pin the sentence as the
+      -- whole line, with nothing appended.
+      sout `shouldSatisfy` ("row five saw 200\n" `isInfixOf`)
+      sout `shouldSatisfy` ("row seven saw 200\n" `isInfixOf`)
+      sout `shouldSatisfy` ("row eight saw 200\n" `isInfixOf`)
+      sout `shouldSatisfy` ("row twelve saw 200 over 100\n" `isInfixOf`)
 
     it "reaches l4 nlg at a NAMED-argument call site without printing twice" $ do
       Output _ sout _ <- nlgOf
@@ -3311,28 +3312,32 @@ spec bin = do
       sout `shouldSatisfy` ("row eight saw amount" `isInfixOf`)
       sout `shouldSatisfy` ("row twelve saw amount over floor" `isInfixOf`)
 
-    it "leaves the placements that already worked byte-identical" $ do
+    it "reads the placements that already worked the same way, argument in the slot" $ do
       Output _ sout _ <- nlgOf
-      sout `shouldSatisfy` ("row one saw `amount` with 200" `isInfixOf`)
-      sout `shouldSatisfy` ("row four saw `amount` with 200" `isInfixOf`)
-      sout `shouldSatisfy` ("row six saw `amount` with 200" `isInfixOf`)
-      sout `shouldSatisfy` ("row nine saw `amount` with 200" `isInfixOf`)
+      sout `shouldSatisfy` ("row one saw 200\n" `isInfixOf`)
+      sout `shouldSatisfy` ("row four saw 200\n" `isInfixOf`)
+      sout `shouldSatisfy` ("row six saw 200\n" `isInfixOf`)
+      sout `shouldSatisfy` ("row nine saw 200\n" `isInfixOf`)
 
     it "keeps a rule's OWN sentence when it also heralds itself (row 13)" $ do
       Output _ sout _ <- nlgOf
       -- The rule's own annotation is found first, so nothing is moved and the
       -- inner herald stays the input's gloss. An unconditional promotion would
       -- overwrite the outer one with the inner.
-      sout `shouldSatisfy` ("row thirteen the rule saw `amount` with 200" `isInfixOf`)
+      sout `shouldSatisfy` ("row thirteen the rule saw 200\n" `isInfixOf`)
       sout `shouldSatisfy` ("row thirteen the input" `isInfixOf`)
 
     it "does not touch an AKA head, where the disagreement is a different one" $ do
       Output _ nlgOut _ <- nlgOf
       Output _ renOut _ <- renderOf
-      -- Row 10: the AKA's name claims the herald, so `l4 nlg` prints it and
-      -- `l4 render` prints its own paraphrase. Row 11: the other way round.
+      -- Row 10: the AKA's name claims the herald, so `l4 nlg` prints it — as
+      -- the bare linearizer does, slot unfilled and the argument appended,
+      -- because the herald is on no position `decideNlg` searches — and
+      -- `l4 render` prints its own paraphrase. Row 11: the herald above the
+      -- head IS found by `decideNlg`, so the splice reads it and the two
+      -- projections now agree on this row; the AKA residue is row 10 alone.
       nlgOut `shouldSatisfy` ("row ten saw `amount` with 200" `isInfixOf`)
-      nlgOut `shouldSatisfy` ("`row eleven` with 200" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("row eleven saw 200\n" `isInfixOf`)
       renOut `shouldSatisfy` ("row eleven saw amount" `isInfixOf`)
 
   -- The verifier footing. Every negative control asserts the finding KIND, not

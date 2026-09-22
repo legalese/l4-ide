@@ -182,10 +182,11 @@ GIVETH A BOOLEAN
 #EVAL `row ten` 200
 #EVAL `row ten` WITH amount IS 200
 
--- Row 11: the same AKA head with the herald ABOVE it. `l4 render` finds it;
--- `l4 nlg` prints the bare name, and still does -- the herald is not on an
--- appform argument, so this repair does not reach it. The one row in this table
--- where the two projections still disagree, kept visible on purpose.
+-- Row 11: the same AKA head with the herald ABOVE it. `l4 render` finds it, and
+-- so does `l4 nlg` -- not through the head-input repair (the herald is on no
+-- appform argument) but through the directive splice, which reads a herald
+-- wherever `decideNlg` finds one and fills its slots from the call. Row 10 is
+-- now the one row in this table where the two projections still disagree.
 GIVEN amount IS A NUMBER
 GIVETH A BOOLEAN
 @nlg row eleven saw %amount%
