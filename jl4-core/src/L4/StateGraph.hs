@@ -1074,9 +1074,35 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
       -- taken by the ACT being performed, not by the clock, so a deadline here
       -- would name an event that does not fire this arm. For a prohibition the
       -- deadline running out means COMPLIANCE.
+      -- A BARRIER with a deadline of its own, distinct from the act's. Two
+      -- clocks then take this one arm — a member missing the act's window, and
+      -- the barrier not being met by the join's — and a caption can name only
+      -- one of them. @jl4\/examples\/bpmn\/modals.l4:57-60@ is the case:
+      -- @WITHIN 30@ on the act, @ONCE ALL HAVE WITHIN 10@ on the join, and
+      -- @L4.Bpmn.Lower@\'s own P-JOIN-DEADLINE note says of exactly this shape
+      -- that "the rule does enforce it: a barrier whose last act lands after
+      -- it fails" (@jl4-core\/src\/L4\/Bpmn\/Lower.hs:2940-2946@). Naming the
+      -- 30 there is a PRECISE claim about which clock fires, and it is the
+      -- wrong one half the time; the bare word "timeout" was vague and
+      -- therefore not wrong. So the bracket is dropped and the reader is left
+      -- with the sibling HENCE edge, which draws both windows.
+      --
+      -- A FORK is not this case even when both are written. Lower.hs's Fork
+      -- arm of the same note says the join's deadline is dead on a fork — "a
+      -- fork has no join event to check it at; only the act's expires a
+      -- member" — so there is one clock and 'memberDeadline' names it.
+      barrierJoinDeadline = do
+        q <- label.labelQuantifier
+        j <- q.quantJoin
+        case j.joinKind of
+          Barrier _ -> j.joinDeadline
+          Fork      -> Nothing
+      twoClocksTakeThisArm = isJust label.labelDeadline && isJust barrierJoinDeadline
+
       armTrigger = case action.modal of
         DMustNot -> Nothing
-        _        -> memberDeadline label
+        _ | twoClocksTakeThisArm -> Nothing
+          | otherwise            -> memberDeadline label
 
       -- The caption for whichever LEST arm this obligation turns out to have.
       -- It carries the modal too: without it a consumer holding only this edge
