@@ -152,7 +152,7 @@ there.
 
 | fact                | value                                                                             |
 | ------------------- | --------------------------------------------------------------------------------- |
-| build               | `cabal build all` (GHC 9.10.3)                                                    |
+| build               | `cabal build all` (GHC 9.10.2)                                                    |
 | ghc-options         | `-Wall -Wderiving-typeable -Wunused-packages -Werror`                             |
 | default extensions  | include `NoFieldSelectors` + `OverloadedRecordDot` — use `.field`, not a selector |
 | prettier            | **pinned to `3.4.2`** in `package.json`                                           |
