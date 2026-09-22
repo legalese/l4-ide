@@ -1,0 +1,36 @@
+-- Hairdressers Act 2003 (NSW), s4(1).
+--
+-- Transcribed for `l4 yscript` (specs/todo/YSCRIPT-EXPORT-SPEC.md R7) from the
+-- verbatim yscript figure quoted in specs/research/DATALEX-YSCRIPT-RESEARCH.md
+-- §C (Mowbray, Chung & Greenleaf 2022/2023, Figure 9). The figure's own
+-- top-level "RULE Section 4" aggregates s4(1) and s4(2) via SUBRULE, a
+-- yscript keyword outside this backend's AND/OR/reference fragment (R2), so
+-- s4(1) itself is the @export entry point here rather than that aggregator —
+-- s4(2) is not reproduced (the figure does not expand it either, leaving
+-- "under section 4(2)" as bare proposition text within s4(1)(a)).
+
+ASSUME `the hairdresser has been awarded a hairdressing qualification` IS A BOOLEAN
+ASSUME `the qualification was awarded by a registered training organisation` IS A BOOLEAN
+ASSUME `the qualification is an "authorised qualification" under section 4(2)` IS A BOOLEAN
+
+ASSUME `a determination has been made under section 37 of the Apprenticeship and Traineeship Act 2001 that the hairdresser is adequately trained to pursue the recognised trade vocation of hairdressing (because the hairdresser has acquired the competencies of the recognised trade vocation)` IS A BOOLEAN
+
+ASSUME `the hairdresser has held, or been taken to have held, a licence under Part 6 (Regulation of the hairdressing trade) of the Shops and Industries Act 1962` IS A BOOLEAN
+ASSUME `the licence was limited to carrying out beauty treatment only` IS A BOOLEAN
+
+@ref Section 4(1)(a)
+DECIDE `section 4(1)(a) applies` IS
+    `the hairdresser has been awarded a hairdressing qualification` AND `the qualification was awarded by a registered training organisation` AND `the qualification is an "authorised qualification" under section 4(2)`
+
+@ref Section 4(1)(c)
+DECIDE `section 4(1)(c) applies` IS
+    `a determination has been made under section 37 of the Apprenticeship and Traineeship Act 2001 that the hairdresser is adequately trained to pursue the recognised trade vocation of hairdressing (because the hairdresser has acquired the competencies of the recognised trade vocation)`
+
+@ref Section 4(1)(d)
+DECIDE `section 4(1)(d) applies` IS
+    `the hairdresser has held, or been taken to have held, a licence under Part 6 (Regulation of the hairdressing trade) of the Shops and Industries Act 1962` AND `the licence was limited to carrying out beauty treatment only`
+
+@ref Section 4(1)
+@export Whether the individual is qualified to act as a hairdresser under section 4(1)
+DECIDE `the hairdresser is qualified to act as a hairdresser` IS
+    `section 4(1)(a) applies` OR `section 4(1)(c) applies` OR `section 4(1)(d) applies`

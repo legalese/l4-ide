@@ -1,0 +1,7 @@
+-- R1 shape probe: the @export entry point itself carries a parameter (a
+-- GIVEN), so it is not nullary. `l4 yscript` must refuse it by name.
+
+@export Whether the amount clears a threshold
+GIVEN threshold IS A NUMBER
+DECIDE `the amount clears threshold` threshold IS
+    threshold > 100

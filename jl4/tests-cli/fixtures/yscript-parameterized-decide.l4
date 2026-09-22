@@ -1,0 +1,13 @@
+-- R1 shape probe: a Decide reached from the @export closure carries a
+-- parameter (a GIVEN), so it is outside yscript's propositional fragment.
+-- `l4 yscript` must refuse by name rather than silently drop or inline it.
+
+ASSUME `the amount is disclosed` IS A BOOLEAN
+
+GIVEN threshold IS A NUMBER
+DECIDE `the amount exceeds threshold` threshold IS
+    threshold > 100
+
+@export Whether the disclosure is complete
+DECIDE `the disclosure is complete` IS
+    `the amount is disclosed` AND `the amount exceeds threshold` 50

@@ -1,0 +1,9 @@
+-- R1/R3 shape probe: an ASSUME reached from the @export closure is typed
+-- NUMBER, not BOOLEAN. yscript's fact model is propositional-only, so
+-- `l4 yscript` refuses rather than silently coerce or drop it.
+
+ASSUME `the applicant's age` IS A NUMBER
+
+@export Whether the applicant is old enough
+DECIDE `the applicant is old enough` IS
+    `the applicant's age`
