@@ -1,0 +1,60 @@
+Document
+
+The contract is `the tenancy` from doc/reference/regulative/every-run-example.l4. Three tenants (Alice, Bob and Carol) must each sign; when the last of them has signed, the landlord (Ms Ng) must deliver. Time is counted in whole days from day 0.
+
+What has happened so far, in order:
+  1. On day 1, Alice signed (Alice did `Sign`).
+  2. On day 2, Bob signed (Bob did `Sign`).
+  3. Carol has not signed. Nothing else has happened; the clock now stands at day 2.
+
+digraph {
+    graph [rankdir=TB
+          ,label="the tenancy"
+          ,labelloc=t
+          ,fontname=Helvetica
+          ,fontsize=14];
+    node [fontname=Helvetica
+         ,fontsize=11];
+    edge [fontname=Helvetica
+         ,fontsize=10];
+    0 [label=initial
+      ,fillcolor=white
+      ,style=filled
+      ,shape=ellipse
+      ,fillcolor="#e8f4fd"];
+    1 [label="theLandlord must Deliver ..."
+      ,fillcolor=white
+      ,style=filled
+      ,shape=ellipse
+      ,fillcolor="#ffffff"];
+    2 [label=Fulfilled
+      ,fillcolor=white
+      ,style=filled
+      ,shape=doublecircle
+      ,fillcolor="#d4edda"];
+    3 [label=Breach
+      ,fillcolor=white
+      ,style=filled
+      ,shape=doublecircle
+      ,fillcolor="#f8d7da"];
+    0 -> 1 [label="EVERY Tenant t IN tenants MUST Sign ... [14]\nONCE ALL HAVE"
+           ,color="#28a745"
+           ,style=solid];
+    0 -> 3 [label=timeout
+           ,color="#dc3545"
+           ,style=dashed];
+    1 -> 2 [label="theLandlord MUST Deliver ... [5]"
+           ,color="#28a745"
+           ,style=solid];
+    1 -> 3 [label=timeout
+           ,color="#dc3545"
+           ,style=dashed];
+}
+
+Q1. What is owed right now, and by whom?
+Q2. Which event(s) would discharge what is owed?
+Q3. Which event(s) or deadline(s) would put someone in breach?
+Q4. Where in the contract are we — which rule, branch or state is live?
+Q5. What happens after the next discharging event?
+
+Answer each question from this document alone. If it does not say, answer 'cannot tell from this' rather than guess.

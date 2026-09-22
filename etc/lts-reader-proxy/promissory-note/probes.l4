@@ -280,7 +280,7 @@ SGD MEANS
 #EVAL Day (February 4 2025)   -- 739650: the note date and the trace's AT
 #EVAL Day (March 17 2025)     -- 739691: the first installment's deadline (31 days + 10 grace)
 #EVAL Day (April 3 2025)      -- 739708: the late payment
-#EVAL Day (June 3 2025)       -- 739769: the reparation's deadline: WITHIN 61 (CEILING 30.4375 + 30), counted from 3 April, the event that revealed the missed installment
+#EVAL Day (June 3 2025)       -- 739769: the reparation's deadline BEFORE 12055ae73; now 17 days past it
 #EVAL Day (June 4 2025)       -- 739770
 -- The reparation amount: the installment plus a 5% penalty.
 #EVAL `Monthly Installment Amount`'s Value TIMES 1.05
@@ -289,24 +289,24 @@ SGD MEANS
 -- the penalty.
 #EVAL `Total Repayment Amount`'s Value PLUS (`Monthly Installment Amount`'s Value TIMES 0.05)
 
--- Q2/Q5: paying the penalty amount by 3 June 2025 -> the NOTE IS FULFILLED
--- (the reparation carries no HENCE, so its default is FULFILLED).
+-- SUPERSEDED by 12055ae73, kept as the record of the old behaviour: this
+-- pays on 3 June, 17 days late now, so it no longer fulfils. See below.
 #TRACE `Payment Obligations` `Total Repayment Amount` AT Day (February 4 2025) WITH
     PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (April 3 2025)
     PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2369.29) AT Day (June 3 2025)
 
--- Q2: paying the plain installment again is too little; still owed.
+-- SUPERSEDED by 12055ae73: the plain installment on 3 June; late AND too little.
 #TRACE `Payment Obligations` `Total Repayment Amount` AT Day (February 4 2025) WITH
     PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (April 3 2025)
     PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (June 3 2025)
 
--- Q3: nothing by 3 June 2025 -> NOT a breach: a further obligation with no
--- deadline (pay all outstanding debts).
+-- SUPERSEDED by 12055ae73: waiting to 4 June now overshoots the 17 May
+-- deadline by 18 days. Still NOT a breach: a further obligation, no deadline.
 #TRACE `Payment Obligations` `Total Repayment Amount` AT Day (February 4 2025) WITH
     PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (April 3 2025)
     (`WAIT UNTIL` (Day (June 4 2025)))
 
--- Q3: the penalty amount paid one day late is no longer enough.
+-- SUPERSEDED by 12055ae73: 4 June is 18 days late, not one. Still too little.
 #TRACE `Payment Obligations` `Total Repayment Amount` AT Day (February 4 2025) WITH
     PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (April 3 2025)
     PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2369.29) AT Day (June 4 2025)
@@ -315,3 +315,34 @@ SGD MEANS
 #TRACE `Payment Obligations` `Total Repayment Amount` AT Day (February 4 2025) WITH
     PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (April 3 2025)
     PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 27190.32) AT Day (December 1 2025)
+
+-- THE RE-CUT OF 2026-09-21. legalese/l4-ide 12055ae73 anchors the LEST at the
+-- MISSED DEADLINE rather than at the act that revealed it, so the reparation
+-- falls due on day 739752 (17 May 2025), not 739769 (3 June 2025). The probes
+-- above are kept as the record of the old behaviour; these are the live ones.
+
+-- The two day serials the re-cut list prints, as calendar dates.
+#EVAL Day (May 17 2025)       -- 739752: the reparation's deadline, day 102 after commencement (the 41-day first deadline that was missed, plus WITHIN 61)
+#EVAL Day (May 18 2025)       -- 739753: the day the clock reaches when that deadline runs out
+
+-- Q2/Q5: paying the penalty amount by 17 May 2025 -> the NOTE IS FULFILLED
+-- (the reparation carries no HENCE, so its default is FULFILLED).
+#TRACE `Payment Obligations` `Total Repayment Amount` AT Day (February 4 2025) WITH
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (April 3 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2369.29) AT Day (May 17 2025)
+
+-- Q2: paying the plain installment again is too little; still owed, on the day.
+#TRACE `Payment Obligations` `Total Repayment Amount` AT Day (February 4 2025) WITH
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (April 3 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (May 17 2025)
+
+-- Q3: nothing by 17 May 2025 -> NOT a breach: a further obligation with no
+-- deadline (pay all outstanding debts).
+#TRACE `Payment Obligations` `Total Repayment Amount` AT Day (February 4 2025) WITH
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (April 3 2025)
+    (`WAIT UNTIL` (Day (May 18 2025)))
+
+-- Q3: the penalty amount paid one day late is no longer enough.
+#TRACE `Payment Obligations` `Total Repayment Amount` AT Day (February 4 2025) WITH
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2256.46) AT Day (April 3 2025)
+    PARTY `The Borrower` DOES `pay monthly installment to` `The Lender` (USD 2369.29) AT Day (May 18 2025)

@@ -1,3 +1,5 @@
+Document
+
 receipts — before anything has happened, the clock stands at 0
   Standing: in progress.
 
@@ -30,3 +32,11 @@ receipts — before anything has happened, the clock stands at 0
       the verdict above is one act's, not the set's: `amount` = 0 was replayed, and another member may end elsewhere
 
   Next deadline: 7 (Tenant OF "Alice": Pay OF (Tenant OF "Alice"), theLandlord, amount; Tenant OF "Bob": Pay OF (Tenant OF "Bob"), theLandlord, amount; Tenant OF "Carol": Pay OF (Tenant OF "Carol"), theLandlord, amount)
+
+Q1. What is owed right now, and by whom?
+Q2. Which event(s) would discharge what is owed?
+Q3. Which event(s) or deadline(s) would put someone in breach?
+Q4. Where in the contract are we — which rule, branch or state is live?
+Q5. What happens after the next discharging event?
+
+Answer each question from this document alone. If it does not say, answer 'cannot tell from this' rather than guess.

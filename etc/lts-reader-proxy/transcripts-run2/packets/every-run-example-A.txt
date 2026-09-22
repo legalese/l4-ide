@@ -1,3 +1,5 @@
+Document
+
 `the tenancy` — after 2 events, the clock stands at 2 (the #TRACE on line 85)
     PARTY alice DOES Sign OF alice AT 1
     PARTY bob DOES Sign OF bob AT 2
@@ -15,3 +17,11 @@
           · Landlord OF "Ms Ng" MUST Deliver theLandlord — due by 7 (5 from now)
 
   Next deadline: 14 (Tenant OF "Carol": Sign OF (Tenant OF "Carol"))
+
+Q1. What is owed right now, and by whom?
+Q2. Which event(s) would discharge what is owed?
+Q3. Which event(s) or deadline(s) would put someone in breach?
+Q4. Where in the contract are we — which rule, branch or state is live?
+Q5. What happens after the next discharging event?
+
+Answer each question from this document alone. If it does not say, answer 'cannot tell from this' rather than guess.

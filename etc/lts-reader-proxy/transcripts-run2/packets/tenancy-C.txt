@@ -1,3 +1,9 @@
+Document
+
+The contract is `receipts` from jl4/examples/bpmn/tenancy.l4. Three tenants (Alice, Bob and Carol) must each pay the landlord (Ms Ng); each tenant who pays is then owed a receipt for that payment by the landlord. Time is counted in whole days from day 0.
+
+What has happened so far: nothing. The contract has just begun and the clock stands at day 0.
+
 <?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
                   xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
@@ -190,3 +196,11 @@
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>
+
+Q1. What is owed right now, and by whom?
+Q2. Which event(s) would discharge what is owed?
+Q3. Which event(s) or deadline(s) would put someone in breach?
+Q4. Where in the contract are we — which rule, branch or state is live?
+Q5. What happens after the next discharging event?
+
+Answer each question from this document alone. If it does not say, answer 'cannot tell from this' rather than guess.

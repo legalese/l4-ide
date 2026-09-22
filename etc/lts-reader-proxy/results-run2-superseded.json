@@ -1,0 +1,389 @@
+{
+  "_comment": "SUPERSEDED 2026-09-21: this is run 2's first scoring, in which the promissory note was judged against a truth.json that commit 12055ae73 had invalidated (deadline 739769/61 days, where the re-cut artifacts and the tree say 739752/44), so readers who read the artifact correctly were scored wrong; results-run2.json now holds the re-judging of all four contracts against the repaired key.",
+  "rows": [
+    {
+      "contract": "contracts",
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 1, 0, 0],
+      "rationale": "Q1-Q3 are exactly right, including the pattern-variable fact (\"the obligation's pattern matches any act by B\") and the clock-reaches-15 breach. Q4 scores 0 as non-responsive under rule 2's boundary: \"in progress at time 10, after the WAIT UNTIL\" names a standing and a clock reading but no rule, branch or state, so it has zero overlap with the truth rather than being a shortened version of it; Q5 is a bare \"Cannot tell from this\", which rule 1 scores 0 since truth.json nowhere says A cannot report the fulfilled ending."
+    },
+    {
+      "contract": "contracts",
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 1, 1, 0, 0],
+      "rationale": "Same shape as repeat 0: Q1-Q3 correct, with Q3 giving both the deadline (14) and the tick that breaches it (15). Q4 is the single word \"In progress\" — the standing, not a location in the contract, so 0 by the same rule-2 boundary applied to repeat 0; Q5 is a bare refusal and scores 0 under rule 1."
+    },
+    {
+      "contract": "contracts",
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Q2 states the truth's core reason — the rule binds the act broadly rather than naming a specific one, so any act by B discharges it — and Q3 gives the 14/15 boundary. Q4 scores 1 where haiku's scored 0 because it does name the live obligation (\"B's 'return' obligation\" due at 14) alongside the standing; Q5's trailing \"cannot tell from this\" is not a refusal under rule 1, since the answer first states the truth (the contract ends fulfilled) and only declines on what lies beyond that ending."
+    },
+    {
+      "contract": "contracts",
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Q2 carries the pattern-variable fact plus the honest caveat that the verdict came from one sampled act, which is a hedge and not a false claim, so rule 2 keeps it at 1. Q4 names B's return obligation as live with its deadline; Q5 opens with \"Cannot tell from this\" but then states that a discharging event ends the contract as fulfilled — the truth is stated, so rule 1 does not fire."
+    },
+    {
+      "contract": "contracts",
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "The trace is right end to end: payment of 21 satisfies AT LEAST 20, the NOT (price EQUALS 20) branch fires, node 4 is live, 4->3 is Fulfilled. Q2's \"a return action\" is incomplete against truth Q2's any-act-by-B but contains nothing false, so rule 2 scores it 1; Q3's \"10 days from when the return obligation became live\" resolves to day 14 given the day-4 entry and is correct."
+    },
+    {
+      "contract": "contracts",
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Q1 and Q4 both land on state 4 via the price-is-not-exactly-20 branch, and Q5 gets the terminal Fulfilled state. Q2 (\"B doing return\") is the same rule-2 case as repeat 0 — under-specified relative to the pattern variable, nothing wrong — and Q3 correctly routes the state-4 timeout to state 5."
+    },
+    {
+      "contract": "contracts",
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Q3 is the strongest reading in the set: it reconstructs the [10] deadline as running from the day-4 entry into state 4, arrives at day 14, and notes the clock is only at 10. Q2's \"no other event is shown as discharging\" is scoped to the diagram and true of B.dot, so it is not a definite wrong claim; Q1's and Q5's hedges are on details beyond the truth (what is being returned, what lies past Fulfilled) and both state the correct answer first, so rule 1 does not fire."
+    },
+    {
+      "contract": "contracts",
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Q1 and Q4 trace correctly to node 4 through the NOT-price-equals-20 branch, and Q5 gets Fulfilled as terminal. Q3 declines the exact calendar day but names the deciding event (the return timeout, 4->5 Breach), so it is incomplete rather than a refusal — rule 2, not rule 1, and scored the same way as row C/sonnet/0's identically hedged Q3."
+    },
+    {
+      "contract": "contracts",
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Every answer is correct and Q3 is unusually precise for this artifact, computing the P10D window from Task_4's activation to day 14 before routing Boundary_4 to End_5. Q2's \"B performing the return\" is the rule-2 incompleteness shared by all B and C readings, since neither artifact can express that return is a pattern variable."
+    },
+    {
+      "contract": "contracts",
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Terse but right throughout: Task_4 live via the NOT (price EQUALS 20) branch at price 21, Boundary_4 timeout to End_5, completion to End_3 Fulfilled. Q1 and Q2 are shortened against the truth (no day-14 figure, no any-act-by-B) but contain nothing false, so rule 2 keeps both at 1."
+    },
+    {
+      "contract": "contracts",
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Q1 and Q4 give the full lane-and-gateway trace to Task_4 with Boundary_4 still pending. Q3 names Boundary_4 -> End_5 as the breach path and declines only the absolute day, on the stated ground that the BPMN does not fix the timer's reference point — the deciding event is given, so this is rule-2 incompleteness, scored identically to B/sonnet/1's Q3."
+    },
+    {
+      "contract": "contracts",
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Q3 adds the correct observation that Boundary_0 and Boundary_1 are no longer live because both underlying obligations were discharged on time, which matches truth Q3's \"only one thing\". Q5 opens with \"does not say what happens after\" but then states that Flow_Task_4__End_3 reaches End_3 \"Fulfilled\" with no further tasks or obligations — the truth is stated, so rule 1 does not fire and it scores 1, the same treatment given A/sonnet/0 and A/sonnet/1."
+    },
+    {
+      "contract": "every-run-example",
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 1, 0, 1],
+      "rationale": "Q1–Q3 and Q5 all match truth (Carol owes Sign by 14, Carol's Sign discharges, clock past 14 breaches with no party named, landlord then owes Deliver by 7). Q4 scores 0 under rule 1: it refuses (\"cannot tell ... which specific rule, branch or state is live\") when A.txt says it outright — \"one of 3 who must all act before the next step\" and \"held back until all have acted: 2 of 3 have\"."
+    },
+    {
+      "contract": "every-run-example",
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 1, 1, 0, 1],
+      "rationale": "Q1 adds the 2-of-3 barrier correctly, Q2/Q3/Q5 match truth. Q4 is a bare \"Cannot tell from this\" — rule 1, scored 0, because A.txt states the held-back 2-of-3 signing stage that truth Q4 asks for."
+    },
+    {
+      "contract": "every-run-example",
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All five match truth, including Q3's \"no party is named\" and Q5's Deliver-by-7. Q4 turned on rule 1 but does not fall to it: the answer substantively gives the truth (clock 2, Alice at 1, Bob at 2, Carol outstanding, next step held back) and hedges only on there being no further branch identifier — an omission, not a refusal, so rule 2 scores it 1."
+    },
+    {
+      "contract": "every-run-example",
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Clean sweep: Q1 names Carol and the 2-of-3 group, Q3 gives 14/clock-15 and the unnamed party, Q4 gives the held-back barrier stage, Q5 gives the landlord's Deliver by 7. Nothing refused and no wrong claim."
+    },
+    {
+      "contract": "every-run-example",
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All five correct. Q3 omits the number 14 but never claims the document lacks it, so rule 2 (incomplete, nothing wrong) scores it 1 — the same omission that sinks the B/sonnet rows only because they assert the deadline is absent. Q4 quotes the live edge, Q5 gets the move to the landlord's Deliver."
+    },
+    {
+      "contract": "every-run-example",
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [0, 1, 1, 1, 1],
+      "rationale": "Q4 scores 0 under rule 2 — wait, Q1 is the failure: \"Nothing is owed right now ... the trigger condition is not met\" directly contradicts truth Q1 (Carol owes a signature), a definite wrong claim. Q2–Q5 are correct: Carol's Sign moves state 0 to state 1, timeouts lead to Breach, we are at the initial signing state, and the landlord's Deliver follows."
+    },
+    {
+      "contract": "every-run-example",
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 0, 1, 0],
+      "rationale": "Q3 and Q5 both fall to rule 1. Q3 says \"the document does not state what the actual deadline/duration is, so cannot tell from this\" — B.dot's edge labels carry [14] and [5], and truth Q3 is precisely the day-14 deadline. Q5 answers \"Cannot tell from this\" about what follows the next discharging event, misreading it as the landlord's Deliver, when truth.json's Q5 evidence cites B.dot's 1->2 Fulfilled and 1->3 timeout edges. Q1, Q2 and Q4 match truth."
+    },
+    {
+      "contract": "every-run-example",
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 0, 1, 1],
+      "rationale": "Q3 scores 0 under rule 1 for the same false disclaimer as the sibling row — \"the document does not say what the actual deadline/date is\" — while B.dot's edges read [14] and [5]. Q5 by contrast scores 1 under rule 2: it states the truth (Carol's Sign moves to the landlord's Deliver, thence Fulfilled or Breach) and hedges only on which future branch fires, which is an omission rather than a refusal."
+    },
+    {
+      "contract": "every-run-example",
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All five match truth: Carol's outstanding Sign instance under Task_0, her signature completing the multi-instance barrier, both P14D and P5D boundary timers leading to Breach, the position inside Task_0, and the flow to Task_1 then End_2."
+    },
+    {
+      "contract": "every-run-example",
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Same clean sweep. Q1's \"owed by the tenants, Carol being the only one remaining\" is loose phrasing but names Carol as the one who must sign, so nothing is wrong under rule 2; Q3 gets both boundary deadlines and Q5 gets both End_2 and End_3 outcomes."
+    },
+    {
+      "contract": "every-run-example",
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All five correct, and Q3 adds the true observation that only Boundary_0 is live yet. Q4 turned on rule 1 and survives it: the answer gives the truth (inside Task_0's multi-instance barrier, Carol's instance pending, Task_1 not yet live) and hedges only on when the 14-day clock started — an omission, so rule 2 applies."
+    },
+    {
+      "contract": "every-run-example",
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All five match truth. Q3's aside about the clock start is muddled but self-corrects to the right conclusion (2 < 14, no breach yet) and asserts nothing false, so rule 2 scores it 1; Q4 and Q5 give the pending Carol instance and the Task_1/P5D/End_2-or-End_3 continuation."
+    },
+    {
+      "contract": "tenancy",
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [1, 0, 0, 1, 0],
+      "rationale": "Q1 and Q4 are right and merely incomplete (rule 2). Q2 and Q5 are bare \"cannot tell\" refusals and score 0 under rule 1 — the post-fix A demonstrably lists the payment acts under \"what would move things along\" (the other A readings quote that section), so truth.json's Q2 evidence line about untried acts describes the pre-fix artifact, not this run's. Q3 falls to rule 2: \"all three tenants are in breach\" is a definite wrong claim against a truth that names the breach to Alice."
+    },
+    {
+      "contract": "tenancy",
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 0, 0, 1, 0],
+      "rationale": "Same shape as its repeat-0 sibling: Q1 and Q4 correct-but-incomplete (rule 2 → 1); Q2 and Q5 are unlicensed \"cannot tell\" refusals (rule 1 → 0), since the regenerated A supplies both the discharging acts and the post-payment state. Q3's \"then the tenants will be in breach\" asserts the same collective breach as repeat 0 and is wrong the same way (rule 2 → 0); I scored the two phrasings identically rather than reading one as looser."
+    },
+    {
+      "contract": "tenancy",
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 0, 0, 1, 1],
+      "rationale": "Q2 scores 0 on rule 2 rather than rule 1: it recites the payment acts but then states the artifact \"does not say what event(s) would actually discharge what is owed\", flatly denying truth.json's headline that each tenant's payment discharges that tenant's obligation. Q3 scores 0 on rule 2 for \"that single deadline is what puts all three in breach\". Q4's hedge and Q5's \"cannot tell\" framing withhold nothing truth.json demands — Q5 then delivers the correct substance (receipt within 5, other two still owe by 7) — so both score 1."
+    },
+    {
+      "contract": "tenancy",
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 0, 1, 1],
+      "rationale": "The strongest A reading: Q2 and Q5 both give the post-fix replay correctly (per-tenant discharge, landlord's Receipt within 5, the other two still owing by 7, amount 0 replayed), and Q1/Q4 match. Only Q3 falls, on rule 2 — \"the breach names Alice, Bob, and Carol in that order\" contradicts truth.json's single breach entry named to Alice, and a definite wrong claim costs the point even though \"Tenant Alice is put in breach\" sits beside it."
+    },
+    {
+      "contract": "tenancy",
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [0, 1, 1, 1, 1],
+      "rationale": "Q1 asserts \"nothing is owed\" at day 0, a definite wrong claim against the three live payment obligations (rule 2 → 0). Q2, Q3 and Q4 are correct; Q5 omits the 5-day deadline and the other two tenants' continuing obligations but, read as \"all three paid and all three receipted → fulfilled\", claims nothing false, so rule 2 keeps it at 1."
+    },
+    {
+      "contract": "tenancy",
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Clean sweep. Q1 names the three tenants, the landlord, and keeps the receipt conditional (\"each tenant who pays is then owed\"), so it does not wrongly put the landlord under an obligation now; the missing day-7 deadline is incompleteness only (rule 2). Q3 gets both breach routes via the two timeout edges, and Q5's short answer contains nothing wrong."
+    },
+    {
+      "contract": "tenancy",
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Q1 through Q4 match truth.json, including the explicit \"nothing is yet owed by the landlord\". Q5's \"cannot tell\" is the one refusal I scored 1 under rule 1: it first supplies everything B does carry (payment → landlord must Receipt → Fulfilled) and hedges only on per-tenant independence, which B.dot genuinely collapses and which truth.json's Q5 evidence cites B for only as \"1 -> 2 Fulfilled, 1 -> 3 timeout\"."
+    },
+    {
+      "contract": "tenancy",
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [0, 0, 0, 1, 0],
+      "rationale": "Q1 \"nothing is yet owed by anyone\" is wrong (rule 2). Q2 names the receipt as *the* discharging event and drops the tenant payment, inverting truth.json's headline (rule 2). Q3 gets both timeout routes but then refuses the deadlines — B.dot labels its edges [7] and [5], so rule 1 makes that 0. Q5 refuses on a misread of the question while B does show the post-payment Receipt state (rule 1 → 0). Only Q4 stands."
+    },
+    {
+      "contract": "tenancy",
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [0, 1, 1, 1, 1],
+      "rationale": "Q1 opens \"Nothing is owed right now\", contradicting the three live MUST Pay obligations, and rule 2 costs the point even though the rest of the sentence describes them correctly as future. Q2, Q3, Q4 and Q5 are all correct against truth.json (both breach timers with their P7D/P5D durations, the multi-instance fork at the start, the receipt within 5 after a payment); their omissions are incompleteness only."
+    },
+    {
+      "contract": "tenancy",
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All five match truth.json. Q1 names the three tenants and the landlord and correctly keeps the receipt obligation contingent on payment; the missing day-7 figure on Q1 is incompleteness (rule 2), and it is supplied correctly at Q3 anyway. Q5's silence about the other two tenants' branches is likewise incompleteness, not error."
+    },
+    {
+      "contract": "tenancy",
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "Every answer matches truth.json, including the two points most readings miss: Q1 states that no receipt obligation has arisen yet, and Q5 states that the other tenants' instances continue independently while the landlord's 5-day clock runs on the one who paid. No refusals, so neither rule was needed."
+    },
+    {
+      "contract": "tenancy",
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 1, 1, 1],
+      "rationale": "All five correct, with the per-tenant branch independence right at both Q3 and Q5. The only refusal is Q5's closing hedge about the group join (whether all three must be fulfilled before EndGroup_0), which withholds nothing truth.json's Q5 asserts — that answer is about the paying tenant's own branch — so rule 1 does not bite."
+    },
+    {
+      "contract": "promissory-note",
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [0, 1, 0, 1, 1],
+      "rationale": "Q1 names the right parties and the right penalty amount (2369.28) but dates it 739752/44-from-now, which contradicts truth.json's 739769/61 — rule 2 decides it 0. Q3 is 0 on both counts: it carries the same wrong day numbers (739752/739753) and leaves breach as 'not explicitly stated' rather than asserting that nothing breaches; Q4 and Q5 are incomplete but contain nothing wrong (rule 2), Q5 stating FULFILLED behind a hedge about what comes after."
+    },
+    {
+      "contract": "promissory-note",
+      "artifact": "A",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [0, 1, 0, 1, 0],
+      "rationale": "Q1 repeats the 739752 deadline and gives no amount (rule 2, 0); Q3 affirmatively asserts breach at that deadline, which truth.json denies outright, so 0. Q5 is a bare 'Cannot tell from this' on a question truth.json shows the artifact can answer — rule 1 decides it 0; Q2 gives the correct 2,369.28 threshold and Q4 names the rule and standing with nothing wrong."
+    },
+    {
+      "contract": "promissory-note",
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [0, 0, 0, 1, 1],
+      "rationale": "Q1 is 0 on the 739752 deadline (rule 2) and gives no amount; Q2 states the right 2369.28 threshold but then asserts 'one such payment (of that same amount) already replayed and treated as fulfilling', which contradicts truth.json's finding that the 3 April payment did not count — rule 2 decides it 0. Q3 carries the wrong deadline and leaves breach unresolved; Q4 and Q5 are correct-but-incomplete (rule of the rule-2 kind), Q5 committing to 'ends in a fulfilled state'."
+    },
+    {
+      "contract": "promissory-note",
+      "artifact": "A",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [0, 1, 0, 0, 1],
+      "rationale": "Q1 and Q4 both state the deadline as 739752 against truth.json's 739769, so rule 2 decides both 0 — Q4 would otherwise have passed as incomplete-but-clean. Q3 also carries 739752 and opens 'Cannot tell from this', 0; Q2 gives the correct threshold and Q5 delivers the FULFILLED verdict behind a hedge about what follows, so both score 1."
+    },
+    {
+      "contract": "promissory-note",
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [0, 1, 0, 0, 0],
+      "rationale": "Q1 credits the 3 April payment against the balance to get 24,821.03, which truth.json says did not happen — rule 2, 0; Q3 asserts breach on timeout, and Q5 asserts both a breach path and eleven further installments, all three contradicting truth.json's no-breach / note-ends-FULFILLED findings. Q4 claims the process 'returned to the initial obligation state', which is the timely-payment loop rather than the live penalty arm, so 0; only Q2's stage-qualified list survives as incomplete-but-clean."
+    },
+    {
+      "contract": "promissory-note",
+      "artifact": "B",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [0, 1, 0, 0, 0],
+      "rationale": "Q1 again uses the credited 24,821.03 figure (rule 2, 0) and Q3 asserts breach on the missed 17 March deadline, which truth.json denies. Q4 and Q5 are bare 'Cannot tell from this' on questions B.dot plus history.txt can settle (the penalty guard vs. the plain amount paid; the 2→3 Fulfilled edge), so rule 1 decides both 0; Q2's stage-dependent phrasing contains nothing wrong."
+    },
+    {
+      "contract": "promissory-note",
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [0, 1, 1, 0, 1],
+      "rationale": "Q1 and Q4 are decided by rule 1: both withhold the operative verdict as 'cannot be told', leaving open whether the plain 2256.46 satisfied the penalty guard, when B.dot's guard plus history.txt's 'plain installment amount' settle it. Q3 reads the 'unreachable: no WITHIN' label correctly to conclude no breach, Q2 gives the correct live-branch threshold, and Q5 commits to Fulfilled as a terminal state — the parenthetical over-generalising which payments reach it is a side-remark about counterfactual branches, not the answer."
+    },
+    {
+      "contract": "promissory-note",
+      "artifact": "B",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [1, 1, 1, 0, 0],
+      "rationale": "Q1 commits to the substantive answer — installment plus penalty owed — and hedges only on the numeral B genuinely lacks, so rule 1 does not bite; Q2 and Q3 are correct on the live-branch threshold and on the unreachable Breach edge. Q4 is 0 under rule 1 for the same undetermined-live-state hedge as the other sonnet rows, and Q5 asserts the process loops back for the remaining eleven installments, which directly contradicts truth.json's FULFILLED-and-ends finding (rule 2)."
+    },
+    {
+      "contract": "promissory-note",
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 0,
+      "scores": [0, 1, 0, 0, 0],
+      "rationale": "Q1 uses the credited 24,821.03 balance that truth.json rules out (rule 2); Q3 asserts breach both at the first deadline and via End_5, which truth.json denies and C.bpmn's 'unreachable: no WITHIN' annotation contradicts. Q4 is a cannot-tell on the live state (rule 1), and Q5 names the next discharging event as 'full payment of all outstanding debts' — the Task_4 branch, not the live penalty payment — which is a definite wrong claim about the current position."
+    },
+    {
+      "contract": "promissory-note",
+      "artifact": "C",
+      "model": "haiku",
+      "repeat": 1,
+      "scores": [0, 1, 0, 0, 1],
+      "rationale": "Q1 is the credited-balance error again (rule 2); Q3 and Q4 both decline — on what triggers breach and on which state is live — where truth.json shows the artifact settles both, so rule 1 decides them 0. Q2's three-stage list includes the correct live option with nothing wrong, and Q5 delivers the verdict that the process concludes at End_3/Fulfilled, hedging only about what lies beyond it."
+    },
+    {
+      "contract": "promissory-note",
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 0,
+      "scores": [0, 1, 1, 0, 1],
+      "rationale": "Q1 and Q4 are both 0 under rule 1: each identifies Task_2 as the branch entered but then leaves undetermined whether anything is still owed or whether Fulfilled has already been reached, which the guard plus the 'plain installment amount' description settle. Q3 correctly reads Boundary_4's 'unreachable: no WITHIN' to conclude nothing reaches Breach, Q2 gives the correct live-branch threshold, and Q5 commits to Fulfilled as an end event while declining — rather than wrongly asserting — anything about the remaining installments."
+    },
+    {
+      "contract": "promissory-note",
+      "artifact": "C",
+      "model": "sonnet",
+      "repeat": 1,
+      "scores": [0, 1, 1, 0, 1],
+      "rationale": "Q1 is 0 under rule 1 — it hedges not merely on the numeral but on whether the amount owed has been discharged at all, unlike the B sonnet run that committed to the substance; Q4 is 0 under the same rule for the identical undetermined-live-state ending, applied uniformly across all four sonnet rows. Q2, Q3 and Q5 are correct: the penalty-then-all-outstanding-debts thresholds, the unreachable Breach boundary, and the process ending at End_3 with no further obligations described."
+    }
+  ]
+}

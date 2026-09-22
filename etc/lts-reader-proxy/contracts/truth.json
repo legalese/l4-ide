@@ -17,7 +17,7 @@
   ],
   "evidence": [
     "lts.json: owed = [{party: B, modal: MUST, action: return, dueBy: 14, remaining: 4}]; nextDeadline.at = 14",
-    "probes.out, the #TRACEs on probes.l4 lines 29, 36, 43 (B foo at 12 → FULFILLED; B delivery at 14 → FULFILLED; S foo at 12 → in progress). lts.json lists the act under untried ('the action binds `return`') — the list itself cannot try it.",
+    "probes.out, the #TRACEs on probes.l4 lines 29, 36, 43 (B foo at 12 → FULFILLED; B delivery at 14 → FULFILLED; S foo at 12 → in progress). lts.json lists the act under `discharging`, with bound.scope `wholeAction`, bound.binds [`return`] and bound.witness `return` = delivery; `untried` is empty. A.txt: 'B does anything now (at 10) → fulfilled', under the caveat it prints — '`return` = delivery was replayed, and another member may end elsewhere'.",
     "lts.json: breaching = [{event: tick at 15 past deadline 14, breach: {party: B, missed: 'MUST return', due: 14, seenAt: 15}}]; probes.out, the #TRACEs on probes.l4 lines 50 (WAIT UNTIL 15 → BREACHED) and 57 (B foo at 15 → BREACHED)",
     "B.dot: node 4 'B must return' reached by 2 -> 4 [IF NOT (price EQUALS 20)]; the golden's step log, jl4/examples/lts/expected/contracts.txt:19-20 ('at 2: … S MUST — done; on to what follows', 'at 4: … B MUST — done; on to what follows')",
     "probes.out, the #TRACE on probes.l4 line 29: Standing FULFILLED after B foo at 12; B.dot: 4 -> 3 Fulfilled"

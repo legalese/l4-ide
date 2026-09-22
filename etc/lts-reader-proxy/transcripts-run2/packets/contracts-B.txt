@@ -1,3 +1,12 @@
+Document
+
+The contract is `aContract` from jl4/examples/ok/contracts.l4. Two parties: S (a seller) and B (a buyer). Time is counted in whole days from day 0.
+
+What has happened so far, in order:
+  1. On day 2, S delivered (S did `delivery`).
+  2. On day 4, B paid 21 (B did `payment` with amount 21). The agreed price was 21, which is at least 20, and is not exactly 20.
+  3. Nothing else has happened; the clock now stands at day 10.
+
 digraph {
     graph [rankdir=TB
           ,label=aContract
@@ -74,3 +83,11 @@ digraph {
            ,color="#dc3545"
            ,style=dashed];
 }
+
+Q1. What is owed right now, and by whom?
+Q2. Which event(s) would discharge what is owed?
+Q3. Which event(s) or deadline(s) would put someone in breach?
+Q4. Where in the contract are we — which rule, branch or state is live?
+Q5. What happens after the next discharging event?
+
+Answer each question from this document alone. If it does not say, answer 'cannot tell from this' rather than guess.

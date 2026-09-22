@@ -1,3 +1,5 @@
+Document
+
 aContract — after 3 events, the clock stands at 10 (the #TRACE on line 23)
     PARTY S DOES delivery AT 2
     PARTY B DOES payment OF 21 AT 4
@@ -16,3 +18,11 @@ aContract — after 3 events, the clock stands at 10 (the #TRACE on line 23)
     - nothing happens by 14 (the clock reaches 15) → B is in breach: MUST return was due by 14; the clock reached 15 without it
 
   Next deadline: 14 (B: return)
+
+Q1. What is owed right now, and by whom?
+Q2. Which event(s) would discharge what is owed?
+Q3. Which event(s) or deadline(s) would put someone in breach?
+Q4. Where in the contract are we — which rule, branch or state is live?
+Q5. What happens after the next discharging event?
+
+Answer each question from this document alone. If it does not say, answer 'cannot tell from this' rather than guess.
