@@ -421,7 +421,14 @@ formatTransitionLabel opts sourceNamesTheObligation TransitionLabel{..} =
 -- Chosen by sweep, not by taste. GraphViz sizes a box to its widest LINE, so
 -- the canvas is a step function of this number AND of the longest token no
 -- wrap may break.
-Measured over the four contracts of the §7.3 reader proxy
+--
+-- __Report the longest RENDERED LINE, and say so.__ This bounds a line, not a
+-- caption: a three-line caption is 100 characters long and 36 wide, and the
+-- two numbers answer different questions. A review of 2026-09-21 tabulated a
+-- \"longest label\" column that was the line metric on two rows and the
+-- whole-string metric on two others, and the row it drew a conclusion from
+-- (@contracts@, \"43 → 43\", read as \"the wrap bought nothing here\") was the
+-- whole-string one; the longest rendered line there is 31. Measured over the four contracts of the §7.3 reader proxy
 -- (@etc\/lts-reader-proxy@), canvas width in inches:
 --
 -- @
@@ -472,8 +479,15 @@ wrapOneLine line = case labelTokens line of
 -- @\`is money at least equal within error\`@ is ONE name that happens to contain
 -- spaces, and breaking it across two lines makes the page assert a name the
 -- source does not have. A word carrying an odd number of back quotes opens or
--- closes such a run; an unterminated run (a caption cut short) runs to the end
--- rather than failing.
+-- closes such a run.
+--
+-- An UNTERMINATED run is not a name. Until 2026-09-22 it was glued into one
+-- token to the end of the line, so a single stray back quote — inside a string
+-- literal in a guard, say — silently defeated the wrap for everything after
+-- it, and the box grew without any diagnostic. There is no closing quote to
+-- honour, so the opener is treated as an ordinary word and the rest of the
+-- line wraps normally; the caption is then merely back-quoted oddly, which is
+-- what the source said.
 labelTokens :: Text -> [Text]
 labelTokens = merge . Text.words
  where
@@ -481,7 +495,9 @@ labelTokens = merge . Text.words
   merge (w : ws)
     | flipsQuoting w = case break flipsQuoting ws of
         (inside, closer : rest) -> Text.unwords (w : inside <> [closer]) : merge rest
-        (inside, [])            -> [Text.unwords (w : inside)]
+        -- No closer: `inside` is all of `ws` and carries no opener of its own,
+        -- so there is nothing further to merge.
+        (inside, [])            -> w : inside
     | otherwise = w : merge ws
   flipsQuoting w = odd (Text.length (Text.filter (== '`') w))
 
