@@ -35,19 +35,34 @@ receipts — before anything has happened, the clock stands at 0
   Standing: in progress.
 
   Owed now:
-    - Tenant OF "Alice" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
-    - Tenant OF "Bob" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
-    - Tenant OF "Carol" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+    - Tenant OF "Alice" MUST Pay OF (Tenant OF "Alice"), theLandlord, amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+    - Tenant OF "Bob" MUST Pay OF (Tenant OF "Bob"), theLandlord, amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+    - Tenant OF "Carol" MUST Pay OF (Tenant OF "Carol"), theLandlord, amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
 
   What would put someone in breach:
     - nothing happens by 7 (the clock reaches 8) → Tenant OF "Alice" is in breach; the breach names, in order: Tenant OF "Alice", Tenant OF "Bob", Tenant OF "Carol"
 
-  What could not be tried:
-    - Tenant OF "Alice" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
-    - Tenant OF "Bob" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
-    - Tenant OF "Carol" does Pay (EXACTLY t) (EXACTLY theLandlord) amount — the action binds `amount`, which the what-if cannot choose
+  What would move things along (neither ends nor breaches it):
+    - Tenant OF "Alice" does Pay OF (Tenant OF "Alice"), theLandlord, amount, with any `amount` now (at 0) → then:
+          · theLandlord MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) — due within 5 from now
+          · Tenant OF "Bob" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+          · Tenant OF "Carol" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+      this obligation's pattern matches any `amount`: the rule binds it and does not test it
+      the verdict above is one act's, not the set's: `amount` = 0 was replayed, and another member may end elsewhere
+    - Tenant OF "Bob" does Pay OF (Tenant OF "Bob"), theLandlord, amount, with any `amount` now (at 0) → then:
+          · Tenant OF "Alice" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+          · theLandlord MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) — due within 5 from now
+          · Tenant OF "Carol" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+      this obligation's pattern matches any `amount`: the rule binds it and does not test it
+      the verdict above is one act's, not the set's: `amount` = 0 was replayed, and another member may end elsewhere
+    - Tenant OF "Carol" does Pay OF (Tenant OF "Carol"), theLandlord, amount, with any `amount` now (at 0) → then:
+          · Tenant OF "Alice" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+          · Tenant OF "Bob" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+          · theLandlord MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) — due within 5 from now
+      this obligation's pattern matches any `amount`: the rule binds it and does not test it
+      the verdict above is one act's, not the set's: `amount` = 0 was replayed, and another member may end elsewhere
 
-  Next deadline: 7 (Tenant OF "Alice": Pay (EXACTLY t) (EXACTLY theLandlord) amount; Tenant OF "Bob": Pay (EXACTLY t) (EXACTLY theLandlord) amount; Tenant OF "Carol": Pay (EXACTLY t) (EXACTLY theLandlord) amount)
+  Next deadline: 7 (Tenant OF "Alice": Pay OF (Tenant OF "Alice"), theLandlord, amount; Tenant OF "Bob": Pay OF (Tenant OF "Bob"), theLandlord, amount; Tenant OF "Carol": Pay OF (Tenant OF "Carol"), theLandlord, amount)
 
   Steps, in order:
     at —: Tenant OF … MUST (member 1 of 3) — no more events; still waiting

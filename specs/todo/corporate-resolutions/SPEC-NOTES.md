@@ -303,6 +303,13 @@ blunt about it:
 
 > **This document does not know whether the picture beats the list.** Nobody has tried.
 
+**Ruled 2026-09-21 — NO** (LTS-VISUALISER.md §7.3): the gate is conjunctive, and on its own three
+questions the list was not beaten (an LLM-reader proxy, pooled Q1–Q3: list 39/48 against the
+state-graph DOT's 41/48 and the BPMN's 42/48, and ahead of both on Q1 and Q3), so **P2d and P2e
+are not built**. The caution below is unchanged and, if anything, firmer: what this arc may build
+on is the list (`l4 lts`), the `l4 state-graph` picture that now renders in both hosts, and P1's
+BPMN — not a two-plane picture that is not coming.
+
 It also corrects an earlier over-claim: the token-animation literature (Maslov et al.) found
 animation did **not** significantly improve comprehension directly — it reduced extraneous
 cognitive load, which in turn predicted comprehension. So "a picture will help" is not warranted

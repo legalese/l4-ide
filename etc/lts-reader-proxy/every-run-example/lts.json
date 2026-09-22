@@ -9,7 +9,7 @@
       },
       "then": [
         {
-          "action": "Deliver (EXACTLY theLandlord)",
+          "action": "Deliver theLandlord",
           "dueBy": 7,
           "kind": "owed",
           "modal": "MUST",
@@ -21,14 +21,17 @@
   ],
   "breaching": [
     {
-      "breach": {},
+      "breach": {
+        "anchor": 0,
+        "names": [{}]
+      },
       "event": {
         "at": 15,
         "deadline": 14,
         "kind": "tick",
         "whose": [
           {
-            "action": "Sign (EXACTLY t)",
+            "action": "Sign t",
             "modal": "MUST",
             "party": "Tenant OF \"Carol\""
           }

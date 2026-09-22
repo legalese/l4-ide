@@ -44,6 +44,7 @@ import L4.Cli.Run (RunOptions, runCmd, runOptionsParser)
 import L4.Cli.StateGraph (StateGraphOptions, stateGraphCmd, stateGraphOptionsParser)
 import L4.Cli.Trace (TraceOptions, traceCmd, traceOptionsParser)
 import L4.Cli.Verify (VerifyOptions, propositionalBound, verifyCmd, verifyOptionsParser)
+import L4.Cli.Yscript (YscriptOptions, yscriptCmd, yscriptOptionsParser)
 
 ----------------------------------------------------------------------------
 -- Top-level command
@@ -66,6 +67,7 @@ data Command
   | CmdNlg        NlgOptions
   | CmdLts        LtsOptions
   | CmdVerify     VerifyOptions
+  | CmdYscript    YscriptOptions
 
 commandParser :: Parser Command
 commandParser =
@@ -136,6 +138,9 @@ commandParser =
            (info (helper <*> (CmdVerify <$> verifyOptionsParser))
              (progDesc "Look for unsatisfiable rules, dead branches, vacuous guards and unreachable outcomes in the boolean decision skeleton"
                <> footerDoc (Just (verbatim propositionalBound))))
+      <> command "yscript"
+           (info (CmdYscript <$> yscriptOptionsParser)
+             (progDesc "Compile the pure-propositional-logic subset of an L4 file to AustLII DataLex's yscript rule language (one-way, no fidelity report)"))
 
 -- | A footer that keeps the line breaks it was written with.
 --
@@ -196,6 +201,7 @@ main = do
     CmdNlg        opts -> nlgCmd        opts
     CmdLts        opts -> ltsCmd        opts
     CmdVerify     opts -> verifyCmd     opts
+    CmdYscript    opts -> yscriptCmd    opts
 
 -- Silence unused-imports warning when we only import Options for types
 -- indirectly via re-exports.

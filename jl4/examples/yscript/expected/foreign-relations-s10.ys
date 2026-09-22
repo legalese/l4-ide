@@ -1,0 +1,11 @@
+RULE Section 10 - Core foreign arrangements PROVIDES
+the arrangement is a "core foreign arrangement" under section 10(2) ONLY IF
+    the arrangement is a "foreign arrangement" under section 6 AND
+    the Australian entity is a "core State/Territory entity" under section 10(3) AND
+    the non-Australian entity is a "core foreign entity" under section 10(4)
+
+RULE Section 10(3) PROVIDES
+the Australian entity is a "core State/Territory entity" under section 10(3) ONLY IF
+    section 7(a) applies OR
+    section 7(b) applies OR
+    section 7(c) applies

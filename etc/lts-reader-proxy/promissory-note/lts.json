@@ -2,12 +2,12 @@
   "advancing": [
     {
       "event": {
-        "at": 739770,
-        "deadline": 739769,
+        "at": 739753,
+        "deadline": 739752,
         "kind": "tick",
         "whose": [
           {
-            "action": "`pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred`",
+            "action": "`pay monthly installment to` `The Lender` `Amount Transferred`",
             "modal": "MUST",
             "party": "`Commercial Borrower` OF (Company OF \"Jane Dough Pte Ltd\", \"42 Jane Doe Rd #04-20, Singapore 420000\", \"Singapore\", \"UEN 200424242N\", (`Bank Account` OF \"DBS Bank Ltd\", \"Jane Dough Pte Ltd\", \"242-242424-9\", \"DBSSSGSG\"))"
           }
@@ -15,7 +15,7 @@
       },
       "then": [
         {
-          "action": "`pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred`",
+          "action": "`pay monthly installment to` `The Lender` `Amount Transferred`",
           "kind": "owed",
           "modal": "MUST",
           "party": "`Commercial Borrower` OF (Company OF \"Jane Dough Pte Ltd\", \"42 Jane Doe Rd #04-20, Singapore 420000\", \"Singapore\", \"UEN 200424242N\", (`Bank Account` OF \"DBS Bank Ltd\", \"Jane Dough Pte Ltd\", \"242-242424-9\", \"DBSSSGSG\"))"
@@ -27,17 +27,35 @@
   "clock": 739708,
   "contract": "`Payment Obligations` OF `Total Repayment Amount`",
   "deadlineNotKnown": [],
-  "discharging": [],
+  "discharging": [
+    {
+      "action": "`pay monthly installment to` OF (`Individual Lender` OF (`Natural Person` OF \"John Doe\", \"42 The Lender Rd, Singapore 424242\", \"Singapore\", \"G5301960D\", (`Bank Account` OF \"DBS Bank Ltd\", \"The Lender\", \"120-643240-1\", \"DBSSSGSG\"))), `Amount Transferred`",
+      "at": 739708,
+      "bound": {
+        "binds": ["Amount Transferred"],
+        "constraint": "`is money at least equal within error` OF `Amount Transferred`, (Money OF \"USD\", 2369.2806990603694)",
+        "scope": "argument",
+        "witness": [
+          {
+            "name": "Amount Transferred",
+            "value": "Money OF \"USD\", 2369.2806990603694"
+          }
+        ]
+      },
+      "kind": "act",
+      "party": "`Commercial Borrower` OF (Company OF \"Jane Dough Pte Ltd\", \"42 Jane Doe Rd #04-20, Singapore 420000\", \"Singapore\", \"UEN 200424242N\", (`Bank Account` OF \"DBS Bank Ltd\", \"Jane Dough Pte Ltd\", \"242-242424-9\", \"DBSSSGSG\"))"
+    }
+  ],
   "events": [
     "PARTY `The Borrower` DOES `pay monthly installment to` OF `The Lender`, (USD OF 2256.46) AT Day OF (April OF 3, 2025)"
   ],
   "format": 1,
   "line": 192,
   "nextDeadline": {
-    "at": 739769,
+    "at": 739752,
     "whose": [
       {
-        "action": "`pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred`",
+        "action": "`pay monthly installment to` OF (`Individual Lender` OF (`Natural Person` OF \"John Doe\", \"42 The Lender Rd, Singapore 424242\", \"Singapore\", \"G5301960D\", (`Bank Account` OF \"DBS Bank Ltd\", \"The Lender\", \"120-643240-1\", \"DBSSSGSG\"))), `Amount Transferred`",
         "modal": "MUST",
         "party": "`Commercial Borrower` OF (Company OF \"Jane Dough Pte Ltd\", \"42 Jane Doe Rd #04-20, Singapore 420000\", \"Singapore\", \"UEN 200424242N\", (`Bank Account` OF \"DBS Bank Ltd\", \"Jane Dough Pte Ltd\", \"242-242424-9\", \"DBSSSGSG\"))"
       }
@@ -45,26 +63,17 @@
   },
   "owed": [
     {
-      "action": "`pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred`",
-      "dueBy": 739769,
+      "action": "`pay monthly installment to` OF (`Individual Lender` OF (`Natural Person` OF \"John Doe\", \"42 The Lender Rd, Singapore 424242\", \"Singapore\", \"G5301960D\", (`Bank Account` OF \"DBS Bank Ltd\", \"The Lender\", \"120-643240-1\", \"DBSSSGSG\"))), `Amount Transferred`",
+      "dueBy": 739752,
       "kind": "owed",
       "modal": "MUST",
       "party": "`Commercial Borrower` OF (Company OF \"Jane Dough Pte Ltd\", \"42 Jane Doe Rd #04-20, Singapore 420000\", \"Singapore\", \"UEN 200424242N\", (`Bank Account` OF \"DBS Bank Ltd\", \"Jane Dough Pte Ltd\", \"242-242424-9\", \"DBSSSGSG\"))",
-      "remaining": 61
+      "remaining": 44
     }
   ],
   "passedOver": [],
   "standing": {
     "status": "inProgress"
   },
-  "untried": [
-    {
-      "event": {
-        "action": "`pay monthly installment to` (EXACTLY `The Lender`) `Amount Transferred`",
-        "kind": "act",
-        "party": "`Commercial Borrower` OF (Company OF \"Jane Dough Pte Ltd\", \"42 Jane Doe Rd #04-20, Singapore 420000\", \"Singapore\", \"UEN 200424242N\", (`Bank Account` OF \"DBS Bank Ltd\", \"Jane Dough Pte Ltd\", \"242-242424-9\", \"DBSSSGSG\"))"
-      },
-      "why": "the action binds `Amount Transferred`, which the what-if cannot choose"
-    }
-  ]
+  "untried": []
 }

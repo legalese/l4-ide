@@ -12,6 +12,6 @@
 
   What would move things along (neither ends nor breaches it):
     - Tenant OF "Carol" does Sign OF (Tenant OF "Carol") now (at 2) → then:
-          · Landlord OF "Ms Ng" MUST Deliver (EXACTLY theLandlord) — due by 7 (5 from now)
+          · Landlord OF "Ms Ng" MUST Deliver theLandlord — due by 7 (5 from now)
 
   Next deadline: 14 (Tenant OF "Carol": Sign OF (Tenant OF "Carol"))

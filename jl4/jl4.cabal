@@ -67,6 +67,7 @@ executable l4
     L4.Cli.StateGraph
     L4.Cli.Trace
     L4.Cli.Verify
+    L4.Cli.Yscript
 
 -- The M3 gate measurement: does information-gain question ordering ask fewer
 -- questions than L4 declaration order? Its own executable rather than a mode on
