@@ -359,16 +359,38 @@ formatTransitionLabel opts sourceNamesTheObligation TransitionLabel{..} =
         , if opts.showGuards then fmap (\g -> "IF " <> g) labelGuard else Nothing
         ]
       -- Drop the second copy only where something is LEFT to read. An
-      -- obligation with no window, no opening, no guard, no binder and no
-      -- join line has nothing new along its arm, and suppressing there leaves the arrow
-      -- BLANK rather than uncluttered: measured 2026-09-21 over
-      -- @jl4\/examples@, @doc@ and @jl4-core\/libraries@, 41 green HENCE edges
-      -- across 12 files, of which @doc\/courses\/foundation\/charity-obligation.l4@
-      -- is the worst — one @MAY@ with no @WITHIN@, so its entry state has a
-      -- single outgoing arrow and that arrow said nothing at all. A blank
-      -- caption is also not distinguishable from a junction's branch edge
-      -- except by colour. Where the suppression buys nothing the edge prints
-      -- in full, which is what it did before 2026-09-21.
+      -- obligation with no window, no opening, no guard, no binder and no join
+      -- line has nothing new along its arm, and suppressing there leaves the
+      -- arrow BLANK rather than uncluttered. The worst case is
+      -- @doc\/courses\/foundation\/charity-obligation.l4@: one @MAY@ with no
+      -- @WITHIN@ draws no @LEST@, so its entry state has a SINGLE outgoing
+      -- arrow, and that arrow said nothing at all — where it in fact means the
+      -- permission being exercised. A blank caption is also not
+      -- distinguishable from a junction's branch edge except by colour. Where
+      -- the suppression buys nothing the edge prints in full, which is what it
+      -- did before 2026-09-21.
+      --
+      -- __How many there were, and who counted.__ The review of 2026-09-21
+      -- swept @jl4\/examples@, @doc@ and @jl4-core\/libraries@ with the
+      -- pre-guard binary and counted @label=\"\"@ directly: 41 green HENCE
+      -- edges across 12 files. That is the number to cite, because it is a
+      -- direct count. An independent reconstruction on 2026-09-22 inferred the
+      -- same set from a LATER build — a green edge whose whole caption is its
+      -- own source node's name is exactly what used to be dropped to nothing —
+      -- and found 34 across 11 files, agreeing file for file on 8 of the 11.
+      -- So 34 is a corroborating FLOOR from a weaker instrument and not a
+      -- correction: an inference drawn from a build that no longer draws the
+      -- defect cannot see every case, and the two disagree in the direction
+      -- that predicts.
+      --
+      -- After the guard, on the same three trees: ZERO green edges with an
+      -- empty caption. 798 @.l4@ files scanned, 88 of them carrying a
+      -- regulative rule and so emitting a graph at all — say both numbers,
+      -- because \"798 files\" alone reads as the population that was drawn and
+      -- it is nine times the population that was drawn. The 107 blank labels
+      -- that remain are every one of them violet (@#6f42c1@, @RAND@) or amber
+      -- (@#e8850c@, @ROR@) — a junction's branch edge, which carries no
+      -- obligation and never did.
       --
       -- The same guard covers the CLI: with @--no-deadlines@ and
       -- @--no-guards@ every 'newParts' is empty, so every restated edge falls
