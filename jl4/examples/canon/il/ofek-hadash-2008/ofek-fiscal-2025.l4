@@ -97,7 +97,7 @@ DECIDE `the component is in the determining base` `the component` IF
 GIVEN `the date` IS A DATE
 GIVETH A NUMBER
 `the reduction rate on` `the date`
-    @nlg the wage reduction rate applying on %the date%
+    @nlg the wage reduction rate applying on %`the date`%
     MEANS
     -- § 9(a): 1.5.2025 to 31.12.2025 — 0.95% of the determining base.
     -- § 9(b): 1.1.2026 to 31.12.2026 — 1.2%. Outside those two windows the
@@ -112,7 +112,7 @@ GIVEN `the determining base` IS A NUMBER
       `the date` IS A DATE
 GIVETH A NUMBER
 `the monthly wage reduction on` `the determining base` `the date`
-    @nlg the monthly wage reduction on a determining base of %the determining base%
+    @nlg the monthly wage reduction on a determining base of %`the determining base`%
     MEANS `the determining base` TIMES (`the reduction rate on` `the date`)
 
 -- § 12: the base on which the employer's study-fund contribution is computed
@@ -175,7 +175,7 @@ GIVEN `the value of the seniority step` IS A NUMBER
       `the date` IS A DATE
 GIVETH A NUMBER
 `the section 16 withholding on` `the value of the seniority step` `the teacher advanced in seniority in september 2025` `the date`
-    @nlg the section 16 withholding of a seniority step worth %the value of the seniority step%
+    @nlg the section 16 withholding of a seniority step worth %`the value of the seniority step`%
     MEANS
     IF `the teacher advanced in seniority in september 2025` AND (`the seniority step is withheld on` `the date`)
         THEN `the value of the seniority step`

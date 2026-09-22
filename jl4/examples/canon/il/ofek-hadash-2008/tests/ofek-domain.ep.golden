@@ -114,7 +114,7 @@ DECLARE `a teacher` HAS
 GIVEN `the teacher` IS A `a teacher`
 GIVETH A `a salary table`
 `the table the teacher is placed in` `the teacher`
-    @nlg the salary table %the teacher% is placed in
+    @nlg the salary table %`the teacher`% is placed in
     MEANS
     -- § 36(c): first degree to the first-degree table; second degree to the
     -- second-degree table; § 36(d)(1) places a doctorate in the SECOND-degree

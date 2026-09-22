@@ -1,12 +1,12 @@
-`agrees to the agora` with the product of `BA cell` with 1 and 1 and the sum of 1 and `the seniority step at` with 2 and `BA cell` with 2 and 1
-`agrees to the agora` with the product of `BA cell` with 6 and 1 and the sum of 1 and `the seniority step at` with 7 and `BA cell` with 7 and 1
-`agrees to the agora` with the product of `BA cell` with 7 and 1 and the sum of 1 and `the seniority step at` with 8 and `BA cell` with 8 and 1
-`agrees to the agora` with the product of `BA cell` with 20 and 3 and the sum of 1 and `the seniority step at` with 21 and `BA cell` with 21 and 3
-`agrees to the agora` with the product of `BA cell` with 35 and 1 and the sum of 1 and `the seniority step at` with 36 and `BA cell` with 36 and 1
-`agrees to the agora` with the product of `MA cell` with 1 and 1 and the sum of 1 and `the seniority step at` with 2 and `MA cell` with 2 and 1
-`agrees to the agora` with the product of `MA cell` with 7 and 1 and the sum of 1 and `the seniority step at` with 8 and `MA cell` with 8 and 1
-`agrees to the agora` with the product of `MA cell` with 26 and 6 and the sum of 1 and `the seniority step at` with 27 and `MA cell` with 27 and 6
-`agrees to the agora` with the product of `MA cell` with 35 and 1 and the sum of 1 and `the seniority step at` with 36 and `MA cell` with 36 and 1
+`agrees to the agora` with the product of `BA cell` with 1 and 1 and the sum of 1 and the seniority step printed against the given row with 2 and `BA cell` with 2 and 1
+`agrees to the agora` with the product of `BA cell` with 6 and 1 and the sum of 1 and the seniority step printed against the given row with 7 and `BA cell` with 7 and 1
+`agrees to the agora` with the product of `BA cell` with 7 and 1 and the sum of 1 and the seniority step printed against the given row with 8 and `BA cell` with 8 and 1
+`agrees to the agora` with the product of `BA cell` with 20 and 3 and the sum of 1 and the seniority step printed against the given row with 21 and `BA cell` with 21 and 3
+`agrees to the agora` with the product of `BA cell` with 35 and 1 and the sum of 1 and the seniority step printed against the given row with 36 and `BA cell` with 36 and 1
+`agrees to the agora` with the product of `MA cell` with 1 and 1 and the sum of 1 and the seniority step printed against the given row with 2 and `MA cell` with 2 and 1
+`agrees to the agora` with the product of `MA cell` with 7 and 1 and the sum of 1 and the seniority step printed against the given row with 8 and `MA cell` with 8 and 1
+`agrees to the agora` with the product of `MA cell` with 26 and 6 and the sum of 1 and the seniority step printed against the given row with 27 and `MA cell` with 27 and 6
+`agrees to the agora` with the product of `MA cell` with 35 and 1 and the sum of 1 and the seniority step printed against the given row with 36 and `MA cell` with 36 and 1
 `agrees to the agora` with the product of `BA cell` with 26 and 1 and the sum of 1 and `the rank step` and `BA cell` with 26 and 2
 `agrees to the agora` with the product of `BA cell` with 26 and 2 and the sum of 1 and `the rank step` and `BA cell` with 26 and 3
 `agrees to the agora` with the product of `BA cell` with 26 and 5 and the sum of 1 and `the rank step` and `BA cell` with 26 and 6
@@ -20,22 +20,22 @@
 `BA cell` with 3 and 2 is equal to `BA cell` with 3 and 9
 `BA cell` with 1 and 1 is equal to `BA cell` with 1 and 9
 `MA cell` with 6 and 3 is equal to `MA cell` with 6 and 9
-`the highest rank the table separates at seniority` with 1 is equal to 1
-`the highest rank the table separates at seniority` with 3 is equal to 2
-`the highest rank the table separates at seniority` with 6 is equal to 3
-`the highest rank the table separates at seniority` with 11 is equal to 5
-`the highest rank the table separates at seniority` with 18 is equal to 7
-`the highest rank the table separates at seniority` with 26 is equal to 9
-`the highest rank the table separates at seniority` with 36 is equal to 9
-`the seniority at which rank is first separated` with 1 is equal to 1
-`the seniority at which rank is first separated` with 2 is equal to 3
-`the seniority at which rank is first separated` with 3 is equal to 6
-`the seniority at which rank is first separated` with 4 is equal to 8
-`the seniority at which rank is first separated` with 5 is equal to 11
-`the seniority at which rank is first separated` with 6 is equal to 14
-`the seniority at which rank is first separated` with 7 is equal to 18
-`the seniority at which rank is first separated` with 8 is equal to 22
-`the seniority at which rank is first separated` with 9 is equal to 26
+the highest rank the table separates at the given seniority with 1 is equal to 1
+the highest rank the table separates at the given seniority with 3 is equal to 2
+the highest rank the table separates at the given seniority with 6 is equal to 3
+the highest rank the table separates at the given seniority with 11 is equal to 5
+the highest rank the table separates at the given seniority with 18 is equal to 7
+the highest rank the table separates at the given seniority with 26 is equal to 9
+the highest rank the table separates at the given seniority with 36 is equal to 9
+the seniority at which the given rank is first separated with 1 is equal to 1
+the seniority at which the given rank is first separated with 2 is equal to 3
+the seniority at which the given rank is first separated with 3 is equal to 6
+the seniority at which the given rank is first separated with 4 is equal to 8
+the seniority at which the given rank is first separated with 5 is equal to 11
+the seniority at which the given rank is first separated with 6 is equal to 14
+the seniority at which the given rank is first separated with 7 is equal to 18
+the seniority at which the given rank is first separated with 8 is equal to 22
+the seniority at which the given rank is first separated with 9 is equal to 26
 `BA cell` with 1 and 1 is equal to 6300
 `BA cell` with 36 and 9 is equal to 16886.09
 `MA cell` with 1 and 1 is equal to 6615

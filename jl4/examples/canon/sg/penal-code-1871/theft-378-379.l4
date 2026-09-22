@@ -2,10 +2,12 @@
 --
 --   s 378  defines "theft"                                (the elements)
 --   s 379  punishes whoever commits theft                 (the charge)
+--   s 380  punishes theft in a building, tent or vessel   (the charge)
 --
--- A charge is laid under the PUNISHING section, so this module exports one
--- charge (s 379) over one facts record, and one offence ladder over the s 378
--- elements.
+-- A charge is laid under the PUNISHING section, so this module exports two
+-- charges (ss 379 and 380) over two facts records, and one offence ladder over
+-- the s 378 elements. The s 380 record NESTS the s 378 one: s 380 adds a place
+-- to a theft, it does not restate one.
 --
 -- s 378 is the parent of the whole property-offence family in this row. It is
 -- IMPORTed by robbery-390-392.l4, which nests a `Theft Facts` inside its own
@@ -47,6 +49,14 @@
 --
 -- 379. Whoever commits theft shall be punished with imprisonment for a term
 --      which may extend to 3 years, or with fine, or with both.
+--
+-- 380. Whoever commits theft in any building, tent or vessel, which building,
+--      tent or vessel is used as a human dwelling, or for the custody of
+--      property, shall be punished with imprisonment for a term which may
+--      extend to 7 years, and shall also be liable to fine.
+--
+--      (The marginal heading is "Theft in dwelling house, etc."; Woon calls the
+--      offence "theft in dwelling", and so does this module.)
 --
 -- The seventeen illustrations to s 378 are not reproduced in full. The three
 -- this module's bench turns on are, verbatim:
@@ -106,6 +116,60 @@
 -- record is both the ladder's input and the charge's.
 --
 -- ---------------------------------------------------------------------------
+-- The shape of s 380: two disjunctions in series, not a flat conjunction
+-- ---------------------------------------------------------------------------
+--
+-- Of the sections this module encodes, s 380 is the first with any disjunctive
+-- limb, and it has two of them:
+--
+--      theft  AND  ( building OR tent OR vessel )
+--             AND  ( used as a human dwelling OR used for the custody of property )
+--
+-- Woon, Essential Criminal Law ch. 8 p. 185, draws exactly that: `Theft`, then
+-- `in a` over three parallel boxes {building, tent, vessel}, then `used` over
+-- two parallel boxes {as a human dwelling, for custody of property}, then the
+-- consequent. Two OR-groups, in series with each other and with the theft. His
+-- `in a` and `used` boxes are inert connectives, and they are inert strings
+-- here.
+--
+-- Writing this as a flat conjunction of five leaves would be a WRONG ANSWER
+-- rather than a difference of style: it would demand a building that was at
+-- once a human dwelling AND a store, and would refuse the commonest case there
+-- is. Woon, same page: shop theft "is captured by the offence of theft in
+-- dwelling because shops are generally buildings used for the custody of
+-- property". `Tan Mei Ling, in the supermarket` below is the fixture to read
+-- first, and `Tan Mei Ling, in a building used for neither` is the control that
+-- proves the two groups are in series rather than fused.
+--
+-- The statute's "which building, tent or vessel" is an express co-reference:
+-- the thing used as a dwelling or a store is the same thing the theft happened
+-- in. One record carries one locus, and both groups are asked of it.
+--
+-- ---------------------------------------------------------------------------
+-- Why s 380 nests a theft, and why there is no `commits theft in dwelling`
+-- ---------------------------------------------------------------------------
+--
+-- `Theft in Dwelling Facts` NESTS a `Theft Facts` rather than adding fields to
+-- it, for the reason `Robbery Facts` nests one: the aggravating section adds to
+-- a theft, it does not restate one. Nesting is also the cheap direction here.
+-- A `Theft Facts WITH` literal must list every field, and there are three in
+-- this module and three more in robbery-390-392.l4; extending the record would
+-- have meant editing all six, and nesting edits none.
+--
+-- Woon and this row characterise s 380 differently, and the difference is worth
+-- recording rather than papering over. p. 185 says in terms that "theft in
+-- dwelling is defined in section 380 PC", and his figure's consequent node
+-- reads `Commits Theft in dwelling` — so he treats s 380 as defining an offence
+-- whose first element is theft. This row treats it as a PUNISHING section that
+-- carries extra elements of its own, like ss 379A, 381 and 382. s 378 is the
+-- only section in the group that says "is said to commit"; s 380 says only
+-- "shall be punished", and a charge is laid under the punishing section (CPC
+-- s 123(4)). So Woon's `Commits Theft in dwelling` maps to `offence under
+-- s 380` here, and NO `commits theft in dwelling` defining ladder is created.
+-- The two readings agree on everything that must be proved; they disagree only
+-- about which section is said to define it.
+--
+-- ---------------------------------------------------------------------------
 -- s 125 and the recital: theft is the section that states NO manner
 -- ---------------------------------------------------------------------------
 --
@@ -123,6 +187,12 @@
 -- possession of any person", so that the one element the recital names beyond
 -- the property is an element the ladder actually tests. Treat the asserted body
 -- below as a fixture of this encoding, not as an oracle.
+--
+-- The s 380 recital is the same body with the locus added, and is CONSTRUCTED
+-- on the same footing:
+--
+--   did commit theft of <the property>, in the possession of <one victim>,
+--   in a building used for the custody of property
 
 IMPORT prelude
 IMPORT `penal-code-general`
@@ -156,6 +226,23 @@ DECLARE `Theft Facts` HAS
     `moves that property`     IS A BOOLEAN @desc Did the accused move the property? Removing an obstacle that prevented it from moving, or separating it from another thing, counts as much as carrying it (Explanation 3); causing an animal to move it counts (Explanation 4); transferring intangible property from one account to another counts (Explanation 6).
     `in order to such taking` IS A BOOLEAN @desc Was the moving done FOR THE PURPOSE of that taking? Illustration (a): severing a tree is theft the moment it is severed, because the severing was done in order to the taking — a moving done for some other reason is not theft.
 
+-- The particulars are NOT repeated here. There is one offence and one occasion,
+-- so a second copy on the outer record could only ever diverge from the one on
+-- the nested theft; `charge under s 380` reads `f's theft's particulars`.
+@ref Penal Code 1871 s 380 — the theft, and the place it was committed in
+DECLARE `Theft in Dwelling Facts` HAS
+    theft IS A `Theft Facts` @desc The taking itself. s 380 adds a place to a theft, so the seven elements of s 378 are asked here and asked once.
+
+    -- "in any building, tent or vessel"
+    building IS A BOOLEAN @desc Was the theft committed in a BUILDING? By far the commonest limb, and it catches theft from shops and other commercial premises as much as theft from homes.
+    tent     IS A BOOLEAN @desc Was it committed in a TENT? The rarest limb.
+    vessel   IS A BOOLEAN @desc Was it committed in a VESSEL? Not a rare limb in Singapore, which is a major port.
+
+    -- "which building, tent or vessel is used as a human dwelling, or for the
+    --  custody of property"
+    `as a human dwelling` IS A BOOLEAN @desc Was that SAME building, tent or vessel used as a human dwelling? "Human dwelling" is not defined in the Penal Code 1871, so the ordinary meaning governs: somewhere a human being lives.
+    `for the custody of property` IS A BOOLEAN @desc Was it used FOR THE CUSTODY OF PROPERTY? A shop is — goods are kept there — and so is a warehouse or a store room. This is the limb that makes shop theft an offence under s 380.
+
 §§ `s 378 — theft`
 
 -- Seven leaves, all conjoined: s 378 has no disjunctive limb. The inert strings
@@ -185,7 +272,26 @@ DECIDE `offence under s 379` f IF
         "Whoever"
    ...  `commits theft` f
 
-§§ `The charge`
+§§ `s 380 — punishment for theft in a dwelling house, etc.`
+
+-- Two OR-groups, in series with each other and with the theft. Reading the rule
+-- top to bottom reconstructs s 380 with no word appearing twice, and the shape
+-- is the one Woon draws on p. 185 — see "The shape of s 380" in the header.
+@export Whether the accused has committed an offence punishable under section 380 of the Penal Code 1871 (theft in a building, tent or vessel used as a human dwelling or for the custody of property)
+GIVEN f IS A `Theft in Dwelling Facts` @desc The taking, and the place it was committed in
+GIVETH A BOOLEAN
+DECIDE `offence under s 380` f IF
+        "Whoever"
+   ...  `commits theft` (f's theft)
+   ...  "in any"
+   ...  (    f's building
+        ..   f's tent
+        OR   f's vessel )
+   ...  ", which building, tent or vessel is used"
+   ...  (    f's `as a human dwelling`
+        OR   f's `for the custody of property` )
+
+§§ `The charges`
 
 -- No manner clause: CPC s 125 illustration (a) says a theft charge need not set
 -- out how the theft was effected. The recital names the thing and the person it
@@ -221,6 +327,58 @@ GIVETH A Charge
         (`offence under s 379` f)
         (`the recital of the theft` f)
         (`elements of theft not made out` f)
+
+-- The locus, for the s 380 recital. Each group is a disjunction, so more than
+-- one limb can hold at once — a houseboat is a vessel used as a human dwelling,
+-- and a shophouse may be both a dwelling and a store — and the recital names
+-- every limb the officer established rather than choosing one for them.
+GIVEN f IS A `Theft in Dwelling Facts`
+GIVETH A STRING
+`the place the theft was committed in` f MEANS
+    `joined with` " or " (concat (LIST
+        (`included if` (f's building) "building"),
+        (`included if` (f's tent) "tent"),
+        (`included if` (f's vessel) "vessel")))
+
+GIVEN f IS A `Theft in Dwelling Facts`
+GIVETH A STRING
+`what that place was used for` f MEANS
+    `joined with` " or " (concat (LIST
+        (`included if` (f's `as a human dwelling`) "as a human dwelling"),
+        (`included if` (f's `for the custody of property`) "for the custody of property")))
+
+GIVEN f IS A `Theft in Dwelling Facts`
+GIVETH A STRING
+`the recital of the theft in dwelling` f MEANS
+    CONCAT (`the recital of the theft` (f's theft)),
+           ", in a ", (`the place the theft was committed in` f),
+           " used ", (`what that place was used for` f)
+
+-- s 380's elements are the theft's, plus two disjunctions. The theft is named
+-- as ONE row rather than leaf by leaf, for the reason `elements of robbery not
+-- made out` gives in robbery-390-392.l4: a reader who needs the individual leaf
+-- runs `charge under s 379` on the nested record, which names them one by one.
+-- Each disjunction is named by the statute's own words for the whole group,
+-- because naming one disjunct would name a limb the facts never relied on.
+GIVEN f IS A `Theft in Dwelling Facts`
+GIVETH A LIST OF STRING
+`elements of theft in dwelling not made out` f MEANS
+    concat (LIST
+        (`missing unless` (`commits theft` (f's theft)) "theft (section 378)"),
+        (`missing unless` (f's building OR f's tent OR f's vessel)
+            "in any building, tent or vessel"),
+        (`missing unless` (f's `as a human dwelling` OR f's `for the custody of property`)
+            "which building, tent or vessel is used as a human dwelling, or for the custody of property"))
+
+@export Frame a charge under section 380 of the Penal Code 1871 (theft in a dwelling house, etc.), or say why none can be framed
+GIVEN f IS A `Theft in Dwelling Facts` @desc The taking, the place it was committed in, and the particulars of the charge
+GIVETH A Charge
+`charge under s 380` f MEANS
+    `frame the charge` (f's theft's particulars) "380" "theft in dwelling"
+        "imprisonment for a term which may extend to 7 years, and shall also be liable to fine"
+        (`offence under s 380` f)
+        (`the recital of the theft in dwelling` f)
+        (`elements of theft in dwelling not made out` f)
 
 §§ `Illustration (q) — the bank transfer`
 
@@ -289,6 +447,155 @@ GIVETH A Charge
     `moves that property`     IS TRUE
     `in order to such taking` IS TRUE
 
+§§ `Section 380 — shop theft, and theft from a home`
+
+-- CONSTRUCTED FIXTURES, not reported charges: the bench this row was built on
+-- has no s 380 case in it. Woon, Essential Criminal Law ch. 8 p. 185, is the
+-- authority for why shop theft leads: it is "the more common variant of theft
+-- in dwelling", caught "because shops are generally buildings used for the
+-- custody of property". He also records that it is not clear from the SPF
+-- Annual Crime Brief 2022 whether shop theft is prosecuted under s 379 or
+-- s 380, and that cases may straddle both — usually charged under s 380 and
+-- reduced to s 379 on a plea of guilt. That is why `applicable charges` in
+-- charge-sheet.l4 lists BOTH on these facts, s 380 first.
+`Tan Mei Ling` MEANS `Theft Facts` WITH
+    particulars           IS Particulars WITH
+                               accused            IS "Tan Mei Ling"
+                               date               IS "the 14th day of June 2023"
+                               time               IS "4.30 pm"
+                               place              IS "Blk 505 Jurong West Street 52"
+                               `co-accused`       IS ""
+                               `common intention` IS FALSE
+    victim                IS "Chua Hock Seng"
+    `victim described as` IS "the manager of the said supermarket"
+    `victim pronoun`      IS he
+    `the property`        IS "one bottle of perfume valued at about $89/-"
+    `intending to take`   IS TRUE
+    dishonestly           IS TRUE
+    `movable property`    IS TRUE
+    `out of the possession of any person` IS TRUE
+    `without that person's consent`       IS TRUE
+    `moves that property`     IS TRUE
+    `in order to such taking` IS TRUE
+
+-- The motivating case. A supermarket is a building used for the custody of
+-- property, so both groups hold, and so does the theft: s 380 is made out, and
+-- s 379 is made out on the same taking.
+`Tan Mei Ling, in the supermarket` MEANS `Theft in Dwelling Facts` WITH
+    theft                         IS `Tan Mei Ling`
+    building                      IS TRUE
+    tent                          IS FALSE
+    vessel                        IS FALSE
+    `as a human dwelling`         IS FALSE
+    `for the custody of property` IS TRUE
+
+-- CONSTRUCTED CONTROL on the FIRST disjunction: the same taking, supposed to
+-- have happened at an open-air stall in the car park. The theft is untouched
+-- and s 379 still lies; there is no building, tent or vessel, so s 380 does
+-- not. This is the assertion that fails if the locus is ever dropped from the
+-- rule — which is the whole difference between s 379 and s 380.
+`Tan Mei Ling, in the open` MEANS `Theft in Dwelling Facts` WITH
+    theft                         IS `Tan Mei Ling`
+    building                      IS FALSE
+    tent                          IS FALSE
+    vessel                        IS FALSE
+    `as a human dwelling`         IS FALSE
+    `for the custody of property` IS FALSE
+
+-- CONSTRUCTED CONTROL on the SECOND disjunction: a building, but one used
+-- neither as a human dwelling nor for the custody of property — a disused
+-- pavilion standing empty. The first group holds and the second does not, so
+-- s 380 fails. This fixture is what proves the two groups are in SERIES: a flat
+-- five-leaf conjunction would fail here too, but it would also fail on
+-- `Tan Mei Ling, in the supermarket`, and the pair together pin the shape.
+`Tan Mei Ling, in a building used for neither` MEANS `Theft in Dwelling Facts` WITH
+    theft                         IS `Tan Mei Ling`
+    building                      IS TRUE
+    tent                          IS FALSE
+    vessel                        IS FALSE
+    `as a human dwelling`         IS FALSE
+    `for the custody of property` IS FALSE
+
+-- CONSTRUCTED CONTROL on the NESTED THEFT. She walked out of the same
+-- supermarket with an item she believed she had already paid for. Both of
+-- s 380's own groups hold; the theft does not, so the offence does not, and the
+-- refusal names the theft rather than the place. Woon, p. 185: "theft is an
+-- element of theft in dwelling, and therefore, the elements of a charge of
+-- theft simpliciter also need to be proved to establish theft in dwelling."
+`Tan Mei Ling, mistaken for her own` MEANS `Theft Facts` WITH
+    particulars           IS `Tan Mei Ling`'s particulars
+    victim                IS `Tan Mei Ling`'s victim
+    `victim described as` IS `Tan Mei Ling`'s `victim described as`
+    `victim pronoun`      IS `Tan Mei Ling`'s `victim pronoun`
+    `the property`        IS `Tan Mei Ling`'s `the property`
+    `intending to take`   IS TRUE
+    dishonestly           IS FALSE
+    `movable property`    IS TRUE
+    `out of the possession of any person` IS TRUE
+    `without that person's consent`       IS TRUE
+    `moves that property`     IS TRUE
+    `in order to such taking` IS TRUE
+
+`Tan Mei Ling, mistaken for her own, in the supermarket` MEANS `Theft in Dwelling Facts` WITH
+    theft                         IS `Tan Mei Ling, mistaken for her own`
+    building                      IS TRUE
+    tent                          IS FALSE
+    vessel                        IS FALSE
+    `as a human dwelling`         IS FALSE
+    `for the custody of property` IS TRUE
+
+-- The variant the section is named for: a taking from someone's home.
+`Ravi s/o Muniandy` MEANS `Theft Facts` WITH
+    particulars           IS Particulars WITH
+                               accused            IS "Ravi s/o Muniandy"
+                               date               IS "the 2nd day of September 2023"
+                               time               IS "10.45 am"
+                               place              IS "Blk 118 Bishan Street 12 #05-233"
+                               `co-accused`       IS ""
+                               `common intention` IS FALSE
+    victim                IS "Ong Bee Choo"
+    `victim described as` IS ""
+    `victim pronoun`      IS she
+    `the property`        IS "a gold necklace valued at about $1,200/-"
+    `intending to take`   IS TRUE
+    dishonestly           IS TRUE
+    `movable property`    IS TRUE
+    `out of the possession of any person` IS TRUE
+    `without that person's consent`       IS TRUE
+    `moves that property`     IS TRUE
+    `in order to such taking` IS TRUE
+
+`Ravi s/o Muniandy, in the flat` MEANS `Theft in Dwelling Facts` WITH
+    theft                         IS `Ravi s/o Muniandy`
+    building                      IS TRUE
+    tent                          IS FALSE
+    vessel                        IS FALSE
+    `as a human dwelling`         IS TRUE
+    `for the custody of property` IS FALSE
+
+-- CONSTRUCTED CONTROLS on the two disjuncts no real fact pattern in this row
+-- reaches. Without them `tent` and `vessel` would be leaves that no fixture
+-- ever turns on, and an encoding that dropped either would still run green.
+-- Woon, p. 185: theft in dwelling "could also occur on ships, since Singapore
+-- is a major port. It goes without saying that the tent variant of the offence
+-- is much rarer." The same taking is supposed to have happened aboard a
+-- houseboat, and in a tent at a campsite; both are lived in.
+`Ravi s/o Muniandy, in the vessel` MEANS `Theft in Dwelling Facts` WITH
+    theft                         IS `Ravi s/o Muniandy`
+    building                      IS FALSE
+    tent                          IS FALSE
+    vessel                        IS TRUE
+    `as a human dwelling`         IS TRUE
+    `for the custody of property` IS FALSE
+
+`Ravi s/o Muniandy, in the tent` MEANS `Theft in Dwelling Facts` WITH
+    theft                         IS `Ravi s/o Muniandy`
+    building                      IS FALSE
+    tent                          IS TRUE
+    vessel                        IS FALSE
+    `as a human dwelling`         IS TRUE
+    `for the custody of property` IS FALSE
+
 §§ `Directives`
 
 #EVAL `commits theft` `Lim Wei Ming`
@@ -315,3 +622,43 @@ GIVETH A Charge
 -- names both, in the order the section states them.
 #ASSERT NOT (`commits theft` `Lim Wei Ming, not in anyone's possession`)
 #ASSERT (`charge under s 379` `Lim Wei Ming, not in anyone's possession`)'s refusal EQUALS "A charge under section 379 would assert that the facts fulfil every legal condition of theft (CPC s 123(5)). On the facts given they do not: out of the possession of any person; without that person's consent."
+
+#EVAL `offence under s 380` `Tan Mei Ling, in the supermarket`
+#EVAL (`charge under s 380` `Tan Mei Ling, in the supermarket`)'s text
+#EVAL (`charge under s 380` `Tan Mei Ling, in the open`)'s refusal
+#EVAL (`charge under s 380` `Tan Mei Ling, mistaken for her own, in the supermarket`)'s refusal
+
+-- Shop theft: a supermarket is a building used for the custody of property.
+-- s 380 is made out, and so is s 379 on the very same taking — the straddle
+-- Woon describes at p. 185.
+#ASSERT `offence under s 380` `Tan Mei Ling, in the supermarket`
+#ASSERT `offence under s 379` `Tan Mei Ling`
+#ASSERT (`charge under s 380` `Tan Mei Ling, in the supermarket`)'s `made out`
+#ASSERT `the recital of the theft in dwelling` `Tan Mei Ling, in the supermarket` EQUALS "did commit theft of one bottle of perfume valued at about $89/-, in the possession of one Chua Hock Seng, the manager of the said supermarket, in a building used for the custody of property"
+#ASSERT (`charge under s 380` `Tan Mei Ling, in the supermarket`)'s text EQUALS "You, Tan Mei Ling, are charged that you, on or about the 14th day of June 2023, at about 4.30 pm, at Blk 505 Jurong West Street 52, Singapore, did commit theft of one bottle of perfume valued at about $89/-, in the possession of one Chua Hock Seng, the manager of the said supermarket, in a building used for the custody of property, and you have thereby committed an offence punishable under section 380 of the Penal Code 1871."
+#ASSERT (`charge under s 380` `Tan Mei Ling, in the supermarket`)'s punishment EQUALS "imprisonment for a term which may extend to 7 years, and shall also be liable to fine"
+
+-- Theft from a home, and the two rarer limbs. Each of these picks a different
+-- disjunct out of the first group, and the recital reports the one that held.
+#ASSERT `offence under s 380` `Ravi s/o Muniandy, in the flat`
+#ASSERT `the recital of the theft in dwelling` `Ravi s/o Muniandy, in the flat` EQUALS "did commit theft of a gold necklace valued at about $1,200/-, in the possession of one Ong Bee Choo, in a building used as a human dwelling"
+#ASSERT `offence under s 380` `Ravi s/o Muniandy, in the vessel`
+#ASSERT `the recital of the theft in dwelling` `Ravi s/o Muniandy, in the vessel` EQUALS "did commit theft of a gold necklace valued at about $1,200/-, in the possession of one Ong Bee Choo, in a vessel used as a human dwelling"
+#ASSERT `offence under s 380` `Ravi s/o Muniandy, in the tent`
+
+-- In the open: the taking is a theft and s 379 lies, but neither group of s 380
+-- holds, and the refusal names both of them.
+#ASSERT NOT (`offence under s 380` `Tan Mei Ling, in the open`)
+#ASSERT `offence under s 379` (`Tan Mei Ling, in the open`'s theft)
+#ASSERT (`charge under s 380` `Tan Mei Ling, in the open`)'s refusal EQUALS "A charge under section 380 would assert that the facts fulfil every legal condition of theft in dwelling (CPC s 123(5)). On the facts given they do not: in any building, tent or vessel; which building, tent or vessel is used as a human dwelling, or for the custody of property."
+
+-- A building used for neither purpose: the first group holds, the second does
+-- not, and only the second is named. The groups are in series.
+#ASSERT NOT (`offence under s 380` `Tan Mei Ling, in a building used for neither`)
+#ASSERT (`charge under s 380` `Tan Mei Ling, in a building used for neither`)'s refusal EQUALS "A charge under section 380 would assert that the facts fulfil every legal condition of theft in dwelling (CPC s 123(5)). On the facts given they do not: which building, tent or vessel is used as a human dwelling, or for the custody of property."
+
+-- Both groups hold and the theft does not. The refusal names the theft, and a
+-- reader who wants the leaf runs `charge under s 379` on the nested record.
+#ASSERT NOT (`commits theft` `Tan Mei Ling, mistaken for her own`)
+#ASSERT NOT (`offence under s 380` `Tan Mei Ling, mistaken for her own, in the supermarket`)
+#ASSERT (`charge under s 380` `Tan Mei Ling, mistaken for her own, in the supermarket`)'s refusal EQUALS "A charge under section 380 would assert that the facts fulfil every legal condition of theft in dwelling (CPC s 123(5)). On the facts given they do not: theft (section 378)."

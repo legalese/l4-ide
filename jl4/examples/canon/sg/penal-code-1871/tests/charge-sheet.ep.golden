@@ -13,6 +13,21 @@
 -- `Complaint` nests one facts record per offence family. An offence whose
 -- facts the officer has not filled in is simply not made out — an empty record
 -- has every element FALSE — so the router is total.
+--
+-- WHERE THE CRIMINAL BREACH OF TRUST CAPACITY IS READ FROM. Not from a new
+-- field on `CBT Facts`, but from the NESTED RECORD `cbt-407-409.l4` declares:
+-- `breach of trust` is an `Aggravated CBT Facts`, which carries the capacity
+-- leaves of ss 407, 408 and 409 and nests the `CBT Facts` of s 405 inside
+-- itself. So the s 406 row reaches through two records
+-- (the complaint's breach of trust, then ITS breach of trust) while the three
+-- aggravated rows read the outer one. That is the same nesting `Robbery Facts`
+-- uses for its theft and extortion, and it keeps `CBT Facts` a record that can
+-- still stand alone under a s 406 charge — which `cbt-405-406.l4`'s whole
+-- Carl Elias Moses bench depends on.
+--
+-- ONE BREAKING CHANGE, for anything that supplies a `Complaint` by name: the
+-- `breach of trust` field keeps its name but changes TYPE, from `CBT Facts` to
+-- `Aggravated CBT Facts`.
 
 IMPORT prelude
 IMPORT `penal-code-general`
@@ -20,22 +35,54 @@ IMPORT `cheating-415-417-420`
 IMPORT `theft-378-379`
 IMPORT `extortion-383-384`
 IMPORT `robbery-390-392`
+IMPORT `misappropriation-403`
 IMPORT `cbt-405-406`
+IMPORT `cbt-407-409`
 IMPORT `criminal-intimidation-503-506`
 IMPORT `hurt-321-323A`
 
 § `Penal Code 1871 — the charge sheet`
 
 @ref Criminal Procedure Code 2010 s 123 — one complaint, every offence this row encodes
+-- `theft` and `theft in dwelling` each carry a `Theft Facts`, and nothing in
+-- the type ties them together. A `Complaint` whose `theft in dwelling`'s nested
+-- theft differed from its own `theft` could return s 380 without s 379 — which
+-- s 380 itself forbids, theft being an element of theft in dwelling (Woon,
+-- Essential Criminal Law ch. 8 p. 185). The row ALREADY has that shape for
+-- robbery: `robbery` nests its own `Theft Facts` beside the `theft` field. It is
+-- handled the same way here — every fixture below supplies the SAME named theft
+-- record to both, and a reader adding one should do likewise. The alternative,
+-- putting the five locus booleans loose on `Complaint` beside a single theft,
+-- was rejected because it breaks this module's one rule: one nested facts
+-- record per offence family, and no law re-implemented here.
 DECLARE Complaint HAS
     cheating     IS A  `Cheating Facts`              @desc The deception, if any
     theft        IS A  `Theft Facts`                 @desc The taking, if any
+    `theft in dwelling` IS A `Theft in Dwelling Facts` @desc The same taking with the place it happened in, if any — s 380 is the aggravated form, and its nested theft should be the same record as `theft`
     extortion    IS AN `Extortion Facts`             @desc The threat that got property, if any
     robbery      IS A  `Robbery Facts`               @desc The theft or extortion with violence, if any
-    `breach of trust` IS A `CBT Facts`               @desc The entrustment and what became of the property, if any
+    misappropriation  IS A `Misappropriation Facts` @desc The dishonest dealing with movable property that was never taken wrongfully, if any
+    `breach of trust` IS AN `Aggravated CBT Facts`   @desc The entrustment, what became of the property, and the capacity the entrustment was made in, if any
     intimidation IS A  `Criminal Intimidation Facts` @desc The threat meant to alarm, if any
     hurt         IS A  `Hurt Facts`                  @desc The hurt caused, if any
 
+-- WHERE THE "403" ROW GOES, AND WHY. s 403 and s 406 are one family — the two
+-- offences of dishonestly dealing with property that was not wrongfully
+-- obtained — and the router's stated rule is most serious first within each
+-- family. s 406 carries up to 7 years, s 403 up to 2, so "403" follows "406".
+-- Note that this is the seriousness rule and NOT a section-number rule: by
+-- number 403 would come first. The list has never been in section order
+-- anyway — "394" precedes "392", and "420" precedes "417" — so seriousness is
+-- the only rule it follows.
+--
+-- NO IMPLICATION ROW IS OWED between "379" and "403". The 394/392/379 rows
+-- overlap because s 390(1) says in terms that in all robbery there is either
+-- theft or extortion, so a robbery IS a theft. Nothing of the kind ties theft
+-- to misappropriation: they are alternatives, not a hierarchy. s 378
+-- Illustration (g) says so from the theft side — the ring on the high road is
+-- in nobody's possession, so there is no theft, "though he may commit criminal
+-- misappropriation of property" — and the first fixture below makes that
+-- boundary executable.
 @export default The punishing sections of the Penal Code 1871 under which a charge can be framed on the facts of this complaint, most serious first within each family
 GIVEN c IS A Complaint @desc Everything the investigation has established, one record per offence family
 GIVETH A LIST OF STRING
@@ -46,21 +93,58 @@ GIVETH A LIST OF STRING
         (`included if` (`offence under s 394` (c's robbery)) "394"),
         (`included if` (`offence under s 392` (c's robbery)) "392"),
         (`included if` (`offence under s 393` (c's robbery)) "393"),
+        (`included if` (`offence under s 380` (c's `theft in dwelling`)) "380"),
         (`included if` (`offence under s 379` (c's theft)) "379"),
         (`included if` (`offence under s 384` (c's extortion)) "384"),
-        (`included if` (`offence under s 406` (c's `breach of trust`)) "406"),
+        (`included if` (`offence under s 409` (c's `breach of trust`)) "409"),
+        (`included if` (`offence under s 408` (c's `breach of trust`)) "408"),
+        (`included if` (`offence under s 407` (c's `breach of trust`)) "407"),
+        (`included if` (`offence under s 406` ((c's `breach of trust`)'s `breach of trust`)) "406"),
+        (`included if` (`offence under s 403` (c's misappropriation)) "403"),
         (`included if` (`offence under s 506` (c's intimidation)) "506"),
         (`included if` (`offence under s 323A` (c's hurt)) "323A"))
 
 §§ `Directives`
 
+-- The locus records the complaints below need. Each nests the SAME theft record
+-- its complaint gives the `theft` field, so the two can never disagree.
+
+`no theft in dwelling` MEANS `Theft in Dwelling Facts` WITH
+    theft                         IS `no theft`
+    building                      IS FALSE
+    tent                          IS FALSE
+    vessel                        IS FALSE
+    `as a human dwelling`         IS FALSE
+    `for the custody of property` IS FALSE
+
+-- Chen Weixiong Jerriek's robbery happened at the void deck of a block of
+-- flats. A void deck is open on every side: it is not a building, tent or
+-- vessel within s 380, so the theft there supports s 379 and not s 380.
+`the handphone taken at the void deck` MEANS `Theft in Dwelling Facts` WITH
+    theft                         IS `the handphone taken from Ng Juin Chye Joel`
+    building                      IS FALSE
+    tent                          IS FALSE
+    vessel                        IS FALSE
+    `as a human dwelling`         IS FALSE
+    `for the custody of property` IS FALSE
+
+`the handphone not taken, at the void deck` MEANS `Theft in Dwelling Facts` WITH
+    theft                         IS `the handphone not taken from Ng Juin Chye Joel`
+    building                      IS FALSE
+    tent                          IS FALSE
+    vessel                        IS FALSE
+    `as a human dwelling`         IS FALSE
+    `for the custody of property` IS FALSE
+
 -- The Lewis Christine facts alone: both cheating sections, nothing else.
 `Lewis Christine's complaint` MEANS Complaint WITH
     cheating          IS `Lewis Christine`
     theft             IS `no theft`
+    `theft in dwelling` IS `no theft in dwelling`
     extortion         IS `no extortion`
     robbery           IS `Chen Weixiong Jerriek, no aggravation`
-    `breach of trust` IS `Carl Elias Moses, as charged`
+    misappropriation  IS `no misappropriation`
+    `breach of trust` IS `Carl Elias Moses, as charged, no aggravating capacity`
     intimidation      IS `Chan Yok Tuang, the facts as they were`
     hurt              IS `Ang Boon Han, the hurt intended was grievous`
 
@@ -68,9 +152,11 @@ GIVETH A LIST OF STRING
 `Chen Weixiong Jerriek's complaint` MEANS Complaint WITH
     cheating          IS `Lewis Christine, no deception`
     theft             IS `the handphone taken from Ng Juin Chye Joel`
+    `theft in dwelling` IS `the handphone taken at the void deck`
     extortion         IS `no extortion`
     robbery           IS `Chen Weixiong Jerriek`
-    `breach of trust` IS `Carl Elias Moses, as charged`
+    misappropriation  IS `no misappropriation`
+    `breach of trust` IS `Carl Elias Moses, as charged, no aggravating capacity`
     intimidation      IS `Chan Yok Tuang, the facts as they were`
     hurt              IS `Ang Boon Han, the hurt intended was grievous`
 
@@ -80,15 +166,126 @@ GIVETH A LIST OF STRING
 `Chen Weixiong Jerriek's complaint, the attempt` MEANS Complaint WITH
     cheating          IS `Lewis Christine, no deception`
     theft             IS `the handphone not taken from Ng Juin Chye Joel`
+    `theft in dwelling` IS `the handphone not taken, at the void deck`
     extortion         IS `no extortion`
     robbery           IS `Chen Weixiong Jerriek, the attempt`
-    `breach of trust` IS `Carl Elias Moses, as charged`
+    misappropriation  IS `no misappropriation`
+    `breach of trust` IS `Carl Elias Moses, as charged, no aggravating capacity`
+    intimidation      IS `Chan Yok Tuang, the facts as they were`
+    hurt              IS `Ang Boon Han, the hurt intended was grievous`
+
+-- THE THEFT / MISAPPROPRIATION BOUNDARY, MADE EXECUTABLE. s 378 Illustration
+-- (g) and s 403 Explanation 2 Illustration (f) are the same ring: taking it is
+-- no theft, because it was in nobody's possession and there was nothing to take
+-- it out of; selling it at once without looking for the owner is an offence
+-- under s 403. The theft side is `no theft` — the all-FALSE record, which is
+-- the honest answer when the section's every element is absent — and the router
+-- returns the one section that does lie.
+`the ring found on the high road` MEANS Complaint WITH
+    cheating          IS `Lewis Christine, no deception`
+    theft             IS `no theft`
+    `theft in dwelling` IS `no theft in dwelling`
+    extortion         IS `no extortion`
+    robbery           IS `Chen Weixiong Jerriek, no aggravation`
+    misappropriation  IS `the ring sold at once`
+    `breach of trust` IS `Carl Elias Moses, as charged, no aggravating capacity`
+    intimidation      IS `Chan Yok Tuang, the facts as they were`
+    hurt              IS `Ang Boon Han, the hurt intended was grievous`
+
+-- The same finding, one step short of the offence: s 403 Explanation 2
+-- Illustration (a), the dollar picked up on the high road. No section lies at
+-- all, which is the vacuity control this router did not previously have — until
+-- now every assertion below named at least one section, so a router that
+-- over-reported would have been caught but one that reported spuriously on
+-- empty facts would not.
+`the dollar found on the high road` MEANS Complaint WITH
+    cheating          IS `Lewis Christine, no deception`
+    theft             IS `no theft`
+    `theft in dwelling` IS `no theft in dwelling`
+    extortion         IS `no extortion`
+    robbery           IS `Chen Weixiong Jerriek, no aggravation`
+    misappropriation  IS `the dollar on the high road`
+    `breach of trust` IS `Carl Elias Moses, as charged, no aggravating capacity`
+    intimidation      IS `Chan Yok Tuang, the facts as they were`
+    hurt              IS `Ang Boon Han, the hurt intended was grievous`
+
+-- Shop theft, the case Woon calls by far the most common version of theft: the
+-- router lists s 380 and s 379 on the same taking, the 7-year section first.
+-- Woon, Essential Criminal Law ch. 8 p. 185, records that it is not clear from
+-- the SPF Annual Crime Brief 2022 which of the two shop theft is prosecuted
+-- under, and that cases may straddle both — charged under s 380, reduced to
+-- s 379 on a plea of guilt. Both rows firing is that straddle.
+`Tan Mei Ling's complaint` MEANS Complaint WITH
+    cheating          IS `Lewis Christine, no deception`
+    theft             IS `Tan Mei Ling`
+    `theft in dwelling` IS `Tan Mei Ling, in the supermarket`
+    extortion         IS `no extortion`
+    robbery           IS `Chen Weixiong Jerriek, no aggravation`
+    misappropriation  IS `no misappropriation`
+    `breach of trust` IS `Carl Elias Moses, as charged, no aggravating capacity`
+    intimidation      IS `Chan Yok Tuang, the facts as they were`
+    hurt              IS `Ang Boon Han, the hurt intended was grievous`
+
+-- The same taking at an open-air stall: s 379 alone. This is the row that would
+-- fail if the 380 row ever stopped reading the locus.
+`Tan Mei Ling's complaint, in the open` MEANS Complaint WITH
+    cheating          IS `Lewis Christine, no deception`
+    theft             IS `Tan Mei Ling`
+    `theft in dwelling` IS `Tan Mei Ling, in the open`
+    extortion         IS `no extortion`
+    robbery           IS `Chen Weixiong Jerriek, no aggravation`
+    misappropriation  IS `no misappropriation`
+    `breach of trust` IS `Carl Elias Moses, as charged, no aggravating capacity`
+    intimidation      IS `Chan Yok Tuang, the facts as they were`
+    hurt              IS `Ang Boon Han, the hurt intended was grievous`
+
+-- The aggravated criminal breach of trust family, on the Carl Elias Moses
+-- entrustment as the court said it should have been pleaded. The capacity is
+-- supposed, not reported — see cbt-407-409.l4's header.
+`the employee's complaint` MEANS Complaint WITH
+    cheating          IS `Lewis Christine, no deception`
+    theft             IS `no theft`
+    `theft in dwelling` IS `no theft in dwelling`
+    extortion         IS `no extortion`
+    robbery           IS `Chen Weixiong Jerriek, no aggravation`
+    misappropriation  IS `no misappropriation`
+    `breach of trust` IS `Carl Elias Moses, as an employee of the company`
+    intimidation      IS `Chan Yok Tuang, the facts as they were`
+    hurt              IS `Ang Boon Han, the hurt intended was grievous`
+
+`the director's complaint` MEANS Complaint WITH
+    cheating          IS `Lewis Christine, no deception`
+    theft             IS `no theft`
+    `theft in dwelling` IS `no theft in dwelling`
+    extortion         IS `no extortion`
+    robbery           IS `Chen Weixiong Jerriek, no aggravation`
+    misappropriation  IS `no misappropriation`
+    `breach of trust` IS `Carl Elias Moses, as a director of the company`
+    intimidation      IS `Chan Yok Tuang, the facts as they were`
+    hurt              IS `Ang Boon Han, the hurt intended was grievous`
+
+-- The same employee, entrusted in a private capacity instead. s 408 drops out
+-- and s 406 alone remains — eight years of maximum sentence turning on one
+-- leaf, which is why the router now asks the question at all.
+`the employee's complaint, not entrusted as an employee` MEANS Complaint WITH
+    cheating          IS `Lewis Christine, no deception`
+    theft             IS `no theft`
+    `theft in dwelling` IS `no theft in dwelling`
+    extortion         IS `no extortion`
+    robbery           IS `Chen Weixiong Jerriek, no aggravation`
+    misappropriation  IS `no misappropriation`
+    `breach of trust` IS `Carl Elias Moses, an employee but not entrusted as one`
     intimidation      IS `Chan Yok Tuang, the facts as they were`
     hurt              IS `Ang Boon Han, the hurt intended was grievous`
 
 #EVAL `applicable charges` `Lewis Christine's complaint`
 #EVAL `applicable charges` `Chen Weixiong Jerriek's complaint`
 #EVAL `applicable charges` `Chen Weixiong Jerriek's complaint, the attempt`
+#EVAL `applicable charges` `Tan Mei Ling's complaint`
+#EVAL `applicable charges` `Tan Mei Ling's complaint, in the open`
+#EVAL `applicable charges` `the employee's complaint`
+#EVAL `applicable charges` `the director's complaint`
+#EVAL `applicable charges` `the employee's complaint, not entrusted as an employee`
 
 -- s 420 implies s 417: the router lists both, aggravated first
 #ASSERT `applicable charges` `Lewis Christine's complaint` EQUALS LIST "420", "417"
@@ -97,3 +294,18 @@ GIVETH A LIST OF STRING
 -- an attempted robbery: s 394 still lies (its own words reach an attempt),
 -- s 393 replaces s 392, and the theft charge goes with the completed taking
 #ASSERT `applicable charges` `Chen Weixiong Jerriek's complaint, the attempt` EQUALS LIST "394", "393"
+-- shop theft: the aggravated section first, the simple one under it
+#ASSERT `applicable charges` `Tan Mei Ling's complaint` EQUALS LIST "380", "379"
+-- the same taking in the open: s 380 drops out and s 379 stands alone
+#ASSERT `applicable charges` `Tan Mei Ling's complaint, in the open` EQUALS LIST "379"
+-- the ring on the high road: no theft lies, s 403 does, and the router says so
+#ASSERT `applicable charges` `the ring found on the high road` EQUALS LIST "403"
+-- the dollar picked up: nothing lies anywhere
+#ASSERT `applicable charges` `the dollar found on the high road` EQUALS EMPTY
+
+-- Criminal breach of trust: the aggravated section first, then s 406, which
+-- every one of them is built on and which therefore always accompanies them.
+#ASSERT `applicable charges` `the employee's complaint` EQUALS LIST "408", "406"
+#ASSERT `applicable charges` `the director's complaint` EQUALS LIST "409", "406"
+-- the capacity withdrawn: the family collapses to the section it is built on
+#ASSERT `applicable charges` `the employee's complaint, not entrusted as an employee` EQUALS LIST "406"

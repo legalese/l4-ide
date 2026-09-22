@@ -1,0 +1,876 @@
+-- Singapore Penal Code 1871 — the aggravated criminal breach of trust sections.
+--
+--   s 407  punishes CBT of property entrusted for transportation or storage
+--   s 408  punishes CBT by an employee
+--   s 409  punishes CBT by a public servant, banker, merchant, agent,
+--          director, officer, partner, key executive or fiduciary
+--
+-- All three are built ON TOP of section 405, which `cbt-405-406.l4` already
+-- defines. None of them redefines criminal breach of trust; each adds a
+-- CAPACITY to it and raises the punishment. Woon, *Essential Criminal Law*
+-- ch. 8, draws exactly that: on p. 196 (s 408) and p. 198 (s 409) the
+-- rightmost element before the consequent is a single box reading "Criminal
+-- breach of trust in respect of that property", and everything to its left is
+-- the capacity. This module has the same shape, because a call to another
+-- rule draws as ONE box on the caller's ladder (`penal-code-general.l4`,
+-- "A design call") and `commits criminal breach of trust` is that call.
+--
+-- ---------------------------------------------------------------------------
+-- Why this is a sibling module and not more of cbt-405-406.l4
+-- ---------------------------------------------------------------------------
+--
+-- `cbt-405-406.l4` is this row's NEGATIVE exhibit. Its header is one long
+-- argument about one flawed charge — that a charge alleging entrustment with
+-- one thing and misappropriation of another discloses no offence — and its
+-- bench walks three states of that single file. The aggravated sections ask a
+-- different question (in what capacity was the accused entrusted?) over a
+-- different record, and folding them in would bury the exhibit.
+--
+-- The row's filenames name their sections (`theft-378-379`, `hurt-321-323A`),
+-- so a second file named for its own three sections is what a reader will
+-- look for. `robbery-390-392.l4` kept its name when ss 393 and 394 were added
+-- because those punish the SAME facts record the file already declared; these
+-- three do not — they need capacity leaves s 405 has no place for.
+--
+-- ---------------------------------------------------------------------------
+-- The text
+-- ---------------------------------------------------------------------------
+--
+-- Verbatim from the in-force Penal Code 1871 (lawplain `statutes`, PC1871).
+--
+-- Criminal breach of trust of property entrusted for purposes of
+-- transportation or storage
+-- 407. Whoever, being entrusted with property for the purpose of
+--      transportation for hire or storage for rent or charge, commits criminal
+--      breach of trust in respect of such property, shall be punished with
+--      imprisonment for a term which may extend to 15 years, and shall also be
+--      liable to fine.
+--      Illustration
+--      A carrier is an example of a person who is entrusted with property for
+--      the purpose of transportation for hire and a warehouse owner or
+--      warehouse operator is an example of a person who is entrusted with
+--      property for the purpose of storage for rent or charge.
+--                                                                   [15/2019]
+--
+-- Criminal breach of trust by employees
+-- 408.—(1) Whoever, being an employee, and being in any manner entrusted in
+--      such capacity with property, or with any dominion over property,
+--      commits criminal breach of trust in respect of that property, shall be
+--      punished with imprisonment for a term which may extend to 15 years, and
+--      shall also be liable to fine.
+--                                                                   [15/2019]
+--      (2) For the purposes of subsection (1) —
+--          (a) an employee includes a person who is engaged in a capacity with
+--              the same fundamental qualities as an employee; and
+--          (b) a person may be an employee or engaged in the capacity
+--              mentioned in paragraph (a) even though that person does not
+--              receive any salary or other remuneration arising from the
+--              person's employment or engagement.
+--                                                                   [15/2019]
+--
+-- Criminal breach of trust by public servant, or by banker, merchant, agent,
+-- director, officer, partner, key executive or fiduciary
+-- 409.—(1) Whoever, being in any manner entrusted with property, or with any
+--      dominion over property —
+--          (a) in his capacity as a public servant;
+--          (b) in the way of his trade, profession or business as a banker, a
+--              merchant, a factor, a broker, an attorney or an agent;
+--          (c) in his professional capacity (other than by way of a trade,
+--              profession or business mentioned in paragraph (b));
+--          (d) in his capacity as a director of a corporation;
+--          (e) in his capacity as an officer of an unincorporated association;
+--          (f) in his capacity as a partner in a partnership;
+--          (g) in his capacity as a key executive of a corporation, an
+--              unincorporated association or a partnership; or
+--          (h) in his capacity as a fiduciary,
+--      commits criminal breach of trust in respect of that property, shall be
+--      punished with imprisonment for a term which may extend to 20 years, and
+--      shall also be liable to fine.
+--                                                                   [15/2019]
+--      (2) In this section —
+--          "director" includes —
+--              (a) any person occupying the position of director of a
+--                  corporation by whatever name called, and includes a person
+--                  in accordance with whose directions or instructions the
+--                  directors or the majority of the directors of a corporation
+--                  are accustomed to act, and an alternate or substitute
+--                  director; or
+--              (b) a member of a corporation in the case where the affairs of
+--                  the corporation are managed by its members, and includes a
+--                  person in accordance with whose directions or instructions
+--                  the members or the majority of the members of such
+--                  corporation are accustomed to act, and an alternate or
+--                  substitute member;
+--          "fiduciary" means a person who has undertaken to act for or on
+--              behalf of another person in a matter in circumstances which give
+--              rise to a relationship of trust, confidence and loyalty, and
+--              includes but is not limited to an executor, an administrator, a
+--              liquidator, a receiver and a trustee (other than the trustee of
+--              an implied, a constructive or a resulting trust);
+--          "key executive" means a person who, whether or not an employee of
+--              the corporation, unincorporated association or partnership, and
+--              whether acting alone or together with any other person, has
+--              general control and management of the administration of that
+--              corporation, unincorporated association or partnership;
+--          "officer", in relation to an unincorporated association (other than
+--              a partnership), means the president, the secretary or any member
+--              of the committee of the unincorporated association, and
+--              includes —
+--              (a) any person holding a position analogous to that of
+--                  president, secretary or member of a committee of the
+--                  unincorporated association;
+--              (b) a person in accordance with whose directions or instructions
+--                  the president, secretary or member of a committee of the
+--                  unincorporated association or a majority of such persons are
+--                  accustomed to act; and
+--              (c) any person purporting to act in any such capacity;
+--          "partner" includes a person purporting to act as a partner;
+--          "partnership" includes a limited partnership and a limited liability
+--              partnership within the meaning of section 2(1) of the Limited
+--              Liability Partnerships Act 2005.
+--                                                                   [15/2019]
+--      (3) For the purposes of this section and to avoid doubt —
+--          (a) a person may be a director of a corporation, officer of an
+--              unincorporated association, partner in a partnership, key
+--              executive of a corporation, unincorporated association or
+--              partnership even though that person does not receive any salary
+--              or other remuneration from that corporation, unincorporated
+--              association or partnership, as the case may be; and
+--          (b) a person may be a fiduciary even though it is stated in a
+--              contract or an agreement between the parties that a fiduciary
+--              relationship does not arise.
+--                                                                   [15/2019]
+--
+-- ---------------------------------------------------------------------------
+-- Interpretation calls, recorded beside the fixtures that make them
+-- ---------------------------------------------------------------------------
+--
+-- 1. THE s 405 NODE IS A NESTED RECORD, NOT A COPY. `Aggravated CBT Facts`
+--    carries `breach of trust IS A CBT Facts`, and every rule below ends in
+--    `commits criminal breach of trust` (c's `breach of trust`). That is the
+--    same nesting `robbery-390-392.l4` uses for `theft IS A Theft Facts`, and
+--    it is what makes Woon's single CBT box a single box here. The one
+--    `property` field that Carl Elias Moses turns on is therefore still the
+--    one property, all the way up: s 407's "in respect of SUCH property" and
+--    ss 408 and 409's "in respect of THAT property" cannot come apart from the
+--    entrustment, because there is nowhere to write a second property down.
+--
+--    The nested record carries its own `particulars`. As in robbery, the
+--    charge reads the OUTER `particulars` and never the nested one; the
+--    duplication is the price of `CBT Facts` also standing alone under s 406.
+--
+-- 2. s 407 IS ENCODED ON THE IN-FORCE TEXT, WHICH NO LONGER NAMES A CARRIER.
+--    Before Act 15 of 2019 the section read "being entrusted with property as
+--    a carrier, wharfinger or keeper of a warehouse". The in-force section
+--    names no occupation at all: it asks what the property was entrusted FOR —
+--    transportation for hire, or storage for rent or charge — and the carrier
+--    and the warehouse operator survive only as the section's Illustration.
+--    The two leaves below are the two purposes, and the Illustration's
+--    examples ride in their `@desc`. A ladder built on the old occupations
+--    would put the wrong question to an investigating officer.
+--
+-- 3. s 408's CAPACITY IS TWO LEAVES, NOT ONE. The section says "being an
+--    employee, AND being in any manner entrusted IN SUCH CAPACITY". It is not
+--    enough that a person who happens to be an employee was entrusted; the
+--    entrustment must be made to him as the employee he is. Woon draws this as
+--    two boxes in series ("Being an employee" -> "In such capacity entrusted
+--    with"), and the bench below has a fixture that separates them: an
+--    employee entrusted in a private capacity is outside s 408 and still
+--    inside s 406.
+--
+-- 4. s 409's CAPACITY IS IN THE LEAF NAMES. The section's paragraphs each read
+--    "in his capacity as …" or "in the way of his …", so the requirement that
+--    the ENTRUSTMENT be in that capacity is carried by the leaf itself rather
+--    than by a separate gate like s 408's. Each `@desc` asks the question that
+--    way round.
+--
+-- 5. s 409(1)(c) CARRIES THE CARVE-OUT, WHICH WOON'S FIGURE DROPS. On p. 198
+--    the residual limb is drawn as a bare box, "In other professional
+--    capacity", in parallel with the other two groups. The statute writes it
+--    as "in his professional capacity (OTHER THAN by way of a trade,
+--    profession or business mentioned in paragraph (b))", and that parenthesis
+--    is what makes (c) a residual rather than an overlap with (b). The leaf
+--    below is named with the exclusion and its `@desc` spells it out. This
+--    encoding follows the statute, not the box. (A figure of parallel branches
+--    cannot show an exclusion without an extra node, which is a limit of the
+--    drawing rather than a mistake in the book; Woon's own text on the same
+--    page concedes that the undefined terms are left to their ordinary sense.)
+--
+-- 6. s 409(2) AND s 409(3) ARE DEFINITIONS AND AVOIDANCE OF DOUBT, NOT
+--    ELEMENTS. They tell an officer how to answer a capacity leaf; they add no
+--    conjunct. They therefore ride in the `@desc` of the leaf each one
+--    governs, in the same way Illustrations do elsewhere in this row. The two
+--    that change an answer rather than describe one are both in s 409(3), and
+--    both say the same kind of thing: an unpaid office-holder still holds the
+--    office, and a contractual recital that "no fiduciary relationship arises"
+--    does not stop one arising. The s 408(2) extensions of "employee" work the
+--    same way.
+--
+-- 7. WOON'S SUB-BOXES ARE KEPT. p. 198 draws paragraph (b) as two columns in
+--    series — {Trade | Profession | Business} then {Banker | Merchant | factor
+--    | Broker | Attorney | Agent} — and paragraph (g) as "Key executive of a"
+--    then {Corporation | Unincorporated association | Partnership}. Both are
+--    inlined below at that granularity rather than hidden behind a named
+--    sub-rule, so the ladder shows what the page shows. The recital helper
+--    repeats the (b) condition, as `in violation of what` already repeats the
+--    second-limb condition in `cbt-405-406.l4`.
+--
+-- 8. THE RECITALS ARE CONSTRUCTED, NOT REPORTED. No s 407, s 408 or s 409
+--    charge is quoted verbatim in any judgment on this row's bench, so the
+--    three bodies below are derived from the s 406 recital in
+--    `cbt-405-406.l4` — capacity words, then that recital unchanged — and are
+--    fixtures of this module, NOT oracles. The same caveat the s 393 and s 394
+--    recitals already carry.
+
+IMPORT prelude
+IMPORT `penal-code-general`
+IMPORT `cbt-405-406`
+
+§ `Penal Code 1871 — aggravated criminal breach of trust`
+
+§§ `The facts of one entrustment, and the capacity it was made in`
+
+@ref Penal Code 1871 ss 407, 408 and 409 — the capacity each section adds over section 405
+DECLARE `Aggravated CBT Facts` HAS
+    particulars           IS A Particulars @desc Who is charged, and when and where the offence was committed
+    `breach of trust`     IS A `CBT Facts` @desc The entrustment and what became of the property — the section 405 case these sections are built on. Its own `particulars` are not read by the charges below.
+
+    -- s 407: "being entrusted with property for the purpose of transportation
+    --         for hire or storage for rent or charge"
+    `for the purpose of transportation for hire`
+                          IS A BOOLEAN @desc Was the property entrusted to the accused FOR THE PURPOSE of transporting it for hire? The section's own Illustration gives a carrier as the example. The purpose is the test, not the occupation: before 2019 the section named "a carrier, wharfinger or keeper of a warehouse", and it no longer does.
+    `for the purpose of storage for rent or charge`
+                          IS A BOOLEAN @desc Was the property entrusted to the accused FOR THE PURPOSE of storing it for rent or for a charge? The section's own Illustration gives a warehouse owner or warehouse operator as the example.
+
+    -- s 408(1): "being an employee, and being in any manner entrusted in such
+    --            capacity with property, or with any dominion over property"
+    `being an employee`   IS A BOOLEAN @desc Was the accused an employee? "Employee" includes a person engaged in a capacity with the same fundamental qualities as an employee (s 408(2)(a)), and a person can be an employee or so engaged even though they receive no salary or other remuneration for the employment or engagement (s 408(2)(b)). Whether someone is an employee is a question of fact; CPF contributions are a strong indicator but not the test.
+    `entrusted in such capacity`
+                          IS A BOOLEAN @desc Was the entrustment made to the accused IN THAT CAPACITY — as the employee he was? It is NOT enough that a person who happened to be an employee was entrusted with something; a manager who is handed a neighbour's house keys is entrusted in a private capacity, and section 408 does not reach it.
+
+    -- s 409(1)(a)
+    `in his capacity as a public servant`
+                          IS A BOOLEAN @desc Was the entrustment made to the accused in his capacity as a public servant (defined in s 21)?
+
+    -- s 409(1)(b): "in the way of his trade, profession or business as a
+    --               banker, a merchant, a factor, a broker, an attorney or an
+    --               agent"
+    `his trade`           IS A BOOLEAN @desc Was the entrustment made in the way of the accused's TRADE?
+    `his profession`      IS A BOOLEAN @desc Was it made in the way of his PROFESSION?
+    `his business`        IS A BOOLEAN @desc Was it made in the way of his BUSINESS?
+    `a banker`            IS A BOOLEAN @desc … carried on as a banker? None of the six words in paragraph (b) is defined in the section, so each bears its ordinary meaning.
+    `a merchant`          IS A BOOLEAN @desc … as a merchant?
+    `a factor`            IS A BOOLEAN @desc … as a factor — an agent entrusted with possession of goods for sale in his own name?
+    `a broker`            IS A BOOLEAN @desc … as a broker?
+    `an attorney`         IS A BOOLEAN @desc … as an attorney?
+    `an agent`            IS A BOOLEAN @desc … as an agent? Illustration (c) to s 405, the Penang agent, is a person entrusted in the way of his business as an agent.
+
+    -- s 409(1)(c)
+    `in his professional capacity, other than by way of a trade, profession or business mentioned in paragraph (b)`
+                          IS A BOOLEAN @desc Was the entrustment made to the accused in a PROFESSIONAL capacity that is NOT one of the ways paragraph (b) names? The exclusion is what makes this limb residual: if the accused was entrusted in the way of his trade, profession or business as a banker, merchant, factor, broker, attorney or agent, that is paragraph (b) and this leaf is FALSE. Answer TRUE only for a professional capacity paragraph (b) does not reach.
+
+    -- s 409(1)(d)
+    `in his capacity as a director of a corporation`
+                          IS A BOOLEAN @desc Was the entrustment made to the accused as a director of a corporation? "Director" includes anyone occupying the position of director by whatever name called, a person on whose directions the directors are accustomed to act, an alternate or substitute director, and — where a corporation's affairs are managed by its members — such a member (s 409(2)). An unpaid director is still a director (s 409(3)(a)).
+
+    -- s 409(1)(e)
+    `in his capacity as an officer of an unincorporated association`
+                          IS A BOOLEAN @desc Was it made to him as an officer of an unincorporated association other than a partnership? "Officer" means the president, the secretary or any committee member, and includes anyone holding an analogous position, anyone on whose directions they are accustomed to act, and anyone purporting to act in such a capacity (s 409(2)). An unpaid officer is still an officer (s 409(3)(a)).
+
+    -- s 409(1)(f)
+    `in his capacity as a partner in a partnership`
+                          IS A BOOLEAN @desc Was it made to him as a partner in a partnership? "Partner" includes a person purporting to act as a partner, and "partnership" includes a limited partnership and a limited liability partnership within the meaning of section 2(1) of the Limited Liability Partnerships Act 2005 (s 409(2)). An unpaid partner is still a partner (s 409(3)(a)).
+
+    -- s 409(1)(g): "in his capacity as a key executive of a corporation, an
+    --               unincorporated association or a partnership"
+    `in his capacity as a key executive`
+                          IS A BOOLEAN @desc Was it made to him as a key executive — a person who, whether or not an employee, and whether alone or with others, has general control and management of the administration of the body (s 409(2))? An unpaid key executive is still a key executive (s 409(3)(a)).
+    `of a corporation`    IS A BOOLEAN @desc … and the body he is key executive of is a corporation?
+    `of an unincorporated association`
+                          IS A BOOLEAN @desc … or an unincorporated association?
+    `of a partnership`    IS A BOOLEAN @desc … or a partnership?
+
+    -- s 409(1)(h)
+    `in his capacity as a fiduciary`
+                          IS A BOOLEAN @desc Was it made to him as a fiduciary — a person who has undertaken to act for or on behalf of another in circumstances giving rise to a relationship of trust, confidence and loyalty, including an executor, administrator, liquidator, receiver or trustee (but not the trustee of an implied, constructive or resulting trust) (s 409(2))? A person may be a fiduciary even though the contract between the parties says a fiduciary relationship does not arise (s 409(3)(b)).
+
+§§ `s 407 — criminal breach of trust of property entrusted for transportation or storage`
+
+@export Whether the accused has committed an offence punishable under section 407 of the Penal Code 1871 (criminal breach of trust of property entrusted for the purpose of transportation or storage)
+GIVEN c IS AN `Aggravated CBT Facts` @desc The entrustment, the purpose it was made for, and what became of the property
+GIVETH A BOOLEAN
+DECIDE `offence under s 407` c IF
+        "Whoever, being entrusted with property"
+   ...  (    c's `for the purpose of transportation for hire`
+        OR   c's `for the purpose of storage for rent or charge` )
+   ...  `commits criminal breach of trust` (c's `breach of trust`)
+
+§§ `s 408 — criminal breach of trust by an employee`
+
+@export Whether the accused has committed an offence punishable under section 408 of the Penal Code 1871 (criminal breach of trust by an employee)
+GIVEN c IS AN `Aggravated CBT Facts` @desc The entrustment, the capacity it was made in, and what became of the property
+GIVETH A BOOLEAN
+DECIDE `offence under s 408` c IF
+        "Whoever,"
+   ...  c's `being an employee`
+   ...  ", and being in any manner"
+   ...  c's `entrusted in such capacity`
+   ...  `commits criminal breach of trust` (c's `breach of trust`)
+
+§§ `s 409 — criminal breach of trust by a public servant, banker, merchant, agent, director, officer, partner, key executive or fiduciary`
+
+@export Whether the accused has committed an offence punishable under section 409 of the Penal Code 1871 (criminal breach of trust by a public servant, or by a banker, merchant, agent, director, officer, partner, key executive or fiduciary)
+GIVEN c IS AN `Aggravated CBT Facts` @desc The entrustment, the capacity it was made in, and what became of the property
+GIVETH A BOOLEAN
+DECIDE `offence under s 409` c IF
+        "Whoever, being in any manner entrusted with property, or with any dominion over property —"
+   ...  (        c's `in his capacity as a public servant`
+            ..  (    "in the way of his"
+                 ...  (    c's `his trade`
+                      ..   c's `his profession`
+                      OR   c's `his business` )
+                 ...  "as"
+                 ...  (    c's `a banker`
+                      ..   c's `a merchant`
+                      ..   c's `a factor`
+                      ..   c's `a broker`
+                      ..   c's `an attorney`
+                      OR   c's `an agent` ) )
+            ..  c's `in his professional capacity, other than by way of a trade, profession or business mentioned in paragraph (b)`
+            ..  c's `in his capacity as a director of a corporation`
+            ..  c's `in his capacity as an officer of an unincorporated association`
+            ..  c's `in his capacity as a partner in a partnership`
+            ..  (    c's `in his capacity as a key executive`
+                 ...  (    c's `of a corporation`
+                      ..   c's `of an unincorporated association`
+                      OR   c's `of a partnership` ) )
+            OR  c's `in his capacity as a fiduciary` )
+   ...  `commits criminal breach of trust` (c's `breach of trust`)
+
+§§ `The charges`
+
+-- Each body is the s 406 recital with the capacity words in front of it. The
+-- s 406 recital begins "being entrusted by X with property, namely, …", so the
+-- capacity clause is written to run into it. CONSTRUCTED, NOT REPORTED — see
+-- interpretation call 8 in the header.
+--
+-- s 407's clause puts the statutory purpose before the particular entrustment:
+--
+--   the property hereinafter mentioned having been entrusted to you for the
+--   purpose of storage for rent or charge, and being entrusted by one Z with
+--   property, namely, …
+GIVEN c IS AN `Aggravated CBT Facts`
+GIVETH A STRING
+`the capacity words for section 407` c MEANS
+    CONCAT "the property hereinafter mentioned having been entrusted to you for the purpose of ",
+           (`joined with` " and for the purpose of " (concat (LIST
+               (`included if` (c's `for the purpose of transportation for hire`) "transportation for hire"),
+               (`included if` (c's `for the purpose of storage for rent or charge`) "storage for rent or charge")))),
+           ", and "
+
+GIVEN c IS AN `Aggravated CBT Facts`
+GIVETH A STRING
+`the manner of the breach of trust of property entrusted for transportation or storage` c MEANS
+    CONCAT (`the capacity words for section 407` c), (`the manner of the breach of trust` (c's `breach of trust`))
+
+-- s 408's clause is the section's own two steps, in the section's own order:
+--
+--   being an employee, and in such capacity being entrusted by X with
+--   property, namely, …
+GIVEN c IS AN `Aggravated CBT Facts`
+GIVETH A STRING
+`the manner of the breach of trust by an employee` c MEANS
+    CONCAT "being an employee, and in such capacity ", (`the manner of the breach of trust` (c's `breach of trust`))
+
+-- s 409's clause names every capacity that holds, joined with "and", then
+-- hands over to the s 406 recital:
+--
+--   being a director of a corporation, and in such capacity being entrusted by
+--   X with property, namely, …
+GIVEN c IS AN `Aggravated CBT Facts`
+GIVETH A STRING
+`the manner of the breach of trust in a section 409 capacity` c MEANS
+    CONCAT (`the section 409 capacity` c), ", and in such capacity ", (`the manner of the breach of trust` (c's `breach of trust`))
+
+-- Paragraph (b)'s phrase is built from both of its columns, because the
+-- section states both: "in the way of his TRADE, PROFESSION OR BUSINESS as a
+-- BANKER, a MERCHANT, …". The condition beside it repeats the conjunction the
+-- ladder draws, as `in violation of what` repeats the second limb's in
+-- cbt-405-406.l4.
+GIVEN c IS AN `Aggravated CBT Facts`
+GIVETH A BOOLEAN
+`entrusted in the way of a trade, profession or business` c MEANS
+       (    c's `his trade`
+         OR c's `his profession`
+         OR c's `his business` )
+   AND (    c's `a banker`
+         OR c's `a merchant`
+         OR c's `a factor`
+         OR c's `a broker`
+         OR c's `an attorney`
+         OR c's `an agent` )
+
+GIVEN c IS AN `Aggravated CBT Facts`
+GIVETH A STRING
+`the words of paragraph (b)` c MEANS
+    CONCAT "in the way of your ",
+           (`joined with` " and " (concat (LIST
+               (`included if` (c's `his trade`) "trade"),
+               (`included if` (c's `his profession`) "profession"),
+               (`included if` (c's `his business`) "business")))),
+           " as ",
+           (`joined with` " and " (concat (LIST
+               (`included if` (c's `a banker`) "a banker"),
+               (`included if` (c's `a merchant`) "a merchant"),
+               (`included if` (c's `a factor`) "a factor"),
+               (`included if` (c's `a broker`) "a broker"),
+               (`included if` (c's `an attorney`) "an attorney"),
+               (`included if` (c's `an agent`) "an agent"))))
+
+-- Paragraph (g)'s phrase names the body as well as the office, for the same
+-- reason: "a key executive of a corporation, an unincorporated association or
+-- a partnership".
+GIVEN c IS AN `Aggravated CBT Facts`
+GIVETH A BOOLEAN
+`entrusted as a key executive` c MEANS
+       c's `in his capacity as a key executive`
+   AND (    c's `of a corporation`
+         OR c's `of an unincorporated association`
+         OR c's `of a partnership` )
+
+GIVEN c IS AN `Aggravated CBT Facts`
+GIVETH A STRING
+`the words of paragraph (g)` c MEANS
+    CONCAT "being a key executive of ",
+           (`joined with` " and " (concat (LIST
+               (`included if` (c's `of a corporation`) "a corporation"),
+               (`included if` (c's `of an unincorporated association`) "an unincorporated association"),
+               (`included if` (c's `of a partnership`) "a partnership"))))
+
+GIVEN c IS AN `Aggravated CBT Facts`
+GIVETH A STRING
+`the section 409 capacity` c MEANS
+    `joined with` " and " (concat (LIST
+        (`included if` (c's `in his capacity as a public servant`) "being a public servant"),
+        (`included if` (`entrusted in the way of a trade, profession or business` c) (`the words of paragraph (b)` c)),
+        (`included if` (c's `in his professional capacity, other than by way of a trade, profession or business mentioned in paragraph (b)`) "acting in your professional capacity, otherwise than by way of a trade, profession or business mentioned in section 409(1)(b)"),
+        (`included if` (c's `in his capacity as a director of a corporation`) "being a director of a corporation"),
+        (`included if` (c's `in his capacity as an officer of an unincorporated association`) "being an officer of an unincorporated association"),
+        (`included if` (c's `in his capacity as a partner in a partnership`) "being a partner in a partnership"),
+        (`included if` (`entrusted as a key executive` c) (`the words of paragraph (g)` c)),
+        (`included if` (c's `in his capacity as a fiduciary`) "being a fiduciary")))
+
+-- The elements, named for the refusal. Each list names the CAPACITY leaf by
+-- leaf, and then names the section 405 case as ONE row — the same architectural
+-- choice `elements of robbery not made out` makes about its nested theft and
+-- extortion, and for the same reason: a reader who needs the leaf runs
+-- `charge under s 406` on the nested record, which names its own elements one
+-- by one.
+GIVEN c IS AN `Aggravated CBT Facts`
+GIVETH A LIST OF STRING
+`elements of criminal breach of trust of property entrusted for transportation or storage not made out` c MEANS
+    concat (LIST
+        (`missing unless` (c's `for the purpose of transportation for hire` OR c's `for the purpose of storage for rent or charge`)
+            "being entrusted with the property for the purpose of transportation for hire, or for the purpose of storage for rent or charge"),
+        (`missing unless` (`commits criminal breach of trust` (c's `breach of trust`))
+            "committing criminal breach of trust in respect of such property (section 405) — run the section 406 charge on the same entrustment to see which of its elements failed"))
+
+GIVEN c IS AN `Aggravated CBT Facts`
+GIVETH A LIST OF STRING
+`elements of criminal breach of trust by an employee not made out` c MEANS
+    concat (LIST
+        (`missing unless` (c's `being an employee`)
+            "being an employee — which includes a person engaged in a capacity with the same fundamental qualities as an employee, whether or not paid (section 408(2))"),
+        (`missing unless` (c's `entrusted in such capacity`)
+            "being in any manner entrusted IN THAT CAPACITY with the property, or with any dominion over it — it is not enough that a person who happened to be an employee was entrusted"),
+        (`missing unless` (`commits criminal breach of trust` (c's `breach of trust`))
+            "committing criminal breach of trust in respect of that property (section 405) — run the section 406 charge on the same entrustment to see which of its elements failed"))
+
+GIVEN c IS AN `Aggravated CBT Facts`
+GIVETH A LIST OF STRING
+`elements of criminal breach of trust in a section 409 capacity not made out` c MEANS
+    concat (LIST
+        (`missing unless` (    c's `in his capacity as a public servant`
+                            OR `entrusted in the way of a trade, profession or business` c
+                            OR c's `in his professional capacity, other than by way of a trade, profession or business mentioned in paragraph (b)`
+                            OR c's `in his capacity as a director of a corporation`
+                            OR c's `in his capacity as an officer of an unincorporated association`
+                            OR c's `in his capacity as a partner in a partnership`
+                            OR `entrusted as a key executive` c
+                            OR c's `in his capacity as a fiduciary`)
+            "being entrusted with the property, or with dominion over it, in one of the capacities section 409(1) names — (a) as a public servant; (b) in the way of a trade, profession or business as a banker, merchant, factor, broker, attorney or agent; (c) in a professional capacity OTHER than one of those; (d) as a director of a corporation; (e) as an officer of an unincorporated association; (f) as a partner in a partnership; (g) as a key executive of a corporation, an unincorporated association or a partnership; or (h) as a fiduciary"),
+        (`missing unless` (`commits criminal breach of trust` (c's `breach of trust`))
+            "committing criminal breach of trust in respect of that property (section 405) — run the section 406 charge on the same entrustment to see which of its elements failed"))
+
+@export Frame a charge under section 407 of the Penal Code 1871 (criminal breach of trust of property entrusted for the purpose of transportation or storage), or say why none can be framed
+GIVEN c IS AN `Aggravated CBT Facts` @desc The entrustment, the purpose it was made for, and the particulars of the charge
+GIVETH A Charge
+`charge under s 407` c MEANS
+    `frame the charge` (c's particulars) "407" "criminal breach of trust of property entrusted for the purpose of transportation or storage"
+        "imprisonment for a term which may extend to 15 years, and shall also be liable to fine"
+        (`offence under s 407` c)
+        (`the manner of the breach of trust of property entrusted for transportation or storage` c)
+        (`elements of criminal breach of trust of property entrusted for transportation or storage not made out` c)
+
+@export Frame a charge under section 408 of the Penal Code 1871 (criminal breach of trust by an employee), or say why none can be framed
+GIVEN c IS AN `Aggravated CBT Facts` @desc The entrustment, the capacity it was made in, and the particulars of the charge
+GIVETH A Charge
+`charge under s 408` c MEANS
+    `frame the charge` (c's particulars) "408" "criminal breach of trust by an employee"
+        "imprisonment for a term which may extend to 15 years, and shall also be liable to fine"
+        (`offence under s 408` c)
+        (`the manner of the breach of trust by an employee` c)
+        (`elements of criminal breach of trust by an employee not made out` c)
+
+@export Frame a charge under section 409 of the Penal Code 1871 (criminal breach of trust by a public servant, or by a banker, merchant, agent, director, officer, partner, key executive or fiduciary), or say why none can be framed
+GIVEN c IS AN `Aggravated CBT Facts` @desc The entrustment, the capacity it was made in, and the particulars of the charge
+GIVETH A Charge
+`charge under s 409` c MEANS
+    `frame the charge` (c's particulars) "409" "criminal breach of trust by a public servant, or by a banker, merchant, agent, director, officer, partner, key executive or fiduciary"
+        "imprisonment for a term which may extend to 20 years, and shall also be liable to fine"
+        (`offence under s 409` c)
+        (`the manner of the breach of trust in a section 409 capacity` c)
+        (`elements of criminal breach of trust in a section 409 capacity not made out` c)
+
+§§ `The Carl Elias Moses entrustment, in three capacities`
+
+-- The base is `Carl Elias Moses, the charge amended` from cbt-405-406.l4 — the
+-- entrustment as the court said it should have been pleaded, with the PROCEEDS
+-- as the one property throughout. Section 405 is made out on it, so these three
+-- fixtures vary only the capacity and nothing else can drift.
+--
+-- CONSTRUCTED, NOT REPORTED. The charge that was actually laid against Carl
+-- Elias Moses was under s 406, and nothing in the judgment says in what
+-- capacity Trans-Pacific Credit Pte Ltd entrusted him. The capacities below are
+-- supposed, so that the aggravating leaves have something to bite on; they are
+-- not findings about him.
+
+-- An employee, entrusted as one. s 408: 15 years and fine, against s 406's 7
+-- years or fine or both.
+`Carl Elias Moses, as an employee of the company` MEANS `Aggravated CBT Facts` WITH
+    particulars           IS `Carl Elias Moses, the charge amended`'s particulars
+    `breach of trust`     IS `Carl Elias Moses, the charge amended`
+    `for the purpose of transportation for hire` IS FALSE
+    `for the purpose of storage for rent or charge` IS FALSE
+    `being an employee`   IS TRUE
+    `entrusted in such capacity` IS TRUE
+    `in his capacity as a public servant` IS FALSE
+    `his trade`           IS FALSE
+    `his profession`      IS FALSE
+    `his business`        IS FALSE
+    `a banker`            IS FALSE
+    `a merchant`          IS FALSE
+    `a factor`            IS FALSE
+    `a broker`            IS FALSE
+    `an attorney`         IS FALSE
+    `an agent`            IS FALSE
+    `in his professional capacity, other than by way of a trade, profession or business mentioned in paragraph (b)` IS FALSE
+    `in his capacity as a director of a corporation` IS FALSE
+    `in his capacity as an officer of an unincorporated association` IS FALSE
+    `in his capacity as a partner in a partnership` IS FALSE
+    `in his capacity as a key executive` IS FALSE
+    `of a corporation`    IS FALSE
+    `of an unincorporated association` IS FALSE
+    `of a partnership`    IS FALSE
+    `in his capacity as a fiduciary` IS FALSE
+
+-- A director of the company, entrusted as one. s 409(1)(d): 20 years and fine.
+-- Note that `being an employee` is FALSE here: a director is not by that fact
+-- an employee, and the row does not pretend otherwise.
+`Carl Elias Moses, as a director of the company` MEANS `Aggravated CBT Facts` WITH
+    particulars           IS `Carl Elias Moses, the charge amended`'s particulars
+    `breach of trust`     IS `Carl Elias Moses, the charge amended`
+    `for the purpose of transportation for hire` IS FALSE
+    `for the purpose of storage for rent or charge` IS FALSE
+    `being an employee`   IS FALSE
+    `entrusted in such capacity` IS FALSE
+    `in his capacity as a public servant` IS FALSE
+    `his trade`           IS FALSE
+    `his profession`      IS FALSE
+    `his business`        IS FALSE
+    `a banker`            IS FALSE
+    `a merchant`          IS FALSE
+    `a factor`            IS FALSE
+    `a broker`            IS FALSE
+    `an attorney`         IS FALSE
+    `an agent`            IS FALSE
+    `in his professional capacity, other than by way of a trade, profession or business mentioned in paragraph (b)` IS FALSE
+    `in his capacity as a director of a corporation` IS TRUE
+    `in his capacity as an officer of an unincorporated association` IS FALSE
+    `in his capacity as a partner in a partnership` IS FALSE
+    `in his capacity as a key executive` IS FALSE
+    `of a corporation`    IS FALSE
+    `of an unincorporated association` IS FALSE
+    `of a partnership`    IS FALSE
+    `in his capacity as a fiduciary` IS FALSE
+
+-- THE NEGATIVE THE SECTION TURNS ON. An employee — but the entrustment was
+-- made to him in a private capacity, not as the employee he was. Section 408
+-- is NOT made out, and section 406 still is. Change one leaf back to TRUE and
+-- eight years of maximum sentence come with it, which is why the section says
+-- "in such capacity" and why this encoding asks it as its own question.
+`Carl Elias Moses, an employee but not entrusted as one` MEANS `Aggravated CBT Facts` WITH
+    particulars           IS `Carl Elias Moses, the charge amended`'s particulars
+    `breach of trust`     IS `Carl Elias Moses, the charge amended`
+    `for the purpose of transportation for hire` IS FALSE
+    `for the purpose of storage for rent or charge` IS FALSE
+    `being an employee`   IS TRUE
+    `entrusted in such capacity` IS FALSE
+    `in his capacity as a public servant` IS FALSE
+    `his trade`           IS FALSE
+    `his profession`      IS FALSE
+    `his business`        IS FALSE
+    `a banker`            IS FALSE
+    `a merchant`          IS FALSE
+    `a factor`            IS FALSE
+    `a broker`            IS FALSE
+    `an attorney`         IS FALSE
+    `an agent`            IS FALSE
+    `in his professional capacity, other than by way of a trade, profession or business mentioned in paragraph (b)` IS FALSE
+    `in his capacity as a director of a corporation` IS FALSE
+    `in his capacity as an officer of an unincorporated association` IS FALSE
+    `in his capacity as a partner in a partnership` IS FALSE
+    `in his capacity as a key executive` IS FALSE
+    `of a corporation`    IS FALSE
+    `of an unincorporated association` IS FALSE
+    `of a partnership`    IS FALSE
+    `in his capacity as a fiduciary` IS FALSE
+
+§§ `Illustration (b) to section 405 — the warehouse operator, for section 407`
+
+-- (b) A is a warehouse owner or warehouse operator. Z, going on a journey,
+--     entrusts his furniture to A, under a contract that it shall be returned
+--     on payment of a stipulated sum for warehouse room. A dishonestly sells
+--     the goods. A has committed breach of trust.
+--
+-- The illustration is the section 405 case; section 407's Illustration then
+-- names a warehouse owner or warehouse operator as an example of a person
+-- entrusted with property FOR THE PURPOSE OF STORAGE FOR RENT OR CHARGE, and
+-- the illustration's own words supply the rent — "on payment of a stipulated
+-- sum for warehouse room". So this is the storage limb, on the statute's own
+-- facts.
+--
+-- The section 405 limb is the SECOND: a dishonest disposal in violation of a
+-- legal contract touching the discharge of the trust. Selling the goods is the
+-- disposal; the contract to return them on payment is the contract violated.
+--
+-- Illustration (b) is also where the statute drops a word — it concludes "A has
+-- committed breach of trust", without "criminal", where every other
+-- illustration says "criminal breach of trust". Nothing turns on it.
+`the warehouse operator's entrustment, Illustration (b)` MEANS `CBT Facts` WITH
+    particulars           IS Particulars WITH
+                               accused            IS "A"
+                               date               IS "a date unknown"
+                               time               IS ""
+                               place              IS "A's warehouse"
+                               `co-accused`       IS ""
+                               `common intention` IS FALSE
+    `entrusted by`        IS "one Z"
+    property              IS "the furniture of the said Z"
+    `property, in short`  IS "furniture"
+    `purpose of the entrustment`
+                          IS "under a contract that it shall be returned on payment of a stipulated sum for warehouse room"
+    `entrusted with property` IS TRUE
+    `entrusted with dominion over property` IS FALSE
+    dishonestly           IS TRUE
+    `misappropriates that property` IS FALSE
+    `converts that property to his own use` IS FALSE
+    `uses that property`  IS FALSE
+    `disposes of that property` IS TRUE
+    `any direction of law prescribing the mode in which such trust is to be discharged` IS FALSE
+    `any legal contract, express or implied, which he has made touching the discharge of such trust` IS TRUE
+    `intentionally suffers any other person to do so` IS FALSE
+
+`the warehouse operator, Illustration (b)` MEANS `Aggravated CBT Facts` WITH
+    particulars           IS `the warehouse operator's entrustment, Illustration (b)`'s particulars
+    `breach of trust`     IS `the warehouse operator's entrustment, Illustration (b)`
+    `for the purpose of transportation for hire` IS FALSE
+    `for the purpose of storage for rent or charge` IS TRUE
+    `being an employee`   IS FALSE
+    `entrusted in such capacity` IS FALSE
+    `in his capacity as a public servant` IS FALSE
+    `his trade`           IS FALSE
+    `his profession`      IS FALSE
+    `his business`        IS FALSE
+    `a banker`            IS FALSE
+    `a merchant`          IS FALSE
+    `a factor`            IS FALSE
+    `a broker`            IS FALSE
+    `an attorney`         IS FALSE
+    `an agent`            IS FALSE
+    `in his professional capacity, other than by way of a trade, profession or business mentioned in paragraph (b)` IS FALSE
+    `in his capacity as a director of a corporation` IS FALSE
+    `in his capacity as an officer of an unincorporated association` IS FALSE
+    `in his capacity as a partner in a partnership` IS FALSE
+    `in his capacity as a key executive` IS FALSE
+    `of a corporation`    IS FALSE
+    `of an unincorporated association` IS FALSE
+    `of a partnership`    IS FALSE
+    `in his capacity as a fiduciary` IS FALSE
+
+§§ `Illustration (c) to section 405 — the Penang agent, for section 409(1)(b)`
+
+-- The Penang agent is the statute's own example of a person entrusted in the
+-- way of his business as an AGENT, which is paragraph (b). Both of that
+-- paragraph's columns must hold, and this fixture exercises the conjunction:
+-- `his business` and `an agent`.
+`the Penang agent, in the way of his business` MEANS `Aggravated CBT Facts` WITH
+    particulars           IS `the Penang agent, Illustration (c)`'s particulars
+    `breach of trust`     IS `the Penang agent, Illustration (c)`
+    `for the purpose of transportation for hire` IS FALSE
+    `for the purpose of storage for rent or charge` IS FALSE
+    `being an employee`   IS FALSE
+    `entrusted in such capacity` IS FALSE
+    `in his capacity as a public servant` IS FALSE
+    `his trade`           IS FALSE
+    `his profession`      IS FALSE
+    `his business`        IS TRUE
+    `a banker`            IS FALSE
+    `a merchant`          IS FALSE
+    `a factor`            IS FALSE
+    `a broker`            IS FALSE
+    `an attorney`         IS FALSE
+    `an agent`            IS TRUE
+    `in his professional capacity, other than by way of a trade, profession or business mentioned in paragraph (b)` IS FALSE
+    `in his capacity as a director of a corporation` IS FALSE
+    `in his capacity as an officer of an unincorporated association` IS FALSE
+    `in his capacity as a partner in a partnership` IS FALSE
+    `in his capacity as a key executive` IS FALSE
+    `of a corporation`    IS FALSE
+    `of an unincorporated association` IS FALSE
+    `of a partnership`    IS FALSE
+    `in his capacity as a fiduciary` IS FALSE
+
+-- The same agent, with the OTHER column of paragraph (b) removed: he is an
+-- agent, but not in the way of any trade, profession or business of his own.
+-- Paragraph (b) needs both columns, so section 409 is not made out and section
+-- 406 still is. Woon draws the two columns in series for exactly this reason.
+`the Penang agent, not in the way of any trade, profession or business` MEANS `Aggravated CBT Facts` WITH
+    particulars           IS `the Penang agent, in the way of his business`'s particulars
+    `breach of trust`     IS `the Penang agent, in the way of his business`'s `breach of trust`
+    `for the purpose of transportation for hire` IS FALSE
+    `for the purpose of storage for rent or charge` IS FALSE
+    `being an employee`   IS FALSE
+    `entrusted in such capacity` IS FALSE
+    `in his capacity as a public servant` IS FALSE
+    `his trade`           IS FALSE
+    `his profession`      IS FALSE
+    `his business`        IS FALSE
+    `a banker`            IS FALSE
+    `a merchant`          IS FALSE
+    `a factor`            IS FALSE
+    `a broker`            IS FALSE
+    `an attorney`         IS FALSE
+    `an agent`            IS TRUE
+    `in his professional capacity, other than by way of a trade, profession or business mentioned in paragraph (b)` IS FALSE
+    `in his capacity as a director of a corporation` IS FALSE
+    `in his capacity as an officer of an unincorporated association` IS FALSE
+    `in his capacity as a partner in a partnership` IS FALSE
+    `in his capacity as a key executive` IS FALSE
+    `of a corporation`    IS FALSE
+    `of an unincorporated association` IS FALSE
+    `of a partnership`    IS FALSE
+    `in his capacity as a fiduciary` IS FALSE
+
+§§ `No aggravating capacity at all`
+
+-- The charge sheet needs an `Aggravated CBT Facts` for every complaint, and
+-- most complaints have no aggravating capacity in them. This wraps the Carl
+-- Elias Moses entrustment AS CHARGED — the one the court held disclosed no
+-- offence — with every capacity leaf FALSE, so it is the row's all-dark
+-- control: nothing at all is made out on it, under any of the four sections.
+`Carl Elias Moses, as charged, no aggravating capacity` MEANS `Aggravated CBT Facts` WITH
+    particulars           IS `Carl Elias Moses, as charged`'s particulars
+    `breach of trust`     IS `Carl Elias Moses, as charged`
+    `for the purpose of transportation for hire` IS FALSE
+    `for the purpose of storage for rent or charge` IS FALSE
+    `being an employee`   IS FALSE
+    `entrusted in such capacity` IS FALSE
+    `in his capacity as a public servant` IS FALSE
+    `his trade`           IS FALSE
+    `his profession`      IS FALSE
+    `his business`        IS FALSE
+    `a banker`            IS FALSE
+    `a merchant`          IS FALSE
+    `a factor`            IS FALSE
+    `a broker`            IS FALSE
+    `an attorney`         IS FALSE
+    `an agent`            IS FALSE
+    `in his professional capacity, other than by way of a trade, profession or business mentioned in paragraph (b)` IS FALSE
+    `in his capacity as a director of a corporation` IS FALSE
+    `in his capacity as an officer of an unincorporated association` IS FALSE
+    `in his capacity as a partner in a partnership` IS FALSE
+    `in his capacity as a key executive` IS FALSE
+    `of a corporation`    IS FALSE
+    `of an unincorporated association` IS FALSE
+    `of a partnership`    IS FALSE
+    `in his capacity as a fiduciary` IS FALSE
+
+§§ `Directives`
+
+#EVAL (`charge under s 408` `Carl Elias Moses, as an employee of the company`)'s text
+#EVAL (`charge under s 409` `Carl Elias Moses, as a director of the company`)'s text
+#EVAL (`charge under s 408` `Carl Elias Moses, an employee but not entrusted as one`)'s refusal
+#EVAL (`charge under s 407` `the warehouse operator, Illustration (b)`)'s text
+#EVAL (`charge under s 409` `the Penang agent, in the way of his business`)'s text
+#EVAL (`charge under s 409` `the Penang agent, not in the way of any trade, profession or business`)'s refusal
+
+-- s 408. The employee, entrusted as one.
+#ASSERT `offence under s 408` `Carl Elias Moses, as an employee of the company`
+#ASSERT (`charge under s 408` `Carl Elias Moses, as an employee of the company`)'s `made out`
+#ASSERT (`charge under s 408` `Carl Elias Moses, as an employee of the company`)'s text EQUALS "You, Carl Elias Moses, are charged that you, on or about 23 October 1989, at the premises of Trans-Pacific Credit Pte Ltd, Singapore, being an employee, and in such capacity being entrusted by Trans-Pacific Credit Pte Ltd (“the company”) with property, namely, the proceeds of the sale of 2,000 Overseas Union Bank Warrant 1994 received by you from DBS Securities Pte Ltd pursuant to a sale (per contract number 414270/501) of the said warrants, for the purpose of paying the same to the company, did dishonestly misappropriate the said proceeds, and you have thereby committed an offence punishable under section 408 of the Penal Code 1871."
+#ASSERT (`charge under s 408` `Carl Elias Moses, as an employee of the company`)'s punishment EQUALS "imprisonment for a term which may extend to 15 years, and shall also be liable to fine"
+-- The employee is not a director, a public servant or anything else in s 409,
+-- and the entrustment was not for transport or storage.
+#ASSERT NOT (`offence under s 409` `Carl Elias Moses, as an employee of the company`)
+#ASSERT NOT (`offence under s 407` `Carl Elias Moses, as an employee of the company`)
+
+-- s 409(1)(d). The director.
+#ASSERT `offence under s 409` `Carl Elias Moses, as a director of the company`
+#ASSERT (`charge under s 409` `Carl Elias Moses, as a director of the company`)'s `made out`
+#ASSERT (`charge under s 409` `Carl Elias Moses, as a director of the company`)'s text EQUALS "You, Carl Elias Moses, are charged that you, on or about 23 October 1989, at the premises of Trans-Pacific Credit Pte Ltd, Singapore, being a director of a corporation, and in such capacity being entrusted by Trans-Pacific Credit Pte Ltd (“the company”) with property, namely, the proceeds of the sale of 2,000 Overseas Union Bank Warrant 1994 received by you from DBS Securities Pte Ltd pursuant to a sale (per contract number 414270/501) of the said warrants, for the purpose of paying the same to the company, did dishonestly misappropriate the said proceeds, and you have thereby committed an offence punishable under section 409 of the Penal Code 1871."
+#ASSERT (`charge under s 409` `Carl Elias Moses, as a director of the company`)'s punishment EQUALS "imprisonment for a term which may extend to 20 years, and shall also be liable to fine"
+-- A director is not thereby an employee, so s 408 does not lie on these facts.
+#ASSERT NOT (`offence under s 408` `Carl Elias Moses, as a director of the company`)
+
+-- THE NEGATIVE. The entrustment was not made in the employee capacity, so
+-- s 408 fails on that leaf alone — and the refusal says which leaf. The
+-- section 405 case underneath is untouched and s 406 still lies, which is the
+-- whole point: the capacity is what the aggravated section adds.
+#ASSERT NOT (`offence under s 408` `Carl Elias Moses, an employee but not entrusted as one`)
+#ASSERT NOT ((`charge under s 408` `Carl Elias Moses, an employee but not entrusted as one`)'s `made out`)
+#ASSERT (`charge under s 408` `Carl Elias Moses, an employee but not entrusted as one`)'s text EQUALS ""
+#ASSERT (`charge under s 408` `Carl Elias Moses, an employee but not entrusted as one`)'s refusal EQUALS "A charge under section 408 would assert that the facts fulfil every legal condition of criminal breach of trust by an employee (CPC s 123(5)). On the facts given they do not: being in any manner entrusted IN THAT CAPACITY with the property, or with any dominion over it — it is not enough that a person who happened to be an employee was entrusted."
+#ASSERT `offence under s 406` (`Carl Elias Moses, an employee but not entrusted as one`'s `breach of trust`)
+
+-- s 407. The warehouse operator, on Illustration (b) to s 405 and the
+-- Illustration to s 407.
+#ASSERT `offence under s 407` `the warehouse operator, Illustration (b)`
+#ASSERT (`charge under s 407` `the warehouse operator, Illustration (b)`)'s `made out`
+#ASSERT (`charge under s 407` `the warehouse operator, Illustration (b)`)'s text EQUALS "You, A, are charged that you, on or about a date unknown, at A's warehouse, Singapore, the property hereinafter mentioned having been entrusted to you for the purpose of storage for rent or charge, and being entrusted by one Z with property, namely, the furniture of the said Z under a contract that it shall be returned on payment of a stipulated sum for warehouse room, did dishonestly dispose of the said furniture in violation of a legal contract, express or implied, which you had made touching the discharge of the said trust, and you have thereby committed an offence punishable under section 407 of the Penal Code 1871."
+#ASSERT (`charge under s 407` `the warehouse operator, Illustration (b)`)'s punishment EQUALS "imprisonment for a term which may extend to 15 years, and shall also be liable to fine"
+-- A warehouse operator is not an employee of the person who stores with him.
+#ASSERT NOT (`offence under s 408` `the warehouse operator, Illustration (b)`)
+#ASSERT NOT (`offence under s 409` `the warehouse operator, Illustration (b)`)
+
+-- s 409(1)(b). Both columns of the paragraph, on the Penang agent.
+#ASSERT `offence under s 409` `the Penang agent, in the way of his business`
+#ASSERT (`charge under s 409` `the Penang agent, in the way of his business`)'s `made out`
+#ASSERT (`charge under s 409` `the Penang agent, in the way of his business`)'s text EQUALS "You, A, are charged that you, on or about a date unknown, at A's place of business, Singapore, in the way of your business as an agent, and in such capacity being entrusted by one Z of Penang with property, namely, $5,000 remitted to you by the said Z with directions to you to invest the same in Government securities, pursuant to an express or implied contract between you and the said Z that all sums remitted by the said Z to you shall be invested by you according to his direction, did dishonestly use the said moneys in violation of a legal contract, express or implied, which you had made touching the discharge of the said trust, and you have thereby committed an offence punishable under section 409 of the Penal Code 1871."
+
+-- Paragraph (b) needs BOTH columns. Take the trade, profession and business
+-- away and the paragraph fails although he is still an agent — and nothing
+-- else in s 409(1) catches him, because (c) excludes the very capacities (b)
+-- names and he is in none of the others.
+#ASSERT NOT (`offence under s 409` `the Penang agent, not in the way of any trade, profession or business`)
+#ASSERT (`charge under s 409` `the Penang agent, not in the way of any trade, profession or business`)'s text EQUALS ""
+#ASSERT `offence under s 406` (`the Penang agent, not in the way of any trade, profession or business`'s `breach of trust`)
+
+-- The all-dark control. The Carl Elias Moses entrustment as charged fails
+-- section 405, and no capacity is asserted, so all three aggravated sections
+-- refuse — and each refusal names BOTH of its rows, the capacity and the
+-- section 405 case. This is the fixture the charge sheet carries by default.
+#ASSERT NOT (`offence under s 407` `Carl Elias Moses, as charged, no aggravating capacity`)
+#ASSERT NOT (`offence under s 408` `Carl Elias Moses, as charged, no aggravating capacity`)
+#ASSERT NOT (`offence under s 409` `Carl Elias Moses, as charged, no aggravating capacity`)
+#ASSERT (`charge under s 409` `Carl Elias Moses, as charged, no aggravating capacity`)'s refusal EQUALS "A charge under section 409 would assert that the facts fulfil every legal condition of criminal breach of trust by a public servant, or by a banker, merchant, agent, director, officer, partner, key executive or fiduciary (CPC s 123(5)). On the facts given they do not: being entrusted with the property, or with dominion over it, in one of the capacities section 409(1) names — (a) as a public servant; (b) in the way of a trade, profession or business as a banker, merchant, factor, broker, attorney or agent; (c) in a professional capacity OTHER than one of those; (d) as a director of a corporation; (e) as an officer of an unincorporated association; (f) as a partner in a partnership; (g) as a key executive of a corporation, an unincorporated association or a partnership; or (h) as a fiduciary; committing criminal breach of trust in respect of that property (section 405) — run the section 406 charge on the same entrustment to see which of its elements failed."

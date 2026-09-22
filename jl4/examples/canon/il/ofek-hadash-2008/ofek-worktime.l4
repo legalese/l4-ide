@@ -47,7 +47,7 @@ DECLARE `a weekly work pattern` HAS
 GIVEN `the pattern` IS A `a weekly work pattern`
 GIVETH A NUMBER
 `the hours in` `the pattern`
-    @nlg the total weekly hours in %the pattern%
+    @nlg the total weekly hours in %`the pattern`%
     MEANS   `the pattern`'s `frontal hours`
       PLUS  `the pattern`'s `individual hours`
       PLUS  `the pattern`'s `presence hours`
@@ -56,7 +56,7 @@ GIVETH A NUMBER
 GIVEN `the stage` IS A `a stage of education`
 GIVETH A `a weekly work pattern`
 `the ordinary full-post week in` `the stage`
-    @nlg the ordinary full-post week in %the stage%
+    @nlg the ordinary full-post week in %`the stage`%
     MEANS
     -- § 15 gives the primary school 36 hours as 26 frontal, 5 individual and
     -- 5 presence, of which up to two are working meetings. § 17 gives the
@@ -77,7 +77,7 @@ GIVEN `the stage` IS A `a stage of education`
       `the classes in the grade` IS A NUMBER
 GIVETH A `a weekly work pattern`
 `the full-post week of a grade coordinator in` `the stage` `the classes in the grade`
-    @nlg the full-post week of a grade coordinator in %the stage%
+    @nlg the full-post week of a grade coordinator in %`the stage`%
     MEANS
     -- The tables § 15 and § 17 print at the foot of each article, as tables:
     -- one row per band of grade size, three columns of hours. The total stays
@@ -108,7 +108,7 @@ GIVEN `the teacher` IS A `a teacher`
       `the pattern` IS A `a weekly work pattern`
 GIVETH A `a weekly work pattern`
 `the week after the age reduction for` `the teacher` `the age on 31 December of the school year` `the pattern`
-    @nlg the weekly pattern of %the teacher% after the section 26 age reduction
+    @nlg the weekly pattern of %`the teacher`% after the section 26 age reduction
     MEANS
     CONSIDER `the teacher`'s `how they entered`
     WHEN `an existing teacher converted under sections 43 to 50` THEN
@@ -224,7 +224,7 @@ GIVEN `the monthly base for the purpose` IS A NUMBER
       `the fraction of a full post` IS A NUMBER
 GIVETH A NUMBER
 `the value of an hour on a base of` `the monthly base for the purpose` `the fraction of a full post`
-    @nlg the value of one hour on a monthly base of %the monthly base for the purpose%
+    @nlg the value of one hour on a monthly base of %`the monthly base for the purpose`%
     MEANS
     -- § 31(b) divides by the FULL-POST month, not by the teacher's own hours.
     -- The base handed in is the teacher's actual monthly figure, already
@@ -280,7 +280,7 @@ GIVEN `the case` IS A `how the extra hour stood to the presence hour`
       `the value of an hour` IS A NUMBER
 GIVETH A NUMBER
 `the pay for one extra hour where` `the case` `the value of an hour`
-    @nlg the pay for one extra hour where %the case%
+    @nlg the pay for one extra hour where %`the case`%
     MEANS
     CONSIDER `the case`
     WHEN `it fell on the teacher's free day` THEN
