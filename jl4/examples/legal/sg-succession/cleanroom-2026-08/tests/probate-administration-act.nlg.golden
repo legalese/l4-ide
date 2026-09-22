@@ -69,10 +69,10 @@ not `s 6(4) — the window in which the court may appoint an additional personal
 not `s 6(4) — the window in which the court may appoint an additional personal representative` with `the Tan intestacy, two administrators having taken a grant` and `the date of the hearing`
 not `s 6(4) — the window in which the court may appoint an additional personal representative` with `the Tan intestacy, fully administered` and `the date of the hearing`
 `s 6(4) — there is a minority of a beneficiary` with `the Tan intestacy, a trust company having taken a grant` and `the date of the hearing`
-`count` with `the personal representatives of the estate still living` with `the Tan intestacy, a trust company having taken a grant` is equal to 1
+the number of items in `the personal representatives of the estate still living` with `the Tan intestacy, a trust company having taken a grant` is equal to 1
 not `s 6(4) — the window in which the court may appoint an additional personal representative` with `the Tan intestacy, a trust company having taken a grant` and `the date of the hearing`
-`count` with `the personal representatives of the estate` with `the Tan intestacy, one of two administrators having died` is equal to 2
-`count` with `the personal representatives of the estate still living` with `the Tan intestacy, one of two administrators having died` is equal to 1
+the number of items in `the personal representatives of the estate` with `the Tan intestacy, one of two administrators having died` is equal to 2
+the number of items in `the personal representatives of the estate still living` with `the Tan intestacy, one of two administrators having died` is equal to 1
 `s 6(4) — the window in which the court may appoint an additional personal representative` with `the Tan intestacy, one of two administrators having died` and `the date of the hearing`
 `s 6(5) — this section applies to the grant` with `a grant to the widow alone`
 not `s 6(5) — this section applies to the grant` with `a grant made on 1 January 1935`
@@ -429,12 +429,12 @@ not `s 28(2) — the grantee is the Public Trustee or a trust company` with `an 
 not `s 28(2) — the grantee is the Public Trustee or a trust company` with `the Government`
 `s 28 — the grantee shall take an oath` with `a PAA grantee` with `an individual` with `Lim Mei Ling`, `as administrator` and `NOTHING`
 `s 28 — the grantee shall take an oath` with `a PAA grantee` with `Public Trustee as grantee`, `as administrator` and `NOTHING`
-executing contract `s 29(7) — the grantee shall give security for the due administration of the estate` with `TRUE` at 0 with the following events:  party `the grantee` did `give security for the due administration of the estate` at 10
-executing contract `s 29(7) — the grantee shall give security for the due administration of the estate` with `TRUE` at 0 with the following events:  party `the court` did `grant letters of administration with or without the will annexed to the Public Trustee` at 40
+executing contract `s 29(7) — the grantee shall give security for the due administration of the estate` with `TRUE` at 0 with the following events: party `the grantee` did `give security for the due administration of the estate` at 10
+executing contract `s 29(7) — the grantee shall give security for the due administration of the estate` with `TRUE` at 0 with the following events: party `the court` did `grant letters of administration with or without the will annexed to the Public Trustee` at 40
 `s 29(7) — the grantee shall give security for the due administration of the estate` with `FALSE`
 `s 12(2) — the probate shall be revoked and a new probate granted` with `s 12 — codicil propounded after probate` with `TRUE` and `TRUE`
 `s 12(2) — the probate shall be revoked and a new probate granted` with `s 12 — codicil propounded after probate` with `TRUE` and `FALSE`
-executing contract `s 12(2) — the probate shall be revoked and a new probate granted` with `s 12 — codicil propounded after probate` with `TRUE` and `TRUE` at 0 with the following events:  party `the court` did `revoke the probate and grant a new probate of the will and codicil together` at 5
+executing contract `s 12(2) — the probate shall be revoked and a new probate granted` with `s 12 — codicil propounded after probate` with `TRUE` and `TRUE` at 0 with the following events: party `the court` did `revoke the probate and grant a new probate of the will and codicil together` at 5
 `s 27 — letters of administration shall be granted` with `the Tan intestacy` and `an expired limited grant`
 `s 27 — letters of administration shall be granted` with `the Tan intestacy` and `a grant to the widow alone`
 not `s 8(3) — probate may be granted to one or more of the persons so appointed, subject to section 6` with `the Ong estate with` with `JUST` with `the will whose executor is willing` and `EMPTY` and `a grant of probate to Chan alone`

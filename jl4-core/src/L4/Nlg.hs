@@ -10,6 +10,14 @@ module L4.Nlg (
   Linearize (..),
   lin,
   unescapeNlgText,
+  -- * Splicing a call's arguments into its herald
+  NlgFnInfo,
+  nlgFnInfo,
+  substituteNlgCalls,
+  substituteNlgDirective,
+  renderNlgWith,
+  normalizeWs,
+  oxford,
 ) where
 
 import Base
@@ -294,11 +302,20 @@ unslot = \ case
 --
 -- Order matters: 'promoteHeadInputNlg' moves a herald and its other-language
 -- renderings together, and 'selectLanguage' then picks from where they now are.
-linearizeDirectives :: Maybe LangTag -> Module Resolved -> [Text]
-linearizeDirectives mlang mod'' =
-  fmap simpleLinearizer (toListOf (gplate @(Directive Resolved)) mod')
+--
+-- Then the splice: a heralded call in a directive reads as its sentence with
+-- the arguments in the @%slots%@ ('substituteNlgDirective'). The table is built
+-- over the dependencies too — prepared the same way, since a rule a directive
+-- calls can live in an imported module and its sentence is read from there.
+linearizeDirectives :: Maybe LangTag -> Module Resolved -> [Module Resolved] -> [Text]
+linearizeDirectives mlang mod'' deps'' =
+  fmap (simpleLinearizer . substituteNlgDirective heralds)
+       (toListOf (gplate @(Directive Resolved)) mod')
  where
-  mod' = selectLanguage mlang (promoteHeadInputNlg mod'')
+  prepare = selectLanguage mlang . promoteHeadInputNlg
+  mod'    = prepare mod''
+  heralds = nlgFnInfo (mod' : map prepare deps'')
+
 -- | Does any rendering in this module name this language?
 --
 -- __The question 'selectLanguage' cannot be asked afterwards.__ Selection
@@ -584,7 +601,7 @@ instance Linearize (Directive Resolved) where
     LazyEvalTrace _ e -> linearize e
     Check _ e -> linearize e
     Contract _ e t es -> hcat $
-      [ "executing contract", lin e, "at", lin t, "with the following events: " ]
+      [ "executing contract", lin e, "at", lin t, "with the following events:" ]
       <> map lin es
     Assert _ e -> linearize e
     AssertRefused _ e _mmsg -> hcat [ "the following must refuse:", lin e ]
@@ -814,3 +831,116 @@ enumerate sep lastSep (x:xs) = x <> sep <> enumerate sep lastSep xs
 
 spaced :: LinTree -> LinTree
 spaced p = text " " <> p <> text " "
+
+-- ----------------------------------------------------------------------------
+-- Splicing a call's arguments into its herald
+-- ----------------------------------------------------------------------------
+
+-- | For every function that carries an @\@nlg@ annotation: its authored
+-- sentence and its GIVEN parameter uniques (in order), so a call's positional
+-- arguments can be matched to the sentence's @%parameter%@ slots.
+--
+-- Keyed by @(function name, arity)@ rather than 'Unique': a call site in the
+-- importing module and the definition in a dependency module do not share
+-- 'Unique's (each module is resolved independently), so a unique-based key
+-- would never match across an @IMPORT@. The inner @%param%@ substitution stays
+-- 'Unique'-based — those refs are self-consistent within the defining module.
+type NlgFnInfo = Map.Map (Text, Int) (Nlg, [Unique])
+
+nlgFnInfo :: [Module Resolved] -> NlgFnInfo
+nlgFnInfo mods = Map.fromList
+  [ ((resolvedText headName, length appArgs), (nlg, [ getUnique a | a <- appArgs ]))
+    -- Value parameters are the appform arguments, not the GIVEN names: a
+    -- polymorphic function (@GIVEN a IS A TYPE@) lists its type parameter in
+    -- GIVEN but never in the appform, so keying arity off GIVEN would not match
+    -- the call's positional argument count.
+  | m <- mods
+  , d@(MkDecide _ _ (MkAppForm _ headName appArgs _) _) <- foldTopLevelDecides (: []) m
+  , Just nlg <- [ decideNlg Nothing d ]
+  ]
+
+-- | Replace a call to an @\@nlg@-annotated function with its authored sentence,
+-- splicing the call's arguments into the @%parameter%@ slots. Bottom-up, so
+-- nested @\@nlg@ calls inside the arguments are expanded first.
+--
+-- __An argument the herald never mentions is appended, never dropped.__ A
+-- herald with no slot for one of its parameters used to swallow that argument
+-- silently — @l4 render@ printed the sentence and the value was gone, exit 0.
+-- The unmentioned arguments now follow the sentence as @with a, b and c@, which
+-- is what the bare linearizer says for every call, so a herald that covers all
+-- its parameters reads as prose and one that covers none degrades to exactly
+-- what it read as before.
+substituteNlgCalls :: NlgFnInfo -> Expr Resolved -> Expr Resolved
+substituteNlgCalls info = transformOf (gplate @(Expr Resolved)) $ \case
+  App ann n args
+    | Just (nlg, params) <- Map.lookup (resolvedText n, length args) info
+    , length params == length args ->
+        let bound    = zip params args
+            leftover = [ a | (p, a) <- bound, p `notElem` nlgRefs nlg ]
+            sentence = renderNlgWith (Map.fromList bound) nlg
+            -- Joined as the bare linearizer joins arguments ("a, b and c",
+            -- no serial comma), so one line does not carry both styles.
+            rest     = case map simpleLinearizer leftover of
+              []  -> ""
+              [x] -> " with " <> x
+              xs  -> " with " <> Text.intercalate ", " (init xs) <> " and " <> last xs
+        in Inert ann (sentence <> rest) InertCtxNone
+  e -> e
+
+-- | The same splice, applied to every expression a directive carries — the
+-- subject of an @#EVAL@ or @#ASSERT@, and the contract, time and events of a
+-- @#TRACE@. This is what makes @l4 nlg@ and the @.nlg.golden@ producer read a
+-- heralded call as its sentence rather than as the bare name followed by
+-- @with@ and the arguments.
+substituteNlgDirective :: NlgFnInfo -> Directive Resolved -> Directive Resolved
+substituteNlgDirective info = over (gplate @(Expr Resolved)) (substituteNlgCalls info)
+
+-- | The parameters a herald actually refers to.
+nlgRefs :: Nlg -> [Unique]
+nlgRefs = \case
+  MkResolvedNlg _ _ frags -> [ getUnique r | MkNlgRef _ r <- frags ]
+  _                       -> []
+
+-- | Render an @\@nlg@ annotation, substituting each parameter reference with the
+-- corresponding call argument.
+renderNlgWith :: Map.Map Unique (Expr Resolved) -> Nlg -> Text
+renderNlgWith argMap = \case
+  MkResolvedNlg _ _ frags -> normalizeWs (Text.concat (map frag frags))
+  other                 -> simpleLinearizer other
+ where
+  -- Escapes decode HERE, not in the lexer: the annotation token carries
+  -- @\%@ / @\]@ verbatim so exactprint can re-emit it. Without this call
+  -- @10\%and\%20@ reaches text, html, json, akn and the LSP webview with the
+  -- backslash still in it.
+  frag (MkNlgText _ t) = unescapeNlgText t
+  -- An unsubstituted reference (definition view, or a name with no matching
+  -- argument) renders as the bare parameter name — NOT via 'simpleLinearizer',
+  -- which would re-expand that parameter's own @\@nlg@ and recurse when the
+  -- annotation is attached to a parameter it also references.
+  frag (MkNlgRef _ r)  = case Map.lookup (getUnique r) argMap of
+    Just a  -> simpleLinearizer a
+    Nothing -> resolvedText r
+
+resolvedText :: Resolved -> Text
+resolvedText = nameToText . getActual
+
+normalizeWs :: Text -> Text
+normalizeWs t0 =
+  let t1 = Text.replace "it 's" "its" t0
+      t2 = Text.replace " 's"  "'s"  t1
+      t3 = Text.replace " %"   "%"   t2
+      t4 = Text.replace " ,"   ","   t3
+      t5 = Text.replace " ."   "."   t4
+      t6 = Text.replace " :"   ":"   t5
+      t7 = Text.replace " ;"   ";"   t6
+      -- Collapse empty list slots that produce ",," / ", ,".
+      t8 = Text.replace ", ," "," (Text.replace ",," "," t7)
+      t9 = Text.replace "is equal to" "is" t8
+  in Text.unwords (Text.words t9)
+
+oxford :: Text -> [Text] -> Text
+oxford conj = \case
+  []     -> ""
+  [a]    -> a
+  [a, b] -> a <> " " <> conj <> " " <> b
+  xs     -> Text.intercalate ", " (init xs) <> ", " <> conj <> " " <> last xs

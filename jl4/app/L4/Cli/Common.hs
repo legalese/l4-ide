@@ -21,6 +21,8 @@ module L4.Cli.Common
   , runOneshot
   , runOneshotWithDiagnostics
   , runOneshotVerbose
+  , transitiveDeps
+  , dedupModules
   , hasBlockingError
 
     -- * Rendering
@@ -68,6 +70,9 @@ import Language.LSP.Protocol.Types (NormalizedFilePath, Diagnostic(..), Diagnost
 import Development.IDE.Graph (Action)
 
 import L4.Lexer (LangTag(..), isLangTagChar)
+import qualified LSP.L4.Rules as Rules
+import L4.Syntax (Module (..), Resolved)
+import qualified Data.List as List
 import L4.EvaluateLazy
   ( EvalConfig
   , EvalDirectiveResult(..)
@@ -448,3 +453,15 @@ putDiagnostics = mapM_ (hPutStrLn stderr . Text.unpack)
 -- JSON envelope quotes the already-prettified LSP log text.
 diagnosticsToJson :: [Text] -> Aeson.Value
 diagnosticsToJson = Aeson.toJSON
+
+-- | Every module the checked one reaches through @IMPORT@, transitively, in
+-- dependency order; a diamond appears once per path, so 'dedupModules' it.
+transitiveDeps :: Rules.TypeCheckResult -> [Module Resolved]
+transitiveDeps tc = go tc.dependencies
+ where
+  go = concatMap (\d -> d.module' : go d.dependencies)
+
+dedupModules :: [Module Resolved] -> [Module Resolved]
+dedupModules = List.nubBy (\a b -> muri a == muri b)
+ where
+  muri (MkModule _ u _) = u

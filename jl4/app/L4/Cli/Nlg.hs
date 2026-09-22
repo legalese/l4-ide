@@ -100,13 +100,17 @@ nlgCmd opts = do
       exitFailure
     Just tc -> do
       putDiagnostics errs
+      let payload = linearizeModule opts.nlgLang tc.module' (dedupModules (transitiveDeps tc))
       case opts.nlgOutput of
-        Just f  -> Text.writeFile f (linearizeModule opts.nlgLang tc.module')
-        Nothing -> Text.putStr (linearizeModule opts.nlgLang tc.module')
+        Just f  -> Text.writeFile f payload
+        Nothing -> Text.putStr payload
       exitSuccess
 
 -- | The payload. Byte-identical to @jl4NlgAnnotationsGolden@'s @output_@ when
 -- no language is requested — 'Nlg.selectLanguage' 'Nothing' is the identity,
 -- so that holds by construction rather than by care.
-linearizeModule :: Maybe LangTag -> Module Resolved -> Text
-linearizeModule mlang mod' = Text.unlines (Nlg.linearizeDirectives mlang mod')
+--
+-- The dependencies ride along because a heralded call in a directive can name
+-- a rule an imported module defines ('Nlg.linearizeDirectives').
+linearizeModule :: Maybe LangTag -> Module Resolved -> [Module Resolved] -> Text
+linearizeModule mlang mod' deps = Text.unlines (Nlg.linearizeDirectives mlang mod' deps)

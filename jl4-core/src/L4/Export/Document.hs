@@ -52,7 +52,7 @@ import Optics (gplate, (%), (^.))
 import L4.Desugar (carameliseNode)
 import L4.Export (isExportedDecide)
 import L4.Mixfix (MixfixInfo (..), MixfixPatternToken (..))
-import L4.Nlg (simpleLinearizer, unescapeNlgText)
+import L4.Nlg (simpleLinearizer, NlgFnInfo, nlgFnInfo, substituteNlgCalls, renderNlgWith, normalizeWs, oxford)
 import qualified L4.Nlg as Nlg
 import L4.Syntax
 import L4.Names (stripSectionBinderElaborations)
@@ -277,28 +277,6 @@ normalizePositionalRecords ctorFields
             AppNamed ann ctor [ MkNamedExpr ann f a | (f, a) <- zip fnames args ] Nothing
       e -> e
 
--- | For every function that carries an @\@nlg@ annotation: its authored
--- sentence and its GIVEN parameter uniques (in order), so a call's positional
--- arguments can be matched to the sentence's @%parameter%@ slots. The @\@nlg@
--- may attach to the declaration, the function name, or the body, so we look in
--- all three.
--- | Keyed by @(function name, arity)@ rather than 'Unique': a call site in the
--- importing module and the definition in a dependency module do not share
--- 'Unique's (each module is resolved independently), so a unique-based key
--- would never match across an @IMPORT@. The inner @%param%@ substitution stays
--- 'Unique'-based — those refs are self-consistent within the defining module.
-nlgFnInfo :: [Module Resolved] -> Map.Map (Text, Int) (Nlg, [Unique])
-nlgFnInfo mods = Map.fromList
-  [ ((resolvedText headName, length appArgs), (nlg, [ getUnique a | a <- appArgs ]))
-    -- Value parameters are the appform arguments, not the GIVEN names: a
-    -- polymorphic function (@GIVEN a IS A TYPE@) lists its type parameter in
-    -- GIVEN but never in the appform, so keying arity off GIVEN would not match
-    -- the call's positional argument count.
-  | m <- mods
-  , d@(MkDecide _ _ (MkAppForm _ headName appArgs _) _) <- foldTopLevelDecides (: []) m
-  , Just nlg <- [ decideNlg d ]
-  ]
-
 -- | The @\@nlg@ annotation attached to a DECIDE, wherever it landed.
 --
 -- One line now, because the search itself moved to 'L4.Nlg.decideNlg' — this
@@ -309,42 +287,11 @@ nlgFnInfo mods = Map.fromList
 decideNlg :: Decide Resolved -> Maybe Nlg
 decideNlg = Nlg.decideNlg Nothing
 
-substNlgInUnit :: Map.Map (Text, Int) (Nlg, [Unique]) -> Unit -> Unit
+substNlgInUnit :: NlgFnInfo -> Unit -> Unit
 substNlgInUnit info u = case u.uDecl of
   UDecide (MkDecide a t af body) ->
     u { uDecl = UDecide (MkDecide a t af (substituteNlgCalls info body)) }
   _ -> u
-
--- | Replace a call to an @\@nlg@-annotated function with its authored sentence,
--- splicing the call's arguments into the @%parameter%@ slots. Bottom-up, so
--- nested @\@nlg@ calls inside the arguments are expanded first.
-substituteNlgCalls :: Map.Map (Text, Int) (Nlg, [Unique]) -> Expr Resolved -> Expr Resolved
-substituteNlgCalls info = transformOf (gplate @(Expr Resolved)) $ \case
-  App ann n args
-    | Just (nlg, params) <- Map.lookup (resolvedText n, length args) info
-    , length params == length args ->
-        Inert ann (renderNlgWith (Map.fromList (zip params args)) nlg) InertCtxNone
-  e -> e
-
--- | Render an @\@nlg@ annotation, substituting each parameter reference with the
--- corresponding call argument.
-renderNlgWith :: Map.Map Unique (Expr Resolved) -> Nlg -> Text
-renderNlgWith argMap = \case
-  MkResolvedNlg _ _ frags -> normalizeWs (Text.concat (map frag frags))
-  other                 -> simpleLinearizer other
- where
-  -- Escapes decode HERE, not in the lexer: the annotation token carries
-  -- @\%@ / @\]@ verbatim so exactprint can re-emit it. Without this call
-  -- @10\%and\%20@ reaches text, html, json, akn and the LSP webview with the
-  -- backslash still in it.
-  frag (MkNlgText _ t) = unescapeNlgText t
-  -- An unsubstituted reference (definition view, or a name with no matching
-  -- argument) renders as the bare parameter name — NOT via 'simpleLinearizer',
-  -- which would re-expand that parameter's own @\@nlg@ and recurse when the
-  -- annotation is attached to a parameter it also references.
-  frag (MkNlgRef _ r)  = case Map.lookup (getUnique r) argMap of
-    Just a  -> simpleLinearizer a
-    Nothing -> resolvedText r
 
 -- | Replace a mixfix function's heading with its precomputed prose form
 -- (e.g. "a Person buyer may trade with a Person seller"). The map is keyed by
@@ -1423,31 +1370,6 @@ monthName = \case
   5 -> "May"; 6 -> "June"; 7 -> "July"; 8 -> "August"
   9 -> "September"; 10 -> "October"; 11 -> "November"; 12 -> "December"
   m -> "month " <> showInt m
-
--- ----------------------------------------------------------------------------
--- Text tidying
--- ----------------------------------------------------------------------------
-
-normalizeWs :: Text -> Text
-normalizeWs t0 =
-  let t1 = Text.replace "it 's" "its" t0
-      t2 = Text.replace " 's"  "'s"  t1
-      t3 = Text.replace " %"   "%"   t2
-      t4 = Text.replace " ,"   ","   t3
-      t5 = Text.replace " ."   "."   t4
-      t6 = Text.replace " :"   ":"   t5
-      t7 = Text.replace " ;"   ";"   t6
-      -- Collapse empty list slots that produce ",," / ", ,".
-      t8 = Text.replace ", ," "," (Text.replace ",," "," t7)
-      t9 = Text.replace "is equal to" "is" t8
-  in Text.unwords (Text.words t9)
-
-oxford :: Text -> [Text] -> Text
-oxford conj = \case
-  []     -> ""
-  [a]    -> a
-  [a, b] -> a <> " " <> conj <> " " <> b
-  xs     -> Text.intercalate ", " (init xs) <> ", " <> conj <> " " <> last xs
 
 -- ----------------------------------------------------------------------------
 -- Plan construction

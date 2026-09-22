@@ -12,18 +12,26 @@ resolveNlgAnnotation ::
   a ->
   Check a
 resolveNlgAnnotation a = do
-  case a ^. annoOf % annNlg of
-    Nothing -> pure a
+  -- The other-language renderings resolve too. They are promoted into the
+  -- default slot by 'L4.Nlg.selectLanguage' at render time, and a slot splice
+  -- keys on the 'Unique' of each @%parameter%@ reference — a rendering left
+  -- parsed has none, so under @--lang he@ every slot fell back to the bare name.
+  alts <- traverse resolveOne (a ^. annoOf % annNlgAlts)
+  let a' = a & annoOf % annNlgAlts .~ alts
+  case a' ^. annoOf % annNlg of
+    Nothing -> pure a'
     Just nlgM -> do
-      resolvedNlg <- case nlgM of
-        MkInvalidNlg{} -> pure nlgM
-        MkResolvedNlg{} -> pure nlgM
-        -- The tag travels with the annotation through resolution: a
-        -- resolved Hebrew rendering is still a Hebrew rendering.
-        MkParsedNlg ann mtag frags -> do
-          resolvedFrags <- traverse resolveNlgFragment frags
-          pure $ MkResolvedNlg ann mtag resolvedFrags
-      setAnnNlg resolvedNlg a
+      resolvedNlg <- resolveOne nlgM
+      setAnnNlg resolvedNlg a'
+ where
+  resolveOne nlgM = case nlgM of
+    MkInvalidNlg{} -> pure nlgM
+    MkResolvedNlg{} -> pure nlgM
+    -- The tag travels with the annotation through resolution: a
+    -- resolved Hebrew rendering is still a Hebrew rendering.
+    MkParsedNlg ann mtag frags -> do
+      resolvedFrags <- traverse resolveNlgFragment frags
+      pure $ MkResolvedNlg ann mtag resolvedFrags
 
 resolveNlgFragment :: NlgFragment Name -> Check (NlgFragment Resolved)
 resolveNlgFragment = \ case

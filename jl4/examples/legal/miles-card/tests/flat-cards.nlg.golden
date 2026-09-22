@@ -8,12 +8,12 @@
 `Citi PremierMiles earns on` with `Citi PremierMiles`, `any cardholder`, `any month` and `a purchase in yen` 's `status` is equal to `Unconfirmed`
 `UOB PRVI Miles earns on` with `UOB PRVI Miles`, `any cardholder`, `any month` and `a purchase in Singapore dollars` 's `conversion status` is equal to `Unconfirmed`
 `Citi PremierMiles earns on` with `Citi PremierMiles`, `any cardholder`, `any month` and `a purchase in Singapore dollars` 's `conversion status` is equal to `Unconfirmed`
-`count` with `UOB PRVI Miles earns on` with `UOB PRVI Miles`, `any cardholder`, `any month` and `a purchase in Singapore dollars` 's `sources` is equal to 0
-`count` with `UOB PRVI Miles earns on` with `UOB PRVI Miles`, `any cardholder`, `any month` and `a purchase in yen` 's `sources` is equal to 0
-`count` with `Citi PremierMiles earns on` with `Citi PremierMiles`, `any cardholder`, `any month` and `a purchase in Singapore dollars` 's `sources` is equal to 0
-`count` with `Citi PremierMiles earns on` with `Citi PremierMiles`, `any cardholder`, `any month` and `a purchase in yen` 's `sources` is equal to 0
-`count` with `UOB PRVI Miles earns on` with `UOB PRVI Miles`, `any cardholder`, `any month` and `a purchase in Singapore dollars` 's `conditions` is equal to 1
-`count` with `Citi PremierMiles earns on` with `Citi PremierMiles`, `any cardholder`, `any month` and `a purchase in yen` 's `conditions` is equal to 1
+the number of items in `UOB PRVI Miles earns on` with `UOB PRVI Miles`, `any cardholder`, `any month` and `a purchase in Singapore dollars`'s `sources` is equal to 0
+the number of items in `UOB PRVI Miles earns on` with `UOB PRVI Miles`, `any cardholder`, `any month` and `a purchase in yen`'s `sources` is equal to 0
+the number of items in `Citi PremierMiles earns on` with `Citi PremierMiles`, `any cardholder`, `any month` and `a purchase in Singapore dollars`'s `sources` is equal to 0
+the number of items in `Citi PremierMiles earns on` with `Citi PremierMiles`, `any cardholder`, `any month` and `a purchase in yen`'s `sources` is equal to 0
+the number of items in `UOB PRVI Miles earns on` with `UOB PRVI Miles`, `any cardholder`, `any month` and `a purchase in Singapore dollars`'s `conditions` is equal to 1
+the number of items in `Citi PremierMiles earns on` with `Citi PremierMiles`, `any cardholder`, `any month` and `a purchase in yen`'s `conditions` is equal to 1
 not `UOB PRVI Miles earns on` with `UOB PRVI Miles`, `any cardholder`, `any month` and `a purchase in Singapore dollars` 's `cap` 's `capped`
 not `Citi PremierMiles earns on` with `Citi PremierMiles`, `any cardholder`, `any month` and `a purchase in Singapore dollars` 's `cap` 's `capped`
 `UOB PRVI Miles earns on` with `UOB PRVI Miles`, `any cardholder`, `any month` and `a purchase in Singapore dollars` 's `cap` 's `basis` is equal to `Unconfirmed basis`

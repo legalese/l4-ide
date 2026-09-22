@@ -197,6 +197,9 @@ $ l4 render --format html --lang he mymodule.l4 -o mymodule.he.html
 `l4 nlg` gives the linearized prose; `l4 render` gives the formatted document,
 in any of its formats. Both take `--lang`.
 
+In both, a call to a rule that carries a herald reads as that herald with the call's arguments in its `%slots%`: `#EVAL `is large` 150` linearizes as `the amount 150 is large`.
+An argument the herald does not mention is not dropped; it follows the sentence as `with …`, so a herald written without slots still shows every value the call supplied.
+
 In the `html` format the document says which language it is in: `<html lang="he" dir="rtl">`.
 `lang` is the `--lang` you asked for, or the module's `@lang` if you asked for nothing, or `en`.
 `dir="rtl"` is added for a right-to-left language — decided from the script subtag when the tag carries one, so `he-Latn` is left-to-right and `az-Arab` is not — and omitted for every other, left-to-right being HTML's own default.

@@ -1,4 +1,4 @@
-`isNothing` with `the Sivakumar intestacy` 's `the will`
+`the Sivakumar intestacy`'s `the will` is absent
 `section 3 — an “intestate” within the meaning of this Act` with `the Sivakumar intestacy`
 `this Act applies to the estate` with `the Sivakumar intestacy`
 `section 5 — the person dies intestate after 2 June 1967` with `the Sivakumar intestacy`
@@ -49,7 +49,7 @@ not `the father is guardian of the infant under section 6(2)` with `Divya as an 
 `who are the guardians of the infant, if this Act has an infant to govern` with `Divya as an infant concerned in the estate` and `YMD` with 2033, 11 and 2 is equal to `the person has attained the age of majority on that date, so this Act has no infant to govern`
 `who are the guardians of the infant, if this Act has an infant to govern` with `Divya as an infant concerned in the estate` and `YMD` with 2033, 11 and 1 is equal to `the person is an infant on that date, and the guardians of the infant are` with list of meera
 `every guardian recorded for this infant is recorded against this infant` with `Divya as an infant concerned in the estate`
-`elem` with meera and `the persons who are guardians of the infant` with `Divya as an infant concerned in the estate`
+meera is one of `the persons who are guardians of the infant` with `Divya as an infant concerned in the estate`
 `whether section 21(2) and the Guardianship of Infants Act agree about this grant` with `the Sivakumar intestacy`, `the grant to the widow and the son` and `the day letters of administration are applied for` is equal to `both Acts are satisfied: the Probate Act opens section 21(2) and the Guardianship of Infants Act counts the grantee as a guardian of the infant`
 not `the mother holds the guardianship section 6(1) gives her` with `Divya, her mother having been removed from the guardianship`
 `the persons who are guardians of the infant` with `Divya, her mother having been removed from the guardianship` is equal to `EMPTY`
@@ -336,7 +336,7 @@ not `section 3 — an “intestate” within the meaning of this Act` with `the 
 `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Sim testacy`, `the grant with the will annexed to Grace and a trust company` and `the day the Sim grant is applied for`
 `the mother is guardian of the infant under section 6(1)` with `Ethan as an infant concerned in the estate`
 `the persons who are guardians of the infant` with `Ethan as an infant concerned in the estate` is equal to list of grace
-`elem` with grace and `the persons who are guardians of the infant` with `Ethan as an infant concerned in the estate`
+grace is one of `the persons who are guardians of the infant` with `Ethan as an infant concerned in the estate`
 `whether section 21(2) and the Guardianship of Infants Act agree about this grant` with `the Sim testacy`, `the grant with the will annexed to Grace and a trust company` and `the day the Sim grant is applied for` is equal to `both Acts are satisfied: the Probate Act opens section 21(2) and the Guardianship of Infants Act counts the grantee as a guardian of the infant`
 `the persons who are guardians of the infant` with `Ethan, no Guardian record having been made for his mother` is equal to list of grace
 not `s 21(2) — letters of administration may be granted to the guardian of the person and property of the infant` with `the Sim testacy, no record having been made for the mother`, `the grant with the will annexed to Grace and a trust company` and `the day the Sim grant is applied for`

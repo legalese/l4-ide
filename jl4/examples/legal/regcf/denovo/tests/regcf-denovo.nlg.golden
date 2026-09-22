@@ -41,8 +41,8 @@ not `the crowdfunding exemption does not apply to the issuer` with `the staff re
 `the investor's net worth` with `a homeowner` is equal to 900000
 not `the investor is an accredited investor` with `a homeowner`
 `the investor's net worth` with `a homeowner`
-executing contract `the material change reconfirmation chain` with `an offering with a material change` and `a reconfirmed commitment` at 0 with the following events:  party `the intermediary` did `give or send the investor notice of the material change` at 1 party `the investor` did `reconfirm the investment commitment` at 3
-executing contract `the material change reconfirmation chain` with `an offering with a material change` and `an abandoned commitment` at 0 with the following events:  party `the intermediary` did `give or send the investor notice of the material change` at 1
+executing contract `the material change reconfirmation chain` with `an offering with a material change` and `a reconfirmed commitment` at 0 with the following events: party `the intermediary` did `give or send the investor notice of the material change` at 1 party `the investor` did `reconfirm the investment commitment` at 3
+executing contract `the material change reconfirmation chain` with `an offering with a material change` and `an abandoned commitment` at 0 with the following events: party `the intermediary` did `give or send the investor notice of the material change` at 1
 `the issuer may close the offering early` with `an offering closing early`
 `the financial statements required` with `the staff reading`, `a first-time issuer` and `a large offering`
 `the financial statements required` with `the staff reading`, `a repeat issuer` and `a large offering`

@@ -38,17 +38,17 @@ not `(a)(3) — conducted through a single complying intermediary` with `an arra
 `notice complies with Rule 204(b)` with `a conforming notice`
 not `notice complies with Rule 204(b)` with `an overreaching notice`
 not `notice complies with Rule 204(b)` with `a notice with no platform link`
-executing contract `advertising restriction` with `a conforming notice` at 0 with the following events:  party `Issuer` did `advertise the terms of the offering` at 10
-executing contract `advertising restriction` with `an overreaching notice` at 0 with the following events:  party `Issuer` did `advertise the terms of the offering` at 10
+executing contract `advertising restriction` with `a conforming notice` at 0 with the following events: party `Issuer` did `advertise the terms of the offering` at 10
+executing contract `advertising restriction` with `an overreaching notice` at 0 with the following events: party `Issuer` did `advertise the terms of the offering` at 10
 `ongoing reporting obligation may terminate` with `a reporting status with` with 1, 299 and 50000000
 not `ongoing reporting obligation may terminate` with `a reporting status with` with 1, 300 and 50000000
 not `(b)(2) — one annual report filed and fewer than 300 holders of record` with `a reporting status with` with 0, 299 and 50000000
 `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` with `a reporting status with` with 3, 400 and 10000000
 not `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` with `a reporting status with` with 3, 400 and 10000001
 not `(b)(3) — three annual reports filed and total assets not exceeding $10,000,000` with `a reporting status with` with 2, 400 and 10000000
-executing contract `ongoing reporting obligation` with `a reporting status with` with 1, 5000 and 50000000 and 2 at 0 with the following events:  party `Issuer` did `file a Form C-AR annual report` at 100
-executing contract `ongoing reporting obligation` with `a reporting status with` with 1, 299 and 50000000 and 2 at 0 with the following events:  party `Issuer` did `file a Form C-TR termination of reporting` at 3
-executing contract `ongoing reporting obligation` with `a reporting status with` with 1, 299 and 50000000 and 2 at 0 with the following events:  party `Issuer` did `file a Form C-TR termination of reporting` at 30
+executing contract `ongoing reporting obligation` with `a reporting status with` with 1, 5000 and 50000000 and 2 at 0 with the following events: party `Issuer` did `file a Form C-AR annual report` at 100
+executing contract `ongoing reporting obligation` with `a reporting status with` with 1, 299 and 50000000 and 2 at 0 with the following events: party `Issuer` did `file a Form C-TR termination of reporting` at 3
+executing contract `ongoing reporting obligation` with `a reporting status with` with 1, 299 and 50000000 and 2 at 0 with the following events: party `Issuer` did `file a Form C-TR termination of reporting` at 30
 not `transfer is permitted` with `a transfer at` with 364 and `FALSE`
 `transfer is permitted` with `a transfer at` with 365 and `FALSE`
 `transfer is permitted` with `a transfer at` with 364 and `TRUE`
@@ -60,8 +60,8 @@ not `transfer is within the one-year restricted period` with `a transfer from _ 
 not `transfer is within the one-year restricted period` with `a transfer from _ to _` with `YMD` with 2021, 6 and 1 and `YMD` with 2022, 6 and 1
 `days until the first anniversary of the issuance` with `a transfer from _ to _` with `YMD` with 2023, 3 and 1 and `YMD` with 2024, 2 and 29
 `days until the first anniversary of the issuance` with `a transfer from _ to _` with `YMD` with 2021, 6 and 1 and `YMD` with 2022, 5 and 31
-executing contract `resale restriction` with `a transfer at` with 364 and `TRUE` at 0 with the following events:  party `Purchaser` did `transfer the securities` at 100
-executing contract `resale restriction` with `a transfer at` with 100 and `FALSE` at 0 with the following events:  party `Purchaser` did `transfer the securities` at 200
+executing contract `resale restriction` with `a transfer at` with 364 and `TRUE` at 0 with the following events: party `Purchaser` did `transfer the securities` at 100
+executing contract `resale restriction` with `a transfer at` with 100 and `FALSE` at 0 with the following events: party `Purchaser` did `transfer the securities` at 200
 `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` with `a transfer under limb (4) at` with 100, `TRUE`, `FALSE`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
 `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` with `a transfer under limb (4) at` with 100, `FALSE`, `TRUE`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
 `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` with `a transfer under limb (4) at` with 100, `FALSE`, `FALSE`, `TRUE`, `FALSE`, `FALSE` and `FALSE`
@@ -71,7 +71,7 @@ executing contract `resale restriction` with `a transfer at` with 100 and `FALSE
 not `(a)(4) — a family or trust transferee, or a death-or-divorce circumstance` with `a transfer under limb (4) at` with 100, `FALSE`, `FALSE`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
 not `transfer is permitted` with `a transfer under limb (4) at` with 100, `FALSE`, `FALSE`, `FALSE`, `FALSE`, `FALSE` and `FALSE`
 `transfer is permitted` with `a transfer under limb (4) at` with 100, `FALSE`, `FALSE`, `FALSE`, `TRUE`, `FALSE` and `FALSE`
-executing contract `resale restriction` with `a transfer under limb (4) at` with 100, `FALSE`, `FALSE`, `FALSE`, `FALSE`, `TRUE` and `FALSE` at 0 with the following events:  party `Purchaser` did `transfer the securities` at 100
+executing contract `resale restriction` with `a transfer under limb (4) at` with 100, `FALSE`, `FALSE`, `FALSE`, `FALSE`, `TRUE` and `FALSE` at 0 with the following events: party `Purchaser` did `transfer the securities` at 100
 `the base case qualifies`
 not `the delinquent-issuer case qualifies`
 not `the over-limit-investor case qualifies`

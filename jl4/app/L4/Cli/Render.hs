@@ -25,7 +25,6 @@ import Base
 import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy.Char8 as BSL8
-import qualified Data.List as List
 import Options.Applicative
 import System.Exit (exitFailure, exitSuccess)
 
@@ -238,12 +237,3 @@ emitBytes opts b = case opts.renderOutput of
   Nothing -> BSL8.putStrLn b
 
 -- | All transitively-imported modules (the resolved dependency forest).
-transitiveDeps :: Rules.TypeCheckResult -> [Module Resolved]
-transitiveDeps tc = go tc.dependencies
- where
-  go = concatMap (\d -> d.module' : go d.dependencies)
-
-dedupModules :: [Module Resolved] -> [Module Resolved]
-dedupModules = List.nubBy (\a b -> muri a == muri b)
- where
-  muri (MkModule _ u _) = u
