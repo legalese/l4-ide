@@ -8,22 +8,22 @@
 >
 > **Everything below is written from the model's own knowledge**, and the history in §1 and §3 is
 > the part most likely to need correction. Before any of this is published, check: Brouwer's
-> formulation of the *Urintuition* and its derivation from the perception of time; the date and
-> character of *Life, Art and Mysticism*; the precise scope of his rejection of excluded middle
+> formulation of the _Urintuition_ and its derivation from the perception of time; the date and
+> character of _Life, Art and Mysticism_; the precise scope of his rejection of excluded middle
 > (it is a rejection for infinite domains, not a blanket one); and the exact behaviour of
 > `Classical.em` in current Lean, which is stated here loosely.
 >
 > The argument in §4 to §6 does not depend on the history being exactly right. The history is
-> there because it is a good joke, and because the joke is *true about the structure* even if a
+> there because it is a good joke, and because the joke is _true about the structure_ even if a
 > date is wrong.
 
 ---
 
 ## 1. The false friend
 
-Brouwer's *intuition* is a term of art, and it is not the everyday word.
+Brouwer's _intuition_ is a term of art, and it is not the everyday word.
 
-He took it from Kant: the *Urintuition*, the primordial intuition of two-oneness, which he held
+He took it from Kant: the _Urintuition_, the primordial intuition of two-oneness, which he held
 arose from the mind's apprehension of the passage of time.
 It names a thesis about what mathematics **is** — mental construction, an activity performed by a
 mathematician, rather than the discovery of objects that were sitting there beforehand.
@@ -52,7 +52,7 @@ Brouwerian intuition is the faculty of **showing**, and nothing that fails to sh
 
 Brouwer was a mystic.
 
-*Life, Art and Mysticism* is his, and so is a long hostility to formalism — a conviction that
+_Life, Art and Mysticism_ is his, and so is a long hostility to formalism — a conviction that
 language was a degraded and unreliable vehicle for the mathematician's inner constructions, and
 that Hilbert's programme was a betrayal of the subject rather than a rescue of it.
 The most Dionysian figure in the foundations crisis produced the most Apollonian artifact in the
@@ -89,7 +89,7 @@ The answer arrives. It is frequently correct. It carries nothing.
 
 Dziri et al.'s measurement is the sharpest available statement of this: on multi-digit
 multiplication of a shape unseen in training, **82.3% of the final answers that were correct had
-at least one error in the computation graph that produced them** (*Faith and Fate*, NeurIPS 2023 —
+at least one error in the computation graph that produced them** (_Faith and Fate_, NeurIPS 2023 —
 see the main paper's citation notes).
 Four right answers in five, arrived at by a route that does not support them.
 
@@ -101,7 +101,7 @@ categorical rather than statistical.
 
 It also explains why the obvious remedy does not work.
 If you audit **outputs** — benchmark scores, spot checks, a partner skimming the memo — you cannot
-detect this failure at all, because in every instance of it the output is *right*.
+detect this failure at all, because in every instance of it the output is _right_.
 The only things that catch it are executing the composition somewhere auditable, or checking the
 chain step by step.
 
