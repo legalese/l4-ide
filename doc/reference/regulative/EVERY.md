@@ -300,7 +300,12 @@ Under the barrier the landlord's five days run from **day 9**, the last signatur
 
 ![Run of the fork: three payments on days 1, 3 and 5; UPON EACH fires three times; three receipts follow, each with its own five days — hand-drawn from the trace](figures/every-fork-run.svg)
 
-Under the fork there is no single moment: each payment starts its own five days, and a receipt to Alice on day 2 discharges Alice's branch while Bob's is still waiting. The `.dot` sources sit beside the `.svg`s in `figures/` — [every-barrier.dot](figures/every-barrier.dot) is the emitted one for the barrier; regenerate the first two with `l4 state-graph` and `dot -Tsvg` after any change to the example.
+Under the fork there is no single moment: each payment starts its own five days, and a receipt to Alice on day 2 discharges Alice's branch while Bob's is still waiting.
+The `.dot` sources sit beside the `.svg`s in `figures/` — [every-barrier.dot](figures/every-barrier.dot) is the emitted one for the barrier.
+
+**Regenerate the first two with `l4 state-graph` and `dot -Tsvg` after any change to the example _or to the renderer that draws it_** — `jl4-core/src/L4/StateGraph.hs` and `jl4-core/src/L4/StateGraph/Dot.hs`, where the captions are decided.
+Nothing in CI compares these two files against a fresh run, and nothing can: they are pictures, and `doc/test-docs.sh` checks links and type-checks `.l4`.
+So a renderer change that nobody carries through to here leaves a figure captioned "compiler output" that the compiler does not produce — which is exactly what happened on 2026-09-21, when five caption fixes landed and these two files did not move with them.
 
 **There is no default.** An `EVERY` with a `HENCE` or a `LEST` and no join line is a type error, and the message names both spellings. The two readings differ, and picking one silently would change a rule's meaning; in particular, a barrier default would reverse what a single party's `MAY … HENCE` means today. An `EVERY` with no `HENCE` and no `LEST` needs no join line: it is one obligation per member and nothing waiting at the end, and the barrier and the fork are then the same thing.
 
