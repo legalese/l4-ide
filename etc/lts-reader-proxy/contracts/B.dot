@@ -61,7 +61,7 @@ digraph {
     2 -> 4 [label="IF NOT (price EQUALS 20)"
            ,color="#e8850c"
            ,style=dotted];
-    4 -> 3 [label="the rule binds `return`"
+    4 -> 3 [label="any act by this party would match\nthis obligation"
            ,color="#28a745"
            ,style=solid];
     4 -> 5 [label="timeout [10]"

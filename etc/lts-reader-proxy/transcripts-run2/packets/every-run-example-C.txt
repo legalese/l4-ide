@@ -1,0 +1,164 @@
+Document
+
+The contract is `the tenancy` from doc/reference/regulative/every-run-example.l4. Three tenants (Alice, Bob and Carol) must each sign; when the last of them has signed, the landlord (Ms Ng) must deliver. Time is counted in whole days from day 0.
+
+What has happened so far, in order:
+  1. On day 1, Alice signed (Alice did `Sign`).
+  2. On day 2, Bob signed (Bob did `Sign`).
+  3. Carol has not signed. Nothing else has happened; the clock now stands at day 2.
+
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_the_tenancy"
+                  targetNamespace="https://l4.legalese.com/bpmn"
+                  exporter="jl4 (L4.Bpmn)"
+                  exporterVersion="1">
+  <bpmn:error id="Error_breach" name="Breach" errorCode="BREACH" />
+  <bpmn:itemDefinition id="Item_the_tenancy_t_cast" structureRef="java.util.List" />
+  <bpmn:itemDefinition id="Item_the_tenancy_t_cast_member" structureRef="java.lang.Object" />
+  <bpmn:collaboration id="Collaboration_the_tenancy">
+    <bpmn:participant id="Participant_the_tenancy" name="the tenancy" processRef="Process_the_tenancy" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_the_tenancy" name="the tenancy" isExecutable="false">
+    <bpmn:property id="the_tenancy_t_cast" name="the_tenancy_t_cast" itemSubjectRef="Item_the_tenancy_t_cast" />
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_1_EVERY_Tenant_t_IN_tenants" name="EVERY Tenant t IN tenants">
+        <bpmn:flowNodeRef>Task_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_0</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_2_theLandlord" name="theLandlord">
+        <bpmn:flowNodeRef>Task_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_1</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_unassigned" name="(unassigned)">
+        <bpmn:flowNodeRef>Start_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_3</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_0" />
+    <bpmn:task id="Task_0" name="MUST Sign ...">
+      <bpmn:documentation>EVERY Tenant t IN tenants MUST Sign ... WITHIN 14 ONCE ALL HAVE — one instance per member of the cast, each bound to ‘t’; the cast is fixed only when the rule runs, so the activity carries no cardinality (P-CAST). ONCE ALL HAVE: the outgoing flow fires once, when every instance has completed — which is what a parallel multi-instance activity&apos;s completion means, so this barrier is drawn faithfully.</bpmn:documentation>
+      <bpmn:ioSpecification id="IoSpec_Task_0">
+        <bpmn:dataInput id="DataInput_Task_0" name="the_tenancy_t_cast" itemSubjectRef="Item_the_tenancy_t_cast" isCollection="true" />
+        <bpmn:inputSet id="InputSet_Task_0">
+          <bpmn:dataInputRefs>DataInput_Task_0</bpmn:dataInputRefs>
+        </bpmn:inputSet>
+        <bpmn:outputSet id="OutputSet_Task_0" />
+      </bpmn:ioSpecification>
+      <bpmn:dataInputAssociation id="DataInputAssoc_Task_0">
+        <bpmn:sourceRef>the_tenancy_t_cast</bpmn:sourceRef>
+        <bpmn:targetRef>DataInput_Task_0</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:multiInstanceLoopCharacteristics id="MultiInstance_Task_0" isSequential="false">
+        <bpmn:loopDataInputRef>DataInput_Task_0</bpmn:loopDataInputRef>
+        <bpmn:inputDataItem id="DataItem_Task_0" name="t" itemSubjectRef="Item_the_tenancy_t_cast_member" />
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:task>
+    <bpmn:boundaryEvent id="Boundary_0" name="after P14D" attachedToRef="Task_0" cancelActivity="true">
+      <bpmn:documentation>LEST: the obligation is not discharged within 14</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Boundary_0">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P14D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:task id="Task_1" name="MUST Deliver ...">
+      <bpmn:documentation>PARTY theLandlord MUST Deliver ... WITHIN 5</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:boundaryEvent id="Boundary_1" name="after P5D" attachedToRef="Task_1" cancelActivity="true">
+      <bpmn:documentation>LEST: the obligation is not discharged within 5</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Boundary_1">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P5D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="End_2" name="Fulfilled" />
+    <bpmn:endEvent id="End_3" name="Breach">
+      <bpmn:errorEventDefinition id="ErrorDef_End_3" errorRef="Error_breach" />
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_Start_0__Task_0" sourceRef="Start_0" targetRef="Task_0" />
+    <bpmn:sequenceFlow id="Flow_Task_0__Task_1" sourceRef="Task_0" targetRef="Task_1" />
+    <bpmn:sequenceFlow id="Flow_Boundary_0__End_3" sourceRef="Boundary_0" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Task_1__End_2" sourceRef="Task_1" targetRef="End_2" />
+    <bpmn:sequenceFlow id="Flow_Boundary_1__End_3" sourceRef="Boundary_1" targetRef="End_3" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_the_tenancy">
+      <bpmndi:BPMNShape id="Shape_Participant_the_tenancy" bpmnElement="Participant_the_tenancy" isHorizontal="true">
+        <dc:Bounds x="130" y="80" width="770" height="600" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_1_EVERY_Tenant_t_IN_tenants" bpmnElement="Lane_1_EVERY_Tenant_t_IN_tenants" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="740" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_2_theLandlord" bpmnElement="Lane_2_theLandlord" isHorizontal="true">
+        <dc:Bounds x="160" y="240" width="740" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_unassigned" bpmnElement="Lane_unassigned" isHorizontal="true">
+        <dc:Bounds x="160" y="400" width="740" height="280" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Start_0" bpmnElement="Start_0">
+        <dc:Bounds x="232" y="442" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_0" bpmnElement="Task_0">
+        <dc:Bounds x="380" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Boundary_0" bpmnElement="Boundary_0">
+        <dc:Bounds x="434" y="162" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_1" bpmnElement="Task_1">
+        <dc:Bounds x="560" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Boundary_1" bpmnElement="Boundary_1">
+        <dc:Bounds x="614" y="322" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_2" bpmnElement="End_2">
+        <dc:Bounds x="772" y="442" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_3" bpmnElement="End_3">
+        <dc:Bounds x="772" y="562" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Task_0" bpmnElement="Flow_Start_0__Task_0">
+        <di:waypoint x="268" y="460" />
+        <di:waypoint x="314" y="460" />
+        <di:waypoint x="314" y="140" />
+        <di:waypoint x="380" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_0__Task_1" bpmnElement="Flow_Task_0__Task_1">
+        <di:waypoint x="480" y="140" />
+        <di:waypoint x="494" y="140" />
+        <di:waypoint x="494" y="300" />
+        <di:waypoint x="560" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_0__End_3" bpmnElement="Flow_Boundary_0__End_3">
+        <di:waypoint x="452" y="198" />
+        <di:waypoint x="520" y="198" />
+        <di:waypoint x="520" y="200" />
+        <di:waypoint x="700" y="200" />
+        <di:waypoint x="700" y="580" />
+        <di:waypoint x="772" y="580" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_1__End_2" bpmnElement="Flow_Task_1__End_2">
+        <di:waypoint x="660" y="300" />
+        <di:waypoint x="674" y="300" />
+        <di:waypoint x="674" y="460" />
+        <di:waypoint x="772" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_1__End_3" bpmnElement="Flow_Boundary_1__End_3">
+        <di:waypoint x="632" y="358" />
+        <di:waypoint x="726" y="358" />
+        <di:waypoint x="726" y="580" />
+        <di:waypoint x="772" y="580" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
+
+Q1. What is owed right now, and by whom?
+Q2. Which event(s) would discharge what is owed?
+Q3. Which event(s) or deadline(s) would put someone in breach?
+Q4. Where in the contract are we — which rule, branch or state is live?
+Q5. What happens after the next discharging event?
+
+Answer each question from this document alone. If it does not say, answer 'cannot tell from this' rather than guess.

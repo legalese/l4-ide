@@ -1020,7 +1020,7 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
       actionText = prettyPattern action.action
       -- Which of the act's names are OPEN, beside the act rather than inside
       -- it; see 'labelBinds'.
-      bindsText = bindsClause (patternBinders action.action)
+      bindsText = bindsClause action.action
       -- The window's closing edge, spelled by 'windowText' so the node and
       -- this edge cannot drift apart.
       deadlineText = fmap windowText due
@@ -1526,9 +1526,33 @@ oneLine = Text.unwords . Text.words
 -- stays a 'PatApp' and binds nothing, which is what keeps this from calling
 -- every act in the corpus a binder.
 --
--- A 'PatVar' at the TOP is the whole action left open, and it is reported the
--- same way: the sentence is true of it, and a reader of a caption has no use
--- for the difference.
+-- __A 'PatVar' at the TOP is a different fact and gets a different sentence,
+-- corrected 2026-09-23.__ This note used to say it was "reported the same way:
+-- the sentence is true of it, and a reader of a caption has no use for the
+-- difference". The sentence IS true of it and the conclusion still does not
+-- follow. @jl4\/examples\/ok\/contracts.l4:15@ writes @PARTY B MUST return@
+-- where @Action IS ONE OF delivery, payment, foo@ (@:1-5@) declares no
+-- @return@, so @return@ binds the whole act; the node then draws @B must
+-- return WITHIN 10@ and its arrow drew @the rule binds \`return\`@, from which
+-- a reader takes @return@ for the act and the clause for a parameter of it.
+-- What is true is the opposite and stronger: there is NO act, and any act by B
+-- discharges the obligation — which is the picture's own "what discharges it"
+-- question, not a detail beside it.
+--
+-- The what-if already draws this line and it is the half this function had
+-- dropped: @L4.Lts.WhatIf@'s @reach@ answers @BoundWholeAction@ with "any act
+-- by this party would match this obligation" and @BoundArgument@ with "any
+-- value in that place". Matching @bindsClause@ alone therefore did not give
+-- the reader ONE sentence across the picture and the what-if, which is what
+-- matching it was for; it gave them one sentence where the what-if has two.
+--
+-- Measured before changing it, because the population is the whole argument:
+-- over every @.l4@ under @jl4\/examples@, @doc@ and @jl4-core\/libraries@ the
+-- renderer emits __46 binds clauses, of which 45 are argument binders and
+-- exactly ONE is a whole act__ — @contracts.l4@'s @return@. One witness in the
+-- corpus is the population that lets a wrong guess survive review, not a reason
+-- to leave it; a caption is read by whoever meets it, and there is nothing else
+-- on that arrow.
 --
 -- __The spelling matches the what-if on purpose, and the what-if is not
 -- importable from here.__ @L4.Lts.WhatIf.patternBinders@ is the same recursion
@@ -1558,8 +1582,13 @@ patternBinders = \ case
 -- The back quotes are the picture\'s, not the act\'s: they are here, in a
 -- clause "L4.StateGraph.Dot" renders and no machine parses, and never inside
 -- 'prettyPattern'.
-bindsClause :: [Text] -> Maybe Text
-bindsClause [] = Nothing
-bindsClause bs = Just ("the rule binds " <> Text.intercalate " and " (map quoted bs))
+bindsClause :: Pattern Resolved -> Maybe Text
+bindsClause = \ case
+  -- The whole act is open. Say what that MEANS for the reader's question, not
+  -- which name holds the hole; the name is already on the node.
+  PatVar _ _ -> Just "any act by this party would match this obligation"
+  p          -> case patternBinders p of
+    [] -> Nothing
+    bs -> Just ("the rule binds " <> Text.intercalate " and " (map quoted bs))
  where
   quoted n = "`" <> n <> "`"

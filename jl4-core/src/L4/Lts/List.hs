@@ -28,6 +28,14 @@
 -- * A candidate the what-if cannot run is LISTED under "could not be
 --   tried", with the reason. It is never dropped, because a list that
 --   omitted it would say "nothing else can happen".
+-- * An act whose pattern BINDS a variable is a SET of acts, and the list
+--   answers for the set: the line names the set, the verdict beside it is
+--   the machine's for ONE act drawn from it, and the two lines under the
+--   bullet ('boundLines') say which is which. That the binder matches
+--   whatever the event carries is the rule's own text; that the act
+--   discharges is the replay's word. The set goes under the heading its
+--   witness's verdict puts it under, and only a witness the contract
+--   passed over, or none at all, leaves it under "could not be tried".
 -- * The enabled set is an over-approximation of what the contract allows
 --   (spec §1.1b, G9): a tick or an act that the replay reports as
 --   advancing may be one the contract's own guards would refuse in a
@@ -238,10 +246,10 @@ renderReport withSteps rp = Text.unlines $
       _ -> []
 
     -- an item is one or more lines; only its first gets the bullet
-    discharges = [ [candidateLine o <> " → fulfilled"] | o <- rp.rpEnabled, Discharging <- [o.ocVerdict] ]
-    breaches   = [ [candidateLine o <> " → " <> blameLine b] | o <- rp.rpEnabled, Breaching b <- [o.ocVerdict] ]
+    discharges = [ [candidateLine o <> " → fulfilled"] <> boundLines o | o <- rp.rpEnabled, Discharging <- [o.ocVerdict] ]
+    breaches   = [ [candidateLine o <> " → " <> blameLine b] <> boundLines o | o <- rp.rpEnabled, Breaching b <- [o.ocVerdict] ]
     advances   =
-      [ (candidateLine o <> " → then:") : map (("    · " <>) . placementLine [] [] (stampOf o)) m
+      [ (candidateLine o <> " → then:") : map (("    · " <>) . placementLine [] [] (stampOf o)) m <> boundLines o
       | o <- rp.rpEnabled, Advancing m <- [o.ocVerdict] ]
     ignored    = [ [candidateLine o <> " — " <> passOverWords why] | o <- rp.rpEnabled, PassedOver why <- [o.ocVerdict] ]
     untriable  = [ [candidateLine o <> " — " <> Text.strip why] | o <- rp.rpEnabled, Untried why <- [o.ocVerdict] ]
@@ -378,11 +386,86 @@ familyLine f = case f.faJoin of
 -- all.
 candidateLine :: Outcome -> Text
 candidateLine o = case (o.ocCandidate.cdKind, o.ocCandidate.cdHypothetical) of
+  -- a binding pattern names a SET of acts; the line is the set, and the
+  -- witness that was actually replayed is printed under it ('boundLines')
+  (ActBy n, hyp) | Just b <- o.ocCandidate.cdBound ->
+    bearerText n.lnBearer <> " does " <> boundSetText b (shapeOr n)
+      <> either (const "") (\ h -> " now (at " <> prettyRatio h.hyAt <> ")") hyp
   (ActBy n, Right h)       -> bearerText n.lnBearer <> " does " <> prettyLayout h.hyAction <> " now (at " <> prettyRatio h.hyAt <> ")"
-  (ActBy n, Left _)        -> bearerText n.lnBearer <> " does " <> maybe n.lnAction prettyLayout o.ocCandidate.cdShape
+  (ActBy n, Left _)        -> bearerText n.lnBearer <> " does " <> shapeOr n
   (TickPast d _, Right h)  -> "nothing happens by " <> prettyRatio d <> " (the clock reaches " <> prettyRatio h.hyAt <> ")"
   (TickPast d _, Left _)   -> "nothing happens by " <> prettyRatio d
   (NoTick n, _)            -> "time runs out on " <> normLine [] n
+  where
+    shapeOr n = maybe n.lnAction prettyLayout o.ocCandidate.cdShape
+
+-- | The SET of acts a binding action pattern describes, in words. A binder
+-- that IS the whole action leaves nothing else to name, so it is
+-- "anything"; a binder in an operand keeps the act and frees that place.
+-- The @PROVIDED@ guard is the set's only narrowing, and it is printed as
+-- the rule wrote it with whatever the residual has already computed read
+-- back into it ('L4.Lts.WhatIf.BoundAct').
+boundSetText :: BoundAct -> Text -> Text
+boundSetText b shape = case b.baScope of
+  BoundWholeAction -> "anything" <> constraint
+  BoundArgument    -> shape <> ", with any " <> binderNames b <> constraint
+  where
+    constraint = maybe "" (\ g -> " for which " <> g <> " holds") b.baGuard
+
+-- | What the reader is owed beside a bound act's verdict: how far the set
+-- reaches, and that the verdict above came from replaying ONE act drawn
+-- from it. The two are different kinds of claim — the reach is the rule's
+-- own text, the verdict is the machine's — and keeping them apart is the
+-- whole job of these two lines.
+--
+-- Neither line may let the verdict be read as the SET's, and until
+-- 2026-09-21 both did. The reach said a member "counts", under a heading
+-- that names an outcome, so the pair asserted that outcome for every
+-- member — and on the flagship corpus file that is false ten lines below
+-- its own listing: @ok/contracts.l4@'s @price >= 20@ is discharged only by
+-- @price = 20@, because the @HENCE@ reads the binder, and 21 leaves B
+-- owing @return@. The same shape put "any act by B counts" under "neither
+-- ends nor breaches it" while the section above named an act by B that
+-- breaches. So:
+--
+--   * the reach is about MATCHING, and about THIS obligation's pattern —
+--     it says what the rule lets in, never where a member ends, and never
+--     anything about the other norms in force at the position;
+--   * the second line carries the verdict's scope explicitly: it is one
+--     act's, and another member may end elsewhere.
+boundLines :: Outcome -> [Text]
+boundLines o = case (o.ocCandidate.cdKind, o.ocCandidate.cdBound) of
+  (ActBy n, Just b) | Right vs <- b.baWitness ->
+    [ reach n b
+    , "the verdict above is one act's, not the set's: " <> valuesText vs
+      <> " was replayed, and another member may end elsewhere"
+    ]
+  -- no witness: the set is named under "could not be tried", with the
+  -- what-if's own reason, and nothing was replayed to add to it
+  _ -> []
+  where
+    reach n b = case (b.baScope, b.baGuard) of
+      (BoundWholeAction, Nothing) ->
+        "this obligation's pattern matches any act by " <> bearerText n.lnBearer
+        <> ": the rule binds " <> binderNames b <> " rather than naming an act"
+      (BoundArgument, Nothing) ->
+        "this obligation's pattern matches any " <> binderNames b
+        <> ": the rule binds it and does not test it"
+      (_, Just _) ->
+        "this obligation's pattern matches any " <> binderNames b
+        <> " the condition accepts: the rule binds it and tests it only through that condition"
+
+binderNames :: BoundAct -> Text
+binderNames b = Text.intercalate " and " (map binderName b.baBinders)
+
+-- | A binder, spelled as the rule wrote it and without its section — the
+-- spelling the action printed beside it uses.
+binderName :: Resolved -> Text
+binderName r = "`" <> unqualifiedNameToText (getOriginal r) <> "`"
+
+-- | @`amount` = 0@, for as many binders as the pattern has.
+valuesText :: [(Resolved, Expr Resolved)] -> Text
+valuesText vs = Text.intercalate ", " [ binderName r <> " = " <> prettyLayout e | (r, e) <- vs ]
 
 -- | A breach, in words. The machine's own no-party clock event is the
 -- "revealing" act when a deadline is missed on a tick; it has no name a
@@ -713,13 +796,39 @@ blameJson b = Aeson.object $ catMaybes
       , ("reason" .=) . reasonText <$> e.beReason
       ]
 
+-- | An act whose pattern binds keeps @action@ meaning what it has always
+-- meant — the shape, with the binder standing by its own name — and says
+-- what was actually replayed under the new @bound@ key. Adding a key
+-- changes no existing key's meaning, so @format@ stays at 1.
 candidateJson :: Outcome -> Aeson.Value
 candidateJson o = case (o.ocCandidate.cdKind, o.ocCandidate.cdHypothetical) of
+  (ActBy n, hyp) | Just b <- o.ocCandidate.cdBound -> Aeson.object $
+    [ "kind" .= ("act" :: Text), "party" .= bearerText n.lnBearer
+    , "action" .= maybe n.lnAction prettyLayout o.ocCandidate.cdShape
+    , "bound" .= boundJson b ]
+    <> either (const []) (\ h -> ["at" .= ratio h.hyAt]) hyp
   (ActBy n, Right h) -> Aeson.object ["kind" .= ("act" :: Text), "party" .= bearerText n.lnBearer, "action" .= prettyLayout h.hyAction, "at" .= ratio h.hyAt]
   (ActBy n, Left _) -> Aeson.object ["kind" .= ("act" :: Text), "party" .= bearerText n.lnBearer, "action" .= maybe n.lnAction prettyLayout o.ocCandidate.cdShape]
   (TickPast d ns, Right h) -> Aeson.object ["kind" .= ("tick" :: Text), "deadline" .= ratio d, "at" .= ratio h.hyAt, "whose" .= map (normJson []) ns]
   (TickPast d ns, Left _) -> Aeson.object ["kind" .= ("tick" :: Text), "deadline" .= ratio d, "whose" .= map (normJson []) ns]
   (NoTick n, _) -> Aeson.object ["kind" .= ("noTick" :: Text), "whose" .= [normJson [] n]]
+
+-- | The set a binding pattern describes, and the one act drawn from it.
+-- @binds@ and @scope@ are the rule's own text; @witness@ is what the replay
+-- carried, and is null when none could be built (the reason is then on the
+-- @untried@ entry's @why@).
+boundJson :: BoundAct -> Aeson.Value
+boundJson b = Aeson.object $
+  [ "binds" .= map (unqualifiedNameToText . getOriginal) b.baBinders
+  , "scope" .= (case b.baScope of
+                  BoundWholeAction -> "wholeAction" :: Text
+                  BoundArgument    -> "argument")
+  , "witness" .= case b.baWitness of
+      Left _   -> Aeson.Null
+      Right vs -> Aeson.toJSON
+        [ Aeson.object ["name" .= unqualifiedNameToText (getOriginal r), "value" .= prettyLayout e] | (r, e) <- vs ]
+  ]
+  <> maybe [] (\ g -> ["constraint" .= g]) b.baGuard
 
 stepJson :: DeonticStep -> Aeson.Value
 stepJson s = Aeson.object $ catMaybes

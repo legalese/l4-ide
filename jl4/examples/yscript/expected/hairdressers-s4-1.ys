@@ -1,0 +1,20 @@
+RULE Section 4(1) PROVIDES
+the hairdresser is qualified to act as a hairdresser ONLY IF
+    section 4(1)(a) applies OR
+    section 4(1)(c) applies OR
+    section 4(1)(d) applies
+
+RULE Section 4(1)(a) PROVIDES
+section 4(1)(a) applies ONLY IF
+    the hairdresser has been awarded a hairdressing qualification AND
+    the qualification was awarded by a registered training organisation AND
+    the qualification is an "authorised qualification" under section 4(2)
+
+RULE Section 4(1)(c) PROVIDES
+section 4(1)(c) applies ONLY IF
+    a determination has been made under section 37 of the Apprenticeship and Traineeship Act 2001 that the hairdresser is adequately trained to pursue the recognised trade vocation of hairdressing (because the hairdresser has acquired the competencies of the recognised trade vocation)
+
+RULE Section 4(1)(d) PROVIDES
+section 4(1)(d) applies ONLY IF
+    the hairdresser has held, or been taken to have held, a licence under Part 6 (Regulation of the hairdressing trade) of the Shops and Industries Act 1962 AND
+    the licence was limited to carrying out beauty treatment only

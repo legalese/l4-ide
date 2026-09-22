@@ -1,0 +1,27 @@
+Document
+
+`Payment Obligations` OF `Total Repayment Amount` — after 1 event, the clock stands at 739708 (the #TRACE on line 192)
+    PARTY `The Borrower` DOES `pay monthly installment to` OF `The Lender`, (USD OF 2256.46) AT Day OF (April OF 3, 2025)
+  Standing: in progress.
+
+  Owed now:
+    - `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) MUST `pay monthly installment to` OF (`Individual Lender` OF (`Natural Person` OF "John Doe", "42 The Lender Rd, Singapore 424242", "Singapore", "G5301960D", (`Bank Account` OF "DBS Bank Ltd", "The Lender", "120-643240-1", "DBSSSGSG"))), `Amount Transferred` — due by 739752 (44 from now)
+
+  What would discharge it (the contract ends fulfilled):
+    - `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) does `pay monthly installment to` OF (`Individual Lender` OF (`Natural Person` OF "John Doe", "42 The Lender Rd, Singapore 424242", "Singapore", "G5301960D", (`Bank Account` OF "DBS Bank Ltd", "The Lender", "120-643240-1", "DBSSSGSG"))), `Amount Transferred`, with any `Amount Transferred` for which `is money at least equal within error` OF `Amount Transferred`, (Money OF "USD", 2369.2806990603694) holds now (at 739708) → fulfilled
+      this obligation's pattern matches any `Amount Transferred` the condition accepts: the rule binds it and tests it only through that condition
+      the verdict above is one act's, not the set's: `Amount Transferred` = Money OF "USD", 2369.2806990603694 was replayed, and another member may end elsewhere
+
+  What would move things along (neither ends nor breaches it):
+    - nothing happens by 739752 (the clock reaches 739753) → then:
+          · `Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")) MUST `pay monthly installment to` `The Lender` `Amount Transferred` — no deadline
+
+  Next deadline: 739752 (`Commercial Borrower` OF (Company OF "Jane Dough Pte Ltd", "42 Jane Doe Rd #04-20, Singapore 420000", "Singapore", "UEN 200424242N", (`Bank Account` OF "DBS Bank Ltd", "Jane Dough Pte Ltd", "242-242424-9", "DBSSSGSG")): `pay monthly installment to` OF (`Individual Lender` OF (`Natural Person` OF "John Doe", "42 The Lender Rd, Singapore 424242", "Singapore", "G5301960D", (`Bank Account` OF "DBS Bank Ltd", "The Lender", "120-643240-1", "DBSSSGSG"))), `Amount Transferred`)
+
+Q1. What is owed right now, and by whom?
+Q2. Which event(s) would discharge what is owed?
+Q3. Which event(s) or deadline(s) would put someone in breach?
+Q4. Where in the contract are we — which rule, branch or state is live?
+Q5. What happens after the next discharging event?
+
+Answer each question from this document alone. If it does not say, answer 'cannot tell from this' rather than guess.

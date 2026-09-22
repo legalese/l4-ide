@@ -31,6 +31,7 @@
 - [Catala](exports/catala.md)
 - [Blawx](exports/blawx.md)
 - [DMN and BPMN](exports/dmn-bpmn.md)
+- [yscript](exports/yscript.md)
 
 ## Apps
 

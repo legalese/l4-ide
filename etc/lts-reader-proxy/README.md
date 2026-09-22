@@ -1,11 +1,22 @@
 # `etc/lts-reader-proxy` — materials for an LLM-reader PROXY of the §7.3 gate
 
-**Status (2026-09-16): prepared, and run the same day as a proxy — see [`RESULTS.md`](./RESULTS.md),
-the scored rows in `results.json`, and the primary evidence under `transcripts/` (every reader's
-prompt and verbatim answers, every judge's prompt and verbatim output, model ids; recovered from
-the run's transcripts by `extract-transcripts.mjs`, which also checks that `results.json` is the
-judges' output and the judges' input is the readers' output).** Nothing in this directory is a
-verdict on the gate.
+**Status: prepared 2026-09-16, and RUN TWICE — 2026-09-16 and 2026-09-21.** Both runs are written
+up in [`RESULTS.md`](./RESULTS.md); the scored rows are `results.json` (run 1) and
+`results-run2.json` (run 2). Nothing in this directory is a verdict on the gate.
+
+| run   | date       | artifacts the readers saw               | evidence recorded                                                                                                                               |
+| ----- | ---------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| run 1 | 2026-09-16 | the **refusing** list; pre-#430 B and C | `transcripts/` — every reader's prompt and verbatim answers, every judge's prompt and output, model ids, recovered by `extract-transcripts.mjs` |
+| run 2 | 2026-09-21 | the **repaired** list; re-cut B and C   | `transcripts-run2/` — **the twelve reader packets only.** Answers and judge outputs were not captured; see that directory's `README.md`         |
+
+**The gate was ruled on 2026-09-21 — NO, P2d and P2e are not built** (LTS-VISUALISER.md §7.3). That
+ruling cites run 1 as one of four grounds, is explicit that a proxy is not the experiment, and names
+three things that would reopen it — the first being a rerun of these same 48 readings against a
+repaired `WhatIf`. **Run 2 is that rerun, and it did not confirm the ruling** (RESULTS.md §6.9):
+the repaired list is last of the three artifacts on the gate's own Q1–Q3, so the reopening condition
+is met on the numbers and the ruling is back with Meng. Read that alongside RESULTS.md §6.2, which
+measures a run-to-run drift on unchanged documents larger than the effect the rerun was for. This
+directory remains materials and evidence, not a verdict.
 
 **The record is frozen; the `B` artifact beside it is not.** The four `B.dot` files were
 re-cut on 2026-09-21 and again on 2026-09-23 from `lts/draw-what-it-means`, where five fixes
@@ -74,7 +85,10 @@ runnable `#TRACE`. None exists: `jl4/examples/legal/regcf/regcf.l4`'s three regu
 
 `manifest.json` is the reader-facing bundle: twelve entries `{contract, artifact, text, history,
 questions, truth}` — the **full** text of each artifact, since a reader sees only what the entry
-carries; `history` is `null` for A.
+carries; `history` is `null` for A. `transcripts-run2/build-packets.mjs` turns it into the twelve
+packets run 2's readers were actually handed (artifact + history + the five questions + one
+instruction, and nothing else); `transcripts-run2/README.md` says what run 2 recorded and what it
+did not.
 
 ## Regenerating
 
@@ -82,16 +96,53 @@ carries; `history` is `null` for A.
 L4=$(cd <worktree with a build> && cabal list-bin l4) etc/lts-reader-proxy/prepare.sh
 ```
 
-from the repo root; needs `jq` and `node`. The committed artifacts were cut with the `l4` built
-from `lts/p2-stack` at `0139c6c5` (re-cut 2026-09-16 on `lts/p2-followups` after the bearer
-change: only `probes.out` moved, see RESULTS.md; and `tenancy/probes.out` and
-`every-run-example/probes.out` alone were re-cut 2026-09-19 from `lts/p2-followups-2`, see item 1
-below — a full rerun on a current binary also moves A, B, `lts.json` and `manifest.json` with
-what `unstable` has changed since, which is a re-cut of the readers' inputs and has not been
-done). It rewrites A/B/C, `lts.json`, `probes.out` and
+from the repo root; needs `jq` and `node`. It rewrites A/B/C, `lts.json`, `probes.out` and
 `manifest.json`, and fails if `every-run-example`'s rule stops exporting byte-identically to the
 `tenancy-barrier` golden. `truth.json` and `history.txt` are hand-written and are **not**
-regenerated: after a rerun, diff `lts.json` and `probes.out` and re-read the answers.
+regenerated: after a rerun, diff `lts.json` and `probes.out` and re-read the answers. **That last
+sentence is the one this directory has already got wrong once — see the note on the promissory
+note's key below, and RESULTS.md §6.6.**
+
+**The committed artifacts are the RUN 2 cut (2026-09-21), on this branch's repaired binary.** Run
+1's artifacts are not in the tree; `git show e633e2e58` is the diff between them, classified by
+cause, and RESULTS.md §6.1 is the summary. The history, for anyone tracing a run-1 number: run 1's
+were cut with the `lts/p2-stack` build at `0139c6c5`, re-cut 2026-09-16 on `lts/p2-followups` after
+the bearer change (only `probes.out` moved), and `tenancy/probes.out` and
+`every-run-example/probes.out` alone were re-cut 2026-09-19 from `lts/p2-followups-2` (item 1
+below).
+
+**Which files the run-2 re-cut moved, and which it did not**, because this is what makes the
+across-run control in RESULTS.md §6.2 possible: it moved all four `A.txt`, one of four `B.dot`
+(`contracts`, a label), three of four `C.bpmn`, and **no `truth.json` and no `history.txt` at all**.
+So `every-run-example/B`, `tenancy/B`, `promissory-note/B` and `promissory-note/C` were shown to
+run-2 readers byte-identically to run 1 — four cells that measure the instrument rather than the
+artifact.
+
+> **The promissory note's key is STILL STALE, and it is now stale against the committed artifact.**
+> This warning stood here before run 2 and was not acted on, so it is restated as a defect rather
+> than a risk. `promissory-note/truth.json` answers with a reparation deadline of day 739769 /
+> 3 June 2025 / 61 days from the position. `12055ae73` (2026-09-17,
+> EVERY-EACH-QUANTIFIER-SPEC §5.2) anchors a `LEST` at the missed deadline rather than at the late
+> act, so the list says **739752 (44 from now)** — day 102 after commencement, 17 May 2025; see
+> `jl4/examples/legal/promissory-note.l4:202-208`. **The 2026-09-21 re-cut moved `A.txt` to 739752
+> and left `truth.json` at 739769**, which is exactly the split the `drift` key says must never
+> happen, and run 2's readers were marked wrong for printing the artifact's own number: eight of
+> A's eleven misses on that contract name the day serial as a ground (RESULTS.md §6.6).
+>
+> **Fix the key and re-cut in ONE change, before quoting any `promissory-note` column from run 2.** > `truth.json`'s `drift` key spells out the substitutions. Correcting the key without re-cutting A,
+> or re-cutting A without correcting the key, puts the two on different trees either way — and the
+> second is what happened.
+
+**What run 2 changed in A, and why it is two things and not one.** On 2026-09-21 the what-if
+stopped refusing a bound pattern variable and began answering for the SET of acts it describes
+(LTS-VISUALISER.md §2.4, the bound-variable block) — §7.7 point 2's repair, and the one line on
+three of these four contracts that run 1 traced all eight of the list's Q2 misses to. The same day,
+the two lines printed beside a bound act were reworded (`L4.Lts.List.boundLines`). **But the re-cut
+also picked up `unstable` drift that is not the repair**: the breach line now appends _"the breach
+names, in order: …"_, the note's `LEST` anchor moved (above), and the action text re-renders per
+member. RESULTS.md §6.1 has the classification and §6.7.3 has why the breach-names clause matters —
+`tenancy` Q3 went 4/4 to 0/4 on it. So "A changed by design" is half true, and the half that is not
+is where run 2's most interesting finding is.
 
 **A full `prepare.sh` un-freezes the record**, because it rewrites `manifest.json` along with the
 artifacts, and `manifest.json` is what the 48 committed readings were made from. To refresh one
