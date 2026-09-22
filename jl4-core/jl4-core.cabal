@@ -197,6 +197,9 @@ library
     L4.TypeCheck.Types
     L4.TypeCheck.Unify
     L4.TypeCheck.With
+    L4.Yscript.IR
+    L4.Yscript.Lower
+    L4.Yscript.Emit
     L4.Utils.IntervalMap
     L4.Utils.RevList
     L4.Utils.Ratio

@@ -1,0 +1,26 @@
+-- Foreign Relations (State and Territory Arrangements) Act 2020 (Cth), s10.
+--
+-- Transcribed for `l4 yscript` (specs/todo/YSCRIPT-EXPORT-SPEC.md R7) from the
+-- verbatim yscript figure quoted in specs/research/DATALEX-YSCRIPT-RESEARCH.md
+-- §C (Mowbray, Chung & Greenleaf 2022/2023, Figure 2). Only as much of s10 as
+-- that figure itself reproduces is encoded here: s10(3) gets its own RULE,
+-- because the figure expands it into one; s6 and s10(4) do not, because the
+-- figure leaves them as bare proposition text with no RULE of their own, so
+-- they are authored here as leaf ASSUME BOOLEAN facts (R3) rather than
+-- invented sub-rules the source never showed.
+
+ASSUME `the arrangement is a "foreign arrangement" under section 6` IS A BOOLEAN
+ASSUME `the non-Australian entity is a "core foreign entity" under section 10(4)` IS A BOOLEAN
+
+ASSUME `section 7(a) applies` IS A BOOLEAN
+ASSUME `section 7(b) applies` IS A BOOLEAN
+ASSUME `section 7(c) applies` IS A BOOLEAN
+
+@ref Section 10(3)
+DECIDE `the Australian entity is a "core State/Territory entity" under section 10(3)` IS
+    `section 7(a) applies` OR `section 7(b) applies` OR `section 7(c) applies`
+
+@ref Section 10 - Core foreign arrangements
+@export Whether the arrangement is a core foreign arrangement under section 10(2)
+DECIDE `the arrangement is a "core foreign arrangement" under section 10(2)` IS
+    `the arrangement is a "foreign arrangement" under section 6` AND `the Australian entity is a "core State/Territory entity" under section 10(3)` AND `the non-Australian entity is a "core foreign entity" under section 10(4)`

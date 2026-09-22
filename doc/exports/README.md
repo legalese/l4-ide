@@ -10,13 +10,14 @@ So L4 compiles **out**. Each export takes the rules you have written and re-expr
 system that already has users, semantics, tooling and an install base — and each one is a genuine
 piece of software with its own community, not a format we invented.
 
-| Neighbour                         | What it is                                                          | What you get from L4                                         | Command          |
-| --------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------- |
-| **[docassemble](docassemble.md)** | open-source guided interviews used across access-to-justice work    | a working interview that asks the citizen only what it needs | `l4 docassemble` |
-| **[OpenFisca](openfisca.md)**     | the microsimulation engine behind several countries' benefit models | a runnable Python module of tax/benefit variables            | `l4 openfisca`   |
-| **[Catala](catala.md)**           | a literate language for law, with a proof assistant behind it       | a literate module pairing statute text with its logic        | `l4 catala`      |
-| **[Blawx](blawx.md)**             | a visual, blocks-based rules tool over the s(CASP) reasoner         | a Blawx project you can open, run and explain                | `l4 blawx`       |
-| **[DMN and BPMN](dmn-bpmn.md)**   | the OMG standards for decision tables and process diagrams          | decision tables and process models for standard engines      | `l4 export`      |
+| Neighbour                         | What it is                                                          | What you get from L4                                                           | Command          |
+| --------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ---------------- |
+| **[docassemble](docassemble.md)** | open-source guided interviews used across access-to-justice work    | a working interview that asks the citizen only what it needs                   | `l4 docassemble` |
+| **[OpenFisca](openfisca.md)**     | the microsimulation engine behind several countries' benefit models | a runnable Python module of tax/benefit variables                              | `l4 openfisca`   |
+| **[Catala](catala.md)**           | a literate language for law, with a proof assistant behind it       | a literate module pairing statute text with its logic                          | `l4 catala`      |
+| **[Blawx](blawx.md)**             | a visual, blocks-based rules tool over the s(CASP) reasoner         | a Blawx project you can open, run and explain                                  | `l4 blawx`       |
+| **[DMN and BPMN](dmn-bpmn.md)**   | the OMG standards for decision tables and process diagrams          | decision tables and process models for standard engines                        | `l4 export`      |
+| **[yscript](yscript.md)**         | AustLII DataLex's decades-old Rules-as-Code rule language           | a consultation with a `Why?`/`How?`/`What if?` explanation apparatus, for free | `l4 yscript`     |
 
 ## Which one do I want?
 
@@ -31,6 +32,8 @@ Pick by what you need to _do_, not by which is most sophisticated:
   [Blawx](blawx.md)
 - **Hand the decision to a business-process team, or an engine they already run.** →
   [DMN and BPMN](dmn-bpmn.md)
+- **Hand a consultation to AustLII's decades-old Rules-as-Code explanation engine, for its
+  `Why?`/`How?`/`What if?` apparatus.** → [yscript](yscript.md)
 
 ## What all of them have in common
 
@@ -64,8 +67,10 @@ default is `none`, and deliberately so: **Blocking usually describes the target'
 than a defect in your file**, and fires on most realistic exports. Read the report; do not assume
 a clean exit means a complete translation.
 
-OpenFisca and Catala do not emit fidelity reports. They rely on refusal plus, in Catala's case, a
-machine-checked equivalence argument — see those pages.
+OpenFisca, Catala and yscript do not emit fidelity reports. They rely on refusal — plus, in
+Catala's case, a machine-checked equivalence argument — see those pages. yscript's refusal is
+whole-run rather than per-element: any offender anywhere in the exported closure means nothing is
+written at all, not a smaller document with notes about what was cut.
 
 ## What these exports are not
 
