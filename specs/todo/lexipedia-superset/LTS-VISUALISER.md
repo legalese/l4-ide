@@ -152,8 +152,14 @@ graph** — and that walk is blind to three things the evaluator is not:
    (`Machine.hs:1570-1575`) evaluates `fromMaybe trueExpr act.provided` and `Contract10`
    (`:1577`) branches on the result. A transition whose guard is false is not fireable, but it is
    drawn, so a topological walk will report a breach state reachable when it is not.
-2. **Action-pattern matching.** Gap 2: `PatApp n args` renders as `n <> " ..."`, so `pay 100` and
-   `pay 5` are one edge in the graph and two different matches at runtime.
+2. **Action-pattern matching.** Gap 2, narrowed 2026-09-21: `pay 100` and `pay 5` are now two
+   edges, because the act prints through `L4.Print.printActionPattern` (`prettyPattern`,
+   `jl4-core/src/L4/StateGraph.hs:1500-1501`) instead of eliding its arguments. What survives is
+   the open name: `pay price` is one edge standing for every value that would discharge it, since
+   `matchPattern`'s `PatVar` arm binds the scrutinee whatever it is
+   (`jl4-core/src/L4/EvaluateLazy/Machine.hs:4051-4052`). The edge now says which names are open
+   — `` the rule binds `price` `` — so a reader is told where the walk stops being exact rather
+   than left to infer it.
 3. **Deadline arithmetic.** Gap 7: `WITHIN` is a string in the IR and a decremented `Rational` in
    the evaluator (`Machine.hs:1469`), so timing-dependent unreachability is invisible.
 
@@ -841,9 +847,24 @@ own §3.2 row contradicted four paragraphs earlier. The sinks are shared. The su
 no AND-join barrier — survives, and P1's `P-NOJOIN` fidelity note reaches the same conclusion by
 a different route: `jl4/examples/bpmn/README.md`, "What can be joined, and why so little of it".)_
 
+_(Gap 6's first clause, measured 2026-09-23 on `ab6ecc4af`: which arrows are blank is a rule, not
+an accident. Over the 88 files under `jl4/examples` and `doc` that produce a graph, 107 edges carry
+`label=""`, and every one is a `RAND` branch (63, violet `#6f42c1`) or an `ROR` branch (44, amber
+`#e8850c`) — `fanLabel` is all-`Nothing` for those two (`jl4-core/src/L4/StateGraph.hs:986-1000`).
+An `IF` branch edge is not blank: it carries the guard that selects it, and has since 2026-08-02
+(`82c49e619`). No obligation edge is blank either: an edge that leaves the entry
+state of its own obligation drops the party, the modal and the act, and `suppress`
+(`jl4-core/src/L4/StateGraph/Dot.hs:398-399`) does that only where a guard, a join line or a binder
+clause survives it — with nothing left to read, the full caption prints.)_
+
 _(2026-09-16: gap 1 is closed for the edge — `labelSite` — and gap 3 is closed for named targets;
-both by §3.4's B1/B2 blocks. A `RECORD` continuation is still a dead end, and the state still has
-no range of its own. Gaps 2, 4, 5, 7 stand.)_
+both by §3.4's B1/B2 blocks. A `RECORD` continuation is still a dead end.)_
+
+_(2026-09-21: gap 1 is closed for the state as well — `ContractState.stateSite`, §3.4's B1 block —
+and gap 2 is narrowed rather than closed. An act prints its arguments through
+`L4.Print.printActionPattern`, so `pay 100` and `pay 5` are two edges and `Pay (EXACTLY t)` keeps
+its `EXACTLY`; what is still not expressed is the value behind an open name, and the edge now says
+which names those are — `` the rule binds `price` ``. Gaps 4, 5, 7 stand.)_
 
 Also positional and worth fixing regardless: `sgInitialState = 0` is hardcoded on "first created
 state is initial" (`:265`), true today only because both entry paths happen to create it first.
@@ -909,8 +930,13 @@ and the residue is a P2d drawing rule, not an IR change.)
 > `NormKey.nkSite`, so the two halves of the key agree by construction and not by convention.
 > Both arms of an obligation carry it (the `HENCE` edge and the `LEST` edge are two outcomes of
 > one obligation; `transType` says which); a junction's branch edge and a hand-built fixture
-> leave it `Nothing`. `ContractState` was **not** changed: B2's memo did not need a site (see
-> below), and click-to-source on a _state_ is answered by the edge that enters it.
+> leave it `Nothing`.
+>
+> **The key is load-bearing in a second place since 2026-09-21** (`289e8aaf5`, `lts/draw-what-it-means`), **so a change to either half now breaks two things.**
+> The second place is `ContractState.stateSite :: Maybe SrcRange` (`jl4-core/src/L4/StateGraph.hs:131`), which carries `rangeOf` the same `RAction` (`deontonSite`, `:1402-1403`) on the state `wireTarget` names after an obligation (`:943`), so a state now carries the range that click-to-source on a _state_ would need rather than having it read off the edge that enters it.
+> The renderer then reads the two halves against each other: `leavesItsOwnObligation = isJust fromSite && fromSite == transLabel.labelSite` (`jl4-core/src/L4/StateGraph/Dot.hs:222`, source site from `:111`), and an edge that passes it drops the party, the modal and the act, because the node it leaves already says all three.
+> So the key now decides both P2's correlation of a logged obligation to an edge and what every DOT caption says.
+> The comment at `Dot.hs:214-221` gives the reason it is a range and not a string comparison, and that reason is the same one this block gives for `nkSite` ↔ `labelSite`: two texts built by two functions agree until one spelling moves, and then disagree silently, while both ranges are read off one `RAction`.
 >
 > **Measured.** `StateGraphSpec.hs`, "B1: the correlation key": a two-obligation fixture with a
 > `#TRACE` is run through `execEvalModuleWithDeonticLog` and `extractStateGraph`, and the
@@ -939,9 +965,10 @@ and the residue is a P2d drawing rule, not an IR change.)
 > different ranges that both name it must land on one state, or the loop does not close. The
 > range identifies the _arm_ — that is what `labelSite` carries — not what the arm points at.
 > Arguments are ignored exactly as a renewing rule's were (the termination argument is the loss,
-> as before; `P-CYCLE`). Not in the map, and so still `TargetOther` → `next`/`failure`: a rule
-> from an `IMPORT` (measured with a two-file scratch pair: `next`), a `RECORD` continuation, a
-> `Refuse`, an `AppNamed`, and any `DECIDE` whose body is not regulative.
+> as before; `P-CYCLE`). Not in the map, and so still `TargetOther`, which is a dead end named
+> after the arm that reaches it (`HENCE of …` / `LEST of …` since 2026-09-21, `next`/`failure`
+> before that): a rule from an `IMPORT` (measured with a two-file scratch pair), a `RECORD`
+> continuation, a `Refuse`, an `AppNamed`, and any `DECIDE` whose body is not regulative.
 >
 > **Measured, (a) DOT over the corpus.** `l4 state-graph` over every `.l4` under `jl4/examples`
 > and `doc` that accepts it: **71 files produce graphs, 9 changed** —
@@ -949,9 +976,15 @@ and the residue is a P2d drawing rule, not an IR change.)
 > `doc/courses/{advanced/module-a1-regulatory,advanced/module-a2-cross-cutting,advanced/module-a3-contracts,foundation/module-7}-examples.l4`,
 > `doc/reference/regulative/every-example.l4`, `doc/tutorials/obligations/what-follows.l4`,
 > `jl4/examples/ok/contracts.l4`, `jl4/examples/ok/every/barrier.l4`. Files carrying a `next` or
-> `failure` state went from 16 to 10; the 10 that remain are `IF` junctions (drawn as `next` with
-> the arms below it — not dead ends) and the `ok/ledger/record-*` `RECORD` continuations (dead
-> ends still). In `ok/contracts.l4`, `a MEANS z RAND z` now draws one `z` junction with two
+> `failure` state went from 16 to 10; the 10 that remain are `IF` junctions (not dead ends) and
+> the `ok/ledger/record-*` `RECORD` continuations (dead ends still).
+>
+> **Both literals are gone since 2026-09-21** (`289e8aaf5`, `lts/draw-what-it-means`): the fallback name is `HENCE of <obligation>` (`jl4-core/src/L4/StateGraph.hs:1162`) or `LEST of <obligation>` (`:1191`), and a junction says which keyword fanned it on a second line, from `ContractState.stateConstruct`.
+> `ok/contracts.l4`'s reads `HENCE of B must payment price\nIF: ONE OF`.
+>
+> **Re-measured 2026-09-23** on `ab6ecc4af`, same sweep, over a corpus that has grown: **88 files under `jl4/examples` and `doc` produce a graph** (71 on 2026-09-16), **none draws a state named `next` or `failure`**, and 13 files draw a `HENCE of …` / `LEST of …` state.
+> Of those states, 13 are junctions in 5 files (`bpmn/handover.l4`, `bpmn/offering.l4`, `ok/contracts.l4`, `ok/every/run-anchors.l4`, `ok/every/run-stack.l4`) and 19 are dead ends in 9 files, six of them the `ok/ledger/record-*` continuations — `record-block.l4` draws `1 [label="HENCE of P must serve"]` with no outgoing edge, exactly as the `next` it replaces did.
+> The two file counts are not comparable, because the sweep is not the same sweep; what is comparable is that the literals are at zero. In `ok/contracts.l4`, `a MEANS z RAND z` now draws one `z` junction with two
 > parallel edges into it where it drew two dead-end `z` states. The `LEST`-into-own-name arm lost
 > its literal `"timeout"`/no-modal caption and goes through `lestArmWording` like its siblings:
 > the two corpus rules with that shape (`ok/deontic-breach-semantics.l4`,
@@ -1845,6 +1878,36 @@ single most under-costed item in this document.
 - **TypeScript assigns pixels**: the browser turns ranks and bands into an SVG, and owns the
   scrubber, the highlight and the animation.
 
+> **RULED 2026-09-21 — the width that prompted a look at layout was label geometry, and B3 was not built.**
+> The measurement that prompted it: `dot -Tplain | head -1` on the four §7.3 proxy artifacts at the merge base `392ba5aa9` gives `promissory-note/B.dot` a canvas of **28.463 × 6.3256 inches**, against 6.1379, 4.7335 and 4.7032 for `contracts`, `every-run-example` and `tenancy`.
+> Six nodes — a chain `0 → 1 → 2 → 4` with one back edge `1 → 0` and two terminals — and a ranking with nothing wrong with it.
+> What was wide was three edge labels of **199, 173 and 141 characters** (`1 -> 0`, `2 -> 3`, `4 -> 3`), each restating the name of its own source node — all three of those nodes read `` `The Borrower` must pay monthly installment to ... ``.
+> A Haskell ranker would have produced the same 28 inches.
+> The note's node and edge sets are identical before and after this branch (six nodes; `0 -> 1`, `0 -> 3`, `1 -> 0`, `1 -> 2`, `2 -> 3`, `2 -> 4`, `4 -> 3`, `4 -> 5`), so only the captions moved, and that alone brought the canvas to 9.9125 × 9.5317.
+> So the layout work taken was **label geometry** (a 36-column wrap, `L4.StateGraph.Dot.labelWidth`, `Dot.hs:471-472`) and **duplication removal** (an edge drops the party, modal and act its own source node already says, `Dot.hs:398`), and **no ranker was written**: `grep -rniE 'feedback[- ]edge' jl4-core/src ts-shared` is empty, measured 2026-09-23.
+>
+> **The coordinate-ownership argument is not retracted.**
+> It is untouched by this, and it is still the reason to build B3 if and when a consumer needs coordinates rather than a picture: nothing on this branch computes a rank, a band or a feedback edge, and GraphViz still owns every position the shipped renderer draws.
+>
+> **Measured 2026-09-23, before (`392ba5aa9`) and after (`ab6ecc4af`).**
+> "Longest line" is the longest single rendered line of any label in the file, which is what GraphViz sizes a box by; "whole" is the same label with its `\n` removed; the canvas is `dot -Tplain`'s first line.
+>
+> | `etc/lts-reader-proxy/<c>/B.dot` | longest line | whole | canvas (in)         |
+> | -------------------------------- | ------------ | ----- | ------------------- |
+> | `contracts` before               | 43           | 43    | 6.1379 × 6.3256     |
+> | `contracts` after                | 29           | 42    | 7.849 × 6.4818      |
+> | `every-run-example` before       | 44           | 57    | 4.7335 × 3.7804     |
+> | `every-run-example` after        | 36           | 54    | 5.3253 × 4.2215     |
+> | `tenancy` before                 | 42           | 51    | 4.7032 × 3.7804     |
+> | `tenancy` after                  | 34           | 109   | 5.3418 × 4.9259     |
+> | `promissory-note` before         | 199          | 199   | **28.463 × 6.3256** |
+> | `promissory-note` after          | 42           | 137   | 9.9125 × 9.5317     |
+>
+> Read honestly: the longest line falls on all four, and no line now exceeds 36.
+> The canvas is _wider_ on the other three, because two clauses were added where an act was ambiguous — the window moved onto the node that carries it, and a rule that binds an open pattern variable says so on its own line — so `tenancy`'s whole-label figure grows 51 → 109 while its longest line falls.
+> That is bought width, not a wrap regression, and it is the note — the artifact that prompted the section — that collapses, from 28.463 wide to 9.9125, paying 6.3256 → 9.5317 in height for it.
+> One baseline is not what it looks like: `contracts/B.dot` at `392ba5aa9` predated a source edit, so its 6.1379 is measured on a stale artifact; the same rule's `jl4/examples/state-graphs/aContract.dot` at that commit gives 5.7943 × 6.3256.
+
 **Bounds, stated because revision 1 bounded nothing.** The picture is legible to roughly **40
 action-plane states and 25 concurrently-marked norm places**. Past that it should degrade to
 §1.1a's list rather than draw something unreadable, and P2 should emit its own `P-…`-style note
@@ -2010,9 +2073,9 @@ files, 250 linked, 0 errors. _Review 2026-09-15 changed:_ the page had said the 
 same way … in the web editor at jl4.legalese.com" in the present tense; the web path was never
 built for wasm here (previous bullet), and that host is deployed by hand with `nixos-rebuild`
 from a checkout (`nix/README.md:22-29`) that cannot contain an unpushed branch. It now says the web editor gets it "from the release that carries this change" and names no URL.
-Same pass: `next`/`failure` for the two hand-over arms (`StateGraph.hs:945`, `:974`, as of
-2026-09-16 — the arms go through `wireTarget` since B2), the bare-MAY gap from the extractor's own
-NOTE (`:983-997`), and the web-host pane eviction above.
+Same pass: the names of the two hand-over arms, the bare-MAY gap from the extractor's own note, and the web-host pane eviction above.
+Those two arms go through `wireTarget` since B2, and since 2026-09-21 they are named `HENCE of <obligation>` (`StateGraph.hs:1162`) and `LEST of <obligation>` (`:1191`) rather than `next` and `failure`; the page says so at `STATE-GRAPH.md:284-287`, and the bare-MAY note is now `StateGraph.hs:1196-1239`.
+Line numbers in this paragraph were re-measured 2026-09-23 on `ab6ecc4af` and will move again; the names and the function are what to search for.
 
 **Not built, and what would make it true** _(as of 2026-09-15; the first two items landed
 2026-09-16 — the next LANDED block)_.
@@ -2195,7 +2258,9 @@ edges intact; `every-barrier.dot` has 6 `<ellipse>` (two per terminal), 2 × `st
 stroke-dasharray="5,2"`, and two `<text>` lines on edge1 with `ONCE ALL HAVE` second; a
 **self-loop fixture** `test/fixtures/self-loop.l4` (HENCE back to the rule's own name, DOT written
 by `l4 state-graph`, `0 -> 0` — the task's cycle witness) renders the loop in HENCE green with its
-label; RAND/ROR diamonds with `ALL OF`/`ONE OF`; XML escaping of `<img onerror>` and `<script>`;
+label; RAND/ROR diamonds with `ALL OF`/`ONE OF` (hand-written DOT, so it still passes; the
+emitter has said `RAND: ALL OF` / `ROR: ONE OF` since 2026-09-21, and this fixture is no longer
+representative of it); XML escaping of `<img onerror>` and `<script>`;
 bad DOT rejects with Graphviz's `syntax error`. `ts-apps/vscode/src/unit-tests/state-graph.test.ts`
 (`node --test`, the existing rig): 12 tests — the CSP string, the inlined picture and the
 `<details>` fold, heading escaping and `</`-safe JSON, the error document, the dimmed-under-error
@@ -2652,7 +2717,7 @@ over.
 | **P2f**  | **Unbundled.** `dom_s(J)` by Lengauer–Tarjan over `StateGraph`, answered as a **set of acts** — printable as a list or as an annotation on P1's BPMN. **No new picture required.** **BUILT 2026-09-15** (`lts/p2-stack`): `L4.StateGraph.Dominators`, `l4 state-graph --dominators [--all-states]`, `DominatorsSpec`; §1.1c LANDED block (iterated dominance equations, not Lengauer–Tarjan; same answer by definition). The DOT annotation was not built on that branch; it was **BUILT 2026-09-16** with B1/B2 (`--dominators --dot`, §1.1c's Annotation LANDED block and its correction).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | P0 (shipped)                                                 | no             |
 | **B1**   | Carry the correlation key (§3.4). Predicted to regenerate the BPMN goldens; in fact none moved. **LANDED 2026-09-16** (`lts/p2-followups`): `TransitionLabel.labelSite` = `rangeOf` the RAction, proved equal to P2b's `nkSite` by test; default DOT and all 14 BPMN goldens byte-identical. §3.4 block.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | P1                                                           | no             |
 | **B2**   | Close the loop (§3.4). Makes `P-CYCLE` reachable; see §4.7. **LANDED 2026-09-16** (`lts/p2-followups`): a named rule already extracted is reused (memo keyed by the rule's `Unique`, not the range — §3.4 says why); 9 of 71 corpus files (with graphs) changed, `next`/`failure` dead ends 16 → 10; BPMN goldens unchanged (no golden source hands over by name). RECORD continuations still dead-end.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | B1                                                           | no             |
-| **B3**   | Layout: Haskell ranks with a feedback-edge set, TS draws (§4.7).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | B2                                                           | no             |
+| **B3**   | Layout: Haskell ranks with a feedback-edge set, TS draws (§4.7). **Still not built 2026-09-21**, and the label work of `lts/draw-what-it-means` is not a down payment on it — §4.7's ruling block says what that work was and what it measured.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | B2                                                           | no             |
 | **P2g**  | **The entry point (§4.8).** A CodeLens above every `Decide` whose body is regulative, in **both** lens producers, opening the view in a pane in VS Code and in the web IDE. Independent of which renderer sits behind the pane — wire it to the shipped `stateGraphToDot` first, which is how P2a′/P2a get run where readers actually are. Four edits, not one; see the table in §4.8. **BUILT 2026-09-15** (`lts/p2-stack`): the lens in both producers and both hosts, `l4_state_graph_by_name`; the pane shows DOT source with Copy (no renderer in the tree); R13 answered — the lenses never stack; §4.8 LANDED block. Not yet clicked by a human in either host. **In-pane rendering LANDED 2026-09-16** (`lts/p2-followups`): `@viz-js/viz@3.30.0` in `ts-shared/state-graph-render`, both hosts draw the picture and redraw on edit (web pane survives the ladder's refresh); extension bundle +1.5 MB (+495 KB gzip), one lazy web chunk; still no human click.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | shipped `StateGraph` (DOT), or P2d for the two-plane picture | no             |
 | **P2h**  | **Carry the join (§4.9).** Teach `extractDeonton` to bind `Deonton.join` and put it on the graph, so a barrier and a fork stop producing byte-identical output; then the drawing rule, and `Threshold`-shaped `markingOf`. Answers R2 and closes the one export gap `EVERY-EACH-QUANTIFIER-SPEC` §2.5 says a reader cannot discover from the export. Same class and cost as B1 — it moves P1's goldens. **Do the first half before P2b**, which is specified against a pre-join `Deonton`. **First half LANDED 2026-09-15** (`fix/join-on-state-graph`): `extractDeonton` binds the join by positional pattern, `TransitionLabel.labelQuantifier` carries it (`Quantifier`/`JoinLabel`/`JoinLabelKind` — renamed from `JoinKind` 2026-09-16, which `DeonticStep` also exports), the DOT draws it on the edge, and BPMN lowers an `EVERY` to a parallel multi-instance task with `P-CAST`/`P-FORK`/`P-JOIN-DEADLINE`. Measured against the prediction here that it "moves P1's goldens": it moved **none** of the six — no golden source contained an `EVERY` — and added two (`tenancy-barrier`, `tenancy-fork`). Second half (the norm-plane drawing rule, `Threshold`-shaped `markingOf`) still open. **Second half, 2026-09-15:** `markingOf` against `Threshold` LANDED with P2c (§4.2a); the norm-plane drawing rule remains P2d's and is gated with it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | shipped `EVERY` (PRs #360/#370/#374)                         | **first half** |
 | **P2d**  | The P2 IR and the **static** two-plane picture. No animation. **Gated: build only if §7.3's condition is met.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | P2c, B1-B3                                                   | no             |
@@ -2849,7 +2914,8 @@ plus, for B and C, the position in plain words, and a `truth.json` per contract:
   (reparation, then a deadline-free reparation of the reparation) and its evaluator answers are
   the least obvious of the four: at the position **nothing can breach** (`lts.json`:
   `breaching: []`; the tick past 3 June 2025 takes the `2 -> 4` timeout edge in `B.dot`, and the
-  only breach edge out of node 4 is `4 -> 5 "unreachable: no WITHIN"`), and
+  only breach edge out of node 4 is `4 -> 5 "unreachable: no WITHIN"` — both still true of the
+  re-cut `B.dot`, checked 2026-09-23, on which that timeout edge now also names its deadline), and
   paying the penalty amount in time ends the **whole twelve-installment note** FULFILLED, because
   the reparation arm has no `HENCE` (`probes.out`, the trace on `probes.l4:294`).
 - **What this proxy cannot measure, stated in the README so the result is not over-read**: it is
@@ -2857,11 +2923,16 @@ plus, for B and C, the position in plain words, and a `truth.json` per contract:
   which an LLM reader cannot stand in for; B and C readers get DOT and XML **as text**, so the
   proxy measures whether the graph's content carries the answer, not whether a drawing helps;
   and the note's list prints day serials, which A readers get unconverted.
-- **The binary.** All artifacts cut with the `lts/p2-stack` build at `0139c6c5` (the same commit
-  this branch is on); its `l4 lts` output diffed byte-identical against all three committed
-  goldens under `jl4/examples/lts/expected/` before anything was cut, and
-  `every-run-example.l4`'s `the tenancy` exports byte-identical to `tenancy-barrier.bpmn`
+- **The binary.** The artifacts **the readers were shown** were cut with the `lts/p2-stack` build
+  at `0139c6c5` (the same commit this branch is on); its `l4 lts` output diffed byte-identical
+  against all three committed goldens under `jl4/examples/lts/expected/` before anything was cut,
+  and `every-run-example.l4`'s `the tenancy` exports byte-identical to `tenancy-barrier.bpmn`
   (`prepare.sh` asserts this on every run).
+  **The four `B.dot` files on disk are no longer that text.** They were re-cut on 2026-09-21 and
+  again on 2026-09-23, as `lts/draw-what-it-means` moved the captions. The reading is frozen and
+  the artifact is not: `etc/lts-reader-proxy/manifest.json` and `transcripts/` still carry what the
+  readers were given, and every number in §7.7 and in `RESULTS.md` is scored against those. Do not
+  regenerate them to agree, which would put 48 committed readings against a packet nobody read.
 - **Two things seen one step past the `tenancy` position, not fixed, not in any reader
   artifact** (`etc/lts-reader-proxy/tenancy/probes.out:15` and `:11`): with Alice paid at 3, the
   what-if for the landlord's `Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)` is
@@ -3288,7 +3359,12 @@ verified at `cfeaea5d` and have since moved.
    **Resolved.** `L4.StateGraph.lestArmWording` now derives the caption from the modal _and_ the
    deadline, and the `LEST` edge carries `labelModal` so a consumer holding only that edge can
    tell the arms apart. `SHANT` + explicit `LEST` reads `violation`; `MAY` + `WITHIN` reads
-   `lapses`. Asserted in `jl4-core/test/StateGraphSpec.hs`, "LEST edge captions", and — for the
+   `lapses`, and since 2026-09-21 that arm also names the clock that takes it — `lapses [30]`,
+   `timeout [14]` — except where two clocks could both take it, an act deadline and a `BARRIER`
+   join deadline, where it goes back to the bare word rather than guess which fired
+   (`twoClocksTakeThisArm`, `jl4-core/src/L4/StateGraph.hs:1108-1119`; a `FORK` is not that case,
+   because the join's deadline is dead there). `violation` never carries a bracket: what reaches
+   it is an act, not a clock. Asserted in `jl4-core/test/StateGraphSpec.hs`, "LEST edge captions", and — for the
    BPMN side, which the goldens do **not** pin — in `jl4/tests/BpmnExport.hs`, "the LEST caption
    where BPMN actually consumes it".
 
