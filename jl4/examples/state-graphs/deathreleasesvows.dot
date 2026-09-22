@@ -18,7 +18,7 @@ digraph {
       ,style=filled
       ,shape=doublecircle
       ,fillcolor="#d4edda"];
-    0 -> 1 [label="Spouse1 MAY exchange vows"
+    0 -> 1 [label="Spouse1 MAY `exchange vows`"
            ,color="#28a745"
            ,style=solid];
 }

@@ -23,7 +23,7 @@ digraph {
       ,style=filled
       ,shape=doublecircle
       ,fillcolor="#f8d7da"];
-    0 -> 1 [label="Spouse2 MUST love and cherish"
+    0 -> 1 [label="Spouse2 MUST `love and cherish`"
            ,color="#28a745"
            ,style=solid];
     0 -> 2 [label="unreachable: no WITHIN"

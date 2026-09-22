@@ -18,7 +18,7 @@ digraph {
       ,style=filled
       ,shape=doublecircle
       ,fillcolor="#d4edda"];
-    2 [label="Alice must drink"
+    2 [label="Alice must drink WITHIN 10"
       ,fillcolor=white
       ,style=filled
       ,shape=ellipse
@@ -37,7 +37,7 @@ digraph {
     2 -> 1 [label="Alice MUST drink [10]"
            ,color="#28a745"
            ,style=solid];
-    2 -> 3 [label=timeout
+    2 -> 3 [label="timeout [10]"
            ,color="#dc3545"
            ,style=dashed];
 }
