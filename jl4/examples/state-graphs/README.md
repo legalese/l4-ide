@@ -187,8 +187,9 @@ Traditional wedding vows formalized as L4 regulative rules:
   - `` the rule binds `amt` `` says the act leaves that name open, so **any**
     value of it discharges the obligation. `MUST payment price` (open) and
     `MUST payment n` (`n MEANS 2`, so only a payment of 2 will do) print exactly
-    alike, and this clause is the only thing on the page that separates them. It
-    is the sentence `l4 lts` gives for the same act.
+    alike, and this clause is the only thing on the page that separates them.
+    `l4 lts` reports the same fact in its own words:
+    `` the action binds `amt`, which the what-if cannot choose ``.
   - A branch edge out of a junction carries its guard (`IF price EQUALS 20`) and
     nothing else, because a junction is a control point, not an action. With no
     guard it is blank.
