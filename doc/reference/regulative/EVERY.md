@@ -93,7 +93,59 @@ The condition names the variable itself — `t` is in scope inside `WHO`, which 
 
 `IN tenants`, on the first line, is doing something different: it says where the group comes from in the first place, and `WHO` then narrows what it produced. The next section but one is about that.
 
-`WHO` is the only filter word. `WHERE` after a rule keeps its usual meaning, a block of local definitions, so this still works and means what it always meant:
+## WHOSE: the same filter, without spelling out the member
+
+**Example file:** [whose-example.l4](whose-example.l4) — the rules in this section, each with a group and a trace. Its cast is a `Tenant` with an `arrears`, a `standing` and an `on notice` flag, rather than the bare `Tenant` the rest of this page uses.
+
+Most conditions say one thing about one field of the member, and under `WHO` that means writing the member's name on every line. `WHOSE` writes it for you:
+
+```l4
+GIVETH A DEONTIC Actor Action
+`those in arrears pay` MEANS
+    EVERY Tenant t IN tenants
+        WHOSE  arrears AT LEAST 1000
+        MUST   Pay t
+        WITHIN 7
+```
+
+is exactly the rule you would write as `WHO t's arrears AT LEAST 1000`, and it runs identically.
+
+**The rule is: the first word of each line is a field.** `WHOSE` reads the first word of each condition as a field of the cast — `Tenant`, here — and nothing else in the condition changes meaning. That is worth stating plainly, because it is what keeps `WHOSE` predictable: a name anywhere but the front of a condition means what it always means.
+
+More than one condition, one per line, joined by the asyndetic operators — `...` for "and", `..` for "or", each on its own line or leading the line it joins:
+
+```l4
+GIVETH A DEONTIC Actor Action
+`those in arrears and still current pay` MEANS
+    EVERY Tenant t IN tenants
+        WHOSE  arrears AT LEAST 1000
+               ...
+               standing EQUALS "current"
+        MUST   Pay t
+        WITHIN 7
+```
+
+The first word of each of those lines is a field, and the rest of the line is an ordinary expression. `AND` and `OR` written out work the same way.
+
+A `BOOLEAN` field stands on its own:
+
+```l4
+        WHOSE `on notice`
+```
+
+**What `WHOSE` refuses, and what to write instead.** Three things, each with the same answer — write it with `WHO`, where the member is named:
+
+| you wrote                                                               | what you get                                                             |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| a word that is not a field of the cast                                  | the cast's fields, listed                                                |
+| `WHOSE` with no cast (`EVERY t IN …`)                                   | there is no constructor to take fields from: name the cast, or use `WHO` |
+| a line that does not start with a field — a negation, a call, a bracket | `WHO` is the general form                                                |
+
+So `WHOSE NOT (standing EQUALS "current")` is refused; write `WHO NOT (t's standing EQUALS "current")`.
+
+One more thing you will meet: where the tooling re-prints a rule from its checked form rather than from your file — `l4 batch` and the REPL do — a `WHOSE` line can come back with the projection spelled out, `WHOSE t's arrears AT LEAST 1000`. That is legal, means the same thing, and reads back unchanged: a line that already names the member is left alone. `l4 format`, which prints your file back token for token, does not change it at all.
+
+`WHO` and `WHOSE` are the only filter words. `WHERE` after a rule keeps its usual meaning, a block of local definitions, so this still works and means what it always meant:
 
 ```l4
 GIVETH A DEONTIC Actor Action

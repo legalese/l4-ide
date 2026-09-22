@@ -665,7 +665,9 @@ instance Linearize (Expr Resolved) where
             <> maybe [] (\ c -> [ linearize c ]) mCast
             <> [ linearize v ]
             <> maybe [] (\ r -> [ frame "in", lin r ]) mRoll
-            <> maybe [] (\ f -> [ frame "who", lin f ]) mFilter
+            <> maybe [] (\ f -> case f of
+                           Who _ e   -> [ frame "who", lin e ]
+                           Whose _ e -> [ frame "whose", lin e ]) mFilter
     Consider _ e br -> hcat
       [ frame "consider"
       , frame "the"

@@ -1,0 +1,10 @@
+executing contract `those in arrears` at 0 with the following events:  party `alice` did `Pay` with `alice` at 3
+executing contract `those in arrears, spelled out` at 0 with the following events:  party `alice` did `Pay` with `alice` at 3
+executing contract `those in arrears` at 0 with the following events:  `WAIT UNTIL` with 9
+executing contract `those in arrears, spelled out` at 0 with the following events:  `WAIT UNTIL` with 9
+executing contract `current and in arrears` at 0 with the following events:  party `alice` did `Pay` with `alice` at 3
+executing contract `in arrears or lapsed` at 0 with the following events:  party `alice` did `Pay` with `alice` at 3 party `carol` did `Pay` with `carol` at 4
+executing contract `current and in arrears, with AND` at 0 with the following events:  party `alice` did `Pay` with `alice` at 3
+executing contract `those on notice` at 0 with the following events:  party `alice` did `Pay` with `alice` at 3 party `carol` did `Pay` with `carol` at 4
+executing contract `chase the overdue` at 0 with the following events:  party `rita` did `Chase` with `rita` at 2
+executing contract `explicit under WHOSE` at 0 with the following events:  party `alice` did `Pay` with `alice` at 3

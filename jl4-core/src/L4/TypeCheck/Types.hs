@@ -256,6 +256,17 @@ data CheckError =
     -- silently decide barrier-or-fork, and the barrier reading reverses what a
     -- single-party @MAY … HENCE@ means today. Carries the first continuation
     -- present, for its source range.
+  | WhoseWithoutCast Name (Expr Name)
+    -- ^ @WHOSE@ under a quantifier with no cast (@EVERY t IN xs WHOSE …@).
+    -- The first word of each operand names a FIELD, and with no cast there is
+    -- no constructor to take the fields from (§13.6, RULED 2026-09-21).
+    -- Carries the member variable and the filter, for the range.
+  | WhoseNotAField Name Name [Name]
+    -- ^ The first word of a @WHOSE@ operand is not a field of the cast.
+    -- Carries the word, the cast it was read against, and the cast's fields.
+  | WhoseOperandNotBare (Expr Name)
+    -- ^ A @WHOSE@ operand does not begin with a bare word at all (it starts
+    -- with @NOT@, a call, a parenthesis). @WHO@ is the general form.
   | AnchorUnavailable EdgeWord (Anchor Name) AnchorRefusal
     -- ^ A lifecycle anchor (@WITHIN d OF THE JOIN@ \/ @THE DEADLINE@ \/
     -- @THE ARMING@, EVERY-EACH-QUANTIFIER-SPEC §5.1.1, R-Q7B; on an @AFTER@
@@ -734,6 +745,9 @@ instance HasSrcRange CheckError where
   rangeOf (EmptyBreachBy e)                 = rangeOf e
   rangeOf (BreachByListNeedsPartyType e)    = rangeOf e
   rangeOf (ContinuationWithoutJoin e)       = rangeOf e
+  rangeOf (WhoseWithoutCast _ e)            = rangeOf e
+  rangeOf (WhoseNotAField n _ _)            = rangeOf n
+  rangeOf (WhoseOperandNotBare e)           = rangeOf e
   rangeOf (ActionPatternReference n _)      = rangeOf n
   rangeOf (ActionPatternNotComparable e _)  = rangeOf e
   rangeOf (AnchorUnavailable _ a _)         = rangeOf a

@@ -1,0 +1,25 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+whose.l4:57:1-58:34:
+  FULFILLED
+whose.l4:60:1-61:34:
+  FULFILLED
+whose.l4:64:1-65:17:
+  DEONTIC BREACHED:
+    BREACH
+whose.l4:67:1-68:17:
+  DEONTIC BREACHED:
+    BREACH
+whose.l4:86:1-87:34:
+  FULFILLED
+whose.l4:103:1-105:34:
+  FULFILLED
+whose.l4:118:1-119:34:
+  FULFILLED
+whose.l4:133:1-135:34:
+  FULFILLED
+whose.l4:159:1-160:34:
+  FULFILLED
+whose.l4:176:1-177:34:
+  FULFILLED

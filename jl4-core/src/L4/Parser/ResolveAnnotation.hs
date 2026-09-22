@@ -816,6 +816,10 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Deadline n) where
 instance (HasSrcRange n, HasNlg n) => HasNlg (Opening n) where
   addNlg (MkOpening ann d ma) = MkOpening ann <$> addNlg d <*> traverse addNlg ma
 
+instance (HasSrcRange n, HasNlg n) => HasNlg (Filter n) where
+  addNlg (Who ann e)   = Who ann <$> addNlg e
+  addNlg (Whose ann e) = Whose ann <$> addNlg e
+
 instance (HasSrcRange n, HasNlg n) => HasNlg (Anchor n) where
   addNlg = \ case
     AnchorAt ann e -> AnchorAt ann <$> addNlg e
@@ -1112,6 +1116,10 @@ instance HasDesc (Deadline n) where
 
 instance HasDesc (Opening n) where
   addDesc (MkOpening ann d ma) = MkOpening ann <$> addDesc d <*> traverse addDesc ma
+
+instance HasDesc (Filter n) where
+  addDesc (Who ann e)   = Who ann <$> addDesc e
+  addDesc (Whose ann e) = Whose ann <$> addDesc e
 
 instance HasDesc (Anchor n) where
   addDesc = \ case
@@ -1795,6 +1803,10 @@ instance (HasSrcRange n, HasRef n) => HasRef (Deadline n) where
 
 instance (HasSrcRange n, HasRef n) => HasRef (Opening n) where
   addRef (MkOpening ann d ma) = MkOpening ann <$> addRef d <*> traverse addRef ma
+
+instance (HasSrcRange n, HasRef n) => HasRef (Filter n) where
+  addRef (Who ann e)   = Who ann <$> addRef e
+  addRef (Whose ann e) = Whose ann <$> addRef e
 
 instance (HasSrcRange n, HasRef n) => HasRef (Anchor n) where
   addRef = \ case

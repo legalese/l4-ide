@@ -1,0 +1,81 @@
+IMPORT prelude
+-- WHOSE: the filter that reads the first word of each line as a field of the
+-- cast. Every rule on EVERY.md's "WHOSE" section is here, with a group and a
+-- trace so that it runs.
+
+DECLARE Actor IS ONE OF
+    Landlord HAS lname IS A STRING
+    Tenant   HAS tname IS A STRING
+                 arrears IS A NUMBER
+                 standing IS A STRING
+                 `on notice` IS A BOOLEAN
+
+DECLARE Action IS ONE OF
+    Pay HAS payer IS AN Actor
+
+alice MEANS Tenant WITH tname IS "Alice", arrears IS 1200, standing IS "current", `on notice` IS TRUE
+bob   MEANS Tenant WITH tname IS "Bob",   arrears IS 0,    standing IS "current", `on notice` IS FALSE
+carol MEANS Tenant WITH tname IS "Carol", arrears IS 900,  standing IS "lapsed",  `on notice` IS TRUE
+ng    MEANS Landlord "Ms Ng"
+
+tenants MEANS LIST alice, bob, carol, ng
+
+-- One condition. The same rule as `WHO t's arrears AT LEAST 1000`.
+GIVETH A DEONTIC Actor Action
+`those in arrears pay` MEANS
+    EVERY Tenant t IN tenants
+        WHOSE  arrears AT LEAST 1000
+        MUST   Pay t
+        WITHIN 7
+        UPON EACH
+        HENCE  FULFILLED
+        LEST   BREACH
+
+-- Alice is the only tenant in arrears; her payment fulfils the rule.
+#TRACE `those in arrears pay` AT 0 WITH
+  PARTY alice DOES Pay alice AT 3
+
+-- Two conditions, one per line, joined by `...` (and).
+GIVETH A DEONTIC Actor Action
+`those in arrears and still current pay` MEANS
+    EVERY Tenant t IN tenants
+        WHOSE  arrears AT LEAST 1000
+               ...
+               standing EQUALS "current"
+        MUST   Pay t
+        WITHIN 7
+        UPON EACH
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `those in arrears and still current pay` AT 0 WITH
+  PARTY alice DOES Pay alice AT 3
+
+-- A BOOLEAN field on its own. Alice and Carol are on notice; Bob is not.
+GIVETH A DEONTIC Actor Action
+`those on notice pay` MEANS
+    EVERY Tenant t IN tenants
+        WHOSE  `on notice`
+        MUST   Pay t
+        WITHIN 7
+        UPON EACH
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `those on notice pay` AT 0 WITH
+  PARTY alice DOES Pay alice AT 3
+  PARTY carol DOES Pay carol AT 4
+
+-- The same filter written out with WHO, which is what WHOSE means.
+GIVETH A DEONTIC Actor Action
+`those in arrears pay, spelled out` MEANS
+    EVERY Tenant t IN tenants
+        WHO    t's arrears AT LEAST 1000
+        MUST   Pay t
+        WITHIN 7
+        UPON EACH
+        HENCE  FULFILLED
+        LEST   BREACH
+
+#TRACE `those in arrears pay, spelled out` AT 0 WITH
+  PARTY alice DOES Pay alice AT 3

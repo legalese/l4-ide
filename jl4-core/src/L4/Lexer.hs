@@ -262,6 +262,9 @@ data TKeywords
   | TKTypically
   | TKEvery      -- ^ @EVERY@: the quantified deonton head (EVERY-EACH-QUANTIFIER-SPEC §2.4)
   | TKWho        -- ^ @WHO@: the quantifier filter (spec §2.1)
+  | TKWhose      -- ^ @WHOSE@: the possessive quantifier filter, whose operands
+                 -- name FIELDS of the cast by position (spec §13.6, ruled
+                 -- 2026-09-21)
   | TKOnce       -- ^ @ONCE@: the barrier\/threshold join, @ONCE ALL HAVE@ (spec §2.2.7.4, R-T1)
   | TKHave       -- ^ @HAVE@: @ONCE ALL HAVE@ (spec §2.2.7.4)
   | TKSome       -- ^ @SOME@: @SOME m OF@ (spec §2.2.7.4, R-T5); lexed now, parsed in phase 3
@@ -368,6 +371,7 @@ keywords = Map.fromList
   , ("TYPICALLY"  , TKTypically  )
   , ("EVERY"      , TKEvery      )
   , ("WHO"        , TKWho        )
+  , ("WHOSE"      , TKWhose      )
   , ("ONCE"       , TKOnce       )
   , ("HAVE"       , TKHave       )
   , ("SOME"       , TKSome       )

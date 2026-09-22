@@ -1,0 +1,22 @@
+Parsing successful
+Typechecking successful
+Info | [Import Resolution] Resolving import: prelude from whose-operand-not-bare.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | [Import Resolution] Resolving import: prelude from whose-operand-not-bare.l4Debug | [Import Resolution] Checking VFS URIs: project:/prelude.l4, prelude.l4, prelude.l4Debug | [Import Resolution] VFS MISS: project:/prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Debug | [Import Resolution] VFS MISS: prelude.l4Info | [Import Resolution] Found on filesystem: $JL4_LIBRARY_PATH/prelude.l4Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: whose-operand-not-bare.l4
+  Hidden: no
+  Range: 18:16-18:47
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    WHOSE reads the FIRST word of each line as a field of the cast, and this
+    line does not begin with a word it can read that way.
+
+    One constraint per line, the field first:
+
+      WHOSE arrears  AT LEAST 1000
+        ... standing EQUALS   "current"
+
+    Anything else — a negation, a call, a parenthesis — is written with WHO,
+    where the member is named:
+
+      WHO NOT (t's standing EQUALS "current")
