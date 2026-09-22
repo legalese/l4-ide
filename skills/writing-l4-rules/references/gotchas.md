@@ -420,13 +420,35 @@ depends on what comes next, and only one of the two outcomes is loud:
   trailing `@nlg SHOULD-BE-ON-RULE` rendered as `SHOULD-BE-ON-RULE where `x` is 1` on the
   record declared beneath it, with a clean typecheck and no diagnostic. This is the silent one.
 
-**The same loud diagnostic also fires on a correctly-placed own-line herald**, when the rule it
-sits above is immediately preceded by another bare `GIVEN`-headed rule with nothing between them —
-no `§§` heading, no `DECLARE`, nothing (smucclaw/l4-ide#976). Two rules stacked with only a blank
-line between them is rare in a real encoding — almost everything sits under a section heading —
-which is why this surfaces as one warning in hundreds of heralds rather than a pattern. A `§§`
-heading between the two rules fixes it, and is usually also the more honest structure: two rules
-with nothing marking a boundary between them are rarely actually the same topic.
+**"Immediately above the definition" means after `GIVETH`, not above `GIVEN` — and the trap here
+is silent, not loud.** `GIVEN`/`GIVETH` read like part of the rule, so `@nlg` above `GIVEN` looks
+right and is the mistake to expect from anyone (a person or a model) who hasn't hit this before.
+It does not attach to the rule, and it usually does not warn either:
+
+```l4
+DECLARE Teacher HAS
+    name IS A STRING
+
+@nlg the only one          -- WRONG: above GIVEN, not above the definition
+GIVEN t IS A Teacher
+GIVETH A NUMBER
+`f of` t MEANS 1
+```
+
+`l4 check` is clean here — no diagnostic at all. `l4 nlg` on a case exercising `` `f of` `` prints
+the bare fallback, `` `f of` with `Teacher` where `name` is Alice ``, not "the only one". The
+herald silently captured BACKWARD onto `DECLARE Teacher` instead (confirmed with `l4 ast`) —
+verified this reaches as far back as an `IMPORT` statement when nothing closer offers a slot. It
+only fails loudly (`Not attached to any valid syntax node`) in the rarer case where nothing at all
+precedes it to capture — which is why one real encoding shipped ~230 heralds with twelve of them
+silently dead and only found out via a `check`-clean corpus, because the loud case never fired for
+eleven of the twelve (smucclaw/l4-ide#976). Move the herald to after `GIVETH`, and it attaches
+correctly regardless of what precedes it — after a `DECLARE`, after another bare rule, or first in
+the file.
+
+**So do not trust `l4 check`'s silence as evidence a herald attached.** The only real check is `l4
+nlg` (or `l4 ast`) on a case that exercises the rule, confirming the herald's own text — not the
+bare fallback — comes out the other end.
 
 **A parameter's herald trails its own line.** `GIVEN n IS A NUMBER @nlg the count` describes `n`
 (`#433`; before it, the `NUMBER`). It describes the parameter, not the rule — a rule whose only
