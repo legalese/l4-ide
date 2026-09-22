@@ -37,7 +37,6 @@ import L4.Lexer (LangTag (..))
 import qualified L4.Nlg as Nlg
 import qualified L4.Parser as Parser
 import L4.Export.Render (RenderConfig(..), renderAkn, renderHtml, renderText)
-import L4.Syntax
 
 import L4.Cli.Common
 
