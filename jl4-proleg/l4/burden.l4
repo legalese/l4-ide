@@ -1,0 +1,185 @@
+§ `Burden of Proof in L4`
+
+IMPORT prelude
+
+-- The burden-of-proof construct of `L4.Proleg.Burden`, written in L4 itself.
+--
+-- Haskell:  type Provable = MaybeT (Writer [Obligation])  ≅  ([Obligation], Maybe a)
+--
+-- L4 has no typeclass Monad, so the *monad* lives in the engine; in L4 the same
+-- algebra surfaces as a record carrying the truth (MAYBE BOOLEAN, with NOTHING =
+-- undecided) plus an accumulating obligation ledger, and explicit combinators.
+
+DECLARE Subject IS ONE OF
+    Plaintiff
+    Defendant
+
+DECLARE Obligation HAS
+    onWhom IS A Subject
+    what   IS A STRING
+
+DECLARE Provable HAS
+    truth       IS A MAYBE BOOLEAN
+    obligations IS A LIST OF Obligation
+
+-- the adversary (PROLEG's opposite(P))
+GIVEN s IS A Subject
+GIVETH A Subject
+opposite s MEANS
+    CONSIDER s
+    WHEN Plaintiff THEN Defendant
+    WHEN Defendant THEN Plaintiff
+
+-- closed-world reading of the truth dimension: undecided counts as not-true
+GIVEN m IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+isTrue m MEANS
+    CONSIDER m
+    WHEN NOTHING THEN FALSE
+    WHEN JUST b THEN b
+
+-- inject a primitive evidential value under a bearer
+GIVEN p     IS A Subject
+      claim IS A STRING
+      mx    IS A MAYBE BOOLEAN
+GIVETH A Provable
+prove p claim mx MEANS
+    Provable WITH
+        truth IS mx
+        obligations IS LIST (Obligation WITH onWhom IS p
+                                             what   IS claim)
+
+GIVEN p     IS A Subject
+      claim IS A STRING
+GIVETH A Provable
+established p claim MEANS prove p claim (JUST TRUE)
+
+GIVEN p     IS A Subject
+      claim IS A STRING
+GIVETH A Provable
+unestablished p claim MEANS prove p claim NOTHING
+
+-- ledger concatenation
+GIVEN xs IS A LIST OF Obligation
+      ys IS A LIST OF Obligation
+GIVETH A LIST OF Obligation
+concatObs xs ys MEANS
+    CONSIDER xs
+    WHEN EMPTY THEN ys
+    WHEN h FOLLOWED BY t THEN h FOLLOWED BY (concatObs t ys)
+
+GIVEN ps IS A LIST OF Provable
+GIVETH A BOOLEAN
+allTrue ps MEANS
+    CONSIDER ps
+    WHEN EMPTY THEN TRUE
+    WHEN h FOLLOWED BY t THEN (isTrue (h's truth)) AND (allTrue t)
+
+GIVEN ps IS A LIST OF Provable
+GIVETH A BOOLEAN
+anyTrue ps MEANS
+    CONSIDER ps
+    WHEN EMPTY THEN FALSE
+    WHEN h FOLLOWED BY t THEN (isTrue (h's truth)) OR (anyTrue t)
+
+GIVEN ps IS A LIST OF Provable
+GIVETH A LIST OF Obligation
+allObs ps MEANS
+    CONSIDER ps
+    WHEN EMPTY THEN EMPTY
+    WHEN h FOLLOWED BY t THEN concatObs (h's obligations) (allObs t)
+
+-- conjunction of a rule body: holds iff all conjuncts hold; ledger accumulates
+GIVEN ps IS A LIST OF Provable
+GIVETH A Provable
+conj ps MEANS
+    Provable WITH
+        truth IS (IF allTrue ps THEN JUST TRUE ELSE NOTHING)
+        obligations IS allObs ps
+
+-- disjunction: holds iff any disjunct holds; ledger accumulates
+GIVEN ps IS A LIST OF Provable
+GIVETH A Provable
+disj ps MEANS
+    Provable WITH
+        truth IS (IF anyTrue ps THEN JUST TRUE ELSE NOTHING)
+        obligations IS allObs ps
+
+-- negation as failure: holds iff its argument is not established
+GIVEN p IS A Provable
+GIVETH A Provable
+notProven p MEANS
+    Provable WITH
+        truth IS (IF isTrue (p's truth) THEN NOTHING ELSE JUST TRUE)
+        obligations IS p's obligations
+
+GIVEN o IS AN Obligation
+GIVETH AN Obligation
+flipOne o MEANS
+    Obligation WITH
+        onWhom IS opposite (o's onWhom)
+        what   IS o's what
+
+GIVEN os IS A LIST OF Obligation
+GIVETH A LIST OF Obligation
+flipAll os MEANS
+    CONSIDER os
+    WHEN EMPTY THEN EMPTY
+    WHEN h FOLLOWED BY t THEN (flipOne h) FOLLOWED BY (flipAll t)
+
+-- relabel a sub-derivation's obligations to the opposite party (involution)
+GIVEN p IS A Provable
+GIVETH A Provable
+flipBurden p MEANS
+    Provable WITH
+        truth IS p's truth
+        obligations IS flipAll (p's obligations)
+
+-- collapse to a closed-world boolean: established => TRUE, else the burden default
+GIVEN p IS A Provable
+GIVETH A BOOLEAN
+resolve p MEANS isTrue (p's truth)
+
+§§ `The lease judgement (examples/lease.pl)`
+
+-- defendant's first defence: alleged but NOT plausible => unestablished
+getApproval MEANS
+    conj (LIST (unestablished Defendant "approval_of_sublease"),
+               (unestablished Defendant "approval_before_cancellation"))
+
+-- plaintiff's exception-of-exception
+abuse MEANS conj (LIST (established Plaintiff "fact_of_abuse_of_confidence"))
+
+-- defendant's second defence, itself defeated by the plaintiff's abuse
+nonabuse MEANS
+    conj (LIST (established Defendant "fact_of_nonabuse_of_confidence"),
+               (notProven abuse))
+
+-- the six constitutive facts (plaintiff's burden, here met by admission) AND
+-- neither defence applies
+cancellation MEANS
+    conj (LIST (established Plaintiff "agreement_of_lease_contract"),
+               (established Plaintiff "handover_to_lessee"),
+               (established Plaintiff "agreement_of_sublease_contract"),
+               (established Plaintiff "handover_to_sublessee"),
+               (established Plaintiff "using_leased_thing"),
+               (established Plaintiff "manifestation_cancellation"),
+               (notProven getApproval),
+               (notProven nonabuse))
+
+contractEnd MEANS disj (LIST cancellation)
+
+#EVAL resolve contractEnd
+#EVAL resolve cancellation
+#EVAL resolve getApproval
+#EVAL resolve nonabuse
+#EVAL resolve abuse
+
+#ASSERT resolve contractEnd
+#ASSERT resolve cancellation
+#ASSERT NOT (resolve getApproval)
+#ASSERT NOT (resolve nonabuse)
+
+-- the responsibility ledger, with burdens flipped to the opposite party
+#EVAL contractEnd's obligations
+#EVAL (flipBurden abuse)'s obligations
