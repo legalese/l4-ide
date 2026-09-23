@@ -1,0 +1,455 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `sg-succession-domain`
+
+§ `Intestate Succession Act 1967`
+
+-- ===========================================================================
+-- THE INTESTATE SUCCESSION ACT 1967 (ISA1967), 2020 Rev Ed, current version
+-- as at 18 August 2026.
+--
+-- Source: https://sso.agc.gov.sg/Act/ISA1967 (official PDF; see
+-- source/fetch-sso.py and source/ISA1967.txt for the fetched text this
+-- encoding quotes).
+--
+-- SCOPE. The whole Act: s 2 (application), s 4-5 (which property), s 6
+-- (relationship), s 7 rules 1-9 (the distribution), s 8 (plural wives),
+-- s 9 (advancement) and s 10 (partial intestacy). Ten sections, all encoded.
+--
+-- STRUCTURE. The Act asks three questions in order, and this module answers
+-- them in that order:
+--
+--   1. Does the Act apply at all?          s 2, s 4, s 5
+--   2. Which class takes?                  s 7 rules 1-9
+--   3. How is a class's share divided?     s 7 rule 3 provisos, s 8
+--
+-- Keeping them separate matters: a Muslim estate and a foreign-domiciled
+-- deceased's overseas bank account both fail question 1, and an encoding
+-- that folded question 1 into question 2 would hand a confident rule-3
+-- answer to somebody the Act never governed.
+-- ===========================================================================
+
+
+-- A SECOND HOUSE RULE, from the printer rather than the parser: NO TWO MIXFIX
+-- OPERATORS IN THIS CORPUS MAY SHARE A HEAD KEYWORD. `L4.Print.prettyLayout`
+-- re-emits only the head keyword of a mixfix call, so three operators all
+-- beginning `under` printed as three definitions of `under` and the printed
+-- module failed to re-typecheck with "multiple definitions for the identifier"
+-- (the round-trip property in jl4/tests/Main.hs). That is the limitation
+-- CLAUDE.md section 3.2.2 records, whose witness is ok/mixfix-garden-path.l4;
+-- the cheap fix is on this side, so the three now read `per stirpes under`,
+-- `the stock under` and `splitting under`.
+
+§§ `A house rule this corpus learned the hard way`
+
+-- PARENTHESISE EVERY `NOT`. In L4, `NOT` takes a WHOLE expression, not an
+-- atom: the grammar parses `NOT` followed by an indented expression
+-- (jl4-core/src/L4/Parser.hs, `negation`). So
+--
+--     A AND NOT B AND NOT C        parses as     A AND NOT (B AND NOT C)
+--
+-- which is NOT what the reader of a statute means, and is not what any other
+-- logic notation means either. Measured on this corpus: ISA s 7 rule 1 is
+-- "a surviving spouse, no issue and no parent", whose obvious transcription is
+-- exactly the left-hand side above. Written that way it fired for an intestate
+-- who left a spouse AND two surviving parents, awarding the spouse the whole
+-- estate where rule 4 gives the spouse one-half. The encoding read like the
+-- section and computed something else -- the failure mode this whole project
+-- exists to catch.
+--
+-- Every `NOT` in this corpus is therefore parenthesised, including where it is
+-- unambiguous, so that no reader has to work out which ones matter.
+
+§§ `1. Does the Act apply?`
+
+@ref ISA 1967 s 2 -- Application
+-- "Nothing in this Act shall apply to the estate of any Muslim or shall
+-- affect any rules of the Muslim law in respect of the distribution of the
+-- estate of any such person."
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`the Act applies to the estate of` c MEANS
+    (NOT c's `deceased`'s `Muslim`)
+
+@ref ISA 1967 s 4(1) -- movables follow the domicile
+-- "The distribution of the movable property of a person deceased shall be
+-- regulated by the law of the country in which he was domiciled at the time
+-- of his death."
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`this Act regulates the movables of` c MEANS
+    c's `deceased`'s `domiciled in Singapore`
+
+@ref ISA 1967 s 4(2) -- Singapore immovables follow this Act regardless
+-- "The distribution of the immovable property of a person deceased shall be
+-- regulated by this Act wherever he may have been domiciled at the time of
+-- his death."
+--
+-- Note the asymmetry, which is the whole point of s 4: a Singapore flat is
+-- governed by this Act even for a deceased domiciled abroad, while that same
+-- deceased's bank balance is not. The two halves of one estate can be
+-- governed by two legal systems, and any tool that reports a single set of
+-- shares for such an estate is reporting a fiction.
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`this Act regulates the Singapore immovables of` c MEANS TRUE
+
+@ref ISA 1967 s 5 -- Property of intestate to be distributed
+-- "If a person dies intestate after 2 June 1967, he being at the time of his
+-- death -- (a) domiciled in Singapore and possessed beneficially of property,
+-- whether movable or immovable, or both, situated in Singapore; or (b)
+-- domiciled outside Singapore and possessed beneficially of immovable
+-- property situated in Singapore, that property or the proceeds thereof,
+-- after payment thereout of the expenses of due administration as prescribed
+-- by the Probate and Administration Act 1934, shall be distributed among the
+-- persons entitled to succeed beneficially ..."
+GIVETH A DATE
+`the Act's commencement` MEANS YMD 1967 6 2
+
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`the death falls within section 5` c MEANS
+    c's `deceased`'s `date of death` GREATER THAN `the Act's commencement`
+
+-- The value this Act actually distributes, as opposed to the whole estate.
+-- Under s 4 read with s 5, a Singapore-domiciled deceased's Singapore
+-- movables AND immovables are within; a foreign-domiciled deceased's
+-- Singapore immovables are within and the movables are not.
+GIVEN c IS A Case
+GIVETH A NUMBER
+`the property this Act distributes in` c MEANS
+    IF `this Act regulates the movables of` c
+    THEN `distributable estate of` c
+    ELSE `the Singapore immovable share of` c
+
+-- Where only the immovables are within the Act, administration expenses and
+-- debts still come off the top (s 5: "after payment thereout"). They are
+-- borne rateably by the part this Act governs, in the absence of any
+-- direction otherwise -- see the fork register, entry F5.
+GIVEN c IS A Case
+GIVETH A NUMBER
+`the Singapore immovable share of` c MEANS
+    IF `gross estate of` c GREATER THAN 0
+    THEN `distributable estate of` c
+         TIMES (c's `estate`'s `immovable property in Singapore` DIVIDED BY `gross estate of` c)
+    ELSE 0
+
+
+§§ `2. The survivorship facts rules 1-9 turn on`
+
+@ref ISA 1967 s 3 -- "issue" includes children and the descendants of deceased children
+-- The recursive test rule 3 needs: a stock is LIVE if the person survived, or
+-- if anyone in their descent did. A child who predeceased leaving no
+-- surviving issue is an extinct stock and is not counted -- which is why the
+-- test is over the whole subtree and not over the child alone.
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+`a survivor stands in the line of` p MEANS
+    p's `survived the deceased`
+    OR any (GIVEN q YIELD `a survivor stands in the line of` q) (p's `issue`)
+
+GIVEN people IS A LIST OF Person
+GIVETH A LIST OF Person
+`the represented stocks among` people MEANS
+    filter (GIVEN p YIELD `a survivor stands in the line of` p) people
+
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`a spouse survives` c MEANS
+    `someone survived among` (c's `family`'s `surviving spouses`)
+
+-- "Issue" for rule-selection purposes: a surviving child, or a predeceased
+-- child with surviving descendants. Both take under rule 3, so both must make
+-- rule 2 or rule 4 fire.
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`issue survive` c MEANS
+    any (GIVEN p YIELD `a survivor stands in the line of` p) (c's `family`'s `children`)
+
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`a parent survives` c MEANS
+    `someone survived among` (c's `family`'s `parents`)
+
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`a sibling line is represented` c MEANS
+    any (GIVEN p YIELD `a survivor stands in the line of` p) (c's `family`'s `siblings`)
+
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`a grandparent survives` c MEANS
+    `someone survived among` (c's `family`'s `grandparents`)
+
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`an uncle or aunt survives` c MEANS
+    `someone survived among` (c's `family`'s `uncles and aunts`)
+
+
+§§ `3. Dividing a portion within a class`
+
+-- Equal division among the survivors of a class. Rules 5, 7 and 8 all divide
+-- "in equal portions", per capita, with no representation.
+GIVEN portion IS A NUMBER
+      people  IS A LIST OF Person
+      basis   IS A STRING
+GIVETH A LIST OF Share
+`divide` portion `equally among` people `citing` basis MEANS
+    IF count takers EQUALS 0
+    THEN EMPTY
+    ELSE map (GIVEN p YIELD Share WITH `taker`    IS p's `name`
+                                     , `fraction` IS portion DIVIDED BY count takers
+                                     , `basis`    IS basis) takers
+    WHERE
+      takers MEANS `the survivors among` people
+
+@ref ISA 1967 s 7 rule 3, Provisos (1) and (2) -- per stirpes
+-- "the estate ... shall be distributed by equal portions per stirpes to and
+-- amongst the children of the person dying intestate and such persons as
+-- legally represent those children, in case any of those children be then
+-- dead."
+--   Proviso No. (1): "The persons who legally represent the children of an
+--   intestate are their descendants and not their next-of-kin."
+--   Proviso No. (2): "Descendants of the intestate to the remotest degree
+--   stand in the place of their parent or other ancestor, and take according
+--   to their stocks the share which he or she would have taken."
+--
+-- The division is by STOCK, not by head: the portion splits equally among the
+-- represented stocks, and a stock whose own member did not survive splits its
+-- share again among ITS represented stocks, "to the remotest degree".
+-- FORK F1 IS MATERIALISED HERE. Where a stock's own member did not survive, the
+-- share descends to that stock's representatives -- that is reading R1, and it
+-- holds however many generations deep the survivors are. Reading R2 says that
+-- where NO member of a generation survives, the generation stops being a
+-- division point and the estate divides per capita among the nearest generation
+-- that does. Both are executable; the Interpretation field selects.
+--
+-- The difference is real money. Child A leaves two children and child B leaves
+-- one, both children predeceasing: R1 gives A's two 1/4 each and B's one 1/2;
+-- R2 gives all three 1/3. See the case `all children predeceased, uneven stocks`.
+GIVEN i       IS AN Interpretation
+      portion IS A NUMBER
+      people  IS A LIST OF Person
+      basis   IS A STRING
+GIVETH A LIST OF Share
+`per stirpes under` i `divide` portion `among` people `citing` basis MEANS
+  BRANCH
+    IF count (`the represented stocks among` people) EQUALS 0
+    THEN EMPTY
+
+    -- R2: no member of THIS generation survived, and the per capita reading is
+    -- taken -- so drop to the nearest generation that has survivors and divide
+    -- among them by head.
+    IF (NOT i's `stirpital division starts at the child generation`)
+       AND (count (`the survivors among` people) EQUALS 0)
+    THEN `divide` portion `equally among` (`the nearest surviving generation among` people) `citing` basis
+
+    OTHERWISE `splitting under` i `the portion` portion `among the stocks` (`the represented stocks among` people) `citing` basis
+
+-- Split a portion equally between represented stocks and let each stock
+-- descend. Separated from the BRANCH above only because a WHERE clause inside
+-- a BRANCH scopes to its own arm, not to the whole definition.
+GIVEN i       IS AN Interpretation
+      portion IS A NUMBER
+      stocks  IS A LIST OF Person
+      basis   IS A STRING
+GIVETH A LIST OF Share
+`splitting under` i `the portion` portion `among the stocks` stocks `citing` basis MEANS
+    concat (map (GIVEN p YIELD `the stock under` i `of` p `takes` (portion DIVIDED BY count stocks) `citing` basis) stocks)
+
+GIVEN i       IS AN Interpretation
+      p       IS A Person
+      portion IS A NUMBER
+      basis   IS A STRING
+GIVETH A LIST OF Share
+`the stock under` i `of` p `takes` portion `citing` basis MEANS
+    IF p's `survived the deceased`
+    THEN LIST (Share WITH `taker` IS p's `name`, `fraction` IS portion, `basis` IS basis)
+    ELSE `per stirpes under` i `divide` portion `among` (p's `issue`) `citing` basis
+
+-- The generation reading R2 divides among: the shallowest one holding a
+-- survivor. Descends breadth-first, so cousins at the same depth compete.
+GIVEN people IS A LIST OF Person
+GIVETH A LIST OF Person
+`the nearest surviving generation among` people MEANS
+  BRANCH
+    IF count people EQUALS 0
+    THEN EMPTY
+    IF count (`the survivors among` people) GREATER THAN 0
+    THEN `the survivors among` people
+    OTHERWISE `the nearest surviving generation among` (concat (map (GIVEN p YIELD p's `issue`) people))
+
+@ref ISA 1967 s 8 -- Special provision if intestate leaves lawful widows
+-- "If any person so dying intestate leaves surviving him more than one wife,
+-- such wives shall share among them equally the share that the wife of the
+-- intestate would have been entitled to, had the intestate left only one wife
+-- surviving him."
+--
+-- The spouse's share is computed once by whichever of rules 1, 2 and 4 fires,
+-- and only then divided. That ordering is the section's own: it fixes "the
+-- share that the wife ... would have been entitled to" first, and splits it
+-- second, so a second wife dilutes the wives and never the children.
+GIVEN c       IS A Case
+      portion IS A NUMBER
+      basis   IS A STRING
+GIVETH A LIST OF Share
+`the spouses of` c `take` portion `citing` basis MEANS
+    `divide` portion `equally among` (c's `family`'s `surviving spouses`) `citing` basis
+
+
+§§ `4. Section 7 -- the rules for distribution`
+
+-- "In effecting such distribution, the following rules shall be observed."
+--
+-- The nine rules are mutually exclusive once read together, but the Act does
+-- not say so: rules 1, 2 and 4 each open with the spouse, rule 3 is expressed
+-- "subject to the rights of the surviving spouse, if any", and rule 5 is
+-- "subject to the rights of the surviving spouse (if any) as provided in rule
+-- 4". BRANCH gives the reading its own shape -- one arm per rule, in the
+-- Act's order, with the guard each rule states.
+
+@ref ISA 1967 s 7 rules 1-9 -- Rules for distribution
+GIVEN i IS AN Interpretation
+      c IS A Case
+GIVETH A LIST OF Share
+`the section 7 shares under` i `of` c MEANS
+  BRANCH
+    -- Rule 1: "If an intestate dies leaving a surviving spouse, no issue and
+    -- no parent, the spouse shall be entitled to the whole of the estate."
+    IF `a spouse survives` c AND (NOT `issue survive` c) AND (NOT `a parent survives` c)
+    THEN `the spouses of` c `take` 1 `citing` "ISA s 7 rule 1 -- spouse takes the whole estate"
+
+    -- Rule 2: "If an intestate dies leaving a surviving spouse and issue, the
+    -- spouse shall be entitled to one-half of the estate."
+    -- Rule 3 then carries the other half to the issue, per stirpes.
+    IF `a spouse survives` c AND `issue survive` c
+    THEN append
+           (`the spouses of` c `take` (1 DIVIDED BY 2) `citing` "ISA s 7 rule 2 -- spouse takes one-half")
+           (`per stirpes under` i `divide` (1 DIVIDED BY 2) `among` (c's `family`'s `children`) `citing` "ISA s 7 rule 3 -- issue take one-half per stirpes")
+
+    -- Rule 4: "If an intestate dies leaving a surviving spouse and no issue
+    -- but a parent or parents, the spouse shall be entitled to one-half of
+    -- the estate and the parent or parents to the other half of the estate."
+    IF `a spouse survives` c AND (NOT `issue survive` c) AND `a parent survives` c
+    THEN append
+           (`the spouses of` c `take` (1 DIVIDED BY 2) `citing` "ISA s 7 rule 4 -- spouse takes one-half")
+           (`divide` (1 DIVIDED BY 2) `equally among` (c's `family`'s `parents`) `citing` "ISA s 7 rule 4 -- the parents take the other half")
+
+    -- Rule 3 standing alone: no spouse, but issue.
+    IF `issue survive` c
+    THEN `per stirpes under` i `divide` 1 `among` (c's `family`'s `children`)
+           `citing` "ISA s 7 rule 3 -- issue take the whole estate per stirpes"
+
+    -- Rule 5: "If there are no descendants, the parent or parents of the
+    -- intestate shall take the estate, in equal portions if there be 2
+    -- parents, subject to the rights of the surviving spouse (if any) as
+    -- provided in rule 4." The spouse case is rule 4's arm above, so what
+    -- reaches here is the no-spouse case.
+    IF `a parent survives` c
+    THEN `divide` 1 `equally among` (c's `family`'s `parents`)
+           `citing` "ISA s 7 rule 5 -- the parents take the whole estate"
+
+    -- Rule 6: "If there are no surviving spouse, descendants or parents, the
+    -- brothers and sisters and children of deceased brothers or sisters of
+    -- the intestate shall share the estate in equal portions between the
+    -- brothers and sisters and the children of any deceased brother or sister
+    -- shall take according to their stocks the share which the deceased
+    -- brother or sister would have taken."
+    IF `a sibling line is represented` c
+    THEN `per stirpes under` i `divide` 1 `among` (c's `family`'s `siblings`)
+           `citing` "ISA s 7 rule 6 -- siblings take, children of deceased siblings by stocks"
+
+    -- Rule 7: "... but grandparents of the intestate, the grandparents shall
+    -- take the whole of the estate in equal portions."
+    IF `a grandparent survives` c
+    THEN `divide` 1 `equally among` (c's `family`'s `grandparents`)
+           `citing` "ISA s 7 rule 7 -- the grandparents take in equal portions"
+
+    -- Rule 8: "... but uncles and aunts of the intestate, the uncles and
+    -- aunts shall take the whole of the estate in equal portions."
+    IF `an uncle or aunt survives` c
+    THEN `divide` 1 `equally among` (c's `family`'s `uncles and aunts`)
+           `citing` "ISA s 7 rule 8 -- the uncles and aunts take in equal portions"
+
+    -- Rule 9: "In default of distribution under rules 1 to 8, the Government
+    -- shall be entitled to the whole of the estate."
+    OTHERWISE
+      LIST (Share WITH `taker`    IS "the Government"
+                     , `fraction` IS 1
+                     , `basis`    IS "ISA s 7 rule 9 -- bona vacantia, in default of rules 1 to 8")
+
+
+§§ `5. Section 10 -- partial intestacy`
+
+@ref ISA 1967 s 10 -- Application to cases of partial intestacy
+-- "Where any person dies leaving a will beneficially disposing of part of his
+-- property, the provisions of this Act shall have effect as respects the part
+-- of his property not so disposed of, subject to the provisions contained in
+-- the will."
+--
+-- The ISA scales down: it governs the undisposed proportion only, and the
+-- will governs the rest. See the domain module's note on the proportion
+-- simplification, and fork-register entry F6.
+GIVEN c IS A Case
+GIVETH A NUMBER
+`the proportion this Act governs in` c MEANS
+    CONSIDER c's `will`
+    WHEN NOTHING THEN 1
+    WHEN JUST w  THEN 1 MINUS w's `proportion of the estate beneficially disposed of`
+
+
+§§ `6. The Act's answer`
+
+-- The entry point. It refuses in exactly the cases the Act refuses, and says
+-- which regime governs instead -- because "the ISA gives your spouse half"
+-- is a wrong answer, not a rough one, for an estate the ISA does not touch.
+GIVEN i IS AN Interpretation
+      c IS A Case
+GIVETH A Distribution
+`the intestate distribution under` i `for` c MEANS
+  BRANCH
+    IF (NOT `the Act applies to the estate of` c)
+    THEN Distribution WITH `governed by this Act` IS FALSE
+                        , `shares` IS EMPTY
+                        , `note`   IS "ISA s 2: this Act does not apply to the estate of a Muslim. The estate is governed by Muslim law and the Administration of Muslim Law Act 1966; a faraid distribution is outside this encoding."
+
+    IF (NOT `the death falls within section 5` c)
+    THEN Distribution WITH `governed by this Act` IS FALSE
+                        , `shares` IS EMPTY
+                        , `note`   IS "ISA s 5: the Act distributes the estates of those dying intestate after 2 June 1967."
+
+    IF `the proportion this Act governs in` c EQUALS 0
+    THEN Distribution WITH `governed by this Act` IS FALSE
+                        , `shares` IS EMPTY
+                        , `note`   IS "ISA s 10: the will beneficially disposes of the whole estate, so no part falls to intestacy."
+
+    OTHERWISE Distribution WITH `governed by this Act` IS TRUE
+                             , `shares` IS `the section 7 shares under` i `of` c
+                             , `note`   IS `the reach of this Act over` c
+
+-- Which property the Act reached, said in words, so that a wizard or a report
+-- can show the s 4 split without recomputing it.
+GIVEN c IS A Case
+GIVETH A STRING
+`the reach of this Act over` c MEANS
+    IF `this Act regulates the movables of` c
+    THEN "ISA s 4-5: the deceased was domiciled in Singapore, so this Act regulates the whole Singapore estate."
+    ELSE "ISA s 4: the deceased was domiciled outside Singapore, so this Act regulates the Singapore IMMOVABLE property only. The movable property is regulated by the law of the domicile and is outside this encoding."
+
+
+§§ `7. The orthodox entry points`
+
+-- What every caller outside the fork tests uses: the same answer, under the
+-- reading the fork register records as live. Keeping the fork-bearing forms
+-- above and the plain forms here means a projection or a wizard never has to
+-- know that F1 and F3 exist, while the test suite can still show what turns on
+-- them.
+GIVEN c IS A Case
+GIVETH A LIST OF Share
+`the section 7 shares of` c MEANS `the section 7 shares under` `the orthodox reading` `of` c
+
+GIVEN c IS A Case
+GIVETH A Distribution
+`the intestate distribution for` c MEANS
+    `the intestate distribution under` `the orthodox reading` `for` c

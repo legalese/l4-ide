@@ -1,0 +1,133 @@
+{
+  "kind": "source-bundle",
+  "bundle_version": 1,
+  "subject": "sg-succession",
+  "citation": "Wills Act 1838; Intestate Succession Act 1967; Probate and Administration Act 1934 (Singapore)",
+  "retrieved": "2026-08-18",
+  "note": "Three Acts, one subject: they are three views of one event and share their nouns, so they are encoded against a single ontology rather than as three subjects. NO ENABLING INSTRUMENT IS RECORDED because there is none to record -- these are Acts of Parliament, not subsidiary legislation, so P1's 'fetch the instrument it is made under' has no referent here. The analogous upward read for primary legislation is the amendment history, which is captured per document in annotations[]. RETRIEVAL NOTE: the SSO HTML landing page is NOT a usable text source for a long Act -- PAA1934 returned its 70 section headings with no bodies, and both ?ViewType=Print and ?WholeDoc=1 are stubbed or WAF-blocked. The official PDF is complete and carries the Schedules, so it is what every sha256 here is taken over. See source/fetch-sso.py.",
+  "in_force": {
+    "statement": "Current version as at 18 Aug 2026",
+    "as_of": "2026-08-18",
+    "document": "isa1967"
+  },
+  "documents": [
+    {
+      "id": "isa1967",
+      "role": "current",
+      "title": "Intestate Succession Act 1967",
+      "citation": "Intestate Succession Act 1967 (2020 Rev Ed)",
+      "url": "https://sso.agc.gov.sg/Act/ISA1967?ViewType=Pdf",
+      "retrieved": "2026-08-18",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "f488fe5e3742d1d2f5fe7f17e67eafe7cb61a997df018367c6383665edad6c79",
+        "local_path": "jl4/examples/legal/sg-succession/source/ISA1967.pdf"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      },
+      "annotations": [
+        {
+          "scheme": "amendment",
+          "markers": [
+            "v19870330",
+            "v20131231"
+          ],
+          "inventory_complete": true,
+          "inventory_note": "Every dated version SSO offers for this Act, taken from the Historical links on the landing page. Complete as the publisher's version list; it is not a list of amending Acts."
+        }
+      ]
+    },
+    {
+      "id": "wa1838",
+      "role": "current",
+      "title": "Wills Act 1838",
+      "citation": "Wills Act 1838 (2020 Rev Ed)",
+      "url": "https://sso.agc.gov.sg/Act/WA1838?ViewType=Pdf",
+      "retrieved": "2026-08-18",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "06854af11c92d57811ba129fab8826602fa60c3ea3c195c9f269a7d2b8025e1b",
+        "local_path": "jl4/examples/legal/sg-succession/source/WA1838.pdf"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      },
+      "annotations": [
+        {
+          "scheme": "amendment",
+          "markers": [
+            "v19870330",
+            "v19920626",
+            "v19961227",
+            "v19971001",
+            "v20161201",
+            "v20210102",
+            "v20211231"
+          ],
+          "inventory_complete": true,
+          "inventory_note": "Every dated version SSO offers for this Act, taken from the Historical links on the landing page. Complete as the publisher's version list; it is not a list of amending Acts."
+        }
+      ]
+    },
+    {
+      "id": "paa1934",
+      "role": "current",
+      "title": "Probate and Administration Act 1934",
+      "citation": "Probate and Administration Act 1934 (2020 Rev Ed)",
+      "url": "https://sso.agc.gov.sg/Act/PAA1934?ViewType=Pdf",
+      "retrieved": "2026-08-18",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "885046361e9746d753e76c0d2b0753dd47026eddff08e8f221eef25ea3767862",
+        "local_path": "jl4/examples/legal/sg-succession/source/PAA1934.pdf"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      },
+      "annotations": [
+        {
+          "scheme": "amendment",
+          "markers": [
+            "v19870330",
+            "v19971001",
+            "v19990225",
+            "v20000701",
+            "v20040308",
+            "v20060101",
+            "v20060201",
+            "v20100301",
+            "v20140307",
+            "v20141231",
+            "v20150101",
+            "v20160610",
+            "v20210102",
+            "v20211231"
+          ],
+          "inventory_complete": true,
+          "inventory_note": "Every dated version SSO offers for this Act, taken from the Historical links on the landing page. Complete as the publisher's version list; it is not a list of amending Acts."
+        }
+      ]
+    },
+    {
+      "id": "amla1966",
+      "role": "corroboration",
+      "title": "Administration of Muslim Law Act 1966",
+      "citation": "Administration of Muslim Law Act 1966 (2020 Rev Ed)",
+      "url": "https://sso.agc.gov.sg/Act/AMLA1966?ViewType=Pdf",
+      "retrieved": "2026-08-18",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "d0dc3fb83beda3670a8a52be22305f0340e769a4d6b8a896b8fe7d5ce32dd573",
+        "local_path": "jl4/examples/legal/sg-succession/source/AMLA1966.pdf"
+      },
+      "covers": {
+        "from": null,
+        "to": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,183 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `sg-succession-domain`
+IMPORT `sg-wills`
+IMPORT `sg-isa`
+IMPORT `sg-paa`
+
+§ `Singapore succession — what happens after somebody dies`
+
+-- ===========================================================================
+-- THE COMPOSITION.
+--
+-- The three Act modules each answer their own question and know nothing about
+-- each other. This module is the only place they meet, and it exists because
+-- the question a bereaved family actually asks -- "what happens now?" -- is
+-- not any one Act's question:
+--
+--   Wills Act 1838       -> is there a will the law will act on?
+--   Probate & Admin 1934 -> who may administer, what comes off the top, when?
+--   Intestate Succ. 1967 -> who takes what is left, and in what shares?
+--
+-- Nothing here restates a rule. Every answer below is delegated to the Act
+-- module that owns it; this module only decides WHICH Act to ask, and in what
+-- order. That is itself a legal judgement -- see `the order of the questions`
+-- below -- but it is the only one made here.
+--
+-- INERT STYLE: no `@export`. The export surface is sg-succession-wizard.l4.
+-- ===========================================================================
+
+
+§§ `The order of the questions`
+
+-- The order is fixed by the statutes themselves and is not a UI choice:
+--
+--   1. ISA s 2 first, because a Muslim estate is outside the ISA altogether
+--      and no later question is worth answering under this Act.
+--   2. Then the Wills Act, because whether there is an operative will decides
+--      whether the ISA applies at all (ISA s 3 "intestate", ISA s 10).
+--   3. Then the PAA, because s 5 of the ISA distributes only what is left
+--      "after payment thereout of the expenses of due administration as
+--      prescribed by the Probate and Administration Act 1934".
+--   4. Then the ISA, over what remains and to the extent it is not disposed
+--      of by the will.
+--
+-- Asking them in any other order gives a confident answer to the wrong
+-- question -- most damagingly by distributing a Muslim estate under rules
+-- that s 2 says do not touch it.
+
+DECLARE `Succession outcome`
+    HAS `the Act that governs the distribution` IS A STRING
+        `there is an operative will`            IS A BOOLEAN
+        `why there is no operative will`        IS A STRING
+        `the gross estate`                      IS A NUMBER
+        `what is left to distribute`            IS A NUMBER
+        `what this Act reaches`                 IS A NUMBER
+        `the intestate distribution`            IS A Distribution
+        `what happens next`                     IS A STRING
+
+
+§§ `Is there a will the law will act on?`
+
+-- Delegated entirely to the Wills Act module. This module only asks.
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`there is an operative will in` c MEANS
+    CONSIDER c's `will`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST w  THEN (`the will is formally valid` w) AND (NOT (`the will has been revoked` w))
+
+GIVEN c IS A Case
+GIVETH A STRING
+`why there is no operative will in` c MEANS
+    CONSIDER c's `will`
+    WHEN NOTHING THEN "No will was made, so the whole estate passes on intestacy under the Intestate Succession Act 1967."
+    WHEN JUST w  THEN `why the will w is not operative` w
+
+GIVEN w IS A Will
+GIVETH A STRING
+`why the will w is not operative` w MEANS
+  BRANCH
+    IF (NOT (`the will is formally valid` w)) THEN `why the will is not formally valid` w
+    IF `the will has been revoked` w          THEN `why the will has been revoked` w
+    OTHERWISE "The will is valid and unrevoked."
+
+
+§§ `The whole answer`
+
+GIVEN c IS A Case
+GIVETH A `Succession outcome`
+`what happens after the death in` c MEANS
+    `Succession outcome` WITH
+        `the Act that governs the distribution` IS governing
+      , `there is an operative will`            IS (`there is an operative will in` c)
+      , `why there is no operative will`        IS (`why there is no operative will in` c)
+      , `the gross estate`                      IS (`gross estate of` c)
+      , `what is left to distribute`            IS (`distributable estate of` c)
+      , `what this Act reaches`                 IS (`the property this Act distributes in` c)
+      , `the intestate distribution`            IS dist
+      , `what happens next`                     IS (`what happens next in` c)
+    WHERE
+      dist      MEANS `the intestate distribution for` c
+      governing MEANS `the Act governing the distribution in` c
+
+GIVEN c IS A Case
+GIVETH A STRING
+`the Act governing the distribution in` c MEANS
+  BRANCH
+    IF c's `deceased`'s `Muslim`
+    THEN "Muslim law and the Administration of Muslim Law Act 1966 — not the Intestate Succession Act 1967 (ISA s 2)."
+    IF (NOT ((`the intestate distribution for` c)'s `governed by this Act`))
+    THEN "Not the Intestate Succession Act 1967 — see the note."
+    OTHERWISE "The Intestate Succession Act 1967."
+
+-- The one sentence a bereaved family most needs, chosen by the same order of
+-- questions as above. It names an Act and a section every time, because a
+-- direction with no citation is advice, and this tool does not give advice.
+GIVEN c IS A Case
+GIVETH A STRING
+`what happens next in` c MEANS
+  BRANCH
+    IF c's `deceased`'s `Muslim`
+    THEN "The estate is distributed under Muslim law. Apply to the Syariah Court for an inheritance certificate, then to the Family Justice Courts for letters of administration. The Intestate Succession Act does not apply (ISA s 2)."
+
+    IF `there is an operative will in` c
+    THEN "There is a valid will. The executor named in it applies to the Family Justice Courts for a grant of PROBATE (PAA s 8). Until the grant is made the estate is administered under the will's directions."
+
+    IF (NOT (`someone survived among` (c's `family`'s `surviving spouses`)))
+         AND (NOT (`issue survive` c))
+         AND (NOT (`a parent survives` c))
+    THEN "There is no will and no close family. Someone interested in the estate — including a creditor — may apply for LETTERS OF ADMINISTRATION (PAA s 18(4)(c)). If nobody applies within 6 months of the death, the Public Trustee may be granted them instead (PAA s 55(1)(a))."
+
+    OTHERWISE "There is no will, so the estate passes on intestacy. A person entitled to a share applies to the Family Justice Courts for LETTERS OF ADMINISTRATION (PAA s 18). Priority follows entitlement to the estate under ISA s 7. Apply within 6 months of the death, or the Public Trustee may be granted them instead (PAA s 55(1)(a))."
+
+
+§§ `An administration, for the timeline`
+
+-- The PAA's timeline needs an `Administration`, which carries 25 facts. Most
+-- of them are FALSE or absent for an ordinary estate where nothing has gone
+-- wrong, so this constructor fixes those and takes only what varies. It is a
+-- convenience for callers, NOT a statement of law: every field it fixes is a
+-- fact about one administration, and a caller with different facts should
+-- build the record directly.
+GIVEN c       IS A Case
+      granted IS A MAYBE DATE
+      asked   IS A DATE
+GIVETH AN Administration
+`the ordinary administration of` c `granted on` granted `asked on` asked MEANS
+  Administration WITH
+      `case`                                          IS c
+    , `persons who are or may become entitled to probate or letters of administration` IS EMPTY
+    , `the date as at which the question is asked`    IS asked
+    , `there is a minority or a life interest arises under the will` IS FALSE
+    , `a probate action is pending`                   IS FALSE
+    , `a general caveat has been entered`             IS FALSE
+    , `the caveator has been given opportunity to contest` IS FALSE
+    , `an application has been made for probate or letters of administration` IS FALSE
+    , `the application has been proceeded with, and has not been withdrawn or refused` IS FALSE
+    , `the administrator has extracted the grant of letters of administration` IS FALSE
+    , `date of the grant`                             IS granted
+    , `granted by a Family Court`                     IS TRUE
+    , `the person for whose use and benefit the grant is made is an infant` IS FALSE
+    , `the Family Court thinks fit to require such security` IS FALSE
+    , `the administrator is entitled to the whole of the estate after payment of the debts` IS FALSE
+    , `the amount at which the estate within the jurisdiction is sworn` IS (`gross estate of` c)
+    , `debts due by the deceased secured by mortgage` IS 0
+    , `such security as he is lawfully required to furnish has been given` IS FALSE
+    , `date of death of the last surviving executor or administrator` IS NOTHING
+    , `an application for the representation of the estate has been made since that death` IS FALSE
+    , `there is danger that the property may be wasted` IS FALSE
+    , `the appointment of a receiver would be a sufficient protection for the estate` IS TRUE
+    , `the Public Trustee has declared that he undertakes to administer the property` IS FALSE
+    , `the value of the assets collected by them`     IS (`gross estate of` c)
+    , `the order of application is varied by the will of the deceased` IS FALSE
+
+-- The dated milestones an app draws on an axis, for an ordinary estate where
+-- the grant is made six months after the death.
+GIVEN c IS A Case
+GIVETH A LIST OF `Timeline event`
+`the ordinary timeline for` c MEANS
+    `the timeline in` (`the ordinary administration of` c `granted on` grant `asked on` asked)
+    WHERE
+      grant MEANS JUST (`add months` (c's `deceased`'s `date of death`) 6)
+      asked MEANS `add months` (c's `deceased`'s `date of death`) 6

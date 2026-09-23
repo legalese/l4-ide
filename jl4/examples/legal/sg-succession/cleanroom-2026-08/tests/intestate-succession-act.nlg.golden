@@ -1,0 +1,381 @@
+`the property of which every share under section 7 is a fraction` with `case 1 — a surviving spouse and issue` is equal to 1000000
+`rule 2 — an intestate dies leaving a surviving spouse and issue` with `case 1 — a surviving spouse and issue`
+not `rule 1 — an intestate dies leaving a surviving spouse, no issue and no parent` with `case 1 — a surviving spouse and issue`
+not `rule 4 — an intestate dies leaving a surviving spouse and no issue but a parent or parents` with `case 1 — a surviving spouse and issue`
+`the share of the estate to which the surviving spouse is entitled` with `case 1 — a surviving spouse and issue` is equal to the result of dividing 1 by 2
+not `section 5(b) — domiciled outside Singapore and possessed beneficially of immovable property situated in Singapore` with `case 1 — a surviving spouse and issue`
+`the immovable property situated in Singapore, possessed beneficially` with `case 1 — a surviving spouse and issue` is equal to 300000
+not `section 8 — the intestate leaves surviving him more than one wife` with `case 1 — a surviving spouse and issue`
+`the distribution, read out` with `case 1 — a surviving spouse and issue` is equal to list of Beatrice takes 0.5, Clara takes 0.25 and Daniel takes 0.25
+`the total of the shares distributed` with `case 1 — a surviving spouse and issue` is equal to 1
+not `rule 3 — this child is a stock which takes, in his own right or through those who legally represent him` with `an ISA legitimate child` with `Kumar` and `JUST` with `YMD` with 2024, 1 and 1
+`rule 3 — this child is a stock which takes, in his own right or through those who legally represent him` with `an ISA legitimate child` with `Gopal` and `JUST` with `YMD` with 2024, 1 and 1
+`the distribution, read out` with `case 2 — per stirpes to the remotest degree` is equal to list of Fatimah takes 0.5, Hana takes 0.25 and Jia takes 0.25
+`the total of the shares distributed` with `case 2 — per stirpes to the remotest degree` is equal to 1
+`rule 1 — an intestate dies leaving a surviving spouse, no issue and no parent` with `case 3 — a surviving spouse, no issue and no parent`
+not `rule 2 — an intestate dies leaving a surviving spouse and issue` with `case 3 — a surviving spouse, no issue and no parent`
+not `rule 4 — an intestate dies leaving a surviving spouse and no issue but a parent or parents` with `case 3 — a surviving spouse, no issue and no parent`
+`the share of the estate to which the surviving spouse is entitled` with `case 3 — a surviving spouse, no issue and no parent` is equal to 1
+`the distribution, read out` with `case 3 — a surviving spouse, no issue and no parent` is equal to list of Marcus takes 1
+`the total of the shares distributed` with `case 3 — a surviving spouse, no issue and no parent` is equal to 1
+`rule 4 — an intestate dies leaving a surviving spouse and no issue but a parent or parents` with `case 4 — a surviving spouse, no issue, two parents`
+not `rule 1 — an intestate dies leaving a surviving spouse, no issue and no parent` with `case 4 — a surviving spouse, no issue, two parents`
+not `rule 2 — an intestate dies leaving a surviving spouse and issue` with `case 4 — a surviving spouse, no issue, two parents`
+`rule 4 — the share of the estate to which the parent or parents are entitled` with `case 4 — a surviving spouse, no issue, two parents` is equal to the result of dividing 1 by 2
+`rule 5 — the share of the estate the parent or parents take` with `case 4 — a surviving spouse, no issue, two parents` is equal to the result of dividing 1 by 2
+`count` with `the parents of the intestate who survive him` with `case 4 — a surviving spouse, no issue, two parents` is equal to 2
+`the distribution, read out` with `case 4 — a surviving spouse, no issue, two parents` is equal to list of Omar takes 0.5, Nadia's father takes 0.25 and Nadia's mother takes 0.25
+`the total of the shares distributed` with `case 4 — a surviving spouse, no issue, two parents` is equal to 1
+`rule 2 — an intestate dies leaving a surviving spouse and issue` with `case 4a — a surviving spouse, issue, and two surviving parents`
+not `rule 4 — an intestate dies leaving a surviving spouse and no issue but a parent or parents` with `case 4a — a surviving spouse, issue, and two surviving parents`
+not `rule 5 — there are no descendants, and there are a parent or parents of the intestate` with `case 4a — a surviving spouse, issue, and two surviving parents`
+`rule 5 — the share of the estate the parent or parents take` with `case 4a — a surviving spouse, issue, and two surviving parents` is equal to 0
+`count` with `the parents of the intestate who survive him` with `case 4a — a surviving spouse, issue, and two surviving parents` is equal to 2
+`null` with `rule 5 — the entitlements of the parent or parents` with `case 4a — a surviving spouse, issue, and two surviving parents`
+`the distribution, read out` with `case 4a — a surviving spouse, issue, and two surviving parents` is equal to list of Beatrice takes 0.5, Clara takes 0.25 and Daniel takes 0.25
+`the total of the shares distributed` with `case 4a — a surviving spouse, issue, and two surviving parents` is equal to 1
+`rule 5 — there are no descendants, and there are a parent or parents of the intestate` with `case 5 — no spouse, no descendants, one surviving parent`
+not `rule 4 — an intestate dies leaving a surviving spouse and no issue but a parent or parents` with `case 5 — no spouse, no descendants, one surviving parent`
+`count` with `the parents of the intestate who survive him` with `case 5 — no spouse, no descendants, one surviving parent` is equal to 1
+`rule 5 — the share of the estate the parent or parents take` with `case 5 — no spouse, no descendants, one surviving parent` is equal to 1
+`the distribution, read out` with `case 5 — no spouse, no descendants, one surviving parent` is equal to list of Priya's mother takes 1
+`the total of the shares distributed` with `case 5 — no spouse, no descendants, one surviving parent` is equal to 1
+`rule 6 — there are no surviving spouse, descendants or parents` with `case 6 — brothers and sisters and the children of a deceased sister`
+`count` with `Tan` 's `children` is equal to 3
+`count` with `rule 6 — the children of a deceased brother or sister who take according to their stocks` with `of the whole blood,` with `Tan` and `JUST` with `YMD` with 2024, 5 and 5 is equal to 2
+not `section 3 — a “child” within the meaning of this Act` with `a child neither legitimate nor adopted` with `Wira`
+not `rule 7 — there are no surviving spouse, descendants, parents, brothers and sisters or children of such brothers and sisters but grandparents of the intestate` with `case 6 — brothers and sisters and the children of a deceased sister`
+not `rule 8 — there are no surviving spouse, descendants, parents, brothers and sisters or their children or grandparents but uncles and aunts of the intestate` with `case 6 — brothers and sisters and the children of a deceased sister`
+not `rule 9 — in default of distribution under rules 1 to 8` with `case 6 — brothers and sisters and the children of a deceased sister`
+`the distribution, read out` with `case 6 — brothers and sisters and the children of a deceased sister` is equal to list of Salim takes 0.5, Uma takes 0.25 and Vik takes 0.25
+`the total of the shares distributed` with `case 6 — brothers and sisters and the children of a deceased sister` is equal to 1
+`related to the deceased by the whole blood` with `of the whole blood,` with `Salim`
+`related to the deceased by the half blood` with `of the half blood,` with `Wati`
+not `related to the deceased by the whole blood` with `of the half blood,` with `Wati`
+`the distribution, read out` with `case 7 — one brother of the whole blood and one of the half blood` is equal to list of Salim takes 1
+`the total of the shares distributed` with `case 7 — one brother of the whole blood and one of the half blood` is equal to 1
+`the distribution, read out` with `case 7a — only brothers and sisters of the half blood` is equal to list of Wati takes 1
+`the total of the shares distributed` with `case 7a — only brothers and sisters of the half blood` is equal to 1
+`rule 7 — there are no surviving spouse, descendants, parents, brothers and sisters or children of such brothers and sisters but grandparents of the intestate` with `case 8 — two surviving grandparents`
+not `rule 8 — there are no surviving spouse, descendants, parents, brothers and sisters or their children or grandparents but uncles and aunts of the intestate` with `case 8 — two surviving grandparents`
+`null` with `the uncles and aunts of the intestate who survive him` with `case 8 — two surviving grandparents`
+`the distribution, read out` with `case 8 — two surviving grandparents` is equal to list of Xin takes 0.5 and Yusof takes 0.5
+`the total of the shares distributed` with `case 8 — two surviving grandparents` is equal to 1
+`rule 8 — there are no surviving spouse, descendants, parents, brothers and sisters or their children or grandparents but uncles and aunts of the intestate` with `case 9 — uncles and aunts of the whole and half blood`
+not `rule 7 — there are no surviving spouse, descendants, parents, brothers and sisters or children of such brothers and sisters but grandparents of the intestate` with `case 9 — uncles and aunts of the whole and half blood`
+not `rule 9 — in default of distribution under rules 1 to 8` with `case 9 — uncles and aunts of the whole and half blood`
+`count` with `the uncles and aunts of the intestate who survive him` with `case 9 — uncles and aunts of the whole and half blood` is equal to 3
+`the distribution, read out` with `case 9 — uncles and aunts of the whole and half blood` is equal to list of Zainab takes 0.5 and Anand takes 0.5
+`the total of the shares distributed` with `case 9 — uncles and aunts of the whole and half blood` is equal to 1
+`this Act has effect in respect of the estate` with `case 10 — nobody within rules 1 to 8`
+not `rule 1 — an intestate dies leaving a surviving spouse, no issue and no parent` with `case 10 — nobody within rules 1 to 8`
+not `rule 5 — there are no descendants, and there are a parent or parents of the intestate` with `case 10 — nobody within rules 1 to 8`
+not `rule 7 — there are no surviving spouse, descendants, parents, brothers and sisters or children of such brothers and sisters but grandparents of the intestate` with `case 10 — nobody within rules 1 to 8`
+not `rule 8 — there are no surviving spouse, descendants, parents, brothers and sisters or their children or grandparents but uncles and aunts of the intestate` with `case 10 — nobody within rules 1 to 8`
+`rule 9 — in default of distribution under rules 1 to 8` with `case 10 — nobody within rules 1 to 8`
+`null` with `the distribution under rules 1 to 8` with `case 10 — nobody within rules 1 to 8`
+`the distribution, read out` with `case 10 — nobody within rules 1 to 8` is equal to list of the Government takes 1
+`the total of the shares distributed` with `case 10 — nobody within rules 1 to 8` is equal to 1
+`section 8 — the intestate leaves surviving him more than one wife` with `case 11 — two surviving wives and one child`
+`count` with `the spouses surviving the intestate` with `case 11 — two surviving wives and one child` is equal to 2
+`the share of the estate to which the surviving spouse is entitled` with `case 11 — two surviving wives and one child` is equal to the result of dividing 1 by 2
+`the distribution, read out` with `case 11 — two surviving wives and one child` is equal to list of Halimah takes 0.25, Sofia takes 0.25 and Idris takes 0.5
+`the total of the shares distributed` with `case 11 — two surviving wives and one child` is equal to 1
+`section 2 — nothing in this Act applies to the estate` with `case 12 — the estate of a Muslim`
+not `this Act applies to the estate` with `case 12 — the estate of a Muslim`
+not `this Act has effect in respect of the estate` with `case 12 — the estate of a Muslim`
+`section 5 — the person dies intestate after 2 June 1967` with `case 12 — the estate of a Muslim`
+`section 5(a) — domiciled in Singapore and possessed beneficially of property situated in Singapore` with `case 12 — the estate of a Muslim`
+not `rule 9 — in default of distribution under rules 1 to 8` with `case 12 — the estate of a Muslim`
+`null` with `the persons entitled to succeed beneficially, and their shares` with `case 12 — the estate of a Muslim`
+`the property of which every share under section 7 is a fraction` with `case 12 — the estate of a Muslim` is equal to 0
+`the total of the shares distributed` with `case 12 — the estate of a Muslim` is equal to 0
+not `section 5 — the person dies intestate after 2 June 1967` with `case 13 — a death before the Act commenced`
+`null` with `the persons entitled to succeed beneficially, and their shares` with `case 13 — a death before the Act commenced`
+`the total of the shares distributed` with `case 13 — a death before the Act commenced` is equal to 0
+not `section 5 — the person dies intestate after 2 June 1967` with `case 13a — a death on 2 June 1967`
+`null` with `the persons entitled to succeed beneficially, and their shares` with `case 13a — a death on 2 June 1967`
+`section 5 — the person dies intestate after 2 June 1967` with `case 13b — a death on 3 June 1967`
+`the distribution, read out` with `case 13b — a death on 3 June 1967` is equal to list of Beatrice takes 1
+`the total of the shares distributed` with `case 13b — a death on 3 June 1967` is equal to 1
+not `section 5(a) — domiciled in Singapore and possessed beneficially of property situated in Singapore` with `case 14 — domiciled abroad, only movables in Singapore`
+not `section 5(b) — domiciled outside Singapore and possessed beneficially of immovable property situated in Singapore` with `case 14 — domiciled abroad, only movables in Singapore`
+not `this Act has effect in respect of the estate` with `case 14 — domiciled abroad, only movables in Singapore`
+`null` with `the persons entitled to succeed beneficially, and their shares` with `case 14 — domiciled abroad, only movables in Singapore`
+not `section 4(1) — the law of the country of domicile is the law of Singapore` with `case 14 — domiciled abroad, only movables in Singapore`
+`section 5(b) — domiciled outside Singapore and possessed beneficially of immovable property situated in Singapore` with `case 14a — domiciled abroad, immovables in Singapore`
+not `section 5(a) — domiciled in Singapore and possessed beneficially of property situated in Singapore` with `case 14a — domiciled abroad, immovables in Singapore`
+`section 5 — that property` with `case 14a — domiciled abroad, immovables in Singapore` is equal to 500000
+`the property of which every share under section 7 is a fraction` with `case 14a — domiciled abroad, immovables in Singapore` is equal to 300000
+`the distribution, read out` with `case 14a — domiciled abroad, immovables in Singapore` is equal to list of Clara takes 1
+`the total of the shares distributed` with `case 14a — domiciled abroad, immovables in Singapore` is equal to 1
+`section 3 — an “intestate” within the meaning of this Act` with `case 15 — a will beneficially disposing of part`
+`section 10 — the person dies leaving a will beneficially disposing of part of his property` with `case 15 — a will beneficially disposing of part`
+`section 10 — the value of the part of his property so disposed of` with `case 15 — a will beneficially disposing of part` is equal to 400000
+`the value beneficially disposed of by the will recorded in the estate agrees with the dispositions made by the will` with `case 15 — a will beneficially disposing of part`
+`the property of which every share under section 7 is a fraction` with `case 15 — a will beneficially disposing of part` is equal to 600000
+`the distribution, read out` with `case 15 — a will beneficially disposing of part` is equal to list of Beatrice takes 0.5, Clara takes 0.25 and Daniel takes 0.25
+`the total of the shares distributed` with `case 15 — a will beneficially disposing of part` is equal to 1
+`section 10 proviso — the personal representative is a trustee for the persons entitled under this Act in respect of the part of the estate not expressly disposed of` with `case 15 — a will beneficially disposing of part`
+`it appears by the will that the personal representative is entitled to take that part beneficially` with `case 15a — the will lets the personal representative take the undisposed part`
+not `section 10 proviso — the personal representative is a trustee for the persons entitled under this Act in respect of the part of the estate not expressly disposed of` with `case 15a — the will lets the personal representative take the undisposed part`
+`section 10 — the person dies leaving a will beneficially disposing of part of his property` with `case 15a — the will lets the personal representative take the undisposed part`
+`the property of which every share under section 7 is a fraction` with `case 15a — the will lets the personal representative take the undisposed part` is equal to 600000
+`section 10 — the person dies leaving a will beneficially disposing of part of his property` with `case 15b — a will with two beneficial dispositions and one that is not`
+`section 10 — the value of the part of his property so disposed of` with `case 15b — a will with two beneficial dispositions and one that is not` is equal to 400000
+`the value beneficially disposed of by the will recorded in the estate agrees with the dispositions made by the will` with `case 15b — a will with two beneficial dispositions and one that is not`
+`the property of which every share under section 7 is a fraction` with `case 15b — a will with two beneficial dispositions and one that is not` is equal to 600000
+`the distribution, read out` with `case 15b — a will with two beneficial dispositions and one that is not` is equal to list of Beatrice takes 0.5, Clara takes 0.25 and Daniel takes 0.25
+`the total of the shares distributed` with `case 15b — a will with two beneficial dispositions and one that is not` is equal to 1
+`section 4 — the value of the property whose distribution is regulated by this Act` with `case 15c — a will beside immovable property outside Singapore` is equal to 1900000
+`section 5 — that property` with `case 15c — a will beside immovable property outside Singapore` is equal to 1200000
+`section 10 — the value of the part of his property so disposed of` with `case 15c — a will beside immovable property outside Singapore` is equal to 400000
+`the property of which every share under section 7 is a fraction` with `case 15c — a will beside immovable property outside Singapore` is equal to 600000
+`the property of which every share under section 7 is a fraction` with `case 15c — a will beside immovable property outside Singapore` is equal to `the property of which every share under section 7 is a fraction` with `case 15 — a will beneficially disposing of part`
+`the total of the shares distributed` with `case 15c — a will beside immovable property outside Singapore` is equal to 1
+`section 10 — the person dies leaving a will beneficially disposing of part of his property` with `case 15d — a will disposing of more than the fund`
+`section 10 — the value of the part of his property so disposed of` with `case 15d — a will disposing of more than the fund` is equal to 5000000
+`section 5 — the property to be distributed, after payment thereout of the expenses of due administration` with `case 15d — a will disposing of more than the fund` is equal to 1000000
+`section 10 — the part of his property not so disposed of` with `case 15d — a will disposing of more than the fund` is equal to 0
+`the property of which every share under section 7 is a fraction` with `case 15d — a will disposing of more than the fund` is equal to 0
+`this Act has effect in respect of the estate` with `case 15d — a will disposing of more than the fund`
+`the distribution, read out` with `case 15d — a will disposing of more than the fund` is equal to list of Beatrice takes 0.5, Clara takes 0.25 and Daniel takes 0.25
+`the total of the shares distributed` with `case 15d — a will disposing of more than the fund` is equal to 1
+`the will beneficially disposes of the whole of his property` with `a will giving Beatrice the residue`
+not `the will beneficially disposes of the whole of his property` with `a will giving Beatrice a pecuniary legacy`
+not `section 3 — an “intestate” within the meaning of this Act` with `case 16 — a will beneficially disposing of the whole`
+not `this Act has effect in respect of the estate` with `case 16 — a will beneficially disposing of the whole`
+not `section 10 — the person dies leaving a will beneficially disposing of part of his property` with `case 16 — a will beneficially disposing of the whole`
+`null` with `the persons entitled to succeed beneficially, and their shares` with `case 16 — a will beneficially disposing of the whole`
+`the total of the shares distributed` with `case 16 — a will beneficially disposing of the whole` is equal to 0
+not `section 10 proviso — the personal representative is a trustee for the persons entitled under this Act in respect of the part of the estate not expressly disposed of` with `case 16 — a will beneficially disposing of the whole`
+`a universal or residuary beneficial gift` with `a beneficial gift` with `Beatrice`, `a universal gift` and 1000000
+`a universal or residuary beneficial gift` with `a beneficial gift` with `Beatrice`, `a residuary gift` and 1000000
+not `a universal or residuary beneficial gift` with `a beneficial gift` with `Beatrice`, `a specific devise or bequest` and 1000000
+not `a universal or residuary beneficial gift` with `a beneficial gift` with `Beatrice`, `a pecuniary legacy` and 1000000
+not `a universal or residuary beneficial gift` with `a beneficial gift` with `Beatrice`, `an appointment by will under a power` and 1000000
+not `a universal or residuary beneficial gift` with `a beneficial gift` with `Beatrice`, `a charge or direction for the payment of a debt` and 1000000
+`section 6(a) — there shall be no distinction between those related through his father and those related through his mother`
+`section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Esther` and `JUST` with `YMD` with 2024, 3 and 1
+not `section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `the ISA Farid` and `JUST` with `YMD` with 2024, 3 and 1
+`section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `the ISA Gita` and `JUST` with `YMD` with 2024, 3 and 1
+`the distribution, read out` with `case 17 — a child conceived in the womb and a child conceived after the death` is equal to list of Gita takes 0.5 and Esther takes 0.5
+`the total of the shares distributed` with `case 17 — a child conceived in the womb and a child conceived after the death` is equal to 1
+not `section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Jamal, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+`the person survives the intestate` with `Jamal, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+not `the person survives the intestate and is within the classes section 6(a) names` with `Jamal, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+`null` with `rule 6 — the stocks of brothers and sisters between which the estate is shared in equal portions` with `case 17a — a brother conceived after the intestate's death`
+`rule 9 — in default of distribution under rules 1 to 8` with `case 17a — a brother conceived after the intestate's death`
+`the distribution, read out` with `case 17a — a brother conceived after the intestate's death` is equal to list of the Government takes 1
+`the total of the shares distributed` with `case 17a — a brother conceived after the intestate's death` is equal to 1
+`section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Jamal, conceived before Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+`the distribution, read out` with `case 17b — a brother conceived in the womb at the intestate's death` is equal to list of Jamal takes 1
+`the total of the shares distributed` with `case 17b — a brother conceived in the womb at the intestate's death` is equal to 1
+`actually born in the lifetime of the intestate` with `born on the day Hakim died` and `JUST` with `YMD` with 2024, 3 and 1
+not `actually born in the lifetime of the intestate` with `born the day after Hakim died` and `JUST` with `YMD` with 2024, 3 and 1
+not `the person survives the intestate` with `died on the day Hakim died` and `JUST` with `YMD` with 2024, 3 and 1
+`the person survives the intestate` with `died the day after Hakim died` and `JUST` with `YMD` with 2024, 3 and 1
+not `section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Kadir, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+`the person survives the intestate` with `Kadir, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+not `the person survives the intestate and is within the classes section 6(a) names` with `Kadir, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+`null` with `the uncles and aunts of the intestate who survive him` with `case 17d — an uncle conceived after the intestate's death`
+not `rule 8 — there are no surviving spouse, descendants, parents, brothers and sisters or their children or grandparents but uncles and aunts of the intestate` with `case 17d — an uncle conceived after the intestate's death`
+`rule 9 — in default of distribution under rules 1 to 8` with `case 17d — an uncle conceived after the intestate's death`
+`the distribution, read out` with `case 17d — an uncle conceived after the intestate's death` is equal to list of the Government takes 1
+`the total of the shares distributed` with `case 17d — an uncle conceived after the intestate's death` is equal to 1
+not `the person survives the intestate and is within the classes section 6(a) names` with `Nabil, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+`the person survives the intestate` with `Nabil, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+`section 3 — a “child” within the meaning of this Act` with `an ISA legitimate child` with `Zara`
+not `null` with `rule 6 — the children of a deceased brother or sister who take according to their stocks` with `of the whole blood,` with `Nabil, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+not `rule 6 — this brother or sister shares, or has children who take according to their stocks` with `of the whole blood,` with `Nabil, born after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+`null` with `rule 6 — the stocks of brothers and sisters between which the estate is shared in equal portions` with `case 17e — a brother conceived after the death, leaving a surviving child`
+`rule 9 — in default of distribution under rules 1 to 8` with `case 17e — a brother conceived after the death, leaving a surviving child`
+`the distribution, read out` with `case 17e — a brother conceived after the death, leaving a surviving child` is equal to list of the Government takes 1
+`the total of the shares distributed` with `case 17e — a brother conceived after the death, leaving a surviving child` is equal to 1
+not `the person survives the intestate` with `Nabil, who predeceased Rahim` and `JUST` with `YMD` with 2024, 5 and 5
+`rule 6 — this brother or sister shares, or has children who take according to their stocks` with `of the whole blood,` with `Nabil, who predeceased Rahim` and `JUST` with `YMD` with 2024, 5 and 5
+`the distribution, read out` with `case 17g — a brother who predeceased, leaving the same surviving child` is equal to list of Zara takes 1
+`the total of the shares distributed` with `case 17g — a brother who predeceased, leaving the same surviving child` is equal to 1
+`section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Nia, in the womb when Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+not `section 6(a) — actually born in his lifetime, or at the date of his death only conceived in the womb but subsequently born alive` with `Osman, conceived after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+`the person survives the intestate` with `Osman, conceived after Rahim died` and `JUST` with `YMD` with 2024, 5 and 5
+`section 3 — a “child” within the meaning of this Act` with `an ISA legitimate child` with `Osman, conceived after Rahim died`
+`count` with `rule 6 — the children of a deceased brother or sister who take according to their stocks` with `of the whole blood,` with `Bakri, who died a month before Rahim` and `JUST` with `YMD` with 2024, 5 and 5 is equal to 1
+`the distribution, read out` with `case 17f — a niece in the womb at the death, and a nephew conceived after it` is equal to list of Nia takes 1
+`the total of the shares distributed` with `case 17f — a niece in the womb at the death, and a nephew conceived after it` is equal to 1
+`section 3 — a “child” within the meaning of this Act` with `an ISA legitimate child` with `Ivan`
+`section 3 — a “child” within the meaning of this Act` with `a child adopted by order of court in Singapore` with `Jasmine`
+not `section 3 — a “child” within the meaning of this Act` with `a child neither legitimate nor adopted` with `Kiran`
+`the distribution, read out` with `case 18 — a legitimate child, an adopted child and neither` is equal to list of Ivan takes 0.5 and Jasmine takes 0.5
+`the total of the shares distributed` with `case 18 — a legitimate child, an adopted child and neither` is equal to 1
+`section 9 — the distributive share is claimed by a child or any descendant of a child of that person` with `Leong` and `Ivan`
+not `section 9 — the distributive share is claimed by a child or any descendant of a child of that person` with `Leong` and `Kiran`
+`Mei` 's `money or other property given, paid or settled by the intestate during his life to or for the advancement of the person` is equal to 60000
+`section 9 — the distributive share is claimed by a child or any descendant of a child of that person` with `Poh` and `Mei`
+`section 9 — the money or other property to be taken into account in estimating such distributive share` with `Poh` and `Mei` is equal to `JUST` with 0
+`section 9 — the distributive share of a child or a descendant of a child, estimated` with `Poh`, `Mei`, the result of dividing 1 by 2 and `the property of which every share under section 7 is a fraction` with `case 19 — a child who received an advancement` is equal to `JUST` with 500000
+not `section 9 — the distributive share is claimed by a child or any descendant of a child of that person` with `Poh` and `Beatrice`
+`section 9 — the money or other property to be taken into account in estimating such distributive share` with `Poh` and `Beatrice` is equal to `NOTHING`
+`the distribution, read out` with `case 19 — a child who received an advancement` is equal to list of Mei takes 0.5 and Ng takes 0.5
+`the total of the shares distributed` with `case 19 — a child who received an advancement` is equal to 1
+`section 9 — the distributive share is claimed by a child or any descendant of a child of that person` with `Elias` and `Jia`
+not `section 9 — the distributive share is claimed by a child or any descendant of a child of that person` with `Elias` and `Marcus`
+`section 4 — the value of the property whose distribution is regulated by this Act` with `case 20 — an estate with movable and immovable property outside Singapore` is equal to 1850000
+`section 5 — that property` with `case 20 — an estate with movable and immovable property outside Singapore` is equal to 1200000
+`the property of which every share under section 7 is a fraction` with `case 20 — an estate with movable and immovable property outside Singapore` is equal to 1000000
+not `section 4(1) — the law of the country of domicile is the law of Singapore` with `case 20a — the same estate, domiciled outside Singapore`
+`section 4(2) — the distribution of the immovable property is regulated by this Act`
+`section 4 — the value of the property whose distribution is regulated by this Act` with `case 20a — the same estate, domiciled outside Singapore` is equal to 700000
+`the date of the death of the intestate` with `case 21 — a death with no date in evidence` is equal to `NOTHING`
+not `section 5 — the person dies intestate after 2 June 1967` with `case 21 — a death with no date in evidence`
+`section 5(a) — domiciled in Singapore and possessed beneficially of property situated in Singapore` with `case 21 — a death with no date in evidence`
+`this Act applies to the estate` with `case 21 — a death with no date in evidence`
+not `rule 9 — in default of distribution under rules 1 to 8` with `case 21 — a death with no date in evidence`
+`null` with `the persons entitled to succeed beneficially, and their shares` with `case 21 — a death with no date in evidence`
+`the total of the shares distributed` with `case 21 — a death with no date in evidence` is equal to 0
+`section 10 — the person dies leaving a will beneficially disposing of part of his property` with `case 22 — the estate's disposed value contradicts the will`
+not `the value beneficially disposed of by the will recorded in the estate agrees with the dispositions made by the will` with `case 22 — the estate's disposed value contradicts the will`
+`section 10 — the value of the part of his property so disposed of` with `case 22 — the estate's disposed value contradicts the will` is equal to 400000
+`the property of which every share under section 7 is a fraction` with `case 22 — the estate's disposed value contradicts the will` is equal to 600000
+not `the will makes some beneficial disposition` with `a will disposing of nothing`
+`section 3 — an “intestate” within the meaning of this Act` with `case 22a — a will that disposes of nothing, beside a recorded disposed value`
+not `section 10 — the person dies leaving a will beneficially disposing of part of his property` with `case 22a — a will that disposes of nothing, beside a recorded disposed value`
+not `the value beneficially disposed of by the will recorded in the estate agrees with the dispositions made by the will` with `case 22a — a will that disposes of nothing, beside a recorded disposed value`
+`section 10 — the value of the part of his property so disposed of` with `case 22a — a will that disposes of nothing, beside a recorded disposed value` is equal to 0
+`the property of which every share under section 7 is a fraction` with `case 22a — a will that disposes of nothing, beside a recorded disposed value` is equal to 1000000
+not `section 10 proviso — the personal representative is a trustee for the persons entitled under this Act in respect of the part of the estate not expressly disposed of` with `case 22a — a will that disposes of nothing, beside a recorded disposed value`
+`the property of which every share under section 7 is a fraction` with `case 23 — an estate with debts far exceeding the property` is equal to 1000000
+`the distribution, read out` with `case 23 — an estate with debts far exceeding the property` is equal to list of Beatrice takes 0.5, Clara takes 0.25 and Daniel takes 0.25
+`section 5(a) — domiciled in Singapore and possessed beneficially of property situated in Singapore` with `case 23a — expenses exceeding the property`
+`section 5 — the property to be distributed, after payment thereout of the expenses of due administration` with `case 23a — expenses exceeding the property` is equal to 0
+`the property of which every share under section 7 is a fraction` with `case 23a — expenses exceeding the property` is equal to 0
+`the total of the shares distributed` with `case 23a — expenses exceeding the property` is equal to 1
+`the property held as trustee and not beneficially, situated in Singapore` with `case 24 — the whole Singapore estate held as trustee for another` is equal to 900000
+`the property situated in Singapore, whether movable or immovable, or both, possessed beneficially` with `case 24 — the whole Singapore estate held as trustee for another` is equal to 0
+not `section 5(a) — domiciled in Singapore and possessed beneficially of property situated in Singapore` with `case 24 — the whole Singapore estate held as trustee for another`
+not `this Act has effect in respect of the estate` with `case 24 — the whole Singapore estate held as trustee for another`
+`null` with `the persons entitled to succeed beneficially, and their shares` with `case 24 — the whole Singapore estate held as trustee for another`
+`the total of the shares distributed` with `case 24 — the whole Singapore estate held as trustee for another` is equal to 0
+`the property situated in Singapore, whether movable or immovable, or both, possessed beneficially` with `case 24a — part of the Singapore estate held as trustee` is equal to 800000
+`section 5(a) — domiciled in Singapore and possessed beneficially of property situated in Singapore` with `case 24a — part of the Singapore estate held as trustee`
+`the property of which every share under section 7 is a fraction` with `case 24a — part of the Singapore estate held as trustee` is equal to 600000
+`the distribution, read out` with `case 24a — part of the Singapore estate held as trustee` is equal to list of Beatrice takes 0.5, Clara takes 0.25 and Daniel takes 0.25
+`section 4 — the value of the property whose distribution is regulated by this Act` with `case 24a — part of the Singapore estate held as trustee` is equal to 1200000
+`section 5 — that property` with `case 24a — part of the Singapore estate held as trustee` is equal to 800000
+`the immovable property situated in Singapore, possessed beneficially` with `case 24b — domiciled abroad, the Singapore trustee figure exceeding the Singapore land` is equal to 0
+not `section 5(b) — domiciled outside Singapore and possessed beneficially of immovable property situated in Singapore` with `case 24b — domiciled abroad, the Singapore trustee figure exceeding the Singapore land`
+`null` with `the persons entitled to succeed beneficially, and their shares` with `case 24b — domiciled abroad, the Singapore trustee figure exceeding the Singapore land`
+`the immovable property situated in Singapore, possessed beneficially` with `case 24c — domiciled abroad, part of the Singapore land held as trustee` is equal to 100000
+`section 5(b) — domiciled outside Singapore and possessed beneficially of immovable property situated in Singapore` with `case 24c — domiciled abroad, part of the Singapore land held as trustee`
+`the property of which every share under section 7 is a fraction` with `case 24c — domiciled abroad, part of the Singapore land held as trustee` is equal to 0
+`the distribution, read out` with `case 24c — domiciled abroad, part of the Singapore land held as trustee` is equal to list of Clara takes 1
+`the property held as trustee and not beneficially, situated in Singapore` with `case 24d — a case file whose trustee figure exceeds the property it is drawn from` is equal to 1000000
+`the property situated in Singapore, whether movable or immovable, or both, possessed beneficially` with `case 24d — a case file whose trustee figure exceeds the property it is drawn from` is equal to 0
+not `section 5(a) — domiciled in Singapore and possessed beneficially of property situated in Singapore` with `case 24d — a case file whose trustee figure exceeds the property it is drawn from`
+`section 5 — that property` with `case 24d — a case file whose trustee figure exceeds the property it is drawn from` is equal to 0
+not `this Act has effect in respect of the estate` with `case 24d — a case file whose trustee figure exceeds the property it is drawn from`
+`null` with `rule 6 — the children of a deceased brother or sister who take according to their stocks` with `of the whole blood,` with `Tan, whose only child predeceased her` and `JUST` with `YMD` with 2024, 5 and 5
+not `rule 6 — this brother or sister shares, or has children who take according to their stocks` with `of the whole blood,` with `Tan, whose only child predeceased her` and `JUST` with `YMD` with 2024, 5 and 5
+`null` with `rule 6 — the stocks of brothers and sisters between which the estate is shared in equal portions` with `case 25 — only a grand-niece survives, and a grandparent`
+`rule 7 — there are no surviving spouse, descendants, parents, brothers and sisters or children of such brothers and sisters but grandparents of the intestate` with `case 25 — only a grand-niece survives, and a grandparent`
+`the distribution, read out` with `case 25 — only a grand-niece survives, and a grandparent` is equal to list of Xin takes 1
+`the total of the shares distributed` with `case 25 — only a grand-niece survives, and a grandparent` is equal to 1
+not `rule 3 — the ancestor leaves a child who takes, or who is himself represented` with `the ISA Chandra` and `JUST` with `YMD` with 2024, 7 and 7
+not `rule 3 — this child is a stock which takes, in his own right or through those who legally represent him` with `an ISA legitimate child` with `the ISA Chandra` and `JUST` with `YMD` with 2024, 7 and 7
+not `the intestate leaves issue` with `case 26 — the only grandchild is neither legitimate nor adopted`
+`rule 7 — there are no surviving spouse, descendants, parents, brothers and sisters or children of such brothers and sisters but grandparents of the intestate` with `case 26 — the only grandchild is neither legitimate nor adopted`
+`the distribution, read out` with `case 26 — the only grandchild is neither legitimate nor adopted` is equal to list of Xin takes 1
+`the total of the shares distributed` with `case 26 — the only grandchild is neither legitimate nor adopted` is equal to 1
+`the intestate leaves issue` with `case 26a — the only grandchild is legitimate`
+not `rule 7 — there are no surviving spouse, descendants, parents, brothers and sisters or children of such brothers and sisters but grandparents of the intestate` with `case 26a — the only grandchild is legitimate`
+`the distribution, read out` with `case 26a — the only grandchild is legitimate` is equal to list of Devi takes 1
+`the total of the shares distributed` with `case 26a — the only grandchild is legitimate` is equal to 1
+not `the intestate leaves issue` with `case 27 — an only child predeceased childless, and a parent survives`
+not `there are descendants` with `case 27 — an only child predeceased childless, and a parent survives`
+`rule 5 — there are no descendants, and there are a parent or parents of the intestate` with `case 27 — an only child predeceased childless, and a parent survives`
+`the distribution, read out` with `case 27 — an only child predeceased childless, and a parent survives` is equal to list of Selva's mother takes 1
+`the total of the shares distributed` with `case 27 — an only child predeceased childless, and a parent survives` is equal to 1
+not `the intestate leaves issue` with `case 28 — an only child who is not a "child" within section 3`
+`rule 1 — an intestate dies leaving a surviving spouse, no issue and no parent` with `case 28 — an only child who is not a "child" within section 3`
+not `rule 2 — an intestate dies leaving a surviving spouse and issue` with `case 28 — an only child who is not a "child" within section 3`
+`the distribution, read out` with `case 28 — an only child who is not a "child" within section 3` is equal to list of Marcus takes 1
+`the total of the shares distributed` with `case 28 — an only child who is not a "child" within section 3` is equal to 1
+`count` with `the spouses surviving the intestate` with `case 29 — one subsisting marriage and one dissolved` is equal to 1
+not `section 8 — the intestate leaves surviving him more than one wife` with `case 29 — one subsisting marriage and one dissolved`
+`the intestate leaves a surviving spouse` with `case 29 — one subsisting marriage and one dissolved`
+`the distribution, read out` with `case 29 — one subsisting marriage and one dissolved` is equal to list of Halimah takes 0.5 and Idris takes 0.5
+`the total of the shares distributed` with `case 29 — one subsisting marriage and one dissolved` is equal to 1
+`count` with `the persons entitled to succeed beneficially, and their shares` with `case 30 — three surviving children and no spouse` is equal to 3
+`rule 3 — the share of the estate distributed among the issue, subject to the rights of the surviving spouse` with `case 30 — three surviving children and no spouse` is equal to 1
+`the total of the shares distributed` with `case 30 — three surviving children and no spouse` is equal to 1
+`the distribution, read out` with `case 30 — three surviving children and no spouse` is equal to list of Wen takes 0.3333333333333333, Xiu takes 0.3333333333333333 and Yan takes 0.3333333333333333
+`count` with `rule 6 — the stocks of brothers and sisters between which the estate is shared in equal portions` with `case 31 — a deceased whole-blood sister's child against a living half-blood sister` is equal to 1
+`the distribution, read out` with `case 31 — a deceased whole-blood sister's child against a living half-blood sister` is equal to list of Ravi takes 1
+`the total of the shares distributed` with `case 31 — a deceased whole-blood sister's child against a living half-blood sister` is equal to 1
+`the distribution, read out` with `case 31a — a deceased half-blood sister's child against a living whole-blood brother` is equal to list of Salim takes 1
+`the total of the shares distributed` with `case 31a — a deceased half-blood sister's child against a living whole-blood brother` is equal to 1
+`rule 8 — there are no surviving spouse, descendants, parents, brothers and sisters or their children or grandparents but uncles and aunts of the intestate` with `case 32 — only uncles and aunts of the half blood`
+`the distribution, read out` with `case 32 — only uncles and aunts of the half blood` is equal to list of Bala takes 1
+`the total of the shares distributed` with `case 32 — only uncles and aunts of the half blood` is equal to 1
+not `a universal or residuary beneficial gift` with `a universal gift that is not beneficial`
+not `the will beneficially disposes of the whole of his property` with `a will containing only a non-beneficial universal gift`
+not `the will makes some beneficial disposition` with `a will containing only a non-beneficial universal gift`
+`section 3 — an “intestate” within the meaning of this Act` with `case 33 — a will whose only disposition is not beneficial`
+not `section 10 — the person dies leaving a will beneficially disposing of part of his property` with `case 33 — a will whose only disposition is not beneficial`
+`section 10 — the value of the part of his property so disposed of` with `case 33 — a will whose only disposition is not beneficial` is equal to 0
+`the property of which every share under section 7 is a fraction` with `case 33 — a will whose only disposition is not beneficial` is equal to 1000000
+not `section 10 proviso — the personal representative is a trustee for the persons entitled under this Act in respect of the part of the estate not expressly disposed of` with `case 33 — a will whose only disposition is not beneficial`
+`rule 1 — an intestate dies leaving a surviving spouse, no issue and no parent` with `case 34 — a surviving spouse beside two brothers`
+not `rule 6 — there are no surviving spouse, descendants or parents` with `case 34 — a surviving spouse beside two brothers`
+`count` with `rule 6 — the stocks of brothers and sisters between which the estate is shared in equal portions` with `case 34 — a surviving spouse beside two brothers` is equal to 2
+`null` with `rule 6 — the entitlements of the brothers and sisters and the children of deceased brothers or sisters` with `case 34 — a surviving spouse beside two brothers`
+`the distribution, read out` with `case 34 — a surviving spouse beside two brothers` is equal to list of Marcus takes 1
+`the total of the shares distributed` with `case 34 — a surviving spouse beside two brothers` is equal to 1
+`rule 5 — there are no descendants, and there are a parent or parents of the intestate` with `case 35 — a surviving parent beside two brothers`
+not `rule 6 — there are no surviving spouse, descendants or parents` with `case 35 — a surviving parent beside two brothers`
+`count` with `rule 6 — the stocks of brothers and sisters between which the estate is shared in equal portions` with `case 35 — a surviving parent beside two brothers` is equal to 2
+`null` with `rule 6 — the entitlements of the brothers and sisters and the children of deceased brothers or sisters` with `case 35 — a surviving parent beside two brothers`
+`the distribution, read out` with `case 35 — a surviving parent beside two brothers` is equal to list of Rahim's mother takes 1
+`the total of the shares distributed` with `case 35 — a surviving parent beside two brothers` is equal to 1
+`rule 6 — there are no surviving spouse, descendants or parents` with `case 36 — a surviving brother beside a grandparent`
+not `null` with `the grandparents of the intestate who survive him` with `case 36 — a surviving brother beside a grandparent`
+not `rule 7 — there are no surviving spouse, descendants, parents, brothers and sisters or children of such brothers and sisters but grandparents of the intestate` with `case 36 — a surviving brother beside a grandparent`
+`null` with `rule 7 — the entitlements of the grandparents` with `case 36 — a surviving brother beside a grandparent`
+`the distribution, read out` with `case 36 — a surviving brother beside a grandparent` is equal to list of Salim takes 1
+`the total of the shares distributed` with `case 36 — a surviving brother beside a grandparent` is equal to 1
+`rule 7 — there are no surviving spouse, descendants, parents, brothers and sisters or children of such brothers and sisters but grandparents of the intestate` with `case 37 — a surviving grandparent beside an uncle`
+not `null` with `the uncles and aunts of the intestate who survive him` with `case 37 — a surviving grandparent beside an uncle`
+not `rule 8 — there are no surviving spouse, descendants, parents, brothers and sisters or their children or grandparents but uncles and aunts of the intestate` with `case 37 — a surviving grandparent beside an uncle`
+`null` with `rule 8 — the entitlements of the uncles and aunts` with `case 37 — a surviving grandparent beside an uncle`
+`the distribution, read out` with `case 37 — a surviving grandparent beside an uncle` is equal to list of Xin takes 1
+`the total of the shares distributed` with `case 37 — a surviving grandparent beside an uncle` is equal to 1
+`rule 1 — an intestate dies leaving a surviving spouse, no issue and no parent` with `case 38 — a surviving spouse beside an uncle`
+not `null` with `the uncles and aunts of the intestate who survive him` with `case 38 — a surviving spouse beside an uncle`
+not `rule 8 — there are no surviving spouse, descendants, parents, brothers and sisters or their children or grandparents but uncles and aunts of the intestate` with `case 38 — a surviving spouse beside an uncle`
+`the distribution, read out` with `case 38 — a surviving spouse beside an uncle` is equal to list of Marcus takes 1
+`the total of the shares distributed` with `case 38 — a surviving spouse beside an uncle` is equal to 1
+`rule 6 — there are no surviving spouse, descendants or parents` with `case 39 — a surviving brother beside an uncle`
+`null` with `the grandparents of the intestate who survive him` with `case 39 — a surviving brother beside an uncle`
+not `null` with `the uncles and aunts of the intestate who survive him` with `case 39 — a surviving brother beside an uncle`
+not `rule 8 — there are no surviving spouse, descendants, parents, brothers and sisters or their children or grandparents but uncles and aunts of the intestate` with `case 39 — a surviving brother beside an uncle`
+`the distribution, read out` with `case 39 — a surviving brother beside an uncle` is equal to list of Salim takes 1
+`the total of the shares distributed` with `case 39 — a surviving brother beside an uncle` is equal to 1
+`rule 2 — an intestate dies leaving a surviving spouse and issue` with `case 40 — an infant child takes half`
+`the distribution, read out` with `case 40 — an infant child takes half` is equal to list of Suria takes 0.5 and Amirah takes 0.5
+`the total of the shares distributed` with `case 40 — an infant child takes half` is equal to 1
+`the shares taken by an infant concerned in the estate, read out` with `case 40 — an infant child takes half` is equal to list of Amirah takes 0.5
+`count` with `the entitlements under this Act taken by an infant concerned in the estate` with `case 40 — an infant child takes half` is equal to 1
+`the distribution, read out` with `case 40a — the same estate, no infant recorded` is equal to list of Suria takes 0.5 and Amirah takes 0.5
+`null` with `the entitlements under this Act taken by an infant concerned in the estate` with `case 40a — the same estate, no infant recorded`
+`null` with `the entitlements under this Act taken by an infant concerned in the estate` with `case 1 — a surviving spouse and issue`
+`count` with `the ISA Amirah, an infant concerned in the estate` 's `the guardians of the infant` is equal to 1
+`the ISA Amirah, an infant concerned in the estate` 's `the capital of the property of the infant` is equal to 500000
+`the ISA Bakar, guardian of Amirah's property` 's `has given a good discharge for a legacy or other capital moneys payable to or receivable by the infant`
+not `the ISA Bakar, guardian of Amirah's property` 's `the court has otherwise ordered as to giving a good discharge`
+`section 9 — the distributive share of a child or a descendant of a child, estimated` with `the ISA Roslan`, `the ISA Amirah`, the result of dividing 1 by 2 and `the property of which every share under section 7 is a fraction` with `case 40 — an infant child takes half` is equal to `JUST` with 500000
+`one person takes the whole of the property distributable under this Act` with `case 3 — a surviving spouse, no issue and no parent`
+`one person takes the whole of the property distributable under this Act` with `case 10 — nobody within rules 1 to 8`
+`the reference for the person entitled` with `the Government` is equal to `NOTHING`
+not `one person takes the whole of the property distributable under this Act` with `case 1 — a surviving spouse and issue`
+`the total of the shares distributed` with `case 1 — a surviving spouse and issue` is equal to 1
+not `one person takes the whole of the property distributable under this Act` with `case 12 — the estate of a Muslim`

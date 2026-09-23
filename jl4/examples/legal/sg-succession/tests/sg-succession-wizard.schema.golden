@@ -1,0 +1,74 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "What happens to the estate when someone dies without a will",
+    "properties": {
+        "children of each child who died": {
+            "type": "number"
+        },
+        "children who died first": {
+            "type": "number"
+        },
+        "day of death": {
+            "type": "number"
+        },
+        "debts, funeral and legal costs": {
+            "type": "number"
+        },
+        "month of death": {
+            "type": "number"
+        },
+        "surviving brothers and sisters": {
+            "type": "number"
+        },
+        "surviving children": {
+            "type": "number"
+        },
+        "surviving grandparents": {
+            "type": "number"
+        },
+        "surviving parents": {
+            "type": "number"
+        },
+        "surviving spouses": {
+            "type": "number"
+        },
+        "surviving uncles and aunts": {
+            "type": "number"
+        },
+        "the deceased lived in Singapore": {
+            "type": "boolean"
+        },
+        "the deceased was Muslim": {
+            "type": "boolean"
+        },
+        "value of everything else": {
+            "type": "number"
+        },
+        "value of the home in Singapore": {
+            "type": "number"
+        },
+        "year of death": {
+            "type": "number"
+        }
+    },
+    "required": [
+        "the deceased was Muslim",
+        "the deceased lived in Singapore",
+        "surviving spouses",
+        "surviving children",
+        "children who died first",
+        "children of each child who died",
+        "surviving parents",
+        "surviving brothers and sisters",
+        "surviving grandparents",
+        "surviving uncles and aunts",
+        "value of the home in Singapore",
+        "value of everything else",
+        "debts, funeral and legal costs",
+        "year of death",
+        "month of death",
+        "day of death"
+    ],
+    "title": "the succession answer",
+    "type": "object"
+}
