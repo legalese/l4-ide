@@ -1,0 +1,23 @@
+---
+config:
+  themeCSS: ".railroad-choice:nth-of-type(1) .railroad-nonterminal:nth-of-type(1) rect{stroke:#2f7a3f!important;fill:#fff!important;opacity:1!important} .railroad-choice:nth-of-type(1) .railroad-nonterminal:nth-of-type(1) text{fill:#111!important;opacity:1!important} .railroad-choice:nth-of-type(1) .railroad-nonterminal:nth-of-type(2) rect{stroke:#c9c9c9!important;fill:#fbfbfb!important;stroke-dasharray:5 4!important;opacity:0.9!important} .railroad-choice:nth-of-type(1) .railroad-nonterminal:nth-of-type(2) text{fill:#c9c9c9!important;opacity:0.9!important} .railroad-choice:nth-of-type(6) .railroad-nonterminal:nth-of-type(1) rect{stroke:#2f7a3f!important;fill:#fff!important;opacity:1!important} .railroad-choice:nth-of-type(6) .railroad-nonterminal:nth-of-type(1) text{fill:#111!important;opacity:1!important} .railroad-choice:nth-of-type(6) .railroad-nonterminal:nth-of-type(2) rect{stroke:#b7791f!important;fill:#fff!important;stroke-dasharray:1.5 3!important;opacity:1!important} .railroad-choice:nth-of-type(6) .railroad-nonterminal:nth-of-type(2) text{fill:#111!important;opacity:1!important} .railroad-choice:nth-of-type(6) .railroad-nonterminal:nth-of-type(3) rect{stroke:#9a9a9a!important;fill:#fff!important;opacity:1!important} .railroad-choice:nth-of-type(6) .railroad-nonterminal:nth-of-type(3) text{fill:#555!important;opacity:1!important} .railroad-choice:nth-of-type(6) .railroad-nonterminal:nth-of-type(4) rect{stroke:#9a9a9a!important;fill:#fff!important;opacity:1!important} .railroad-choice:nth-of-type(6) .railroad-nonterminal:nth-of-type(4) text{fill:#555!important;opacity:1!important} .railroad-sequence .railroad-nonterminal:nth-of-type(2):not(.railroad-choice *) rect{stroke:#2f7a3f!important;fill:#fff!important;opacity:1!important} .railroad-sequence .railroad-nonterminal:nth-of-type(2):not(.railroad-choice *) text{fill:#111!important;opacity:1!important} .railroad-sequence .railroad-nonterminal:nth-of-type(4):not(.railroad-choice *) rect{stroke:#2f7a3f!important;fill:#fff!important;opacity:1!important} .railroad-sequence .railroad-nonterminal:nth-of-type(4):not(.railroad-choice *) text{fill:#111!important;opacity:1!important} .railroad-sequence .railroad-terminal rect{fill:none!important;stroke:none!important} .railroad-sequence .railroad-terminal text{fill:#9a9a9a!important;font-style:italic!important} .railroad-line{stroke:#d5d5d5!important;stroke-width:1px!important;stroke-dasharray:none!important;} .railroad-sequence .railroad-line:not(.railroad-choice *){stroke:#1a1a1a!important;stroke-width:2.8px!important;stroke-dasharray:none!important;} .railroad-choice:nth-of-type(1) .railroad-line:nth-of-type(1), .railroad-choice:nth-of-type(1) .railroad-line:nth-of-type(2){stroke:#1a1a1a!important;stroke-width:2.8px!important;stroke-dasharray:none!important;} .railroad-choice:nth-of-type(1) .railroad-line:nth-of-type(3), .railroad-choice:nth-of-type(1) .railroad-line:nth-of-type(4){stroke:#c9c9c9!important;stroke-width:1px!important;stroke-dasharray:5 4!important;} .railroad-choice:nth-of-type(6) .railroad-line:nth-of-type(1), .railroad-choice:nth-of-type(6) .railroad-line:nth-of-type(2){stroke:#1a1a1a!important;stroke-width:2.8px!important;stroke-dasharray:none!important;} .railroad-choice:nth-of-type(6) .railroad-line:nth-of-type(3), .railroad-choice:nth-of-type(6) .railroad-line:nth-of-type(4){stroke:#8a8a8a!important;stroke-width:1.7px!important;stroke-dasharray:none!important;}"
+  railroad:
+    nonTerminalFill: "#ffffff"
+    nonTerminalStroke: "#2f7a3f"
+    terminalFill: "transparent"
+    terminalStroke: "transparent"
+    lineColor: "#b0b0b0"
+    markerFill: "#222222"
+    strokeWidth: 1.5
+    fontSize: 15
+    ruleNameColor: "#333333"
+---
+railroad-beta
+cheat = sequence(
+  choice(nonterminal("by deceiving"), nonterminal("dishonest concealment")),
+  nonterminal("intentionally"),
+  terminal("induces an act or omission that"),
+  nonterminal("causes harm"),
+  terminal("to any person in"),
+  choice(nonterminal("body"), nonterminal("mind"), nonterminal("reputation"), nonterminal("property"))
+);

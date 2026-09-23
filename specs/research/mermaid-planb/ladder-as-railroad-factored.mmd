@@ -1,0 +1,18 @@
+---
+config:
+  railroad:
+    nonTerminalFill: "#ffffff"
+    nonTerminalStroke: "#2f7a3f"
+    nonTerminalTextColor: "#111111"
+    terminalFill: "transparent"
+    terminalStroke: "transparent"
+    terminalTextColor: "#888888"
+    lineColor: "#8a8a8a"
+    markerFill: "#222222"
+    strokeWidth: 1.5
+    fontSize: 15
+---
+railroad-beta
+complies_with_A3 = choice(nonterminal("NOT: A3 covers this window"), nonterminal("A3 requirement met"));
+A3_covers = sequence(nonterminal("on an upper floor"), choice(nonterminal("in a wall"), nonterminal("in a roof slope")));
+A3_requirement_met = sequence(nonterminal("obscure-glazed"), choice(nonterminal("non-opening"), nonterminal("openable parts >= 1.7m")));

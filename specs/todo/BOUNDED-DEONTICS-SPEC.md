@@ -1,3 +1,9 @@
+> **Status (audited 2026-07-03):** PARTIAL — Phase 1 object-level deontics are implemented; Phases 1b-4 (verification/assertions) are open.
+>
+> - DONE: `DO` primitive + `MUST`/`MAY`/`SHANT` sugar, `HENCE`/`LEST`, `FULFILLED`/`BREACH` terminals — `DeonticModal` incl. `DDo` in `jl4-core/src/L4/Syntax.hs:283-287`, parsed `jl4-core/src/L4/Parser.hs:1769-1794`, terminals in `StateGraph.hs`.
+> - OPEN: Phase 1b prepositional action args (`TO`/`WITH`/`BEFORE` still not action markers; `BEFORE` isn't even a keyword); Phase 2 backends (no UPPAAL/SPIN/NuSMV/Maude); Phase 3 LTL/CTL assertion language.
+> - Note: related work is live in the `mengwong/bounded-deontics-paper` and `mengwong/verification-backend-lowering-spec` worktrees.
+
 # Bounded Deontics Specification
 
 **Status:** Planning
@@ -209,6 +215,10 @@ This would make `TO`, `WITH`, `BEFORE`, `UNDER`, etc. into structured argument m
 - [ ] Reconcile with `BEFORE`/`WITHIN` deadline syntax
 
 ### Phase 2: Transpilation to Verification Backends
+
+> Detailed architecture (fan-out to Z3/Alloy/TLA+/NuSMV/UPPAAL/TAPAAL, the core-IR
+> faithfulness obligation, and the defeasibility crux): see
+> [VERIFICATION-BACKEND-LOWERING-SPEC.md](../proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md).
 
 - [ ] Transpile to UPPAAL (timed automata, CTL)
 - [ ] Transpile to SPIN/Promela (LTL model checking)
