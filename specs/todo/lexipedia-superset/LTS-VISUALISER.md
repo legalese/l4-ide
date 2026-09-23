@@ -1191,6 +1191,7 @@ AllocPre | Push | Pop` (`Trace.hs:87-95`) is an expression-level reduction tree.
   disturbing callers"_ (`Ledger.hs:94-96`). But `txTime` is a per-run constant ordered by log
   position (`:172-173`), i.e. wall-clock. Good for "what did this party record"; wrong axis for
   the token game.
+  _(Added 2026-09-23.)_ `specs/todo/NORM-LOG-SPEC.md` proposes putting norm fates into the ledger after all, on the **contract** clock rather than `txTime` (its N3), and letting a `PROVIDED` read them. That would make the step log an input rather than an observer, which reopens R5 (its N6). R5 stands until that is ruled.
 
 ### 4.2a Deriving the marking — the function revision 1 never wrote
 
