@@ -1,0 +1,282 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://legalese.com/l4/schemas/external-modifications.schema.json",
+  "title": "External-modification register",
+  "description": "P2's deliverable (SPEC.md §4): what has happened to the published text since it was printed. Three parts, and the second and third are the point. 'entries' are the findings, each classed (a) binding, (b) interpretive or (c) prospective and routed accordingly. 'searches' is the searched-not-just-found record — SPEC.md §4 P2: 'the report states what was searched, not only what was found, so \"no post-enactment modification found\" is a checked claim rather than an assumption' — so a search with no findings is a first-class record carrying what it did NOT cover. 'dispositions' is the completeness join over the source bundle's annotation inventory, which exists because the BNA smoke's hand sweep disposed of four of five modification annotations and silently dropped the fifth (SMOKE-REPORT.md §3.5): the fix is not a more careful reviewer, it is a machine-checked table.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "register_version",
+    "subject",
+    "searches",
+    "entries",
+    "dispositions"
+  ],
+  "properties": {
+    "kind": { "const": "external-modifications" },
+    "register_version": { "const": 1 },
+    "subject": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "note": { "type": "string", "minLength": 1 },
+    "swept": {
+      "type": "string",
+      "format": "date",
+      "description": "The date the sweep as a whole was run; individual searches carry their own."
+    },
+    "searches": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/search" },
+      "description": "At least one: a sweep that records no search records nothing about what was checked, and its silence would read as coverage."
+    },
+    "entries": { "type": "array", "items": { "$ref": "#/$defs/entry" } },
+    "dispositions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/disposition" }
+    }
+  },
+  "$defs": {
+    "search": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "question",
+        "method",
+        "scope",
+        "performed",
+        "outcome",
+        "findings",
+        "coverage_note"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$" },
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What was being asked, in words — 'has any court read down s 1(4)?', not 'searched Google'."
+        },
+        "method": {
+          "enum": [
+            "web-search",
+            "agency-index",
+            "court-docket",
+            "federal-register",
+            "publisher-page",
+            "manual"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The corpus actually consulted."
+        },
+        "query": { "type": "string", "minLength": 1 },
+        "performed": { "type": "string", "format": "date" },
+        "outcome": { "enum": ["findings", "no-findings"] },
+        "findings": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Entry ids this search produced. Empty exactly when outcome is 'no-findings'."
+        },
+        "coverage_note": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required, and the reason this schema exists: what this search does not cover. A negative result is a claim about a blind spot, and the blind spot has to be written down for the claim to be readable."
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "class",
+        "summary",
+        "provenance",
+        "routing",
+        "disposition",
+        "disposition_note",
+        "found_by"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$" },
+        "class": {
+          "enum": ["binding", "interpretive", "prospective"],
+          "description": "SPEC.md §4 P2's (a)/(b)/(c). The class is what routes the finding, so each class has its own routing obligation below."
+        },
+        "binding_effect": {
+          "enum": [
+            "struck",
+            "stayed",
+            "read-down",
+            "restricted",
+            "added",
+            "substituted"
+          ],
+          "description": "Required for class 'binding'. The split matters because only the suppressive three (struck/stayed/read-down) are what SPEC.md's rule-version treatment was written for — 'a struck provision is still encoded but marked inoperative on the rule-version axis'. A modification that adds a restriction (BNA's C3, the s 41A good-character gate) is equally binding and has no arm to mark inoperative; requiring one of it would have forced a fake."
+        },
+        "summary": { "type": "string", "minLength": 1 },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "retrieved", "citation"],
+          "properties": {
+            "source": { "type": "string", "minLength": 1 },
+            "url": { "type": "string", "minLength": 1 },
+            "url_absent_reason": { "type": "string", "minLength": 1 },
+            "retrieved": { "type": "string", "format": "date" },
+            "citation": { "type": "string", "minLength": 1 },
+            "quote": { "type": "string", "minLength": 1 }
+          }
+        },
+        "routing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fork_ids", "currency_risk"],
+          "properties": {
+            "rule_version_arm": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The dated arm in the encoding that carries this modification."
+            },
+            "fork_ids": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Fork-register entries this finding opens, settles or bears on. Empty is an answer and must be written."
+            },
+            "currency_risk": {
+              "type": "boolean",
+              "description": "P9 reports this. An undated prospective change is exactly a currency risk, which is why the rule below forces the flag when the date is missing."
+            },
+            "effective_from": { "type": "string", "format": "date" },
+            "effective_from_absent_reason": { "type": "string", "minLength": 1 }
+          }
+        },
+        "disposition": {
+          "enum": [
+            "encoded",
+            "scoped-out",
+            "subsumed",
+            "deferred",
+            "no-effect"
+          ],
+          "description": "What the encoding did about it. 'subsumed' is BNA C2's case — its substance rides inside a broader scope-out — and is distinct from 'scoped-out', which leaves nothing behind."
+        },
+        "disposition_note": { "type": "string", "minLength": 1 },
+        "found_by": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Search ids. A finding that no recorded search produced is a finding with no provenance for how it was looked for."
+        }
+      }
+    },
+    "disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document", "markers", "disposition", "note"],
+      "properties": {
+        "document": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A document id in the source bundle."
+        },
+        "markers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
+          "description": "An array so a homogeneous run of annotations (the BNA's nineteen textual-amendment markers, all disposed the same way by one scope-out) is one row with one argued note, rather than nineteen copies of the same sentence nobody will re-read."
+        },
+        "disposition": {
+          "enum": ["encoded", "scoped-out", "subsumed", "deferred", "no-effect"]
+        },
+        "note": { "type": "string", "minLength": 1 },
+        "entry": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The register entry that carries this marker, where one does."
+        }
+      }
+    }
+  },
+  "x-rules": [
+    { "id": "entry-ids-unique", "description": "No two entries share an id." },
+    {
+      "id": "search-ids-unique",
+      "description": "No two searches share an id."
+    },
+    {
+      "id": "search-outcome-matches-findings",
+      "description": "findings is empty exactly when outcome is 'no-findings'. A 'no-findings' search that lists findings, or a 'findings' search that lists none, is a miscount of the sweep."
+    },
+    {
+      "id": "search-findings-resolve",
+      "description": "Every id in a search's findings names an entry."
+    },
+    {
+      "id": "findings-attributed-to-a-search",
+      "description": "Every id in an entry's found_by names a search, and that search lists the entry back. The link is checked in both directions so neither side can drift."
+    },
+    {
+      "id": "binding-effect-declared",
+      "description": "class 'binding' requires binding_effect; the other classes forbid it."
+    },
+    {
+      "id": "suppressive-effects-need-a-rule-version-arm",
+      "description": "binding_effect struck, stayed or read-down requires routing.rule_version_arm — SPEC.md §4 P2(a): the provision stays encoded but marked inoperative on the rule-version axis, citing the striking authority."
+    },
+    {
+      "id": "binding-routes-into-the-encoding",
+      "description": "A binding modification disposed as 'encoded' must say where it landed: a rule_version_arm or at least one fork id."
+    },
+    {
+      "id": "interpretive-routes-to-a-fork",
+      "description": "class 'interpretive' disposed as 'encoded' or 'deferred' requires at least one fork id — SPEC.md §4 P2(b): guidance either closes a fork or opens one, and either way the fork register is where it goes. The escape for 'scoped-out', 'subsumed' and 'no-effect' is forced by the BNA's C2 (S.I. 1972/1613 art. 6 'explains' s 1(1) by treating certain persons as settled): its substance was subsumed into a scoped-out input, so there is no fork to name, and a rule demanding one would have obliged the register to invent a link. The escape costs nothing because those three dispositions each require a note saying what happened instead."
+    },
+    {
+      "id": "prospective-dated-or-flagged",
+      "description": "class 'prospective' with an effective_from needs no flag; without one it must set currency_risk true and give effective_from_absent_reason — SPEC.md §4 P2(c) exactly."
+    },
+    {
+      "id": "url-or-absent-reason",
+      "description": "Exactly one of provenance.url and provenance.url_absent_reason."
+    },
+    {
+      "id": "effective-from-exclusive",
+      "description": "effective_from and effective_from_absent_reason are mutually exclusive."
+    },
+    {
+      "id": "disposition-entry-resolves",
+      "description": "A disposition's entry id names an entry of this register."
+    },
+    {
+      "id": "markers-disposed-once",
+      "description": "Within one document, no marker is disposed twice — two dispositions of one marker means two answers."
+    },
+    {
+      "id": "empty-register-explains",
+      "description": "A register with no entries carries a note. A sweep that found nothing is a real and reportable outcome; an empty file that does not say so is not."
+    },
+    {
+      "id": "fork-refs-resolve",
+      "peer": "fork-register",
+      "description": "Every routing fork id names a fork-register entry."
+    },
+    {
+      "id": "dispositions-name-bundle-markers",
+      "peer": "source-bundle",
+      "description": "Every disposition names a document of the bundle and markers that document's annotation inventory actually lists."
+    },
+    {
+      "id": "annotation-inventory-disposed",
+      "peer": "source-bundle",
+      "description": "Every marker of every bundle annotation group declaring inventory_complete is disposed exactly once. This is the BNA C2 defect (SMOKE-REPORT.md §3.5) as an exit code."
+    },
+    {
+      "id": "peer-subjects-agree",
+      "peer": "any",
+      "description": "All files given in one invocation name the same subject."
+    }
+  ]
+}

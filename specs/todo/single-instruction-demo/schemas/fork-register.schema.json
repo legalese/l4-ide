@@ -1,0 +1,294 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://legalese.com/l4/schemas/fork-register.schema.json",
+  "title": "Fork register",
+  "description": "P4's deliverable (SPEC.md §4): one entry per interpretation fork, naming the ambiguous source text it interprets, every reading considered, which reading was taken and why. Under R4 (ANSWERED 2026-08-02, R4-FORK-REPRESENTATION.md) a fork that is materialised in L4 maps 1:1 to a field of the corpus's Interpretation record, and its readings map 1:1 to that field's enum constructors. Not every register entry is materialised: the BNA smoke test (PR #195) produced twelve ambiguities of which zero needed a runtime fork, so 'materialisation' is a discriminator and 'interpretation_field' is required only on the arm that has one. Paths under 'site' are validated for shape only — a register may be written before the file it points into is committed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "register_version", "subject", "entries"],
+  "properties": {
+    "kind": { "const": "fork-register" },
+    "register_version": { "const": 1 },
+    "subject": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "The subject sidecar id under etc/go/subjects/, so a register cannot float free of the body of law it registers."
+    },
+    "interpretation_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The L4 record type the materialised entries are fields of; conventionally 'Interpretation'."
+    },
+    "note": { "type": "string", "minLength": 1 },
+    "entries": { "type": "array", "items": { "$ref": "#/$defs/entry" } }
+  },
+  "$defs": {
+    "citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "cite"],
+      "properties": {
+        "kind": {
+          "enum": ["provision", "instrument", "authority", "scholarship"],
+          "description": "'authority' is a court or regulator whose word settles; 'scholarship' supports an argument without settling it. Keeping them apart is what stops a persuasive paper from reading as a resolution."
+        },
+        "cite": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "minLength": 1 }
+      }
+    },
+    "reading": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "status", "citations"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9]*$",
+          "description": "On a materialised fork this is the L4 enum constructor name, so the register and the encoding share one vocabulary."
+        },
+        "description": { "type": "string", "minLength": 1 },
+        "status": {
+          "enum": ["live", "arguable", "rejected", "demoted"],
+          "description": "'rejected' = the encoder argued it away; 'demoted' = an authority struck it (R4 §1: a court striking a reading demotes, never deletes). 'arguable' = NEITHER: not taken, and not refuted — a reading the operative text forecloses, which a court could yet adopt. It exists because 'rejected' was carrying two different facts under one name, and only one of them is 'do not cite this'. A reader sizing exposure wants exactly the arguable list: readings live as law but not live in the encoding. ADDED 2026-08-09 ON ONE MEASURED INSTANCE, disclosed here rather than implied: F-100A1-CAP-vs-STATUTE's `statuteCap`, where Congress wrote $1,000,000 into 15 U.S.C. 77d(a)(6)(A) — the very paragraph the exemption is granted by, never since amended — and the Commission set $5,000,000 by rule. Nobody argued the statute away; the entry's own rationale says whether § 28's general exemptive authority reaches a specific numeric cap Congress placed in that paragraph 'is a question for a court, and no encoding settles it'. The other six entries in that register have genuinely refuted alternatives, so one instance is what this value rests on. If a second does not appear in the BNA's twelve dispositions or the charities corpus, reconsider it rather than let it become the bin every awkward reading is filed in."
+        },
+        "rejection_rationale": { "type": "string", "minLength": 1 },
+        "foreclosure": {
+          "type": "string",
+          "minLength": 1,
+          "description": "For an 'arguable' reading only: what makes it non-operative, given that no one refuted it. Kept apart from `rejection_rationale` because the field names must not lie — nothing was rejected."
+        },
+        "citations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/citation" }
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "materialisation",
+        "site",
+        "source",
+        "readings",
+        "taken",
+        "status",
+        "cross_refs"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$" },
+        "kind": {
+          "enum": [
+            "statutory-wording",
+            "vagueness",
+            "fact-convention",
+            "encoding-placement"
+          ],
+          "description": "What sort of ambiguity this is. The BNA's twelve rows forced all four: nine turn on the words (A1, A2, A4-A8, A10, A11); one is a vague undefined term with no competing parse (A3, 'new-born infant'); one is a counting convention the text does not rule on at all (A9); and one is not about the source words at all (A12, whether s 41A's good-character restriction narrows the s 1 entitlement or only the grant) — an ambiguity of encoding placement, which a wording-only schema would have had nowhere to put."
+        },
+        "materialisation": {
+          "enum": [
+            "interpretation-field",
+            "resolved-at-encode",
+            "delegated-to-fact"
+          ],
+          "description": "How the fork lives in the encoding. 'interpretation-field' is R4's shape: a field of the Interpretation record, readings as its enum constructors, both readings executable. 'resolved-at-encode': one reading was taken on argument and the alternative is recorded but not encoded (all of the BNA's ten such rows). 'delegated-to-fact': the ambiguity is pushed into an input field whose construction the fact-supplier certifies (BNA A3, A9). Only the first arm is a fork the machinery can execute; the other two are a fork the register remembers."
+        },
+        "interpretation_field": {
+          "type": "string",
+          "minLength": 1,
+          "description": "R4's 1:1 map: the Interpretation record field this entry is. Backticked L4 names are written without their backticks."
+        },
+        "delegated_field": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The input field that carries the construction, so a reviewer can find who bears the burden."
+        },
+        "site": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["file", "anchor", "provisions"],
+          "properties": {
+            "file": { "type": "string", "minLength": 1 },
+            "anchor": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The L4 definition or § section the fork sits at. Not a line number, which rots on the next edit."
+            },
+            "line": { "type": "integer", "minimum": 1 },
+            "provisions": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 },
+              "description": "An array, not a string: BNA A1 ('after commencement') is one ambiguity spanning four subsections."
+            }
+          }
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["citations"],
+          "properties": {
+            "quote": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The ambiguous text, verbatim."
+            },
+            "quote_absent_reason": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Required when there is no quote. BNA A12 needs this: the restriction it is about sits in s 41A, whose text the ingest never fetched verbatim, so quoting it would have been invention."
+            },
+            "citations": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/citation" },
+              "description": "The same citation objects `readings[].citations` carries — an array, not a string, and not a string-or-array union. Two things measured 2026-08-09 forced it. (1) Three of the four entries in jl4/examples/legal/regcf/fork-register.json already held a citation OBJECT where this field declared `string`, so that register failed its own schema and nobody knew, because nothing had ever run the validator over it. (2) Twelve of the twenty-six entries in jl4/examples/legal/regcf/denovo/fork-register.json packed two or more distinct texts into one string, joined by 'read against', 'against' or a semicolon — which buries the very thing the entry exists to record: F-100A1-CAP-vs-STATUTE's source read '17 CFR 227.100(a)(1), read against 15 U.S.C. 77d(a)(6)(A)', a regulation set against the statute it is made under, and no query could see the second half or its `instrument` kind. One shape only, and no string alternative: `oneOf` is outside the keyword set etc/go/lib/register-validate.mjs implements, and a keyword parsed but not enforced is a constraint that silently does not exist."
+            }
+          }
+        },
+        "readings": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/reading" },
+          "description": "A fork with one reading is not a fork."
+        },
+        "taken": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reading", "mechanism", "rationale"],
+          "properties": {
+            "reading": { "type": "string", "minLength": 1 },
+            "mechanism": {
+              "enum": ["TYPICALLY", "encoded", "fact-supplied"],
+              "description": "How the choice is expressed. 'TYPICALLY' is the R4 default on the Interpretation field — the slot a settling authority gets cited at. The other two exist because a resolved-at-encode or delegated fork has no TYPICALLY to carry the citation, and pretending otherwise would put an authority's name on a construct that is not there."
+            },
+            "rationale": { "type": "string", "minLength": 1 }
+          }
+        },
+        "status": {
+          "enum": ["open", "resolved", "settled", "demoted"],
+          "description": "STATUS IS ABOUT WHAT THE ENCODER DID, NOT ABOUT HOW MANY READINGS SURVIVE. 'open': the encoder took no reading — there is no `taken`, and the fork is disclosed unresolved. 'resolved': the encoder took one reading on its own argument — the BNA's twelve are all this, and a three-value open/settled/demoted vocabulary had nowhere to put them without either overclaiming an authority or leaving twelve entries permanently 'open'. 'settled': an authority settled it. 'demoted': an authority struck a reading. RULED 2026-08-09, because the earlier gloss defined 'open' by a live-reading count ('more than one reading is live and no authority has spoken') while defining 'resolved' by the encoder's act, and the two tests disagree: F-501A4-DETERMINER is 'resolved' with two readings still live, and F-100A1-CAP-vs-STATUTE was 'open' with one. Live-reading count is NOT the test — a reading may stay live because no authority has struck it while the encoder has nonetheless taken another. Crucially 'resolved' does not assert the underlying legal question is settled; that is exactly what 'settled' is for, and an entry may be 'resolved' while its `taken.rationale` records that a court could hold otherwise."
+        },
+        "settled_by": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["authority", "citation", "date"],
+          "properties": {
+            "authority": { "type": "string", "minLength": 1 },
+            "citation": { "type": "string", "minLength": 1 },
+            "url": { "type": "string", "minLength": 1 },
+            "date": { "type": "string", "format": "date" },
+            "external_modification": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The external-modifications register entry id that carries this authority, when the P2 sweep is what found it."
+            }
+          }
+        },
+        "divergence": {
+          "enum": [
+            "observable",
+            "extensionally-equivalent",
+            "none",
+            "unassessed"
+          ],
+          "description": "Whether the readings actually produce different answers — R4 §4's agreement/divergence split, and the field P6's witnesses hang off. 'none' is BNA A11's case: the readings differ in what they say but the encoding cannot tell them apart, because the field arrives pre-construed. 'unassessed' is honest at P4 time and is what forbids a report from claiming interpretation-independence it never measured."
+        },
+        "witnesses": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Named test cases that exhibit the divergence (R4 §4's divergence witnesses)."
+        },
+        "cross_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "External-modifications register entry ids bearing on this fork. Empty is a normal answer and must be written out, so 'nobody looked' and 'nothing bears on it' are not the same JSON."
+        },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "x-rules": [
+    { "id": "entry-ids-unique", "description": "No two entries share an id." },
+    {
+      "id": "reading-ids-unique-within-entry",
+      "description": "Reading ids are unique within their entry; on a materialised fork they are enum constructors, where a duplicate would not compile."
+    },
+    {
+      "id": "taken-names-a-live-reading",
+      "description": "taken.reading names a reading of this entry whose status is 'live'. Taking a reading you rejected is the failure this catches."
+    },
+    {
+      "id": "at-least-one-live-reading",
+      "description": "Some reading must be live: a fork where every reading is rejected states no law."
+    },
+    {
+      "id": "materialisation-implies-field",
+      "description": "materialisation 'interpretation-field' requires interpretation_field and forbids delegated_field; 'delegated-to-fact' requires delegated_field and forbids interpretation_field; 'resolved-at-encode' forbids both."
+    },
+    {
+      "id": "materialisation-implies-mechanism",
+      "description": "interpretation-field ⇒ taken.mechanism TYPICALLY; resolved-at-encode ⇒ encoded; delegated-to-fact ⇒ fact-supplied."
+    },
+    {
+      "id": "interpretation-fields-unique",
+      "description": "R4's 1:1 map: two entries may not claim the same Interpretation field."
+    },
+    {
+      "id": "non-live-readings-explain",
+      "description": "A rejected or demoted reading carries a rejection_rationale. Every BNA row already wrote one; the schema makes it non-optional. 'arguable' is exempt and carries `foreclosure` instead — see the next rule."
+    },
+    {
+      "id": "live-readings-cite-their-licence",
+      "description": "A live reading carries at least one citation — R4 §1: each per-reading implementation carries @ref citations to the text that licenses its reading."
+    },
+    {
+      "id": "arguable-readings-cite-and-foreclose",
+      "description": "An 'arguable' reading is held to a HIGHER bar than a rejected one, not a lower one: it must cite the text that makes it arguable (it is, after all, law someone could win on) AND state in `foreclosure` what makes it non-operative, and it must NOT carry a rejection_rationale, because nothing rejected it. `foreclosure` is forbidden on every other status. The strictness is deliberate: the failure mode of a new enum value is that it becomes the bin for anything awkward, and a value that costs two fields to use does not attract lazy filing."
+    },
+    {
+      "id": "settled-or-demoted-requires-authority",
+      "description": "status settled or demoted ⇔ settled_by present."
+    },
+    {
+      "id": "demoted-requires-a-demoted-reading",
+      "description": "status 'demoted' means an authority struck a reading, so some reading must have status 'demoted'."
+    },
+    {
+      "id": "quote-or-absent-reason",
+      "description": "Exactly one of source.quote and source.quote_absent_reason."
+    },
+    {
+      "id": "materialised-forks-declare-divergence",
+      "description": "A materialised fork declares a divergence value (possibly 'unassessed'), because P6 owes it witnesses or an explicit agreement claim."
+    },
+    {
+      "id": "observable-divergence-requires-witnesses",
+      "description": "divergence 'observable' requires at least one witness: the claim that readings disagree is only as good as the case that shows it."
+    },
+    {
+      "id": "witnesses-only-when-observable",
+      "description": "Witnesses without divergence 'observable' means the classification and the evidence disagree."
+    },
+    {
+      "id": "empty-register-explains",
+      "description": "A register with no entries carries a note saying why — 'we found no ambiguity' and 'nobody ran P4' must not be the same file."
+    },
+    {
+      "id": "cross-refs-resolve",
+      "peer": "external-modifications",
+      "description": "Every cross_refs id and every settled_by.external_modification names an entry of the external-modifications register."
+    },
+    {
+      "id": "peer-subjects-agree",
+      "peer": "any",
+      "description": "All files given in one invocation name the same subject."
+    }
+  ]
+}
