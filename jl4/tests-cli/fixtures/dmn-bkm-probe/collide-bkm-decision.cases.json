@@ -1,0 +1,16 @@
+{
+  "note": [
+    "Cases for collide-bkm-decision.dmn (probe E4, NEGATIVE CONTROL). 1 case x",
+    "4 decisions = 4 value checks. call_dup expects the BKM reading (300) and",
+    "read_dup expects the decision reading (6); they cannot both hold, so the",
+    "banner MUST fail and the interesting information is WHICH of the two an",
+    "engine satisfied, and whether it said anything while doing so."
+  ],
+  "cases": [
+    {
+      "name": "A. n = 0, so the decision `dup` is 5",
+      "context": { "n": 0 },
+      "expect": { "dup": 5, "call_dup": 300, "read_dup": 6 }
+    }
+  ]
+}

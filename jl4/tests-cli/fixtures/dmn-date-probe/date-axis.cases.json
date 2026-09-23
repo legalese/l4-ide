@@ -1,0 +1,47 @@
+{
+  "note": [
+    "The context for the law-time date probe (DMN-EXPORT-PROGRAM-MODEL-SPEC.md 15.6).",
+    "",
+    "`{\"$date\": \"YYYY-MM-DD\"}` is the fixture vocabulary's ONLY way to say",
+    "\"this is a FEEL date\". Deliberately an explicit tag and NOT an ISO-shape",
+    "sniff on strings: both harnesses convert by declared type and never by",
+    "appearance (see the BigDecimal note on KieDmnCheck.jsonToFeel), and a sniff",
+    "would silently retype any genuine string that happened to look like a date.",
+    "",
+    "The three cases pin the interval convention itself: the low end is CLOSED",
+    "and the high end is OPEN, so the day of a change belongs to the new regime",
+    "and the day before belongs to the old one. Case C reaches the floor row."
+  ],
+  "cases": [
+    {
+      "name": "A. the day of the 2024 change -- low end is CLOSED",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "2024-01-01" }
+      },
+      "expect": {
+        "regime": 9,
+        "change_date": { "$date": "2024-01-01" }
+      }
+    },
+    {
+      "name": "B. the day before -- high end is OPEN",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "2023-12-31" }
+      },
+      "expect": {
+        "regime": 3,
+        "change_date": { "$date": "2024-01-01" }
+      }
+    },
+    {
+      "name": "C. before commencement -- the floor row fires",
+      "context": {
+        "RULES_EFFECTIVE_DATE": { "$date": "1990-01-01" }
+      },
+      "expect": {
+        "regime": -1,
+        "change_date": { "$date": "2024-01-01" }
+      }
+    }
+  ]
+}

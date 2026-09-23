@@ -1,0 +1,17 @@
+{
+  "note": [
+    "One case, one decision, an empty context. `false` is CAMUNDA'S answer;",
+    "KIE never gets as far as a value, because an unsupplied required input",
+    "is a model error there and the decision is SKIPPED. See null-absent.dmn",
+    "for the full measurement and for why the exporter cannot reach this case."
+  ],
+  "cases": [
+    {
+      "name": "r is never supplied",
+      "context": {},
+      "expect": {
+        "absent_is_not_null": false
+      }
+    }
+  ]
+}

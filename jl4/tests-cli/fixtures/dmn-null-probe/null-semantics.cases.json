@@ -1,0 +1,58 @@
+{
+  "note": [
+    "Cases for null-semantics.dmn. Every value below is what BOTH engines",
+    "ANSWERED on 2026-07-31, not what was predicted before the run. 3 cases x 5",
+    "decisions = 15 value checks, which is the 15/15 both engine legs in",
+    "jl4/tests-cli/Main.hs assert.",
+    "",
+    "A `null` in `expect` LICENSES a null answer for that decision — the D8",
+    "carve-out added to both harnesses in the same change. Before it, a",
+    "correct null answer scored as a failure on both engines, and this probe",
+    "could not have been written at all: the only green fixture would have",
+    "been one that avoided the absent branch, i.e. one that measured nothing."
+  ],
+  "cases": [
+    {
+      "name": "A. q supplied, n = 5 (under the table's line)",
+      "context": {
+        "q": "x",
+        "n": 5
+      },
+      "expect": {
+        "present_is_not_null": true,
+        "number_eq_null": false,
+        "guarded_if": "present",
+        "whole_value_null": null,
+        "table_default_null": 5
+      }
+    },
+    {
+      "name": "B. q supplied AS NULL, n = 20 (past the line: the default output entry fires)",
+      "context": {
+        "q": null,
+        "n": 20
+      },
+      "expect": {
+        "present_is_not_null": false,
+        "number_eq_null": false,
+        "guarded_if": "absent",
+        "whole_value_null": null,
+        "table_default_null": null
+      }
+    },
+    {
+      "name": "C. q supplied AS NULL, n = 10 (the boundary row: <= 10 is closed)",
+      "context": {
+        "q": null,
+        "n": 10
+      },
+      "expect": {
+        "present_is_not_null": false,
+        "number_eq_null": false,
+        "guarded_if": "absent",
+        "whole_value_null": null,
+        "table_default_null": 10
+      }
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE A2. What this asks: can a BKM be invoked with NAMED arguments, given in
+  an order DIFFERENT from the declaration order of its formalParameters?
+
+  Spec section 2.3.1 rules "emit named parameters at every call site" for
+  decisionSERVICE invocation. Section 6.2 leaves the BKM call-site spelling open.
+  This probe closes it.
+
+  Same body as probe A1, deliberately, so the two files differ in exactly one
+  thing, the call-site spelling:
+
+      f(a, b, c) = if b then (if c = "x" then a - 1 else a - 100) else (100 - a)
+
+  invoked as f(c: "x", a: 2, b: true), i.e. declaration order REVERSED in the
+  first slot and scrambled thereafter. If names were being ignored and the
+  engine were binding positionally, `a` would receive the string "x" and the
+  arithmetic would fail or answer differently; it cannot silently agree.
+
+  WHAT A FLIP MEANS. If an engine rejects this, section 2.3.1's named-parameter
+  rule CANNOT be lifted to BKMs, the emitter must invoke BKMs positionally, and
+  L4's position-to-name seam (section 6.2) becomes an emitter invariant with NO
+  engine backstop; i.e. a bug in the seam would be silent, and a checkDrg
+  assertion becomes mandatory rather than belt-and-braces.
+
+  No negative control: this asks whether an idiom EVALUATES.
+
+  MEASURED 2026-07-31: 6/6 values on BOTH engines, KIE clean, Camunda clean. So
+  the load-bearing unknown resolves the easy way: zeebe-dmn's feel-engine
+  ACCEPTS named arguments to a BKM, in scrambled order, and section 2.3.1's
+  "emit named parameters at every call site" rule CAN be lifted from services to
+  BKMs. Combined with probe A1, both spellings are portable and the emitter may
+  choose named for legibility without giving anything up.
+
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_bkm_named_args" name="bkm_named_args" namespace="https://legalese.com/l4/dmn/bkm_named_args" exporter="hand">
+  <businessKnowledgeModel id="bkm_f" name="f">
+    <variable id="bkm_f_var" name="f" typeRef="number"/>
+    <encapsulatedLogic id="bkm_f_logic">
+      <formalParameter id="bkm_f_p1" name="a" typeRef="number"/>
+      <formalParameter id="bkm_f_p2" name="b" typeRef="boolean"/>
+      <formalParameter id="bkm_f_p3" name="c" typeRef="string"/>
+      <literalExpression id="bkm_f_lit">
+        <text>if b then (if c = "x" then a - 1 else a - 100) else (100 - a)</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_named_rev" name="named_rev">
+    <variable id="decision_named_rev_var" name="named_rev" typeRef="number"/>
+    <knowledgeRequirement id="kr_named_rev">
+      <requiredKnowledge href="#bkm_f"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_named_rev_lit">
+      <text>f(c: "x", a: 2, b: true)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_named_decl_order" name="named_decl_order">
+    <variable id="decision_named_decl_order_var" name="named_decl_order" typeRef="number"/>
+    <knowledgeRequirement id="kr_named_decl_order">
+      <requiredKnowledge href="#bkm_f"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_named_decl_order_lit">
+      <text>f(a: 5, b: true, c: "y")</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_named_from_input" name="named_from_input">
+    <variable id="decision_named_from_input_var" name="named_from_input" typeRef="number"/>
+    <informationRequirement id="ir_named_from_input">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_named_from_input">
+      <requiredKnowledge href="#bkm_f"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_named_from_input_lit">
+      <text>f(b: false, c: "x", a: n)</text>
+    </literalExpression>
+  </decision>
+</definitions>

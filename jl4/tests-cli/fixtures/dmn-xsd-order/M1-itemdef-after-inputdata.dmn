@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DMN-EXPORT-PROGRAM-MODEL-SPEC.md 4.3 and 9: the negative golden.
+
+  A MATCHED PAIR of hand-written DMN 1.3 files. They contain exactly the same
+  lines; the ONLY difference is where the <itemDefinition> block sits.
+
+    M1-itemdef-before-inputdata.dmn   itemDefinition first, DMN 1.3 VALID
+                                      (the positive control)
+    M1-itemdef-after-inputdata.dmn    itemDefinition last, DMN 1.3 INVALID
+                                      (the negative golden)
+
+  tDefinitions' content model is a SEQUENCE (import*, itemDefinition*,
+  drgElement*, ...), so an itemDefinition after an inputData is a schema
+  violation, not a style preference. Xerces says so, with
+  cvc-complex-type.2.4.a. libxml2/xmllint does not, and neither does
+  dmn-moddle, whose own header in etc/validate-dmn.mjs says it "does NOT check
+  XSD sequence order". That is the whole point of committing this pair: without
+  it nothing in the tree demonstrates that the placement gate CAN go red, and a
+  misordered emitter would pass CI and then fail in every JAXP-based engine.
+
+  These are NOT emitted goldens and must never be regenerated from L4. They are
+  fixtures for etc/kie-dmn-check/run.sh, driven from jl4/tests-cli/Main.hs
+  ("the XSD sequence-order gate"), with M1-itemdef.cases.json as the context.
+  Keep the two files line-for-line identical; the suite asserts it.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_xsd_order_fixture" name="XSD order fixture" namespace="https://legalese.com/l4/dmn/xsd_order_fixture">
+  <inputData id="input_tier" name="tier">
+    <variable id="input_tier_var" name="tier" typeRef="Tier"/>
+  </inputData>
+  <decision id="decision_is_gold" name="is_gold" label="is gold">
+    <variable id="decision_is_gold_var" name="is_gold" label="is gold" typeRef="boolean"/>
+    <informationRequirement id="decision_is_gold_ir1">
+      <requiredInput href="#input_tier"/>
+    </informationRequirement>
+    <literalExpression id="decision_is_gold_literal">
+      <text>tier = "gold"</text>
+    </literalExpression>
+  </decision>
+  <itemDefinition id="itemdef_tier" name="Tier">
+    <typeRef>string</typeRef>
+    <allowedValues>
+      <text>"gold","silver","bronze"</text>
+    </allowedValues>
+  </itemDefinition>
+</definitions>

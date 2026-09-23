@@ -1,0 +1,15 @@
+{
+  "note": [
+    "Cases for collide-svc-decision.dmn (probe E5). 1 case x 4 decisions = 4",
+    "value checks. The expectations are the DECISION reading of the colliding",
+    "name (bundle = 9, read_bundle = 10); if an engine resolves the name to the",
+    "invocable instead, read_bundle moves or fails, which is the measurement."
+  ],
+  "cases": [
+    {
+      "name": "A. n = 4",
+      "context": { "n": 4 },
+      "expect": { "step": 8, "total": 9, "bundle": 9, "read_bundle": 10 }
+    }
+  ]
+}

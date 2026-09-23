@@ -31,6 +31,7 @@ import System.IO (hSetEncoding, stdin, stdout, stderr)
 import L4.Cli.Ast (AstOptions, astCmd, astOptionsParser)
 import L4.Cli.Batch (BatchOptions, batchCmd, batchOptionsParser)
 import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
+import L4.Cli.Export (ExportOptions, exportCmd, exportOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
 import L4.Cli.Nlg (NlgOptions, nlgCmd, nlgOptionsParser)
 import L4.Cli.Render (RenderOptions, renderCmd, renderOptionsParser)
@@ -52,6 +53,7 @@ data Command
   | CmdTrace      TraceOptions
   | CmdStateGraph StateGraphOptions
   | CmdRender     RenderOptions
+  | CmdExport     ExportOptions
   | CmdNlg        NlgOptions
   | CmdVerify     VerifyOptions
 
@@ -91,6 +93,9 @@ commandParser =
       <> command "render"
            (info (CmdRender <$> renderOptionsParser)
              (progDesc "Render an L4 file to a formatted document (html|text|json|plan)"))
+      <> command "export"
+           (info (CmdExport <$> exportOptionsParser)
+             (progDesc "Export an L4 file to a foreign interchange notation (dmn|dmn-md|bpmn) with a fidelity report"))
       <> command "nlg"
            (info (helper <*> (CmdNlg <$> nlgOptionsParser))
              (progDesc "Linearize a module's directives to natural-language prose (the .nlg golden payload)"))
@@ -158,6 +163,7 @@ main = do
     CmdTrace      opts -> traceCmd      opts
     CmdStateGraph opts -> stateGraphCmd opts
     CmdRender     opts -> renderCmd     opts
+    CmdExport     opts -> exportCmd     opts
     CmdNlg        opts -> nlgCmd        opts
     CmdVerify     opts -> verifyCmd     opts
 

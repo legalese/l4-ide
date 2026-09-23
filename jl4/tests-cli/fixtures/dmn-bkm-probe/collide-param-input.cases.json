@@ -1,0 +1,21 @@
+{
+  "note": [
+    "Cases for collide-param-input.dmn (probe E1). 2 cases x 3 decisions = 6",
+    "value checks per engine. Case A supplies x = 1 so that the parameter (2)",
+    "and the global (1) are distinguishable; case B supplies x = 2 so that they",
+    "COINCIDE, and from_param must still be 2. Case B is not redundant: it is",
+    "the control that shows case A's answer was not an artefact of the value."
+  ],
+  "cases": [
+    {
+      "name": "A. global x = 1, argument 2; the two differ",
+      "context": { "x": 1 },
+      "expect": { "from_param": 2, "from_global": 1, "param_wins": true }
+    },
+    {
+      "name": "B. global x = 2, argument 2; the two coincide",
+      "context": { "x": 2 },
+      "expect": { "from_param": 2, "from_global": 2, "param_wins": false }
+    }
+  ]
+}

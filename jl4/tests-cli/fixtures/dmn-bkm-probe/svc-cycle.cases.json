@@ -1,0 +1,12 @@
+{
+  "note": [
+    "Cases for svc-cycle.dmn (probe D6, NEGATIVE CONTROL). 1 case x 3 decisions",
+    "= 3 value checks. The expected values are the ones the model would give if",
+    "the mutual service requirement terminated, which it cannot; they exist so",
+    "that the VALUE leg is what reports the fault, since neither the validator",
+    "nor the status channel does."
+  ],
+  "cases": [
+    { "name": "A. n = 4", "context": { "n": 4 }, "expect": { "a_out": 6, "b_out": 6, "top": 5 } }
+  ]
+}

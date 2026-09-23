@@ -1,0 +1,84 @@
+-- The DEONTIC-VERDICT exhibit for the DMN exporter (R13, spec §16).
+--
+-- A guarded chain whose row bodies are all deontic arms does not refuse any
+-- more: it lowers to a VERDICT decision table over its guards, each rule's
+-- output a string naming the arm. The obligation semantics
+-- (PARTY/MUST/WITHIN/HENCE/LEST) are the BPMN exporter's job; a BPMN gateway
+-- consumes the verdict to choose the process path.
+--
+-- One decide per shape the lowering must pin:
+--
+--   * `reporting duty`      the generic verdict chain, off-corpus: MUST,
+--                           FULFILLED, MAY, SHANT and MUST+HENCE arms in one
+--                           chain, exercising every `verdictOf` spelling —
+--                           including the HENCE self-call, whose edge must
+--                           NOT survive into the DRG (the verdict table's
+--                           requirements are its guards, R13 × R11), and
+--                           whose self-recursion keeps the decide
+--                           safety-refused (D-PARTIAL, verdict-aware form);
+--   * `joint duty`          the NEGATIVE control for the v1 scope: an arm
+--                           that is RAND of two obligations is not a single
+--                           deontic arm, so the chain keeps today's
+--                           RegulativeBody refusal (D-LITERALEXPR Blocking);
+--   * `bare duty`           the other negative control: a bare deontic body
+--                           is not a guarded chain at all and keeps
+--                           NotAGuardedChain (D-LITERALEXPR Blocking).
+--
+-- The two controls are module-called (`invoked …`) so §2.5.6 rule 3 does not
+-- drop them before they can refuse — same device as
+-- not-ok/dated-chain-regulative.l4.
+--
+-- The heading below is load-bearing: `l4 export --to=dmn` with no
+-- `--model-name` takes the model name from the outermost `§`.
+
+IMPORT prelude
+
+§ `deontic verdict`
+
+DECLARE Actor IS ONE OF
+    Issuer
+
+DECLARE Action IS ONE OF
+    `file the termination report`
+    `file the annual report`
+    `publish a notice`
+    `advertise the offering`
+    `file jointly`
+    `notify investors`
+
+GIVEN `may terminate`       IS A BOOLEAN
+      cycles                IS A NUMBER
+      `notice window open`  IS A BOOLEAN
+      escalated             IS A BOOLEAN
+GIVETH A DEONTIC Actor Action
+`reporting duty` `may terminate` cycles `notice window open` escalated MEANS
+    IF   `may terminate`
+    THEN PARTY Issuer MUST `file the termination report` WITHIN 5
+    ELSE IF   cycles AT MOST 0
+         THEN FULFILLED
+         ELSE IF   `notice window open`
+              THEN PARTY Issuer MAY `publish a notice`
+              ELSE IF   escalated
+                   THEN PARTY Issuer SHANT `advertise the offering`
+                   ELSE PARTY Issuer MUST `file the annual report` WITHIN 30
+                        HENCE `reporting duty` `may terminate` (cycles MINUS 1) `notice window open` escalated
+
+-- v1-scope negative control: RAND of two obligations is not a single arm.
+GIVEN trigger IS A BOOLEAN
+GIVETH A DEONTIC Actor Action
+`joint duty` trigger MEANS
+    IF   trigger
+    THEN (PARTY Issuer MUST `file jointly` WITHIN 5
+          RAND PARTY Issuer MUST `notify investors` WITHIN 5)
+    ELSE FULFILLED
+
+GIVEN trigger IS A BOOLEAN
+GIVETH A DEONTIC Actor Action
+`invoked joint duty` trigger MEANS `joint duty` trigger
+
+-- the other negative control: a bare deontic body is not a chain.
+GIVETH A DEONTIC Actor Action
+`bare duty` MEANS PARTY Issuer MUST `notify investors` WITHIN 10
+
+GIVETH A DEONTIC Actor Action
+`invoked bare duty` MEANS `bare duty`

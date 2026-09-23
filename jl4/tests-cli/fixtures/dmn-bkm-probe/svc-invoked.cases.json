@@ -1,0 +1,12 @@
+{
+  "note": [
+    "Cases for svc-invoked.dmn (probe D2). 2 cases x 3 decisions = 6 value",
+    "checks. via_bundle is (n + 100) * 2 + 1, deliberately not equal to total,",
+    "so a service call that silently did nothing cannot pass by coincidence.",
+    "The Camunda leg never reaches these cases: it fails at parse."
+  ],
+  "cases": [
+    { "name": "A. n = 4", "context": { "n": 4 }, "expect": { "step": 8, "total": 9, "via_bundle": 209 } },
+    { "name": "B. n = 0", "context": { "n": 0 }, "expect": { "step": 0, "total": 1, "via_bundle": 201 } }
+  ]
+}

@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE B2. What this asks: when a boxed context entry invokes a BKM, may the
+  ARGUMENT be an EARLIER SIBLING ENTRY of the same context?
+
+  B1 measured that a context entry can call a BKM at all, but passed it a
+  projection off the inputData, which needs no intra context scope. This one
+  passes `subtotal`, an entry defined two lines above it, and then passes
+  `graded`, an entry that was itself computed by a BKM call. So the chain is
+
+      subtotal : raw.a + raw.b            (projection)
+      graded   : classify(subtotal)       <<< BKM called on a SIBLING
+      doubled  : twice(graded)            <<< BKM called on a BKM-computed sibling
+      note     : "g=" + graded            (plain read of a BKM-computed sibling)
+
+  Section 4.4.2 requires the emitter to place hydrator entries in topological
+  order and warns that "getting it wrong is silent". This measures whether that
+  ordering guarantee survives a CALL boundary, which section 4.4.2 does not say.
+
+  WHAT A FLIP MEANS. If an engine cannot see an earlier sibling from inside an
+  invocation's argument list, hydrators may not contain calls whose arguments
+  are computed, and the emitter must hoist every such argument into its own
+  decision, which un-hydrates exactly the records Phase 3.6 hydrated.
+
+  The values are deliberately chosen so that reading the WRONG sibling, or
+  reading a stale null, gives a different non-null number: see case C, where
+  subtotal and raw.a differ and either would type check.
+
+  MEASURED 2026-07-31: 6/6 values on BOTH engines, KIE clean, Camunda clean. A
+  BKM invoked inside a hydrator MAY take an earlier sibling entry as an
+  argument, including a sibling that was itself computed by an earlier BKM call.
+  Section 4.4.2's topological ordering guarantee therefore does cross a call
+  boundary. Measured in passing, and useful elsewhere: FEEL `string(...)` and
+  `+` string concatenation both work identically on the two engines.
+
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_bkm_in_context_sibling" name="bkm_in_context_sibling" namespace="https://legalese.com/l4/dmn/bkm_in_context_sibling" exporter="hand">
+  <itemDefinition id="itemdef_raw" name="Raw">
+    <itemComponent id="itemdef_raw_c1" name="a">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_raw_c2" name="b">
+      <typeRef>number</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_bundle" name="Bundle">
+    <itemComponent id="itemdef_bundle_c1" name="subtotal">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_bundle_c2" name="graded">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_bundle_c3" name="doubled">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_bundle_c4" name="note">
+      <typeRef>string</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <businessKnowledgeModel id="bkm_classify" name="classify">
+    <variable id="bkm_classify_var" name="classify" typeRef="number"/>
+    <encapsulatedLogic id="bkm_classify_logic">
+      <formalParameter id="bkm_classify_p1" name="v" typeRef="number"/>
+      <literalExpression id="bkm_classify_lit">
+        <text>if v &gt;= 100 then 1 else 0</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <businessKnowledgeModel id="bkm_twice" name="twice">
+    <variable id="bkm_twice_var" name="twice" typeRef="number"/>
+    <encapsulatedLogic id="bkm_twice_logic">
+      <formalParameter id="bkm_twice_p1" name="v" typeRef="number"/>
+      <literalExpression id="bkm_twice_lit">
+        <text>v * 2</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <inputData id="input_raw" name="raw">
+    <variable id="input_raw_var" name="raw" typeRef="Raw"/>
+  </inputData>
+  <decision id="decision_bundle" name="bundle">
+    <variable id="decision_bundle_var" name="bundle" typeRef="Bundle"/>
+    <informationRequirement id="ir_bundle_raw">
+      <requiredInput href="#input_raw"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_bundle_classify">
+      <requiredKnowledge href="#bkm_classify"/>
+    </knowledgeRequirement>
+    <knowledgeRequirement id="kr_bundle_twice">
+      <requiredKnowledge href="#bkm_twice"/>
+    </knowledgeRequirement>
+    <context id="ctx_bundle">
+      <contextEntry id="ce_subtotal">
+        <variable id="ce_subtotal_var" name="subtotal" typeRef="number"/>
+        <literalExpression id="ce_subtotal_lit">
+          <text>raw.a + raw.b</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="ce_graded">
+        <variable id="ce_graded_var" name="graded" typeRef="number"/>
+        <literalExpression id="ce_graded_lit">
+          <text>classify(subtotal)</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="ce_doubled">
+        <variable id="ce_doubled_var" name="doubled" typeRef="number"/>
+        <literalExpression id="ce_doubled_lit">
+          <text>twice(graded)</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="ce_note">
+        <variable id="ce_note_var" name="note" typeRef="string"/>
+        <literalExpression id="ce_note_lit">
+          <text>"g=" + string(graded)</text>
+        </literalExpression>
+      </contextEntry>
+    </context>
+  </decision>
+  <decision id="decision_total" name="total">
+    <variable id="decision_total_var" name="total" typeRef="number"/>
+    <informationRequirement id="ir_total_bundle">
+      <requiredDecision href="#decision_bundle"/>
+    </informationRequirement>
+    <literalExpression id="decision_total_lit">
+      <text>bundle.subtotal + bundle.doubled</text>
+    </literalExpression>
+  </decision>
+</definitions>

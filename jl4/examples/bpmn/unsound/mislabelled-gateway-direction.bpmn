@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_mislabelled_gateway_direction"
+                  targetNamespace="https://l4.legalese.com/bpmn"
+                  exporter="hand-written fixture, NOT exporter output"
+                  exporterVersion="1">
+  <bpmn:collaboration id="Collaboration_mislabelled_gateway_direction">
+    <bpmn:participant id="Participant_mislabelled_gateway_direction" name="a renewal loop whose gateway lies about its direction" processRef="Process_mislabelled_gateway_direction" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_mislabelled_gateway_direction" name="a renewal loop whose gateway lies about its direction" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_1_Issuer" name="Issuer">
+        <bpmn:flowNodeRef>Task_1</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_unassigned" name="(unassigned)">
+        <bpmn:flowNodeRef>Start_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Split_0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_2</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_0" />
+    <bpmn:exclusiveGateway id="Split_0" name="one of" gatewayDirection="Diverging">
+      <bpmn:documentation>THE DEFECT, AND THE ONLY ONE: this gateway declares
+        gatewayDirection="Diverging" while carrying TWO incoming sequence flows
+        — Start_0 on the way in, and Task_1 on the renewal loop back. BPMN 2.0
+        §10.5.1 Table 10.100 says Diverging MUST NOT have multiple incoming;
+        with multiple of both this is Mixed.
+
+        Every token-game property below still passes. That is the point: the
+        file is behaviourally fine and structurally a lie, so nothing but a
+        checker that reads the attribute AND counts the edges can see it. The
+        XSD types gatewayDirection as a plain enumeration, so this file is
+        schema-valid and bpmn-moddle parses it at zero warnings.
+
+        Provenance: this is the shape jl4 really shipped. regcf-reporting.bpmn
+        carried exactly this contradiction, because the exporter chose the
+        direction in a pass that ran before any edge existed and the
+        `HENCE &lt;this rule&gt;` renewal loop then handed the gateway a second
+        arrival. See withGatewayDirections in
+        jl4-core/src/L4/Bpmn/Lower.hs.</bpmn:documentation>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="Task_1" name="MUST file an annual report">
+      <bpmn:documentation>PARTY Issuer MUST file an annual report</bpmn:documentation>
+    </bpmn:task>
+    <bpmn:endEvent id="End_2" name="Fulfilled" />
+    <bpmn:sequenceFlow id="Flow_Start_0__Split_0" sourceRef="Start_0" targetRef="Split_0" />
+    <bpmn:sequenceFlow id="Flow_Split_0__Task_1" sourceRef="Split_0" targetRef="Task_1" />
+    <bpmn:sequenceFlow id="Flow_Split_0__End_2" sourceRef="Split_0" targetRef="End_2" />
+    <bpmn:sequenceFlow id="Flow_Task_1__Split_0" sourceRef="Task_1" targetRef="Split_0" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_mislabelled_gateway_direction">
+      <bpmndi:BPMNShape id="Shape_Participant_mislabelled_gateway_direction" bpmnElement="Participant_mislabelled_gateway_direction" isHorizontal="true">
+        <dc:Bounds x="130" y="80" width="830" height="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_1_Issuer" bpmnElement="Lane_1_Issuer" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="800" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Lane_unassigned" bpmnElement="Lane_unassigned" isHorizontal="true">
+        <dc:Bounds x="160" y="240" width="800" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Start_0" bpmnElement="Start_0">
+        <dc:Bounds x="232" y="282" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Split_0" bpmnElement="Split_0" isMarkerVisible="true">
+        <dc:Bounds x="405" y="275" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Task_1" bpmnElement="Task_1">
+        <dc:Bounds x="560" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End_2" bpmnElement="End_2">
+        <dc:Bounds x="832" y="282" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Split_0" bpmnElement="Flow_Start_0__Split_0">
+        <di:waypoint x="268" y="300" />
+        <di:waypoint x="405" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Split_0__Task_1" bpmnElement="Flow_Split_0__Task_1">
+        <di:waypoint x="455" y="300" />
+        <di:waypoint x="494" y="300" />
+        <di:waypoint x="494" y="140" />
+        <di:waypoint x="560" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Split_0__End_2" bpmnElement="Flow_Split_0__End_2">
+        <di:waypoint x="455" y="300" />
+        <di:waypoint x="832" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Task_1__Split_0" bpmnElement="Flow_Task_1__Split_0">
+        <di:waypoint x="660" y="140" />
+        <di:waypoint x="726" y="140" />
+        <di:waypoint x="726" y="220" />
+        <di:waypoint x="380" y="220" />
+        <di:waypoint x="380" y="300" />
+        <di:waypoint x="405" y="300" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

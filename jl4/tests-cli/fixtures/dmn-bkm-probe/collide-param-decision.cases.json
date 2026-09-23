@@ -1,0 +1,22 @@
+{
+  "note": [
+    "Cases for collide-param-decision.dmn (probe E3). 2 cases x 3 decisions = 6",
+    "value checks. The expectations are written for the DMN-conformant reading:",
+    "a BKM may not silently read a decision (via_reader would then be null, and",
+    "the engines are being asked which they do), and the parameter shadows the",
+    "decision name (via_shadow = 2000, not 7000 or 8000). Where an engine",
+    "differs, THAT is the measurement; read the recorded run, not this note."
+  ],
+  "cases": [
+    {
+      "name": "A. n = 0, so base = 7",
+      "context": { "n": 0 },
+      "expect": { "base": 7, "via_reader": 8, "via_shadow": 2000 }
+    },
+    {
+      "name": "B. n = 1, so base = 8; via_shadow must NOT move",
+      "context": { "n": 1 },
+      "expect": { "base": 8, "via_reader": 9, "via_shadow": 2000 }
+    }
+  ]
+}

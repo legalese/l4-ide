@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE C2. C1's DISCRIMINATOR. Byte-for-byte the same model as bkm-chain.dmn
+  except for where the two knowledgeRequirement edges live:
+
+      C1: outer -> inner        on the BKM
+          result -> outer       on the decision
+      C2: result -> outer       on the decision
+          result -> inner       on the decision   <<< the transitive edge
+          outer carries NO knowledgeRequirement at all
+
+  What this asks: is an engine satisfied by the TRANSITIVE CLOSURE of the call
+  graph pinned on the top caller, rather than by the direct-call edges pinned on
+  each caller?
+
+  WHAT THE PAIR MEANS.
+    C1 pass, C2 pass -> both spellings work; the emitter may choose, and should
+      choose direct edges because they are what a modeler renders and what an
+      SCC over the requirement graph needs to be correct.
+    C1 pass, C2 fail -> direct edges are mandatory. Cleanest outcome.
+    C1 fail, C2 pass -> the emitted edge set is a transitive closure, NOT a
+      direct-call set, and section 6.3.9's SCC would be running over a graph that
+      is not the graph the engine consumes. That would be a spec-level
+      correction, not a fixture note.
+
+  Read the two files together; neither answers the question alone.
+
+  MEASURED 2026-07-31, and the answer is the cleanest of the three possible
+  ones: C1 passes, C2 FAILS ON BOTH ENGINES.
+
+    KIE 8.44  : ERROR [ERR_COMPILING_FEEL] Error compiling FEEL expression
+                'inner(v) * 10' for name 'outer' on node 'outer': Unknown
+                variable 'inner'. Validator AND build, i.e. compile time, and
+                no case is ever evaluated.
+    Camunda 8 : parses, then `result` evaluates to null in every case, with no
+                message of any kind. Caught here only by the harness's own
+                null-value rule.
+
+  So a knowledgeRequirement pinned on the top-level caller does NOT put the
+  callee's name into an intermediate BKM's FEEL scope. The engines consume the
+  DIRECT-CALL edge set, not its transitive closure, and section 6.3.9's SCC is
+  therefore running over the same graph the engine consumes. Wired
+  HarnessMustFail on both legs.
+
+  Note the asymmetry in HOW they fail, because it recurs across this whole
+  probe set: KIE refuses at compile time and names the missing binding; Camunda
+  silently answers null. Every "is the engine a backstop" question in Phase 5
+  has that same shape.
+
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_bkm_chain_flat" name="bkm_chain_flat" namespace="https://legalese.com/l4/dmn/bkm_chain_flat" exporter="hand">
+  <businessKnowledgeModel id="bkm_inner" name="inner">
+    <variable id="bkm_inner_var" name="inner" typeRef="number"/>
+    <encapsulatedLogic id="bkm_inner_logic">
+      <formalParameter id="bkm_inner_p1" name="v" typeRef="number"/>
+      <literalExpression id="bkm_inner_lit">
+        <text>v + 1</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <businessKnowledgeModel id="bkm_outer" name="outer">
+    <variable id="bkm_outer_var" name="outer" typeRef="number"/>
+    <encapsulatedLogic id="bkm_outer_logic">
+      <formalParameter id="bkm_outer_p1" name="v" typeRef="number"/>
+      <literalExpression id="bkm_outer_lit">
+        <text>inner(v) * 10</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_result" name="result">
+    <variable id="decision_result_var" name="result" typeRef="number"/>
+    <informationRequirement id="ir_result_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_result_outer">
+      <requiredKnowledge href="#bkm_outer"/>
+    </knowledgeRequirement>
+    <knowledgeRequirement id="kr_result_inner">
+      <requiredKnowledge href="#bkm_inner"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_result_lit">
+      <text>outer(n)</text>
+    </literalExpression>
+  </decision>
+</definitions>
