@@ -398,7 +398,20 @@ GIVETH A DEONTIC Actor Action
         LEST   BREACH
 ```
 
-**Inside the continuation**, `THE DEADLINE` and the others name the `EVERY`'s own lifecycle, and which deadline that is depends on the join:
+**Inside the continuation**, `THE DEADLINE` and the others name the `EVERY`'s own lifecycle, and which deadline that is depends on the join.
+
+At a glance, for a **barrier** — the case with a choice to make, because a group has many deadlines and the continuation needs one:
+
+| where the anchor is written                   | `THE DEADLINE` is                                                                                     |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| under `HENCE`, the `ONCE` line has a `WITHIN` | that `WITHIN` — the deadline on the group as a whole                                                  |
+| under `HENCE`, no `WITHIN` on the `ONCE` line | the **latest** of the members' own deadlines                                                          |
+| under `LEST`                                  | the deadline actually missed: the **earliest** member to fail, or the `ONCE` line's if all acted late |
+| over an empty group                           | the `ONCE` line's `WITHIN` if one is written; with none, there is no deadline, and the run refuses    |
+
+The second row is the one that surprises people, and it is deliberate (ruled 21 September 2026). "Cure within five days of the deadline" means five days from when **all** performance had fallen due. Taking the deadline of whoever happened to act last, or of the first member on the list, would make the landlord's cure period move when the tenants sign in a different order, or when the list is written in a different order — and neither of those changes what the lease says. The latest of the members' deadlines does not move for either.
+
+The precise rules, including ties:
 
 - under a **barrier**, `THE JOIN` is the last completion and `THE ARMING` is the `EVERY`'s. `THE DEADLINE` depends on the slot. Under `HENCE` it is the `ONCE` line's `WITHIN` when one is written (the deadline on the whole), and otherwise the _latest_ of the members' act deadlines — the instant by which all performance had fallen due, which does not depend on who acted last or on the order the roll names them. Under `LEST` it is the deadline that was actually missed: when members expired, the act deadline of the member whose failure the `LEST` is anchored at — the **earliest** failure, wherever that member stands on the roll; when two failures land at the same stamp, the one the stream reached first (two `SHANT` violations at one stamp are two events, and the `LEST` sees what followed the first of them); and when two misses come to light at the same event, the one with the earlier deadline — or the `ONCE` line's when everyone acted but the last act landed after it. A barrier over an empty group is joined at its arming and then goes through the `ONCE` line's `WITHIN` like any other join: its `HENCE` fires, and `THE DEADLINE` there is the `ONCE` line's `WITHIN` when written — unless that `WITHIN` is anchored to an instant so early that the deadline lies before the arming, in which case the `LEST` fires and `THE DEADLINE` there is that missed state deadline. With only an act `WITHIN` there is no deadline at all — nobody had one — so the run refuses and says so;
 - under a **fork**, each member's continuation is its own, so all three name that member's: its completion, its deadline, the `EVERY`'s arming.
