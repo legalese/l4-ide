@@ -38,7 +38,9 @@ This is the export for handing your rules to an organisation rather than an indi
   [logic, not flowcharts](../concepts/language-design/logic-not-flowcharts.md).)
 - **Deadlines and breach become first-class.** A `WITHIN` becomes a timer boundary event and a
   `LEST` becomes the path taken when it fires — which is exactly how a process modeller would have
-  drawn it by hand.
+  drawn it by hand. A permission's `WITHIN` is a timer too: a `MAY` that goes unexercised lapses,
+  and that arm ends the rule fulfilled, whatever its `HENCE` says. A permission with no `WITHIN`
+  cannot lapse, so it gets no timer.
 
 ## The command
 

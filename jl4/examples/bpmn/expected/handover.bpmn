@@ -19,13 +19,13 @@
       </bpmn:lane>
       <bpmn:lane id="Lane_2_Landlord" name="Landlord">
         <bpmn:flowNodeRef>Task_2</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Lapse_2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_2</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_4</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Lapse_4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_4</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_6</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Lapse_6</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_6</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_7</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Lapse_7</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_7</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_unassigned" name="(unassigned)">
         <bpmn:flowNodeRef>Start_0</bpmn:flowNodeRef>
@@ -50,9 +50,9 @@
     <bpmn:task id="Task_2" name="MAY inspect the premises">
       <bpmn:documentation>PARTY Landlord MAY inspect the premises WITHIN 7</bpmn:documentation>
     </bpmn:task>
-    <bpmn:boundaryEvent id="Lapse_2" name="after P7D" attachedToRef="Task_2" cancelActivity="true">
-      <bpmn:documentation>the permission lapses: the deadline passes without it being exercised, which routes where HENCE routes</bpmn:documentation>
-      <bpmn:timerEventDefinition id="Timer_Lapse_2">
+    <bpmn:boundaryEvent id="Boundary_2" name="after P7D" attachedToRef="Task_2" cancelActivity="true">
+      <bpmn:documentation>the permission lapses: it is not exercised within 7, so the rule ends fulfilled</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Boundary_2">
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P7D</bpmn:timeDuration>
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
@@ -60,9 +60,9 @@
     <bpmn:task id="Task_4" name="MAY photograph the premises">
       <bpmn:documentation>PARTY Landlord MAY photograph the premises WITHIN 7</bpmn:documentation>
     </bpmn:task>
-    <bpmn:boundaryEvent id="Lapse_4" name="after P7D" attachedToRef="Task_4" cancelActivity="true">
-      <bpmn:documentation>the permission lapses: the deadline passes without it being exercised, which routes where HENCE routes</bpmn:documentation>
-      <bpmn:timerEventDefinition id="Timer_Lapse_4">
+    <bpmn:boundaryEvent id="Boundary_4" name="after P7D" attachedToRef="Task_4" cancelActivity="true">
+      <bpmn:documentation>the permission lapses: it is not exercised within 7, so the rule ends fulfilled</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Boundary_4">
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P7D</bpmn:timeDuration>
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
@@ -72,18 +72,18 @@
     <bpmn:task id="Task_6" name="MAY retain the deposit">
       <bpmn:documentation>PARTY Landlord MAY retain the deposit WITHIN 30</bpmn:documentation>
     </bpmn:task>
-    <bpmn:boundaryEvent id="Lapse_6" name="after P30D" attachedToRef="Task_6" cancelActivity="true">
-      <bpmn:documentation>the permission lapses: the deadline passes without it being exercised, which routes where HENCE routes</bpmn:documentation>
-      <bpmn:timerEventDefinition id="Timer_Lapse_6">
+    <bpmn:boundaryEvent id="Boundary_6" name="after P30D" attachedToRef="Task_6" cancelActivity="true">
+      <bpmn:documentation>the permission lapses: it is not exercised within 30, so the rule ends fulfilled</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Boundary_6">
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P30D</bpmn:timeDuration>
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
     <bpmn:task id="Task_7" name="MAY apply to the tribunal">
       <bpmn:documentation>PARTY Landlord MAY apply to the tribunal WITHIN 30</bpmn:documentation>
     </bpmn:task>
-    <bpmn:boundaryEvent id="Lapse_7" name="after P30D" attachedToRef="Task_7" cancelActivity="true">
-      <bpmn:documentation>the permission lapses: the deadline passes without it being exercised, which routes where HENCE routes</bpmn:documentation>
-      <bpmn:timerEventDefinition id="Timer_Lapse_7">
+    <bpmn:boundaryEvent id="Boundary_7" name="after P30D" attachedToRef="Task_7" cancelActivity="true">
+      <bpmn:documentation>the permission lapses: it is not exercised within 30, so the rule ends fulfilled</bpmn:documentation>
+      <bpmn:timerEventDefinition id="Timer_Boundary_7">
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P30D</bpmn:timeDuration>
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
@@ -93,15 +93,15 @@
     <bpmn:sequenceFlow id="Flow_Split_1__Task_2" sourceRef="Split_1" targetRef="Task_2" />
     <bpmn:sequenceFlow id="Flow_Split_1__Task_4" sourceRef="Split_1" targetRef="Task_4" />
     <bpmn:sequenceFlow id="Flow_Task_2__End_3" sourceRef="Task_2" targetRef="End_3" />
-    <bpmn:sequenceFlow id="Flow_Lapse_2__End_3" sourceRef="Lapse_2" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Boundary_2__End_3" sourceRef="Boundary_2" targetRef="End_3" />
     <bpmn:sequenceFlow id="Flow_Task_4__End_3" sourceRef="Task_4" targetRef="End_3" />
-    <bpmn:sequenceFlow id="Flow_Lapse_4__End_3" sourceRef="Lapse_4" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Boundary_4__End_3" sourceRef="Boundary_4" targetRef="End_3" />
     <bpmn:sequenceFlow id="Flow_Split_5__Task_6" sourceRef="Split_5" targetRef="Task_6" />
     <bpmn:sequenceFlow id="Flow_Split_5__Task_7" sourceRef="Split_5" targetRef="Task_7" />
     <bpmn:sequenceFlow id="Flow_Task_6__End_3" sourceRef="Task_6" targetRef="End_3" />
-    <bpmn:sequenceFlow id="Flow_Lapse_6__End_3" sourceRef="Lapse_6" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Boundary_6__End_3" sourceRef="Boundary_6" targetRef="End_3" />
     <bpmn:sequenceFlow id="Flow_Task_7__End_3" sourceRef="Task_7" targetRef="End_3" />
-    <bpmn:sequenceFlow id="Flow_Lapse_7__End_3" sourceRef="Lapse_7" targetRef="End_3" />
+    <bpmn:sequenceFlow id="Flow_Boundary_7__End_3" sourceRef="Boundary_7" targetRef="End_3" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_the_handover">
@@ -132,7 +132,7 @@
       <bpmndi:BPMNShape id="Shape_Task_2" bpmnElement="Task_2">
         <dc:Bounds x="740" y="260" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Shape_Lapse_2" bpmnElement="Lapse_2">
+      <bpmndi:BPMNShape id="Shape_Boundary_2" bpmnElement="Boundary_2">
         <dc:Bounds x="794" y="322" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_End_3" bpmnElement="End_3">
@@ -141,7 +141,7 @@
       <bpmndi:BPMNShape id="Shape_Task_4" bpmnElement="Task_4">
         <dc:Bounds x="740" y="380" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Shape_Lapse_4" bpmnElement="Lapse_4">
+      <bpmndi:BPMNShape id="Shape_Boundary_4" bpmnElement="Boundary_4">
         <dc:Bounds x="794" y="442" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Split_5" bpmnElement="Split_5">
@@ -150,13 +150,13 @@
       <bpmndi:BPMNShape id="Shape_Task_6" bpmnElement="Task_6">
         <dc:Bounds x="740" y="500" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Shape_Lapse_6" bpmnElement="Lapse_6">
+      <bpmndi:BPMNShape id="Shape_Boundary_6" bpmnElement="Boundary_6">
         <dc:Bounds x="794" y="562" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Task_7" bpmnElement="Task_7">
         <dc:Bounds x="740" y="620" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Shape_Lapse_7" bpmnElement="Lapse_7">
+      <bpmndi:BPMNShape id="Shape_Boundary_7" bpmnElement="Boundary_7">
         <dc:Bounds x="794" y="682" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Edge_Flow_Start_0__Task_0" bpmnElement="Flow_Start_0__Task_0">
@@ -195,7 +195,7 @@
         <di:waypoint x="854" y="820" />
         <di:waypoint x="952" y="820" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Edge_Flow_Lapse_2__End_3" bpmnElement="Flow_Lapse_2__End_3">
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_2__End_3" bpmnElement="Flow_Boundary_2__End_3">
         <di:waypoint x="812" y="358" />
         <di:waypoint x="861" y="358" />
         <di:waypoint x="861" y="820" />
@@ -207,7 +207,7 @@
         <di:waypoint x="868" y="820" />
         <di:waypoint x="952" y="820" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Edge_Flow_Lapse_4__End_3" bpmnElement="Flow_Lapse_4__End_3">
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_4__End_3" bpmnElement="Flow_Boundary_4__End_3">
         <di:waypoint x="812" y="478" />
         <di:waypoint x="875" y="478" />
         <di:waypoint x="875" y="820" />
@@ -231,7 +231,7 @@
         <di:waypoint x="882" y="820" />
         <di:waypoint x="952" y="820" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Edge_Flow_Lapse_6__End_3" bpmnElement="Flow_Lapse_6__End_3">
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_6__End_3" bpmnElement="Flow_Boundary_6__End_3">
         <di:waypoint x="812" y="598" />
         <di:waypoint x="889" y="598" />
         <di:waypoint x="889" y="820" />
@@ -243,7 +243,7 @@
         <di:waypoint x="896" y="820" />
         <di:waypoint x="952" y="820" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Edge_Flow_Lapse_7__End_3" bpmnElement="Flow_Lapse_7__End_3">
+      <bpmndi:BPMNEdge id="Edge_Flow_Boundary_7__End_3" bpmnElement="Flow_Boundary_7__End_3">
         <di:waypoint x="812" y="718" />
         <di:waypoint x="903" y="718" />
         <di:waypoint x="903" y="820" />

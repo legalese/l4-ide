@@ -384,8 +384,21 @@ spec = do
       it "still defaults a prohibition to a violation into Breach" $
         lestCaptions (defaultLestSrc "SHANT") `shouldBe` Right ["violation"]
 
-      it "still draws no LEST arm at all for a bare permission" $
-        lestCaptions (defaultLestSrc "MAY") `shouldBe` Right []
+      -- Until 2026-09-17 a permission got no LEST arm at all, so a rule whose
+      -- expiry reaches FULFILLED showed no route there. 'bareSrc "MAY"' below
+      -- is the control that says the fix did not go one step too far: with no
+      -- WITHIN there is no expiry event, so there is still no arm to draw.
+      it "now draws a bare permission's lapse, which used to be drawn nowhere" $
+        lestCaptions (defaultLestSrc "MAY") `shouldBe` Right ["lapses"]
+
+      -- And it goes to Fulfilled, out of the initial state: a lapsed
+      -- permission ends the rule fulfilled, whatever its HENCE says.
+      it "sends that lapse to Fulfilled" $ do
+        let lapseOf src = case graphFor src of
+              Left errs -> Left (show errs)
+              Right sg -> Right [ (t.transLabel.labelAction, nameOf sg t.transTo)
+                                | t <- lestEdges sg, t.transFrom == sg.sgInitialState ]
+        lapseOf (defaultLestSrc "MAY") `shouldBe` Right [("lapses", "Fulfilled")]
 
       -- DO is documented as requiring an explicit LEST, and the extractor used
       -- to believe the documentation and draw nothing — leaving a rule whose
@@ -402,6 +415,9 @@ spec = do
         lestCaptions (bareSrc "MUST") `shouldBe` Right [noTriggerWording]
         lestCaptions (bareSrc "DO") `shouldBe` Right [noTriggerWording]
         lestCaptions (bareSrc "SHANT") `shouldBe` Right ["violation"]
+        -- The control for the arm above: a permission with no WITHIN cannot
+        -- lapse, so nothing is drawn — the deadline, not the modal, decides
+        -- whether there is an arm.
         lestCaptions (bareSrc "MAY") `shouldBe` Right []
 
     -- L4.Bpmn.Lower reads the obligation's modal off `henceOf sid <|> lestOf
