@@ -1,0 +1,36 @@
+-- Computed (MEANS) record fields, in the one position they are representable.
+--
+-- After L4.Desugar.desugarComputedFields a MEANS field is not a field any
+-- more: the desugarer strips it from the RecordDecl before type checking and
+-- synthesizes a top-level selector decide, so `m's isSenior` is an ordinary
+-- boolean predicate call, not an RProj — and like every boolean predicate its
+-- output argument is dropped. This seed pins both polarities of that call in
+-- guard position: the value-position IF gives the positive call and its
+-- materialised complement, and `pays full price` gives a source-level NOT.
+-- The value-position half of the story is not-ok/bool-value-position.l4,
+-- where the same selector is batch-rejected rather than handed an invented
+-- output arity its declaration does not have.
+
+DECLARE Member HAS
+    age      IS A NUMBER
+    isSenior IS A BOOLEAN
+        MEANS age AT LEAST 65
+
+@export
+GIVEN m IS A Member
+GIVETH A NUMBER
+`ticket price` m MEANS
+    IF m's isSenior THEN 8 ELSE 15
+
+@export
+GIVEN m IS A Member
+GIVETH A BOOLEAN
+DECIDE `pays full price` IF
+    NOT m's isSenior
+
+#EVAL `ticket price` (Member WITH age IS 70)
+-- L4 oracle ==> 8
+#EVAL `ticket price` (Member WITH age IS 30)
+-- L4 oracle ==> 15
+#EVAL `pays full price` (Member WITH age IS 30)
+-- L4 oracle ==> TRUE

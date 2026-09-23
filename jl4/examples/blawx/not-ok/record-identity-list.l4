@@ -1,0 +1,45 @@
+-- The W1 fixture's second shape (BLAWX-EXPORT-SPEC §11 W1, §4.1), measured
+-- 2026-09-02: record identity smuggled inside a CONTAINER.
+--
+-- `not-ok/record-identity.l4` compares two Player records directly. This file
+-- never mentions a bare Player on either side of an `EQUALS` — it compares two
+-- `LIST OF Player` fields, and then two `LIST OF MAYBE Player` fields — and it
+-- diverges for exactly the same reason. L4 compares a list element-wise BY
+-- VALUE; Blawx unifies it element-wise BY ATOM; and R11's flattening still
+-- mints one object per OCCURRENCE, so a roster and its structural twin arrive
+-- as lists of different atoms.
+--
+-- Measured before the refusal descended into containers: `l4 blawx` on the
+-- first rule exited 0 and emitted `Members = Members2` inside
+-- `according_to(sec_1_section,same_roster,A,B)`. The refusal now covers any
+-- operand sort that CONTAINS a declared record, under any nesting of `LIST OF`
+-- and `MAYBE`, which is why both rules below are rejected and why this file
+-- carries the `MAYBE` one: a bare `MAYBE Player` FIELD is refused earlier, by
+-- the ontology check ("sort with no Blawx value type"), so `LIST OF MAYBE
+-- Player` is the only reachable way to put a `MAYBE` under this check.
+--
+-- The edits that work are the same two the diagnostic names: state the rule
+-- once per slot, or compare fields whose sorts are atoms.
+
+§ `Roster Identity`
+
+DECLARE Player HAS
+    number IS A NUMBER
+
+DECLARE Team HAS
+    members IS A LIST OF Player
+    reserves IS A LIST OF MAYBE Player
+
+@export A team fields the same roster as another if their member lists are the same.
+GIVEN a IS A Team
+      b IS A Team
+GIVETH A BOOLEAN
+DECIDE `same roster` a b IF
+  a's members EQUALS b's members
+
+@export A team keeps the same reserves as another if their reserve lists are the same.
+GIVEN a IS A Team
+      b IS A Team
+GIVETH A BOOLEAN
+DECIDE `same reserves` a b IF
+  a's reserves EQUALS b's reserves

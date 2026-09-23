@@ -1,0 +1,727 @@
+§ `Housing Act 1988 — Schedule 2 — Grounds 8, 13, 15 and 17`
+
+-- The statute showcase (P4c). FOUR grounds for possession, inlined from
+-- `jl4/experiments/housing-act-ground-{8,13,15,17}.l4` (which are NOT modified)
+-- into ONE self-contained module in the Blawx seed conventions.
+--
+-- WHY ONE FILE. `buildCtx` in `L4.Relational.Lower` is MODULE-SCOPED: an
+-- imported `DECLARE` never becomes a Blawx category, so an aggregator that
+-- `IMPORT`ed the four grounds would emit their queries against an ontology that
+-- does not exist. Inlining is a requirement of the bridge, not a style choice.
+-- One module also means ONE Blawx atom namespace, and a duplicate atom there is
+-- a hard error rather than an overload — see THE RENAMES below.
+--
+-- WHAT WAS DROPPED, and why each is safe:
+--
+--   * `IMPORT prelude`, `IMPORT housing-act-common`, `IMPORT daydate`. `AT LEAST`,
+--     `TIMES`, `AND`/`OR`/`NOT` and `CONSIDER` need no import. Dropping `daydate`
+--     also keeps every DATE out of the module, which matters more than it looks:
+--     record FIELDS are declared unconditionally (`L4.Blawx.Lower`,
+--     `declarations`) and are NOT reachability-filtered, so a DATE field would
+--     reach the ontology even if no exported decision read it.
+--   * the four `ground N possession order` deontic tails, and with them the
+--     `Actor`/`Action` types they needed. Lowering is EXPORT-ROOTED (the walk
+--     starts from `@export`ed decisions and follows `closureRefs`), so leaving
+--     them unexported would also have worked — deleting them is simply cleaner
+--     for a file whose whole job is to be self-contained. The grounds' modality
+--     (Part I is MUST, Part II is MAY) is preserved in the `@export` prose.
+--
+-- THE RENAMES, all forced by the single namespace. Each is MEASURED: the tree's
+-- injectivity check refuses the original spelling.
+--
+--   1. Ground 8's field `rent period` collided with the enum TYPE `RentPeriod`
+--      (both mangle to `rent_period`). The FIELD is renamed
+--      `the basis on which rent is payable`, which also reads better in the
+--      synthesised NLG ("has the basis on which rent is payable of").
+--   2. `lodger or sub-tenant removal proviso` existed in grounds 13 AND 15.
+--      Suffixed with each ground's own trigger:
+--      `… (waste, neglect or default)` and `… (ill-treatment)`.
+--   3./4. Two Ground13Claim/Ground15Claim fields were spelled identically.
+--      Ground 15's are renamed to name ground 15's OWN subject matter —
+--      ill-treatment of the furniture, rather than ground 13's waste, neglect
+--      or default: "the person ill-treating the furniture", "…who ill-treated
+--      the furniture". The shared spelling had erased a distinction the two
+--      grounds actually draw; restoring it is a fidelity gain, not a
+--      workaround. NOTE, because an earlier draft of this header said
+--      otherwise: those two phrases are a DERIVED paraphrase, not the
+--      statute's words. Ground 15's own wording is "and, in the case of
+--      ill-treatment by a person lodging with the tenant or by a sub-tenant of
+--      his, the tenant has not taken such steps as he ought reasonably to have
+--      taken for the removal of the lodger or sub-tenant" — carried verbatim in
+--      the decision bodies and on the `@export` line below, where it belongs.
+--      A field name is an ontology label; a citation is a quotation; they are
+--      not the same thing and this file does not conflate them.
+--
+-- WHERE THE CITATIONS LIVE. `@export` and `@desc` are the SAME annotation slot
+-- (`L4.Relational.Lower` reads one `annDesc` per declaration and strips a leading
+-- `export` keyword off it), so writing `@export` on one line and `@desc <prose>`
+-- on the next keeps one and silently discards the other. Every citation in this
+-- file therefore rides on the `@export` line itself, which is the form that
+-- reaches Blawx's `rule_text` section. The verbatim statutory words stay in the
+-- decision bodies as inert prose as well: that is what makes the L4 source
+-- readable as law, even though the bridge erases it.
+--
+-- TWO DECISIONS ARE DELIBERATELY NOT EXPORTED — `definition — rent means rent
+-- lawfully due from the tenant` and `rule — universal credit housing amount not
+-- yet received is ignored`. Both are pure inert prose over `TRUE`; exported they
+-- would be constant-true predicates in the ontology, which is worse than useless
+-- in a scenario editor. Their words are carried instead on the `@export` lines of
+-- `per-period threshold met` and `Ground 8 made out` respectively, so nothing is
+-- lost from the artifact. They are kept in the source because the statute says
+-- them.
+--
+-- EXPORT ORDER IS AUTHORING, NOT LAYOUT. Exactly ONE `interview` test is emitted
+-- per file and its goal is the FIRST `@export` in the file, so `Ground 8 made
+-- out` — the mandatory ground, the one a duty solicitor asks about first — comes
+-- first. The other three grounds' interviews are driven by hand in the container.
+-- L4 is order-independent at the top level, so the forward references are fine.
+--
+-- DIRECTIVE SHAPES. `lowerQuery` matches an application whose argument is a
+-- record literal, a list of them, or a ground literal. A NAMED scenario constant
+-- (the experiments files' idiom) and `#ASSERT NOT` are BOTH silently dropped, so
+-- every scenario below is inlined at its directive and every negative case is an
+-- `#EVAL` with a `FALSE` oracle. Each directive carries its `l4 run` value on the
+-- following line, per BLAWX-EXPORT-SPEC R11: one copy, outside the artifact.
+--
+-- The four `#ASSERT`s are spelled `OF … WITH` rather than with a parenthesised
+-- record literal, and that is a parser constraint, not taste: `Assert` is built
+-- from `singleLineExpr` and is line-oriented, so a `(` on a continuation line is
+-- a parse error ("unexpected (, expecting %, ;, OF, end of input, or space
+-- token"). `#EVAL` has no such restriction, which is why the two spellings sit
+-- side by side below. Both reach `lowerQuery`'s record-literal branch, and all
+-- four `#ASSERT`s emit their `false :- not …` constraint plus a query.
+
+§§ `Domain model — Ground 8 (Part I, mandatory): rent arrears`
+
+-- The rent period. The in-force ground sets thresholds only for
+-- weekly/fortnightly and monthly periods; `other` stands for any basis the
+-- in-force ground no longer addresses (the quarterly and yearly limbs were
+-- omitted by the Renters' Rights Act 2025), for which no threshold engages.
+DECLARE RentPeriod IS ONE OF
+    `weekly or fortnightly`
+    `monthly`
+    `other`
+
+-- `rent for one period` is the rent for ONE of the unit the threshold is stated
+-- in: one week's rent for the weekly/fortnightly limb (threshold = 13 times it),
+-- one month's rent for the monthly limb (threshold = 3 times it).
+DECLARE Ground8Claim HAS
+  `the basis on which rent is payable`                           IS A RentPeriod
+  `rent for one period`                                          IS A NUMBER
+  `rent unpaid at the date of service of the section 8 notice`   IS A NUMBER
+  `rent unpaid at the date of the hearing`                       IS A NUMBER
+
+§§ `Domain model — Grounds 13, 15 and 17 (Part II, discretionary)`
+
+DECLARE Ground13Claim HAS
+  -- LIMB 1
+  `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house`  IS A BOOLEAN
+  -- LIMB 2 — the lodger/sub-tenant proviso
+  `the responsible actor is a person lodging with the tenant or a sub-tenant of his`  IS A BOOLEAN
+  `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant`  IS A BOOLEAN
+
+DECLARE Ground15Claim HAS
+  -- LIMB 1
+  `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house`  IS A BOOLEAN
+  -- LIMB 2 — the lodger/sub-tenant proviso, in ground 15's own words
+  `the person ill-treating the furniture is a person lodging with the tenant or a sub-tenant of his`  IS A BOOLEAN
+  `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant who ill-treated the furniture`  IS A BOOLEAN
+
+DECLARE Ground17Claim HAS
+  -- LIMB 1
+  `the tenant is the person, or one of the persons, to whom the tenancy was granted`  IS A BOOLEAN
+  -- LIMB 2
+  `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly`  IS A BOOLEAN
+  -- LIMB 3 — the maker of the statement: (a) or (b)
+  `the false statement was made by the tenant`  IS A BOOLEAN
+  `the false statement was made by a person acting at the tenant's instigation`  IS A BOOLEAN
+
+§ `Ground 8 — rent arrears (Part I: the court MUST order possession)`
+
+§§ `The both-dates requirement`
+
+-- "Both at the date of the service of the notice under section 8 of this Act
+-- relating to the proceedings for possession and at the date of the hearing—"
+-- the per-period threshold must be met at BOTH dates.
+@export Sch 2 Ground 8 (Part I — the court MUST order possession): "Both at the date of the service of the notice under section 8 of this Act relating to the proceedings for possession and at the date of the hearing—" the per-period threshold must be met. When calculating how much rent is unpaid, an amount unpaid only because the tenant had not yet received the housing element of an award of universal credit under Part 1 of the Welfare Reform Act 2012 is to be ignored (inserted by the Renters' Rights Act 2025 (c. 26), Sch. 1 para. 24(d), in force 1.5.2026).
+GIVEN claim IS A Ground8Claim
+GIVETH A BOOLEAN
+`Ground 8 made out` claim MEANS
+        "Both at the date of the service of the notice under section 8 of this Act relating to the proceedings for possession and at the date of the hearing—"
+    ... `per-period threshold met` claim (claim's `rent unpaid at the date of service of the section 8 notice`)
+    AND `per-period threshold met` claim (claim's `rent unpaid at the date of the hearing`)
+
+§§ `(a)/(b) — the per-period arrears thresholds, stated verbatim (in-force)`
+
+-- The two in-force limbs, carried verbatim as inert prose. `threshold met for
+-- arrears` (a separate decision in the experiments file) is folded in here, so
+-- that this module carries exactly ONE arity-2 computed predicate rather than
+-- two.
+--
+-- THAT PREDICATE IS THE CORPUS'S ONE UNDECLARED NAME, deliberately. It is
+-- (Ground8Claim, NUMBER) -> BOOLEAN: total arity 2 once the boolean output is
+-- dropped, and its second parameter is neither record- nor enum-sorted, so it is
+-- not attribute-shaped and does not reach the arity-3 relationship form either.
+-- `L4.Blawx.Lower` therefore emits NO `blawx_attribute` fact for it, while its
+-- rules and its four query rows DO emit and DO carry Blockly images. Measured:
+-- every row round-trips through the headless re-save (the fixpoint harness), so
+-- the shape is kept rather than worked around with arity-1 wrappers. What the
+-- editor shows for it is wrong in two cosmetic ways — an invented value type
+-- (`object` in the rules, `number` in the queries) and the raw mangled atom as
+-- its infix phrase, since there is no NLG fact to draw one from. That is the
+-- recorded gap, witnessed here rather than asserted, and `jl4/tests-cli` pins
+-- both halves of it.
+@export Sch 2 Ground 8 (a) and (b): "(a) if rent is payable weekly or fortnightly, at least thirteen weeks' rent is unpaid; (b) if rent is payable monthly, at least three months' rent is unpaid". For the purpose of this ground "rent" means rent lawfully due from the tenant.
+GIVEN claim   IS A Ground8Claim
+      arrears IS A NUMBER
+GIVETH A BOOLEAN
+`per-period threshold met` claim arrears MEANS
+        "(a) if rent is payable weekly or fortnightly, at least thirteen weeks' rent is unpaid;"
+    ... "(b) if rent is payable monthly, at least three months' rent is unpaid;"
+    ... `an in-force threshold applies to this rent period` claim
+    AND arrears AT LEAST `required arrears for the period` claim
+
+§§ `The in-force thresholds — thirteen weeks' rent, three months' rent`
+
+@export Sch 2 Ground 8, thresholds as amended by the Renters' Rights Act 2025 (c. 26), Sch. 1 para. 24 (in force 1.5.2026, S.I. 2026/421, reg. 2(b)): thirteen weeks' rent for a tenancy whose rent is payable weekly or fortnightly, three months' rent for one payable monthly.
+GIVEN claim IS A Ground8Claim
+GIVETH A NUMBER
+`required arrears for the period` claim MEANS
+    CONSIDER claim's `the basis on which rent is payable`
+    WHEN `weekly or fortnightly` THEN 13 TIMES claim's `rent for one period`   -- thirteen weeks' rent
+    WHEN `monthly`               THEN  3 TIMES claim's `rent for one period`   -- three months' rent
+    WHEN `other`                 THEN -1   -- no in-force threshold engages
+
+@export Sch 2 Ground 8: the quarterly and yearly limbs were omitted by the Renters' Rights Act 2025, Sch. 1 para. 24(c), so no in-force threshold engages for rent payable on any other basis, however large the arrears.
+GIVEN claim IS A Ground8Claim
+GIVETH A BOOLEAN
+`an in-force threshold applies to this rent period` claim MEANS
+    CONSIDER claim's `the basis on which rent is payable`
+    WHEN `weekly or fortnightly` THEN TRUE
+    WHEN `monthly`               THEN TRUE
+    WHEN `other`                 THEN FALSE
+
+§§ `Definitions and interpretive rules (inert prose, deliberately not exported)`
+
+-- Both are pure prose over `TRUE`. Their words ride on the `@export` lines of
+-- `per-period threshold met` and `Ground 8 made out` respectively; exported here
+-- they would be constant-true predicates in the emitted ontology.
+
+GIVEN claim IS A Ground8Claim
+GIVETH A BOOLEAN
+`definition — rent means rent lawfully due from the tenant` claim MEANS
+        "and for the purpose of this ground 'rent' means rent lawfully due from the tenant."
+    ... TRUE
+
+GIVEN claim IS A Ground8Claim
+GIVETH A BOOLEAN
+`rule — universal credit housing amount not yet received is ignored` claim MEANS
+        "When calculating how much rent is unpaid for the purpose of this ground, if the tenant is entitled to receive an amount for housing as part of an award of universal credit under Part 1 of the Welfare Reform Act 2012, any amount that was unpaid only because the tenant had not yet received the payment of that award is to be ignored."
+    ... TRUE
+
+§ `Ground 13 — deterioration of the dwelling-house (Part II: the court MAY order possession)`
+
+§§ `Ground 13 made out — deterioration AND the removal proviso`
+
+@export Sch 2 Ground 13 (Part II — the court MAY order possession) is made out when the deterioration limb and the lodger-or-sub-tenant removal proviso are both satisfied. For the purposes of this ground "common parts" means any part of a building comprising the dwelling-house and any other premises which the tenant is entitled under the terms of the tenancy to use in common with the occupiers of other dwelling-houses in which the landlord has an estate or interest.
+GIVEN claim IS A Ground13Claim
+GIVETH A BOOLEAN
+`Ground 13 made out` claim MEANS
+        `deterioration owing to waste, neglect or default` claim
+    AND `lodger or sub-tenant removal proviso (waste, neglect or default)` claim
+
+§§ `Limb 1 — deterioration owing to waste, neglect or default`
+
+@export Sch 2 Ground 13: "The condition of the dwelling-house or any of the common parts has deteriorated owing to acts of waste by, or the neglect or default of, the tenant or any other person residing in the dwelling-house".
+GIVEN claim IS A Ground13Claim
+GIVETH A BOOLEAN
+`deterioration owing to waste, neglect or default` claim MEANS
+        "The condition of the dwelling-house or any of the common parts has deteriorated owing to acts of waste by, or the neglect or default of, the tenant or any other person residing in the dwelling-house"
+    ... claim's `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house`
+
+§§ `Limb 2 — the lodger/sub-tenant removal proviso (an implication)`
+
+-- Read as: IF the responsible actor is a lodger/sub-tenant THEN the tenant failed
+-- to take reasonable removal steps. Encoded as the material implication
+-- (NOT P) OR Q, so it is vacuously TRUE when the actor is not a lodger/sub-tenant.
+@export Sch 2 Ground 13, proviso: "and, in the case of an act of waste by, or the neglect or default of, a person lodging with the tenant or a sub-tenant of his, the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant". Read as an implication, so it is vacuously satisfied where the responsible person is not a lodger or sub-tenant.
+GIVEN claim IS A Ground13Claim
+GIVETH A BOOLEAN
+`lodger or sub-tenant removal proviso (waste, neglect or default)` claim MEANS
+        "and, in the case of an act of waste by, or the neglect or default of, a person lodging with the tenant or a sub-tenant of his,"
+    ..  NOT claim's `the responsible actor is a person lodging with the tenant or a sub-tenant of his`
+    ..  "the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant."
+    ..  claim's `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant`
+
+§ `Ground 15 — deterioration of furniture (Part II: the court MAY order possession)`
+
+§§ `Ground 15 made out — deterioration AND the removal proviso`
+
+@export Sch 2 Ground 15 (Part II — the court MAY order possession) is made out when the furniture-deterioration limb and the removal proviso are both satisfied. "In the opinion of the court" qualifies the standard of proof on the deterioration finding; it is not an independent condition.
+GIVEN claim IS A Ground15Claim
+GIVETH A BOOLEAN
+`Ground 15 made out` claim MEANS
+        `furniture deteriorated owing to ill-treatment` claim
+    AND `lodger or sub-tenant removal proviso (ill-treatment)` claim
+
+§§ `Limb 1 — furniture deteriorated, in the opinion of the court, owing to ill-treatment`
+
+@export Sch 2 Ground 15: "The condition of any furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house".
+GIVEN claim IS A Ground15Claim
+GIVETH A BOOLEAN
+`furniture deteriorated owing to ill-treatment` claim MEANS
+        "The condition of any furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house"
+    ... claim's `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house`
+
+§§ `Limb 2 — the lodger/sub-tenant removal proviso (an implication)`
+
+@export Sch 2 Ground 15, proviso: "and, in the case of ill-treatment by a person lodging with the tenant or by a sub-tenant of his, the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant". Read as an implication, vacuously satisfied where the person ill-treating the furniture is not a lodger or sub-tenant.
+GIVEN claim IS A Ground15Claim
+GIVETH A BOOLEAN
+`lodger or sub-tenant removal proviso (ill-treatment)` claim MEANS
+        "and, in the case of ill-treatment by a person lodging with the tenant or by a sub-tenant of his,"
+    ..  NOT claim's `the person ill-treating the furniture is a person lodging with the tenant or a sub-tenant of his`
+    ..  "the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant."
+    ..  claim's `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant who ill-treated the furniture`
+
+§ `Ground 17 — false statement (Part II: the court MAY order possession)`
+
+§§ `Ground 17 made out — LIMB 1 AND LIMB 2 AND (a OR b)`
+
+@export Sch 2 Ground 17 (Part II — the court MAY order possession; inserted by the Housing Act 1996 (c. 52), s. 102, in force 28.2.1997, S.I. 1997/225, art. 2) is made out when the tenant is a grantee, the landlord was induced by a false statement made knowingly or recklessly, and that statement was made by the tenant or at the tenant's instigation.
+GIVEN claim IS A Ground17Claim
+GIVETH A BOOLEAN
+`Ground 17 made out` claim MEANS
+        `tenant is a grantee of the tenancy` claim
+    AND `landlord induced by a false statement` claim
+    AND `statement made by the tenant or at the tenant's instigation` claim
+
+§§ `Limb 1 — the tenant is a grantee of the tenancy`
+
+@export Sch 2 Ground 17: "The tenant is the person, or one of the persons, to whom the tenancy was granted".
+GIVEN claim IS A Ground17Claim
+GIVETH A BOOLEAN
+`tenant is a grantee of the tenancy` claim MEANS
+        "The tenant is the person, or one of the persons, to whom the tenancy was granted"
+    ... claim's `the tenant is the person, or one of the persons, to whom the tenancy was granted`
+
+§§ `Limb 2 — the landlord was induced by a false statement made knowingly or recklessly`
+
+@export Sch 2 Ground 17: "and the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly".
+GIVEN claim IS A Ground17Claim
+GIVETH A BOOLEAN
+`landlord induced by a false statement` claim MEANS
+        "and the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly"
+    ... claim's `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly`
+
+§§ `Limb 3 — the statement was made by (a) the tenant OR (b) a person at the tenant's instigation`
+
+@export Sch 2 Ground 17, limbs (a) and (b): the false statement was made "by— (a) the tenant, or (b) a person acting at the tenant's instigation."
+GIVEN claim IS A Ground17Claim
+GIVETH A BOOLEAN
+`statement made by the tenant or at the tenant's instigation` claim MEANS
+        "by—"
+    ..  "(a) the tenant, or"
+    ..  claim's `the false statement was made by the tenant`
+    ..  "(b) a person acting at the tenant's instigation."
+    ..  claim's `the false statement was made by a person acting at the tenant's instigation`
+
+§ `Tests`
+
+§§ `Ground 8 — made out: weekly, thirteen weeks' rent unpaid at both dates`
+
+-- Weekly rent of 100; threshold = 13 weeks = 1300. Arrears of 1300 at service
+-- exactly clears it, and 1400 at the hearing still clears it.
+#ASSERT `Ground 8 made out` OF
+            Ground8Claim
+            WITH
+                `the basis on which rent is payable` IS `weekly or fortnightly`
+                `rent for one period` IS 100
+                `rent unpaid at the date of service of the section 8 notice` IS 1300
+                `rent unpaid at the date of the hearing` IS 1400
+-- L4 oracle ==> assertion satisfied
+
+#EVAL `per-period threshold met`
+        (Ground8Claim WITH `the basis on which rent is payable` IS `weekly or fortnightly`,
+                           `rent for one period` IS 100,
+                           `rent unpaid at the date of service of the section 8 notice` IS 1300,
+                           `rent unpaid at the date of the hearing` IS 1400)
+        1300
+-- L4 oracle ==> TRUE
+
+#EVAL `required arrears for the period`
+        (Ground8Claim WITH `the basis on which rent is payable` IS `weekly or fortnightly`,
+                           `rent for one period` IS 100,
+                           `rent unpaid at the date of service of the section 8 notice` IS 1300,
+                           `rent unpaid at the date of the hearing` IS 1400)
+-- L4 oracle ==> 1300
+
+#EVAL `an in-force threshold applies to this rent period`
+        (Ground8Claim WITH `the basis on which rent is payable` IS `weekly or fortnightly`,
+                           `rent for one period` IS 100,
+                           `rent unpaid at the date of service of the section 8 notice` IS 1300,
+                           `rent unpaid at the date of the hearing` IS 1400)
+-- L4 oracle ==> TRUE
+
+§§ `Ground 8 — made out: monthly, three months' rent unpaid at both dates`
+
+#EVAL `required arrears for the period`
+        (Ground8Claim WITH `the basis on which rent is payable` IS `monthly`,
+                           `rent for one period` IS 800,
+                           `rent unpaid at the date of service of the section 8 notice` IS 2400,
+                           `rent unpaid at the date of the hearing` IS 3200)
+-- L4 oracle ==> 2400
+
+#EVAL `Ground 8 made out`
+        (Ground8Claim WITH `the basis on which rent is payable` IS `monthly`,
+                           `rent for one period` IS 800,
+                           `rent unpaid at the date of service of the section 8 notice` IS 2400,
+                           `rent unpaid at the date of the hearing` IS 3200)
+-- L4 oracle ==> TRUE
+
+§§ `Ground 8 — knocked out: the both-dates requirement`
+
+-- Thirteen weeks' worth at service (1300), but the tenant pays down so only
+-- twelve weeks' worth (1200) is unpaid at the hearing.
+#EVAL `per-period threshold met`
+        (Ground8Claim WITH `the basis on which rent is payable` IS `weekly or fortnightly`,
+                           `rent for one period` IS 100,
+                           `rent unpaid at the date of service of the section 8 notice` IS 1300,
+                           `rent unpaid at the date of the hearing` IS 1200)
+        1200
+-- L4 oracle ==> FALSE
+
+#EVAL `Ground 8 made out`
+        (Ground8Claim WITH `the basis on which rent is payable` IS `weekly or fortnightly`,
+                           `rent for one period` IS 100,
+                           `rent unpaid at the date of service of the section 8 notice` IS 1300,
+                           `rent unpaid at the date of the hearing` IS 1200)
+-- L4 oracle ==> FALSE
+
+-- The mirror image: only two months' worth (1600) at service, though three
+-- months (2400) by the hearing.
+#EVAL `per-period threshold met`
+        (Ground8Claim WITH `the basis on which rent is payable` IS `monthly`,
+                           `rent for one period` IS 800,
+                           `rent unpaid at the date of service of the section 8 notice` IS 1600,
+                           `rent unpaid at the date of the hearing` IS 2400)
+        1600
+-- L4 oracle ==> FALSE
+
+#EVAL `Ground 8 made out`
+        (Ground8Claim WITH `the basis on which rent is payable` IS `monthly`,
+                           `rent for one period` IS 800,
+                           `rent unpaid at the date of service of the section 8 notice` IS 1600,
+                           `rent unpaid at the date of the hearing` IS 2400)
+-- L4 oracle ==> FALSE
+
+§§ `Ground 8 — knocked out: a rent period with no in-force threshold`
+
+-- The omitted quarterly/yearly limbs. No threshold engages, so the ground is not
+-- made out however large the arrears.
+#EVAL `an in-force threshold applies to this rent period`
+        (Ground8Claim WITH `the basis on which rent is payable` IS `other`,
+                           `rent for one period` IS 5000,
+                           `rent unpaid at the date of service of the section 8 notice` IS 100000,
+                           `rent unpaid at the date of the hearing` IS 100000)
+-- L4 oracle ==> FALSE
+
+#EVAL `Ground 8 made out`
+        (Ground8Claim WITH `the basis on which rent is payable` IS `other`,
+                           `rent for one period` IS 5000,
+                           `rent unpaid at the date of service of the section 8 notice` IS 100000,
+                           `rent unpaid at the date of the hearing` IS 100000)
+-- L4 oracle ==> FALSE
+
+§§ `Ground 8 — the thirteen-week boundary, from both sides`
+
+-- `AT LEAST` is >=, so exactly thirteen weeks' rent at BOTH dates suffices.
+#EVAL `Ground 8 made out`
+        (Ground8Claim WITH `the basis on which rent is payable` IS `weekly or fortnightly`,
+                           `rent for one period` IS 100,
+                           `rent unpaid at the date of service of the section 8 notice` IS 1300,
+                           `rent unpaid at the date of the hearing` IS 1300)
+-- L4 oracle ==> TRUE
+
+-- One pound short at the service date, and the mandatory ground fails.
+#EVAL `per-period threshold met`
+        (Ground8Claim WITH `the basis on which rent is payable` IS `weekly or fortnightly`,
+                           `rent for one period` IS 100,
+                           `rent unpaid at the date of service of the section 8 notice` IS 1299,
+                           `rent unpaid at the date of the hearing` IS 1400)
+        1299
+-- L4 oracle ==> FALSE
+
+#EVAL `Ground 8 made out`
+        (Ground8Claim WITH `the basis on which rent is payable` IS `weekly or fortnightly`,
+                           `rent for one period` IS 100,
+                           `rent unpaid at the date of service of the section 8 notice` IS 1299,
+                           `rent unpaid at the date of the hearing` IS 1400)
+-- L4 oracle ==> FALSE
+
+§§ `Ground 13 — made out: deterioration by the tenant personally`
+
+-- The tenant is not a lodger/sub-tenant, so the removal proviso is vacuously
+-- satisfied and need not be separately made out.
+#ASSERT `Ground 13 made out` OF
+            Ground13Claim
+            WITH
+                `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house` IS TRUE
+                `the responsible actor is a person lodging with the tenant or a sub-tenant of his` IS FALSE
+                `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant` IS FALSE
+-- L4 oracle ==> assertion satisfied
+
+#EVAL `deterioration owing to waste, neglect or default`
+        (Ground13Claim WITH `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house` IS TRUE,
+                            `the responsible actor is a person lodging with the tenant or a sub-tenant of his` IS FALSE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant` IS FALSE)
+-- L4 oracle ==> TRUE
+
+#EVAL `lodger or sub-tenant removal proviso (waste, neglect or default)`
+        (Ground13Claim WITH `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house` IS TRUE,
+                            `the responsible actor is a person lodging with the tenant or a sub-tenant of his` IS FALSE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant` IS FALSE)
+-- L4 oracle ==> TRUE
+
+§§ `Ground 13 — made out: deterioration by a lodger the tenant did not remove`
+
+#EVAL `Ground 13 made out`
+        (Ground13Claim WITH `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house` IS TRUE,
+                            `the responsible actor is a person lodging with the tenant or a sub-tenant of his` IS TRUE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant` IS TRUE)
+-- L4 oracle ==> TRUE
+
+§§ `Ground 13 — knocked out: the lodger was removed`
+
+-- The proviso's consequent fails: the actor IS a lodger, but the tenant took the
+-- reasonable removal steps.
+#EVAL `lodger or sub-tenant removal proviso (waste, neglect or default)`
+        (Ground13Claim WITH `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house` IS TRUE,
+                            `the responsible actor is a person lodging with the tenant or a sub-tenant of his` IS TRUE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant` IS FALSE)
+-- L4 oracle ==> FALSE
+
+#EVAL `Ground 13 made out`
+        (Ground13Claim WITH `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house` IS TRUE,
+                            `the responsible actor is a person lodging with the tenant or a sub-tenant of his` IS TRUE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant` IS FALSE)
+-- L4 oracle ==> FALSE
+
+§§ `Ground 13 — knocked out: no deterioration at all`
+
+#EVAL `deterioration owing to waste, neglect or default`
+        (Ground13Claim WITH `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house` IS FALSE,
+                            `the responsible actor is a person lodging with the tenant or a sub-tenant of his` IS FALSE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant` IS FALSE)
+-- L4 oracle ==> FALSE
+
+#EVAL `Ground 13 made out`
+        (Ground13Claim WITH `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house` IS FALSE,
+                            `the responsible actor is a person lodging with the tenant or a sub-tenant of his` IS FALSE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant` IS FALSE)
+-- L4 oracle ==> FALSE
+
+§§ `Ground 13 — the proviso alone carries nothing`
+
+-- An unremoved lodger, but no deterioration: the proviso is satisfied and the
+-- ground still fails. It is a filter on the deterioration limb, not an
+-- independent ground.
+#EVAL `lodger or sub-tenant removal proviso (waste, neglect or default)`
+        (Ground13Claim WITH `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house` IS FALSE,
+                            `the responsible actor is a person lodging with the tenant or a sub-tenant of his` IS TRUE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant` IS TRUE)
+-- L4 oracle ==> TRUE
+
+#EVAL `Ground 13 made out`
+        (Ground13Claim WITH `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house` IS FALSE,
+                            `the responsible actor is a person lodging with the tenant or a sub-tenant of his` IS TRUE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant` IS TRUE)
+-- L4 oracle ==> FALSE
+
+§§ `Ground 15 — made out: ill-treatment by the tenant personally`
+
+#ASSERT `Ground 15 made out` OF
+            Ground15Claim
+            WITH
+                `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house` IS TRUE
+                `the person ill-treating the furniture is a person lodging with the tenant or a sub-tenant of his` IS FALSE
+                `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant who ill-treated the furniture` IS FALSE
+-- L4 oracle ==> assertion satisfied
+
+#EVAL `furniture deteriorated owing to ill-treatment`
+        (Ground15Claim WITH `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house` IS TRUE,
+                            `the person ill-treating the furniture is a person lodging with the tenant or a sub-tenant of his` IS FALSE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant who ill-treated the furniture` IS FALSE)
+-- L4 oracle ==> TRUE
+
+#EVAL `lodger or sub-tenant removal proviso (ill-treatment)`
+        (Ground15Claim WITH `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house` IS TRUE,
+                            `the person ill-treating the furniture is a person lodging with the tenant or a sub-tenant of his` IS FALSE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant who ill-treated the furniture` IS FALSE)
+-- L4 oracle ==> TRUE
+
+§§ `Ground 15 — made out: ill-treatment by a sub-tenant the tenant did not remove`
+
+#EVAL `Ground 15 made out`
+        (Ground15Claim WITH `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house` IS TRUE,
+                            `the person ill-treating the furniture is a person lodging with the tenant or a sub-tenant of his` IS TRUE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant who ill-treated the furniture` IS TRUE)
+-- L4 oracle ==> TRUE
+
+§§ `Ground 15 — knocked out: the sub-tenant was removed`
+
+#EVAL `lodger or sub-tenant removal proviso (ill-treatment)`
+        (Ground15Claim WITH `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house` IS TRUE,
+                            `the person ill-treating the furniture is a person lodging with the tenant or a sub-tenant of his` IS TRUE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant who ill-treated the furniture` IS FALSE)
+-- L4 oracle ==> FALSE
+
+#EVAL `Ground 15 made out`
+        (Ground15Claim WITH `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house` IS TRUE,
+                            `the person ill-treating the furniture is a person lodging with the tenant or a sub-tenant of his` IS TRUE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant who ill-treated the furniture` IS FALSE)
+-- L4 oracle ==> FALSE
+
+§§ `Ground 15 — knocked out: no deterioration of furniture at all`
+
+#EVAL `furniture deteriorated owing to ill-treatment`
+        (Ground15Claim WITH `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house` IS FALSE,
+                            `the person ill-treating the furniture is a person lodging with the tenant or a sub-tenant of his` IS FALSE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant who ill-treated the furniture` IS FALSE)
+-- L4 oracle ==> FALSE
+
+#EVAL `Ground 15 made out`
+        (Ground15Claim WITH `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house` IS FALSE,
+                            `the person ill-treating the furniture is a person lodging with the tenant or a sub-tenant of his` IS FALSE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant who ill-treated the furniture` IS FALSE)
+-- L4 oracle ==> FALSE
+
+§§ `Ground 15 — the proviso alone carries nothing`
+
+#EVAL `lodger or sub-tenant removal proviso (ill-treatment)`
+        (Ground15Claim WITH `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house` IS FALSE,
+                            `the person ill-treating the furniture is a person lodging with the tenant or a sub-tenant of his` IS TRUE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant who ill-treated the furniture` IS TRUE)
+-- L4 oracle ==> TRUE
+
+#EVAL `Ground 15 made out`
+        (Ground15Claim WITH `the condition of furniture provided for use under the tenancy has, in the opinion of the court, deteriorated owing to ill-treatment by the tenant or any other person residing in the dwelling-house` IS FALSE,
+                            `the person ill-treating the furniture is a person lodging with the tenant or a sub-tenant of his` IS TRUE,
+                            `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant who ill-treated the furniture` IS TRUE)
+-- L4 oracle ==> FALSE
+
+§§ `Ground 17 — made out: the false statement was made by the tenant (limb (a))`
+
+#ASSERT `Ground 17 made out` OF
+            Ground17Claim
+            WITH
+                `the tenant is the person, or one of the persons, to whom the tenancy was granted` IS TRUE
+                `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly` IS TRUE
+                `the false statement was made by the tenant` IS TRUE
+                `the false statement was made by a person acting at the tenant's instigation` IS FALSE
+-- L4 oracle ==> assertion satisfied
+
+#EVAL `tenant is a grantee of the tenancy`
+        (Ground17Claim WITH `the tenant is the person, or one of the persons, to whom the tenancy was granted` IS TRUE,
+                            `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly` IS TRUE,
+                            `the false statement was made by the tenant` IS TRUE,
+                            `the false statement was made by a person acting at the tenant's instigation` IS FALSE)
+-- L4 oracle ==> TRUE
+
+#EVAL `landlord induced by a false statement`
+        (Ground17Claim WITH `the tenant is the person, or one of the persons, to whom the tenancy was granted` IS TRUE,
+                            `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly` IS TRUE,
+                            `the false statement was made by the tenant` IS TRUE,
+                            `the false statement was made by a person acting at the tenant's instigation` IS FALSE)
+-- L4 oracle ==> TRUE
+
+#EVAL `statement made by the tenant or at the tenant's instigation`
+        (Ground17Claim WITH `the tenant is the person, or one of the persons, to whom the tenancy was granted` IS TRUE,
+                            `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly` IS TRUE,
+                            `the false statement was made by the tenant` IS TRUE,
+                            `the false statement was made by a person acting at the tenant's instigation` IS FALSE)
+-- L4 oracle ==> TRUE
+
+§§ `Ground 17 — made out: the statement was made at the tenant's instigation (limb (b))`
+
+#EVAL `statement made by the tenant or at the tenant's instigation`
+        (Ground17Claim WITH `the tenant is the person, or one of the persons, to whom the tenancy was granted` IS TRUE,
+                            `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly` IS TRUE,
+                            `the false statement was made by the tenant` IS FALSE,
+                            `the false statement was made by a person acting at the tenant's instigation` IS TRUE)
+-- L4 oracle ==> TRUE
+
+#EVAL `Ground 17 made out`
+        (Ground17Claim WITH `the tenant is the person, or one of the persons, to whom the tenancy was granted` IS TRUE,
+                            `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly` IS TRUE,
+                            `the false statement was made by the tenant` IS FALSE,
+                            `the false statement was made by a person acting at the tenant's instigation` IS TRUE)
+-- L4 oracle ==> TRUE
+
+§§ `Ground 17 — knocked out: the tenant is not a grantee (limb 1 fails)`
+
+#EVAL `tenant is a grantee of the tenancy`
+        (Ground17Claim WITH `the tenant is the person, or one of the persons, to whom the tenancy was granted` IS FALSE,
+                            `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly` IS TRUE,
+                            `the false statement was made by the tenant` IS TRUE,
+                            `the false statement was made by a person acting at the tenant's instigation` IS FALSE)
+-- L4 oracle ==> FALSE
+
+#EVAL `Ground 17 made out`
+        (Ground17Claim WITH `the tenant is the person, or one of the persons, to whom the tenancy was granted` IS FALSE,
+                            `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly` IS TRUE,
+                            `the false statement was made by the tenant` IS TRUE,
+                            `the false statement was made by a person acting at the tenant's instigation` IS FALSE)
+-- L4 oracle ==> FALSE
+
+§§ `Ground 17 — knocked out: no inducement (limb 2 fails)`
+
+#EVAL `landlord induced by a false statement`
+        (Ground17Claim WITH `the tenant is the person, or one of the persons, to whom the tenancy was granted` IS TRUE,
+                            `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly` IS FALSE,
+                            `the false statement was made by the tenant` IS TRUE,
+                            `the false statement was made by a person acting at the tenant's instigation` IS FALSE)
+-- L4 oracle ==> FALSE
+
+#EVAL `Ground 17 made out`
+        (Ground17Claim WITH `the tenant is the person, or one of the persons, to whom the tenancy was granted` IS TRUE,
+                            `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly` IS FALSE,
+                            `the false statement was made by the tenant` IS TRUE,
+                            `the false statement was made by a person acting at the tenant's instigation` IS FALSE)
+-- L4 oracle ==> FALSE
+
+§§ `Ground 17 — knocked out: an unconnected third party made the statement`
+
+-- The inducement is present, but the false statement was made neither by the
+-- tenant nor by anyone acting at his instigation, so limb 3 fails.
+#EVAL `statement made by the tenant or at the tenant's instigation`
+        (Ground17Claim WITH `the tenant is the person, or one of the persons, to whom the tenancy was granted` IS TRUE,
+                            `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly` IS TRUE,
+                            `the false statement was made by the tenant` IS FALSE,
+                            `the false statement was made by a person acting at the tenant's instigation` IS FALSE)
+-- L4 oracle ==> FALSE
+
+#EVAL `Ground 17 made out`
+        (Ground17Claim WITH `the tenant is the person, or one of the persons, to whom the tenancy was granted` IS TRUE,
+                            `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly` IS TRUE,
+                            `the false statement was made by the tenant` IS FALSE,
+                            `the false statement was made by a person acting at the tenant's instigation` IS FALSE)
+-- L4 oracle ==> FALSE
+
+§§ `Ground 17 — limb 3's OR is inclusive: both (a) and (b)`
+
+-- A statement made by the tenant AND one made at his instigation does not
+-- double-count or cancel.
+#EVAL `statement made by the tenant or at the tenant's instigation`
+        (Ground17Claim WITH `the tenant is the person, or one of the persons, to whom the tenancy was granted` IS TRUE,
+                            `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly` IS TRUE,
+                            `the false statement was made by the tenant` IS TRUE,
+                            `the false statement was made by a person acting at the tenant's instigation` IS TRUE)
+-- L4 oracle ==> TRUE
+
+#EVAL `Ground 17 made out`
+        (Ground17Claim WITH `the tenant is the person, or one of the persons, to whom the tenancy was granted` IS TRUE,
+                            `the landlord was induced to grant the tenancy by a false statement made knowingly or recklessly` IS TRUE,
+                            `the false statement was made by the tenant` IS TRUE,
+                            `the false statement was made by a person acting at the tenant's instigation` IS TRUE)
+-- L4 oracle ==> TRUE

@@ -1,0 +1,3 @@
+lowering errors: 2
+  bool-value-position.l4:26:40-57: in `eligibility flag`: boolean-valued call in value position: `is eligible` is a boolean predicate whose output argument is dropped, so it cannot denote a value here
+  bool-value-position.l4:31:38-52: in `seniority flag`: boolean-valued call in value position: `isSenior` is a computed BOOLEAN field; its selector's output argument is dropped, so it cannot denote a value here

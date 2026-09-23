@@ -1,0 +1,2 @@
+lowering errors: 1
+  maybe-overload.l4:25:26-54: in `has no floor`: MAYBE beyond isJust/isNothing/fromMaybe: `minimum` here is the MAYBE-valued overload, which is outside the M1 fragment

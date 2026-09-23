@@ -1,0 +1,28 @@
+-- The stratification fixture: a cycle THROUGH a negation.
+--
+-- `p holds` depends negatively on `q holds`, which depends negatively on
+-- `p holds`, so the two sit in one strongly-connected component containing a
+-- negative edge — the Apt–Blair–Walker definition of unstratified.
+--
+-- __This module lowers successfully.__ It belongs beside the positive seeds and
+-- NOT under not-ok/, because 'RStratification' is RECORDED, never enforced:
+-- swipl rejects a non-stratified program, Blawx rejects it in v1, and ASP treats
+-- non-stratification as the source of the multiple stable models that are the
+-- entire point of that leg. Turning it into a LowerError in the middle-end would
+-- break the ASP leg before it exists. The assertion this fixture carries is on
+-- the `stratification:` block of the render, not on a failure.
+
+DECLARE Flag HAS
+    seed IS A BOOLEAN
+
+@export
+GIVEN f IS A Flag
+GIVETH A BOOLEAN
+DECIDE `p holds` IF
+    f's seed AND NOT `q holds` f
+
+@export
+GIVEN f IS A Flag
+GIVETH A BOOLEAN
+DECIDE `q holds` IF
+    NOT `p holds` f

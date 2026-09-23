@@ -1,0 +1,180 @@
+§ `Anti-social Behaviour, Crime and Policing Act 2014 — section 43`
+
+-- The P4b showcase: a module with NO `DECLARE` at all, whose entire ontology
+-- comes from top-level `ASSUME`. Adapted from `jl4/examples/legal/anti-social.l4`
+-- (which is NOT modified).
+--
+-- WHAT THIS SEED IS FOR. Before the ASSUME→RInput widening, `L4.Relational.Lower`
+-- bailed on any reference to an `ASSUME`d name, so an ASSUME-shaped module had
+-- no Blawx image at all and `interviewTest` recovered an input's category and
+-- arity from the record-FIELD tables — meaning a module with no records got no
+-- interview test either (the P1 earmark, left open on `sumlist`). This file is
+-- the discharge of that earmark: five `ASSUME`d TYPEs become Blawx categories,
+-- nine `ASSUME`d predicates become the declared attributes that hang off them,
+-- and the emitted `interview` test abduces every one of them.
+--
+-- THE ORIGINAL'S SPELLING CANNOT BE USED, and the reason is not in this leg.
+-- `jl4/examples/legal/anti-social.l4` writes every input as
+-- `ASSUME `is authorised` IS A FUNCTION FROM Person TO BOOLEAN`. Lowering is
+-- export-rooted, and `L4.Export.validateExportInputs` makes it a TYPE ERROR for
+-- an `@export`ed decision to reference a function-typed `ASSUME`
+-- ("Function type inputs are not supported for @export") because it appends
+-- referenced `ASSUME`s to the export's parameter list and a function cannot
+-- cross the web app's JSON boundary. So a module in that spelling has no export
+-- root and never reaches the middle end at all. The original's own comment at
+-- `:30-33` records the same wall from the other side: it says the decision is
+-- deliberately NOT `@export`ed.
+--
+-- The fix is a re-spelling, not a change of meaning: `GIVEN p IS A Person`
+-- + `ASSUME `is authorised` p IS A BOOLEAN` declares the same one-place
+-- predicate with a non-arrow declared type, and passes. The form is
+-- long-standing L4 (`jl4/examples/ok/signatures.l4:9-10`), and the middle end
+-- admits BOTH spellings, so nothing here has to move if the export rule is
+-- later relaxed. Whether it should be — an `ASSUME`d predicate is a perfectly
+-- good logic-program input and a nonsensical web form field — is reported as a
+-- question against `L4.Export`, not decided here.
+--
+-- TWO TYPES ARE RENAMED, and the reason is a hard Blawx error, not taste.
+-- The original has both a TYPE `Conduct` and an accessor `conduct`, and both a
+-- TYPE `Effect` and an accessor `effect`. Measured on this tree, `l4 check`
+-- accepts that and `l4 blawx` refuses it:
+--
+--     in `conduct`: name collision (Blawx): distinct L4 definitions `Conduct`
+--     and `conduct` both mangle to the Blawx atom `conduct` — rename one
+--
+-- The accessors keep the Act's words, because that is where they read as the
+-- statute and because a value attribute's synthesised NLG is "has <name> of";
+-- the TYPEs become `Behaviour` and `Consequence`. Recorded as a deviation.
+--
+-- `EffectTarget` is carried over from the original UNREFERENCED, on purpose: it
+-- is the corpus witness for the reachability gate. An `ASSUME` no lowered
+-- clause reaches must contribute nothing — otherwise a module that merely
+-- carries one would gain a predicate and move some other backend's golden — so
+-- `effect_target` must NOT appear anywhere in the goldens beside this file.
+--
+-- THE ORACLE PROBLEM, AND HOW IT IS SOLVED HERE. `ASSUME` is uninterpreted, so
+-- `l4 run` cannot answer for a decision in this file, and `lowerQuery` builds a
+-- scenario only out of a record-literal query argument — so an `#EVAL` here
+-- would lower to a query with no facts at all. This file therefore carries NO
+-- directives, and its `.blawx` carries only the `interview` test. Pairing zero
+-- oracles against zero tests would be a VACUOUS green, which is worse than a
+-- failure because it looks like coverage.
+--
+-- The anchor is `antisocial-twin.l4`: the same logic spelled with `DECLARE`
+-- records whose field names are these `ASSUME` names character for character,
+-- so the two files lower to the SAME s(CASP) atoms at the same arities. The
+-- twin's `#EVAL`s DO run under `l4 run`, and `etc/blawx-tier1-harness.py` uses
+-- the twin's measured value as the single expectation for BOTH programs: it
+-- replays the twin's fact rows against THIS file's workspaces and requires the
+-- same answer. One logic, two spellings, cross-checked — no expectation is
+-- authored twice, and none is hand-derived.
+--
+-- THE GROUPING, MEASURED. The original's body mixes AND and OR across four
+-- indentation levels, which is the same "read the layout" hazard as
+-- `rodents.l4`. Measured over eleven scenarios on a record twin carrying the
+-- original's exact AND/OR columns, the parse is
+--
+--     authorised AND (individual-16-or-over OR body)
+--                AND (detrimental AND persistent AND affects-quality)
+--                AND unreasonable
+--
+-- The two discriminating rows — "not authorised but a body, everything else
+-- true" and "authorised individual with none of the conduct limbs" — both
+-- evaluate FALSE, which rules out every reading that lets the `OR` escape its
+-- conjunct. Both rows are kept in the twin as regression pins. The seed writes
+-- the grouping with parentheses so the reading is on the page rather than in
+-- the indentation.
+--
+-- EXPORT ORDER IS AUTHORING, NOT LAYOUT: one `interview` test is emitted per
+-- file and its goal is the FIRST `@export`, so the headline decision comes
+-- first.
+--
+-- The `@ref` on `the conduct is unreasonable` is deliberate and carries no
+-- prose: it is the corpus witness for the `rule_text` fallback
+-- `@desc -> @ref -> stub`, whose middle arm no committed golden exercised
+-- before. Read its section in `expected/antisocial.blawx`: it should be the
+-- citation, not "Definition of the conduct is unreasonable."
+
+ASSUME Person IS A TYPE
+ASSUME Receiver IS A TYPE
+ASSUME Behaviour IS A TYPE
+ASSUME Consequence IS A TYPE
+
+-- Unreferenced on purpose: the reachability gate's corpus witness (see header).
+ASSUME EffectTarget IS A TYPE
+
+GIVEN p IS A Person
+ASSUME `is authorised` p IS A BOOLEAN
+
+GIVEN r IS A Receiver
+ASSUME `is an individual aged 16 or over` r IS A BOOLEAN
+
+GIVEN r IS A Receiver
+ASSUME `is a body` r IS A BOOLEAN
+
+GIVEN r IS A Receiver
+ASSUME conduct r IS A Behaviour
+
+GIVEN b IS A Behaviour
+ASSUME effect b IS A Consequence
+
+GIVEN b IS A Behaviour
+ASSUME `is unreasonable` b IS A BOOLEAN
+
+GIVEN c IS A Consequence
+ASSUME `is detrimental` c IS A BOOLEAN
+
+GIVEN c IS A Consequence
+ASSUME `is of a persistent or continuing nature` c IS A BOOLEAN
+
+GIVEN c IS A Consequence
+ASSUME `affects the quality of life of those in the locality` c IS A BOOLEAN
+
+@export Anti-social Behaviour, Crime and Policing Act 2014 s.43(1): an authorised person may issue a community protection notice to an individual aged 16 or over, or to a body, if satisfied on reasonable grounds that (a) the conduct of the individual or body is having a detrimental effect, of a persistent or continuing nature, on the quality of life of those in the locality, and (b) the conduct is unreasonable.
+@ref https://www.legislation.gov.uk/ukpga/2014/12/section/43
+GIVEN p IS A Person
+      r IS A Receiver
+GIVETH A BOOLEAN
+DECIDE `may issue a community protection notice` IF
+        `is authorised` p
+    AND `the recipient is a person to whom a notice may be given` r
+    AND `the conduct is having a detrimental effect of a persistent or continuing nature` r
+    AND `the conduct is unreasonable` r
+
+@export s.43(1): the notice may be given "to an individual aged 16 or over, or to a body". The two limbs are alternatives, and nothing else is a permissible recipient.
+GIVEN r IS A Receiver
+GIVETH A BOOLEAN
+DECIDE `the recipient is a person to whom a notice may be given` IF
+        `is an individual aged 16 or over` r
+     OR `is a body` r
+
+@export s.43(1)(a): the conduct of the individual or body "is having a detrimental effect, of a persistent or continuing nature, on the quality of life of those in the locality".
+GIVEN r IS A Receiver
+GIVETH A BOOLEAN
+DECIDE `the conduct is having a detrimental effect of a persistent or continuing nature` IF
+    `the effect is detrimental, persistent, and affects the quality of life in the locality` (effect (conduct r))
+
+-- The three limbs of s.43(1)(a) are properties of ONE effect, and this decision
+-- is what makes that so in the emitted logic program. Written inline over
+-- `effect (conduct r)` three times, ANF gives each occurrence its own variable
+-- (`effect(C1,E1), … effect(C2,E2), …`), because an ASSUMEd value function
+-- lowers to a RELATION with no functionality constraint. Under a scenario that
+-- states one effect per conduct the two encodings agree; under the interview's
+-- abduction they do not, and a model could satisfy each limb with a DIFFERENT
+-- effect. Taking the effect as a parameter binds it once and removes the
+-- question. (The divergence is reported as a finding against the widening: an
+-- ASSUMEd function is single-valued in L4 and multi-valued in s(CASP).)
+@export s.43(1)(a), of the effect itself: it must be "detrimental", "of a persistent or continuing nature", and on "the quality of life of those in the locality" — all three, of the same effect.
+GIVEN c IS A Consequence
+GIVETH A BOOLEAN
+DECIDE `the effect is detrimental, persistent, and affects the quality of life in the locality` IF
+        `is detrimental` c
+    AND `is of a persistent or continuing nature` c
+    AND `affects the quality of life of those in the locality` c
+
+@export
+@ref Anti-social Behaviour, Crime and Policing Act 2014, s.43(1)(b)
+GIVEN r IS A Receiver
+GIVETH A BOOLEAN
+DECIDE `the conduct is unreasonable` IF
+    `is unreasonable` (conduct r)

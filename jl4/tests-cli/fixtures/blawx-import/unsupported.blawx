@@ -1,0 +1,22 @@
+# A hand-written .blawx whose only rule reaches the date layer, which ruling
+# P5-1 keeps out of the block IR this phase. The refusal must name the row and
+# the block, not just fail.
+- model: blawx.ruledoc
+  pk: 1
+  fields:
+    ruledoc_name: Dates
+    rule_text: "Dates\n\n1. Bob was born on a date."
+    scasp_encoding: ''
+    tutorial: ''
+    owner: 1
+    published: true
+- model: blawx.workspace
+  pk: 1
+  fields:
+    ruledoc: 1
+    workspace_name: sec_1_section
+    xml_content: |-
+      <xml xmlns="https://developers.google.com/blockly/xml">
+      <block type="unattributed_fact" id="f000000001" x="40" y="40"><statement name="statements"><block type="attribute_selector" id="f000000002"><mutation xmlns="http://www.w3.org/1999/xhtml" attributename="born_on" attributetype="date" attributeorder="ov"></mutation><field name="prefix"></field><field name="infix">was born on</field><field name="postfix"></field><value name="first_element"><block type="object_selector" id="f000000003"><mutation xmlns="http://www.w3.org/1999/xhtml" objectname="bob"></mutation><field name="object_name">bob</field></block></value><value name="second_element"><block type="date_value" id="f000000004"><field name="year">2020</field><field name="month">1</field><field name="day">1</field></block></value></block></statement></block>
+      </xml>
+    scasp_encoding: ''

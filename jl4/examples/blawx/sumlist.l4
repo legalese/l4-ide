@@ -1,0 +1,96 @@
+-- The structural-recursion seed: the construct Catala must reject and the
+-- relational middle-end admits.
+--
+-- `CONSIDER l WHEN EMPTY … WHEN x FOLLOWED BY xs …` is M1's ONE recursion
+-- warrant (brief IR constraint 7; BLAWX-EXPORT-SPEC R9). It lowers to a
+-- two-clause definition whose head carries `[]` in one clause and `[X|Xs]` in
+-- the other, so the decrease is visible in the emitted program rather than
+-- asserted by a marker beside it — and `rpRecursion` records the argument
+-- position, which the golden prints as `recursion: structural on argument 0`.
+--
+-- The decrease check is positional and syntactic: the recursive call must pass
+-- the TAIL binder in the scrutinised slot. `not-ok/nonstructural.l4` is the
+-- other side of that line (counting a NUMBER down has no decreasing list
+-- argument at all) and is a batch LowerError.
+--
+-- `first or zero` is here to pin the case that is easy to get wrong in the
+-- other direction: destructuring a list is not recursion, so it takes the same
+-- two-clause shape and carries NO `recursion:` line.
+--
+-- Read the goldens together with `scores.l4`: the synthesised `member`
+-- predicate there is the same two-clause list shape, minted by the middle-end
+-- rather than written by an author.
+--
+-- Each directive below carries its L4-oracle value on the line after it, as a
+-- `-- L4 oracle ==>` comment produced by `l4 run sumlist.l4`. It is the
+-- differential harness's expectation, and it lives outside the emitted program
+-- on purpose (BLAWX-EXPORT-SPEC R11) — one copy per directive, so there is
+-- nothing here for a later edit to leave behind.
+
+@export
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+`running total` xs MEANS
+  CONSIDER xs
+    WHEN EMPTY              THEN 0
+    WHEN x FOLLOWED BY rest THEN x PLUS `running total` rest
+
+@export
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A BOOLEAN
+DECIDE `all positive` IF
+  CONSIDER xs
+    WHEN EMPTY              THEN TRUE
+    WHEN x FOLLOWED BY rest THEN x GREATER THAN 0 AND `all positive` rest
+
+@export
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+`first or zero` xs MEANS
+  CONSIDER xs
+    WHEN EMPTY              THEN 0
+    WHEN x FOLLOWED BY rest THEN x
+
+-- `total from` is the case the positional decrease check gets wrong when it
+-- confuses two coordinate systems. `srPos` is a position in the lowered HEAD,
+-- which for a lambda-lifted WHERE helper begins with the enclosing decision's
+-- parameters (`xs` and `floor` are threaded in, so `go`'s head is
+-- `go(Xs, Floor, Ys, Out)` and the scrutinised argument is at 2) — while the
+-- source call `go rest` writes only the helper's own argument, at 0. Reading the
+-- head position out of the source arguments therefore fell off the end of the
+-- list and reported this perfectly decreasing call as undecreasing. Every
+-- recursive list helper written inside a parameterised decision hits it, and no
+-- fixture did, because the two top-level recursions above have no enclosing
+-- parameters and the offset is zero for them.
+@export
+GIVEN
+  xs    IS A LIST OF NUMBER
+  floor IS A NUMBER
+GIVETH A NUMBER
+`total from` xs floor MEANS
+  go xs
+  WHERE
+    GIVEN ys IS A LIST OF NUMBER
+    GIVETH A NUMBER
+    go ys MEANS
+      CONSIDER ys
+        WHEN EMPTY              THEN floor
+        WHEN y FOLLOWED BY rest THEN y PLUS go rest
+
+#EVAL `running total` (LIST 1, 2, 3)
+-- L4 oracle ==> 6
+
+#EVAL `running total` EMPTY
+-- L4 oracle ==> 0
+
+#EVAL `all positive` (LIST 1, 2, 3)
+-- L4 oracle ==> TRUE
+
+#EVAL `all positive` (LIST 1, 0, 3)
+-- L4 oracle ==> FALSE
+
+#EVAL `first or zero` (LIST 7, 8)
+-- L4 oracle ==> 7
+
+#EVAL `total from` (LIST 1, 2, 3) 10
+-- L4 oracle ==> 16

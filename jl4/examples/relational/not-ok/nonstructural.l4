@@ -1,0 +1,55 @@
+-- Named rejection: self-reference with no structurally decreasing argument.
+--
+-- M1 admits exactly one recursion warrant, a structurally decreasing list
+-- argument, so that the promise "emitted programs terminate" stays checkable.
+-- Widening this tracks LP-R7 (tabling / well-founded semantics on the swipl leg).
+--
+-- Two definitions, because the check has two halves and a fixture that exercised
+-- only the first would let the second rot:
+--
+--   * `countdown` counts a NUMBER down. There is no list to decompose at all, so
+--     nothing in the clause shows the recursion is well-founded and a target
+--     that ran it would loop rather than fail. This one never reaches the
+--     structural recogniser; it is caught by the self-call check on the ordinary
+--     guarded-rows path.
+--
+--   * `shuffle sum` has exactly the right SHAPE — `CONSIDER … WHEN EMPTY …
+--     WHEN x FOLLOWED BY rest …` — and passes the whole list back instead of
+--     `rest`. The decrease check is positional and syntactic, so this is the
+--     fixture that pins it: a recogniser that only matched the shape would admit
+--     a definition that never terminates. Note that the diagnostic names the
+--     RECURSION decision rather than the table shape, which is why the recogniser
+--     runs before `normaliseGuarded` (see risks.md §6 — `considerRows` answers
+--     Nothing for every FOLLOWED BY row, so a check placed after it would report
+--     "CONSIDER with a binding pattern").
+
+@export
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`countdown` n MEANS
+  IF n AT MOST 0
+    THEN 0
+    ELSE `countdown` (n MINUS 1)
+
+@export
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+`shuffle sum` xs MEANS
+  CONSIDER xs
+    WHEN EMPTY              THEN 0
+    WHEN x FOLLOWED BY rest THEN x PLUS `shuffle sum` xs
+
+--   * `empty loop` puts the offending call in the arm the check used to ignore.
+--     Only the STEP arm was inspected, so a self-call in the EMPTY arm was
+--     admitted unchecked — and it lowers to `empty loop([], V) :- empty
+--     loop([], V).`, which is directly left-recursive: not a subtle
+--     non-termination but the textbook one, in the one arm no fixture covered.
+--     The base arm may not call back at all; its scrutinee is `[]`, so there is
+--     nothing smaller for it to pass.
+@export
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+`empty loop` xs MEANS
+  CONSIDER xs
+    WHEN EMPTY              THEN `empty loop` xs
+    WHEN x FOLLOWED BY rest THEN x PLUS `empty loop` rest

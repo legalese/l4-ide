@@ -1,0 +1,283 @@
+-- Imported from Blawx by `l4 blawx --import` (BLAWX-EXPORT-SPEC R14, §10 P5).
+--
+--   source        rps.yaml
+--   ruledoc       "Rock Paper Scissors Act"
+--   rows          11 blawx.workspace, 3 blawx.blawxtest
+--   blocks        105 across 15 block types
+--   WARNING       stored `scasp_encoding` is STALE against the current
+--                 generator (P5-2) in 5 row(s), first sec_1_section.
+--                 The XML is canonical (R14); the encodings were not used.
+--
+-- Blawx models a flat universe of atoms under predicates of one, two or
+-- more places: a category is `c(X)`, a category-valued attribute is
+-- `a(X,Y)`, a relationship is `r(X,Y,Z)`. So this lift declares ONE record
+-- for the universe, carrying one input slot per declared predicate (the
+-- s(CASP) fact channel: `MAYBE BOOLEAN` at one place, a list of argument
+-- tuples above it) and one BOOLEAN decision per predicate. The defeat layer
+-- is unfolded: one decision per (section, literal) pair, named from the
+-- generator's own #pred wording.
+--
+-- Because a Blawx test loads its own objects and facts beside the rules,
+-- the universe is a PARAMETER (`w`) of every derived decision rather than a
+-- module-level constant, and each test passes its own world.
+
+IMPORT prelude
+IMPORT `negation-as-failure`
+
+§ `Rock Paper Scissors Act`
+
+-- The CLEAN `rule_text` continues past its title line. It is not flat
+-- numbered from the start — an un-numbered heading intervenes — so the
+-- lift has no § to put the rest under (W3). Verbatim:
+--
+-- Players
+-- 1. A game of rock paper scissors has two players.
+-- 2. There are three signs:
+--   (a) Rock,
+--   (b) Paper, and
+--   (c) Scissors.
+--
+-- Defeating Relationships
+-- 3. The signs are related in the following ways:
+--   (a) Rock beats Scissors,
+--   (b) Scissors beats Paper, and
+--   (c) Paper beats Rock.
+--
+-- Winner
+-- 4. The winner of a game is the player who throws
+-- a sign that beats the sign of the other player.
+
+§§ `Ontology`
+
+-- @ref sec_1_section new_category_declaration game    (NLG "" / "is a game")
+-- @ref sec_1_section new_category_declaration player  (NLG "" / "is a player")
+-- @ref sec_2_section new_category_declaration sign    (NLG "" / "is a sign")
+-- @ref sec_1_section new_attribute_declaration game.player : player
+-- @ref sec_3_section new_attribute_declaration sign.beats : sign
+-- @ref sec_4_section new_attribute_declaration game.winner : player
+-- @ref sec_4_section relationship_declaration throw(player, sign, game)
+DECLARE Object
+    HAS
+      @desc the object's Blawx atom
+      name              IS A STRING
+      @desc x is a game
+      `game fact`       IS A MAYBE BOOLEAN
+      @desc x is a player
+      `player fact`     IS A MAYBE BOOLEAN
+      @desc x is a sign
+      `sign fact`       IS A MAYBE BOOLEAN
+      @desc x2 played in x1
+      `player/2 fact`   IS A LIST OF (LIST OF STRING)
+      @desc x1 beats x2
+      `beats fact`      IS A LIST OF (LIST OF STRING)
+      @desc the winner of x1 is x2
+      `winner fact`     IS A LIST OF (LIST OF STRING)
+      @desc x1 threw x2 in x3
+      `throw fact`      IS A LIST OF (LIST OF STRING)
+
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE game x @nlg %x% is a game
+    IF holds (x's `game fact`)
+
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE player x @nlg %x% is a player
+    IF holds (x's `player fact`)
+
+@ref sec_2__para_a_section object_declaration — rock is a sign
+GIVEN x IS AN Object
+GIVETH A BOOLEAN
+DECIDE sign x @nlg %x% is a sign
+    IF holds (x's `sign fact`)
+    OR x's name EQUALS "rock"
+    OR x's name EQUALS "paper"
+    OR x's name EQUALS "scissors"
+
+GIVEN x1 IS AN Object
+      x2 IS AN Object
+GIVETH A BOOLEAN
+DECIDE `player/2` x1 x2 @nlg %x2% played in %x1%
+    IF elem (LIST x2's name) (x1's `player/2 fact`)
+
+GIVEN x1 IS AN Object
+      x2 IS AN Object
+GIVETH A BOOLEAN
+DECIDE beats x1 x2 @nlg %x1% beats %x2%
+    IF elem (LIST x2's name) (x1's `beats fact`)
+    OR (x1's name EQUALS "rock" AND x2's name EQUALS "scissors")
+    OR (x1's name EQUALS "paper" AND x2's name EQUALS "rock")
+    OR (x1's name EQUALS "scissors" AND x2's name EQUALS "paper")
+
+GIVEN x1 IS AN Object
+      x2 IS AN Object
+      x3 IS AN Object
+GIVETH A BOOLEAN
+DECIDE throw x1 x2 x3 @nlg %x1% threw %x2% in %x3%
+    IF elem (LIST x2's name, x3's name) (x1's `throw fact`)
+
+§§ `RPSA 1`
+
+-- sec_1_section carries no rules of its own; its 3 blocks are lifted elsewhere:
+-- declarations into `§§ Ontology`, ground facts into the predicates they ground.
+
+§§ `RPSA 2`
+
+-- sec_2_section carries no rules of its own; its one block is lifted elsewhere:
+-- declarations into `§§ Ontology`, ground facts into the predicates they ground.
+
+§§ `RPSA 3`
+
+-- sec_3_section carries no rules of its own; its one block is lifted elsewhere:
+-- declarations into `§§ Ontology`, ground facts into the predicates they ground.
+
+§§ `RPSA 4`
+
+@ref RPSA 4 — sec_4_section attributed_rule (defeasible FALSE, inapplicable FALSE)
+GIVEN x1      IS AN Object
+      x2      IS AN Object
+      player2 IS AN Object
+      throw1  IS AN Object
+      throw2  IS AN Object
+GIVETH A BOOLEAN
+DECIDE `according to RPSA 4, the winner of x1 is x2, witnessed by player2, throw1 and throw2` x1 x2 player2 throw1 throw2
+    IF  game x1
+    AND player x2
+    AND player player2
+    AND NOT (x2's name EQUALS player2's name)
+    AND `player/2` x1 x2
+    AND `player/2` x1 player2
+    AND throw x2 throw1 x1
+    AND throw player2 throw2 x1
+    AND beats throw1 throw2
+
+-- The rule's body binds player2, throw1 and throw2, which its head does not.
+-- s(CASP) reads those existentially; Blawx has no open domain, so the
+-- quantifier below ranges over exactly the objects the universe holds.
+@ref RPSA 4 — sec_4_section attributed_rule, existential closure
+GIVEN w  IS A LIST OF Object
+      x1 IS AN Object
+      x2 IS AN Object
+GIVETH A BOOLEAN
+DECIDE `according to RPSA 4, the winner of x1 is x2` w x1 x2
+    IF any (GIVEN player2 YIELD any (GIVEN throw1 YIELD any (GIVEN throw2 YIELD `according to RPSA 4, the winner of x1 is x2, witnessed by player2, throw1 and throw2` x1 x2 player2 throw1 throw2) w) w) w
+
+@ref RPSA 4 — indefeasible: no `not blawx_defeated` conjunct
+GIVEN w  IS A LIST OF Object
+      x1 IS AN Object
+      x2 IS AN Object
+GIVETH A BOOLEAN
+DECIDE `the conclusion in RPSA 4 that the winner of x1 is x2 holds` w x1 x2
+    IF `according to RPSA 4, the winner of x1 is x2` w x1 x2
+
+§§ `The base predicates`
+
+-- `p(x) :- holds(sec_N, p, x).` for every section concluding p, OR-joined,
+-- plus the scenario fact channel (a bare `p(a).` is another clause of p).
+
+GIVEN w  IS A LIST OF Object
+      x1 IS AN Object
+      x2 IS AN Object
+GIVETH A BOOLEAN
+DECIDE winner w x1 x2 @nlg the winner of %x1% is %x2%
+    IF elem (LIST x2's name) (x1's `winner fact`)
+    OR `the conclusion in RPSA 4 that the winner of x1 is x2 holds` w x1 x2
+
+§§ `Objects`
+
+@ref sec_2__para_a_section object_declaration rock
+rock MEANS
+    Object WITH
+        name            IS "rock"
+        `game fact`     IS NOTHING
+        `player fact`   IS NOTHING
+        `sign fact`     IS NOTHING
+        `player/2 fact` IS EMPTY
+        `beats fact`    IS EMPTY
+        `winner fact`   IS EMPTY
+        `throw fact`    IS EMPTY
+
+@ref sec_2__para_b_section object_declaration paper
+paper MEANS
+    Object WITH
+        name            IS "paper"
+        `game fact`     IS NOTHING
+        `player fact`   IS NOTHING
+        `sign fact`     IS NOTHING
+        `player/2 fact` IS EMPTY
+        `beats fact`    IS EMPTY
+        `winner fact`   IS EMPTY
+        `throw fact`    IS EMPTY
+
+@ref sec_2__para_c_section object_declaration scissors
+scissors MEANS
+    Object WITH
+        name            IS "scissors"
+        `game fact`     IS NOTHING
+        `player fact`   IS NOTHING
+        `sign fact`     IS NOTHING
+        `player/2 fact` IS EMPTY
+        `beats fact`    IS EMPTY
+        `winner fact`   IS EMPTY
+        `throw fact`    IS EMPTY
+
+`all objects` MEANS LIST rock, paper, scissors
+
+GIVEN x IS AN Object
+GIVETH A STRING
+`the name of` x MEANS x's name
+
+§§ `Tests`
+
+-- blawxtest bobjane — `game(testgame).` `player(bob).` `player(jane).` `player(testgame,bob).` `player(testgame,jane).` `throw(jane,rock,testgame).` `throw(bob,scissors,testgame).` `?- winner(testgame,Winner).`
+
+`bobjane testgame` MEANS
+    Object WITH
+        name            IS "testgame"
+        `game fact`     IS JUST TRUE
+        `player fact`   IS NOTHING
+        `sign fact`     IS NOTHING
+        `player/2 fact` IS LIST (LIST "bob"), (LIST "jane")
+        `beats fact`    IS EMPTY
+        `winner fact`   IS EMPTY
+        `throw fact`    IS EMPTY
+
+`bobjane bob` MEANS
+    Object WITH
+        name            IS "bob"
+        `game fact`     IS NOTHING
+        `player fact`   IS JUST TRUE
+        `sign fact`     IS NOTHING
+        `player/2 fact` IS EMPTY
+        `beats fact`    IS EMPTY
+        `winner fact`   IS EMPTY
+        `throw fact`    IS LIST (LIST "scissors", "testgame")
+
+`bobjane jane` MEANS
+    Object WITH
+        name            IS "jane"
+        `game fact`     IS NOTHING
+        `player fact`   IS JUST TRUE
+        `sign fact`     IS NOTHING
+        `player/2 fact` IS EMPTY
+        `beats fact`    IS EMPTY
+        `winner fact`   IS EMPTY
+        `throw fact`    IS LIST (LIST "rock", "testgame")
+
+`bobjane world` MEANS LIST `bobjane testgame`, `bobjane bob`, `bobjane jane`, rock, paper, scissors
+
+#EVAL map `the name of` (filter (GIVEN winner_ YIELD winner `bobjane world` `bobjane testgame` winner_) `bobjane world`)
+-- L4 oracle ==> LIST "jane"
+
+-- blawxtest hypothetical — `player(bob).` `player(jane).` `?- winner(Game,bob).`
+-- Blawx cannot hypothesize across disunity blocks (_ and _ are not the same
+-- object). Because that block is used in our section 4 encoding, we need to
+-- be explicit about who the players are, but Blawx can hypothesize about the
+-- rest.
+-- We ask specifically whether bob won any games so that we don't get the same
+-- three answers twice, once for each possible player.
+-- NOT LIFTED (blawx-lift/test-block): an `assume` (an abducible: hypothetical reasoning) has no #EVAL image this phase.
+
+-- blawxtest who_wins — `?- winner(Game,Player).`
+#EVAL concat (map (GIVEN game_ YIELD map (GIVEN player_ YIELD LIST `the name of` game_, `the name of` player_) (filter (GIVEN player_ YIELD winner `all objects` game_ player_) `all objects`)) `all objects`)
+-- L4 oracle ==> EMPTY

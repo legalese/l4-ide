@@ -1,0 +1,37 @@
+-- Named rejection: a lambda outside a recognised combinator position.
+--
+-- First-order Horn clauses cannot carry a function as a value. M1 admits a
+-- lambda only where an aggregate recogniser consumes it; anywhere else it is
+-- LEHigherOrder, not a silently defunctionalised approximation.
+--
+-- Two definitions, so the batch is visible: `adder` returns a function, and
+-- `doubled` uses `map` in a position no aggregate consumes. The second is the
+-- one worth reading — `map` IS admitted, but only directly inside an aggregate
+-- (`sum (map … xs)` in ../scores.l4), where its lambda becomes the findall
+-- template. Standing alone it would have to produce a list value, which is a
+-- higher-order transformation this fragment does not lower. It is rejected BY
+-- NAME rather than falling through to "unbound reference", because a
+-- scope-resolution diagnosis for a fragment decision sends the reader to the
+-- wrong place entirely.
+
+IMPORT prelude
+
+@export
+GIVEN n IS A NUMBER
+`adder` n MEANS GIVEN x YIELD x PLUS n
+
+@export
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A LIST OF NUMBER
+`doubled` xs MEANS map (GIVEN x YIELD x TIMES 2) xs
+
+-- The third is about the DIAGNOSTIC rather than the decision. `all` is a
+-- prelude list combinator M1 does not recognise, and it used to fall through to
+-- "unbound reference `all` (prelude combinators … are outside the M1 fragment)"
+-- — prose that names the fragment under a KIND that says the name did not
+-- resolve. #258 §6.1's rejection census counts by kind precisely so it cannot be
+-- polluted by prose, so a fragment decision has to be reported as one.
+@export
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A BOOLEAN
+DECIDE `every positive` IF all (GIVEN x YIELD x GREATER THAN 0) xs

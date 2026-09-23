@@ -1,0 +1,21 @@
+-- A decision that pins its CLEAN section number (spec §11 W3(a)) and then
+-- opens with a SECOND index. `L4.Blawx.Emit.renderRuleText` would write the
+-- rule_text line "4. 5. A director is disqualified.", and clean-law 0.0.4 reads
+-- that as one section index with an insert index -- `number + insert_index +
+-- DOT`, clean/clean.py:53 -- giving eId sec_4_5 while the workspace we name is
+-- sec_4_section. Every canvas in the document would then be orphaned: it
+-- imports, it stores, and it belongs to no section of the Act. Measured
+-- 2026-09-02 with etc/blawx-eid-harness.py before the refusal existed:
+-- "clean-law yields ['sec_4_ 5_section'], workspaces are ['sec_4_section']".
+--
+-- Sub-provision anchoring (Jason Morris's sec_1__para_a_section) is what the
+-- author is reaching for here, and it is W3(b) -- still open. So this refuses
+-- by name rather than emitting a document that looks fine and is not.
+
+DECLARE Director HAS
+    `is bankrupt` IS A BOOLEAN
+
+@export 4. 5. A director is disqualified.
+GIVEN d IS A Director
+GIVETH A BOOLEAN
+DECIDE `is disqualified` d IF d's `is bankrupt`
