@@ -188,7 +188,7 @@ This is useful for pinning down a rule's _interface_: if a refactor accidentally
 File:     failing-check.l4
   Severity: DiagnosticSeverity_Error
   Message:
-    The first argument of function
+    The first input of function
 
       twice (defined at failing-check.l4:3:8-15)
 

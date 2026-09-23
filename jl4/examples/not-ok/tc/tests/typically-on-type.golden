@@ -9,7 +9,7 @@ File: typically-on-type.l4
   Code: <none>
   Message:
     `some type` is a type, which cannot carry a TYPICALLY default value.
-    TYPICALLY defaults apply to term-level fields, parameters and assumptions.
+    TYPICALLY can give a default to a DECLARE field, a GIVEN input, or an ASSUME.
 
 File: typically-on-type.l4
   Hidden: no
@@ -19,4 +19,4 @@ File: typically-on-type.l4
   Code: <none>
   Message:
     `a` is a type, which cannot carry a TYPICALLY default value.
-    TYPICALLY defaults apply to term-level fields, parameters and assumptions.
+    TYPICALLY can give a default to a DECLARE field, a GIVEN input, or an ASSUME.

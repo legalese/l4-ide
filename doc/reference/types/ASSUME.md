@@ -108,8 +108,8 @@ ASSUME age IS A NUMBER
 
 DECIDE isAdult IS age >= 18
 
--- ✘ You are trying to apply isAdult ... of type BOOLEAN (which is not a function)
---   to (named) arguments
+-- ✘ You are giving named inputs to isAdult ... of type BOOLEAN
+--   but it is not a function, so it takes none.
 #CHECK isAdult WITH age IS 25
 ```
 

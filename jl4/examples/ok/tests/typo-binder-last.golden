@@ -3,7 +3,7 @@ Typechecking successful
 Evaluation successful
 typo-binder-last.l4:16:8-12:
   I found a problem while checking the definition of `f`:
-    This CONSIDER branch binds a new variable
+    This CONSIDER branch introduces a new name
     
       `gren`
     

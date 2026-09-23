@@ -21,7 +21,7 @@ If you already know what error you are looking at, use the table of contents bel
 - [Type Errors](#type-errors)
   - [Branch type mismatch](#branch-type-mismatch)
   - [Undefined field access](#undefined-field-access)
-  - [Function arity mismatch](#function-arity-mismatch)
+  - [Wrong number of inputs](#wrong-number-of-inputs)
   - [APPEND vs append](#append-vs-append)
 - [Compiler Warnings](#compiler-warnings)
   - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
@@ -295,15 +295,15 @@ result MEANS
 
 ---
 
-### Function arity mismatch
+### Wrong number of inputs
 
-**Error message:** `Error: function expects N arguments, got M`
+**Error message:** `The function … expects 2 inputs, but here it is given 1 input.`
 
-**What you wrote:** A function call with too many or too few arguments.
+**What you wrote:** A rule used with too many or too few inputs.
 
-**What went wrong:** The function was defined with a certain number of GIVEN parameters, and you provided a different number of arguments.
+**What went wrong:** The rule was defined with a certain number of `GIVEN` inputs, and a different number was supplied where it was used.
 
-**How to fix it:** Check the function's definition to see how many arguments it expects, and provide exactly that many. If you intentionally want to supply fewer arguments (partial application), make sure the context supports it.
+**How to fix it:** Check the rule's definition to see how many inputs it expects, and supply exactly that many. If you meant to supply fewer (partial application), make sure the context supports it.
 
 ---
 

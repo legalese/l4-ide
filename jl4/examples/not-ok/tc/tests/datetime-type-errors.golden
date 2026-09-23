@@ -8,7 +8,7 @@ File: datetime-type-errors.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first argument of function 
+    The first input of function 
 
       DATETIME_FROM_DTZ (predefined)
 
@@ -27,7 +27,7 @@ File: datetime-type-errors.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first argument of function 
+    The first input of function 
 
       DATETIME_DATE (predefined)
 
