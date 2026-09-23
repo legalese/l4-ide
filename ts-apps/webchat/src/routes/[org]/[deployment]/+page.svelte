@@ -121,15 +121,21 @@
     bridge?.dispose()
   })
 
+  // Mobile-only full-screen drawer holding the sidebar. On desktop the
+  // sidebar is always visible and this flag has no effect (CSS-gated).
+  let sidebarOpen = $state(false)
+
   function newChat(): void {
     // webchat is always deployment-scoped, so a fresh chat must keep the
     // deployment binding (newConversation() clears it). Re-binding makes the
     // empty state show the deployment's intended-use box rather than the
     // generic "Get started" seeds.
     store?.startDeploymentChat(deployment, apiBaseUrl, intendedUse)
+    sidebarOpen = false
   }
 
   async function selectChat(id: string): Promise<void> {
+    sidebarOpen = false
     await store?.loadConversation(id)
   }
 
@@ -154,20 +160,31 @@
   <NotFound detail="This is not a deployment in your account." />
 {:else if store}
   <div class="app">
-    <Sidebar
-      onNewChat={newChat}
-      onSelect={selectChat}
-      onDelete={deleteChat}
-      items={store.history}
-      currentId={store.currentId}
-      streamingIds={store.streamingConversationIds}
-    />
+    <!-- `display: contents` on desktop (the sidebar sits in the flex row as
+         before); on mobile it's hidden until `open`, when it becomes a
+         full-screen fixed drawer. -->
+    <div class="sidebar-host" class:open={sidebarOpen}>
+      <Sidebar
+        onNewChat={newChat}
+        onSelect={selectChat}
+        onDelete={deleteChat}
+        onClose={() => (sidebarOpen = false)}
+        items={store.history}
+        currentId={store.currentId}
+        streamingIds={store.streamingConversationIds}
+      />
+    </div>
     <main class="chat-pane">
       <ChatPanel {store} messenger={messengerRef} />
       {#if store.deploymentBinding}
         <DeploymentBanner deploymentId={store.deploymentBinding.deploymentId} />
       {/if}
-      <ChatInput {store} disabled={!store.signedIn} />
+      <ChatInput
+        {store}
+        disabled={!store.signedIn}
+        onNewChat={newChat}
+        onOpenHistory={() => (sidebarOpen = true)}
+      />
     </main>
   </div>
 {:else}
@@ -178,7 +195,11 @@
   .app {
     display: flex;
     height: 100vh;
-    width: 100vw;
+    /* Track the *visible* viewport on mobile browsers — with plain 100vh
+       the chat input hides behind the collapsing URL bar and the message
+       list can't scroll to its true bottom. */
+    height: 100dvh;
+    width: 100%;
     overflow: hidden;
     background: var(--chat-bg);
   }
@@ -190,6 +211,23 @@
     flex-direction: column;
     background: var(--chat-bg);
   }
+
+  .sidebar-host {
+    display: contents;
+  }
+  @media (max-width: 768px) {
+    .sidebar-host {
+      display: none;
+    }
+    .sidebar-host.open {
+      display: block;
+      position: fixed;
+      inset: 0;
+      height: 100dvh;
+      z-index: 50;
+      background: var(--sidebar-bg);
+    }
+  }
   .brand {
     font-weight: 600;
     color: var(--brand);
@@ -200,15 +238,17 @@
     display: grid;
     place-items: center;
     height: 100vh;
+    height: 100dvh;
     background: var(--chat-bg);
   }
   .login-card {
     text-align: center;
     color: var(--vscode-foreground);
+    padding: 0 1.5rem;
   }
   .login-card p {
     color: var(--vscode-descriptionForeground);
-    margin: 0.5rem 0 1rem;
+    margin: 0.5rem 0 2.25rem;
   }
   .login-btn {
     padding: 0.5rem 1.25rem;
