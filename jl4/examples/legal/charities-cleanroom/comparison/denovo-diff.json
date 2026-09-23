@@ -1,0 +1,5335 @@
+{
+  "schema": "l4-go/denovo-diff-report@1",
+  "subject": "charities-jersey-2014",
+  "map_path": "/private/tmp/claude-502/-Users-mengwong-src-legalese-l4-ide/7c74365c-e8cf-487b-a5ba-00ebbcbd6c57/scratchpad/charities.surface-map.json",
+  "fixed_now": "2025-01-31T00:00:00Z",
+  "l4": "/Users/mengwong/src/legalese/l4wt/feel-dates/dist-newstyle/build/aarch64-osx/ghc-9.10.3/jl4-0.1/x/l4/build/l4/l4",
+  "sides": {
+    "left": {
+      "label": "corpus",
+      "module": "paper/case-studies/charities-jersey-2014/part-3-charity-test.l4"
+    },
+    "right": {
+      "label": "cleanroom",
+      "module": "jl4/examples/legal/charities-cleanroom/charity-test.l4"
+    }
+  },
+  "surface": {
+    "left": {
+      "rules": 33,
+      "paired": 16,
+      "exported": 0
+    },
+    "right": {
+      "rules": 90,
+      "paired": 17,
+      "exported": 1
+    }
+  },
+  "battery": {
+    "cases": null,
+    "seeds": 45,
+    "perturbations": 2070,
+    "rows": 2115,
+    "truncated": false
+  },
+  "pairs": 17,
+  "evaluations": 23535,
+  "per_pair": [
+    {
+      "pair": "head-d",
+      "citation": "Charities (Jersey) Law 2014, art 6(1)(d), 6(2)(a)",
+      "fork": null,
+      "evaluated": 2115,
+      "agreed": 2115,
+      "diverged": 0,
+      "leaves_perturbed": 27,
+      "leaves_inert": 25
+    },
+    {
+      "pair": "head-f",
+      "citation": "art 6(1)(f), 6(2)(b)",
+      "fork": null,
+      "evaluated": 2115,
+      "agreed": 2115,
+      "diverged": 0,
+      "leaves_perturbed": 27,
+      "leaves_inert": 24
+    },
+    {
+      "pair": "head-h",
+      "citation": "art 6(1)(h), 6(2)(c)",
+      "fork": null,
+      "evaluated": 2115,
+      "agreed": 2115,
+      "diverged": 0,
+      "leaves_perturbed": 27,
+      "leaves_inert": 25
+    },
+    {
+      "pair": "head-i",
+      "citation": "art 6(1)(i), 6(2)(d)",
+      "fork": null,
+      "evaluated": 2115,
+      "agreed": 2115,
+      "diverged": 0,
+      "leaves_perturbed": 27,
+      "leaves_inert": 24
+    },
+    {
+      "pair": "head-n",
+      "citation": "art 6(1)(n), 6(2)(e)",
+      "fork": null,
+      "evaluated": 2115,
+      "agreed": 2027,
+      "diverged": 88,
+      "leaves_perturbed": 27,
+      "leaves_inert": 25
+    },
+    {
+      "pair": "head-p",
+      "citation": "art 6(1)(p), 6(2)(f)",
+      "fork": null,
+      "evaluated": 2115,
+      "agreed": 2115,
+      "diverged": 0,
+      "leaves_perturbed": 27,
+      "leaves_inert": 25
+    },
+    {
+      "pair": "within-6-1",
+      "citation": "art 6(1)",
+      "fork": null,
+      "evaluated": 2115,
+      "agreed": 2081,
+      "diverged": 34,
+      "leaves_perturbed": 27,
+      "leaves_inert": 3
+    },
+    {
+      "pair": "charitable-purpose",
+      "citation": "art 6(1), 6(5)",
+      "fork": null,
+      "evaluated": 2115,
+      "agreed": 2084,
+      "diverged": 31,
+      "leaves_perturbed": 27,
+      "leaves_inert": 2
+    },
+    {
+      "pair": "political",
+      "citation": "art 6(5)",
+      "fork": null,
+      "evaluated": 2115,
+      "agreed": 148,
+      "diverged": 1967,
+      "leaves_perturbed": 27,
+      "leaves_inert": 2
+    },
+    {
+      "pair": "ancillary",
+      "citation": "art 5(1)(a)(ii), 6(5)",
+      "fork": null,
+      "evaluated": 2115,
+      "agreed": 2108,
+      "diverged": 7,
+      "leaves_perturbed": 27,
+      "leaves_inert": 25
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "citation": "art 5(1)(a)",
+      "fork": null,
+      "evaluated": 2115,
+      "agreed": 2086,
+      "diverged": 29,
+      "leaves_perturbed": 27,
+      "leaves_inert": 1
+    },
+    {
+      "pair": "5-1-a",
+      "citation": "art 5(1)(a)",
+      "fork": null,
+      "evaluated": 45,
+      "agreed": 42,
+      "diverged": 3,
+      "leaves_perturbed": 0,
+      "leaves_inert": 0
+    },
+    {
+      "pair": "5-1-b",
+      "citation": "art 5(1)(b), 7(3)(b)",
+      "fork": null,
+      "evaluated": 45,
+      "agreed": 44,
+      "diverged": 1,
+      "leaves_perturbed": 0,
+      "leaves_inert": 0
+    },
+    {
+      "pair": "7-3-b",
+      "citation": "art 7(3)(b)",
+      "fork": null,
+      "evaluated": 45,
+      "agreed": 45,
+      "diverged": 0,
+      "leaves_perturbed": 0,
+      "leaves_inert": 0
+    },
+    {
+      "pair": "5-2",
+      "citation": "art 5(2)",
+      "fork": null,
+      "evaluated": 45,
+      "agreed": 45,
+      "diverged": 0,
+      "leaves_perturbed": 0,
+      "leaves_inert": 0
+    },
+    {
+      "pair": "5-2-bites",
+      "citation": "art 5(2), 5(3)",
+      "fork": null,
+      "evaluated": 45,
+      "agreed": 44,
+      "diverged": 1,
+      "leaves_perturbed": 0,
+      "leaves_inert": 0
+    },
+    {
+      "pair": "charity-test",
+      "citation": "art 5",
+      "fork": null,
+      "evaluated": 45,
+      "agreed": 40,
+      "diverged": 5,
+      "leaves_perturbed": 0,
+      "leaves_inert": 0
+    }
+  ],
+  "totals": {
+    "evaluated": 23535,
+    "agreed": 21369,
+    "diverged": 2166,
+    "witnesses": 116,
+    "leaves_perturbed": 297,
+    "leaves_inert": 181
+  },
+  "witnesses": [
+    {
+      "pair": "5-1-a",
+      "row_id": "s4",
+      "row_kind": "seed",
+      "row_name": "purpose:care-home",
+      "derived_from": null,
+      "mutation": null,
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "whole-seed-row",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": null,
+      "fork": null
+    },
+    {
+      "pair": "5-1-b",
+      "row_id": "s40",
+      "row_kind": "seed",
+      "row_name": "entity:the applicant not yet operating",
+      "derived_from": null,
+      "mutation": null,
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "whole-seed-row",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": null,
+      "fork": null
+    },
+    {
+      "pair": "5-2-bites",
+      "row_id": "s39",
+      "row_kind": "seed",
+      "row_name": "entity:the trust with a Minister in a private capacity",
+      "derived_from": null,
+      "mutation": null,
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "whole-seed-row",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": null,
+      "fork": null
+    },
+    {
+      "pair": "ancillary",
+      "row_id": "s23m44",
+      "row_kind": "perturbation",
+      "row_name": "entity:the gift shop with nothing behind it · purpose.is purely ancillary or incidental to any of the entity's charitable purposes = true",
+      "derived_from": "s23",
+      "mutation": {
+        "path": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 6,
+      "disposition": "UNTRIAGED",
+      "seed_name": "entity:the gift shop with nothing behind it",
+      "fork": null
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "row_id": "s4m0",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.description = \"relieving poverty in St Helier\"",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.description",
+        "from": "providing accommodation and care",
+        "to": "relieving poverty in St Helier"
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 19,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "row_id": "s6m42",
+      "row_kind": "perturbation",
+      "row_name": "purpose:chess · purpose.(2)(e) relief given by the provision of accommodation or care = true",
+      "derived_from": "s6",
+      "mutation": {
+        "path": "purpose.(2)(e) relief given by the provision of accommodation or care",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:chess",
+      "fork": null
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "row_id": "s4",
+      "row_kind": "seed",
+      "row_name": "purpose:care-home",
+      "derived_from": null,
+      "mutation": null,
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "whole-seed-row",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": null,
+      "fork": null
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "row_id": "s4m27",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(h) the advancement of public participation in sport = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(h) the advancement of public participation in sport",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "row_id": "s4m28",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "row_id": "s4m39",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(c) the sport involves physical skill and exertion = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(c) the sport involves physical skill and exertion",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "row_id": "s4m40",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "row_id": "s4m41",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "charitable-purpose",
+      "row_id": "s4m0",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.description = \"relieving poverty in St Helier\"",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.description",
+        "from": "providing accommodation and care",
+        "to": "relieving poverty in St Helier"
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 19,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "charitable-purpose",
+      "row_id": "s6m42",
+      "row_kind": "perturbation",
+      "row_name": "purpose:chess · purpose.(2)(e) relief given by the provision of accommodation or care = true",
+      "derived_from": "s6",
+      "mutation": {
+        "path": "purpose.(2)(e) relief given by the provision of accommodation or care",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 3,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:chess",
+      "fork": null
+    },
+    {
+      "pair": "charitable-purpose",
+      "row_id": "s4",
+      "row_kind": "seed",
+      "row_name": "purpose:care-home",
+      "derived_from": null,
+      "mutation": null,
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "whole-seed-row",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": null,
+      "fork": null
+    },
+    {
+      "pair": "charitable-purpose",
+      "row_id": "s4m27",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(h) the advancement of public participation in sport = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(h) the advancement of public participation in sport",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "charitable-purpose",
+      "row_id": "s4m28",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "charitable-purpose",
+      "row_id": "s4m39",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(c) the sport involves physical skill and exertion = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(c) the sport involves physical skill and exertion",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "charitable-purpose",
+      "row_id": "s4m40",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "charitable-purpose",
+      "row_id": "s4m41",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "charitable-purpose",
+      "row_id": "s4m44",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.is purely ancillary or incidental to any of the entity's charitable purposes = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "charity-test",
+      "row_id": "s4",
+      "row_kind": "seed",
+      "row_name": "purpose:care-home",
+      "derived_from": null,
+      "mutation": null,
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "whole-seed-row",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": null,
+      "fork": null
+    },
+    {
+      "pair": "charity-test",
+      "row_id": "s39",
+      "row_kind": "seed",
+      "row_name": "entity:the trust with a Minister in a private capacity",
+      "derived_from": null,
+      "mutation": null,
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "whole-seed-row",
+      "also_seen_on": 1,
+      "disposition": "UNTRIAGED",
+      "seed_name": null,
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s0m42",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(2)(e) relief given by the provision of accommodation or care = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(2)(e) relief given by the provision of accommodation or care",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 42,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m0",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.description = \"relieving poverty in St Helier\"",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.description",
+        "from": "providing accommodation and care",
+        "to": "relieving poverty in St Helier"
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 19,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4",
+      "row_kind": "seed",
+      "row_name": "purpose:care-home",
+      "derived_from": null,
+      "mutation": null,
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "whole-seed-row",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": null,
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m20",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(a) the prevention or relief of poverty = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(a) the prevention or relief of poverty",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m21",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(b) the advancement of education = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(b) the advancement of education",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m22",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(c) the advancement of religion = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(c) the advancement of religion",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m23",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(d) the advancement of health = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(d) the advancement of health",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m24",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(e) the saving of lives = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(e) the saving of lives",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m25",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(f) the advancement of citizenship or community development = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(f) the advancement of citizenship or community development",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m26",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(g) the advancement of the arts, heritage, culture or science = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(g) the advancement of the arts, heritage, culture or science",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m27",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(h) the advancement of public participation in sport = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(h) the advancement of public participation in sport",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m28",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m29",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(j) the advancement of human rights, conflict resolution or reconciliation = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(j) the advancement of human rights, conflict resolution or reconciliation",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m30",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(k) the promotion of religious or racial harmony = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(k) the promotion of religious or racial harmony",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m31",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(l) the promotion of equality and diversity = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(l) the promotion of equality and diversity",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m32",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(m) the advancement of environmental protection or improvement = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(m) the advancement of environmental protection or improvement",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m34",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(o) the advancement of animal welfare = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(o) the advancement of animal welfare",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m35",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o) = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m36",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(a) the prevention or relief of sickness, disease or human suffering = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(a) the prevention or relief of sickness, disease or human suffering",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m37",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(b)(i) rural or urban regeneration = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(b)(i) rural or urban regeneration",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m38",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m39",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(c) the sport involves physical skill and exertion = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(c) the sport involves physical skill and exertion",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m40",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m41",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m43",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god) = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m44",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.is purely ancillary or incidental to any of the entity's charitable purposes = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "head-n",
+      "row_id": "s4m45",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m0",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.description = \"running a school\"",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.description",
+        "from": "relieving poverty in St Helier",
+        "to": "running a school"
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 759,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m0",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.description = \"relieving poverty in St Helier\"",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.description",
+        "from": "campaigning for a political party",
+        "to": "relieving poverty in St Helier"
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 59,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m24",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(e) the saving of lives = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(e) the saving of lives",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 41,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m26",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(g) the advancement of the arts, heritage, culture or science = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(g) the advancement of the arts, heritage, culture or science",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 41,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m29",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(j) the advancement of human rights, conflict resolution or reconciliation = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(j) the advancement of human rights, conflict resolution or reconciliation",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 41,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m30",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(k) the promotion of religious or racial harmony = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(k) the promotion of religious or racial harmony",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 41,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m31",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(l) the promotion of equality and diversity = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(l) the promotion of equality and diversity",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 41,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m32",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(m) the advancement of environmental protection or improvement = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(m) the advancement of environmental protection or improvement",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 41,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m34",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(o) the advancement of animal welfare = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(o) the advancement of animal welfare",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 41,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m38",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 41,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m45",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 41,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m22",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(c) the advancement of religion = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(c) the advancement of religion",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 40,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m23",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(d) the advancement of health = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(d) the advancement of health",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 40,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m25",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(f) the advancement of citizenship or community development = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(f) the advancement of citizenship or community development",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 40,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m33",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 40,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m35",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o) = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 40,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m36",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(2)(a) the prevention or relief of sickness, disease or human suffering = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(2)(a) the prevention or relief of sickness, disease or human suffering",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 40,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m37",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(2)(b)(i) rural or urban regeneration = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(2)(b)(i) rural or urban regeneration",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 40,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m42",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(2)(e) relief given by the provision of accommodation or care = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(2)(e) relief given by the provision of accommodation or care",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 40,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m43",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god) = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 40,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s1m20",
+      "row_kind": "perturbation",
+      "row_name": "purpose:education · purpose.(a) the prevention or relief of poverty = true",
+      "derived_from": "s1",
+      "mutation": {
+        "path": "purpose.(a) the prevention or relief of poverty",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 40,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:education",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0",
+      "row_kind": "seed",
+      "row_name": "purpose:poverty",
+      "derived_from": null,
+      "mutation": null,
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "whole-seed-row",
+      "also_seen_on": 37,
+      "disposition": "UNTRIAGED",
+      "seed_name": null,
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m39",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(2)(c) the sport involves physical skill and exertion = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(2)(c) the sport involves physical skill and exertion",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 37,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m40",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 37,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m41",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 37,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m44",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.is purely ancillary or incidental to any of the entity's charitable purposes = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 37,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m27",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(h) the advancement of public participation in sport = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(h) the advancement of public participation in sport",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 36,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m28",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 35,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s0m21",
+      "row_kind": "perturbation",
+      "row_name": "purpose:poverty · purpose.(b) the advancement of education = true",
+      "derived_from": "s0",
+      "mutation": {
+        "path": "purpose.(b) the advancement of education",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 16,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:poverty",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13",
+      "row_kind": "seed",
+      "row_name": "purpose:political",
+      "derived_from": null,
+      "mutation": null,
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "whole-seed-row",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": null,
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m20",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(a) the prevention or relief of poverty = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(a) the prevention or relief of poverty",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m21",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(b) the advancement of education = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(b) the advancement of education",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m22",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(c) the advancement of religion = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(c) the advancement of religion",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m23",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(d) the advancement of health = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(d) the advancement of health",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m24",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(e) the saving of lives = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(e) the saving of lives",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m25",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(f) the advancement of citizenship or community development = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(f) the advancement of citizenship or community development",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m26",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(g) the advancement of the arts, heritage, culture or science = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(g) the advancement of the arts, heritage, culture or science",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m27",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(h) the advancement of public participation in sport = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(h) the advancement of public participation in sport",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m28",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m29",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(j) the advancement of human rights, conflict resolution or reconciliation = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(j) the advancement of human rights, conflict resolution or reconciliation",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m30",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(k) the promotion of religious or racial harmony = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(k) the promotion of religious or racial harmony",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m31",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(l) the promotion of equality and diversity = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(l) the promotion of equality and diversity",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m32",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(m) the advancement of environmental protection or improvement = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(m) the advancement of environmental protection or improvement",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m33",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m34",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(o) the advancement of animal welfare = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(o) the advancement of animal welfare",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m35",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o) = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m36",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(2)(a) the prevention or relief of sickness, disease or human suffering = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(2)(a) the prevention or relief of sickness, disease or human suffering",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m37",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(2)(b)(i) rural or urban regeneration = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(2)(b)(i) rural or urban regeneration",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m38",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m39",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(2)(c) the sport involves physical skill and exertion = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(2)(c) the sport involves physical skill and exertion",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m40",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m41",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m42",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(2)(e) relief given by the provision of accommodation or care = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(2)(e) relief given by the provision of accommodation or care",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m43",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god) = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s13m44",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political · purpose.is purely ancillary or incidental to any of the entity's charitable purposes = true",
+      "derived_from": "s13",
+      "mutation": {
+        "path": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 2,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political",
+      "fork": null
+    },
+    {
+      "pair": "political",
+      "row_id": "s14m45",
+      "row_kind": "perturbation",
+      "row_name": "purpose:political-edu · purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere = false",
+      "derived_from": "s14",
+      "mutation": {
+        "path": "purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+        "from": true,
+        "to": false
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:political-edu",
+      "fork": null
+    },
+    {
+      "pair": "within-6-1",
+      "row_id": "s4m0",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.description = \"relieving poverty in St Helier\"",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.description",
+        "from": "providing accommodation and care",
+        "to": "relieving poverty in St Helier"
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 19,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "within-6-1",
+      "row_id": "s6m42",
+      "row_kind": "perturbation",
+      "row_name": "purpose:chess · purpose.(2)(e) relief given by the provision of accommodation or care = true",
+      "derived_from": "s6",
+      "mutation": {
+        "path": "purpose.(2)(e) relief given by the provision of accommodation or care",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 5,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:chess",
+      "fork": null
+    },
+    {
+      "pair": "within-6-1",
+      "row_id": "s4",
+      "row_kind": "seed",
+      "row_name": "purpose:care-home",
+      "derived_from": null,
+      "mutation": null,
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "whole-seed-row",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": null,
+      "fork": null
+    },
+    {
+      "pair": "within-6-1",
+      "row_id": "s4m27",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(h) the advancement of public participation in sport = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(h) the advancement of public participation in sport",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "within-6-1",
+      "row_id": "s4m28",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "within-6-1",
+      "row_id": "s4m39",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(c) the sport involves physical skill and exertion = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(c) the sport involves physical skill and exertion",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "within-6-1",
+      "row_id": "s4m40",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "within-6-1",
+      "row_id": "s4m41",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "within-6-1",
+      "row_id": "s4m44",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.is purely ancillary or incidental to any of the entity's charitable purposes = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    },
+    {
+      "pair": "within-6-1",
+      "row_id": "s4m45",
+      "row_kind": "perturbation",
+      "row_name": "purpose:care-home · purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere = true",
+      "derived_from": "s4",
+      "mutation": {
+        "path": "purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+        "from": false,
+        "to": true
+      },
+      "rule_date": null,
+      "left": {
+        "kind": "value",
+        "value": "TRUE",
+        "text": "TRUE"
+      },
+      "right": {
+        "kind": "value",
+        "value": "FALSE",
+        "text": "FALSE"
+      },
+      "agree": false,
+      "minimal": "one-field-from-agreeing-seed",
+      "also_seen_on": 0,
+      "disposition": "UNTRIAGED",
+      "seed_name": "purpose:care-home",
+      "fork": null
+    }
+  ],
+  "sensitivity": [
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(2)(a) the prevention or relief of sickness, disease or human suffering",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(2)(b)(i) rural or urban regeneration",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(2)(c) the sport involves physical skill and exertion",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(2)(e) relief given by the provision of accommodation or care",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(a) the prevention or relief of poverty",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(b) the advancement of education",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(c) the advancement of religion",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(d) the advancement of health",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(e) the saving of lives",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(f) the advancement of citizenship or community development",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(g) the advancement of the arts, heritage, culture or science",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(h) the advancement of public participation in sport",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(j) the advancement of human rights, conflict resolution or reconciliation",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(k) the promotion of religious or racial harmony",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(l) the promotion of equality and diversity",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(m) the advancement of environmental protection or improvement",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(o) the advancement of animal welfare",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.description",
+      "perturbed": 900,
+      "moved": 0
+    },
+    {
+      "pair": "ancillary",
+      "leaf": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+      "perturbed": 45,
+      "moved": 42
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(2)(a) the prevention or relief of sickness, disease or human suffering",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(2)(b)(i) rural or urban regeneration",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(2)(c) the sport involves physical skill and exertion",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(2)(e) relief given by the provision of accommodation or care",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+      "perturbed": 45,
+      "moved": 41
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(a) the prevention or relief of poverty",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(b) the advancement of education",
+      "perturbed": 45,
+      "moved": 29
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(c) the advancement of religion",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(d) the advancement of health",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(e) the saving of lives",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(f) the advancement of citizenship or community development",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(g) the advancement of the arts, heritage, culture or science",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(h) the advancement of public participation in sport",
+      "perturbed": 45,
+      "moved": 1
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(j) the advancement of human rights, conflict resolution or reconciliation",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(k) the promotion of religious or racial harmony",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(l) the promotion of equality and diversity",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(m) the advancement of environmental protection or improvement",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(o) the advancement of animal welfare",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.description",
+      "perturbed": 900,
+      "moved": 0
+    },
+    {
+      "pair": "charitable-or-ancillary",
+      "leaf": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(2)(a) the prevention or relief of sickness, disease or human suffering",
+      "perturbed": 45,
+      "moved": 6
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(2)(b)(i) rural or urban regeneration",
+      "perturbed": 45,
+      "moved": 6
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(2)(c) the sport involves physical skill and exertion",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(2)(e) relief given by the provision of accommodation or care",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)",
+      "perturbed": 45,
+      "moved": 6
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+      "perturbed": 45,
+      "moved": 39
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(a) the prevention or relief of poverty",
+      "perturbed": 45,
+      "moved": 6
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(b) the advancement of education",
+      "perturbed": 45,
+      "moved": 30
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(c) the advancement of religion",
+      "perturbed": 45,
+      "moved": 6
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(d) the advancement of health",
+      "perturbed": 45,
+      "moved": 6
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(e) the saving of lives",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(f) the advancement of citizenship or community development",
+      "perturbed": 45,
+      "moved": 6
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(g) the advancement of the arts, heritage, culture or science",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(h) the advancement of public participation in sport",
+      "perturbed": 45,
+      "moved": 1
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(j) the advancement of human rights, conflict resolution or reconciliation",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(k) the promotion of religious or racial harmony",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(l) the promotion of equality and diversity",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(m) the advancement of environmental protection or improvement",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 6
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(o) the advancement of animal welfare",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)",
+      "perturbed": 45,
+      "moved": 6
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.description",
+      "perturbed": 900,
+      "moved": 0
+    },
+    {
+      "pair": "charitable-purpose",
+      "leaf": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(2)(a) the prevention or relief of sickness, disease or human suffering",
+      "perturbed": 45,
+      "moved": 44
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(2)(b)(i) rural or urban regeneration",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(2)(c) the sport involves physical skill and exertion",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(2)(e) relief given by the provision of accommodation or care",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(a) the prevention or relief of poverty",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(b) the advancement of education",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(c) the advancement of religion",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(d) the advancement of health",
+      "perturbed": 45,
+      "moved": 44
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(e) the saving of lives",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(f) the advancement of citizenship or community development",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(g) the advancement of the arts, heritage, culture or science",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(h) the advancement of public participation in sport",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(j) the advancement of human rights, conflict resolution or reconciliation",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(k) the promotion of religious or racial harmony",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(l) the promotion of equality and diversity",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(m) the advancement of environmental protection or improvement",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(o) the advancement of animal welfare",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.description",
+      "perturbed": 900,
+      "moved": 0
+    },
+    {
+      "pair": "head-d",
+      "leaf": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(2)(a) the prevention or relief of sickness, disease or human suffering",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(2)(b)(i) rural or urban regeneration",
+      "perturbed": 45,
+      "moved": 44
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities",
+      "perturbed": 45,
+      "moved": 43
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(2)(c) the sport involves physical skill and exertion",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(2)(e) relief given by the provision of accommodation or care",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(a) the prevention or relief of poverty",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(b) the advancement of education",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(c) the advancement of religion",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(d) the advancement of health",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(e) the saving of lives",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(f) the advancement of citizenship or community development",
+      "perturbed": 45,
+      "moved": 44
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(g) the advancement of the arts, heritage, culture or science",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(h) the advancement of public participation in sport",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(j) the advancement of human rights, conflict resolution or reconciliation",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(k) the promotion of religious or racial harmony",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(l) the promotion of equality and diversity",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(m) the advancement of environmental protection or improvement",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(o) the advancement of animal welfare",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.description",
+      "perturbed": 900,
+      "moved": 0
+    },
+    {
+      "pair": "head-f",
+      "leaf": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(2)(a) the prevention or relief of sickness, disease or human suffering",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(2)(b)(i) rural or urban regeneration",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(2)(c) the sport involves physical skill and exertion",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(2)(e) relief given by the provision of accommodation or care",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(a) the prevention or relief of poverty",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(b) the advancement of education",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(c) the advancement of religion",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(d) the advancement of health",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(e) the saving of lives",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(f) the advancement of citizenship or community development",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(g) the advancement of the arts, heritage, culture or science",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(h) the advancement of public participation in sport",
+      "perturbed": 45,
+      "moved": 1
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(j) the advancement of human rights, conflict resolution or reconciliation",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(k) the promotion of religious or racial harmony",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(l) the promotion of equality and diversity",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(m) the advancement of environmental protection or improvement",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(o) the advancement of animal welfare",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.description",
+      "perturbed": 900,
+      "moved": 0
+    },
+    {
+      "pair": "head-h",
+      "leaf": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(2)(a) the prevention or relief of sickness, disease or human suffering",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(2)(b)(i) rural or urban regeneration",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(2)(c) the sport involves physical skill and exertion",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(2)(e) relief given by the provision of accommodation or care",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(a) the prevention or relief of poverty",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(b) the advancement of education",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(c) the advancement of religion",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(d) the advancement of health",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(e) the saving of lives",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(f) the advancement of citizenship or community development",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(g) the advancement of the arts, heritage, culture or science",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(h) the advancement of public participation in sport",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(j) the advancement of human rights, conflict resolution or reconciliation",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(k) the promotion of religious or racial harmony",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(l) the promotion of equality and diversity",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(m) the advancement of environmental protection or improvement",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(o) the advancement of animal welfare",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.description",
+      "perturbed": 900,
+      "moved": 0
+    },
+    {
+      "pair": "head-i",
+      "leaf": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(2)(a) the prevention or relief of sickness, disease or human suffering",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(2)(b)(i) rural or urban regeneration",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(2)(c) the sport involves physical skill and exertion",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(2)(e) relief given by the provision of accommodation or care",
+      "perturbed": 45,
+      "moved": 44
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(a) the prevention or relief of poverty",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(b) the advancement of education",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(c) the advancement of religion",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(d) the advancement of health",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(e) the saving of lives",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(f) the advancement of citizenship or community development",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(g) the advancement of the arts, heritage, culture or science",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(h) the advancement of public participation in sport",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(j) the advancement of human rights, conflict resolution or reconciliation",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(k) the promotion of religious or racial harmony",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(l) the promotion of equality and diversity",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(m) the advancement of environmental protection or improvement",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 45
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(o) the advancement of animal welfare",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.description",
+      "perturbed": 900,
+      "moved": 0
+    },
+    {
+      "pair": "head-n",
+      "leaf": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(2)(a) the prevention or relief of sickness, disease or human suffering",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(2)(b)(i) rural or urban regeneration",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(2)(c) the sport involves physical skill and exertion",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(2)(e) relief given by the provision of accommodation or care",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)",
+      "perturbed": 45,
+      "moved": 44
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(a) the prevention or relief of poverty",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(b) the advancement of education",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(c) the advancement of religion",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(d) the advancement of health",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(e) the saving of lives",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(f) the advancement of citizenship or community development",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(g) the advancement of the arts, heritage, culture or science",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(h) the advancement of public participation in sport",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(j) the advancement of human rights, conflict resolution or reconciliation",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(k) the promotion of religious or racial harmony",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(l) the promotion of equality and diversity",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(m) the advancement of environmental protection or improvement",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(o) the advancement of animal welfare",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)",
+      "perturbed": 45,
+      "moved": 44
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.description",
+      "perturbed": 900,
+      "moved": 0
+    },
+    {
+      "pair": "head-p",
+      "leaf": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(2)(a) the prevention or relief of sickness, disease or human suffering",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(2)(b)(i) rural or urban regeneration",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(2)(c) the sport involves physical skill and exertion",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(2)(e) relief given by the provision of accommodation or care",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+      "perturbed": 45,
+      "moved": 45
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(a) the prevention or relief of poverty",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(b) the advancement of education",
+      "perturbed": 45,
+      "moved": 29
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(c) the advancement of religion",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(d) the advancement of health",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(e) the saving of lives",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(f) the advancement of citizenship or community development",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(g) the advancement of the arts, heritage, culture or science",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(h) the advancement of public participation in sport",
+      "perturbed": 45,
+      "moved": 1
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(j) the advancement of human rights, conflict resolution or reconciliation",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(k) the promotion of religious or racial harmony",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(l) the promotion of equality and diversity",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(m) the advancement of environmental protection or improvement",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(o) the advancement of animal welfare",
+      "perturbed": 45,
+      "moved": 4
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)",
+      "perturbed": 45,
+      "moved": 5
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.description",
+      "perturbed": 900,
+      "moved": 0
+    },
+    {
+      "pair": "political",
+      "leaf": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(2)(a) the prevention or relief of sickness, disease or human suffering",
+      "perturbed": 45,
+      "moved": 8
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(2)(b)(i) rural or urban regeneration",
+      "perturbed": 45,
+      "moved": 8
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities",
+      "perturbed": 45,
+      "moved": 7
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(2)(c) the sport involves physical skill and exertion",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(2)(e) relief given by the provision of accommodation or care",
+      "perturbed": 45,
+      "moved": 7
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)",
+      "perturbed": 45,
+      "moved": 8
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+      "perturbed": 45,
+      "moved": 0
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(a) the prevention or relief of poverty",
+      "perturbed": 45,
+      "moved": 8
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(b) the advancement of education",
+      "perturbed": 45,
+      "moved": 33
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(c) the advancement of religion",
+      "perturbed": 45,
+      "moved": 8
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(d) the advancement of health",
+      "perturbed": 45,
+      "moved": 8
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(e) the saving of lives",
+      "perturbed": 45,
+      "moved": 7
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(f) the advancement of citizenship or community development",
+      "perturbed": 45,
+      "moved": 8
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(g) the advancement of the arts, heritage, culture or science",
+      "perturbed": 45,
+      "moved": 7
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(h) the advancement of public participation in sport",
+      "perturbed": 45,
+      "moved": 1
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended",
+      "perturbed": 45,
+      "moved": 2
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(j) the advancement of human rights, conflict resolution or reconciliation",
+      "perturbed": 45,
+      "moved": 7
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(k) the promotion of religious or racial harmony",
+      "perturbed": 45,
+      "moved": 7
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(l) the promotion of equality and diversity",
+      "perturbed": 45,
+      "moved": 7
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(m) the advancement of environmental protection or improvement",
+      "perturbed": 45,
+      "moved": 7
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage",
+      "perturbed": 45,
+      "moved": 8
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(o) the advancement of animal welfare",
+      "perturbed": 45,
+      "moved": 7
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)",
+      "perturbed": 45,
+      "moved": 8
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.description",
+      "perturbed": 900,
+      "moved": 0
+    },
+    {
+      "pair": "within-6-1",
+      "leaf": "purpose.is purely ancillary or incidental to any of the entity's charitable purposes",
+      "perturbed": 45,
+      "moved": 0
+    }
+  ],
+  "limits": [
+    "**Only the pairs the map declares.** Coverage is `rules paired / rules declared` above. A decision present in one encoding and absent from the other is invisible here unless somebody wrote the pair down — the map is a declaration, and the oracle can only disagree with what was declared.",
+    "**Decisions only — the deontic layer is not exercised.** The battery evaluates `DECIDE`/`MEANS` functions. Regulative rules (obligations, deadlines, reparations) have no answer this comparator reads, so two encodings could differ on who owes what, by when, and with what consequence on breach, and every row here would still agree. The BPMN/LTS legs are where that divergence would show; wiring them into the diff is not built.",
+    "**Answer equality is equality of the compiler's rendering.** Two answers that mean the same thing but render differently (a record with reordered fields, `4/2` against `2.0`) read as a divergence, and are triaged away by a human. The `field` projection in the map exists to narrow the comparison when that noise dominates.",
+    "**Both sides erroring identically counts as agreement.** If a fact pattern makes both encodings refuse, that is recorded as an agreement on the refusal — which is the right answer for a curated refusal (Reg CF pre-commencement dates) and the wrong one if both encodings are broken in the same way.",
+    "**Perturbation is single-field.** Interaction defects that need two fields to move together are out of reach. The generator is a search over a neighbourhood of the seed cases, not over the input space.",
+    "**A leaf the battery never made a decision respond to is not compared, only visited.** The generator reaches the values it can derive from the seed cases (±1, ×0/×½/×2, ×−1, cross-pollination, declared thresholds); a statutory boundary outside every one of them is never crossed, and both encodings answer identically on the near side of it whatever they say on the far side. Measured case: moving `total assets threshold` from 10,000,000 to 20,000,000 in a scratch copy of `regcf.l4` changes a live path of `reporting-may-terminate` and produces **zero** divergence, because every value the battery reaches for `status.total assets` is below both. The Sensitivity table above is that blind spot enumerated rather than described; the remedy is a seed case or a `slots.<n>.thresholds` entry at the boundary.",
+    "**List-valued and optional-shaped facts are not perturbed.** `leavesOf` descends objects and stops at arrays.",
+    "**An enum-typed input field cannot be fed.** `JSONDECODE` delivers a constructor name as a string, so any `CONSIDER` over an enum-valued field of a decoded record raises `NonExhaustivePatterns` — on both sides identically, which reads as agreement on an error and measures nothing. Keep such slots out of the map (the Reg CF identity fixture drops `FormCFiling` for exactly this) until the decoder learns constructors. `l4 batch` decodes rows the same way and has the same limit.",
+    "**A `#ASSERT` in either module is not consulted.** This is a differential oracle between two encodings; it says nothing about whether either agrees with the statute. That is HG1's question and P5's."
+  ]
+}

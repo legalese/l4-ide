@@ -1,0 +1,244 @@
+{
+    "$defs": {
+        "Constitution": {
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "express permission for any of the entity's governors to be a Minister": {
+                    "type": "boolean"
+                },
+                "express permission for any of the entity's governors to be a member of the States Assembly": {
+                    "type": "boolean"
+                },
+                "express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction": {
+                    "type": "boolean"
+                },
+                "express permission for the entity's activities to be directed or otherwise controlled by a Minister": {
+                    "type": "boolean"
+                },
+                "express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly": {
+                    "type": "boolean"
+                },
+                "express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction": {
+                    "type": "boolean"
+                },
+                "that permission extended to such a person acting in that capacity": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "description",
+                "express permission for the entity's activities to be directed or otherwise controlled by a Minister",
+                "express permission for the entity's activities to be directed or otherwise controlled by a member of the States Assembly",
+                "express permission for the entity's activities to be directed or otherwise controlled by any equivalent of such a person in another jurisdiction",
+                "express permission for any of the entity's governors to be a Minister",
+                "express permission for any of the entity's governors to be a member of the States Assembly",
+                "express permission for any of the entity's governors to be any equivalent of such a person in another jurisdiction",
+                "that permission extended to such a person acting in that capacity"
+            ],
+            "type": "object"
+        },
+        "Entity": {
+            "properties": {
+                "an applicant": {
+                    "type": "boolean"
+                },
+                "constitution": {
+                    "$ref": "#/$defs/Constitution"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "purposes": {
+                    "items": {
+                        "$ref": "#/$defs/Purpose"
+                    },
+                    "type": "array"
+                },
+                "specified in an Order under Article 5(3) disapplying paragraph (2)": {
+                    "type": "boolean"
+                },
+                "the public benefit finding": {
+                    "$ref": "#/$defs/PublicBenefitFinding"
+                }
+            },
+            "required": [
+                "name",
+                "purposes",
+                "constitution",
+                "an applicant",
+                "the public benefit finding",
+                "specified in an Order under Article 5(3) disapplying paragraph (2)"
+            ],
+            "type": "object"
+        },
+        "PublicBenefitFinding": {
+            "properties": {
+                "a particular charitable purpose presumed to be for the public benefit": {
+                    "type": "boolean"
+                },
+                "any condition on obtaining that benefit (including any charge or fee) unduly restrictive": {
+                    "type": "boolean"
+                },
+                "benefit provided only to one particular natural person or to a group of identified natural persons": {
+                    "type": "boolean"
+                },
+                "benefit provided to a section of the public only": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes": {
+                    "type": "boolean"
+                },
+                "public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes": {
+                    "type": "boolean"
+                },
+                "regard had to the comparison required by Article 7(2)(a)": {
+                    "type": "boolean"
+                },
+                "regard had to the question required by Article 7(2)(b)": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "description",
+                "public benefit in Jersey or elsewhere, to a reasonable degree, provided in giving effect to those purposes",
+                "public benefit in Jersey or elsewhere, to a reasonable degree, intended to be provided in giving effect to those purposes",
+                "benefit provided only to one particular natural person or to a group of identified natural persons",
+                "benefit provided to a section of the public only",
+                "any condition on obtaining that benefit (including any charge or fee) unduly restrictive",
+                "regard had to the comparison required by Article 7(2)(a)",
+                "regard had to the question required by Article 7(2)(b)",
+                "a particular charitable purpose presumed to be for the public benefit"
+            ],
+            "type": "object"
+        },
+        "Purpose": {
+            "properties": {
+                "available to members of the public at large or to male or female members of the public at large": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere": {
+                    "type": "boolean"
+                },
+                "primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage": {
+                    "type": "boolean"
+                },
+                "purely ancillary or incidental to any of the entity's charitable purposes": {
+                    "type": "boolean"
+                },
+                "reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)": {
+                    "type": "boolean"
+                },
+                "rural or urban regeneration": {
+                    "type": "boolean"
+                },
+                "sport that involves physical skill and exertion": {
+                    "type": "boolean"
+                },
+                "the advancement of a philosophical belief (whether or not involving belief in a god)": {
+                    "type": "boolean"
+                },
+                "the advancement of animal welfare": {
+                    "type": "boolean"
+                },
+                "the advancement of citizenship or community development": {
+                    "type": "boolean"
+                },
+                "the advancement of education": {
+                    "type": "boolean"
+                },
+                "the advancement of environmental protection or improvement": {
+                    "type": "boolean"
+                },
+                "the advancement of health": {
+                    "type": "boolean"
+                },
+                "the advancement of human rights, conflict resolution or reconciliation": {
+                    "type": "boolean"
+                },
+                "the advancement of public participation in sport": {
+                    "type": "boolean"
+                },
+                "the advancement of religion": {
+                    "type": "boolean"
+                },
+                "the advancement of the arts, heritage, culture or science": {
+                    "type": "boolean"
+                },
+                "the prevention or relief of poverty": {
+                    "type": "boolean"
+                },
+                "the prevention or relief of sickness, disease or human suffering": {
+                    "type": "boolean"
+                },
+                "the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities": {
+                    "type": "boolean"
+                },
+                "the promotion of equality and diversity": {
+                    "type": "boolean"
+                },
+                "the promotion of religious or racial harmony": {
+                    "type": "boolean"
+                },
+                "the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended": {
+                    "type": "boolean"
+                },
+                "the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage": {
+                    "type": "boolean"
+                },
+                "the saving of lives": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "description",
+                "the prevention or relief of poverty",
+                "the advancement of education",
+                "the advancement of religion",
+                "the advancement of health",
+                "the prevention or relief of sickness, disease or human suffering",
+                "the saving of lives",
+                "the advancement of citizenship or community development",
+                "rural or urban regeneration",
+                "the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities",
+                "the advancement of the arts, heritage, culture or science",
+                "the advancement of public participation in sport",
+                "sport that involves physical skill and exertion",
+                "the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom they are primarily intended",
+                "primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage",
+                "available to members of the public at large or to male or female members of the public at large",
+                "the advancement of human rights, conflict resolution or reconciliation",
+                "the promotion of religious or racial harmony",
+                "the promotion of equality and diversity",
+                "the advancement of environmental protection or improvement",
+                "the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage",
+                "the advancement of animal welfare",
+                "reasonably regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)",
+                "the advancement of a philosophical belief (whether or not involving belief in a god)",
+                "for advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere",
+                "purely ancillary or incidental to any of the entity's charitable purposes"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Decide whether an entity meets the charity test in Article 5 of the Charities (Jersey) Law 2014, applying the charitable-purposes heads in Article 6 (including the political-purposes carve-out), the public-benefit rules in Article 7, and the government-control disqualification in Article 5(2).",
+    "properties": {
+        "entity": {
+            "$ref": "#/$defs/Entity",
+            "description": "The entity, its purposes as characterised against the Article 6(1) heads, its constitution as characterised against Article 5(2), and the Article 7 public-benefit finding."
+        }
+    },
+    "required": [
+        "entity"
+    ],
+    "title": "the entity meets the charity test",
+    "type": "object"
+}
