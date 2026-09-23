@@ -2,6 +2,7 @@ module L4.Print where
 
 import Base
 import qualified Base.Map as Map
+import qualified Base.Set as Set
 import qualified Base.Text as Text
 import L4.Evaluate.ValueLazy as Lazy
 import qualified L4.Lexer as Lexer
@@ -202,6 +203,111 @@ instance LayoutPrinter Name where
 instance LayoutPrinter Resolved where
   printWithLayout r = printWithLayout (getActual r)
 
+-- | Every 'Unique' that names a mixfix function, mapped to its CANONICAL
+-- pattern (@the will _ is duly executed without _@).
+--
+-- Keyed by 'Unique' for the same reason
+-- 'L4.Export.Document.mixfixHeadingsFromRegistry' is: name resolution discards
+-- the pattern from the AST, and the registry is the only thing that still has
+-- it.
+mixfixCanonicalByUnique :: TC.MixfixRegistry -> Map Unique RawName
+mixfixCanonicalByUnique reg = Map.fromList
+  [ (getUnique nm, canonical)
+  | (canonical, ftss) <- Map.toList reg.byCanonicalName
+  , fts <- ftss
+  , nm <- fts.name.names
+  ]
+
+-- | Stamp each mixfix application and definition with its canonical pattern,
+-- so the printer can re-emit the interior keywords.
+--
+-- __Run this before 'prettyLayout' wherever a registry is available.__
+-- Without it the printer can only emit a mixfix name's HEAD keyword, and two
+-- operators sharing a head collapse onto each other: the printed module
+-- parses, type-checks, and then resolves a call to the wrong operator or
+-- fails to terminate (smucclaw\/l4-ide#967). With it, definition and call
+-- site both round-trip their full surface form.
+--
+-- A pass rather than an environment threaded through 'LayoutPrinter': the
+-- class has ~100 instances and none of the others wants a registry.
+restoreMixfixPatterns :: TC.MixfixRegistry -> Module Resolved -> Module Resolved
+restoreMixfixPatterns reg m0 =
+    ( Optics.over (Optics.gplate @(AppForm Resolved)) stampAppForm
+    . Optics.over (Optics.gplate @(Expr Resolved)) deepExpr
+    ) m0
+ where
+  -- ONLY mixfixes DEFINED IN THIS MODULE get the surface form, and that
+  -- restriction is what keeps the printed text self-contained.
+  --
+  -- The surface spelling of an imported mixfix — @x \`is after\` y@ for
+  -- @daydate.l4@'s @_ is after _@ — parses only where the parser can see the
+  -- definition, because the mixfix hint registry is built from definitions.
+  -- The @OF@ fallback needs no hint. Printing the surface form for an
+  -- imported operator therefore makes the output parseable in context and
+  -- NOT parseable on its own, which is a property the round-trip check
+  -- rightly refuses: measured upstream on
+  -- @ok\/closing-the-loop/fristberechnung.l4@ (not in this tree), whose
+  -- printed form checked fine in place and failed to re-parse standing alone.
+  --
+  -- #967's collisions are all within one module, so nothing is lost. A
+  -- cross-module head-keyword collision would still mis-resolve; that needs
+  -- the imports to be in scope for whatever re-reads the output, and is a
+  -- separate question from this one.
+  localUniques =
+    Set.fromList
+      [ getUnique n | MkAppForm _ n _ _ <- Optics.toListOf (Optics.gplate @(AppForm Resolved)) m0 ]
+  -- 'gplate' reaches a module's OUTERMOST expressions only; 'Expr' is
+  -- recursive, so a call nested in a CONSIDER arm or a WHERE needs
+  -- 'transformOf' to reach it. Missing that is not a quiet half-fix: the
+  -- DEFINITION gets its surface form and the nested call site keeps the `OF`
+  -- spelling, the two disagree, and the printed module stops resolving —
+  -- measured upstream on `canon/sg/succession/sg-wills.l4` (not in this tree)
+  -- before this line existed.
+  -- Idiom borrowed from 'L4.Transform.inlineLocalBindings'.
+  deepExpr = Optics.transformOf (Optics.gplate @(Expr Resolved)) stampExprAndForms
+  stampExprAndForms =
+    stampExpr . Optics.over (Optics.gplate @(AppForm Resolved)) stampAppForm
+  canon = mixfixCanonicalByUnique reg
+  look r
+    | Set.member (getUnique r) localUniques = Map.lookup (getUnique r) canon
+    | otherwise = Nothing
+  stampExpr e = case e of
+    App ann n es@(_ : _) | Just c <- look n -> App (Optics.set annMixfixCanonical (Just c) ann) n es
+    _ -> e
+  stampAppForm a = case a of
+    MkAppForm ann n ns@(_ : _) maka | Just c <- look n ->
+      MkAppForm (Optics.set annMixfixCanonical (Just c) ann) n ns maka
+    _ -> a
+
+-- | A canonical pattern split into its keyword runs and its slots.
+--
+-- @the will _ is duly executed without _@ becomes
+-- @[Left "the will", Right (), Left "is duly executed without", Right ()]@.
+mixfixPatternTokens :: Text -> Maybe [Either Text ()]
+mixfixPatternTokens t = chunk <$> mixfixSlots t
+ where
+  chunk ws = case span (/= "_") ws of
+    ([], "_" : rest) -> Right () : chunk rest
+    ([], [])         -> []
+    (kw, rest)       -> Left (Text.unwords kw) : chunk rest
+
+-- | Re-emit a mixfix call or definition in its SURFACE form, interleaving the
+-- pattern's keywords with the already-printed arguments.
+--
+-- 'Nothing' when the pattern's slot count does not match the arguments
+-- given — a partial application, say — in which case the caller falls back to
+-- the @OF@ spelling, which is wrong only in the way it was already wrong.
+mixfixSurface :: RawName -> [Doc ann] -> Maybe (Doc ann)
+mixfixSurface canonical args = do
+  toks <- mixfixPatternTokens (rawNameToText canonical)
+  let slots = length [ () | Right () <- toks ]
+  if slots /= length args then Nothing else Just (hsep (go toks args))
+ where
+  go [] _ = []
+  go (Left kw : ts) as = pretty (quoteIfNeeded kw) : go ts as
+  go (Right () : ts) (a : as) = a : go ts as
+  go (Right () : ts) [] = go ts []
+
 -- | The prefix spelling of a canonical mixfix name, if this is one.
 --
 -- The type checker resolves a mixfix call site (@3 \`plus\` 5@) to the
@@ -237,27 +343,30 @@ instance LayoutPrinter Resolved where
 -- reason, and indeed does not type-check today: @`mag` n `stop` MEANS …@ is
 -- read as a one-argument @mag@ applied to two arguments.
 --
--- KNOWN BOUND. Two operators that share a head keyword, an arity and an
--- argument type vector print to the same text and the module then fails to
--- re-check with "There are multiple definitions for the identifier". The corpus
--- witness is @ok/mixfix-garden-path.l4@ — @tax on _ item costing _ as GST in _@
--- beside @tax on _ item costing _ as VAT in _@ — and it only stays green
--- because both call sites live in @#EVAL@ directives, which
--- 'L4.DirectiveFilter.filterIdeDirectives' strips before @l4 batch@ prints. It
--- is a LOUD failure, and it is not a regression: before the head-keyword repair
--- the same file printed @`_ tax on _ item costing _ as VAT in _`@, an
--- identifier defined nowhere.
+-- WHAT THIS IS STILL FOR, now that 'restoreMixfixPatterns' exists. Two
+-- operators that share a head keyword, an arity and an argument type vector
+-- used to print to the same text, and the module then failed to re-check with
+-- "There are multiple definitions for the identifier". That is fixed
+-- (smucclaw\/l4-ide#967): a pass stamps each call site and definition with its
+-- canonical pattern from the 'L4.Mixfix.MixfixRegistry' and the printer emits
+-- the full surface form on both sides. This function is the FALLBACK, taken
+-- for any name the pass did not stamp — an operator imported from another
+-- module, chiefly, where the surface form would not re-parse standing alone
+-- because the importing module has no hint for it.
 --
--- Re-emitting the SURFACE form instead (interleaving the arguments back into
--- the pattern, @`tax on` c `item costing` p `as GST in` k@) was built and
--- MEASURED, and it does not work: a DEFINITION prints from its restructured
--- AppForm, i.e. @DECIDE andop a b c IS …@, so the printed module registers a
--- plain n-ary function and no longer has the later keywords to match against.
--- @ok/fixity-nary-guard.l4@'s @1 andop 2 hadop 3@ went from evaluating to 1006
--- to failing resolution outright. Call sites and definitions have to agree, and
--- the head keyword is the only spelling both can produce. A real fix needs the
--- mixfix registry ('L4.Mixfix.MixfixRegistry', already threaded into
--- 'L4.Export.Document' by 'mixfixHeadingsFromRegistry') to reach the printer.
+-- Two findings from building the fix, kept because each cost a measured
+-- attempt. Re-emitting the surface form at the CALL SITE alone does not work:
+-- a DEFINITION prints from its restructured AppForm, @DECIDE andop a b c IS …@,
+-- so the printed module registers a plain n-ary function with no later
+-- keywords to match, and @ok\/fixity-nary-guard.l4@'s @1 andop 2 hadop 3@ went
+-- from evaluating to 1006 to failing resolution outright. Call sites and
+-- definitions have to agree. And the pattern is genuinely absent from the AST
+-- rather than merely suppressed here: deleting this reduction entirely leaves
+-- the printed corpus byte-identical.
+--
+-- The residue is two IMPORTED operators sharing a head keyword, which this
+-- fallback still collapses — smucclaw\/l4-ide#968. It fails LOUDLY, with the
+-- message above.
 mixfixHeadKeyword :: Text -> Maybe Text
 mixfixHeadKeyword t = case mixfixSlots t of
   Just ws | kws@(_ : _) <- takeWhile (/= "_") (dropWhile (== "_") ws)
@@ -469,6 +578,15 @@ instance LayoutPrinterWithName a => LayoutPrinter (Declare a) where
 
 instance LayoutPrinterWithName a => LayoutPrinter (AppForm a) where
   printWithLayout = \ case
+    -- The DEFINITION has to spell the pattern out too, or the printed module
+    -- has no later keywords for its call sites to match — which is exactly
+    -- how an earlier attempt at this failed (CLAUDE.md §3.2.2).
+    MkAppForm ann _n ns@(_:_) maka
+      | Just c <- Optics.view annMixfixCanonical ann
+      , Just d <- mixfixSurface c (fmap printWithLayout ns) ->
+          d <> case maka of
+            Nothing  -> mempty
+            Just aka -> space <> printWithLayout aka
     MkAppForm _ n ns maka ->
       (printWithLayout n <> case ns of
         [] -> mempty
@@ -671,6 +789,12 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     -- with a prefix grammar, so that never re-parses.
     App        _ n [e] | Just kw <- prefixKeywordBuiltin (rawName (getName n)) ->
       kw <+> parensIfNeeded e
+    -- A mixfix CALL SITE re-emits its surface form when the pattern is on the
+    -- node ('restoreMixfixPatterns'). Without that stamp only the head
+    -- keyword survives, and two operators sharing one collapse together.
+    App      ann _n es@(_:_)
+      | Just c <- Optics.view annMixfixCanonical ann
+      , Just d <- mixfixSurface c (fmap parensIfNeeded es) -> d
     App        _ n es -> printWithLayout n <> case es of
       [] -> mempty
       exprs@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap parensIfNeeded exprs))
