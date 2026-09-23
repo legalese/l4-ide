@@ -64,6 +64,10 @@ import L4.Parser.SrcSpan
 data Warning
   = NotAttached NlgWithSpan
   | UnknownLocation Nlg
+  | EmptyNlg Name NlgWithSpan
+    -- ^ An @\@nlg@ with no prose in it. Dropped rather than attached: a
+    -- rendering REPLACES the thing it annotates, so an empty one erases the
+    -- name from the output instead of leaving it alone.
   | Ambiguous Name [NlgWithSpan] -- Must be at least two
   | RefUnattached RefWithSpan
     -- ^ A @ref could not be attached to any following AST node.
@@ -292,8 +296,46 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypeDecl n) where
       ty' <- addNlg ty
       pure $ SynonymDecl ann ty'
 
+-- | A type mentioned in a SIGNATURE claims no @\@nlg@ annotation and registers
+-- no span, so the name it belongs to claims the whole binder instead.
+--
+-- __Why a type must not claim.__ @\@nlg@ attaches to the name it FOLLOWS, and
+-- the range algebra in 'NlgA' cuts a name off at the start of its sibling\'s
+-- span — so in @GIVEN a IS A STRING \@nlg the amount@ the annotation fell
+-- outside @a@\'s range and inside the TYPE\'s, and @STRING@ took it. It then
+-- rendered nowhere, with no diagnostic, because it HAD attached — to a node
+-- nothing reads. The same cut put an @\@nlg@ written on its own line above a
+-- @DECIDE@ onto the @GIVETH@ type rather than onto the rule.
+--
+-- Measured upstream on 2026-09-19 before the change: 11 of 116 annotations
+-- across ten sampled corpus files sat on a builtin type name, and every
+-- annotation in @ok\/nlg-percent.l4@ — the file whose whole job is to witness
+-- @\@nlg@ — was dead for this reason, its @.nlg.golden@ showing bare names.
+--
+-- __Why claiming nothing is the right shape rather than reordering.__ A name
+-- needs to claim on BOTH sides of its type: @GIVEN a [the amount] IS A NUMBER@
+-- puts the annotation before the type and @GIVEN a IS A NUMBER \@nlg …@ after
+-- it. Those are not one contiguous range, so no ordering of the two siblings
+-- can capture both. Dropping the type\'s span removes the cut entirely and the
+-- name\'s range covers the whole binder.
+--
+-- What is given up is annotating a type REFERENCE in a signature, which was
+-- never meaningful: it is a use of a global type, so the annotation could only
+-- ever describe that one occurrence. Annotating a type DECLARATION still works
+-- — that is 'Declare'\'s 'AppForm' head, untouched here.
+unclaimedSignatureType :: t -> NlgA t
+unclaimedSignatureType = pure
+
 instance (HasSrcRange n, HasNlg n) => HasNlg (TypedName n) where
   addNlg a = extendNlgA a $ case a of
+    -- NOT 'unclaimedSignatureType' here, deliberately — see its note. A RECORD
+    -- FIELD is the one place the corpus annotates a name and its type on the
+    -- same line on purpose: @ok/nlg_declare1.l4@ writes
+    -- @head [Get First Element] IS AN a [Start Element]@, glossing the field
+    -- and the type parameter separately. Letting the field's name claim the
+    -- whole line makes those two annotations collide, and the ambiguity rule
+    -- then correctly refuses both — so the repair would delete four working
+    -- annotations to fix none.
     MkTypedName ann n ty mTypically mExpr -> do
       n' <- addNlg n
       ty' <- addNlg ty
@@ -314,9 +356,53 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypeSig n) where
       givethSig' <- traverse addNlg givethSig
       pure $ MkTypeSig ann givenSig' givethSig'
 
+-- | Run a computation with its lookup range clamped to the node's own span,
+-- extended to the END OF THE LINE the node finishes on.
+--
+-- __The line, not the span, and that boundary is the whole rule.__ An
+-- annotation TRAILING a construct on the same line describes that construct;
+-- an annotation starting a line of its own describes what FOLLOWS it. Those
+-- are the two shapes authors actually write:
+--
+-- @
+-- GIVEN a IS A STRING \@nlg the amount    -- trailing: describes `a`
+--
+-- GIVETH A BOOLEAN
+-- \@nlg 5% with %amount%                  -- own line: describes the rule below
+-- DECIDE `over threshold` IF …
+-- @
+--
+-- Clamping to the span alone gets the second right and the first wrong — the
+-- trailing annotation sits just past the span's end and attaches to nothing.
+-- Clamping to the end of that line gets both.
+--
+-- __Why any clamp is needed.__ 'extendNlgA' only ADVERTISES a span to a node's
+-- siblings; it does not restrict what the node's own children may look up, so
+-- the last child of the last child reaches as far as the enclosing context
+-- allows. That is how a @GIVEN@ parameter came to claim an annotation written
+-- on its own line BELOW the whole signature, in a rule with no @GIVETH@ whose
+-- span would have stopped it.
+confineToEndOfLine :: HasSrcRange e => e -> NlgA a -> NlgA a
+confineToEndOfLine e = hoistNlgA (inLocRange r)
+ where
+  r = case fromSrcRange <$> rangeOf e of
+    Nothing    -> mempty
+    Just span' ->
+      locRangeFrom (Just span'.start)
+        <> locRangeTo (Just (endOfLine span'.end))
+  -- The last column of a line, expressed as the first column of the next.
+  -- Cheaper and more robust than asking how long the line actually is, and
+  -- the only annotations between the two are on the trailing line by
+  -- construction.
+  endOfLine pos = MkSrcPos {line = pos.line + 1, column = 1}
+
 instance (HasSrcRange n, HasNlg n) => HasNlg (GivenSig n) where
   addNlg a = extendNlgA a $ case a of
-    MkGivenSig ann tys -> do
+    MkGivenSig ann tys -> confineToEndOfLine a $ do
+      -- A GIVEN block's annotations stay inside the GIVEN block. Without this,
+      -- the last parameter claims everything up to the next node with a span —
+      -- which, in a rule with no GIVETH, is the rule's own name, so an @nlg
+      -- written on its own line above the DECIDE landed on a parameter.
       tys' <- traverse addNlg tys
       pure $ MkGivenSig ann tys'
 
@@ -324,14 +410,17 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (OptionallyTypedName n) where
   addNlg a = extendNlgA a $ case a of
     MkOptionallyTypedName ann n mty mTypically -> do
       n' <- addNlg n
-      tys' <- traverse addNlg mty
+      tys' <- traverse unclaimedSignatureType mty
       mTypically' <- traverse addNlg mTypically
       pure $ MkOptionallyTypedName ann n' tys' mTypically'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (GivethSig n) where
   addNlg a = extendNlgA a $ case a of
     MkGivethSig ann mty -> do
-      mty' <- addNlg mty
+      -- A GIVETH type claims nothing either, which is what lets an @nlg
+      -- written on its own line between GIVETH and DECIDE fall through to the
+      -- rule's own name instead of landing on the return type.
+      mty' <- unclaimedSignatureType mty
       pure $ MkGivethSig ann mty'
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Type' n) where
@@ -377,18 +466,44 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Aka n) where
 instance HasNlg Name where
   addNlg a = extendNlgA a $ case a of
     MkName ann raw -> do
-      ann' <- liftNlgA $ do
-        nlgs <- takeNlgComments
-        case nlgs of
-          [nlg] -> do
-            pure $ setNlg nlg.payload ann
-          [] ->
-            pure ann
-          ns -> do
-            addWarning $ Ambiguous a ns
-            pure ann
-
+      ann' <- liftNlgA (attachNlgs a ann =<< takeNlgComments)
       pure $ MkName ann' raw
+
+-- | Attach the annotations in scope for one name. Exactly one attaches; two or
+-- more are an ambiguity, which warns and attaches neither.
+attachNlgs :: Name -> Anno -> [NlgWithSpan] -> NlgM Anno
+attachNlgs a ann nlgs0 = do
+  -- An annotation with no prose is dropped, and says so. 'L4.Nlg.lin' renders
+  -- a node's annotation INSTEAD of the node, so attaching an empty one makes
+  -- the name disappear from the output. Three of these sit in
+  -- @ok/contract.l4@ — @`the buyer` IS A Person \@nlg@ with nothing after the
+  -- herald — and they were invisible only because they used to land on the
+  -- TYPE, where nothing reads them. Repairing the attachment moved them onto
+  -- the parameters and blanked all three names, which is how the trap
+  -- surfaced.
+  let (empties, nlgs) = List.partition (nlgIsBlank . (.payload)) nlgs0
+  for_ empties $ \ e -> addWarning $ EmptyNlg a e
+  case nlgs of
+    [nlg] -> pure $ setNlg nlg.payload ann
+    []    -> pure ann
+    ns    -> do
+      addWarning $ Ambiguous a ns
+      pure ann
+
+-- | Does this annotation carry any prose at all?
+--
+-- Whitespace-only counts as blank: @\@nlg@ followed by spaces is the same
+-- mistake as @\@nlg@ followed by nothing.
+nlgIsBlank :: Nlg -> Bool
+nlgIsBlank = \ case
+  MkInvalidNlg _        -> True
+  MkParsedNlg _ frags   -> all blankFragment frags
+  MkResolvedNlg _ frags -> all blankFragment frags
+ where
+  blankFragment :: NlgFragment n -> Bool
+  blankFragment = \ case
+    MkNlgText _ t -> Text.all isSpace t
+    MkNlgRef{}    -> False
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (Expr n) where
   addNlg expr = extendNlgA expr $ case expr of
