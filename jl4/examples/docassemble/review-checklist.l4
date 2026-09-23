@@ -1,0 +1,83 @@
+-- M4 (spec §10): the `review:` block as a COMPLIANCE-CHECKLIST view.
+--
+-- The rule is short-circuiting on purpose. With `the return was filed` FALSE,
+-- the other three inputs decide nothing and a backchaining interview never
+-- asks them — which is the property the backend sells, and also the property
+-- that makes a plain answer summary misleading: a summary that lists only the
+-- answers given says nothing about the three questions the law never had to
+-- put. A compliance checklist must show all four rows, and must distinguish
+-- "answered NO" from "never asked".
+--
+-- WHAT `skip undefined: False` ACTUALLY DOES, measured. Spec §10 called for
+-- a `review:` block "with `skip undefined: False`". That flag does not
+-- produce a passive checklist: it makes the review block FORCE-ASK every
+-- undefined variable it lists (parse.py:5876-5904 at 1b6678384 — with the
+-- flag the row's eval is no longer wrapped in try/except). The default
+-- (absent) is the opposite failure: an undefined row is SILENTLY DROPPED into
+-- a debug log line. Neither is a checklist; one interrogates the user about
+-- questions the law never reached, the other hides them.
+--
+-- The recipe that does work, probed against 1.10.7: `note:` rows carrying
+-- `showifdef('<var>', '<not asked>')`. A note row has no `saveas` to evaluate,
+-- so it always renders, giving one row per L4 input including the never-asked
+-- ones. That is the whole of what M4 emits.
+--
+-- NOT `Edit:` rows. This paragraph used to end "pair each with an `Edit:` row
+-- gated on `show if: defined('<var>')` so the edit affordance appears only
+-- where there is an answer to edit". That probe result is real, but the GREEN
+-- phase then declined to emit `Edit:` rows at all (spec §10, "What M4 did NOT
+-- do"): the checklist is a VIEW, and the answer-changing path it exists to make
+-- ordinary is tested through `undefine()` + re-ask, which is what §8.4's repair
+-- was measured against. Emitting edit affordances is a UI decision with its own
+-- probes owing. Every one of the thirteen committed goldens has zero `Edit:`
+-- rows; the sentence was retracted here on 2026-08-17 so this file, which is
+-- what a reader opens to understand the review block, stops describing a shape
+-- the emitter does not produce.
+
+DECLARE Filing
+    HAS
+      @desc Whether the annual return was filed at all
+      `the return was filed`   IS A BOOLEAN
+      @desc Whether the annual return was filed by the statutory deadline
+      `the return was on time` IS A BOOLEAN
+      @desc Whether the filing fee was paid
+      `the fee was paid`       IS A BOOLEAN
+      @desc Whether the registrar granted a waiver of the filing fee
+      `a waiver was granted`   IS A BOOLEAN
+
+@export Whether the annual filing obligation has been discharged
+GIVEN f IS A Filing @desc The annual filing under review
+GIVETH A BOOLEAN
+DECIDE `the filing obligation is discharged` f IF
+        f's `the return was filed`
+    AND f's `the return was on time`
+    AND (f's `the fee was paid` OR f's `a waiver was granted`)
+
+-- Everything in order.
+#EVAL `the filing obligation is discharged` OF
+        Filing WITH
+            `the return was filed`   IS TRUE
+            `the return was on time` IS TRUE
+            `the fee was paid`       IS TRUE
+            `a waiver was granted`   IS FALSE
+-- TRUE
+
+-- Fee unpaid but waived.
+#EVAL `the filing obligation is discharged` OF
+        Filing WITH
+            `the return was filed`   IS TRUE
+            `the return was on time` IS TRUE
+            `the fee was paid`       IS FALSE
+            `a waiver was granted`   IS TRUE
+-- TRUE
+
+-- NOTHING WAS FILED. The remaining three inputs are short-circuited away and
+-- must never be asked — and must still appear on the checklist, marked as
+-- never asked. This is the case the review block exists for.
+#EVAL `the filing obligation is discharged` OF
+        Filing WITH
+            `the return was filed`   IS FALSE
+            `the return was on time` IS FALSE
+            `the fee was paid`       IS FALSE
+            `a waiver was granted`   IS FALSE
+-- FALSE

@@ -1,0 +1,45 @@
+-- L4 names that land on the interview's OTHER two top-level namespaces.
+--
+-- M2 closed one third of this hazard (`l4runtime`'s star-import; see
+-- `docassemble-runtime-collision.l4`) and left the two larger thirds open:
+--
+--   * PYTHON BUILTINS. A driver's `if all:` execs in the user_dict, whose
+--     `__builtins__` Python injects automatically. `'all' in user_dict` is
+--     False, but `eval('all', user_dict)` returns the built-in, so docassemble
+--     never raises NameError and never backchains to the code block that would
+--     have defined it. The function object is truthy, the driver takes the
+--     "holds" branch, NO QUESTION IS ASKED AT ALL, and the fidelity report says
+--     `(nothing lost)`. Measured against real docassemble 1.10.7 on the
+--     unreserved spelling: `screen='All: Holds'`, `questions asked=[]`, against
+--     an L4 `#EVAL` of FALSE.
+--   * `docassemble.base.util`. `parse.py:131` compiles
+--     `from docassemble.base.util import *` and `Interview.assemble` execs it
+--     into the user_dict on every pass unless the interview sets `imports_util`
+--     (parse.py:8523-8524). The emitter deliberately keeps that module out of
+--     `modules:` so the auto-import still happens, so this cannot be avoided by
+--     emitting differently. `Today` was measured the same way, and it is worse
+--     than the builtins case: the name is in the user_dict for real, so
+--     `reconsider:`'s deletion does not rescue it either.
+--
+-- Expect `all_` and `today_`, and no bare `all`/`today` in a variable position.
+
+DECLARE Facts
+    HAS
+      @desc whether the box on the form was ticked
+      `the box was ticked` IS A BOOLEAN
+
+@export whether the builtin-shadowing rule holds
+GIVEN f IS A Facts @desc The facts under assessment
+GIVETH A BOOLEAN
+DECIDE `All` f IF f's `the box was ticked`
+
+@export whether the util-shadowing rule holds
+GIVEN f IS A Facts @desc The facts under assessment
+GIVETH A BOOLEAN
+DECIDE `Today` f IF f's `the box was ticked`
+
+#EVAL `All` OF Facts WITH `the box was ticked` IS FALSE
+-- FALSE
+
+#EVAL `Today` OF Facts WITH `the box was ticked` IS FALSE
+-- FALSE

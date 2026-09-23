@@ -1,0 +1,30 @@
+-- REFUSED: higher-order (un-inlinable function value).
+-- The WHERE binding `is positive` is function-valued and is PASSED AS AN
+-- ARGUMENT to `holds for` rather than being directly applied. R3 lowers a
+-- function-valued binding only when every use is a direct application
+-- (inlined into a code: block); a function value that travels as data has
+-- no docassemble variable it could become, so the lowering must refuse it
+-- by name. Contrast rodents-and-vermin.l4's `not covered if`, which IS
+-- directly applied and therefore inlines.
+-- The file itself typechecks: the refusal belongs to `l4 docassemble`.
+
+DECLARE Reading
+    HAS
+      @desc The measured value under assessment
+      `the value` IS A NUMBER
+
+GIVEN g IS A FUNCTION FROM NUMBER TO BOOLEAN
+      n IS A NUMBER
+GIVETH A BOOLEAN
+`holds for` g n MEANS g n
+
+@export Whether the reading is acceptable, via a passed-around predicate
+GIVEN r IS A Reading @desc The reading under assessment
+GIVETH A BOOLEAN
+DECIDE `reading is acceptable` r IF
+    `holds for` `is positive` (r's `the value`)
+ WHERE
+    `is positive` MEANS GIVEN x YIELD x GREATER THAN 0
+
+#EVAL `reading is acceptable` (Reading WITH `the value` IS 7)  -- TRUE
+#EVAL `reading is acceptable` (Reading WITH `the value` IS 0)  -- FALSE

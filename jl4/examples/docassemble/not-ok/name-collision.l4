@@ -1,0 +1,16 @@
+-- REFUSED: name collision after sanitisation.
+-- `notice period` and notice_period are two distinct L4 fields that both
+-- sanitise to the Python identifier notice_period. Silently conflating
+-- them would merge two different docassemble questions into one variable
+-- and answer both with one input; checkCollisions must reject the module
+-- with a diagnostic naming both originals and the shared sanitised name.
+-- The file itself typechecks: the refusal belongs to `l4 docassemble`.
+
+DECLARE Tenancy HAS `notice period` IS A NUMBER, notice_period IS A NUMBER
+
+@export Sum of the two colliding notice periods
+GIVEN t IS A Tenancy @desc A tenancy with two fields that collide after sanitisation
+GIVETH A NUMBER
+`combined notice period` t MEANS (t's `notice period`) PLUS (t's notice_period)
+
+#EVAL `combined notice period` (Tenancy WITH `notice period` IS 2, notice_period IS 3)  -- 5

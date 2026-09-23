@@ -1,0 +1,37 @@
+-- STILL REFUSED after M4: `MAYBE <enum>`.
+--
+-- M4 widens `MAYBE` to NUMBER and DATE (see ../maybe-scalars.l4) by pairing an
+-- is-known boolean with a `show if: {code: …}`-guarded value question. That
+-- design does not reach an enum payload, because the value question for an
+-- enum is itself a `datatype: radio` whose absent path is not the widget's
+-- empty submission but a fourth choice — a representation decision M4 does not
+-- make. `MAYBE <record>` is refused for the same reason and worse: a record
+-- explodes into several questions, and "the record is absent" would have to
+-- gate all of them.
+--
+-- This fixture exists to keep the DIAGNOSTIC honest. At M1 the catch-all said
+-- "v1: MAYBE BOOLEAN and MAYBE STRING only". The moment M4 lands NUMBER and
+-- DATE that sentence is a false claim in user-facing prose, which is exactly
+-- the drift the repo's CLAUDE.md warns about. The refusal must therefore name
+-- what it is refusing — the enum — rather than recite a list that has moved on
+-- without it.
+--
+-- The file itself typechecks: the refusal belongs to `l4 docassemble`.
+
+DECLARE Severity IS ONE OF Critical, Reportable, Trivial
+
+DECLARE Incident
+    HAS
+      @desc Triage class assigned to the breach, if one has been assigned yet
+      `assessed severity` IS A MAYBE Severity
+
+@export Whether the incident is still awaiting triage
+GIVEN inc IS AN Incident @desc The incident under review
+GIVETH A BOOLEAN
+DECIDE `the incident is awaiting triage` inc IF
+    CONSIDER inc's `assessed severity`
+    WHEN JUST s  THEN FALSE
+    WHEN NOTHING THEN TRUE
+
+#EVAL `the incident is awaiting triage` (Incident WITH `assessed severity` IS JUST Critical)  -- FALSE
+#EVAL `the incident is awaiting triage` (Incident WITH `assessed severity` IS NOTHING)        -- TRUE

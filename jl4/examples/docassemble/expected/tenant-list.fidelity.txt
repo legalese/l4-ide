@@ -1,0 +1,7 @@
+fidelity report — docassemble
+  [DA-FLOAT] advisory — tenant-list.l4
+      NUMBER is emitted as docassemble `datatype: number` and Python float arithmetic; L4 evaluates numbers as exact Rationals
+      lost: exact decimal arithmetic — do not rely on exact equality of computed sums
+  [DA-REVIEW-LIST] advisory — tenant-list.l4
+      the compliance checklist has no row for these gathered list attributes, because their variable carries docassemble's iterator and there is no element to name until the list is gathered: h.tenants[i].age, h.tenants[i].signed_the_agreement, h.tenants[i].has_been_evicted
+      lost: the checklist view of list elements; the interview still asks and decides them
