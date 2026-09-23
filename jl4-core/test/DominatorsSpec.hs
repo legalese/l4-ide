@@ -192,11 +192,11 @@ orphanGraph = StateGraph
   { sgName = "orphan"
   , sgDecide = Nothing
   , sgStates =
-      [ ContractState 0 "initial" InitialState Linear
-      , ContractState 1 "Bob must deliver" IntermediateState Linear
-      , ContractState 2 "Fulfilled" TerminalFulfilled Linear
-      , ContractState 3 "Breach" TerminalBreach Linear
-      , ContractState 4 "nobody comes here" IntermediateState Linear
+      [ ContractState 0 "initial" InitialState Linear Nothing Nothing
+      , ContractState 1 "Bob must deliver" IntermediateState Linear Nothing Nothing
+      , ContractState 2 "Fulfilled" TerminalFulfilled Linear Nothing Nothing
+      , ContractState 3 "Breach" TerminalBreach Linear Nothing Nothing
+      , ContractState 4 "nobody comes here" IntermediateState Linear Nothing Nothing
       ]
   , sgTransitions =
       [ Transition 0 1 (act "Alice" "pay") HenceTransition
@@ -209,8 +209,8 @@ orphanGraph = StateGraph
  where
   -- the fourth field is the window's opening edge (AFTER, EVERY-EACH-QUANTIFIER-SPEC §5.1.2);
   -- the ninth is the site the edge was drawn from (P2g, LTS-VISUALISER §4.8)
-  act p a = TransitionLabel (Just p) (Just DMust) a Nothing Nothing Nothing Nothing Nothing Nothing
-  timeout = TransitionLabel Nothing (Just DMust) "timeout" Nothing Nothing Nothing Nothing Nothing Nothing
+  act p a = TransitionLabel (Just p) (Just DMust) a Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  timeout = TransitionLabel Nothing (Just DMust) "timeout" Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 --------------------------------------------------------------------------------
 -- Tests
@@ -229,7 +229,10 @@ spec = do
 
     it "a chain: an intermediate state is dominated by the acts before it" $
       withGraph chainSrc \sg -> do
-        case [ s.stateId | s <- sg.sgStates, s.stateName == "Carol must notify" ] of
+        -- The state name carries the obligation's window since 2026-09-22
+        -- ('L4.StateGraph.describeDeonton'): without it the promissory note
+        -- drew three of its six states under one string.
+        case [ s.stateId | s <- sg.sgStates, s.stateName == "Carol must notify WITHIN 7" ] of
           [carol] -> acts sg (dominators sg carol) `shouldBe` Just ["pay", "deliver"]
           other   -> expectationFailure ("expected one Carol state, got " <> show other)
 
@@ -287,7 +290,7 @@ spec = do
 
     it "an IF between arms: the arm taken dominates the state inside it, and either arm can breach" $
       withGraph ifSrc \sg -> do
-        case [ s.stateId | s <- sg.sgStates, s.stateName == "Alice must pay" ] of
+        case [ s.stateId | s <- sg.sgStates, s.stateName == "Alice must pay WITHIN 3" ] of
           [alice] -> acts sg (dominators sg alice) `shouldBe` Just ["sign", "the arm IF 1 EQUALS 1"]
           other   -> expectationFailure ("expected one Alice state, got " <> show other)
         acts sg (dominators sg (fulfilled sg)) `shouldBe` Just ["sign"]

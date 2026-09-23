@@ -483,6 +483,19 @@ fixtureDir = "tests-cli/fixtures"
 bilingualFixture :: FilePath
 bilingualFixture = fixtureDir </> "bilingual.l4"
 
+-- | Eight shapes whose @l4 state-graph@ caption said something false in
+-- September 2026, each cut down to the four or five lines that draw it.
+--
+-- It is a CLI fixture and not a corpus example because NO golden captures
+-- state-graph DOT output — measured 2026-09-22,
+-- @grep -rl digraph jl4\/examples --include=*.golden@ is empty — so a corpus
+-- file would pin the type checker on these rules and nothing about the
+-- drawing. @tests-cli\/fixtures@ is also in no goldened glob
+-- (@jl4\/tests\/Main.hs@\'s list, kept in step by
+-- @etc\/check-corpus-goldens.mjs@), so it ships no @tests\/@ directory.
+captionFixture :: FilePath
+captionFixture = fixtureDir </> "state-graph-captions.l4"
+
 cleanFixture, evalFixture, errorFixture, garbageFixture :: FilePath
 cleanFixture   = fixtureDir </> "clean.l4"
 evalFixture    = fixtureDir </> "eval.l4"
@@ -1770,7 +1783,7 @@ spec bin = do
         , "  Every path to FULFILLED passes through: nothing in particular (there is more than one route)."
         , "  Every path to BREACH passes through:"
         , "    - the deadline passing on PARTY S delivery (MUST, WITHIN 3)"
-        , "    - the deadline passing on PARTY B payment ... (MUST, WITHIN 5)"
+        , "    - the deadline passing on PARTY B payment n (MUST, WITHIN 5)"
         , "a"
         , "  Every path to FULFILLED passes through: nothing in particular (there is more than one route)."
         , "  Every path to BREACH passes through: nothing in particular (there is more than one route)."
@@ -1781,10 +1794,20 @@ spec bin = do
         ["state-graph", "--dominators", "--all-states", "examples/ok/contracts.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("\"initial\" is the start state" `isInfixOf`)
+      -- Two things moved in this block on 2026-09-22 and neither is a change
+      -- to what dominates what. The state NAME carries the obligation\'s
+      -- @WITHIN@ ('L4.StateGraph.describeDeonton'), because without it the
+      -- promissory note drew three of its six states under one string. And
+      -- the act is printed by 'L4.Print.printActionPattern' now, which spells
+      -- a binder bare: @price@ was @`price`@ here for one day, under a
+      -- back-quote mark of the picture\'s own that also reached the BPMN task
+      -- names. Which of @price@ and @n@ BINDS is said in the DOT, in a clause
+      -- beside the act ('L4.StateGraph.labelBinds'); this view has no such
+      -- clause and does not claim one.
       sout `shouldSatisfy` (unlines
-        [ "  Every path to \"B must return\" passes through:"
+        [ "  Every path to \"B must return WITHIN 10\" passes through:"
         , "    - PARTY S delivery (MUST, WITHIN 3)"
-        , "    - PARTY B payment ... (MUST, WITHIN 3, PROVIDED price AT LEAST 20)"
+        , "    - PARTY B payment price (MUST, WITHIN 3, PROVIDED price AT LEAST 20)"
         , "    - the arm IF NOT (price EQUALS 20)"
         ] `isInfixOf`)
 
@@ -1834,6 +1857,77 @@ spec bin = do
       code2 `shouldSatisfy` (/= ExitSuccess)
       serr2 `shouldSatisfy` ("cannot be combined" `isInfixOf`)
       sout2 `shouldSatisfy` ("digraph" `notInfixOf`)
+
+    -- The caption defects of 2026-09-21\/22, one shape each, over
+    -- 'captionFixture'. These are asserted HERE and could not be asserted
+    -- anywhere else: no golden in the tree captures state-graph DOT output,
+    -- and the review that found them ran the renderer by hand.
+    --
+    -- Each assertion names what it catches. A reader who moves one of these
+    -- deliberately should be able to tell from the line above which claim
+    -- about the picture they are giving up.
+    it "draws an act, a binder, a deadline and a wrap the way the reader has to read them" $ do
+      Output code sout _ <- runL4 bin ["state-graph", captionFixture]
+      code `shouldBe` ExitSuccess
+
+      -- Shape 1 — a suppressed caption never leaves a BLANK arrow. The inner
+      -- obligation has no window, no guard, no opening, no binder and no join
+      -- line, so there is nothing left once the node\'s copy is dropped and
+      -- the restatement stands. A blank green arrow reads "it just goes
+      -- there" where the arrow MEANS the act being performed, and it is
+      -- indistinguishable from a junction\'s branch edge but for colour.
+      -- This fixture has no junction, so no caption here may be empty at all.
+      sout `shouldSatisfy` ("1 -> 2 [label=\"a MUST deliver (EXACTLY theChair)\"" `isInfixOf`)
+      sout `shouldSatisfy` ("label=\"\"" `notInfixOf`)
+
+      -- Shape 2 — the act is 'L4.Print.printActionPattern' and not a second
+      -- printer. A hand-written one dropped the @EXACTLY@ the author wrote
+      -- and the brackets round a compound pinned expression, so this read
+      -- @pay base PLUS 1@ — which is @pay@ applied to three arguments.
+      sout `shouldSatisfy` ("pay (EXACTLY (base" `isInfixOf`)
+      sout `shouldSatisfy` ("pay base PLUS 1" `notInfixOf`)
+
+      -- Shape 3 — a caption may name a deadline only when it is THE deadline
+      -- that takes that arm. Here the act says @WITHIN 30@ and the barrier
+      -- says @ONCE ALL HAVE WITHIN 10@: two clocks, one red arm, so naming
+      -- either one is a precise claim that is wrong half the time. The bare
+      -- word is vague and true. Both windows are still drawn, on the green
+      -- edge, where they are not a claim about which fires.
+      sout `shouldSatisfy` ("[label=timeout\n" `isInfixOf`)
+      sout `shouldSatisfy` ("timeout [30]" `notInfixOf`)
+      sout `shouldSatisfy` ("ONCE ALL HAVE WITHIN 10" `isInfixOf`)
+
+      -- Shape 4 — the wrap breaks between tokens and never inside a
+      -- back-quoted L4 name, which is ONE name that happens to contain
+      -- spaces; breaking it makes the page assert a name the source has not
+      -- got. Beside it, the binder clause: @sum@ is a 'L4.Syntax.PatVar' and
+      -- any number discharges the act.
+      sout `shouldSatisfy` ("`settle the account with` (EXACTLY" `isInfixOf`)
+      sout `shouldSatisfy` ("the rule binds `sum`" `isInfixOf`)
+
+      -- Shape 5 — the state NAME carries the obligation\'s window. Two
+      -- obligations over one act pattern are told apart by nothing else, and
+      -- the promissory note writes that shape three times.
+      sout `shouldSatisfy` ("[label=\"theChair must pay 1 WITHIN 9\"" `isInfixOf`)
+
+      -- Shape 6 — the binder clause is not the node\'s, so it survives the
+      -- suppression that drops party, modal, act and window. It is the whole
+      -- of what this arrow has left, and it says the one thing the act text
+      -- cannot.
+      sout `shouldSatisfy` ("1 -> 2 [label=\"the rule binds `amount`\"" `isInfixOf`)
+
+      -- Shape 7 — and the counterpart, which is why the clause exists.
+      -- @pay base@ and shape 6\'s @pay amount@ print identically, because
+      -- 'L4.Print.printActionPattern' is re-emitting source and the source
+      -- says a bare name in both. Only shape 6 binds; only shape 6 says so.
+      sout `shouldSatisfy` ("MUST pay base [3]" `isInfixOf`)
+      sout `shouldSatisfy` ("the rule binds `base`" `notInfixOf`)
+
+      -- Shape 8 — an UNTERMINATED back-quoted run is not a name. It used to
+      -- be glued into one token to the end of the line, so a single stray
+      -- back quote in a string literal silently defeated the wrap for
+      -- everything after it and the box grew with no diagnostic.
+      sout `shouldSatisfy` ("after\\nit" `isInfixOf`)
 
   describe "l4 batch" $ do
     -- `batch` re-prints the module through 'prettyLayout' and re-runs it per

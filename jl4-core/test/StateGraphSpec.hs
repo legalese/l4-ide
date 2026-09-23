@@ -557,8 +557,10 @@ spec = do
         Left errs -> expectationFailure (show errs)
         Right sg  -> do
           length (outOf sg sg.sgInitialState) `shouldBe` 2
+          -- A branch state is named after the obligation it enters, window
+          -- and all ('L4.StateGraph.describeDeonton', 2026-09-22).
           branchNames sg sg.sgInitialState
-            `shouldBe` ["Alice must pay", "Bob must deliver"]
+            `shouldBe` ["Alice must pay WITHIN 3", "Bob must deliver WITHIN 5"]
 
     it "makes branch edges unlabelled control flow, not obligations" $ do
       case graphFor randSrc of
@@ -575,7 +577,10 @@ spec = do
         Right sg  -> do
           junctions sg `shouldBe` [("initial", AllOf)]
           branchNames sg sg.sgInitialState
-            `shouldBe` ["Alice must pay", "Bob must deliver", "Carol must notify"]
+            `shouldBe` [ "Alice must pay WITHIN 3"
+                       , "Bob must deliver WITHIN 5"
+                       , "Carol must notify WITHIN 7"
+                       ]
 
     it "keeps a ROR nested inside a RAND distinct from its parent" $ do
       case graphFor mixedSrc of
@@ -585,7 +590,7 @@ spec = do
           map snd (junctions sg) `shouldBe` [AllOf, OneOf]
           lookup "initial" (junctions sg) `shouldBe` Just AllOf
           lookup "one of" (junctions sg) `shouldBe` Just OneOf
-          branchNames sg sg.sgInitialState `shouldBe` ["Alice must pay", "one of"]
+          branchNames sg sg.sgInitialState `shouldBe` ["Alice must pay WITHIN 3", "one of"]
 
   describe "DOT rendering" $ do
     it "labels a RAND junction ALL OF and nothing else" $ do
@@ -906,14 +911,18 @@ spec = do
     it "does not change the unmarked edges' attributes" $
       withGraph (graphFor linearSrc) \sg -> do
         let marked = stateGraphToDot defaultStateGraphOptions { showDominators = True } sg
-            timeoutEdge from =
-              from <> " -> 3 [label=timeout\n           ,color=\"#dc3545\"\n           ,style=dashed];"
+            -- The caption names the deadline that TAKES the arm, not just the
+            -- fact that one ran out, so it is per-edge: 3 for Alice's, 5 for
+            -- Bob's. Before 2026-09-21 both read the bare word "timeout".
+            timeoutEdge from due =
+              from <> " -> 3 [label=\"timeout [" <> due
+                   <> "]\"\n           ,color=\"#dc3545\"\n           ,style=dashed];"
         -- The two timeouts dominate nothing, and their three lines are
         -- exactly the default output's: the annotation only ADDS, to the
         -- edges it marks.
-        dotFor sg `shouldSatisfy` Text.isInfixOf (timeoutEdge "0")
-        marked `shouldSatisfy` Text.isInfixOf (timeoutEdge "0")
-        marked `shouldSatisfy` Text.isInfixOf (timeoutEdge "1")
+        dotFor sg `shouldSatisfy` Text.isInfixOf (timeoutEdge "0" "3")
+        marked `shouldSatisfy` Text.isInfixOf (timeoutEdge "0" "3")
+        marked `shouldSatisfy` Text.isInfixOf (timeoutEdge "1" "5")
  where
   isJust' = maybe False (const True)
   allSame xs = case xs of

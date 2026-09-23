@@ -31,8 +31,8 @@
       <bpmn:documentation>ROR: exactly one branch is entered</bpmn:documentation>
     </bpmn:exclusiveGateway>
     <bpmn:endEvent id="End_1" name="Fulfilled" />
-    <bpmn:task id="Task_2" name="SHANT transfer the securities">
-      <bpmn:documentation>PARTY Purchaser SHANT transfer the securities WITHIN (`days until the first anniversary of the issuance` OF transfer) — completing this activity means the prohibited act was performed, which is the LEST arm</bpmn:documentation>
+    <bpmn:task id="Task_2" name="SHANT `transfer the securities`">
+      <bpmn:documentation>PARTY Purchaser SHANT `transfer the securities` WITHIN (`days until the first anniversary of the issuance` OF transfer) — completing this activity means the prohibited act was performed, which is the LEST arm</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_2" name="deadline passes, not performed" attachedToRef="Task_2" cancelActivity="true">
       <bpmn:documentation>the deadline passes (`days until the first anniversary of the issuance` OF transfer) with the prohibited act not performed: the prohibition is respected, so this is the HENCE arm</bpmn:documentation>

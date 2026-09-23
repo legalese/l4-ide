@@ -91,7 +91,7 @@ import L4.Syntax
   , getOriginal
   , getUnique
   )
-import L4.Print (LayoutPrinter (..), docText, prettyLayout)
+import L4.Print (LayoutPrinter (..), docText, prettyLayout, printActionPattern)
 
 -- | Convert a Resolved name to Text.
 --
@@ -116,6 +116,30 @@ data ContractState = ContractState
   , stateName :: Text      -- ^ Human-readable name (e.g., "purchase template", "Fulfilled")
   , stateType :: StateType
   , stateFan  :: FanKind   -- ^ How this state's outgoing transitions relate
+  , stateConstruct :: Maybe Text
+    -- ^ The rule construct that made this state a junction — @RAND@, @ROR@ or
+    -- @IF@ — set by 'markFan' at the moment the construct is known, and
+    -- 'Nothing' on every 'Linear' state and on a hand-built fixture.
+    --
+    -- 'FanKind' cannot answer this: @ROR@ and a regulative @IF@ are BOTH
+    -- 'OneOf', so a junction drawn from either says \"ONE OF\" and a reader
+    -- cannot tell a choice the obliged party makes from a branch the facts
+    -- make — the distinction 'guardedIfBranches' exists to preserve. It is a
+    -- field rather than a third 'FanKind' constructor because the two answer
+    -- different questions: 'FanKind' says how many branches fire, which is
+    -- what a gateway needs, and this says which keyword wrote them.
+  , stateSite :: Maybe SrcRange
+    -- ^ @rangeOf@ the 'RAction' of the obligation this state is the ENTRY of,
+    -- when it is one — the same range that obligation's own edges carry in
+    -- 'labelSite'. Set only where 'wireTarget' names a state after an
+    -- obligation ('describeDeonton'), so an edge whose 'labelSite' equals it
+    -- is an edge whose caption the state's own name already gives.
+    --
+    -- That equality is the structural correlation key "L4.StateGraph.Dot"
+    -- uses to stop printing the party, the modal and the act twice. Comparing
+    -- the rendered texts would do the same job until either spelling drifted,
+    -- and then fail silently; the range cannot drift, because both sides read
+    -- the same 'RAction'.
   } deriving (Eq, Show)
 
 -- | Classification of states for rendering
@@ -159,6 +183,22 @@ data TransitionLabel = TransitionLabel
   { labelParty    :: Maybe Text    -- ^ Party responsible (e.g., "buyer", "seller")
   , labelModal    :: Maybe DeonticModal  -- ^ Deontic modal (MUST, MAY, etc.)
   , labelAction   :: Text          -- ^ Action description
+  , labelBinds    :: Maybe Text
+    -- ^ The names the act pattern BINDS, already spelled as a clause —
+    -- @the rule binds \`amount\`@ — or 'Nothing' where it binds none
+    -- ('bindsClause', 'patternBinders').
+    --
+    -- It is a field of its own and not part of 'labelAction' because
+    -- 'labelAction' is L4\'s own spelling of the act
+    -- ('L4.Print.printActionPattern') and has to stay that: the node, this
+    -- edge, @l4 lts@ and the BPMN task name all print it, and a mark added
+    -- here would reach an XML @name=@ attribute that four external parsers
+    -- read. The distinction is real and the drawing has to carry it, so it
+    -- travels BESIDE the act.
+    --
+    -- Read by "L4.StateGraph.Dot" and by nothing else, deliberately. It is a
+    -- sentence for a reader, not data: @L4.Bpmn.Lower@ has 'labelAction' for
+    -- its task name and the pattern itself for anything finer.
   , labelOpening  :: Maybe Text
     -- ^ The window's OPENING edge, the body of the @AFTER@ as written
     -- (@3@, @3 OF THE JOIN@, a date) — EVERY-EACH-QUANTIFIER-SPEC §5.1.2,
@@ -524,20 +564,33 @@ type ExtractM = St.State ExtractState
 -- | Create a new state and return its ID. States start out 'Linear'; a state
 -- becomes a junction only when 'markFan' is applied to it.
 newState :: Text -> StateType -> ExtractM StateId
-newState name stype = do
+newState = newStateAt Nothing
+
+-- | 'newState', recording the obligation the state is the entry of.
+--
+-- Only 'wireTarget' passes a site, and only where it names the state after an
+-- obligation, so 'stateSite' is 'Just' exactly on the states whose name is a
+-- 'describeDeonton'. Everything else — the @initial@ state, a named rule's
+-- entry, a junction, a terminal — goes through 'newState' and stays 'Nothing',
+-- which is what makes the equality test in "L4.StateGraph.Dot" safe: a
+-- 'Nothing' site never matches an edge.
+newStateAt :: Maybe SrcRange -> Text -> StateType -> ExtractM StateId
+newStateAt site name stype = do
   st <- St.get
   let sid = st.esNextId
-      s = ContractState sid name stype Linear
+      s = ContractState sid name stype Linear Nothing site
   St.put st { esNextId = sid + 1, esStates = s : st.esStates }
   pure sid
 
--- | Turn an existing state into a junction of the given kind.
-markFan :: StateId -> FanKind -> ExtractM ()
-markFan sid kind = St.modify $ \st ->
+-- | Turn an existing state into a junction of the given kind, recording the
+-- rule construct that did it. The construct travels with the state because
+-- the 'FanKind' alone cannot recover it: see 'stateConstruct'.
+markFan :: StateId -> FanKind -> Text -> ExtractM ()
+markFan sid kind construct = St.modify $ \st ->
   st { esStates = map retag st.esStates }
   where
     retag s
-      | s.stateId == sid = s { stateFan = kind }
+      | s.stateId == sid = s { stateFan = kind, stateConstruct = Just construct }
       | otherwise        = s
 
 -- | Add a transition
@@ -698,10 +751,10 @@ extractExpr mFromState expr = case expr of
   Regulative _ obl -> extractDeonton mFromState obl
 
   -- Parallel composition: every branch must be fulfilled.
-  RAnd{} -> extractFan AllOf mFromState (flattenRAnd expr)
+  RAnd{} -> extractFan AllOf "RAND" mFromState (flattenRAnd expr)
 
   -- Choice: exactly one branch is taken.
-  ROr{}  -> extractFan OneOf mFromState (flattenROr expr)
+  ROr{}  -> extractFan OneOf "ROR" mFromState (flattenROr expr)
 
   -- A conditional over regulative arms. Also a @OneOf@ junction — exactly one
   -- arm applies — but unlike @ROr@ the arms are selected by the facts, and the
@@ -781,9 +834,9 @@ flattenROr = \case
 -- an arm back into it is a back-edge. An @IF@'s arms are exclusive — the
 -- facts run one — and keep sharing ('extractIfFan'), as do an obligation's
 -- @HENCE@ and @LEST@, which are two outcomes of which exactly one occurs.
-extractFan :: FanKind -> Maybe StateId -> [Expr Resolved] -> ExtractM ()
-extractFan kind mFromState branches =
-  extractGuardedFanWith perBranch kind mFromState [(Nothing, b) | b <- branches]
+extractFan :: FanKind -> Text -> Maybe StateId -> [Expr Resolved] -> ExtractM ()
+extractFan kind construct mFromState branches =
+  extractGuardedFanWith perBranch kind construct mFromState [(Nothing, b) | b <- branches]
 
 -- | Run one branch's extraction and restore the memo afterwards, so what the
 -- branch memoised is visible below it and nowhere else.
@@ -796,7 +849,7 @@ perBranch act = do
 -- | 'extractGuardedFan' over @IF@ arms, whose guards are structured.
 extractIfFan :: Maybe StateId -> [(BranchGuard, Expr Resolved)] -> ExtractM ()
 extractIfFan mFromState branches =
-  extractGuardedFan OneOf mFromState [(Just g, b) | (g, b) <- branches]
+  extractGuardedFan OneOf "IF" mFromState [(Just g, b) | (g, b) <- branches]
 
 -- | Extract an @IF@ chain whose arms are regulative as a guarded @OneOf@
 -- junction. A chain none of whose arms is regulative is not a rule and
@@ -812,7 +865,7 @@ extractIf mFromState expr
 
 -- | As 'extractFan', with a guard attached to each branch edge.
 extractGuardedFan
-  :: FanKind -> Maybe StateId -> [(Maybe BranchGuard, Expr Resolved)] -> ExtractM ()
+  :: FanKind -> Text -> Maybe StateId -> [(Maybe BranchGuard, Expr Resolved)] -> ExtractM ()
 extractGuardedFan = extractGuardedFanWith id
 
 -- | 'extractGuardedFan' with each branch's extraction wrapped: 'perBranch'
@@ -820,12 +873,17 @@ extractGuardedFan = extractGuardedFanWith id
 -- arms are exclusive (see 'extractFan').
 extractGuardedFanWith
   :: (ExtractM () -> ExtractM ())
-  -> FanKind -> Maybe StateId -> [(Maybe BranchGuard, Expr Resolved)] -> ExtractM ()
-extractGuardedFanWith wrap kind mFromState branches = do
+  -> FanKind -> Text -> Maybe StateId -> [(Maybe BranchGuard, Expr Resolved)] -> ExtractM ()
+extractGuardedFanWith wrap kind construct mFromState branches = do
   junction <- case mFromState of
     Just sid -> pure sid
+    -- Still @initial@, deliberately: this is the graph's ENTRY, and that is
+    -- the more useful thing for the node to say. Which construct fanned it is
+    -- recorded on 'stateConstruct' and drawn beside the fan kind, so naming
+    -- the state after the construct instead would trade the start of the
+    -- contract for a fact the page already carries.
     Nothing  -> newState "initial" InitialState
-  markFan junction kind
+  markFan junction kind construct
   traverse_ (wrap . uncurry (extractBranch junction)) branches
 
 -- | Extract one branch of a junction, wiring the junction to its entry state.
@@ -878,7 +936,11 @@ wireTarget from label ttype otherName expr = do
     TargetBreach    -> terminal "Breach" TerminalBreach
 
     TargetDeonton obl -> do
-      entryId <- newState (describeDeonton obl) IntermediateState
+      -- Named after the obligation, so it is stamped with that obligation's
+      -- site: the edges 'extractDeonton' hangs off it carry the same range in
+      -- 'labelSite', and that equality is how the renderer knows the caption
+      -- would merely repeat the node.
+      entryId <- newStateAt (deontonSite obl) (describeDeonton obl) IntermediateState
       addTransition from entryId label ttype
       extractDeonton (Just entryId) obl
 
@@ -926,6 +988,7 @@ fanLabel mGuard = TransitionLabel
   { labelParty    = Nothing
   , labelModal    = Nothing
   , labelAction   = ""
+  , labelBinds    = Nothing
   , labelOpening  = Nothing
   , labelDeadline = Nothing
   -- One source, not two: the text IS the rendering of the structure, so a
@@ -955,17 +1018,12 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
   let partyText = Just (subjectText subject)
       modalVal  = Just (action.modal)
       actionText = prettyPattern action.action
-      -- An anchored deadline (R-Q7, §5.1.1) prints as its source form,
-      -- @5 OF THE JOIN@, the duration bracketed where the source needs it
-      -- ('edgeText'); 'L4.Bpmn.Lower.parseDuration' cannot read an anchor and
-      -- the lowering reports it as anchored, which is the stated limit. A
-      -- @BEFORE@ (R-X5, §5.1.2) keeps its keyword in the label for the same
-      -- reason: it is a date, not a duration, and the lowering must be able
-      -- to see that.
-      deadlineText = fmap closingText due
-      closingText = \ case
-        d@MkDeadline{} -> edgeText d
-        d@MkBefore{}   -> "BEFORE " <> edgeText d
+      -- Which of the act's names are OPEN, beside the act rather than inside
+      -- it; see 'labelBinds'.
+      bindsText = bindsClause action.action
+      -- The window's closing edge, spelled by 'windowText' so the node and
+      -- this edge cannot drift apart.
+      deadlineText = fmap windowText due
       -- The opening edge (§5.1.2), as its source form; the BPMN lowering
       -- does not draw it and says so ('L4.Bpmn.Lower.openingFindings').
       openingText = fmap edgeText opens
@@ -991,18 +1049,23 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
             }
       joinLabel = \case
         JoinOnce _ th d ->
-          MkJoinLabel { joinKind = Barrier (thresholdText th), joinDeadline = closingText <$> d }
+          MkJoinLabel { joinKind = Barrier (thresholdText th), joinDeadline = windowText <$> d }
         JoinUpon _ _ d ->
-          MkJoinLabel { joinKind = Fork, joinDeadline = closingText <$> d }
+          MkJoinLabel { joinKind = Fork, joinDeadline = windowText <$> d }
 
       -- The key's static half (B1): the same @rangeOf@ of the same
       -- 'RAction' that @armNormKey@ stamps on the runtime step.
       site = rangeOf action
 
+      -- This obligation as its own entry state is named, so an arm of it that
+      -- has to mint a state can say which obligation it is an arm OF.
+      selfName = describeAction subject action
+
       label = TransitionLabel
         { labelParty    = partyText
         , labelModal    = modalVal
         , labelAction   = actionText
+        , labelBinds    = bindsText
         , labelOpening  = openingText
         , labelDeadline = deadlineText
         , labelGuard    = guardText
@@ -1011,13 +1074,58 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
         , labelSite     = site
         }
 
+      -- The deadline that TAKES this arm, as against the one that bounds the
+      -- act. They are the same clause read from opposite ends: on the HENCE
+      -- edge the @WITHIN@ says by when the act still counts, and here it names
+      -- the instant the arm fires. 'lestArmWording' says WHAT happens and has
+      -- only ever read the deadline's PRESENCE; this says WHEN, so an edge
+      -- captioned "timeout" no longer leaves the reader to hunt the sibling
+      -- edge for which timeout it was.
+      --
+      -- 'DMustNot' is 'Nothing', and that is the same short-circuit
+      -- lestArmWording makes on its first line: a prohibition's arm is
+      -- taken by the ACT being performed, not by the clock, so a deadline here
+      -- would name an event that does not fire this arm. For a prohibition the
+      -- deadline running out means COMPLIANCE.
+      --
+      -- A BARRIER with a deadline of its own, distinct from the act's. Two
+      -- clocks then take this one arm — a member missing the act's window, and
+      -- the barrier not being met by the join's — and a caption can name only
+      -- one of them. @jl4\/examples\/bpmn\/modals.l4:57-60@ is the case:
+      -- @WITHIN 30@ on the act, @ONCE ALL HAVE WITHIN 10@ on the join, and
+      -- @L4.Bpmn.Lower@\'s own P-JOIN-DEADLINE note says of exactly this shape
+      -- that "the rule does enforce it: a barrier whose last act lands after
+      -- it fails" (@jl4-core\/src\/L4\/Bpmn\/Lower.hs:2940-2946@). Naming the
+      -- 30 there is a PRECISE claim about which clock fires, and it is the
+      -- wrong one half the time; the bare word "timeout" was vague and
+      -- therefore not wrong. So the bracket is dropped and the reader is left
+      -- with the sibling HENCE edge, which draws both windows.
+      --
+      -- A FORK is not this case even when both are written. Lower.hs's Fork
+      -- arm of the same note says the join's deadline is dead on a fork — "a
+      -- fork has no join event to check it at; only the act's expires a
+      -- member" — so there is one clock and 'memberDeadline' names it.
+      barrierJoinDeadline = do
+        q <- label.labelQuantifier
+        j <- q.quantJoin
+        case j.joinKind of
+          Barrier _ -> j.joinDeadline
+          Fork      -> Nothing
+      twoClocksTakeThisArm = isJust label.labelDeadline && isJust barrierJoinDeadline
+
+      armTrigger = case action.modal of
+        DMustNot -> Nothing
+        _ | twoClocksTakeThisArm -> Nothing
+          | otherwise            -> memberDeadline label
+
       -- The caption for whichever LEST arm this obligation turns out to have.
       -- It carries the modal too: without it a consumer holding only this edge
       -- cannot tell a missed deadline from a prohibition that was breached,
-      -- which is the whole of smucclaw/l4-ide#927. The party, deadline and
-      -- guard are deliberately absent — they belong to the obligation, which
-      -- the HENCE edge already restates, and repeating them here would read as
-      -- a second, contradictory copy of the rule.
+      -- which is the whole of smucclaw/l4-ide#927. The party and the guard are
+      -- deliberately absent — they belong to the obligation, which the HENCE
+      -- edge already restates, and repeating them here would read as a second,
+      -- contradictory copy of the rule. The DEADLINE is not in that company:
+      -- see 'armTrigger'.
       -- The caption reads the deadline that expires a MEMBER, which for a
       -- quantified rule may sit on the join line rather than on the act; see
       -- 'memberDeadline'. Passing @due@ here said "unreachable: no WITHIN" of
@@ -1026,8 +1134,12 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
         { labelParty    = Nothing
         , labelModal    = modalVal
         , labelAction   = lestArmWording action.modal (memberDeadline label)
+        -- The arm is not the act, so it binds nothing: its caption is
+        -- "timeout", and "the rule binds `amount`" under it would attach the
+        -- act's open names to the edge taken when the act did NOT happen.
+        , labelBinds    = Nothing
         , labelOpening  = Nothing
-        , labelDeadline = Nothing
+        , labelDeadline = armTrigger
         , labelGuard    = Nothing
         , labelBranch   = Nothing
         , labelQuantifier = Nothing
@@ -1040,7 +1152,14 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
 
   -- Handle HENCE (success path)
   case hence of
-    Just henceExpr -> wireTarget fromState label HenceTransition "next" henceExpr
+    -- The fallback name is used only where the target is not already a state
+    -- (wireTarget's TargetOther): a bare RAND / ROR / IF below a
+    -- HENCE, in practice. It used to be the word @next@, which named neither
+    -- the construct that put the node there nor the obligation it continues,
+    -- so @ok/contracts.l4@ drew a junction captioned @next@. Naming it after
+    -- the arm and its obligation says both, and the junction's own construct
+    -- arrives separately on 'stateConstruct'.
+    Just henceExpr -> wireTarget fromState label HenceTransition ("HENCE of " <> selfName) henceExpr
 
     -- No HENCE specified. Every modal defaults it to FULFILLED — see the HENCE
     -- table in doc/reference/regulative/README.md and @fromMaybe fulfilExpr@ in
@@ -1069,7 +1188,7 @@ extractDeonton mFromState (MkDeonton _anno subject action opens due mJoin hence 
   -- with a literal @\"timeout\"@ and no modal, left over from before #927;
   -- it now goes through 'wireTarget' with the same caption as its siblings.
   case lest of
-    Just lestExpr -> wireTarget fromState lestLabel LestTransition "failure" lestExpr
+    Just lestExpr -> wireTarget fromState lestLabel LestTransition ("LEST of " <> selfName) lestExpr
 
     Nothing -> do
       -- No LEST specified - use default based on modal
@@ -1176,9 +1295,98 @@ classifyTarget rules = \case
   LetIn _ _ e -> classifyTarget rules e
   _ -> TargetOther
 
--- | Generate a descriptive name for an obligation (for intermediate states)
+-- | Generate a descriptive name for an obligation (for intermediate states).
+--
+-- The @WITHIN@ is part of the name, and that is the whole of what tells two
+-- states apart when their obligations share an act.
+-- @jl4\/examples\/legal\/promissory-note.l4@ writes one @MUST@ three times
+-- (@:90@, @:103@, @:111@) — same party, same modal, same act pattern — under
+-- an escalating clock, @\`Next Payment Due Date\`@, then
+-- @\`Default After Days Beyond Commencement\`@, then none at all. Until
+-- 2026-09-22 the node printed @PARTY … MUST …@ and stopped, so three of the
+-- note\'s six states carried the identical string and the only difference the
+-- picture drew was on their out-edges. @PARTY … MUST … WITHIN …@ is one
+-- sentence in the source and the node now says all of it — in the source\'s
+-- own keyword, which is not always @WITHIN@ ('windowClause').
+--
+-- __Usually this MOVES a copy of the deadline rather than adding one__, and
+-- the exception is worth stating because it is the common shape. The window
+-- prints on the @HENCE@ edge as well, and "L4.StateGraph.Dot" suppresses that
+-- copy wherever the source state is this obligation\'s own entry — the same
+-- 'stateSite' \/ @labelSite@ test that suppresses the party, the modal and the
+-- act. But that suppression is conditional: it is dropped where it would
+-- leave the arrow BLANK, so an obligation whose ONLY caption is its window
+-- keeps the full restatement and the window is then drawn twice, once on the
+-- node and once on the arrow. Measured 2026-09-22 on
+-- @jl4\/tests-cli\/fixtures\/state-graph-captions.l4@ shape 5:
+-- @[label="theChair must pay 1 WITHIN 9"]@ on the node and
+-- @[label="theChair MUST pay 1 [9]"]@ on its arrow. A second copy of a true
+-- sentence is the price of not drawing an empty one.
+--
+-- Where the suppression does hold, the division of labour is clean: the node
+-- says the obligation, the green arrow says what is NEW along it, the red
+-- arrow says the clock that breaches it.
+--
+-- The @LEST@ arm keeps its own bracket ('armTrigger'), which is NOT the copy
+-- this moved. It can name a different quantity: 'memberDeadline' falls back to
+-- the join line\'s @WITHIN@ for a rule whose act has none, so on that shape the
+-- node says nothing and the red arm says the join\'s clock.
+--
+-- Only the obligation's own window travels here, never the join line's: the
+-- join is drawn by 'L4.StateGraph.Dot.formatTransitionLabel' on the edge,
+-- where a barrier and a fork stay distinguishable.
 describeDeonton :: Deonton Resolved -> Text
-describeDeonton MkDeonton{subject, action} =
+describeDeonton MkDeonton{subject, action, due} =
+  describeAction subject action <> maybe "" (\ d -> " " <> windowClause d) due
+
+-- | The window as a CLAUSE, keyword and all, for a place that is spelling out
+-- a rule rather than bracketing a quantity.
+--
+-- The keyword is not always @WITHIN@, and assuming it was drew
+-- @buyer must Order buyer WITHIN BEFORE (YMD OF 2026, 6, 30)@ on the state
+-- @jl4\/examples\/lsp\/semantic-tokens\/after.l4:21@ mints — measured 2026-09-22
+-- by sweeping @jl4\/examples@, @doc@ and @jl4-core\/libraries@, ONE node in the
+-- whole corpus, which is exactly the population that makes a wrong guess
+-- survive review. Only a nested obligation is at risk: a top-level @BEFORE@
+-- such as @jl4\/examples\/ok\/every\/run-after.l4:409@ enters at @initial@ and
+-- mints no node to be wrong on. 'windowText' already carries @BEFORE@ because a
+-- consumer reading the bracket as a duration has to see at once that it is not
+-- one, so the two keywords have to be told apart here too.
+windowClause :: Deadline Resolved -> Text
+windowClause d = case d of
+  MkDeadline{} -> "WITHIN " <> windowText d
+  MkBefore{}   -> windowText d
+
+-- | An act's closing edge as the picture spells it, in ONE place.
+--
+-- The node ('describeDeonton') and the edge ('extractDeonton'\'s
+-- @deadlineText@) print the same @WITHIN@, and "L4.StateGraph.Dot" suppresses
+-- the second on the strength of them being the same clause. Two spellings of
+-- it would make that suppression a lie the first time either moved — the
+-- hazard @L4.StateGraph.Dot.transitionToEdge@ documents for the party and the
+-- act, one function away.
+--
+-- An anchored deadline (R-Q7, §5.1.1) prints as its source form, @5 OF THE
+-- JOIN@, the duration bracketed where the source needs it ('edgeText');
+-- @L4.Bpmn.Lower.parseDuration@ cannot read an anchor and the lowering reports
+-- it as anchored, which is the stated limit. A @BEFORE@ (R-X5, §5.1.2) keeps
+-- its keyword for the same reason: it is a date, not a duration, and the
+-- lowering must be able to see that.
+windowText :: Deadline Resolved -> Text
+windowText = \ case
+  d@MkDeadline{} -> edgeText d
+  d@MkBefore{}   -> "BEFORE " <> edgeText d
+
+-- | 'describeDeonton' for a subject and act held separately, which is how
+-- 'extractDeonton' has them: it needs the same words to name the states its
+-- own arms land on ('wireTarget'\'s fallback names).
+--
+-- The @WITHIN@ is deliberately NOT here. This names a state that some ARM of
+-- the obligation lands on — @HENCE of …@ — and that state is not the
+-- obligation\'s entry, so its window has already expired or been met by the
+-- time the contract is there.
+describeAction :: Subject Resolved -> RAction Resolved -> Text
+describeAction subject action =
   let partyT = subjectText subject
       modalT = case action.modal of
         DMust    -> "must"
@@ -1187,6 +1395,12 @@ describeDeonton MkDeonton{subject, action} =
         DDo      -> "do"
       actionT = prettyPattern action.action
   in partyT <> " " <> modalT <> " " <> actionT
+
+-- | @rangeOf@ an obligation's act: the key its own edges carry in 'labelSite',
+-- stamped on the state that is its entry. One reader, one range — see
+-- 'stateSite'.
+deontonSite :: Deonton Resolved -> Maybe SrcRange
+deontonSite MkDeonton{action} = rangeOf action
 
 -- | The subject of a deonton as label text.
 --
@@ -1207,11 +1421,195 @@ subjectText = \case
     <> maybe [] (\r -> [ "IN", prettyLayout r ]) mRoll
     <> maybe [] (\f -> [ "WHO", prettyLayout f ]) mFilter
 
--- | Pretty-print a pattern to text
+-- | Pretty-print an act pattern to text, in L4's own spelling.
+--
+-- __One clause, one spelling.__ This is 'L4.Print.printActionPattern' and
+-- nothing else, collapsed onto one line. Until 2026-09-22 it was a second,
+-- hand-written printer, and what that cost was one clause reading three ways.
+-- @jl4\/examples\/bpmn\/tenancy.l4:56@ then read
+-- @MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount@ in the source (the
+-- retired keyword was swept out of that file on 2026-09-23; the line reads
+-- @MUST Pay t theLandlord amount@ now, and all three outputs moved together);
+-- @l4 lts@ said what the source said, because it goes through
+-- 'L4.Print.printActionPattern'
+-- (@jl4-core\/src\/L4\/Lts\/Marking.hs:419@, importing it at @:106@), while the
+-- state-graph node said @Pay t theLandlord \`amount\`@ and the BPMN task name
+-- said a third thing again. A reader moving between the three outputs had to
+-- take it on the verb alone that they were one obligation.
+--
+-- Reusing the printer settles three things that had been separate arguments:
+--
+--   * @EXACTLY@ is re-emitted exactly where 'L4.Syntax.exactlyKeywordRange'
+--     says the AUTHOR wrote it (@jl4-core\/src\/L4\/Print.hs:1267-1269@) —
+--     \"A pattern whose source said EXACTLY keeps saying it\", in that
+--     printer\'s own words. It is NOT added to an R1-synthesised 'PatExpr',
+--     which carries no keyword because the source had none. A caption that
+--     marked both would spell in the picture something the source does not
+--     say, and would disagree with @l4 lts@ again.
+--   * A compound pinned expression is BRACKETED ('pinnedNeedsParens',
+--     @jl4-core\/src\/L4\/Print.hs:1271-1275@), so @MUST pay (EXACTLY base
+--     PLUS 1)@ no longer draws as @pay base PLUS 1@ — which reads as @pay@
+--     applied to three arguments.
+--   * There is no back-quote mark of our own. A name is back-quoted exactly
+--     when L4 would back-quote it, through the same 'L4.Print.quoteIfNeeded'
+--     every other printer uses. Between 2026-09-21 and 2026-09-22 a BINDER was
+--     back-quoted as a placeholder mark; it meant two things at once on one act
+--     (@\`The Lender\`@ quoted for its spaces, @\`Amount Transferred\`@ quoted
+--     for binding), and it rode into the BPMN task name and from there into an
+--     XML @name=@ attribute that four external parsers read
+--     (@etc\/check-bpmn-soundness.mjs@, @etc\/validate-bpmn.mjs@ against
+--     bpmn-moddle, @etc\/check-bpmn-kie.sh@ against jBPM, and
+--     @etc\/check-bpmn-dmn-refs.mjs@). A placeholder mark, if the picture ever
+--     wants one again, belongs where the picture is drawn and nowhere a machine
+--     reads.
+--
+-- __The arguments are PRINTED.__ Until 2026-09-21 a 'PatApp' with arguments
+-- drew as @f ...@ and a 'PatCons' as @h ...@, which is not an abbreviation of
+-- the act so much as a deletion of it: every obligation over the same verb then
+-- drew the SAME label. @jl4\/examples\/ok\/contracts.l4@ has two, @payment price@
+-- (@:13@) and @payment fine@ (@:18@), and they drew as the one string
+-- @payment ...@.
+--
+-- WHERE that elision travelled, precisely, because the commit that fixed it
+-- said this wrong. This function is read by 'describeAction' (the state NODE
+-- names) and by 'extractDeonton' (an edge\'s @labelAction@), and from the
+-- second it reaches the BPMN task names and
+-- 'L4.StateGraph.Dominators.renderTransition'. It did NOT reach @l4 lts@, which
+-- has always gone through 'L4.Print.printActionPattern':
+-- @etc\/lts-reader-proxy\/tenancy\/A.txt@, an @l4 lts@ block cut BEFORE the
+-- change, already shows the arguments printed. Commit @b12383af5@\'s message
+-- says the elision rode into @l4 lts@ as well; that is false.
+--
+-- __What un-eliding did NOT buy, and what a reader should not expect of it.__
+-- Two obligations that share an act pattern still draw the same label, because
+-- the label is the act and the act is the same. All three @MUST@s of
+-- @jl4\/examples\/legal\/promissory-note.l4@ (@:90@, @:103@, @:111@) are one
+-- act written out three times; what tells them apart is the @PROVIDED@ guard
+-- and the @WITHIN@, and both of those live on the transition, not on the act.
+-- Commit @b12383af5@\'s message claims this function separated those three
+-- states. It did not and could not; see 'describeDeonton', which carries the
+-- @WITHIN@ onto the node for exactly that reason.
+--
+-- __What delegating COSTS, and where that is paid.__ The printer is
+-- re-emitting source, so it prints a binder and an R1-resolved reference the
+-- same way: @MUST payment price@ with no @price@ in scope and
+-- @MUST payment n@ with @n MEANS 2@ both draw bare
+-- (@jl4\/examples\/ok\/contracts.l4:13@ and @:53@, the second\'s @n@ at @:56@).
+-- That is right for re-emitting source and silent about what a reader can
+-- tell, and the picture is asking \"what discharges this\" — to which a binder
+-- answers ANY payment and a pin answers exactly that one. The distinction is
+-- carried by 'patternBinders' and 'labelBinds', beside the act and never
+-- inside it, so this function stays one spelling of one clause.
 prettyPattern :: Pattern Resolved -> Text
-prettyPattern = \case
-  PatVar _ n      -> resolvedToText n
-  PatApp _ n args -> resolvedToText n <> if null args then "" else " ..."
-  PatCons _ h _   -> prettyPattern h <> " ..."
-  PatExpr _ e     -> prettyLayout e
-  PatLit _ lit    -> prettyLayout lit
+prettyPattern = oneLine . docText . printActionPattern
+
+-- | Collapse a rendering onto one line: a caption must not carry a line break
+-- it did not choose.
+--
+-- 'docText' lays out @Unbounded@ (@jl4-core\/src\/L4\/Print.hs:37-38@), so it
+-- inserts no break of its own and this is a guard rather than a repair — but a
+-- 'Doc' can still carry a hard break, and nothing in the type says an act
+-- pattern will not. A newline would land inside @labelAction@, where
+-- 'L4.StateGraph.Dot.wrapLabel' takes it as a hard break mid-caption and where
+-- @L4.Bpmn.Lower@ puts it inside an XML @name=@ attribute, whose value
+-- normalisation folds it to a space on the way back out — a round trip that
+-- changes the name with nothing said.
+oneLine :: Text -> Text
+oneLine = Text.unwords . Text.words
+
+-- | The names an act pattern BINDS, in source order: its 'PatVar' leaves.
+--
+-- A 'PatVar' and a 'PatExpr' are different CONSTRUCTORS, which is the whole of
+-- why this is decidable here and not a guess about scope. The parser builds
+-- neither: it writes @'PatApp' n []@ for a bare name, and the checker then
+-- rewrites it to a 'PatVar' when the name is NOT in scope
+-- (@jl4-core\/src\/L4\/TypeCheck.hs:4249-4251@) and R1 rewrites it to a
+-- 'PatExpr' when it resolves to a non-constructor
+-- (@jl4-core\/src\/L4\/TypeCheck.hs:4239-4243@). So a declared nullary act
+-- stays a 'PatApp' and binds nothing, which is what keeps this from calling
+-- every act in the corpus a binder.
+--
+-- __A 'PatVar' at the TOP is a different fact and gets a different sentence,
+-- corrected 2026-09-23.__ This note used to say it was "reported the same way:
+-- the sentence is true of it, and a reader of a caption has no use for the
+-- difference". The sentence IS true of it and the conclusion still does not
+-- follow. @jl4\/examples\/ok\/contracts.l4:15@ writes @PARTY B MUST return@
+-- where @Action IS ONE OF delivery, payment, foo@ (@:1-5@) declares no
+-- @return@, so @return@ binds the whole act; the node then draws @B must
+-- return WITHIN 10@ and its arrow drew @the rule binds \`return\`@, from which
+-- a reader takes @return@ for the act and the clause for a parameter of it.
+-- What is true is the opposite and stronger: there is NO act, and any act by B
+-- discharges the obligation — which is the picture's own "what discharges it"
+-- question, not a detail beside it.
+--
+-- The what-if already draws this line and it is the half this function had
+-- dropped: @L4.Lts.WhatIf@'s @reach@ answers @BoundWholeAction@ with "any act
+-- by this party would match this obligation" and @BoundArgument@ with "any
+-- value in that place". Matching @bindsClause@ alone therefore did not give
+-- the reader ONE sentence across the picture and the what-if, which is what
+-- matching it was for; it gave them one sentence where the what-if has two.
+--
+-- Measured before changing it, because the population is the whole argument:
+-- over every @.l4@ under @jl4\/examples@, @doc@ and @jl4-core\/libraries@ the
+-- renderer emits __46 binds clauses, of which 45 are argument binders and
+-- exactly ONE is a whole act__ — @contracts.l4@'s @return@. One witness in the
+-- corpus is the population that lets a wrong guess survive review, not a reason
+-- to leave it; a caption is read by whoever meets it, and there is nothing else
+-- on that arrow.
+--
+-- __The spelling matches the what-if on purpose, and the what-if is not
+-- importable from here.__ @L4.Lts.WhatIf.patternBinders@ is the same recursion
+-- with a @BoundScope@ tag on each binder, and @L4.Lts.WhatIf.bindsClause@
+-- renders it with the same words; that module is on branch
+-- @lts\/whatif-bound-values@ and NOT on @unstable@ (checked 2026-09-22:
+-- @git log origin\/unstable -- jl4-core\/src\/L4\/Lts\/WhatIf.hs@ is empty), so
+-- this is a second copy and says so. If that branch lands, one of the two
+-- should go.
+patternBinders :: Pattern Resolved -> [Text]
+patternBinders = \ case
+  PatVar _ v    -> [resolvedToText v]
+  PatApp _ _ ps -> concatMap patternBinders ps
+  PatCons _ a b -> patternBinders a <> patternBinders b
+  PatLit _ _    -> []
+  PatExpr _ _   -> []
+
+-- | The binders as the picture says them, or 'Nothing' where there are none.
+--
+-- __The picture and @l4 lts@ carry the same DISTINCTION, not the same
+-- sentence, and an earlier version of this note claimed otherwise.__ It said a
+-- reader moving between the two "meets ONE sentence". They do not, and the
+-- claim was measured false on 2026-09-23 against the merged what-if (#452),
+-- which prints, for @jl4\/examples\/ok\/contracts.l4@ and
+-- @jl4\/examples\/legal\/promissory-note.l4@ respectively:
+--
+-- > this obligation's pattern matches any act by B: the rule binds \`return\`
+-- >   rather than naming an act
+-- > this obligation's pattern matches any \`Amount Transferred\` the condition
+-- >   accepts: the rule binds it and tests it only through that condition
+--
+-- Ninety-seven and one hundred and thirty characters. A caption cannot carry
+-- either: it is wrapped at 'L4.StateGraph.Dot.labelWidth' (36 columns) inside a
+-- box GraphViz sizes to it, and a 97-character sentence on an arrow is the
+-- defect this whole branch exists to remove. So the picture says the short
+-- form — @the rule binds \`price\`@, or @any act by this party would match this
+-- obligation@ where the act itself is open — and the list says the long one.
+--
+-- What must NOT drift is the distinction: both surfaces separate an open
+-- ARGUMENT from an open ACT, and they must never disagree about which a given
+-- obligation is. The shared vocabulary is "binds" and the back-quoted name;
+-- the sentences around it are free to differ, because one has a line and the
+-- other has a box. Do not "fix" this by lengthening the caption.
+--
+-- The back quotes are the picture\'s, not the act\'s: they are here, in a
+-- clause "L4.StateGraph.Dot" renders and no machine parses, and never inside
+-- 'prettyPattern'.
+bindsClause :: Pattern Resolved -> Maybe Text
+bindsClause = \ case
+  -- The whole act is open. Say what that MEANS for the reader's question, not
+  -- which name holds the hole; the name is already on the node.
+  PatVar _ _ -> Just "any act by this party would match this obligation"
+  p          -> case patternBinders p of
+    [] -> Nothing
+    bs -> Just ("the rule binds " <> Text.intercalate " and " (map quoted bs))
+ where
+  quoted n = "`" <> n <> "`"

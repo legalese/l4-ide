@@ -28,8 +28,13 @@
 #
 # WHAT IT DOES NOT CHECK — stated because a green run must not be mistaken for
 # CI. See the memory note "local gate is not CI".
-#   DMN engine harnesses, the `go` selftest, jl4-mlir, the WASM build, Nix, and
-#   TypeScript. A PR that passes this can still go red in CI on any of those.
+#   Test suites NOT run here, although CI runs `cabal test all`: jl4-lsp-test,
+#   jl4-mlir-test, jl4-websessions-test, jl4-proleg-burden, jl4-proleg-roundtrip.
+#   Named as suites on purpose — this list used to say only `jl4-mlir`, between
+#   the WASM build and Nix, where it read as the MLIR backend among build targets
+#   rather than as a suite among suites, so five missing suites looked like one.
+#   Also not run: DMN engine harnesses, the `go` selftest, the WASM build, Nix,
+#   and TypeScript. A PR that passes this can still go red in CI on any of those.
 #
 set -uo pipefail
 
@@ -129,6 +134,10 @@ fi
 
 step "l4-cli-test"    bash -c "cd '$WT' && cabal test l4-cli-test 2>&1 | tee /tmp/vb-cli.\$\$ | grep -E 'examples,|PASS|FAIL' | tail -2; grep -q 'l4-cli-test: PASS' /tmp/vb-cli.\$\$"
 step "jl4-core-test"  bash -c "cd '$WT' && cabal test jl4-core-test 2>&1 | tee /tmp/vb-core.\$\$ | grep -E 'examples,|PASS|FAIL' | tail -2; grep -q 'jl4-core-test: PASS' /tmp/vb-core.\$\$"
+# jl4-service-test renders a state graph over the HTTP surface and asserts its captions
+# (jl4-service/test/IntegrationSpec.hs). Added 2026-09-22: a caption change on
+# lts/draw-what-it-means turned it red while this script stayed green, because it was not here.
+step "jl4-service-test" bash -c "cd '$WT' && cabal test jl4-service-test 2>&1 | tee /tmp/vb-svc.\$\$ | grep -E 'examples,|PASS|FAIL' | tail -2; grep -q 'jl4-service-test: PASS' /tmp/vb-svc.\$\$"
 
 step "check-corpus-goldens" bash -c "cd '$WT' && node etc/check-corpus-goldens.mjs"
 
@@ -182,8 +191,11 @@ banner
 echo "  RESULTS"
 for r in "${RESULTS[@]}"; do echo "    $r"; done
 echo
-echo "  NOT CHECKED: DMN engine harnesses, go selftest, jl4-mlir, WASM, Nix,"
+echo "  NOT CHECKED — suites CI runs and this does not: jl4-lsp-test,"
+echo "               jl4-mlir-test, jl4-websessions-test, jl4-proleg-burden,"
+echo "               jl4-proleg-roundtrip."
+echo "  NOT CHECKED — also: DMN engine harnesses, go selftest, WASM, Nix,"
 echo "               TypeScript. A green run here is not a green CI."
 echo "────────────────────────────────────────────────────────────────────"
-rm -f /tmp/vb-jl4-test.$$ /tmp/vb-cli.$$ /tmp/vb-core.$$
+rm -f /tmp/vb-jl4-test.$$ /tmp/vb-cli.$$ /tmp/vb-core.$$ /tmp/vb-svc.$$
 exit "$FAILED"

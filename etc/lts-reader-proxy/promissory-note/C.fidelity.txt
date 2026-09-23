@@ -42,7 +42,7 @@ fidelity report — BPMN 2.0
       This LEST has no deadline, and BPMN has no untriggered boundary event, so it is drawn as a conditional boundary event rather than a timer. Nothing can fire it: for every modal but SHANT this arm is reached only by the deadline passing, and for SHANT this node is the compliance arm, which is likewise reached only by the deadline passing.
       lost: the trigger as something an engine could evaluate
   [P-CYCLE] lossy — Process_Payment_Obligations
-      The state graph has a cycle (initial, `The Borrower` must pay monthly installment to ...). BPMN can draw a loop, but this layout places a node by its longest path from the start and a node on a cycle has none, so inside the loop a node further right no longer means a moment further on: the positions are wherever the relaxation ran out of fuel.
+      The state graph has a cycle (initial, `The Borrower` must `pay monthly installment to` `The Lender` `Amount Transferred` WITHIN `Next Payment Due Date`). BPMN can draw a loop, but this layout places a node by its longest path from the start and a node on a cycle has none, so inside the loop a node further right no longer means a moment further on: the positions are wherever the relaxation ran out of fuel.
       lost: the reading that left-to-right is time, which is the only thing the horizontal axis was carrying
   [F2] lossy — Process_Payment_Obligations
       A lane says who performs the work, where L4's PARTY says who owes the obligation, and this diagram can only show the first (lanes here: `The Borrower`).

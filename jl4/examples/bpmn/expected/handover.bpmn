@@ -35,8 +35,8 @@
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="Start_0" />
-    <bpmn:task id="Task_0" name="MUST give vacant possession">
-      <bpmn:documentation>PARTY Tenant MUST give vacant possession WITHIN `grace period`</bpmn:documentation>
+    <bpmn:task id="Task_0" name="MUST `give vacant possession`">
+      <bpmn:documentation>PARTY Tenant MUST `give vacant possession` WITHIN `grace period`</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_0" name="timeout" attachedToRef="Task_0" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within `grace period`</bpmn:documentation>
@@ -47,8 +47,8 @@
     <bpmn:parallelGateway id="Split_1" name="all of" gatewayDirection="Diverging">
       <bpmn:documentation>RAND: every branch is entered</bpmn:documentation>
     </bpmn:parallelGateway>
-    <bpmn:task id="Task_2" name="MAY inspect the premises">
-      <bpmn:documentation>PARTY Landlord MAY inspect the premises WITHIN 7</bpmn:documentation>
+    <bpmn:task id="Task_2" name="MAY `inspect the premises`">
+      <bpmn:documentation>PARTY Landlord MAY `inspect the premises` WITHIN 7</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_2" name="after P7D" attachedToRef="Task_2" cancelActivity="true">
       <bpmn:documentation>the permission lapses: it is not exercised within 7, so the rule ends fulfilled</bpmn:documentation>
@@ -57,8 +57,8 @@
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
     <bpmn:endEvent id="End_3" name="Fulfilled" />
-    <bpmn:task id="Task_4" name="MAY photograph the premises">
-      <bpmn:documentation>PARTY Landlord MAY photograph the premises WITHIN 7</bpmn:documentation>
+    <bpmn:task id="Task_4" name="MAY `photograph the premises`">
+      <bpmn:documentation>PARTY Landlord MAY `photograph the premises` WITHIN 7</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_4" name="after P7D" attachedToRef="Task_4" cancelActivity="true">
       <bpmn:documentation>the permission lapses: it is not exercised within 7, so the rule ends fulfilled</bpmn:documentation>
@@ -69,8 +69,8 @@
     <bpmn:exclusiveGateway id="Split_5" name="one of" gatewayDirection="Diverging">
       <bpmn:documentation>ROR: exactly one branch is entered</bpmn:documentation>
     </bpmn:exclusiveGateway>
-    <bpmn:task id="Task_6" name="MAY retain the deposit">
-      <bpmn:documentation>PARTY Landlord MAY retain the deposit WITHIN 30</bpmn:documentation>
+    <bpmn:task id="Task_6" name="MAY `retain the deposit`">
+      <bpmn:documentation>PARTY Landlord MAY `retain the deposit` WITHIN 30</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_6" name="after P30D" attachedToRef="Task_6" cancelActivity="true">
       <bpmn:documentation>the permission lapses: it is not exercised within 30, so the rule ends fulfilled</bpmn:documentation>
@@ -78,8 +78,8 @@
         <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P30D</bpmn:timeDuration>
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
-    <bpmn:task id="Task_7" name="MAY apply to the tribunal">
-      <bpmn:documentation>PARTY Landlord MAY apply to the tribunal WITHIN 30</bpmn:documentation>
+    <bpmn:task id="Task_7" name="MAY `apply to the tribunal`">
+      <bpmn:documentation>PARTY Landlord MAY `apply to the tribunal` WITHIN 30</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_7" name="after P30D" attachedToRef="Task_7" cancelActivity="true">
       <bpmn:documentation>the permission lapses: it is not exercised within 30, so the rule ends fulfilled</bpmn:documentation>

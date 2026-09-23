@@ -33,8 +33,8 @@
     <bpmn:exclusiveGateway id="Split_0" name="one of" gatewayDirection="Mixed">
       <bpmn:documentation>ROR: exactly one branch is entered</bpmn:documentation>
     </bpmn:exclusiveGateway>
-    <bpmn:task id="Task_1" name="MUST pay monthly installment to ...">
-      <bpmn:documentation>PARTY `The Borrower` MUST pay monthly installment to ... WITHIN `Next Payment Due Date` PROVIDED `is money at least equal within error` OF `Amount Transferred`, (`Next Payment Due`&apos;s Amount)</bpmn:documentation>
+    <bpmn:task id="Task_1" name="MUST `pay monthly installment to` `The Lender` `Amount Transferred`">
+      <bpmn:documentation>PARTY `The Borrower` MUST `pay monthly installment to` `The Lender` `Amount Transferred` WITHIN `Next Payment Due Date` PROVIDED `is money at least equal within error` OF `Amount Transferred`, (`Next Payment Due`&apos;s Amount)</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_1" name="timeout" attachedToRef="Task_1" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within `Next Payment Due Date`</bpmn:documentation>
@@ -42,8 +42,8 @@
         <bpmn:condition xsi:type="bpmn:tFormalExpression">`Next Payment Due Date`</bpmn:condition>
       </bpmn:conditionalEventDefinition>
     </bpmn:boundaryEvent>
-    <bpmn:task id="Task_2" name="MUST pay monthly installment to ...">
-      <bpmn:documentation>PARTY `The Borrower` MUST pay monthly installment to ... WITHIN `Default After Days Beyond Commencement` PROVIDED `is money at least equal within error` OF `Amount Transferred`, `Next Payment Due Amount With Penalty`</bpmn:documentation>
+    <bpmn:task id="Task_2" name="MUST `pay monthly installment to` `The Lender` `Amount Transferred`">
+      <bpmn:documentation>PARTY `The Borrower` MUST `pay monthly installment to` `The Lender` `Amount Transferred` WITHIN `Default After Days Beyond Commencement` PROVIDED `is money at least equal within error` OF `Amount Transferred`, `Next Payment Due Amount With Penalty`</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_2" name="timeout" attachedToRef="Task_2" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged within `Default After Days Beyond Commencement`</bpmn:documentation>
@@ -52,8 +52,8 @@
       </bpmn:conditionalEventDefinition>
     </bpmn:boundaryEvent>
     <bpmn:endEvent id="End_3" name="Fulfilled" />
-    <bpmn:task id="Task_4" name="MUST pay monthly installment to ...">
-      <bpmn:documentation>PARTY `The Borrower` MUST pay monthly installment to ... PROVIDED `is money at least equal within error` OF `Amount Transferred`, `All Outstanding Debts`</bpmn:documentation>
+    <bpmn:task id="Task_4" name="MUST `pay monthly installment to` `The Lender` `Amount Transferred`">
+      <bpmn:documentation>PARTY `The Borrower` MUST `pay monthly installment to` `The Lender` `Amount Transferred` PROVIDED `is money at least equal within error` OF `Amount Transferred`, `All Outstanding Debts`</bpmn:documentation>
     </bpmn:task>
     <bpmn:boundaryEvent id="Boundary_4" name="unreachable: no WITHIN" attachedToRef="Task_4" cancelActivity="true">
       <bpmn:documentation>LEST: the obligation is not discharged — but the rule sets no WITHIN, and for every modal but SHANT this arm is reached only by the deadline passing, so nothing reaches it</bpmn:documentation>
