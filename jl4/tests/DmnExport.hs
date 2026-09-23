@@ -2234,7 +2234,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
   -- one of those groups is renamed apart instead. The golden fidelity report
   -- shows the same thing; this says it as an invariant rather than as a diff.
   it "fires D-FEELNAME zero times on the Reg CF corpus, by construction" $ do
-    src <- Text.readFile (examplesRoot </> "legal" </> "regcf" </> "regcf.l4")
+    src <- Text.readFile (examplesRoot </> "canon" </> "us" </> "regcf" </> "regcf.l4")
     let notes = (dmnReport (drgAsCli "regcf.l4" src)).notes
     [n | n <- notes, n.code == "D-FEELNAME"] `shouldBe` []
     [n | n <- notes, n.code == "D-RENAME"] `shouldSatisfy` (not . null)
@@ -2247,7 +2247,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
           src <- Text.readFile (examplesRoot </> "dmn" </> "gst-rate.l4")
           pure (drgAsCli "gst-rate.l4" src)
         corpusDrg = do
-          src <- Text.readFile (examplesRoot </> "legal" </> "regcf" </> "regcf.l4")
+          src <- Text.readFile (examplesRoot </> "canon" </> "us" </> "regcf" </> "regcf.l4")
           pure (drgAsCli "regcf.l4" src)
         notOkDrg n = do
           src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> n)
@@ -2806,7 +2806,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
   ----------------------------------------------------------------------
   describe "the deontic verdict lowering (R13, §16)" $ do
     let corpusDrg = do
-          src <- Text.readFile (examplesRoot </> "legal" </> "regcf" </> "regcf.l4")
+          src <- Text.readFile (examplesRoot </> "canon" </> "us" </> "regcf" </> "regcf.l4")
           pure (drgAsCli "regcf.l4" src)
         verdictDrg = do
           src <- Text.readFile (examplesRoot </> "dmn" </> "deontic-verdict.l4")
@@ -4048,7 +4048,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 --   It and @dmn\/ymd-dates.l4@ are the subjects whose engine cases FEED DATES;
 --   they divide the date surface between them, this one by CONSTRUCTOR
 --   (@Date d m y@) and that one by the other constructor (@YMD y m d@).
--- * @legal\/regcf\/regcf.l4@ is the REAL corpus — 1,241 lines and 102
+-- * @canon\/us\/regcf\/regcf.l4@ is the REAL corpus — 1,241 lines and 102
 --   decisions since the rule-version axis landed — written
 --   in the house @GIVEN@ + record style. It is here to be honest about what
 --   that costs: a DMN decision is a 0-ary variable, so every cross-decision
@@ -4067,7 +4067,7 @@ goldenSubjects =
     , "gst-rate"
     , "the dated-regime exhibit"
     )
-  , ( "legal" </> "regcf" </> "regcf.l4"
+  , ( "canon" </> "us" </> "regcf" </> "regcf.l4"
     , "regcf-corpus"
     , "the Reg CF corpus"
     )

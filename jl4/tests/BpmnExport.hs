@@ -2347,7 +2347,7 @@ spec = do
   -- arms do not line up with the table's rows, or quietly wiring nothing while
   -- the fidelity report still claimed a loss it no longer has.
   describe "the DMN wiring (PROCESS-TRACK.md §8.3)" $ do
-    let regcf = "legal" </> "regcf" </> "regcf.l4"
+    let regcf = "canon" </> "us" </> "regcf" </> "regcf.l4"
 
         wiredExport ruleName wiring = do
           dataDir <- Paths_jl4.getDataDir
@@ -2519,7 +2519,7 @@ spec = do
   -- regulative rules and a BPMN document holds exactly one process, so one
   -- source yields three pairs of goldens.
   --
-  -- The Reg CF rows read from @legal\/regcf\/regcf.l4@ — the corpus itself
+  -- The Reg CF rows read from @canon\/us\/regcf\/regcf.l4@ — the corpus itself
   -- (1,268 lines since the rule-version axis landed), not a fixture beside it. There used to be a hand-written
   -- @bpmn\/regcf.l4@ standing in for it, because the extractor could not see
   -- past an @IfThenElse@ to the deontic head and every corpus duty is written
@@ -2556,7 +2556,7 @@ spec = do
     , ("bpmn" </> "option.l4", "the option", "option")
     ]
 
-  regcfCorpus = "legal" </> "regcf" </> "regcf.l4"
+  regcfCorpus = "canon" </> "us" </> "regcf" </> "regcf.l4"
 
   goldenCase srcPath ruleName out ext render = do
     dataDir <- Paths_jl4.getDataDir

@@ -110,7 +110,7 @@ CASES = [
             "shape of two of the eleven winners. The ladder's simplified form "
             "costs 3.125 here and the emitted interview costs 2.875."},
     {"name": "regcf-denovo-intermediary",
-     "l4": "jl4/examples/legal/regcf/denovo/regcf-denovo.l4",
+     "l4": "jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4",
      "keepExport": "Determine whether a person is qualified to act as an intermediary",
      "decision": "`the person qualifies to act as an intermediary`",
      "why": "A REAL WINNER (decl 2.25 vs plan 1.75) driven in real docassemble. "

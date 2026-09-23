@@ -6,14 +6,14 @@ transactions, and financial statements.
 The financial statements are the part that scales with the size of the raise,
 and Rule 201(t) sets three tiers by aggregate offering amount:
 
-- at or below [$124,000](src:jl4/examples/legal/regcf/regcf.l4#L192) — financial
+- at or below [$124,000](src:jl4/examples/canon/us/regcf/regcf.l4#L192) — financial
   statements certified by the principal executive officer, with tax return
   information;
-- at or below [$618,000](src:jl4/examples/legal/regcf/regcf.l4#L202) — financial
+- at or below [$618,000](src:jl4/examples/canon/us/regcf/regcf.l4#L202) — financial
   statements reviewed by an independent public accountant;
 - above that — **audited** statements, with one exception: an issuer that has
   not previously sold securities under this exemption may supply reviewed
-  statements up to [$1,235,000](src:jl4/examples/legal/regcf/regcf.l4#L212).
+  statements up to [$1,235,000](src:jl4/examples/canon/us/regcf/regcf.l4#L212).
   That relief is bounded. Above the ceiling even a first-time issuer must be
   audited.
 

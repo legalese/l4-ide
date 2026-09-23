@@ -11,7 +11,7 @@
     "document": "bna-s1-revised"
   },
   "assembled": {
-    "local_path": "jl4/examples/legal/bna/source-s1.txt",
+    "local_path": "specs/todo/single-instruction-demo/schemas/fixtures/bna-source-s1.txt",
     "sha256": "a84c2b524dcf4b70900ecde967b656e99a9d4c5e896ea36eb3cced7e771913ac",
     "note": "The provenance-headed artifact P3 encodes from: the verbatim s 1 text with its F/C annotation lists, plus a s 50 definitional annex. This is the only digest in the bundle that pins bytes we hold, which is why the schema keeps it separate from the retrieved documents."
   },

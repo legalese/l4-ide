@@ -4484,7 +4484,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
   //     note, run small (--max-rows) so it stays a selftest rather than a job.
   {
     const l4 = process.env.L4;
-    const corpus = resolve(HERE, "../../jl4/examples/legal/regcf/regcf.l4");
+    const corpus = resolve(HERE, "../../jl4/examples/canon/us/regcf/regcf.l4");
     if (!l4 || !existsSync(l4)) {
       skip("the identity run agrees with itself", "$L4 is unset or missing");
     } else if (!existsSync(corpus)) {
@@ -4562,7 +4562,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     const l4 = process.env.L4;
     const shipped = resolve(
       HERE,
-      "../../jl4/examples/legal/regcf/denovo/surface-map.json",
+      "../../jl4/examples/canon/us/regcf/cleanroom/registers/surface-map.json",
     );
     if (!l4 || !existsSync(l4)) {
       skip(
@@ -4647,7 +4647,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     "bna",
   );
 
-  const CORPUS = resolve(REPO, "jl4/examples/legal/regcf/regcf.l4");
+  const CORPUS = resolve(REPO, "jl4/examples/canon/us/regcf/regcf.l4");
 
   // --- 1. the sidecar's split sections (R2/R3) ------------------------------
   //
@@ -4874,7 +4874,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
   {
     mkSidecar("selfdiff", {
       encodings: {
-        "cleanroom-a": { modules: ["jl4/examples/legal/regcf/regcf.l4"] },
+        "cleanroom-a": { modules: ["jl4/examples/canon/us/regcf/regcf.l4"] },
       },
     });
     const r = subjectRun("selfdiff");

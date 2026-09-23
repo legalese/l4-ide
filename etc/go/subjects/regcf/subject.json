@@ -32,24 +32,24 @@
   "citation": "17 CFR Part 227",
   "source_url": "https://www.ecfr.gov/current/title-17/chapter-II/part-227",
   "encoding": {
-    "main": "jl4/examples/legal/regcf/regcf.l4",
-    "wizard": "jl4/examples/legal/regcf/regcf-wizard.l4"
+    "main": "jl4/examples/canon/us/regcf/regcf.l4",
+    "wizard": "jl4/examples/canon/us/regcf/regcf-wizard.l4"
   },
   "checks": {
     "min_dated_arms": 2,
     "min_assertions": 20
   },
   "natlang_sources": {
-    "bundle": "jl4/examples/legal/regcf/denovo/source-bundle.json",
-    "register": "jl4/examples/legal/regcf/denovo/external-modifications.json"
+    "bundle": "jl4/examples/canon/us/regcf/cleanroom/registers/source-bundle.json",
+    "register": "jl4/examples/canon/us/regcf/cleanroom/registers/external-modifications.json"
   },
   "comparison": {
-    "fork_register": "jl4/examples/legal/regcf/denovo/fork-register.json",
-    "surface_map": "jl4/examples/legal/regcf/denovo/surface-map.json"
+    "fork_register": "jl4/examples/canon/us/regcf/cleanroom/registers/fork-register.json",
+    "surface_map": "jl4/examples/canon/us/regcf/cleanroom/registers/surface-map.json"
   },
   "encodings": {
     "cleanroom-2026-08": {
-      "modules": ["jl4/examples/legal/regcf/denovo/regcf-denovo.l4"],
+      "modules": ["jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4"],
       "checks": {
         "min_dated_arms": 0,
         "min_assertions": 39
@@ -87,13 +87,14 @@
     "p7-lts": {},
     "p7-mcp": {},
     "p7-tnr": {
-      "golden": "jl4/examples/legal/regcf/tests/regcf.nlg.golden",
-      "wizard_golden": "jl4/examples/legal/regcf/tests/regcf-wizard.nlg.golden"
+      "golden": "jl4/examples/canon/us/regcf/tests/regcf.nlg.golden",
+      "wizard_golden": "jl4/examples/canon/us/regcf/tests/regcf-wizard.nlg.golden"
     },
     "p7-wizard": {},
     "p7-akn": {}
   },
   "canon": {
-    "subject_path": "us/regcf"
+    "subject_path": "us/regcf",
+    "primary_row": "legalese"
   }
 }

@@ -67,7 +67,7 @@
       "file": "call-to-action.md"
     },
     "forks": {
-      "register": "jl4/examples/legal/regcf/fork-register.json"
+      "register": "jl4/examples/canon/us/regcf/registers/fork-register.json"
     },
     "how_it_works": {
       "file": "how-it-works.md"

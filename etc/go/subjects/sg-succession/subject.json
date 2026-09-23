@@ -96,12 +96,12 @@
     "min_assertions": 178
   },
   "natlang_sources": {
-    "bundle": "jl4/examples/legal/sg-succession/cleanroom-2026-08/source-bundle.json",
-    "register": "jl4/examples/legal/sg-succession/cleanroom-2026-08/external-modifications.json"
+    "bundle": "jl4/examples/canon/sg/succession/cleanroom/registers/source-bundle.json",
+    "register": "jl4/examples/canon/sg/succession/cleanroom/registers/external-modifications.json"
   },
   "comparison": {
-    "fork_register": "jl4/examples/legal/sg-succession/cleanroom-2026-08/fork-register.json",
-    "surface_map": "jl4/examples/legal/sg-succession/cleanroom-2026-08/surface-map.json"
+    "fork_register": "jl4/examples/canon/sg/succession/cleanroom/registers/fork-register.json",
+    "surface_map": "jl4/examples/canon/sg/succession/cleanroom/registers/surface-map.json"
   },
   "legs": {
     "p7-lts": {},
@@ -112,12 +112,12 @@
   "encodings": {
     "cleanroom-2026-08": {
       "modules": [
-        "jl4/examples/legal/sg-succession/cleanroom-2026-08/family-domain.l4",
-        "jl4/examples/legal/sg-succession/cleanroom-2026-08/wills-act.l4",
-        "jl4/examples/legal/sg-succession/cleanroom-2026-08/intestate-succession-act.l4",
-        "jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4",
-        "jl4/examples/legal/sg-succession/cleanroom-2026-08/guardianship-of-infants-act.l4",
-        "jl4/examples/legal/sg-succession/cleanroom-2026-08/family-cases.l4"
+        "jl4/examples/canon/sg/succession/cleanroom/family-domain.l4",
+        "jl4/examples/canon/sg/succession/cleanroom/wills-act.l4",
+        "jl4/examples/canon/sg/succession/cleanroom/intestate-succession-act.l4",
+        "jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4",
+        "jl4/examples/canon/sg/succession/cleanroom/guardianship-of-infants-act.l4",
+        "jl4/examples/canon/sg/succession/cleanroom/family-cases.l4"
       ],
       "checks": {
         "min_dated_arms": 0,
@@ -131,6 +131,7 @@
     }
   },
   "canon": {
-    "subject_path": "sg/succession"
+    "subject_path": "sg/succession",
+    "primary_row": "legalese"
   }
 }

@@ -33,13 +33,13 @@
   "sides": {
     "left": {
       "label": "corpus",
-      "module": "jl4/examples/legal/regcf/regcf.l4",
+      "module": "jl4/examples/canon/us/regcf/regcf.l4",
       "timezone": "America/New_York",
       "note": "The committed hand-built encoding. At G2 this side is the diff oracle's reference, per SPEC.md §5."
     },
     "right": {
       "label": "corpus (identity)",
-      "module": "jl4/examples/legal/regcf/regcf.l4",
+      "module": "jl4/examples/canon/us/regcf/regcf.l4",
       "timezone": "America/New_York",
       "note": "The same file. Self-test B points this at a scratch copy with one constant moved."
     }

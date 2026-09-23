@@ -1,7 +1,7 @@
 Selling shares in your company to the public normally means registering the
 offering with the Securities and Exchange Commission. Regulation Crowdfunding is
 the rulebook for one exemption from that requirement: an issuer may
-[offer or sell securities in reliance on section 4(a)(6) of the Securities Act of 1933](src:jl4/examples/legal/regcf/regcf.l4#L889 "verbatim"),
+[offer or sell securities in reliance on section 4(a)(6) of the Securities Act of 1933](src:jl4/examples/canon/us/regcf/regcf.l4#L889 "verbatim"),
 raising money from ordinary people over the internet, if it satisfies the
 conditions this Part sets out.
 
@@ -12,7 +12,7 @@ round, and a member of the public deciding how much of their savings to put in.
 
 **It binds four kinds of party, not one.** The encoding names them as the
 regulation does —
-[Issuer Intermediary Investor Purchaser](src:jl4/examples/legal/regcf/regcf.l4#L89-L93 "verbatim")
+[Issuer Intermediary Investor Purchaser](src:jl4/examples/canon/us/regcf/regcf.l4#L89-L93 "verbatim")
 — the company that raises the money, the funding portal or broker whose platform
 the offering sits on, the person who buys, and the holder who later wants to
 sell. A reader who thinks of this as "the rules for companies" will miss half of
@@ -33,11 +33,11 @@ worth reading where it lands on the first.
 
 **What it covers, and what it leaves out.** The encoding deliberately mirrors
 one external summary of this regulation, which
-[presents Reg CF as eight numbered requirement groups](src:jl4/examples/legal/regcf/regcf.l4#L14-L17 "verbatim"),
+[presents Reg CF as eight numbered requirement groups](src:jl4/examples/canon/us/regcf/regcf.l4#L14-L17 "verbatim"),
 and the rule-by-rule sections under **The rules** take seven of the eight. The
 one with no section of its
 own is
-[Intermediary obligations](src:jl4/examples/legal/regcf/regcf.l4#L23 "verbatim"),
+[Intermediary obligations](src:jl4/examples/canon/us/regcf/regcf.l4#L23 "verbatim"),
 the conduct regime for the funding portal. The encoding reaches it only as far
 as the exemption depends on it, so a section devoted to it would have had almost
 nothing to say; what it does have is said under **The bargain** and under
