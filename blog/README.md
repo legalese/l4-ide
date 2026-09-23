@@ -1,5 +1,8 @@
 # The L4 blog — prefiguring the papers
 
+**STATUS 2026-09-23: LAY-READER PASS.** Meng ruled on 2026-09-23 that the first reader is the intelligent lay reader and that posts have no length ceiling (`STYLE.md` §1 and §3); the length figures in the paragraph below predate that ruling.
+Post 1 has been rewritten to it (about 8,500 words of prose, opening on Robodebt) and awaits Meng's read; posts 2–9 and S1 have not been touched.
+
 **STATUS 2026-09-14 (evening): DRAFTING.** Posts 1, 2, 3 and 5 have been machine-drafted, critiqued
 by six reader personas and a live fact-check, revised, and gated, with the bench answers of 2026-09-14 folded in; posts 4 and 6 have machine drafts
 with critiques gathered and revision pending; 7, 8, 9 and S1 exist as INITIAL DRAFTS (machine-drafted

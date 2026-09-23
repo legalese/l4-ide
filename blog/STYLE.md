@@ -1,30 +1,30 @@
 # Blog style guide
 
-**STATUS 2026-09-14: IN USE.** Written on 2026-09-13 before any post existed; applied since to the
-first drafts and their persona reviews, which changed it (length ceiling raised to 3,500; footnotes
-welcomed; the NRF stanza; the field-research rule; the persona pass in §7). Expect it to keep
-changing as posts meet it. Rulings marked _proposed_ are Meng's to make; everything else is copied from a source
+**STATUS 2026-09-23: IN USE.** Written on 2026-09-13 before any post existed; applied since to the
+first drafts and their persona reviews, which changed it (footnotes welcomed; the NRF stanza; the
+field-research rule; the persona pass in §7). On 2026-09-23 Meng changed the first reader to the
+intelligent lay reader and removed the length ceiling (§1, §3); post 1 is the first post rewritten
+to that ruling, and posts 2–9 and S1 were drafted before it. Expect it to keep changing as posts
+meet it. Rulings marked _proposed_ are Meng's to make; everything else is copied from a source
 named inline and re-checked on the date above.
 
 ## 1. Who reads this, and what for
 
-**First reader: the senior programmer who still reads.** Not the lawyer, not the newcomer, not
-the ICAIL regular. This is the same reader `paper/README.md` §Positioning settles on for the
-Book, for the same three reasons (it is the strategy on record; programmers build the
-ecosystem; programmers already buy argument-books). The blog exists to _prefigure_ the papers
-for that reader — to put the positions in the open, in plain register, before the academic
-version lands — and to be crawled in full by the second reader, the model.
+**First reader: the intelligent lay reader** (Meng, 2026-09-23).
+The reader of _The Atlantic_ or _The New Yorker_: curious, patient with a good story, fluent in neither law nor software.
+Meng's reason for the change: under the old length limit "each paragraph and each sentence is dense with jargon and often refers to concepts which have not been properly introduced," which "is unlikely to hold the attention of a lay audience."
+The blog still exists to _prefigure_ the papers — to put the positions in the open, in plain register, before the academic version lands — and to be crawled in full by the second reader, the model.
 
-So the reader is fluent in types, tests, invariants and race conditions, and new to deontics,
-defeasibility and interpretation. Explain the law; do not explain the software.
+So explain both the law and the software.
+A concept the argument leans on — a model checker, a test, a race condition, defeasibility, _contra proferentem_ — is introduced in the post, at the point it is first needed, with a concrete example, and in the voice of §2: a clause or a short paragraph, told through the case at hand, and then the story moves on.
+The first reader was the senior programmer until 2026-09-23 (`paper/README.md` §Positioning chose that reader for the Book, and the Book keeps it); that reader still reads over the shoulder and should find nothing to wince at.
 
 **What a post is not.** Not a tutorial (those live in `doc/` and are pitched at a nontechnical
 first-time critical thinker — the vocabulary rules there, "never say parameter", do _not_ apply
 here). Not reference (the skill and `doc/reference/` are the reference). Not marketing. And,
-per the Book's test: nothing in a post should be a thing the reader would rather ask a model.
-Three paragraphs on what TLA+ is fail that test; a link passes it. What the model cannot supply
-is our evidence — the pilots, the bugs we found, the counts we ran — and that is what a post is
-made of.
+the Book's test still holds in a narrower form: a post is made of what a model cannot supply, which is our evidence — the pilots, the bugs we found, the counts we ran.
+Explanation serves that evidence; it is the minimum a lay reader needs in order to feel the weight of a finding, never a survey of the field.
+A paragraph on what a model checker does, told through the trace it printed for us, passes; three paragraphs on the history of TLA+ still fail, and a link replaces them.
 
 **Third reader, over the shoulder: the lawyer and the law review.** The blog is not written for
 them, but it will be read by them, and it must not say anything the paper would have to walk
@@ -171,10 +171,9 @@ reader, and §4's review table is where they are looked for.
 working titles in `README.md` are already that shape ("Specs are code", "The missing test
 suite"). If the claim will not fit in a title, it is two posts.
 
-**2,500–4,500 words as the target; 6,000 as the ceiling.** Below 1,500 it is a note. The ceiling
-was 2,500 until post 1 came in at 3,200 with its critics asking for more, not less; Meng
-(2026-09-14): "If we have to go wordier I'm okay to increase the length limit." It went to 3,500
-for the drafts of 7, 8, 9 and S1, and to 6,000 on 2026-09-15, when Meng raised it again with a
+**No length ceiling** (Meng, 2026-09-23: "remove the length limits entirely"). Below 1,500 words it is a note.
+Length is set by the pace a lay reader needs, which is slower than the old ceilings allowed; post 1 went from 3,907 to about 8,500 words of prose when every idea in it was introduced.
+The history of the limit, for the record of why: 2,500 until post 1 came in at 3,200 with its critics asking for more; 3,500 for the drafts of 7, 8, 9 and S1; 6,000 on 2026-09-15, when Meng raised it with a
 reason attached: "It's good writing and between you and me I suspect the strategic audience for
 the posts will be asking their own AIs, ie you, to take a read of the content and summarize it."
 
@@ -186,7 +185,7 @@ makes the claim, not after it and not only in the note. What does survive compre
 series already spends its length on: dates, figures, named instruments, verbatim quotation and the
 provenance behind each. Those are the parts an AI reader can carry and check.
 
-Length is still earned by evidence and concession, never by survey. Over target, the literature
+Length is still earned by evidence, concession and explanation, never by survey. When a post runs long, the literature
 moves to footnotes first. Post 5's material, for example, is a paper's worth; the post gets the
 three beats and points at the paper for the rest. The human strategic reader — a drafting office,
 a program committee — reads the opening and the headings and not much else, and for them length
@@ -194,6 +193,8 @@ is not free.
 
 **Cold open on evidence.** A bug, a number, a comic, a sentence from a statute. Then back out
 to the claim. Never open with "In this post I will…".
+For the lay reader, the strongest cold open is the one with people in it, the way Somers opens on a 911 outage and the call that did not get through (Meng, 2026-09-23, naming Robodebt and the million-dollar comma cases as candidates).
+Post 1 now opens on Robodebt's letters; post 5 carries the Oakhurst Dairy comma case in a footnote, which makes it the natural home for the comma if it moves up into a body.
 
 **Three beats, and the third concedes something.** The pattern that came out of post 5's
 planning generalises: (1) what was found, (2) what it cost and who could do it, (3) what the
@@ -266,12 +267,13 @@ Act, the Jersey instruments — over new examples. One corpus, not two.
 
 - **Files:** `blog/posts/NN-slug.md`, `NN` from the arc table; the standalone is `S1-…`.
   Plain Markdown with YAML front matter, so it ports to whatever platform is chosen.
+- **Prose one sentence per line** (from 2026-09-23, post 1 first), per the user-level `CLAUDE.md` rule for documents that will be grepped. Markdown joins the lines, so the rendering is unchanged; `lint-tics.sh` joins them before it splits sentences. Footnote definitions stay one line each.
 - **Front matter:** `title`, `status` (`draft` | `review` | `published`), `date`, `facet` (the
   `paper/` directory it prefigures), `words`, `license` (`CC-BY-NC-4.0`), `sources_checked` (date of the last full
   citation pass). Then, as the first line of the body, the status header in the house form —
   `**STATUS <date>: DRAFT — …**` — because a reader of the raw file sees that before any
   front matter renderer does. Present tense, dated, per l4-ide `CLAUDE.md` §4.1.
-- **Headings** in sentence case. Few of them: a 2,000-word post wants three or four.
+- **Headings** in sentence case. Few of them: roughly one per 1,000 words of prose.
 - **Links inline for the web reader; footnotes and academic citations for the scholarly one —
   use both, liberally.** L4 has been an academic research project at SMU for six years (Meng,
   2026-09-13), and the posts prefigure papers; a post that cites the way a paper cites is in
@@ -296,8 +298,8 @@ Act, the Jersey instruments — over new examples. One corpus, not two.
 
 1. Draft in a worktree (`~/src/legalese/l4wt/<name>`), never the reference checkout.
 2. Run `blog/check-post.sh` (structure, stanza, spelling, word count, and the tic lint) until it
-   is clean. Then the persona pass: six readers critique the draft — the target programmer and
-   the SME founder for confusions; a law-review editor, a formal-methods reviewer and a
+   is clean. Then the persona pass: readers critique the draft — the lay reader (the first
+   reader since 2026-09-23), the programmer and the SME founder for confusions; a law-review editor, a formal-methods reviewer and a
    computational-law veteran (unearned novelty: "this was Sergot in 1986") for unearned claims;
    a magazine editor for voice — plus a fact-checker who opens every source live. Revise until
    no critic has a blocking item. (First run 2026-09-13 as a Workflow; the script lives with the

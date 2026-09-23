@@ -24,7 +24,9 @@ for f in "$@"; do
   if [ "${tw:-0}" -gt 12 ]; then echo "warn $f: title is $tw words (>12)"; fi
   # epigram ratio: share of paragraphs whose final sentence is <=6 words with no digit/quote/proper noun.
   # Exemplars measured 2026-09-13 run 6-19%; warn above 25%. Individual epigrams are allowed (Meng's ruling).
-  printf '%s\n' "$body" | awk -v f="$f" 'BEGIN{RS="";FS="\n"} { if ($0 ~ /^[[:space:]]*[-|#>]/) next; np++;
+  # Soft line breaks are joined first: posts are written one sentence per line (2026-09-23), and a
+  # newline between sentences must split them exactly as a space does.
+  printf '%s\n' "$body" | awk -v f="$f" 'BEGIN{RS="";FS="\n"} { if ($0 ~ /^[[:space:]]*[-|#>]/) next; gsub(/\n/," "); np++;
      n=split($0,s,/[.!?]["”]? +/); last=s[n]; sub(/[.!?"”]+$/,"",last); w=split(last,ww," ");
      if (w>0 && w<=6 && last !~ /[0-9"“”]/) { caps=0; for(i=2;i<=w;i++) if (ww[i] ~ /^[A-Z]/) caps++; if (caps==0) ne++ } }
      END { if (np>0 && ne/np>0.25) printf "warn %s: epigram ratio %d/%d paragraphs (>25%%) — the figure is carrying the piece\n", f, ne, np }'

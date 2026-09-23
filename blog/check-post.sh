@@ -27,7 +27,8 @@ for f in "$@"; do
   grep -n '\[NEEDS MENG' "$f" | head -8 | sed "s|^|warn $f: needs-Meng marker at line |"
   # word count of prose (front matter, Sources, stanza excluded)
   words=$(printf '%s\n' "$body" | awk '/^#+ *Sources/{exit} {print}' | wc -w | tr -d ' ')
-  [ "$words" -ge 1500 ] && [ "$words" -le 6000 ] || warn "prose is $words words (target 2,500–4,500; ceiling 6,000)"
+  # No ceiling since 2026-09-23 (STYLE.md §3): length is paced by the lay reader, not capped. Below 1,500 it is a note.
+  [ "$words" -ge 1500 ] || warn "prose is $words words (below 1,500 it is a note, not a post)"
   decl=$(sed -n 's/^words: *//p' "$f" | head -1); [ -n "$decl" ] && [ "${decl:-0}" -ne 0 ] && { d=$(( decl>words ? decl-words : words-decl )); [ "$d" -gt 150 ] && warn "front matter says words: $decl, counted $words"; }
   # US spelling: a short list of British forms that are not inside quotation marks
   brit=$(printf '%s\n' "$body" | grep -nE '\b([Ff]ormalis(e|ed|es|ing|ation)|[Rr]ecognis(e|ed|es|ing)|[Oo]rganis(e|ed|es|ation)|[Bb]ehaviour|[Cc]olour|[Ff]avour|[Ll]icence|[Pp]ractising|[Jj]udgement|[Aa]nalys(e|ed)|[Cc]entre|[Pp]rogramme)\b' | grep -vE 'Pre-Positioning Programme|Research Programme|Organisation for Economic|organisation-automaton|^[0-9]+:>' | grep -vE '"[^"]*\b([Ff]ormalis|[Rr]ecognis|[Oo]rganis|[Bb]ehaviour|[Cc]olour|[Ff]avour|[Ll]icence|[Pp]ractising|[Jj]udgement|[Aa]nalys|[Cc]entre|[Pp]rogramme)[^"]*"' | cut -c1-120 | head -5)
@@ -35,7 +36,7 @@ for f in "$@"; do
   # acronym spelled out: any ALLCAPS token of 3-6 letters in the PROSE (not footnotes/Sources, not code spans,
   # not house markers, not citation identifiers) must appear as '… (ABC)' somewhere in the post, or be allowlisted
   prose=$(printf '%s\n' "$body" | awk '/^#+ *Sources/{exit} /^```/{fence=!fence; next} fence{next} /^\[\^[0-9]+\]:/{next} {print}' | perl -pe 's/`[^`\n]*`//g; s/\[(?:NEEDS MENG|UNVERIFIED)[^\]]*\]//g; s/\*\*STATUS[^*]*\*\*//g')
-  printf '%s\n' "$prose" | grep -oE '\b[A-Z]{3,6}\b' | sort -u | while read -r a; do case "$a" in NRF|SMU|USA|AWS|PDF|URL|API|SQL|HTML|CSS|JSON|YAML|DOI|MIT|IBM|GPT|LLM|LLMs|TLA|NZ|UK|US|EU|OECD|ICAIL|JURIX|DEON|CACM|SOSP|ACM|CC|BY|NC|MUST|MAY|SHANT|GIVEN|DECIDE|ASSERT|IF|AND|OR|SHOULD|NOT|IS|A|THE|OF|FOR|EVAL|UNDER|RULES|EFFECTIVE|AT|DECLARE|HAS|ONE|TRUE|FALSE|STATUS|DRAFT|SC|EC|NEEDS|MENG|README|STYLE|SPEC|NOTES|CODEX|PROLEG|PROLOG|SWI|SWISH|LNCS|SGCA|SGHC|CELEX|EUR|EEC|CJEU|UPPAAL|NUSMV|SPIN|ATVA|ICTAC|ICFP|OPA|HSPEC|ZFS|SMR|CPU|ISO|IEEE|CXO|CEO|CTO|FCA|ABC|LSJ|NZLII|VUB|QUB|OUP|ENS|ICT|NUS|LTS|IR|CTD|FCL|ATL|LTL|CTL|TCTL|SMT|BMC|IC|WASM|NLG|DMN|BPMN|TCK|DVA|DHS|RR|YC|SAFE|OSM|LII|FTC|UPL|WJP|LSC|NUPEDIA) continue;; esac; printf '%s\n' "$body" | grep -qE "\($a\)" || echo "warn $f: acronym $a never spelled out as '… ($a)'"; done
+  printf '%s\n' "$prose" | grep -oE '\b[A-Z]{3,6}\b' | sort -u | while read -r a; do case "$a" in NRF|SMU|USA|AWS|PDF|URL|API|SQL|HTML|CSS|JSON|YAML|DOI|MIT|IBM|GPT|LLM|LLMs|TLA|NZ|UK|US|EU|OECD|ICAIL|JURIX|DEON|CACM|SOSP|ACM|CC|BY|NC|MUST|MAY|SHANT|GIVEN|DECIDE|ASSERT|IF|AND|OR|SHOULD|NOT|IS|A|THE|OF|FOR|EVAL|UNDER|RULES|EFFECTIVE|AT|DECLARE|HAS|ONE|TRUE|FALSE|STATUS|DRAFT|SC|EC|NEEDS|MENG|README|STYLE|SPEC|NOTES|CODEX|PROLEG|PROLOG|SWI|SWISH|LNCS|SGCA|SGHC|CELEX|EUR|EEC|CJEU|UPPAAL|NUSMV|SPIN|ATVA|ICTAC|ICFP|OPA|HSPEC|ZFS|SMR|CPU|ISO|IEEE|CXO|CEO|CTO|FCA|ABC|LSJ|NZLII|VUB|QUB|OUP|ENS|ICT|NUS|LTS|IR|CTD|FCL|ATL|LTL|CTL|TCTL|SMT|BMC|IC|WASM|NLG|DMN|BPMN|TCK|DVA|DHS|RR|YC|SAFE|OSM|LII|FTC|UPL|WJP|LSC|NUPEDIA|BASIC) continue;; esac; printf '%s\n' "$body" | grep -qE "\($a\)" || echo "warn $f: acronym $a never spelled out as '… ($a)'"; done
   "$HERE/lint-tics.sh" "$f" || rc=1
   [ $rc -eq 0 ] && echo "ok   $f (structure clean)"
 done
