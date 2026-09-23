@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="120 70 800 460" role="img" aria-label="BPMN diagram of the Reg CF resale restriction">
+<style>
+svg{--ink:#191511;--soft:#5d5648;--line:#ddd5c6;--wax:#b03d29;--jade:#2e7d5b;--gold:#9a7b2d;--card:#ffffff;--paper:#faf7f1}
+@media (prefers-color-scheme:dark){svg{--ink:#eae4d8;--soft:#a49a88;--line:#332e26;--wax:#e06a52;--jade:#5fbd93;--gold:#d4af52;--card:#1d1a16;--paper:#141210}}
+.lane{fill:none;stroke:var(--line)}
+.lbl2{font-family:"SF Mono",Menlo,monospace;font-size:12px;fill:var(--soft)}
+.nm{font-family:"SF Mono",Menlo,monospace;font-size:13px;fill:var(--ink)}
+.cond{font-family:"SF Mono",Menlo,monospace;font-size:11px;fill:var(--soft)}
+.flow{fill:none;stroke:var(--soft);stroke-width:2}
+.node{fill:var(--card);stroke:var(--soft);stroke-width:2}
+</style>
+  <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="var(--soft)"/></marker></defs>
+  <rect class="lane" x="130" y="80" width="770" height="440"/>
+  <line x1="160" y1="80" x2="160" y2="520" stroke="var(--line)"/>
+  <line x1="160" y1="240" x2="900" y2="240" stroke="var(--line)"/>
+  <text class="lbl2" transform="translate(150,160) rotate(-90)" text-anchor="middle">Purchaser</text>
+  <text class="lbl2" transform="translate(150,380) rotate(-90)" text-anchor="middle">(unassigned)</text>
+  <path class="flow" d="M268,300 H405" marker-end="url(#ah2)"/>
+  <path class="flow" d="M455,300 H494 V360 H674 V300 H772" marker-end="url(#ah2)"/>
+  <path class="flow" d="M455,300 H520 V140 H560" marker-end="url(#ah2)"/>
+  <path class="flow" d="M632,198 H700 V300 H772" marker-end="url(#ah2)"/>
+  <path class="flow" d="M660,140 H726 V420 H772" marker-end="url(#ah2)"/>
+  <circle class="node" cx="250" cy="300" r="18"/>
+  <polygon class="node" points="430,275 455,300 430,325 405,300"/>
+  <path d="M422,292 L438,308 M438,292 L422,308" stroke="var(--soft)" stroke-width="2"/>
+  <text class="lbl2" x="430" y="266" text-anchor="middle">one of</text>
+  <rect class="node" x="560" y="100" width="100" height="80" rx="8"/>
+  <text class="nm" x="610" y="133" text-anchor="middle">SHANT transfer</text>
+  <text class="nm" x="610" y="151" text-anchor="middle">the securities</text>
+  <circle class="node" cx="632" cy="180" r="18"/>
+  <circle cx="632" cy="180" r="13" fill="none" stroke="var(--soft)" stroke-width="1.5"/>
+  <text class="cond" x="600" y="215" text-anchor="middle">deadline passes,</text>
+  <text class="cond" x="600" y="229" text-anchor="middle">not performed</text>
+  <circle class="node" cx="790" cy="300" r="18" stroke="var(--jade)" stroke-width="4"/>
+  <text class="nm" x="790" y="338" text-anchor="middle" fill="var(--jade)">Fulfilled</text>
+  <circle class="node" cx="790" cy="420" r="18" stroke="var(--wax)" stroke-width="4"/>
+  <path d="M783,414 L790,422 L786,422 L797,428" fill="none" stroke="var(--wax)" stroke-width="2"/>
+  <text class="nm" x="790" y="458" text-anchor="middle" fill="var(--wax)">Breach</text>
+  <text class="cond" x="505" y="352">exception in Rule 501(a) applies</text>
+  <text class="cond" x="528" y="262">otherwise</text>
+</svg>

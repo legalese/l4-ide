@@ -1,0 +1,102 @@
+-- Worked examples for doc/tutorials/getting-started/grouping-and-precedence.md
+--
+-- Every snippet quoted in that tutorial lives here, so the page cannot drift
+-- from code that compiles. The ladder figures beside it are generated from
+-- THIS file through the LSP -- see ts-shared/ladder-svg/demo/grouping.ts.
+
+§ `Grouping and precedence`
+
+-- The same three atoms, grouped two ways by indentation alone.
+
+GIVEN `a` IS A BOOLEAN
+      `b` IS A BOOLEAN
+      `c` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `left grouped` IF
+            `a`
+        OR  `b`
+    AND `c`
+
+GIVEN `a` IS A BOOLEAN
+      `b` IS A BOOLEAN
+      `c` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `right grouped` IF
+        `a`
+    OR      `b`
+        AND `c`
+
+-- On one line, with no layout signal, the precedence table decides.
+GIVEN `a` IS A BOOLEAN
+      `b` IS A BOOLEAN
+      `c` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `one line` IF `a` OR `b` AND `c`
+
+#EVAL `left grouped`  TRUE FALSE FALSE   -- FALSE
+#EVAL `right grouped` TRUE FALSE FALSE   -- TRUE
+#EVAL `one line`      TRUE FALSE FALSE   -- TRUE: a OR (b AND c)
+
+§ `Chew — bracketing`
+
+GIVEN `makes improper use of his position` IS A BOOLEAN
+      `an advantage for himself`           IS A BOOLEAN
+      `an advantage for any other person`  IS A BOOLEAN
+      `detriment to the corporation`       IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `contravenes s 229(4)` IF
+        "An officer or employee of a corporation shall not"
+    ... `makes improper use of his position`
+    ... "as such an officer or employee,"
+    AND     "to gain, directly or indirectly, an advantage"
+        ..  `an advantage for himself`
+        ..  `an advantage for any other person`
+        ..  "or to cause"
+        OR  `detriment to the corporation`
+
+#EVAL `contravenes s 229(4)` TRUE FALSE FALSE TRUE    -- TRUE
+#EVAL `contravenes s 229(4)` TRUE FALSE FALSE FALSE   -- FALSE
+
+§ `Oakhurst — tokenization`
+
+GIVEN `packs the goods` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `exempt — packing is one activity` IF
+        "packing for shipment or distribution"
+    ... `packs the goods`
+
+GIVEN `packs the goods for shipment` IS A BOOLEAN
+      `distributes the goods`        IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `exempt — packing and distribution are two` IF
+        "packing for shipment"   ... `packs the goods for shipment`
+    OR  "or distribution"        ... `distributes the goods`
+
+-- A driver who distributes but does not pack: exempt on one reading only.
+#EVAL `exempt — packing is one activity`          FALSE         -- FALSE
+#EVAL `exempt — packing and distribution are two` FALSE TRUE    -- TRUE
+
+§ `Rogers — attachment`
+
+GIVEN `initial term is running`        IS A BOOLEAN
+      `a renewal term is running`      IS A BOOLEAN
+      `one year notice has been given` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `in force — notice binds renewals only` IF
+            "for a period of five (5) years"      ... `initial term is running`
+        OR      "and thereafter for successive terms"
+                ... `a renewal term is running`
+                AND NOT `one year notice has been given`
+
+GIVEN `initial term is running`        IS A BOOLEAN
+      `a renewal term is running`      IS A BOOLEAN
+      `one year notice has been given` IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `in force — notice binds both` IF
+            "for a period of five (5) years"      ... `initial term is running`
+        OR  "and thereafter for successive terms" ... `a renewal term is running`
+    AND NOT `one year notice has been given`
+
+-- The dispute: initial term running, notice served.
+#EVAL `in force — notice binds renewals only` TRUE FALSE TRUE   -- TRUE, still in force
+#EVAL `in force — notice binds both`          TRUE FALSE TRUE   -- FALSE, terminated

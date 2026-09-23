@@ -13,6 +13,7 @@ New to L4? Start here:
 - **[Version Control for Rules](getting-started/version-control-for-rules.md)** - Manage L4 files with git
 - **[Encoding Legislation](getting-started/encoding-legislation.md)** - Turn legal text into L4
 - **[Wedding Vows](getting-started/wedding-vows.md)** - Fun intro to regulative rules
+- **[Grouping and Precedence](getting-started/grouping-and-precedence.md)** - What binds to what, why L4 groups by indentation, and three cases where a comma was the whole dispute
 
 See also: [Common Patterns](../reference/patterns/common-patterns.md) - a quick reference of frequently used L4 patterns.
 
@@ -24,6 +25,14 @@ Write functions that read like legal prose:
 - **[Optimising for Natural Language Document Generation with `@nlg`](natural-language-functions/optimising-natural-language-generation.md)** - Make the rendered prose read as naturally as possible, then refine it with Legalese AI
 
 **Prerequisites:** Basic function syntax
+
+## Multi-Temporal Modeling
+
+Model rules that change over time:
+
+- **[Multi-Temporal Rule Modeling](multi-temporal-modeling/multi-temporal-rule-modeling.md)** - System time, valid time, and rule-effective time: the three axes L4 tracks, and how amendments/effective dates fall out of them
+
+**Prerequisites:** Basic L4 knowledge, familiarity with dates
 
 ## Deployment and Legalese Cloud
 
@@ -37,6 +46,7 @@ Export your L4 rules as live REST API endpoints:
 - **[Use Deployed Rules from an AI Agent (MCP)](legalese-cloud/agent-marketplace.md)** - Connect an agent to the org's rules MCP server; it finds and calls the right rule (scales to many deployments)
 - **[WebMCP Embed Script](legalese-cloud/webmcp-embed.md)** - One embed tag so your website serves its own rules
 - **[RESTful OpenAPI Specification](legalese-cloud/openapi-spec.md)** - Generate clients and call rules as plain REST
+- **[Exporting L4 to Blawx (and Importing Back)](blawx/l4-to-blawx.md)** - Compile L4 decisions into a Blawx project with `l4 blawx`, run them under s(CASP) with English justification trees, and lift Blawx projects back into L4
 
 **Prerequisites:** Basic L4 knowledge
 

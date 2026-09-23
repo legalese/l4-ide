@@ -2,6 +2,8 @@
 
 Regulative keywords express legal obligations, permissions, prohibitions, and their consequences. They form the core of L4's contract and regulation modeling.
 
+> **See also:** [Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md) — how L4 decides _who may perform which action_ (the performer/agreement rule, duplex actions, `EXACTLY`-applied parameterised actions, and higher-order procurement), with worked ✅/❌ examples.
+
 ## Overview
 
 ### Deontic Modalities
@@ -90,6 +92,10 @@ PARTY Alice MUST pay 100 WITHIN 30
 -- Anchored to an event
 PARTY Seller MUST deliver WITHIN 5 days OF `order confirmation`
 ```
+
+### Boundary
+
+The deadline boundary is inclusive: an action arriving _exactly at_ the deadline instant is timely. The failure/expiry path fires only once an event's timestamp is _strictly greater_ than the deadline (i.e. the deadline has _passed_).
 
 ### See Also
 
@@ -223,12 +229,24 @@ MUST `Amount Transferred`
 
 ## EXACTLY (Exact Action Matching)
 
-Changes how the action is matched against incoming events during contract execution. Without EXACTLY, the action is a pattern (matched structurally, like WHEN in CONSIDER -- can bind variables). With EXACTLY, the action is an expression that is evaluated to a value and compared for equality against the event.
+Changes how (part of) the action is matched against incoming events during contract execution. Without EXACTLY, the action is a pattern (matched structurally, like WHEN in CONSIDER -- can bind variables). With EXACTLY, the marked part is an expression that is evaluated to a value and compared for equality against the corresponding part of the event.
+
+There are two placements:
+
+1. **Whole-action**: `MUST EXACTLY expression` -- the entire action expression is evaluated and the event must equal the result.
+2. **Per-argument**: `MUST action (EXACTLY expression) pattern...` -- the action's name and its other arguments are still matched as patterns, but the argument marked EXACTLY must equal the evaluated expression.
+
+The per-argument form comes with two constraints:
+
+- **Parenthesize the EXACTLY argument** whenever the action has more than one argument. EXACTLY greedily consumes everything to its right, so `MUST transfer EXACTLY 100 recipient` is read as a single EXACTLY expression spanning `100 recipient` and fails to typecheck ("transfer expects 2 arguments, but you are applying it to 1"). Write `MUST transfer (EXACTLY 100) recipient` instead. For a single-argument action, `MUST pay EXACTLY 100` needs no parentheses.
+- **Order EXACTLY arguments before pattern binders.** A binder to the left of an EXACTLY argument -- e.g. `MUST transfer amt (EXACTLY Bob)` -- is currently rejected at evaluation time with an internal "not in scope" error. Until that limitation is lifted, put the exact arguments first: `MUST transfer (EXACTLY 100) recip` works, matching the amount exactly while still binding `recip`.
 
 ### Syntax
 
 ```l4
 MUST EXACTLY expression
+MUST actionName EXACTLY expression             -- single-argument action
+MUST actionName (EXACTLY expression) pattern   -- multi-argument action
 ```
 
 ### Examples
@@ -237,12 +255,19 @@ MUST EXACTLY expression
 -- Without EXACTLY: "pay" is a pattern, matches any pay-shaped event
 PARTY buyer MUST pay
 
--- With EXACTLY: expression is evaluated, event must equal the result
+-- Whole-action: the expression is evaluated, event must equal the result
 PARTY lender MUST EXACTLY send capital to borrower
 
--- Exact value match
+-- Per-argument, single argument: pay's amount must equal 100 exactly
 PARTY Alice
-MUST pay price EXACTLY 100
+MUST pay EXACTLY 100
+WITHIN 30
+
+-- Per-argument, multiple arguments: parenthesize EXACTLY and put it before
+-- any binders; the amount must be exactly 100, the recipient is bound
+-- as the pattern variable recip
+PARTY Alice
+MUST transfer (EXACTLY 100) recip
 WITHIN 30
 ```
 
@@ -347,6 +372,8 @@ RAND
 ## ROR (Parallel OR of Obligations)
 
 Disjunctive choice between deontic obligations. EITHER obligation being fulfilled suffices for the compound to be fulfilled. If either side fulfills, the whole compound fulfills (short-circuit).
+
+If ALL alternatives are breached, the compound is breached; the reported breach is the latest one (the last alternative "missed its chance"), falling back to the right operand when the breaches carry no distinguishing timestamps.
 
 In concurrency theory terms, this is a race where the first to complete determines the outcome.
 

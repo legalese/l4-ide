@@ -26,6 +26,10 @@ ORPHAN_OK=0
 
 # Options
 VERBOSE=false
+
+# Whether PART 2 (l4 CLI validation) is deliberately skipped. This must be an
+# explicit choice, never an inferred one: see the fatal branch in PART 2.
+SKIP_L4=false
 FIX_LINKS=false
 
 log_info() {
@@ -95,6 +99,11 @@ USAGE:
 
 OPTIONS:
     --verbose, -v     Show all checks, not just errors
+    --no-l4           Skip PART 2 (l4 CLI validation) deliberately. Without
+                      this flag, a missing l4 CLI is a FATAL error, not a
+                      warning: parts 1 and 3 need no build and are safe to run
+                      anywhere, but "l4 files: 0 valid" must never be
+                      indistinguishable from "l4 files: all valid".
     --help, -h        Show this help message
 
 CHECKS:
@@ -125,6 +134,10 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --verbose|-v)
             VERBOSE=true
+            shift
+            ;;
+        --no-l4)
+            SKIP_L4=true
             shift
             ;;
         --help|-h)
@@ -313,16 +326,29 @@ elif command -v cabal &> /dev/null; then
     if [[ $CABAL_EXIT -eq 0 && -n "$L4_BIN" && -x "$L4_BIN" ]]; then
         JL4_AVAILABLE=true
         log_verbose "Using cabal run jl4:l4"
-    else
-        log_warn "l4 CLI not built. Run 'cabal build jl4:l4' first."
-        log_warn "Skipping L4 validation"
     fi
-else
-    log_warn "l4 CLI not found and cabal not available"
-    log_warn "Skipping L4 validation"
 fi
 
-if $JL4_AVAILABLE; then
+# A missing l4 CLI used to be two log_warn lines and a skip. That is the one
+# failure mode this suite cannot afford: the summary below still printed
+# "L4 files: 0 valid, 0 errors" and the script still exited 0, so a run that
+# checked nothing was indistinguishable from a run that checked everything —
+# which is exactly the failure the unfiltered corpus-goldens job in
+# pr-checks.yml exists to prevent, reproduced inside the doc suite.
+#
+# So the choice is now explicit and one of two: pass --no-l4 and be told loudly
+# that PART 2 did not run, or have the binary. There is no third state.
+if ! $JL4_AVAILABLE && ! $SKIP_L4; then
+    log_error "l4 CLI not available (not on PATH, and 'cabal list-bin jl4:l4' found no built binary)."
+    log_error "Build it with 'cabal build jl4:l4', or pass --no-l4 to skip PART 2 deliberately."
+    exit 1
+fi
+
+if $SKIP_L4; then
+    log_warn "PART 2 SKIPPED by --no-l4: no .l4 file under doc/ was validated."
+fi
+
+if $JL4_AVAILABLE && ! $SKIP_L4; then
     # Find all .l4 files in doc/
     while IFS= read -r -d '' l4_file; do
         relative_path="${l4_file#$SCRIPT_DIR/}"
@@ -470,7 +496,11 @@ echo "  Summary"
 echo "========================================"
 echo ""
 echo "  Markdown links:  $LINK_OK valid, $LINK_ERRORS errors"
-echo "  L4 files:        $L4_OK valid, $L4_ERRORS errors"
+if $SKIP_L4; then
+    echo "  L4 files:        NOT CHECKED (--no-l4)"
+else
+    echo "  L4 files:        $L4_OK valid, $L4_ERRORS errors"
+fi
 echo "  Orphan check:    $ORPHAN_OK linked, $ORPHAN_ERRORS orphaned"
 echo ""
 

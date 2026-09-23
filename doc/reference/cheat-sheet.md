@@ -18,6 +18,7 @@ This page is a quick translation guide for developers coming from Python, JavaSc
 | Null check               | `if x is None` (Python), `x == null` (JS)                   | `CONSIDER ... WHEN NOTHING`            | `CONSIDER val WHEN NOTHING THEN 0 WHEN JUST x THEN x`  |
 | Array / list             | `list` (Python), `Array` (JS), `[]` (Haskell)               | `LIST OF`                              | `scores IS A LIST OF NUMBER`                           |
 | List literal             | `[1,2,3]` (Python/JS/Haskell)                               | `LIST`                                 | `LIST 1, 2, 3`                                         |
+| Bullet list (vertical)   | `- x` per line (YAML/Markdown)                              | `•` at line offside                    | `• 1` / `• 2` per line `== LIST 1, 2` (nests as args)  |
 | Empty list               | `[]` (Python/JS/Haskell)                                    | `EMPTY`                                | `CONSIDER xs WHEN EMPTY THEN 0`                        |
 | Dot notation / property  | `obj.field` (JS/Python/Java), `^. field` (Haskell lens)     | `'s` (possessive)                      | `person's age`, `company's ceo's name`                 |
 | String concatenation     | `+` (JS/Python), `++` (Haskell), `concat` (Java)            | `CONCAT`                               | `CONCAT "Hello, ", name, "!"`                          |
