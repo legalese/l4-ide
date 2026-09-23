@@ -57,6 +57,7 @@ executable l4
     L4.Cli.Export
     L4.Cli.Format
     L4.Cli.Nlg
+    L4.Cli.OpenFisca
     L4.Cli.Render
     L4.Cli.Run
     L4.Cli.StateGraph

@@ -1,0 +1,29 @@
+-- Group entity + LIST OF aggregation — the canonical OpenFisca household demo.
+--
+-- A Household has a list of member Persons. `household income` sums the
+-- salaries of all members. The bridge maps:
+--   Household (has a LIST OF Person field) -> an OpenFisca *group entity*
+--   Person                                 -> the *person* entity
+--   sum (map (GIVEN m YIELD m's salary) (h's members))
+--                                          -> household.sum(household.members('salary', period))
+
+IMPORT prelude
+
+DECLARE Person HAS
+    name   IS A STRING
+    salary IS A NUMBER
+
+DECLARE Household HAS
+    members IS A LIST OF Person
+
+@export Total monthly income of a household (sum of member salaries)
+GIVEN h      IS A Household
+      period IS A STRING
+GIVETH A NUMBER
+`household income` h period MEANS
+  sum (map (GIVEN m YIELD m's salary) (h's members))
+
+#EVAL `household income`
+        (Household WITH members IS LIST (Person WITH name IS "A", salary IS 1000),
+                                        (Person WITH name IS "B", salary IS 1500))
+        "2026-01"   -- expect 2500

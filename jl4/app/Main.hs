@@ -34,6 +34,7 @@ import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
 import L4.Cli.Export (ExportOptions, exportCmd, exportOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
 import L4.Cli.Nlg (NlgOptions, nlgCmd, nlgOptionsParser)
+import L4.Cli.OpenFisca (OpenFiscaOptions, openFiscaCmd, openFiscaOptionsParser)
 import L4.Cli.Render (RenderOptions, renderCmd, renderOptionsParser)
 import L4.Cli.Run (RunOptions, runCmd, runOptionsParser)
 import L4.Cli.StateGraph (StateGraphOptions, stateGraphCmd, stateGraphOptionsParser)
@@ -54,6 +55,7 @@ data Command
   | CmdStateGraph StateGraphOptions
   | CmdRender     RenderOptions
   | CmdExport     ExportOptions
+  | CmdOpenFisca  OpenFiscaOptions
   | CmdNlg        NlgOptions
   | CmdVerify     VerifyOptions
 
@@ -96,6 +98,9 @@ commandParser =
       <> command "export"
            (info (CmdExport <$> exportOptionsParser)
              (progDesc "Export an L4 file to a foreign interchange notation (dmn|dmn-md|bpmn) with a fidelity report"))
+      <> command "openfisca"
+           (info (CmdOpenFisca <$> openFiscaOptionsParser)
+             (progDesc "Compile the decision-rule subset of an L4 file to a runnable OpenFisca Python module"))
       <> command "nlg"
            (info (helper <*> (CmdNlg <$> nlgOptionsParser))
              (progDesc "Linearize a module's directives to natural-language prose (the .nlg golden payload)"))
@@ -164,6 +169,7 @@ main = do
     CmdStateGraph opts -> stateGraphCmd opts
     CmdRender     opts -> renderCmd     opts
     CmdExport     opts -> exportCmd     opts
+    CmdOpenFisca  opts -> openFiscaCmd  opts
     CmdNlg        opts -> nlgCmd        opts
     CmdVerify     opts -> verifyCmd     opts
 
