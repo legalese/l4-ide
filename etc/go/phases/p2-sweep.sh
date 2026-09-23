@@ -18,7 +18,7 @@
 # search that does not list it, a binding modification disposed as 'encoded'
 # that names nowhere it landed.
 #
-# Requirements source: jl4/examples/legal/bna/SMOKE-REPORT.md §2 (p2-sweep) —
+# Requirements source: legalese/canon subjects/uk/bna-1981/encodings/legalese/report/SMOKE-REPORT.md §2 (p2-sweep) —
 # "the real stage needs: input = the annotated source; output = a COMPLETE
 # disposition table over the annotation inventory — every F and C key either
 # cited in the encoding or named in a scope-out — and that completeness must be

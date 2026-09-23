@@ -61,7 +61,7 @@
 --     the project's review gate reserves to a lawyer.
 --
 -- SCOPE. An illustration of the axes, not a replacement for the corpus
--- encoding at jl4/examples/legal/bna/bna.l4, which models all of section 1
+-- encoding at jl4/examples/canon/uk/bna-1981/bna.l4, which models all of section 1
 -- and takes its facts as a GIVEN record instead.
 
 IMPORT prelude
@@ -81,7 +81,7 @@ TIMEZONE IS "Etc/UTC"
 
 § `Which territories, and the designation that never came`
 
--- s 50(1), from Annex A of jl4/examples/legal/bna/source-s1.txt, verbatim:
+-- s 50(1), from Annex A of source/source-s1.txt in legalese/canon (subject uk/bna-1981), verbatim:
 --
 --   "designated territory" means a qualifying territory, or the Sovereign
 --       Base Areas of Akrotiri and Dhekelia, which is designated by Her

@@ -163,7 +163,7 @@ directive exists to test.
 | the export schema     | nothing. A refusal is not an input, so it is not a parameter                                                                                                                                 |
 
 That last row is what the corpus migration of 2026-09-06 made visible. Until then the encoding
-floor in `jl4/examples/legal/regcf/denovo/` was an `ASSUME`, so it appeared in the exported JSON
+floor in `jl4/examples/canon/us/regcf/cleanroom/` was an `ASSUME`, so it appeared in the exported JSON
 schema as
 
 ```json
@@ -229,7 +229,7 @@ us or from a wrong answer.
 - **`TBD` is not distinguished from a hand-written refusal.** It reports as an ordinary refusal
   whose reason begins `TBD:`. Warning separately on placeholders needs `Ref(f)` first.
 - **Most curated refusals in the corpus are now a `REFUSE`** (2026-09-06): the encoding floor in
-  `jl4/examples/legal/regcf/denovo/`, the DMN exhibits `jl4/examples/dmn/gst-rate.l4` and
+  `jl4/examples/canon/us/regcf/cleanroom/`, the DMN exhibits `jl4/examples/dmn/gst-rate.l4` and
   `ymd-dates.l4`, and `jl4-core/libraries/daydate.l4`'s out-of-range `YMD`. That last one
   deserves a note. An out-of-range `YMD 2026 28 7` is invalid _input_ rather than a case the law
   does not cover, and the principled fix would be a constructor that answers `EITHER` a reason
@@ -237,7 +237,7 @@ us or from a wrong answer.
   on; until it is made, `REFUSE` is the one construct that keeps the constructor loud without
   turning its sentinel into something a caller could supply.
 - **The Reg CF corpus's own two refusals have NOT moved**, and the reason is a DMN limit this
-  page did not know until it was measured (2026-09-06). `jl4/examples/legal/regcf/regcf.l4`'s
+  page did not know until it was measured (2026-09-06). `jl4/examples/canon/us/regcf/regcf.l4`'s
   commencement floor is read by five decisions the exporter emits as business knowledge models
   (`investment limit`, `financial statements required`, `offering is within the offering limit`,
   `investor is within the investment limit`, `the transaction qualifies for the section 4(a)(6)

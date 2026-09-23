@@ -116,7 +116,7 @@
 // one. Every suppression is listed in the run's output, so they stay countable.
 //
 // Usage:  node etc/check-not-precedence.mjs <file.l4> [more.l4 ...]
-//         node etc/check-not-precedence.mjs --dir jl4/examples/legal/sg-succession
+//         node etc/check-not-precedence.mjs --dir jl4/examples/canon/sg/succession
 //         node etc/check-not-precedence.mjs --dir .        (what CI runs)
 //         node etc/check-not-precedence.mjs --selftest      (also what CI runs)
 // Exit:   0 clean · 1 findings · 2 usage

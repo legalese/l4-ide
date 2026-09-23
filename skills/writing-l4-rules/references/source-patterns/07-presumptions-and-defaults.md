@@ -11,7 +11,7 @@ One area of the phrasebook. The index, the preamble and the other ten areas are 
 
 > `The deeming reaches ONLY subsection (1): "deemed for the purposes of subsection (1)". A foundling gets no help toward subsection (1A)`
 >
-> — `jl4/examples/legal/bna/bna.l4:263-266`, on British Nationality Act 1981 s 1(2)
+> — `jl4/examples/canon/uk/bna-1981/bna.l4:263-266`, on British Nationality Act 1981 s 1(2)
 
 **It is doing** rewriting the facts **before** the rule runs, rather than handling a gap afterwards.
 This is how a statute avoids a non-answer, and it is why nothing in L4 catches a refusal: the legal
@@ -57,7 +57,7 @@ verbatim words stay whole — a deemed fact is one of the three cases it names.
 
 > `-- AMBIGUITY: "unless the contrary is shown". What must be shown to the contrary — the deemed birth facts of limb (a), the deemed parentage of limb (b), or either?`
 >
-> — `jl4/examples/legal/bna/bna.l4:230-240`, on British Nationality Act 1981 s 1(2). The note ends:
+> — `jl4/examples/canon/uk/bna-1981/bna.l4:230-240`, on British Nationality Act 1981 s 1(2). The note ends:
 > "Sergot et al. (1986) §'Some Difficulties with the Formalization of Negation' (pp. 378-381)
 > wrestle with the same default; their encoding, like this one, makes rebuttal an explicit input."
 
@@ -252,7 +252,7 @@ record fields, rule `GIVEN` parameters and `ASSUME` declarations, and whose own 
 
 > `... "No presumption shall arise that a funding portal has violated the prohibitions under section 3(a)(80) of the Exchange Act or this part by reason of ... engaging in activities ... that do not meet the conditions specified in paragraph (b) of this section."`
 >
-> — `jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2881`, carried verbatim. The note above it, at
+> — `jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4:2881`, carried verbatim. The note above it, at
 > `:2881-2883`: "Encoded as a definition carrier, because turning 'no presumption shall arise' into a
 > boolean would assert something the paragraph is careful not to assert."
 

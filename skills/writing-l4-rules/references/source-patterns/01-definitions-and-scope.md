@@ -11,7 +11,7 @@ One area of the phrasebook. The index, the preamble and the other ten areas are 
 
 > `PAA s 2 — "court" means the General Division of the High Court or a Family Court`
 >
-> — `jl4/examples/legal/sg-succession/cleanroom-2026-08/family-domain.l4:172`
+> — `jl4/examples/canon/sg/succession/cleanroom/family-domain.l4:172`
 
 **It is doing** The drafter has written the right-hand side down, so the meaning is settled for
 every reader of the Act. It is not a fact about the case in front of you.
@@ -91,7 +91,7 @@ exercisable on any case; the Part's rule is exercised as [entry 11.9](11-when-th
 
 > `s 28(1) — "Upon the grant of any probate or letters of administration, the grantee shall take an oath in the prescribed form, faithfully to administer the estate and to account for the same."`
 >
-> — `jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:2715`
+> — `jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:2715`
 
 **It is doing** naming a role that each case fills differently. The Part opens by naming "the
 grantee" and then talks about him for twenty sections without introducing him again — the role is
@@ -153,7 +153,7 @@ subtree, and a rule that reaches two at once is an error naming both.
 files under `jl4/examples/legal/` and `jl4/examples/canon/` (measured 2026-09-16): no `("P")`, no `(the "Purchaser")`, no `(hereinafter …)`, in
 quoted text or in comments. Modern United Kingdom drafting uses it constantly, and the encoded slice
 of the British Nationality Act 1981 does not reach one. The nearest corpus analogue is the role
-parameter `GIVEN person IS A PersonProfile` (`jl4/examples/legal/bna/bna.l4:257`, and 28 more
+parameter `GIVEN person IS A PersonProfile` (`jl4/examples/canon/uk/bna-1981/bna.l4:257`, and 28 more
 sites).
 
 **It is doing** exactly what [entry 1.2](#e1-2) does, with a shorter name. The parenthetical letter is a role
@@ -193,7 +193,7 @@ renamed role breaks that for no gain.
 
 > `s 6(6) — "For the purposes of this section, "trust corporation" means the Public Trustee or a corporation licensed as a trust company under the Trust Companies Act 2005."`
 >
-> — `jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:222`
+> — `jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:222`
 
 and then, twenty-two sections later, uses "a trust company" unqualified for a class that is **not**
 the same (`:2715`).
@@ -325,7 +325,7 @@ That is the mistake the corpus made and reverted.
 
 > `"(4) In this Law, unless the context otherwise requires, \"constitution\" in relation to an entity means –"`
 >
-> — `jl4/examples/legal/charities-cleanroom/charity-test.l4:81`
+> — `jl4/examples/canon/je/charities-2014/charity-test.l4:81`
 
 **It is doing** two very different jobs under one phrase. As boilerplate on a definitions section it
 usually has no operative effect and rides as inert prose beside the definition. But where a
@@ -334,7 +334,7 @@ and belongs to whoever runs the rules.
 
 **Write** the reading as a parameter, and declare it once for the whole encoding as a section
 `GIVEN`. "Rather than pick one and present it as the text, the encoding takes the reading as a
-parameter" (`jl4/examples/legal/regcf/denovo/regcf-denovo.l4:92-93`).
+parameter" (`jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4:92-93`).
 
 ```l4
 § `Regulation Crowdfunding`
@@ -626,8 +626,8 @@ clause runs to a table rather than a list.
 
 > `(2) _Funding portal_ means a broker acting as an intermediary in a transaction involving the offer or sale of securities in reliance on section 4(a)(6) of the Securities Act …, that does not: (i) Offer investment advice or recommendations; (ii) Solicit purchases, sales or offers to buy the securities displayed on its platform; …`
 >
-> — 17 CFR (Code of Federal Regulations) 227.300(c)(2), in the repository at
-> `jl4/examples/legal/regcf/denovo/source/part227.txt:458`
+> — 17 CFR (Code of Federal Regulations) 227.300(c)(2), at
+> `source/part227.txt:458` of the `us/regcf` subject in `legalese/canon`
 
 The same instrument's sibling definition carries the other common form, an exception rather than a
 condition: "except that any person … whose functions are solely clerical or ministerial shall not be
@@ -663,7 +663,7 @@ DECIDE `the intermediary is a funding portal` intermediary IF
 
 _(Checked on the release binary, exit 0, no errors; limb (iii) is elided above for length, which is
 why the tags run (i), (ii), (iv).)_ This is the corpus's own shape, at
-`jl4/examples/legal/regcf/denovo/regcf-denovo.l4:2210-2218`, where all four limbs are written
+`jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4:2210-2218`, where all four limbs are written
 against fields declared in the positive at `:869-873`, under a comment calling them the four
 negative limbs of "funding portal".
 
@@ -710,7 +710,7 @@ on a section rather than part of a definition.
 
 > `"charitable purpose" has the meaning given by Article 6;` … `"constitution" has the meaning given by Article 2(4);`
 >
-> — `jl4/examples/legal/charities-cleanroom/charity-test.l4:66-71`, carrying Article 1 of the
+> — `jl4/examples/canon/je/charities-2014/charity-test.l4:66-71`, carrying Article 1 of the
 > Charities (Jersey) Law 2014
 
 **It is doing** deferring. The interpretation section is not defining anything; it is telling you
@@ -772,7 +772,7 @@ _(Checked on the release binary, exit 0, no errors, with an `#ASSERT` over the c
 satisfied. The adoption field's name is shortened here; the corpus carries the whole phrase,
 including the three jurisdictions, for the reason its own note gives.)_ The three rule names are the
 corpus's own:
-`jl4/examples/legal/sg-succession/cleanroom-2026-08/intestate-succession-act.l4:194`,
+`jl4/examples/canon/sg/succession/cleanroom/intestate-succession-act.l4:194`,
 `probate-administration-act.l4:417`, and the cross-check at `family-cases.l4:1016-1019`, whose
 comment says why it exists — "there are two texts of one definition. What a composition can do is
 assert that they still say the same thing, in one expression that fails if either is edited alone".
@@ -967,7 +967,7 @@ find it: a `#EVAL` or `#ASSERT` on every defined term you actually use, not a cl
 
 **If the source says** an interpretation section for the whole instrument and, later, a Part that
 redefines one of its words for itself. Section 2 of the Probate and Administration Act 1934 carries
-"the three definitions" for the Act (`jl4/examples/legal/sg-succession/cleanroom-2026-08/family-domain.l4:1497`),
+"the three definitions" for the Act (`jl4/examples/canon/sg/succession/cleanroom/family-domain.l4:1497`),
 while s 6(6) confines a definition of "trust corporation" to s 6 alone
 (`probate-administration-act.l4:222`; entry [1.4](#e1-4)).
 

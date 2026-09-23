@@ -71,10 +71,10 @@ scored against a ground truth derived from the evaluator.
 | `promissory-note`   | `Payment Obligations`, `jl4/examples/legal/promissory-note.l4` | the file's own second `#TRACE` (line 192): one late payment on 3 April 2025               | a real LEST chain (reparation, then a deadline-free reparation of the reparation), see below |
 
 **Why not a Reg CF rule.** The task asked for a regcf rule with a LEST chain, a BPMN golden and a
-runnable `#TRACE`. None exists: `jl4/examples/legal/regcf/regcf.l4`'s three regulative rules
+runnable `#TRACE`. None exists: `jl4/examples/canon/us/regcf/regcf.l4`'s three regulative rules
 (`advertising restriction`, `ongoing reporting obligation`, `resale restriction`) contain **no
 `LEST`** — two are bare `SHANT`s and the third is a `HENCE` cycle — and
-`jl4/examples/legal/regcf/denovo/regcf-denovo.l4` has `LEST BREACH … BECAUSE` arms but no
+`jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4` has `LEST BREACH … BECAUSE` arms but no
 `#TRACE` and no BPMN golden. So the fourth is from `jl4/examples/legal/`, per the task's fallback.
 
 ## Files per contract

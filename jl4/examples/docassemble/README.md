@@ -197,7 +197,7 @@ recognise the same program.
     set. The hazard it defends against is not an exception but a successful
     empty render.
 - A test outside this directory, worth knowing about: `l4 docassemble` on
-  `jl4/examples/legal/charities-cleanroom/charity-test.l4` — 700 lines of the
+  `jl4/examples/canon/je/charities-2014/charity-test.l4` — 700 lines of the
   Jersey charities encoding, not written for this backend — now emits, because
   its `Entity.purposes` is a `LIST OF Purpose` and ONE such field anywhere in a
   reachable record used to refuse the whole module. It is also the only place

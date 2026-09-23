@@ -66,11 +66,11 @@ Guard 2 was rebuilt too; see below.
 cabal build m3-measure
 JL4_LIBRARY_PATH=$PWD/jl4-core/libraries \
   ./dist-newstyle/build/*/ghc-*/jl4-0.1/x/m3-measure/build/m3-measure/m3-measure \
-  jl4/examples/legal/regcf/regcf.l4 \
-  jl4/examples/legal/regcf/regcf-wizard.l4 \
-  jl4/examples/legal/regcf/denovo/regcf-denovo.l4 \
-  jl4/examples/legal/charities-cleanroom/charity-test.l4 \
-  jl4/examples/legal/bna/bna.l4 \
+  jl4/examples/canon/us/regcf/regcf.l4 \
+  jl4/examples/canon/us/regcf/regcf-wizard.l4 \
+  jl4/examples/canon/us/regcf/cleanroom/regcf-denovo.l4 \
+  jl4/examples/canon/je/charities-2014/charity-test.l4 \
+  jl4/examples/canon/uk/bna-1981/bna.l4 \
   jl4/examples/docassemble/*.l4 jl4/examples/docassemble/not-ok/*.l4 \
   --exhaustive-max 12 --samples 2000 --seed 20260817 --synthetic-priors 8 \
   --json jl4/measure/data/m3-ordering.json \

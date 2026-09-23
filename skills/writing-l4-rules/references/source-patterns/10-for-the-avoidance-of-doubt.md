@@ -167,7 +167,7 @@ what a failing assertion looks like when the expression refuses instead of retur
 > will annexed before the expiration of a period of 6 months of the death of the deceased."
 >
 > — Probate and Administration Act 1934 s 55(2), at
-> `jl4/examples/legal/sg-succession/cleanroom-2026-08/probate-administration-act.l4:2465`
+> `jl4/examples/canon/sg/succession/cleanroom/probate-administration-act.l4:2465`
 
 or, in a contract, "Nothing in this clause prevents the Company from terminating immediately for
 material breach."
@@ -189,7 +189,7 @@ The corpus's statutory witness for that fork is British Nationality Act 1981 s 1
 citizenship acquired under subsection (5) survives the adoption order later ceasing to have effect.
 The encoder's note states the technique exactly: "Encoded by deliberately NOT reading the cesser
 field — the predicate below equals `a British citizen by virtue of subsection (5)` whatever the
-cesser flag says, and the tests assert exactly that" (`jl4/examples/legal/bna/bna.l4:564-568`).
+cesser flag says, and the tests assert exactly that" (`jl4/examples/canon/uk/bna-1981/bna.l4:564-568`).
 
 **Write** the surviving right as a rule that does not read the field the other clause turns on, and
 assert that it answers the same way whichever way that field goes.
@@ -232,7 +232,7 @@ obvious to whoever edits the notice rule next quarter. The pair of assertions is
 > "Without prejudice to subsection (2), the following shall be treated as properly executed:"
 >
 > — Wills Act 1838 s 5(3), carried as the chapeau of both halves of the encoding at
-> `jl4/examples/legal/sg-succession/cleanroom-2026-08/wills-act.l4:911` and `:930`
+> `jl4/examples/canon/sg/succession/cleanroom/wills-act.l4:911` and `:930`
 
 or, in a contract, "It is hereby declared that a payment made under protest does not waive any
 claim", or "The remedies in this clause are without prejudice to any other remedy available at law."
