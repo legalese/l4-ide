@@ -8,13 +8,16 @@ module L4.Syntax where
 
 import Base
 import L4.Annotation
-import L4.Lexer (PosToken)
+import L4.Lexer (PosToken, FixityDirection)
+import L4.Parser.SrcSpan (SrcRange)
 
 #if defined(SERIALISE_ENABLED)
 import L4.Instances.Serialise ()
-import Codec.Serialise (Serialise)
+import L4.Parser.SrcSpan (SrcPos)
+import Codec.Serialise (Serialise (..))
 #endif
 import Data.Default
+import Data.TreeDiff.Class (ToExpr (..))
 import qualified GHC.Generics as GHC
 import qualified Generics.SOP as SOP
 import Optics
@@ -88,6 +91,24 @@ rawNameToText (QualifiedName qs n) = Text.intercalate "." (NE.toList qs <> [n])
 nameToText :: Name -> Text
 nameToText = rawNameToText . rawName
 
+-- | As 'rawNameToText', but dropping any section qualification.
+--
+-- A constructor or stored record selector declared inside a @§@ gets a
+-- section-qualified /spelling/ as well as its bare one (see
+-- @specs\/todo\/SECTION-RANKING-SPEC.md@). 'rawNameToText' renders that by
+-- joining the section path with @.@, which is right inside L4 and wrong in
+-- every export format that gives @.@ its own meaning: in FEEL @.@ is path
+-- traversal into a value, and in a diagram label a section heading is noise
+-- that crowds out the act. Exporters should therefore ask for the base name
+-- and let their own fidelity report account for any collision that creates.
+unqualifiedRawNameToText :: RawName -> Text
+unqualifiedRawNameToText (QualifiedName _ n) = n
+unqualifiedRawNameToText rn                  = rawNameToText rn
+
+-- | As 'nameToText', dropping any section qualification.
+unqualifiedNameToText :: Name -> Text
+unqualifiedNameToText = unqualifiedRawNameToText . rawName
+
 data Type' n =
     Type   Anno -- ^ the type of types
   | TyApp  Anno n [Type' n] -- ^ an application of a type constructor
@@ -105,13 +126,15 @@ data Type' n =
 type Kind = Int
 
 data TypedName n =
-  MkTypedName Anno n (Type' n) (Maybe (Expr n))
-  -- ^ Nothing = stored field, Just expr = computed field (MEANS clause)
+  MkTypedName Anno n (Type' n) (Maybe (Expr n)) (Maybe (Expr n))
+  -- ^ 4th field: TYPICALLY default value (Nothing = no default);
+  --   5th field: Nothing = stored field, Just expr = computed field (MEANS clause)
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 data OptionallyTypedName n =
-  MkOptionallyTypedName Anno n (Maybe (Type' n))
+  MkOptionallyTypedName Anno n (Maybe (Type' n)) (Maybe (Expr n))
+  -- ^ 4th field: TYPICALLY default value (Nothing = no default)
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
@@ -156,7 +179,8 @@ data Declare n =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 data Assume n =
-  MkAssume Anno (TypeSig n) (AppForm n) (Maybe (Type' n))
+  MkAssume Anno (TypeSig n) (AppForm n) (Maybe (Type' n)) (Maybe (Expr n))
+  -- ^ 5th field: TYPICALLY default value (Nothing = no default)
   deriving stock (GHC.Generic, Eq, Ord, Show, Functor, Foldable, Traversable)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
@@ -213,7 +237,6 @@ data Expr n =
   | Times      Anno (Expr n) (Expr n)
   | DividedBy  Anno (Expr n) (Expr n)
   | Modulo     Anno (Expr n) (Expr n)
-  | Exponent   Anno (Expr n) (Expr n)
   | Cons       Anno (Expr n) (Expr n)
   | Leq        Anno (Expr n) (Expr n)
   | Geq        Anno (Expr n) (Expr n)
@@ -237,6 +260,67 @@ data Expr n =
   | Fetch      Anno (Expr n)
   | Env        Anno (Expr n)  -- environment variable name
   | Post       Anno (Expr n) (Expr n) (Expr n)  -- url, headers, body
+  | Record     Anno (Maybe (Expr n)) (Expr n) (Expr n) Bool (Maybe (Expr n))
+    -- ^ append to the ledger (STATE-AS-LEDGER M1). An optional /recipient/
+    -- party-qualifier, a cell expr, a value expr, an isOfficial flag, and an
+    -- optional @HENCE@ continuation (M5).
+    --
+    -- The leading 'Maybe (Expr n)' is the NOTIFY-v1 /recipient/ qualifier: the
+    -- symmetric WRITE to 'ReadCell'\'s cross-party READ. @Nothing@ is the M1 own
+    -- write (@RECORD <cell> IS <v>@ lands in the acting party's OWN ledger);
+    -- @Just q@ is the recipient-qualified write (@RECORD q's <cell> IS <v>@), in
+    -- which the acting party performs the write but the value lands in @q@'s own
+    -- ledger, keyed via the SAME 'partyKeyWHNF' that @RECALL q's <cell>@ reads
+    -- from — so a NOTIFY write and a recipient's read match by construction.
+    -- Parser-enforced invariant: @isOfficial == True@ (@COMMIT@/@ATTEST@) implies
+    -- the recipient 'Maybe' is 'Nothing' (an official write has no recipient),
+    -- mirroring 'ReadCell'\'s @isOfficial ⟹ no party@ invariant.
+    --
+    -- The isOfficial flag: 'False' = @RECORD@ (the acting party's own ledger,
+    -- or a recipient's own ledger when qualified), 'True' = @COMMIT@/@ATTEST@
+    -- (the shared official record). The flag is stored faithfully so M4 can split
+    -- own/official.
+    --
+    -- The final 'Maybe (Expr n)' is the M5 @HENCE@ continuation: 'Nothing' is the
+    -- M1 expression-position form (@RECORD <cell> IS <v>@ evaluates to @v@);
+    -- @Just k@ makes the write an *event-free deontic step* (@RECORD <cell> IS <v>
+    -- HENCE k@), so the write fires its effect and then forwards @[time, events]@
+    -- straight to @k@ — the @do { tell (x ↦ v); k }@ correspondence (spec App. B).
+  | ReadCell   Anno (Maybe (Expr n)) Bool RecallMode (Expr n)
+    -- ^ read a cell back from the ledger (STATE-AS-LEDGER M1.5 / M4.5).
+    -- @RECALL [ALL] [<party>'s | OFFICIAL's] <cell>@. (@OFFICIAL@ is a
+    -- case-sensitive keyword, all-caps like @RECORD@/@COMMIT@/@RECALL@; lowercase
+    -- @official@ remains an ordinary identifier.)
+    --
+    -- The fields are: an optional /party-qualifier/ expression, an /isOfficial/
+    -- flag, a 'RecallMode' (last-write-wins vs collect-all, approach B), and the
+    -- /cell/ expr (a string-keyed path: a backtick ident or string literal, the
+    -- same surface as 'Record').
+    --
+    -- The 'RecallMode' axis is orthogonal to the party/official axis: any of the
+    -- six combinations (own/party/official x last/all) is well-formed. With
+    -- 'RecallLast' the read is last-write-wins and yields @MAYBE a@; with
+    -- 'RecallAll' (@RECALL ALL …@) it folds EVERY 'Assign' to the cell into a
+    -- @LIST OF a@, oldest->newest (empty list when never written — deliberately
+    -- NOT @NOTHING@, the intended difference from plain @RECALL@'s @MAYBE a@).
+    --
+    --   * @RECALL <cell>@            — @(Nothing, False)@: read the CURRENT acting
+    --     party's own ledger (the M1.5 default, unchanged).
+    --   * @RECALL <party>'s <cell>@  — @(Just party, False)@: read ANOTHER party's
+    --     OWN ledger. The party qualifier is a NAME-RESOLVED expression (the same
+    --     party value a PARTY clause uses), rendered via @partyKeyWHNF@ so the
+    --     read key matches a write key exactly.
+    --   * @RECALL OFFICIAL's <cell>@ — @(Nothing, True)@: read the shared OFFICIAL
+    --     record (the COMMIT/ATTEST target).
+    --
+    -- Parser-enforced invariant: @isOfficial == True@ implies the @Maybe@ is
+    -- 'Nothing' (an official read has no party qualifier). This mirrors 'Record'\'s
+    -- flat (cell, val, isOfficial, mHence) encoding rather than a parameterized
+    -- sum, so no extra instance derivation is needed.
+    --
+    -- It forward-evaluates the cell to a 'Path', reads the latest 'snapshot'
+    -- projection of the routed M0/M4 ledger, and yields @MAYBE a@ — @JUST v@ if
+    -- the cell has been written there, @NOTHING@ otherwise.
   | Concat     Anno [Expr n] -- string concatenation
   | AsString   Anno (Expr n) -- type coercion to string
   | Breach     Anno (Maybe (Expr n)) (Maybe (Expr n))  -- BREACH [BY party] [BECAUSE reason]
@@ -250,6 +334,16 @@ data InertContext
   = InertCtxAnd   -- ^ In AND context, evaluates to True (AND identity)
   | InertCtxOr    -- ^ In OR context, evaluates to False (OR identity)
   | InertCtxNone  -- ^ Default context, evaluates to True
+  deriving stock (GHC.Generic, Eq, Ord, Show)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+-- | How a @RECALL@ projects the append-only ledger (STATE-AS-LEDGER approach B).
+-- A named sum (rather than a second bare 'Bool' adjacent to @isOfficial@ in
+-- 'ReadCell') so the last-vs-all axis is distinct from the own/party/official
+-- axis and cannot be silently transposed at a deconstruction site.
+data RecallMode
+  = RecallLast  -- ^ @RECALL …@: last-write-wins, yields @MAYBE a@.
+  | RecallAll   -- ^ @RECALL ALL …@: collect every assignment, yields @LIST OF a@.
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
@@ -421,20 +515,75 @@ moduleTopDecls = lens
 -- Source Annotations
 -- ----------------------------------------------------------------------------
 
+-- | One clause of a multi-clause pattern-matching group, as parsed: the
+-- clause head name's source range (the warning anchor) and the argument
+-- patterns, one per column.
+--
+-- DELIBERATELY not 'GHC.Generic' (and hence invisible to @gplate@-based
+-- generic traversals): the stored patterns transitively contain @Expr Name@
+-- (via 'PatExpr'), so a Generic instance here would splice a Name-pass AST
+-- fragment into the generic-representation closure of EVERY annotated node —
+-- making polymorphic @gplate \@(Decide n)@ traversals ambiguous (overlapping
+-- instances) and monomorphic ones silently descend into annotation extras.
+-- Without 'GHC.Generic', optics' @GPlateInner@ treats the field as a leaf.
+-- 'NFData', 'ToExpr' and 'Serialise' are therefore written by hand below.
+data PmMatrixClause = MkPmMatrixClause
+  { headRange :: Maybe SrcRange
+  , patterns  :: [Pattern Name]
+  }
+  deriving stock (Eq, Ord, Show)
+
+instance NFData PmMatrixClause where
+  rnf (MkPmMatrixClause r ps) = rnf r `seq` rnf ps
+
+instance ToExpr PmMatrixClause where
+  toExpr (MkPmMatrixClause r ps) = toExpr (r, ps)
+
+-- | The source clause matrix of a multi-clause pattern-matching group,
+-- attached by the parser to the fused Decide's annotation BEFORE
+-- 'L4.Parser.matchClauses' lowers the group to nested CONSIDERs (which have
+-- no per-clause structure and no source ranges). Consumed once, by the
+-- type checker's clause-matrix exhaustiveness analysis
+-- ('L4.TypeCheck.checkClauseMatrix'). Stored in the Name pass; the AST
+-- Functor does not map into annotation extras, so the Resolved tree still
+-- carries the Name-pass patterns — the checker re-resolves them itself
+-- (quietly) against the GIVEN column types. Not 'GHC.Generic' — see
+-- 'PmMatrixClause'.
+data PmMatrix = MkPmMatrix
+  { scrutinees :: [Name]          -- ^ column scrutinee names (GIVEN or @_pm_arg_i@)
+  , clauses    :: [PmMatrixClause]
+  }
+  deriving stock (Eq, Ord, Show)
+
+instance NFData PmMatrix where
+  rnf (MkPmMatrix s cs) = rnf s `seq` rnf cs
+
+instance ToExpr PmMatrix where
+  toExpr (MkPmMatrix s cs) = toExpr (s, cs)
+
+-- NOTE on serialisation: adding 'pmMatrix' below changes the CBOR shape of
+-- 'Extension' — jl4-service's AST-cache blobs from before the change will
+-- fail to deserialise and the cache re-fills; that is the cache's normal
+-- versioning behaviour. If a @SERIALISE_ENABLED@ build breaks on a missing
+-- instance here, the fix is to add the instance (see the CPP block at the
+-- bottom of this module), not to remove the field.
 data Extension = Extension
   { resolvedInfo :: Maybe Info
   , nlg          :: Maybe Nlg
   , desc         :: Maybe Desc
+  , ref          :: Maybe Ref
+  , fixityAnn    :: Maybe Fixity
+  , pmMatrix     :: Maybe PmMatrix
   }
   deriving stock (GHC.Generic, Eq, Ord, Show)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Semigroup Extension where
-  Extension i1 nlg1 desc <> Extension i2 nlg2 desc' =
-    Extension (i1 <|> i2) (nlg1 <|> nlg2) (desc <|> desc')
+  Extension i1 nlg1 desc ref1 fix1 pm1 <> Extension i2 nlg2 desc' ref2 fix2 pm2 =
+    Extension (i1 <|> i2) (nlg1 <|> nlg2) (desc <|> desc') (ref1 <|> ref2) (fix1 <|> fix2) (pm1 <|> pm2)
 
 instance Monoid Extension where
-  mempty = Extension Nothing Nothing Nothing
+  mempty = Extension Nothing Nothing Nothing Nothing Nothing Nothing
 
 data Info =
     TypeInfo (Type' Resolved) (Maybe TermKind)
@@ -444,7 +593,7 @@ data Info =
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
 instance Default Extension where
-  def = Extension Nothing Nothing Nothing
+  def = Extension Nothing Nothing Nothing Nothing Nothing Nothing
 
 annoOf :: HasAnno a => Lens' a (Anno' a)
 annoOf = lens
@@ -460,11 +609,29 @@ annNlg = #extra % #nlg
 annDesc :: Lens' Anno (Maybe Desc)
 annDesc = #extra % #desc
 
+annRef :: Lens' Anno (Maybe Ref)
+annRef = #extra % #ref
+
+annFixity :: Lens' Anno (Maybe Fixity)
+annFixity = #extra % #fixityAnn
+
+annPmMatrix :: Lens' Anno (Maybe PmMatrix)
+annPmMatrix = #extra % #pmMatrix
+
 setNlg :: Nlg -> Anno -> Anno
 setNlg n a = a & annNlg ?~ n
 
 setDesc :: Desc -> Anno -> Anno
 setDesc d a = a & annDesc ?~ d
+
+setRef :: Ref -> Anno -> Anno
+setRef r a = a & annRef ?~ r
+
+setFixity :: Fixity -> Anno -> Anno
+setFixity f a = a & annFixity ?~ f
+
+setPmMatrix :: PmMatrix -> Anno -> Anno
+setPmMatrix m a = a & annPmMatrix ?~ m
 
 data TermKind =
     Computable -- ^ a variable with known definition (let or global)
@@ -591,11 +758,14 @@ deriving anyclass instance ToConcreteNodes PosToken (GivenSig Name)
 deriving anyclass instance ToConcreteNodes PosToken (Directive Name)
 deriving anyclass instance ToConcreteNodes PosToken (Import Name)
 
+-- Manual instance: the hole-fit order must follow the *source* order of the
+-- clauses, which depends on 'atFirst'. @AT ts PARTY p DOES d@ (atFirst) puts
+-- the timestamp hole first; @PARTY p DOES d AT ts@ puts it last.
 instance ToConcreteNodes PosToken (Event Name) where
   toNodes (MkEvent ann party does ts atFirst) =
     if atFirst
-      then flattenConcreteNodes ann [toNodes party, toNodes does, toNodes ts]
-      else flattenConcreteNodes ann [toNodes ts, toNodes party, toNodes does]
+      then flattenConcreteNodes ann [toNodes ts, toNodes party, toNodes does]
+      else flattenConcreteNodes ann [toNodes party, toNodes does, toNodes ts]
 
 instance ToConcreteNodes PosToken (Module Name) where
   toNodes (MkModule ann _ secs) = flattenConcreteNodes ann [toNodes secs]
@@ -640,10 +810,12 @@ deriving anyclass instance ToConcreteNodes PosToken (Import Resolved)
 instance ToConcreteNodes PosToken (Module Resolved) where
   toNodes (MkModule ann _ secs) = flattenConcreteNodes ann [toNodes secs]
 
+-- See the 'Event Name' instance: hole-fit order follows the source order of
+-- the clauses, which depends on 'atFirst'.
 instance ToConcreteNodes PosToken (Event Resolved) where
   toNodes (MkEvent ann party does ts atFirst) = if atFirst
-      then flattenConcreteNodes ann [toNodes party, toNodes does, toNodes ts]
-      else flattenConcreteNodes ann [toNodes ts, toNodes party, toNodes does]
+      then flattenConcreteNodes ann [toNodes ts, toNodes party, toNodes does]
+      else flattenConcreteNodes ann [toNodes party, toNodes does, toNodes ts]
 
 data Comment = MkComment Anno [Text]
   deriving stock (Show, Eq, Ord, GHC.Generic)
@@ -690,8 +862,33 @@ data Desc = MkDesc Anno Text
   deriving stock (Show, Eq, Ord, GHC.Generic)
   deriving anyclass (SOP.Generic, ToExpr, NFData)
 
+-- | The human-readable text of a @\@desc@, trimmed.
+--
+-- The lexer keeps the annotation's line verbatim, separator included, because
+-- the exact-printer reprints it as @\"\@desc\" <> t@ and must round-trip byte
+-- for byte. Every /reader/ of the text wants the sentence, though, so the space
+-- after @\@desc@ was surfacing in JSON Schema @description@s, in the deployed
+-- function schema and in hovers: every field of the Reg CF wizard was
+-- described as @\" Does your company already file …\"@. Trim here, once, rather
+-- than at each of the four call sites — and not in the lexer, where it would
+-- break exact printing.
 getDesc :: Desc -> Text
-getDesc (MkDesc _ t) = t
+getDesc (MkDesc _ t) = Text.strip t
+
+-- | A fixity annotation ('@infixl N' / '@infixr N' / '@infix N') attached to
+-- the definition of a binary identifier operator. The 'Text' is the raw
+-- payload following the herald; it is parsed and validated by the
+-- typechecker (see 'L4.TypeCheck'), which gives malformed payloads a proper
+-- diagnostic with the annotation's own source range.
+data Fixity = MkFixity Anno FixityDirection Text
+  deriving stock (Show, Eq, Ord, GHC.Generic)
+  deriving anyclass (SOP.Generic, ToExpr, NFData)
+
+getFixityDirection :: Fixity -> FixityDirection
+getFixityDirection (MkFixity _ dir _) = dir
+
+getFixityPayload :: Fixity -> Text
+getFixityPayload (MkFixity _ _ t) = t
 
 deriving via L4Syntax Nlg
   instance HasAnno Nlg
@@ -703,6 +900,8 @@ deriving via L4Syntax Ref
   instance HasAnno Ref
 deriving via L4Syntax Desc
   instance HasAnno Desc
+deriving via L4Syntax Fixity
+  instance HasAnno Fixity
 
 instance ToConcreteNodes PosToken Comment where
   toNodes (MkComment ann _) = flattenConcreteNodes ann []
@@ -737,6 +936,27 @@ instance ToConcreteNodes PosToken Text where
 -- InertContext has no concrete syntax nodes (derived during desugaring)
 instance ToConcreteNodes PosToken InertContext where
   toNodes _ = pure []
+
+-- RecallMode has no concrete syntax nodes (the ALL keyword is captured in the
+-- surrounding Anno of the RECALL expression, like Record's isOfficial flag)
+instance ToConcreteNodes PosToken RecallMode where
+  toNodes _ = pure []
+
+-- The empty-surface payload fields (Bool isOfficial, RecallMode mode) still
+-- occupy one holeFit slot in the generic exactprint traversal, so the parser
+-- emits a placeholder 'annoHole' for each in field-declaration order (see
+-- recordOrCommitExpr / recallExpr). 'annoHole' needs 'HasSrcRange'; an empty
+-- field contributes no surface, so its hole-hint range is 'Nothing'.
+instance HasSrcRange RecallMode where
+  rangeOf _ = Nothing
+
+-- Bool has no concrete syntax nodes (used in Record for the isOfficial flag;
+-- the RECORD/COMMIT/ATTEST keyword is already captured in the surrounding Anno)
+instance ToConcreteNodes PosToken Bool where
+  toNodes _ = pure []
+
+instance HasSrcRange Bool where
+  rangeOf _ = Nothing
 
 instance ToConcreteNodes PosToken Name where
   toNodes (MkName ann _) =
@@ -790,6 +1010,7 @@ deriving anyclass instance HasSrcRange Lit
 deriving anyclass instance HasSrcRange Name
 deriving anyclass instance HasSrcRange Nlg
 deriving anyclass instance HasSrcRange Desc
+deriving anyclass instance HasSrcRange Fixity
 deriving anyclass instance HasSrcRange (NlgFragment n)
 deriving anyclass instance HasSrcRange Comment
 deriving anyclass instance HasSrcRange Ref
@@ -848,6 +1069,7 @@ deriving anyclass instance Serialise n => Serialise (TypeDecl n)
 deriving anyclass instance Serialise n => Serialise (ConDecl n)
 deriving anyclass instance Serialise n => Serialise (Expr n)
 deriving anyclass instance Serialise InertContext
+deriving anyclass instance Serialise RecallMode
 deriving anyclass instance Serialise n => Serialise (GuardedExpr n)
 deriving anyclass instance Serialise n => Serialise (Deonton n)
 deriving anyclass instance Serialise DeonticModal
@@ -861,6 +1083,16 @@ deriving anyclass instance Serialise n => Serialise (Module n)
 deriving anyclass instance Serialise n => Serialise (Section n)
 deriving anyclass instance Serialise n => Serialise (TopDecl n)
 deriving anyclass instance Serialise n => Serialise (LocalDecl n)
+deriving anyclass instance Serialise SrcPos
+deriving anyclass instance Serialise SrcRange
+-- 'PmMatrixClause' and 'PmMatrix' are deliberately non-Generic (see their
+-- definitions), so their instances are written by hand, via tuples.
+instance Serialise PmMatrixClause where
+  encode (MkPmMatrixClause r ps) = encode (r, ps)
+  decode = (\ (r, ps) -> MkPmMatrixClause r ps) <$> decode
+instance Serialise PmMatrix where
+  encode (MkPmMatrix s cs) = encode (s, cs)
+  decode = (\ (s, cs) -> MkPmMatrix s cs) <$> decode
 deriving anyclass instance Serialise Extension
 deriving anyclass instance Serialise Info
 deriving anyclass instance Serialise TermKind
@@ -869,5 +1101,7 @@ deriving anyclass instance Serialise n => Serialise (NlgFragment n)
 deriving anyclass instance Serialise Comment
 deriving anyclass instance Serialise Ref
 deriving anyclass instance Serialise Desc
+deriving anyclass instance Serialise Fixity
+deriving anyclass instance Serialise FixityDirection
 #endif
 

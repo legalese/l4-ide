@@ -1,0 +1,20 @@
+§ `VerifyCleanFixture`
+
+-- The positive control for `l4 verify`: a module with real boolean structure
+-- and nothing wrong with it. If this ever starts producing findings, the
+-- checker has learnt to cry wolf and the negative controls beside it stop
+-- meaning anything.
+
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `either but not both` IS
+     x AND NOT y
+  OR NOT x AND y
+
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+      z IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `all three` IS
+  x AND y AND z

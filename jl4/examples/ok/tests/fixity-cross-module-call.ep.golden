@@ -1,0 +1,11 @@
+-- Fixity declarations flow through IMPORT with the mixfix registry:
+-- operators declared @infixl in fixity-cross-module-def re-associate
+-- in bare chains here, without any local declaration.
+
+IMPORT `fixity-cross-module-def`
+
+-- 1 UNIONX (2 INTERSECTX 3) = 7
+#EVAL 1 UNIONX 2 INTERSECTX 3
+
+-- (1 UNIONX 2) UNIONX 3 = 6
+#EVAL 1 UNIONX 2 UNIONX 3

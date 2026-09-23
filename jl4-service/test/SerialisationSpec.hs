@@ -51,6 +51,7 @@ testOpts = Options
   , evalTimeout = 60
   , compileTimeout = 60
   , instanceToken = Nothing
+  , maxLadderNodes = 10000
   }
 
 spec :: SpecWith ()

@@ -1,0 +1,27 @@
+-- =============================================================================
+-- Clause-matrix analysis vs the column-wildcard idiom under constructor
+-- shadowing: the GIVEN parameter `active` reuses the name of a nullary
+-- constructor of its own column type. Per the pattern-matching spec, a bare
+-- clause pattern that reuses its column's GIVEN name is the WILDCARD idiom —
+-- the desugarer (L4.Parser.patAlwaysMatchesAs) skips the column entirely, so
+-- clause 2 matches ALL Status values at runtime and the group is total:
+-- `f suspended` is 2, not a NonExhaustivePatterns error.
+--
+-- The clause-matrix analysis must agree: re-resolving the bare `active`
+-- pattern through the constructor-first pattern checker would mis-read row 2
+-- as covering only the `active` constructor and warn that `suspended` is
+-- missing — a false positive that the DMN leg would escalate to a D-PARTIAL
+-- Blocking on a sound program. This golden pins the ABSENCE of any
+-- PatternClausesMissing warning here (TypeCheck.patIsColumnWildcard mirrors
+-- the desugarer), alongside the runtime results proving totality.
+DECLARE Status IS ONE OF active, inactive, suspended
+
+GIVEN active IS A Status
+GIVETH A NUMBER
+DECIDE f inactive IS 1
+DECIDE f active IS 2
+
+-- Clause 2 is a wildcard: every non-`inactive` value takes it.
+#EVAL f suspended -- 2, NOT a non-exhaustive-patterns error
+#EVAL f active    -- 2
+#EVAL f inactive  -- 1

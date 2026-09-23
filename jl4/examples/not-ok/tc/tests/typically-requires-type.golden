@@ -1,0 +1,12 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: typically-requires-type.l4
+  Hidden: no
+  Range: 8:8-8:22
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    `x` has a TYPICALLY default but no explicit type.
+    Add a type annotation (for example IS A NUMBER) so the default can be type-checked.

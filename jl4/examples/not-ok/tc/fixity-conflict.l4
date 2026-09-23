@@ -1,0 +1,17 @@
+-- Two signatures of the same binary operator (overloaded at different types)
+-- that declare disagreeing fixities: the chain use site reports the conflict
+-- rather than silently picking one.
+
+@infixl 6
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p CLASHOP q MEANS p + q
+
+@infixr 7
+GIVEN p IS A STRING
+      q IS A STRING
+GIVETH A STRING
+p CLASHOP q MEANS q
+
+#EVAL 1 CLASHOP 2 CLASHOP 3

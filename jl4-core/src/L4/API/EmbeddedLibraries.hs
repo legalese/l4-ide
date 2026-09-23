@@ -20,7 +20,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict (Map)
-import System.Directory (doesFileExist)
+import System.Directory (doesFileExist, getCurrentDirectory)
 import System.FilePath ((</>))
 import Language.Haskell.TH.Syntax (runIO)
 
@@ -64,5 +64,32 @@ embeddedLibraries = Map.fromList $ map (\(n, c) -> (Text.pack n, Text.pack c)) $
           repoExists <- runIO $ doesFileExist (repoLibDir </> "prelude.l4")
           if repoExists
             then embedLibrariesFromDir repoLibDir
-            else [| [] |]  -- No libraries found, return empty list
+            -- FAIL. This used to be `[| [] |]`, which turned "I cannot find the
+            -- standard library" at BUILD time into a binary that ships without
+            -- one and only fails when a user writes `IMPORT prelude`. A
+            -- stdlib-less build is never intentional, so it is a build error.
+            --
+            -- If you are seeing this: the usual cause is that `data-files` in
+            -- jl4-core.cabal has been silently disabled by a section inserted
+            -- above it, so the sdist carries no .l4 files and a store build
+            -- (`cabal install`) has nothing to embed. Check with
+            -- `cabal check` and `cabal sdist jl4-core --list-only | grep '\.l4$'`.
+            else do
+              cwd <- runIO getCurrentDirectory
+              fail $ unlines
+                [ "L4.API.EmbeddedLibraries: found no standard library to embed."
+                , "Probed, in order:"
+                , "  1. " ++ (dataDir </> "libraries") ++ "   (Cabal datadir)"
+                , "  2. " ++ devLibDir  ++ "   (relative to cwd)"
+                , "  3. " ++ repoLibDir ++ "   (relative to cwd)"
+                , "cwd was: " ++ cwd
+                , ""
+                , "A binary built from this would answer \"Module not found: prelude\""
+                , "for every IMPORT. Refusing to build it."
+                , "Most likely cause: jl4-core.cabal's `data-files` field has been"
+                , "disabled by a section appearing above it, so the sdist ships no"
+                , "libraries. Verify with:"
+                , "  cabal check"
+                , "  cabal sdist jl4-core --list-only | grep '\\.l4$'"
+                ]
   )

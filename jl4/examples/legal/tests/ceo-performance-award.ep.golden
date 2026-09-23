@@ -700,22 +700,22 @@ GIVETH A STRING
 
 -- Regulatory provision traces - High Performance
 #TRACE `Eligible Service Requirement` `Example Award State Active` AT 0 WITH
-    PARTY 365
+    PARTY `Elon Musk` DOES `maintain eligible service status` `Chief Executive Officer` AT 365
 
-DOES `Elon Musk` AT `maintain eligible service status` `Chief Executive Officer` #TRACE `Milestone Achievement Requirement` 1 `Example Award State Active` AT 0 WITH
-    PARTY 365
-    DOES `Elon Musk` AT `achieve market cap milestone` 1 (Trillion 2) PARTY 730
+#TRACE `Milestone Achievement Requirement` 1 `Example Award State Active` AT 0 WITH
+    PARTY `Elon Musk` DOES `achieve market cap milestone` 1 (Trillion 2) AT 365
+    PARTY `Elon Musk` DOES `achieve operational milestone` 1 "Product Goal" AT 730
 
 -- Regulatory provision traces - Medium Performance
-DOES `Elon Musk` AT `achieve operational milestone` 1 "Product Goal" #TRACE `Milestone Achievement Requirement` 1 `Example Award State Medium Performance` AT 0 WITH
-    PARTY 365
+#TRACE `Milestone Achievement Requirement` 1 `Example Award State Medium Performance` AT 0 WITH
+    PARTY `Elon Musk` DOES `achieve market cap milestone` 1 (Trillion 2) AT 365
 
 -- Regulatory provision traces - Low Performance (should show FULFILLED due to conditions not met)
-DOES `Elon Musk` AT `achieve market cap milestone` 1 (Trillion 2) #TRACE `Milestone Achievement Requirement` 1 `Example Award State Low Performance` AT 0 WITH
-    PARTY 365
+#TRACE `Milestone Achievement Requirement` 1 `Example Award State Low Performance` AT 0 WITH
+    PARTY `Elon Musk` DOES `maintain eligible service status` `Chief Executive Officer` AT 365
 
 -- Vesting traces - Create award state with tranche 1 earned 5 years ago
-DOES `Elon Musk` AT `maintain eligible service status` `Chief Executive Officer` `Example Award State With Earned Tranche` MEANS `CEO Award State` WITH
+`Example Award State With Earned Tranche` MEANS `CEO Award State` WITH
     `Musk Service Status`           IS `Chief Executive Officer`
     `Current Date`                  IS `Seventh And Half Anniversary`
     `Performance Metrics`           IS `Example Metrics High Performance`
@@ -729,12 +729,12 @@ DOES `Elon Musk` AT `maintain eligible service status` `Chief Executive Officer`
     `Shareholder Approval Received` IS TRUE
 
 #TRACE `Vesting Requirement` 1 `Example Award State With Earned Tranche` AT 0 WITH
-    PARTY 1
-    DOES `Elon Musk` AT `vest earned shares` 1 `Seventh And Half Anniversary` PARTY 31
-    DOES `Elon Musk` AT `pay offset amount` (`Offset Amount For Tranche` 1) PARTY 61
+    PARTY `Elon Musk` DOES `vest earned shares` 1 `Seventh And Half Anniversary` AT 1
+    PARTY `Elon Musk` DOES `pay offset amount` (`Offset Amount For Tranche` 1) AT 31
+    PARTY `Elon Musk` DOES `hold shares for period` 5 AT 61
 
-DOES `Elon Musk` AT `hold shares for period` 5 #TRACE `Eligible Service Requirement` `Example Award State Terminated` AT 0 WITH
-    PARTY 1
+#TRACE `Eligible Service Requirement` `Example Award State Terminated` AT 0 WITH
+    PARTY `Elon Musk` DOES `vest immediately` "Termination Without Cause" AT 1
 
-DOES `Elon Musk` AT `vest immediately` "Termination Without Cause" #TRACE `Eligible Service Requirement` `Example Award State Change In Control` AT 0 WITH
-    PARTY 1DOES `Elon Musk` AT `vest immediately` "Change In Control" 
+#TRACE `Eligible Service Requirement` `Example Award State Change In Control` AT 0 WITH
+    PARTY `Elon Musk` DOES `vest immediately` "Change In Control" AT 1

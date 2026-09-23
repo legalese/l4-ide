@@ -1,0 +1,12 @@
+Parsing successful
+Typechecking successful
+check-display-typevars.l4:10:1-14:
+  a
+check-display-typevars.l4:11:1-23:
+  FUNCTION FROM a TO a
+check-display-typevars.l4:12:1-26:
+  FUNCTION FROM a AND b TO a
+check-display-typevars.l4:13:1-27:
+  LIST OF a
+check-display-typevars.l4:14:1-32:
+  FUNCTION FROM a TO NUMBER

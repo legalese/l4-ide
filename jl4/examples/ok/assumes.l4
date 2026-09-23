@@ -1,3 +1,12 @@
+-- `l4 run` EXITS 1 ON THIS FILE, BY DESIGN. Every #EVAL below names an assumed
+-- term, so evaluation gets Stuck rather than producing a value, and a module
+-- that cannot evaluate should not report success (ruled by Meng 2026-08-01; see
+-- L4.Cli.Run.evalDirectiveCrashed). `l4 check` still exits 0 — the file is
+-- well-typed, and that is the point of the example. If a quiet exit is ever
+-- wanted, add a -q/--quiet-eval flag rather than flipping the default back.
+-- The golden suite is unaffected: it evaluates in-process and compares output,
+-- and never inspects a process exit code.
+
 ASSUME foo IS A FUNCTION FROM NUMBER TO BOOLEAN
 #EVAL foo 2
 

@@ -56,6 +56,10 @@ runtimeFunctions =
   , ("__l4_round",       [l4NumberType],               [l4NumberType])
   , ("__l4_str_concat",  [l4NumberType, l4NumberType], [l4NumberType])
   , ("__l4_str_eq",      [l4NumberType, l4NumberType], [l4NumberType])
+    -- Ordered STRING comparison. Returns -1.0\/0.0\/1.0 as f64 (same ABI
+    -- as @__l4_rat_cmp@): lexicographic by Unicode CODE POINT, matching
+    -- jl4-core's Data.Text Ord. NOT JS-native @<@ (UTF-16 code units).
+  , ("__l4_str_cmp",     [l4NumberType, l4NumberType], [l4NumberType])
   , ("__l4_str_len",     [l4NumberType],               [l4NumberType])
   , ("__l4_to_string",   [l4NumberType],               [l4NumberType])
   , ("__l4_list_count",  [l4NumberType],               [l4NumberType])

@@ -1,0 +1,7 @@
+-- A parse error caused by a RESOLVED ditto names the copied token:
+-- "unexpected ^ (resolved to PLUS)" — not the bare "unexpected ^" that
+-- once blamed the caret (SET-OPERATORS-SPEC §17.3 bookmark). The caret
+-- below column-aligns with PLUS on the line above, so it resolves to
+-- PLUS, which cannot start an expression.
+one MEANS 1 PLUS 2
+huh MEANS   ^

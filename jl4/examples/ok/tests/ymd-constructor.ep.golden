@@ -1,0 +1,112 @@
+-- YMD: the ISO 8601-ordered, BOUNDS-CHECKED date constructor.
+--
+-- `YMD y m d` is the recommended constructor for new code. On valid input it
+-- agrees with `Date d m y` exactly (it builds through Date); on out-of-range
+-- input it REFUSES, where Date silently rolls. The pair is deliberate:
+-- strict literals via YMD, lenient arithmetic via Date.
+--
+-- Harness clock: JL4_FIXED_NOW = 2025-01-31T15:45:30Z.
+
+IMPORT prelude
+IMPORT daydate
+
+TIMEZONE IS "Etc/UTC"
+
+
+§ `YMD agrees with Date`
+
+-- expected: DATE OF 28, 7, 2026 — big-endian arguments, little-endian display
+#EVAL YMD 2026 7 28
+
+-- expected: TRUE — same date, two argument orders
+#EVAL YMD 2026 7 28 EQUALS Date 28 7 2026
+
+-- expected: TRUE — the AKA resolves to the same constructor
+#EVAL `Year month day` 2026 7 28 EQUALS YMD 2026 7 28
+
+
+§ `DATE_SERIAL round-trip`
+
+-- expected: 740189 — days since 1st January 0000
+#EVAL DATE_SERIAL (YMD 2026 7 28)
+
+-- expected: DATE OF 28, 7, 2026 — serial round-trips back to the same date
+#EVAL Date (DATE_SERIAL (YMD 2026 7 28))
+
+-- expected: TRUE
+#EVAL Date (DATE_SERIAL (YMD 2026 7 28)) EQUALS YMD 2026 7 28
+
+
+§ `The transposition footgun, and how each constructor answers it`
+
+-- Transposing month and day is the mistake little-endian `Date d m y` invites,
+-- and Date's failure is SILENT: month 28 is not rejected, it rolls forward.
+--
+-- expected: DATE OF 28, 7, 2026 — what the author meant
+#EVAL YMD 2026 7 28
+
+-- expected: DATE OF 7, 4, 2028 — `Date 7 28 2026` read as day 7, month 28,
+-- year 2026; month 28 overflows 2026 by 16 months into April 2028. No error,
+-- no warning, just a date two years off.
+#EVAL Date 7 28 2026
+
+-- expected: FALSE — the transposed form is a different date entirely
+#EVAL Date 7 28 2026 EQUALS YMD 2026 7 28
+
+-- expected: 740808 — 619 days adrift of the intended 740189
+#EVAL DATE_SERIAL (Date 7 28 2026)
+
+-- YMD answers the same transposition by REFUSING: the component round-trip
+-- sees month 28 roll and lands on the refusal binding. A bare refused YMD
+-- DISPLAYS as that binding's name (lazy WHNF); any USE of it is loud — see
+-- the forcing probe below.
+-- expected: `YMD refused an out-of-range month or day`
+#EVAL YMD 2026 28 7
+
+
+§ `Bounds: the boundary days are valid, the rolled ones refuse`
+
+-- expected: DATE OF 31, 12, 2026 — upper boundary of the year
+#EVAL YMD 2026 12 31
+
+-- expected: DATE OF 29, 2, 2024 — a real leap day
+#EVAL YMD 2024 2 29
+
+-- expected: the refusal, by name — 2023 has no Feb 29
+#EVAL YMD 2023 2 29
+
+-- expected: DATE OF 1, 3, 2023 — Date's lenient roll of the same input,
+-- unchanged and deliberate: strict literals via YMD, lenient arithmetic
+-- via Date
+#EVAL Date 29 2 2023
+
+-- expected: the refusal, by name — month 0 clamps in Date; YMD refuses it
+#EVAL YMD 2026 0 15
+
+-- expected: the refusal, by name — day 32 rolls in Date; YMD refuses it
+#EVAL YMD 2026 1 32
+
+-- Forcing a refused date through arithmetic is LOUD: the machine stops with
+-- "I could not continue evaluating, because I needed to know the value of
+-- `YMD refused an out-of-range month or day` but it is an assumed term."
+-- expected: that error
+#EVAL DATE_SERIAL (YMD 2023 2 29)
+
+
+§ `YMD under a rule-version axis`
+
+-- GST rose from 7% to 9% for rules effective on/after 2024-01-01, expressed
+-- with YMD throughout.
+`GST rate` MEANS
+  IF `RULES EFFECTIVE DATE` AT LEAST YMD 2024 1 1
+  THEN 9
+  ELSE 7
+
+-- expected: 7 — old rule-version
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (YMD 2023 6 1) `GST rate`
+
+-- expected: 9 — new rule-version
+#EVAL `EVAL UNDER RULES EFFECTIVE AT` (YMD 2024 7 1) `GST rate`
+
+-- expected: 9 — axis unset, fallback = localized today 2025-01-31
+#EVAL `GST rate`

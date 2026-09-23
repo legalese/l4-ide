@@ -1,0 +1,27 @@
+-- Regression fixture for issue #920, second half.
+--
+-- Two DIFFERENT types both spelled `Verdict`, in sibling sections. Nothing is
+-- ambiguous here -- section proximity picks Alpha's `Verdict` for the GIVETH
+-- and the constructor `no` pins Beta's for the body -- so the type mismatch is
+-- entirely genuine, and must still be reported.
+--
+-- What was broken is only how it READ. `prettyLayout` renders a type from its
+-- surface names and never shows uniques, so the message came out as
+--
+--   must match its type signature at ..., namely
+--     Verdict
+--   but is here of type
+--     Verdict
+--
+-- which tells the reader nothing at all. The golden must now show each side
+-- qualified by where its `Verdict` was declared.
+
+§ Alpha
+DECLARE Verdict IS ONE OF yes
+
+§ Beta
+DECLARE Verdict IS ONE OF no
+
+§ Alpha
+GIVETH A Verdict
+t MEANS no

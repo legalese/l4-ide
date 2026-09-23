@@ -57,6 +57,7 @@ l4QueryPlan source uriText functionName bindingsJson =
                     , varInputRefsByUnique =
                         fmap (Set.map (\ref -> QP.MkInputRef ref.rootUnique ref.path)) inputRefs
                     , compiled = compiled
+                    , priorsByUnique = VizExpr.boolPriorsFromBody ladderInfo.funDecl.body
                     }
 
                   -- Parse bindings from JSON
@@ -89,7 +90,7 @@ vizExprToBoolExpr expr =
   go = \case
     VizExpr.TrueE _ _ -> (BDQ.BTrue, mempty, [])
     VizExpr.FalseE _ _ -> (BDQ.BFalse, mempty, [])
-    VizExpr.UBoolVar _ nm _ _ _ ->
+    VizExpr.UBoolVar _ nm _ _ _ _ ->
       let u = nm.unique
        in (BDQ.BVar u, Map.singleton u nm.label, [u])
     VizExpr.App _ nm _args _ ->

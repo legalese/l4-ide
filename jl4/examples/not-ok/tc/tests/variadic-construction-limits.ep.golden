@@ -1,0 +1,31 @@
+§ `Route-α variadic construction: what does NOT fire (SET-OPERATORS-SPEC §D7.1)`
+
+-- The rewrite is deliberately narrow: record constructors with exactly one
+-- LIST-typed field, at two or more arguments. Everything below must remain
+-- an error, locking in the conservative-extension boundary.
+
+DECLARE Bag OF a
+  HAS items IS A LIST OF a
+
+DECLARE Tag OF a
+  HAS label IS A STRING
+      value IS AN a
+
+GIVEN a IS A TYPE
+      xs IS A LIST OF a
+GIVETH A Bag OF a
+mkBag xs MEANS Bag OF xs
+
+-- one argument that is not a list: never rewritten (no singleton sugar)
+oneArg MEANS Bag OF 5
+
+-- a two-field constructor over-applied: not a single-list-field shape
+overApplied MEANS Tag OF "x", 1, 2
+
+-- an ordinary FUNCTION with a list parameter: constructors only
+fnApplied MEANS mkBag OF 1, 2, 3
+
+-- the infix chain spelling does not fire the rescue: mixfix-chain-parsed
+-- heads are synthesized rangeless and never carry the Constructor stamp
+-- (see isConstructorKind boundary note); this pins that behavior
+infixSpelling MEANS 1 Bag 2

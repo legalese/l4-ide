@@ -1,0 +1,7 @@
+@export This function computes a premium, treating a missing value as zero
+GIVEN premium IS A MAYBE NUMBER
+GIVETH A NUMBER
+computePremium premium MEANS
+  CONSIDER premium
+    WHEN JUST p THEN p
+    WHEN NOTHING THEN 0

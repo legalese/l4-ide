@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+section-scoping-param-not-shadowed.l4:15:1-12:
+  7
+section-scoping-param-not-shadowed.l4:16:1-13:
+  42
+section-scoping-param-not-shadowed.l4:19:1-10:
+  100

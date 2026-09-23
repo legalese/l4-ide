@@ -1,0 +1,33 @@
+-- A fixity-conflicted operator chain where, unlike fixity-conflict.l4, ONE
+-- overload remains viable for the flat application: the 4-parameter VOP can
+-- absorb the whole un-reassociated shape `VOP 1 2 VOP 3` (the inner marker
+-- resolves as its FUNCTION-typed argument), so overload resolution sees
+-- exactly one locally-succeeding candidate.
+--
+-- This pins the forkWithLazyFallback seam: the FixityConflict emitted in the
+-- App preamble makes every branch a failure upstream, so the one-success
+-- skip of the ambiguity fallback must NOT fire — the expected output is the
+-- FixityConflict AND the two AmbiguousTermErrors, exactly as before the
+-- lazy-fallback optimisation. If the ambiguity errors disappear from this
+-- golden, the preamble-diagnostic flag has come unthreaded.
+
+@infixl 6
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+p VOP q MEANS p PLUS q
+
+@infixr 7
+GIVEN p IS A STRING
+      q IS A STRING
+GIVETH A STRING
+p VOP q MEANS p
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      g IS A FUNCTION FROM A NUMBER AND A NUMBER TO A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+VOP MEANS g a (g b c)
+
+chain MEANS 1 VOP 2 VOP 3

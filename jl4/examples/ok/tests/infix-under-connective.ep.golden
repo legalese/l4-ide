@@ -1,0 +1,124 @@
+-- A user-defined infix operator is admitted as an operand of the built-in
+-- operator chain (AND / OR / '..' / comparisons / arithmetic), binding
+-- tighter than every built-in operator — the same grouping that prefix
+-- application has always had. Before this, an infix call was admitted only
+-- at the outermost level of an expression or inside parentheses; see
+-- SET-OPERATORS-SPEC §17.3 ("Style 3"), whose forms this file pins.
+
+§ `Style 3 — distributed predicates, infix + dittos`
+
+DECLARE Person
+    HAS name                 IS A STRING
+        `state of residence` IS A STRING
+
+alice MEANS Person WITH name IS "alice", `state of residence` IS "NY"
+carol MEANS Person WITH name IS "carol", `state of residence` IS "NJ"
+dave  MEANS Person WITH name IS "dave",  `state of residence` IS "CT"
+erin  MEANS Person WITH name IS "erin",  `state of residence` IS "DE"
+
+GIVEN p IS A Person
+      s IS A STRING
+GIVETH A BOOLEAN
+p `resides in` s MEANS p's `state of residence` EQUALS s
+
+-- The two-element form: infix operands on both sides of OR, no parens.
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+`may apply` p MEANS
+       p `resides in` "NY"
+    OR ^ ^            "NJ"
+
+-- The four-element form: '..' asyndeton rows, dittos carrying the repeated
+-- subject and operator; OR uttered once, where grammar compels it.
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+`may apply broadly` p MEANS
+       p `resides in` "NY"
+    .. ^ ^            "NJ"
+    .. ^ ^            "PA"
+    OR ^ ^            "DE"
+
+#EVAL `may apply` alice
+#EVAL `may apply` carol
+#EVAL `may apply` dave
+#EVAL `may apply broadly` erin
+#EVAL `may apply broadly` dave
+
+§ `Bare-word operators and mixed built-in forms`
+
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+x SCALEDBY y MEANS x TIMES y
+
+-- Backticks are not load-bearing: a bare-word infix operator is admitted
+-- under built-ins the same way, binding tighter than PLUS and EQUALS.
+#EVAL 10 PLUS 2 SCALEDBY 3
+#EVAL 2 SCALEDBY 3 PLUS 10
+#EVAL 2 SCALEDBY 3 EQUALS 6 AND TRUE
+
+-- A built-in comparison as the other operand of OR: the chain binds
+-- tightest, then GREATER THAN, then OR.
+GIVEN p IS A Person
+      n IS A NUMBER
+GIVETH A BOOLEAN
+`qualifies` p n MEANS
+       p `resides in` "NY"
+    OR n GREATER THAN 3
+
+#EVAL `qualifies` dave 5
+#EVAL `qualifies` dave 2
+
+§ `Controls that must stay green`
+
+-- Prefix spelling (was always admitted).
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+`may apply prefix` p MEANS
+       `resides in` p "NY"
+    OR `resides in` p "NJ"
+
+-- Parenthesized spelling (was always admitted).
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+`may apply parens` p MEANS
+    (p `resides in` "NY") OR (p `resides in` "NJ")
+
+#EVAL `may apply prefix` carol
+#EVAL `may apply parens` carol
+#EVAL `may apply prefix` dave
+
+§ `Declared fixity composes with built-in operators`
+
+@infixl 6
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+x `plusop` y MEANS x PLUS y
+
+@infixl 7
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+x `timesop` y MEANS x TIMES y
+
+-- The declared-fixity chain re-associates (timesop binds tighter) and the
+-- whole chain is one operand of the built-in operator on either side.
+#EVAL 1 `plusop` 2 `timesop` 3
+#EVAL TRUE OR 1 `plusop` 2 `timesop` 3 EQUALS 8
+#EVAL 1 `plusop` 2 EQUALS 3 AND 2 `timesop` 3 EQUALS 6
+
+§ `Same-line discipline for operand chains`
+
+-- A chain keyword in operand position must be on the operand's own line;
+-- a next-line keyword is NOT absorbed (it would routinely be the next
+-- declaration's head). This is why the following top-level definition,
+-- whose name is also an operator in scope, parses as a definition:
+qq MEANS 1 PLUS
+2
+
+GIVEN r IS A NUMBER
+GIVETH A NUMBER
+`plusop-shadow` r MEANS r PLUS 100
+
+#EVAL qq

@@ -1,0 +1,27 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+cheating-415-poh-yuan-nie.l4:182:1-86:
+  TRUE
+cheating-415-poh-yuan-nie.l4:183:1-87:
+  FALSE
+cheating-415-poh-yuan-nie.l4:184:1-86:
+  TRUE
+cheating-415-poh-yuan-nie.l4:185:1-87:
+  TRUE
+cheating-415-poh-yuan-nie.l4:187:1-94:
+  assertion satisfied
+cheating-415-poh-yuan-nie.l4:188:1-95:
+  assertion satisfied
+cheating-415-poh-yuan-nie.l4:227:1-80:
+  FALSE
+cheating-415-poh-yuan-nie.l4:228:1-81:
+  FALSE
+cheating-415-poh-yuan-nie.l4:230:1-80:
+  TRUE
+cheating-415-poh-yuan-nie.l4:231:1-81:
+  FALSE
+cheating-415-poh-yuan-nie.l4:234:1-100:
+  assertion satisfied
+cheating-415-poh-yuan-nie.l4:236:1-101:
+  assertion satisfied

@@ -1,0 +1,43 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+nested-context.l4:15:1-36:
+  TRUE
+nested-context.l4:18:1-37:
+  FALSE
+nested-context.l4:21:1-37:
+  FALSE
+nested-context.l4:34:1-37:
+  TRUE
+nested-context.l4:37:1-37:
+  TRUE
+nested-context.l4:40:1-38:
+  FALSE
+nested-context.l4:54:1-38:
+  TRUE
+nested-context.l4:57:1-39:
+  FALSE
+nested-context.l4:72:1-37:
+  TRUE
+nested-context.l4:75:1-38:
+  FALSE
+nested-context.l4:78:1-38:
+  FALSE
+nested-context.l4:95:1-40:
+  TRUE
+nested-context.l4:98:1-39:
+  TRUE
+nested-context.l4:101:1-40:
+  FALSE
+nested-context.l4:104:1-40:
+  FALSE
+nested-context.l4:118:1-37:
+  TRUE
+nested-context.l4:121:1-38:
+  FALSE
+nested-context.l4:124:1-38:
+  FALSE
+nested-context.l4:138:1-40:
+  TRUE
+nested-context.l4:141:1-41:
+  FALSE

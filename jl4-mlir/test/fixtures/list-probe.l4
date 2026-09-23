@@ -1,0 +1,49 @@
+-- Differential-parity probe for prelude's list helpers.
+--
+-- These all lambda-lift a recursive local helper named `go`. Because local
+-- helper names are scoped in L4 but FLAT once lifted to a top-level func.func,
+-- every arity-2 `go` in the prelude (sum, product, count, reverse, dictSize,
+-- dictDelete, groupPairs — ten of them) used to collapse onto a single WASM
+-- symbol under the arity-only mangle. `count`'s body won, so `sum` silently
+-- returned the list LENGTH and `product` returned length+1.
+--
+-- Trivial inputs mask this (sum of a 1-element list == its length when the
+-- element is 1), so the cases sidecar deliberately uses values that separate
+-- sum / product / count / maximum from each other AND from the list length.
+
+IMPORT prelude
+
+@export Sum of three numbers (prelude sum)
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+DECIDE `sum three` IS sum (LIST a, b, c)
+
+@export Product of three numbers (prelude product)
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+DECIDE `product three` IS product (LIST a, b, c)
+
+@export How many of the three numbers there are (prelude count)
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+DECIDE `count three` IS count (LIST a, b, c)
+
+@export The largest of three numbers (prelude maximum)
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+DECIDE `max three` IS maximum (LIST a, b, c)
+
+@export The first number after reversing (prelude reverse)
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+      c IS A NUMBER
+GIVETH A NUMBER
+DECIDE `last of three` IS sum (take 1 (reverse (LIST a, b, c)))

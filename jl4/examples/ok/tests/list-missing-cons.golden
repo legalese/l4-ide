@@ -1,0 +1,8 @@
+Parsing successful
+Typechecking successful
+list-missing-cons.l4:7:3-8:20:
+  I found a problem while checking the definition of `count`:
+    The following branches still need to be considered:
+    
+      WHEN `_` FOLLOWED BY `_` THEN
+    

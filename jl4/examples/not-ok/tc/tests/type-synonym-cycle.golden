@@ -1,0 +1,46 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: type-synonym-cycle.l4
+  Hidden: no
+  Range: 5:9-5:13
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Circular dependency detected between type synonyms:
+
+      `Loop`
+
+    A type synonym must not refer to itself, directly or via other
+    synonyms, because it could then never be fully expanded.
+
+File: type-synonym-cycle.l4
+  Hidden: no
+  Range: 7:9-7:13
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    Circular dependency detected between type synonyms:
+
+      `Ping`
+      `Pong`
+
+    A type synonym must not refer to itself, directly or via other
+    synonyms, because it could then never be fully expanded.
+
+File: type-synonym-cycle.l4
+  Hidden: no
+  Range: 11:12-11:14
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    The type of this definition must match its type signature at type-synonym-cycle.l4:10:8-14, namely
+
+      Loop
+
+    but is here of type
+
+      NUMBER

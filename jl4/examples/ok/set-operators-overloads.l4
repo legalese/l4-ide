@@ -1,0 +1,61 @@
+IMPORT prelude
+
+§ `Set operators — Phase 2: the overloads, and the two ANDs side by side`
+
+-- The acceptance test of SET-OPERATORS-SPEC.md §5, as amended by §16:
+-- term-level set union is spelled UNION explicitly; sentence-level AND on
+-- BOOLEANs stays conjunction. The AND/OR-on-sets overloads were REMOVED
+-- 2026-07-28 — a second __AND__/__OR__ candidate made typechecking
+-- exponential (base 3) in AND/OR chain depth (smucclaw/l4-ide#929), so
+-- the type-directed dispatch of the same token now stops at the boolean
+-- reading, and the union reading is written in its own word.
+
+§§ `Term-level union: spelled UNION`
+
+`new yorkers`   MEANS setFromList (LIST "alice", "bob")
+`new jerseyans` MEANS setFromList (LIST "carol")
+
+-- "residents of New York and New Jersey may apply": either state
+-- qualifies. The drafter resolves the source text's "and" to UNION
+-- explicitly; AND on two SETs is a type error (see
+-- not-ok/tc/set-and-unoverloaded.l4).
+`eligible` MEANS `new yorkers` UNION `new jerseyans`
+
+#EVAL setSize `eligible`
+#EVAL "carol" `is in` `eligible`
+
+§§ `Sentence-level AND: conjunction, as always`
+
+`is cruel`   MEANS TRUE
+`is unusual` MEANS FALSE
+
+-- "cruel and unusual punishments": must be both.
+`violates 8th amendment` MEANS `is cruel` AND `is unusual`
+
+#EVAL `violates 8th amendment`
+
+§§ `PLUS and MINUS: bare, precedence-correct — and not a group`
+
+a1 MEANS setFromList (LIST 1, 2, 3)
+b1 MEANS setFromList (LIST 2, 3, 4)
+
+#EVAL setSize (a1 PLUS b1)
+#EVAL setSize (a1 MINUS b1)
+-- unparenthesized chain: left-associates at arithmetic precedence
+#EVAL setSize (a1 PLUS b1 MINUS b1)
+-- the semilattice trap, demonstrated: (a1 PLUS b1) MINUS b1 is NOT a1
+#EVAL setToList (a1 PLUS b1 MINUS b1)
+-- numeric dispatch is untouched
+#EVAL 5 MINUS 2
+#EVAL 5 PLUS 2
+
+§§ `Extensional equality`
+
+-- order and duplicates are invisible under `set equals`.
+-- (Bare EQUALS on two SETs is deliberately an ambiguity error — see
+-- not-ok/tc/set-equals-ambiguous.l4 and prelude `Sets` notes.)
+#EVAL (setFromList (LIST 2, 1, 1)) `set equals` (setFromList (LIST 1, 2))
+#EVAL (setFromList (LIST 1)) `set equals` (setFromList (LIST 1, 2))
+-- numeric and string EQUALS untouched
+#EVAL 42 EQUALS 42
+#EVAL "a" EQUALS "b"
