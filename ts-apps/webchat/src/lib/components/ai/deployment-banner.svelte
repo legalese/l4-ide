@@ -19,7 +19,9 @@
 <style>
   .deployment-banner {
     box-sizing: border-box;
-    width: 100%;
+    /* Margin-compensated: plain 100% + side margins overflowed the centered
+       flex column on narrow viewports (horizontal scroll on phones). */
+    width: calc(100% - 1.5rem);
     max-width: 800px;
     margin: 0 0.75rem -6px;
     /* Tuck the flat bottom edge behind the input's rounded top so the
