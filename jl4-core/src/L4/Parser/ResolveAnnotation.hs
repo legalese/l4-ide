@@ -191,6 +191,19 @@ class HasNlg a where
   -- based on the 'SrcSpan' of 'a' and its neighbours.
   addNlg :: a -> NlgA a
 
+  -- | The claim a RECORD FIELD's name makes, given the span of its type.
+  --
+  -- Two disjoint regions, which is why it needs the type's span rather than
+  -- just a range: everything BEFORE the type (the field's own trailing
+  -- gloss, as always), plus everything on a LATER LINE than the field
+  -- (ruled 2026-09-19 — an annotation written underneath a field describes
+  -- that field). What falls between — trailing the type on the field's own
+  -- line — is left for the type, which runs next.
+  --
+  -- Defaults to the ordinary claim, so only the 'Name' instance has to care.
+  addNlgFieldName :: Maybe SrcSpan -> a -> NlgA a
+  addNlgFieldName _ = addNlg
+
 instance (HasSrcRange n, HasNlg n) => HasNlg (Module n) where
   addNlg a = extendNlgA a $ case a of
     MkModule uri ann sect -> MkModule uri ann <$> addNlg sect
@@ -296,6 +309,16 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (TypeDecl n) where
       ty' <- addNlg ty
       pure $ SynonymDecl ann ty'
 
+-- | Run a computation but advertise NO span for it, so a sibling's range is
+-- not cut short by it.
+--
+-- 'extendNlgA' inside each instance advertises the node's own span, which is
+-- what delimits its neighbours. A record field's NAME has to be able to reach
+-- PAST its type to the line below, so the type must stop advertising — while
+-- still claiming, which is why this is not 'unclaimedSignatureType'.
+unspanned :: NlgA a -> NlgA a
+unspanned a = liftNlgA a.computation
+
 -- | A type mentioned in a SIGNATURE claims no @\@nlg@ annotation and registers
 -- no span, so the name it belongs to claims the whole binder instead.
 --
@@ -328,17 +351,33 @@ unclaimedSignatureType = pure
 
 instance (HasSrcRange n, HasNlg n) => HasNlg (TypedName n) where
   addNlg a = extendNlgA a $ case a of
-    -- NOT 'unclaimedSignatureType' here, deliberately — see its note. A RECORD
-    -- FIELD is the one place the corpus annotates a name and its type on the
-    -- same line on purpose: @ok/nlg_declare1.l4@ writes
-    -- @head [Get First Element] IS AN a [Start Element]@, glossing the field
-    -- and the type parameter separately. Letting the field's name claim the
-    -- whole line makes those two annotations collide, and the ambiguity rule
-    -- then correctly refuses both — so the repair would delete four working
-    -- annotations to fix none.
+    -- A RECORD FIELD splits its two lines between the two claimants (ruled
+    -- 2026-09-19, Meng). An annotation written UNDERNEATH a field describes
+    -- that field:
+    --
+    -- @
+    -- HAS `full name`  IS A STRING
+    --     \@nlg the employee's full name      -- describes `full name`
+    --     `start date` IS A DATE
+    -- @
+    --
+    -- so the field's NAME claims below-the-line annotations, and to reach
+    -- past its own type it needs the type to stop advertising a span —
+    -- hence 'unspanned'. The type still CLAIMS, and it runs second, so it
+    -- picks up whatever is left on the field's own line. That is what keeps
+    -- @ok/nlg_declare1.l4@ working: @head [Get First Element] IS AN a
+    -- [Start Element]@ glosses the field and the type parameter separately
+    -- and on purpose, both TRAILING, and letting the name take the whole
+    -- line would make them collide and lose both.
+    --
+    -- This is the one exception to "own line describes what follows". A
+    -- field list is a column of things rather than a sequence of
+    -- declarations, and all three independently generated Hebrew encodings
+    -- measured in 2026-09 annotate fields this way — 100 heralds, every one
+    -- below its field.
     MkTypedName ann n ty mTypically mExpr -> do
-      n' <- addNlg n
-      ty' <- addNlg ty
+      n' <- addNlgFieldName (fromSrcRange <$> rangeOf ty) n
+      ty' <- unspanned (addNlg ty)
       mTypically' <- traverse addNlg mTypically
       pure $ MkTypedName ann n' ty' mTypically' mExpr
 
@@ -464,10 +503,28 @@ instance (HasSrcRange n, HasNlg n) => HasNlg (Aka n) where
       pure $ MkAka ann ns'
 
 instance HasNlg Name where
-  addNlg a = extendNlgA a $ case a of
-    MkName ann raw -> do
-      ann' <- liftNlgA (attachNlgs a ann =<< takeNlgComments)
-      pure $ MkName ann' raw
+  addNlg = addNlgNameWhere (const True)
+  addNlgFieldName mTySpan a =
+    addNlgNameWhere (\ w -> startsBefore mTySpan w || startsBelow a w) a
+
+-- | The shared body of both of 'Name'\'s claims.
+addNlgNameWhere :: (NlgWithSpan -> Bool) -> Name -> NlgA Name
+addNlgNameWhere p a = extendNlgA a $ case a of
+  MkName ann raw -> do
+    ann' <- liftNlgA (attachNlgs a ann =<< takeNlgCommentsWhere p)
+    pure $ MkName ann' raw
+
+-- | Does this annotation begin on a line strictly below where @e@ ends?
+startsBelow :: HasSrcRange e => e -> NlgWithSpan -> Bool
+startsBelow e w = case fromSrcRange <$> rangeOf e of
+  Nothing    -> False
+  Just span' -> w.range.start.line > span'.end.line
+
+-- | Does this annotation begin before the given span starts? A missing span
+-- means "no type to be before", so nothing qualifies on that ground.
+startsBefore :: Maybe SrcSpan -> NlgWithSpan -> Bool
+startsBefore Nothing      _ = False
+startsBefore (Just span') w = w.range.start < span'.start
 
 -- | Attach the annotations in scope for one name. Exactly one attaches; two or
 -- more are an ambiguity, which warns and attaches neither.
@@ -1871,13 +1928,16 @@ takeNlgsInRange locRange nlgs =
 -- Takes the 'Nlg's that are currently in scope and removes
 -- them from the internal state.
 --
-takeNlgComments :: NlgM [NlgWithSpan]
-takeNlgComments = do
+-- | 'takeNlgComments', but only those in range that also satisfy @p@. The rest
+-- stay in the state for a later node to claim.
+takeNlgCommentsWhere :: (NlgWithSpan -> Bool) -> NlgM [NlgWithSpan]
+takeNlgCommentsWhere p = do
   s <- get
   locRange <- ask
   let
-    (taken, rest) = takeNlgsInRange locRange s.nlgs
-  put (s{nlgs = rest})
+    (here, elsewhere) = takeNlgsInRange locRange s.nlgs
+    (taken, declined) = List.partition p here
+  put (s{nlgs = declined <> elsewhere})
   pure taken
 
 {- Note [Adding Haddock comments to the syntax tree]
