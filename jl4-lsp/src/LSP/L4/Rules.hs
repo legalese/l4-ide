@@ -261,7 +261,16 @@ data LibraryResolution = LibraryResolution
     -- ^ /every/ candidate that exists, in precedence order — kept so callers
     -- can detect when a lower-priority copy is being shadowed (spec Option E)
   , candidates      :: ![LibraryCandidate]  -- ^ full ordered list probed
-  , searchedPaths   :: ![FilePath]          -- ^ filesystem paths probed (for the not-found diagnostic)
+  , searchedPaths   :: ![FilePath]          -- ^ filesystem paths probed
+  , tiersInOrder    :: ![LibraryCandidate]
+    -- ^ every tier in ladder order, for the not-found diagnostic, INCLUDING the
+    -- embedded one when @JL4_LIBRARY_PATH@ suppressed it. Distinct from
+    -- 'candidates', which lists only what was actually probed and whose 1-based
+    -- indices the winner line and the shadow warning cite: adding an unprobed
+    -- entry there would renumber both. The diagnostic needs the ladder rather
+    -- than the probe list, because it claims to print the locations in the order
+    -- they were tried, and the embedded tier's rank is 4 of 6 -- it used to be
+    -- appended last whatever its rank.
   , hasExplicitPath :: !Bool                -- ^ True if JL4_LIBRARY_PATH is set (embedded copy not consulted)
   }
 
@@ -302,9 +311,14 @@ resolveLibrary rootDirectory mImportingFile modName = do
       xdgCand      = FileCandidate "XDG data dir" (xdgDataDir </> "libraries" </> modName <.> "l4")
       bundledCand  = FileCandidate "VSCode bundle" (extensionRoot </> "libraries" </> modName <.> "l4")
 
-      cands = envCands <> [rootCand] <> siblingCands
-           <> [ EmbeddedCandidate | not hasExplicit ]
+      -- ONE definition of the ladder. 'cands' is what gets probed; 'tiers' is
+      -- what the not-found diagnostic lists. They differ in exactly one entry,
+      -- and writing the order out twice is how they would come to differ in
+      -- more than one.
+      tiers = envCands <> [rootCand] <> siblingCands
+           <> [EmbeddedCandidate]
            <> [xdgCand, bundledCand]
+      cands = [ c | c <- tiers, not (hasExplicit && c == EmbeddedCandidate) ]
 
       probe (i, c) = case c of
         FileCandidate _ p -> do
@@ -321,6 +335,7 @@ resolveLibrary rootDirectory mImportingFile modName = do
     , existing = present
     , candidates = cands
     , searchedPaths = [ p | FileCandidate _ p <- cands ]
+    , tiersInOrder = tiers
     , hasExplicitPath = hasExplicit
     }
 
@@ -341,17 +356,58 @@ candidateDisplayCanonical c = case c of
     real <- either (\(_ :: SomeException) -> p) id <$> tryAny (canonicalizePath p)
     pure $ candidateDisplay c <> if real == p then "" else " -> " <> Text.pack real
 
+-- | A @file:@ URI that reads back as the path it was built from.
+--
+-- Every candidate URI the resolver hands downstream is turned back into a
+-- FilePath before anything is read: 'GetLexTokens' falls back to
+-- @uriToNormalizedFilePath@ plus 'Shake.addVirtualFileFromFS'. So a URI that
+-- does not round-trip names a file that does not exist -- and the resulting
+-- failure is SILENT at the IMPORT, because the import counted as resolved and
+-- the load failure lands on the bogus URI instead (smucclaw/l4-ide#971).
+--
+-- The trap is that a RELATIVE path cannot be spelled in a @file:@ URI at all.
+-- 'filePathToUri' emits @file://<escaped path>@ with no leading slash, so the
+-- escaped path lands in the URI's /authority/; and lsp-types' @uriToFilePath@
+-- prepends the authority WITHOUT un-escaping it
+-- (@Language.LSP.Protocol.Types.Uri.platformAdjustFromUriPath@, lsp-types
+-- 2.3.0.1). Every percent-escape therefore survives literally: a module whose
+-- basename is written in Hebrew letters goes out as @file://%D7%A7...@ and
+-- comes back as a filename that begins with a literal percent sign, which
+-- nothing can open. An ASCII basename escapes to itself, which is why this
+-- stayed invisible for as long as every module name in the corpus was ASCII --
+-- and it is not only a non-ASCII problem, since a space or a literal @%@ in a
+-- basename is lost the same way.
+--
+-- An ABSOLUTE path has a leading slash, so it lands in the URI's /path/, which
+-- @uriToFilePath@ does un-escape. Hence: keep the relative spelling whenever it
+-- does round-trip -- so the resolution logs the golden suite captures verbatim
+-- do not move -- and fall back to the absolute one only for a path that would
+-- otherwise be lost.
+roundTrippingFileUri :: FilePath -> IO NormalizedUri
+roundTrippingFileUri fp
+  | readsBack = pure asGiven
+  | otherwise = toNormalizedUri . filePathToUri <$> makeAbsolute fp
+  where
+    asGiven = toNormalizedUri (filePathToUri fp)
+    readsBack =
+      (fromNormalizedFilePath <$> uriToNormalizedFilePath asGiven) == Just (normalise fp)
+
 -- | What one import resolved to, plus everything that was tried (for the
 -- not-found diagnostic).
 data ImportOutcome = ImportOutcome
   { importUri  :: !(Maybe NormalizedUri)
   , vfsTried   :: ![NormalizedUri]
-  , pathsTried :: ![FilePath]
+  , libTried   :: ![LibraryCandidate]
+    -- ^ The filesystem + embedded ladder, in the order it was probed
+    -- ('LibraryResolution'’s @tiersInOrder@), so the not-found diagnostic can
+    -- list the locations in that order.
   , embedTried :: !EmbedStatus
-    -- ^ What happened at the embedded tier. Kept SEPARATE from 'pathsTried'
-    -- because the embed has no path, and the not-found diagnostic listed only
-    -- paths — so the one tier that can silently be empty was the one tier the
-    -- error could not mention. See 'renderEmbedStatus'.
+    -- ^ What happened at the embedded tier: 'libTried' says WHERE the embed sits
+    -- in the ladder, this says what came of consulting it — including that it was
+    -- not consulted at all. Separate because the embed has no path, and the
+    -- not-found diagnostic listed only paths, so the one tier that can silently
+    -- be empty was the one tier the error could not mention. See
+    -- 'renderEmbedStatus'.
   }
 
 -- | The embedded-stdlib tier, as the not-found diagnostic needs to describe it.
@@ -382,6 +438,93 @@ renderEmbedStatus = \ case
     , "  from `cabal install`, check that jl4-core.cabal's `data-files` field still"
     , "  precedes every section (`cabal check` reports it if not) and rebuild."
     ]
+
+-- | One location an unresolved import was tried at, as the not-found
+-- diagnostic lists it.
+data TriedLocation = TriedLocation
+  { display       :: !Text
+    -- ^ how this location is printed
+  , sameFileAs    :: !(Maybe FilePath)
+    -- ^ the absolute, normalised path this entry names, when it names a file at
+    -- all. Two entries sharing it are ONE location, however differently they are
+    -- spelled. 'Nothing' for the @project:@ VFS key and for the embedded stdlib,
+    -- neither of which is a path.
+  , spelledAsPath :: !Bool
+    -- ^ True when 'display' is a plain filesystem path rather than a URI
+  }
+
+-- | The not-found diagnostic's list of locations: one line per location, in tier
+-- order, spelled as a plain path wherever any of the entries for that location
+-- is one.
+--
+-- Deduped by 'sameFileAs' — the file — rather than by rendered text, because the
+-- VFS tier prints URIs and the filesystem tiers print paths, and when the project
+-- root is the importing file's own directory (which is what the CLI sets it to)
+-- those are the same file. So a CLI run printed
+--
+-- >     file://zz-nope.l4,
+-- >     zz-nope.l4,
+--
+-- two lines that read as a repeat, for one place looked in once; in an LSP
+-- session it was four lines for two locations. A text-level @nub@ cannot see
+-- that, because the two spellings differ.
+--
+-- The path spelling wins because the URI is a VFS key rather than anything the
+-- user wrote: @file://zz-nope.l4@ is a /relative/ @file:@ URI, which is not a
+-- location a reader can go and look at, while @zz-nope.l4@ is the name they
+-- typed. And the location is printed at the rank of the entry whose spelling
+-- won — so a file the VFS tier and a filesystem tier both name appears at the
+-- filesystem tier's rank, and the list comes out in the order of the ladder
+-- table the reader is about to compare it against
+-- (doc\/reference\/libraries\/resolution.md). Positioning it at its FIRST try
+-- instead was built and measured: it put the project directory above
+-- @$JL4_LIBRARY_PATH@, because the VFS probe of that directory precedes every
+-- filesystem tier, which is true and reads as wrong.
+dedupeTriedLocations :: [TriedLocation] -> [Text]
+dedupeTriedLocations locs =
+  [ l.display | (i, l) <- indexed, chosenIndex (keyOf l) == Just i ]
+  where
+    indexed = zip [0 :: Int ..] locs
+    -- A location with no path is keyed on its own text, which is what the
+    -- text-level `nub` did for every entry.
+    keyOf l = maybe (Left l.display) Right l.sameFileAs
+    chosenIndex k =
+      let grp = [ il | il@(_, l) <- indexed, keyOf l == k ]
+       in fst <$> (Maybe.listToMaybe (filter ((.spelledAsPath) . snd) grp)
+                   <|> Maybe.listToMaybe grp)
+
+-- | Every location an unresolved import was tried at, in the order it was tried,
+-- ready to print. 'makeAbsolute' is what makes two spellings of one file
+-- comparable; it reads the current directory and touches nothing else, and a
+-- failure falls back to the entry's own spelling, which still collapses exact
+-- duplicates.
+triedLocations :: ImportOutcome -> IO [Text]
+triedLocations outcome = do
+  vfs <- traverse vfsLoc outcome.vfsTried
+  lib <- traverse libLoc outcome.libTried
+  pure $ dedupeTriedLocations (vfs <> lib)
+  where
+    absKey p = either (\ (_ :: SomeException) -> normalise p) id <$> tryAny (makeAbsolute p)
+    vfsLoc u = do
+      key <- traverse (absKey . fromNormalizedFilePath) (uriToNormalizedFilePath u)
+      pure TriedLocation
+        { display = (fromNormalizedUri u).getUri
+        , sameFileAs = key
+        , spelledAsPath = False
+        }
+    libLoc = \ case
+      EmbeddedCandidate -> pure TriedLocation
+        { display = renderEmbedStatus outcome.embedTried
+        , sameFileAs = Nothing
+        , spelledAsPath = False
+        }
+      FileCandidate _ p -> do
+        key <- absKey p
+        pure TriedLocation
+          { display = Text.pack (normalise p)
+          , sameFileAs = Just key
+          , spelledAsPath = True
+          }
 
 -- | Resolve one bare-module-name import. This is the /single/ resolution code
 -- path shared by 'GetMixfixRegistry' (parser-hint resolution) and 'GetImports'
@@ -419,12 +562,17 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
       -- are then ranked by 'resolveLibrary' alone (project root above embedded,
       -- per Option B′), the same ranking every other importer gets: one module
       -- name stays bound to one source across the whole build.
-      relativeUri = do
+      relativePath = do
         nfp <- uriToNormalizedFilePath importerUri
         let dir = takeDirectory $ fromNormalizedFilePath nfp
-        pure $ toNormalizedUri $ filePathToUri $ dir </> modName <.> "l4"
-      rootUri = toNormalizedUri $ filePathToUri $ rootDirectory </> modName <.> "l4"
-      vfsUris = [projectUri] <> Maybe.maybeToList relativeUri <> [rootUri]
+        pure $ dir </> modName <.> "l4"
+      rootPath = rootDirectory </> modName <.> "l4"
+  -- 'roundTrippingFileUri', not a bare 'filePathToUri': a relative candidate
+  -- path whose basename needs percent-escaping does not survive the URI round
+  -- trip, so the VFS key it produces cannot be read back (#971).
+  vfsFileUris <- liftIO $ traverse roundTrippingFileUri $
+    Maybe.maybeToList relativePath <> [rootPath]
+  let vfsUris = projectUri : vfsFileUris
 
   logWith recorder Debug $ LogImportResolution $
     "Checking VFS URIs: " <> Text.intercalate ", " (map ((.getUri) . fromNormalizedUri) vfsUris)
@@ -448,7 +596,7 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
       logWith recorder Info $ LogImportResolution $
         "Found in VFS: " <> (fromNormalizedUri vfsUri).getUri
       -- Resolved above the library tiers entirely, so the embed was never reached.
-      pure ImportOutcome { importUri = Just vfsUri, vfsTried = vfsUris, pathsTried = []
+      pure ImportOutcome { importUri = Just vfsUri, vfsTried = vfsUris, libTried = []
                          , embedTried = EmbedSkipped }
     Nothing -> do
       let mImportingNfp = uriToNormalizedFilePath importerUri
@@ -477,7 +625,7 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
             | otherwise           = EmbedMissing n
             where n = Map.size EmbeddedLibraries.embeddedLibraries
           outcome mUri = ImportOutcome
-            { importUri = mUri, vfsTried = vfsUris, pathsTried = res.searchedPaths
+            { importUri = mUri, vfsTried = vfsUris, libTried = res.tiersInOrder
             , embedTried = embedStatus }
 
       case res.winner of
@@ -493,7 +641,11 @@ resolveImportShared recorder shadowWarnedRef rootDirectory importerUri modName =
                      <> Text.pack (show (length res.candidates)) <> "): " <> Text.pack fp
                      <> (if real == fp then "" else " -> " <> Text.pack real)
           logWith recorder Info $ LogImportResolution msg
-          pure $ outcome $ Just $ toNormalizedUri $ filePathToUri fp
+          -- See 'roundTrippingFileUri': a relative @fp@ whose basename needs
+          -- percent-escaping would otherwise be handed on as a URI that reads
+          -- back as a different, nonexistent file.
+          resolvedUri <- liftIO $ roundTrippingFileUri fp
+          pure $ outcome $ Just resolvedUri
         Just (ix, EmbeddedCandidate) -> do
           logWith recorder Info $ LogImportResolution $
             "Found in embedded libraries (candidate " <> Text.pack (show ix) <> " of "
@@ -636,39 +788,49 @@ jl4Rules evalConfig rootDirectory recorder = do
           outcome <- resolveImport uri modName
           pure (rangeOf a, modName, outcome)
 
+        -- 'Nothing' for an import that did not resolve: it contributes its
+        -- diagnostic and no 'ImportResult' at all. Until #971 this handed back
+        -- the IMPORTING module's own URI, which made the module appear to
+        -- import itself: every unresolvable import also produced "Your module
+        -- depends on itself", and in a CLI run that message was printed more
+        -- often than the one that says what is actually wrong. Dropping the
+        -- entry leaves the downstream rules with nothing to load, which is the
+        -- truth; the error is already reported here.
         mkImportUri (range, modName, outcome) = case outcome.importUri of
           Just u ->
-            pure ([], range, u)
-          Nothing ->
-            -- nub: the CLI sets the project root to the importing file's own
-            -- directory, so the root and importer-relative tiers coincide and
-            -- the list used to repeat every path twice.
-            let allPaths = List.nub
-                  ( map ((.getUri) . fromNormalizedUri) outcome.vfsTried
-                 <> map Text.pack outcome.pathsTried )
-                 <> [renderEmbedStatus outcome.embedTried]
-                diag = mkSimpleFileDiagnostic uri
+            pure ([], Just u)
+          Nothing -> do
+            -- One line per location, in probe order, deduped by the FILE rather
+            -- than by the spelling: see 'dedupeTriedLocations', which is where
+            -- both of those properties are argued and unit-tested. The embedded
+            -- tier is in 'libTried' at its own rank (tier 4 of the ladder), not
+            -- appended after everything else as it was until 2026-09-21: a list
+            -- that says it is in the order things were tried has to be.
+            allPaths <- liftIO $ triedLocations outcome
+            let diag = mkSimpleFileDiagnostic uri
                   $ mkSimpleDiagnostic
                     (fromNormalizedUri uri).getUri
                     (Text.unlines
                       [ "I could not find a module with this name: " <> Text.pack modName
+                      , "Nothing it defines is in scope here; names you expected from it are reported as undefined."
                       , "I have tried the following locations:"
                       , Text.intercalate ",\n" allPaths
                       ])
                     (fromSrcRange <$> range)
-             in pure ([diag], range, uri)
+            pure ([diag], Nothing)
 
-        mkDiagsAndImports :: TopDecl Name -> Ap Action [([FileDiagnostic], ImportResult)]
+        mkDiagsAndImports :: TopDecl Name -> Ap Action [([FileDiagnostic], Maybe ImportResult)]
         mkDiagsAndImports = \ case
           Import _a i@(MkImport _ n _) -> Ap do
-            (diag, r, u) <- mkImportUri =<< mkImportPath i
-            pure [(diag, MkImportResult n r u)]
+            (r, modName, outcome) <- mkImportPath i
+            (diag, mu) <- mkImportUri (r, modName, outcome)
+            pure [(diag, MkImportResult n r <$> mu)]
           _ -> pure []
 
 
     prog <- use_ GetParsedAst uri
     (diags, imports) <- fmap unzip $ getAp $ foldTopDecls mkDiagsAndImports prog
-    pure (concat diags, Just imports)
+    pure (concat diags, Just (Maybe.catMaybes imports))
 
   defineWithCallStack shakeRecorder $ \GetTypeCheckDependencies cs uri -> do
     imports <- use_  GetImports uri
@@ -1017,7 +1179,10 @@ prettyNlgResolveWarning = \ case
 listL4Files :: FilePath -> IO [NormalizedUri]
 listL4Files dir = do
   files <- filterM doesFileExist . map (dir </>) =<< listDirectory dir
-  pure $ toNormalizedUri . filePathToUri <$> filter ((== ".l4") . takeExtension) files
+  -- 'roundTrippingFileUri' rather than 'filePathToUri': @dir@ is the CLI's root
+  -- directory, which is @"."@ when the entry file is named relatively, so a
+  -- non-ASCII filename here would be listed under a URI nothing can read back.
+  traverse roundTrippingFileUri $ filter ((== ".l4") . takeExtension) files
 
 
 rangeOfResolveWarning :: Resolve.Warning -> LSP.Range

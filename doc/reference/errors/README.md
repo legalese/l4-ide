@@ -486,7 +486,16 @@ See [Libraries](../libraries/README.md) for the full list of available libraries
 
 ### Module not found
 
-**Error message:** `Error: cannot resolve import 'modulename'`
+**Error message:**
+
+```
+I could not find a module with this name: modulename
+Nothing it defines is in scope here; names you expected from it are reported as undefined.
+I have tried the following locations:
+...
+```
+
+This is an error, not a warning: it fails `l4 check` and `l4 run` even when nothing in your file reads anything from the missing module. The message lists every place that was searched, once each, in the same tier order as the resolution table. Other commands — `l4 render`, `l4 nlg` and the transpilers among them — print the same error and still exit 0; [When nothing resolves](../libraries/resolution.md#which-commands-fail-on-it) has the measured list.
 
 **What went wrong:** L4 could not find the module you are trying to import. L4 searches for modules in this order (first match wins):
 
@@ -502,7 +511,7 @@ Project-scoped locations (2–4) outrank the embedded stdlib, so intentional ove
 
 **How to fix it:**
 
-- Check the module name for typos.
+- Check the module name for typos. This is usually not the first error on screen: a failed import also produces one "I could not find a definition for the identifier" per name it was meant to supply, so read the top of the output.
 - For your own modules, place them in the project directory or set `JL4_LIBRARY_PATH`.
 - For third-party (non-stdlib) libraries, install them to `~/.local/share/jl4/libraries/`
 - If `JL4_LIBRARY_PATH` is set, ensure it contains the standard libraries you need (e.g., `prelude.l4`).

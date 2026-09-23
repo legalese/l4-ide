@@ -44,6 +44,15 @@ const ROOTS = [
     recursive: false,
     only: (n) => n.startsWith("export-"),
   },
+  {
+    // The unresolvable-IMPORT fixtures (smucclaw/l4-ide#971). Their own glob
+    // rather than the whole directory, so that a library placed beside an
+    // importer later can stay in no glob at all.
+    label: "import-unresolved",
+    dir: join(examples, "not-ok", "import"),
+    recursive: false,
+    only: (n) => n.startsWith("unresolved-"),
+  },
 ];
 const SUFFIXES = ["golden", "ep.golden", "nlg.golden", "schema.golden"];
 
