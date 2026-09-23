@@ -176,6 +176,17 @@ The evaluator is the only consumer that resolves an anchor. The others carry it 
 
 The deadline boundary is inclusive: an action arriving _exactly at_ the deadline instant is timely. The failure/expiry path fires only once an event's timestamp is _strictly greater_ than the deadline (i.e. the deadline has _passed_).
 
+### Counting days
+
+Read as days, that boundary is the counting rule most statutes use: **the day you count from is not counted, and the last day is.** `WITHIN 14 OF 10` is due on day 24 — an act on day 24 is in time and one on day 25 is late (measured). That is the rule of the Singapore Interpretation Act s 50(a), of EU Regulation 1182/71 Art 3(1), and of the German Civil Code § 187(1), and it applies to both edges of a window: `AFTER 3` opens on the third day after its anchor, not on the day itself.
+
+Two neighbours of that rule are yours to write, not the language's:
+
+- **"Beginning with" the anchor day** (§ 187(2) BGB, and some contracts) counts the first day too, so fourteen days beginning with day 10 end on day 23: write `WITHIN 13 OF 10`.
+- **Months, month-ends, business days and public holidays** are calendar questions, and the calendar belongs to a library rather than to `WITHIN`: compute the day with the date library and anchor on it (`WITHIN 0 OF <that day>`, or `BEFORE <that date>`). Numbers on their own are just days on the trace's clock.
+
+(Ruled 21 September 2026, EVERY bench card B6.)
+
 ### See Also
 
 - **[AFTER](AFTER.md)** -- the window's opening edge: `AFTER d [OF anchor]`, `AFTER date`
