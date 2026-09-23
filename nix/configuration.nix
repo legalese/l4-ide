@@ -4,6 +4,11 @@
     ./jl4-web/configuration.nix
     ./jl4-lsp/configuration.nix
     ./jl4-service/configuration.nix
+    # The Reg CF citizen wizard. Imported but NOT enabled: the module defaults to
+    # off, so importing it changes nothing that is served. Turning the page on is
+    # one line — `services.regcf-wizard.enable = true;` — plus a rebuild. See
+    # ts-apps/regcf-wizard/README.md §"Deploying".
+    ./regcf-wizard/configuration.nix
     ./jl4-websessions/configuration.nix
     ./fibo-sparql/configuration.nix
     ./module.nix
