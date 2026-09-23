@@ -587,8 +587,8 @@ stateGraphToBpmn opts sg =
         wd.wdVerdict
     unless (length rows == length arms) $
       Left
-        ( "`" <> wd.wdName <> "` has " <> Text.show (length rows) <> " rule(s) against the \
-          \gateway's " <> Text.show (length arms) <> " arm(s)"
+        ( "`" <> wd.wdName <> "` has " <> Text.textShow (length rows) <> " rule(s) against the \
+          \gateway's " <> Text.textShow (length arms) <> " arm(s)"
         )
     conds <- traverse (uncurry (armVerdict wd)) (zip arms rows)
     pure MkWiredGateway {wgCall = callTo w wd, wgConds = conds, wgShape = "verdict"}
@@ -635,7 +635,7 @@ stateGraphToBpmn opts sg =
       [] -> Left "the gateway's arms carry no guard at all"
       us ->
         Left
-          ( "the gateway's arms test " <> Text.show (length us)
+          ( "the gateway's arms test " <> Text.textShow (length us)
               <> " different decisions, and one businessRuleTask invokes one decision"
           )
     -- __One decide is not yet one question.__ A 'Unique' says which @DECIDE@ a
@@ -654,7 +654,7 @@ stateGraphToBpmn opts sg =
       [_] -> Right ()
       qs ->
         Left
-          ( "the gateway's arms apply one decision to " <> Text.show (length qs)
+          ( "the gateway's arms apply one decision to " <> Text.textShow (length qs)
               <> " different arguments (\8216"
               <> Text.intercalate "\8217, \8216" qs
               <> "\8217), which are different questions, and one businessRuleTask \
