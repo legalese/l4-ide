@@ -10,7 +10,7 @@
         },
         "then": [
           {
-            "action": "Sign (EXACTLY t)",
+            "action": "Sign t",
             "dueBy": 14,
             "group": {
               "join": "barrier",
@@ -22,7 +22,7 @@
             "remaining": 14
           },
           {
-            "action": "Sign (EXACTLY t)",
+            "action": "Sign t",
             "dueBy": 14,
             "group": {
               "join": "barrier",
@@ -50,7 +50,7 @@
         },
         "then": [
           {
-            "action": "Sign (EXACTLY t)",
+            "action": "Sign t",
             "dueBy": 14,
             "group": {
               "join": "barrier",
@@ -62,7 +62,7 @@
             "remaining": 14
           },
           {
-            "action": "Sign (EXACTLY t)",
+            "action": "Sign t",
             "dueBy": 14,
             "group": {
               "join": "barrier",
@@ -90,7 +90,7 @@
         },
         "then": [
           {
-            "action": "Sign (EXACTLY t)",
+            "action": "Sign t",
             "dueBy": 14,
             "group": {
               "join": "barrier",
@@ -102,7 +102,7 @@
             "remaining": 14
           },
           {
-            "action": "Sign (EXACTLY t)",
+            "action": "Sign t",
             "dueBy": 14,
             "group": {
               "join": "barrier",
@@ -136,17 +136,17 @@
           "kind": "tick",
           "whose": [
             {
-              "action": "Sign (EXACTLY t)",
+              "action": "Sign t",
               "modal": "MUST",
               "party": "Tenant OF \"Alice\""
             },
             {
-              "action": "Sign (EXACTLY t)",
+              "action": "Sign t",
               "modal": "MUST",
               "party": "Tenant OF \"Bob\""
             },
             {
-              "action": "Sign (EXACTLY t)",
+              "action": "Sign t",
               "modal": "MUST",
               "party": "Tenant OF \"Carol\""
             }
@@ -298,14 +298,14 @@
         },
         "then": [
           {
-            "action": "Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)",
+            "action": "Receipt theLandlord t amount",
             "dueWithin": "5",
             "kind": "owed",
             "modal": "MUST",
             "party": "theLandlord"
           },
           {
-            "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+            "action": "Pay t theLandlord amount",
             "dueBy": 7,
             "group": {
               "join": "fork",
@@ -317,7 +317,7 @@
             "remaining": 7
           },
           {
-            "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+            "action": "Pay t theLandlord amount",
             "dueBy": 7,
             "group": {
               "join": "fork",
@@ -351,7 +351,7 @@
         },
         "then": [
           {
-            "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+            "action": "Pay t theLandlord amount",
             "dueBy": 7,
             "group": {
               "join": "fork",
@@ -363,14 +363,14 @@
             "remaining": 7
           },
           {
-            "action": "Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)",
+            "action": "Receipt theLandlord t amount",
             "dueWithin": "5",
             "kind": "owed",
             "modal": "MUST",
             "party": "theLandlord"
           },
           {
-            "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+            "action": "Pay t theLandlord amount",
             "dueBy": 7,
             "group": {
               "join": "fork",
@@ -404,7 +404,7 @@
         },
         "then": [
           {
-            "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+            "action": "Pay t theLandlord amount",
             "dueBy": 7,
             "group": {
               "join": "fork",
@@ -416,7 +416,7 @@
             "remaining": 7
           },
           {
-            "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+            "action": "Pay t theLandlord amount",
             "dueBy": 7,
             "group": {
               "join": "fork",
@@ -428,7 +428,7 @@
             "remaining": 7
           },
           {
-            "action": "Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount)",
+            "action": "Receipt theLandlord t amount",
             "dueWithin": "5",
             "kind": "owed",
             "modal": "MUST",
@@ -460,17 +460,17 @@
           "kind": "tick",
           "whose": [
             {
-              "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+              "action": "Pay t theLandlord amount",
               "modal": "MUST",
               "party": "Tenant OF \"Alice\""
             },
             {
-              "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+              "action": "Pay t theLandlord amount",
               "modal": "MUST",
               "party": "Tenant OF \"Bob\""
             },
             {
-              "action": "Pay (EXACTLY t) (EXACTLY theLandlord) amount",
+              "action": "Pay t theLandlord amount",
               "modal": "MUST",
               "party": "Tenant OF \"Carol\""
             }

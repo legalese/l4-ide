@@ -3427,12 +3427,32 @@ the three things that would reopen them._
 Both runs read the B artifacts cut before that branch: the elided act (`payment ...`, so two obligations over one verb drew one label), the party and modal restated on an edge whose own node already carried them, a junction called `next`, a bare `timeout` naming no deadline, and no wrap — the promissory note's canvas was 28.463 inches wide and three of its six nodes were byte-identical.
 None of that is true of the B artifacts in `etc/lts-reader-proxy/` today.
 
-**A and C did not move, and the scope matters, so it is stated rather than left to be inferred.**
-Measured on this branch: `git diff --stat origin/unstable...HEAD -- etc/lts-reader-proxy/` touches the four `B.dot`, `README.md` and `RESULTS.md`, and nothing else — every `A.txt` and every `C.bpmn` is byte-identical, because `l4 lts` prints through `L4.Print.printActionPattern` and the BPMN task names were already re-blessed with the branch's own spelling.
-So A's and C's rows still describe the artifacts that ship today; only B's do not.
-That is what keeps §7.3's ruling standing on its own evidence, since the gate asks whether the LIST suffices and the list is unchanged — but B's 40/48 on Q1–Q3 is now a fact about a superseded picture and must not be quoted as one about this one, in either direction.
-**The only thing that would make it evidence again is running the experiment again**, which has not been done — the branch changed the artifact and left the readings, deliberately, because re-cutting the packets would put 48 committed readings against materials that no longer exist (§7.3's PREPARED block and `etc/lts-reader-proxy/README.md` say which half of that directory is frozen and why).
+**B AND C BOTH MOVED. A did not, with one exception this branch made on 2026-09-23.**
+The first version of this paragraph said only B had moved, and it was measured too narrowly: `git diff origin/unstable...HEAD -- etc/lts-reader-proxy/` answers what the branch WROTE inside that directory, not what inside it is still current, and C went stale without the branch writing to it.
+The packets' `C.bpmn` is cut from the BPMN exporter, and MUMBLE un-elided the act (`b12383af5`, `49096e028`) while the packets were last cut at `e633e2e58`.
+Measured 2026-09-23, by regenerating every column with `prepare.sh`'s own commands and diffing against the committed file: **all four `C.bpmn` were behind** — `name="MUST Pay ..."` against `name="MUST Pay t theLandlord amount"` — three of the four `A.txt` were current, and the fourth, `tenancy`, went out of date the same day under the `EXACTLY` sweep recorded below.
+All of them have been re-cut here, by hand with `prepare.sh`'s own commands rather than by running `prepare.sh`, whose last line rewrites `manifest.json` and would un-freeze the record.
+`manifest.json` and `transcripts/` are untouched, so what the 48 readers were shown is intact; what moved is the working copy beside it.
+
+**What that does to §7.3, stated rather than softened.**
+The gate's own sentence is not comparative — _build P2d/P2e only if P2a′ shows that readers CANNOT answer what do I owe, what discharges it, what breaches it_ — and A answers it alone, at 41/48 pooled and 16/16 on Q1 (§7.7a), on an artifact that has not moved.
+So **the ruling stands**, and it now stands on A by itself rather than on A and C together.
+What does not survive is point 1's comparative sub-claim, _"the list is not beaten"_: it set a current A against a B and a C that have both since been redrawn, and redrawn in the direction that would help them.
+Nobody should quote A-against-B or A-against-C from either run as a fact about today's artifacts, in either direction, including the direction that flatters the list.
+**The only thing that settles it is running the experiment again**, which has not been done — the branch changed the artifacts and left the readings, deliberately, because re-cutting `manifest.json` or `transcripts/` would score 48 committed readings against materials nobody read.
 That re-run is the first of §7.3's three reopen conditions in everything but name, and it is cheaper now than it was: the harness, the judges and the answer keys all exist.
+
+**The `tenancy` packet's own move, 2026-09-23.**
+`jl4/examples/bpmn/tenancy.l4` is what that packet is cut from, and this branch dropped the ten deprecated `EXACTLY` keywords out of it ahead of the 2026-10-01 sunset (`specs/todo/PATTERN-REFERENCE-RULE-SPEC.md` §10.1).
+The gap it opened is bounded, and was measured rather than characterised: rewriting each committed artifact with `s/(EXACTLY x)/x/` makes it byte-identical to the fresh output, on every one of the eight the sweep touched — `jl4/examples/lts/expected/tenancy.{json,txt}`, the three `tenancy-*.bpmn`, and their three fidelity reports, which are byte-identical either way.
+No deadline, party, join, count or binder note moved; the binder-note lines number 3 before and 3 after.
+`tenancy/probes.l4` is hand-written rather than cut, so it still spells the old keyword and `probes.out` is unchanged — the probes test behaviour, the sweep is meaning-preserving, and they still test what they tested.
+
+**The sweep was not cosmetic: it repaired an invariant the re-run depends on.**
+`prepare.sh` exports `the tenancy` from `doc/reference/regulative/every-run-example.l4`, diffs it against `jl4/examples/bpmn/expected/tenancy-barrier.bpmn` cut from the corpus file, and `exit 1`s when they differ — the two sources are the same rule, as `tenancy.l4`'s own header says.
+#407 swept the doc file (`e435c3a9d`) and left the corpus file, so that assertion had been failing since 2026-09-16; nothing caught it, because `prepare.sh` is run by hand and had not been run since.
+Measured 2026-09-23: against the pre-sweep golden the export differs on four lines (`name="MUST Sign (EXACTLY t)"` against `name="MUST Sign t"`, and the same for `Deliver`); against the swept one it is byte-identical.
+A paired fixture whose pairing is asserted only by a hand-run script is a gap of the same shape as the one §7.2 records for the goldens, and it is worth a CI leg if this directory is ever re-run in anger.
 
 **RUN 2026-09-16, on `lts/p2a-prime-proxy`, as a PROXY. This section decides nothing about the
 gate.** Full write-up, per-reading rationales and the raw scored rows:

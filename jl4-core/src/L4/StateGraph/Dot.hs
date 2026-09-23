@@ -302,12 +302,13 @@ oneOfEdgeColor = "#e8850c"
 -- top level, so its entry state is @initial@ and cannot name it and the whole
 -- caption prints on the arrow; the SAME obligation under @receipts and
 -- delivery@ sits in a @RAND@ branch, gets an entry state of its own, and the
--- restatement is dropped. Measured 2026-09-22:
--- @0 -> 1 [label="EVERY Tenant t IN tenants MUST Pay\\n(EXACTLY t) (EXACTLY
--- theLandlord)\\namount [7]\\nthe rule binds \\`amount\\`\\nUPON EACH"]@ against
+-- restatement is dropped. Re-measured 2026-09-23, after the retired @EXACTLY@
+-- was swept out of that file (the split is unchanged; only the spelling moved):
+-- @0 -> 1 [label="EVERY Tenant t IN tenants MUST Pay t\\ntheLandlord amount
+-- [7]\\nthe rule binds \\`amount\\`\\nUPON EACH"]@ against
 -- @1 -> 2 [label="the rule binds \\`amount\\`\\nUPON EACH"]@ over a node reading
--- @EVERY Tenant t IN tenants must Pay (EXACTLY t) (EXACTLY theLandlord) amount
--- WITHIN 7@. Node and arrow together say the same thing in both; the split
+-- @EVERY Tenant t IN tenants must Pay t\\ntheLandlord amount WITHIN 7@. Node and
+-- arrow together say the same thing in both; the split
 -- between them differs because one obligation has a node and the other does
 -- not. Making them identical means either restating always (which is this
 -- function undone) or refusing to stamp a top-level entry (which is renaming

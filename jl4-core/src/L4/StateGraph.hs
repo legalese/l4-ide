@@ -1426,9 +1426,12 @@ subjectText = \case
 -- __One clause, one spelling.__ This is 'L4.Print.printActionPattern' and
 -- nothing else, collapsed onto one line. Until 2026-09-22 it was a second,
 -- hand-written printer, and what that cost was one clause reading three ways.
--- @jl4\/examples\/bpmn\/tenancy.l4:56@ is
--- @MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount@ in the source; @l4 lts@
--- said that, because it goes through 'L4.Print.printActionPattern'
+-- @jl4\/examples\/bpmn\/tenancy.l4:56@ then read
+-- @MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount@ in the source (the
+-- retired keyword was swept out of that file on 2026-09-23; the line reads
+-- @MUST Pay t theLandlord amount@ now, and all three outputs moved together);
+-- @l4 lts@ said what the source said, because it goes through
+-- 'L4.Print.printActionPattern'
 -- (@jl4-core\/src\/L4\/Lts\/Marking.hs:419@, importing it at @:106@), while the
 -- state-graph node said @Pay t theLandlord \`amount\`@ and the BPMN task name
 -- said a third thing again. A reader moving between the three outputs had to

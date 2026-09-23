@@ -152,8 +152,8 @@ while one tenant signing does not end anything — it moves the count to 1 of 3:
 ```
   What would move things along (neither ends nor breaches it):
     - Tenant OF "Alice" does Sign OF (Tenant OF "Alice") now (at 0) → then:
-          · Tenant OF "Bob" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
-          · Tenant OF "Carol" MUST Sign (EXACTLY t) — due by 14 (14 from now) (one of 3 who must all act before the next step)
+          · Tenant OF "Bob" MUST Sign t — due by 14 (14 from now) (one of 3 who must all act before the next step)
+          · Tenant OF "Carol" MUST Sign t — due by 14 (14 from now) (one of 3 who must all act before the next step)
           · the next step is held back until all have acted: 1 of 3 have
 ```
 
@@ -165,9 +165,9 @@ For the fork there is no "held back" line, because nothing waits: each member's 
 
   What would move things along (neither ends nor breaches it):
     - Tenant OF "Alice" does Pay OF (Tenant OF "Alice"), theLandlord, amount, with any `amount` now (at 0) → then:
-          · theLandlord MUST Receipt (EXACTLY theLandlord) (EXACTLY t) (EXACTLY amount) — due within 5 from now
-          · Tenant OF "Bob" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
-          · Tenant OF "Carol" MUST Pay (EXACTLY t) (EXACTLY theLandlord) amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+          · theLandlord MUST Receipt theLandlord t amount — due within 5 from now
+          · Tenant OF "Bob" MUST Pay t theLandlord amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
+          · Tenant OF "Carol" MUST Pay t theLandlord amount — due by 7 (7 from now) (one of 3, each with a next step of their own)
       this obligation's pattern matches any `amount`: the rule binds it and does not test it
       the verdict above is one act's, not the set's: `amount` = 0 was replayed, and another member may end elsewhere
 ```

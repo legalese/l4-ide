@@ -18,17 +18,25 @@ is met on the numbers and the ruling is back with Meng. Read that alongside RESU
 measures a run-to-run drift on unchanged documents larger than the effect the rerun was for. This
 directory remains materials and evidence, not a verdict.
 
-**The record is frozen; the `B` artifact beside it is not.** The four `B.dot` files were
+**The record is frozen; every artifact `prepare.sh` cuts is not.** `A.txt`, `lts.json`, `B.dot`,
+`C.bpmn`, `C.fidelity.txt` and `probes.out` are all regenerated from the corpus, and all of them
+are kept current rather than frozen. The record of what the 48 readers were actually shown is
+`manifest.json` and `transcripts/` — those are the primary evidence for every score in
+`RESULTS.md`, and the regenerated files are not. Do not re-cut `manifest.json` or `transcripts/`
+to make the directory self-consistent: that would score 48 committed readings against a packet
+nobody read. `prepare.sh` ends with `build-manifest.mjs`, which rewrites `manifest.json` with the
+full artifact text, so re-cutting one packet by hand with `prepare.sh`'s own commands is the way
+to keep the record intact.
+
+**What has moved since the runs, measured 2026-09-23 rather than assumed.** The four `B.dot` were
 re-cut on 2026-09-21 and again on 2026-09-23 from `lts/draw-what-it-means`, where five fixes
-changed what `l4 state-graph` writes on a node and on an arrow, so each of them now differs from
-the B text the readers were actually shown. That text is still here, unchanged, in
-`manifest.json` and under `transcripts/` — those are the primary evidence for every score in
-`RESULTS.md`, and `B.dot` is not. `B.dot` was kept current rather than frozen because it is a
-regenerated artifact that `prepare.sh` cuts from the corpus, and one of the four had already
-drifted from its own source before any of this (`contracts/B.dot` said `B must payment OF fine`
-at a tree that emitted something else). Do not re-cut `manifest.json` or `transcripts/` to make
-the directory self-consistent: that would score 48 committed readings against a packet nobody
-read.
+changed what `l4 state-graph` writes on a node and on an arrow. **All four `C.bpmn` had also gone
+stale** — the same branch un-elided the act, so a task the packets carry as `name="MUST Pay ..."`
+now exports as `name="MUST Pay t theLandlord amount"` — and were re-cut on 2026-09-23. Three of
+the four `A.txt` were still current; `tenancy/A.txt` went out of date the same day, when
+`jl4/examples/bpmn/tenancy.l4` had its ten deprecated `EXACTLY` keywords swept out, and was re-cut
+with them. One `B.dot` had already drifted from its own source before any of this
+(`contracts/B.dot` said `B must payment OF fine` at a tree that emitted something else).
 
 `specs/todo/lexipedia-superset/LTS-VISUALISER.md` §7.3 gates the two-plane picture (P2d/P2e) on a
 **reader** experiment: can readers answer _what do I owe, what discharges it, what breaches it_
