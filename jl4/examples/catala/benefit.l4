@@ -1,0 +1,26 @@
+-- Appendix A of specs/todo/CATALA-EXPORT-SPEC.md, as `l4 catala` compiles it.
+--
+-- `@export` must sit ABOVE `GIVEN`: the annotation slot between `GIVETH` and
+-- `DECIDE` does not register the export (spec §10.2).
+
+DECLARE Applicant HAS
+    age       IS A NUMBER
+    income    IS A NUMBER
+    isVeteran IS A BOOLEAN
+
+@export
+GIVEN a IS AN Applicant
+GIVETH A BOOLEAN
+DECIDE `eligible for benefit` IF
+       a's age AT LEAST 65
+    OR a's isVeteran
+  UNLESS a's income GREATER THAN 100000
+
+@export
+GIVEN a IS AN Applicant
+GIVETH A NUMBER
+`benefit amount` a MEANS
+    IF `eligible for benefit` a THEN 1000 PLUS bonus ELSE 0
+    WHERE bonus MEANS IF a's isVeteran THEN 250 ELSE 0
+
+#EVAL `benefit amount` (Applicant WITH age IS 70, income IS 50000, isVeteran IS FALSE)

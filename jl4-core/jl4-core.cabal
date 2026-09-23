@@ -114,6 +114,10 @@ library
     L4.Bpmn.Lower
     L4.Bpmn.Emit
     L4.Bpmn.Wiring
+    L4.Catala.IR
+    L4.Catala.Lower
+    L4.Catala.Emit
+    L4.Catala.Equivalence
     L4.Citations
     L4.Desugar
     L4.Diagnostic
@@ -204,6 +208,7 @@ test-suite jl4-core-test
     UUID5Spec
     ExportReadSetSpec
     ExportValidationSpec
+    CatalaLowerSpec
     NumberLiteralSpec
     DirectiveRenameSpec
     DirectiveAmbiguitySpec

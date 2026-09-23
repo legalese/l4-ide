@@ -1,0 +1,18 @@
+-- REJECTED (§4.3), the constructor-pattern twin of otherwise-not-last.l4.
+-- `l4 check` does warn here ("the following CONSIDER branch is redundant"),
+-- but `l4 catala` proceeds past non-fatal diagnostics by design, so the
+-- lowering has to reject it itself.
+
+DECLARE Colour IS ONE OF red, green, blue
+DECLARE Thing HAS c IS A Colour
+
+@export
+GIVEN t IS A Thing
+GIVETH A NUMBER
+`pick` t MEANS
+  CONSIDER t's c
+    WHEN red THEN 1
+    OTHERWISE 99
+    WHEN green THEN 2
+
+#EVAL `pick` (Thing WITH c IS green)   -- 99 in L4

@@ -1,0 +1,28 @@
+-- A rate table: three bands whose guards NEST (income > 100000 implies
+-- income > 50000). That nesting is what makes the emitted exception ladder's
+-- priority direction observable, and it is why this file is in the corpus:
+-- the first version of the ladder builder reversed it, and `BandsEqvGrid`
+-- below is the check that caught it.
+
+DECLARE Filer HAS
+    income   IS A NUMBER
+    resident IS A BOOLEAN
+
+@export The marginal rate band a filer falls into.
+GIVEN f IS A Filer
+GIVETH A NUMBER
+`rate band` f MEANS
+  BRANCH
+    IF f's income GREATER THAN 100000 THEN 0.40
+    IF f's income GREATER THAN  50000 THEN 0.25
+    OTHERWISE                               0.10
+
+@export
+GIVEN f IS A Filer
+GIVETH A NUMBER
+`tax due` f MEANS f's income TIMES `rate band` f
+
+#EVAL `rate band` (Filer WITH income IS 60000, resident IS TRUE)
+#EVAL `rate band` (Filer WITH income IS 200000, resident IS TRUE)
+#EVAL `tax due` (Filer WITH income IS 60000, resident IS TRUE)
+#ASSERT `rate band` (Filer WITH income IS 10, resident IS FALSE) EQUALS 0.10
