@@ -3340,6 +3340,19 @@ spec bin = do
       nlgOut `shouldSatisfy` ("row eleven saw 200\n" `isInfixOf`)
       renOut `shouldSatisfy` ("row eleven saw amount" `isInfixOf`)
 
+    it "reads a GIVEN gloss as the input's label, never as the rule's sentence (row 14)" $ do
+      Output _ nlgOut _ <- nlgOf
+      Output _ renOut _ <- renderOf
+      -- The head names no input, so the type checker hoists the GIVEN name
+      -- into it; the gloss must not be taken for the rule's herald on that
+      -- account (smucclaw/l4-ide#977). Positional: the bare name. WITH: the
+      -- gloss labels the input. Render: the rule's own body.
+      nlgOut `shouldSatisfy` ("`row fourteen` with 200\n" `isInfixOf`)
+      nlgOut `shouldSatisfy` ("`row fourteen` where the sum of money is 200" `isInfixOf`)
+      nlgOut `shouldNotSatisfy` ("the sum of money with 200" `isInfixOf`)
+      renOut `shouldNotSatisfy` ("holds if the sum of money" `isInfixOf`)
+      renOut `shouldSatisfy` ("Row fourteen holds if amount is more than 100" `isInfixOf`)
+
   -- The verifier footing. Every negative control asserts the finding KIND, not
   -- merely a red exit: a checker that goes red for the wrong reason is a
   -- checker whose green runs mean nothing either.
