@@ -27,60 +27,66 @@ more authoritative than the other as a test.
 **The difference that matters to you:** files here are edited here. Files under `canon/` are a
 copy — edit them in canon and bump the pin. `canon/README.md` says how.
 
-## The migration happened — what left, and what deliberately did not
+## What moved to canon, and where it is now
 
-Done 2026-09-16. **`chubb` and `sg-succession`'s committed encodings are now in
-[`../canon/`](../canon/)** and are globbed from there:
+Two moves, and every encoding that left this directory is now vendored back under
+[`../canon/`](../canon/) and globbed from there, goldens included.
+
+**2026-09-16** (SPEC §4): `chubb` and `sg-succession`'s committed encoding.
+
+**2026-09-23** (LODGER, SPEC §4.2): the rest of the subjects with a home in canon.
 
 | was | is now |
 | --- | --- |
 | `chubb/chubb.l4` | `canon/us/chubb-hospital-cash/blind-inert/chubb.l4` |
 | `chubb/denovo/chubb-denovo.l4` | `canon/us/chubb-hospital-cash/blind-guarded/chubb-denovo.l4` |
 | `sg-succession/*.l4` (7) | `canon/sg/succession/*.l4` |
+| `sg-succession/cleanroom-2026-08/*.l4` (6) | `canon/sg/succession/cleanroom/*.l4` |
+| `regcf/regcf.l4`, `regcf/regcf-wizard.l4` | `canon/us/regcf/` |
+| `regcf/denovo/regcf-denovo.l4` | `canon/us/regcf/cleanroom/` |
+| `bna/bna.l4` | `canon/uk/bna-1981/` |
+| `charities-cleanroom/charity-test.l4` | `canon/je/charities-2014/` |
+| `miles-card/*.l4` (14) | `canon/contracts/payments/sg-miles-card/` |
 
-Their goldens moved with them. **45 files left this directory; not one was lost.**
+The deposit registers (`fork-register.json`, `source-bundle.json`, `external-modifications.json`,
+`surface-map.json`) went with them. They are vendored at `canon/<to>/registers/`, because the
+mirror has carried `registers/*.json` since 2026-09-23. The prose, projections and reports went
+to canon only. Find them in canon under `subjects/<path>/encodings/<row>/`, where each row's
+`NOTES.md` maps old paths to new.
 
-**Two things stayed, and both are deliberate.**
+## What stayed, and why each one did
 
-**`sg-succession/cleanroom-2026-08/`** — 6 `.l4` and 24 goldens — is an encoding
-canon holds but the pin does **not** bless, so **the mirror carries none of it**.
-That is why it stayed: deleting it would have dropped six corpus files and their
-goldens from the regression suite with nothing to replace them. It is fully
-self-contained — every import is a sibling inside it — so it stands alone now that
-its parent's top-level files have gone.
+These directories hold no `.l4` any more, so the harness sees nothing in them. Each one stays
+for a stated reason.
 
-An earlier draft of this paragraph said the copy here was "the healthy one". It is
-not, and the claim is retracted: the two copies' goldens are byte-identical but for
-one column count, both were blessed by an older binary, and the diagnostic that
-makes two files exit non-zero is Info-level and comes from `daydate.l4:104`, a
-library neither copy owns. This copy is partly swept for clitic verbs and canon's
-is not — less dirty, not healthy. Re-blessing canon's copy is boarded as a
-canon-side job.
+- **`regcf/README.md`, `regcf/PROJECTIONS.md`, `regcf/figures/`** (ruled 2026-09-23, M3). They
+  describe this repository's own projections of the corpus. `ts-shared/ladder-svg` generates
+  the figures and tests them, the DMN and BPMN exporter goldens under `../dmn/` and `../bpmn/`
+  are what `PROJECTIONS.md` documents, and the Reg CF explainer cites `README.md` and
+  `figures/README.md` by line and pins all three by `sha256`. So they are **not edited**:
+  their own commands still say `jl4/examples/legal/regcf/regcf.l4`, and the corpus they
+  describe is at `../canon/us/regcf/regcf.l4`, byte-identical to what they were written
+  against.
+- **`sg-succession/source/`, `sg-succession/cleanroom-2026-08/source/`** (M2). These are the
+  Singapore Acts as fetched from SSO. Their source terms are undetermined, so canon pins them by
+  `sha256` and does not hold them. The source bundles vendored under `../canon/sg/succession/`
+  name these paths, which is why the digest checks still run.
+- **`miles-card/source/`** (M2). These are the eight issuers' T&C PDFs, their text extractions
+  and the two table generators. Canon's row names this directory as the authoritative copy, for
+  the same reason.
+- **`chubb/denovo/*.json`, `chubb/denovo/source/`**. These are chubb's deposit data, which stayed
+  on 2026-09-16 and were not part of LODGER.
 
-**The deposit JSONs** — `chubb/denovo/*.json` and
-`sg-succession/cleanroom-2026-08/*.json` — stayed because **the mirror's allowlist
-does not carry `registers/`**: it takes `.l4`, `tests/*.golden`, `encoding.json`
-and `SOURCE-LICENSE.md` and nothing else. `etc/go/subjects/{chubb,sg-succession}`
-still point at them here, and only their *corpus-module* paths were retargeted.
-Whether `registers/*.json` should join the mirror is open, and is really the
-question of how `etc/go` addresses a canon-hosted subject.
+This is the ruling working as written, not an exception to it: *"there would also be some
+corpora left inside jl4/examples/legal that are not in canon, and that's ok too."*
 
-This is the ruling working as written, not an exception to it: *"there would also
-be some corpora left inside jl4/examples/legal that are not in canon, and that's
-ok too."*
+## What stays here as corpus, and why that is not a defect
 
-## What stays here, and why that is not a defect
-
-A subject that is already in canon **moves** there (moved, not lost). A subject that is not in
-canon **stays here**, and the ruling says that is fine. As of 2026-09-15 that means `regcf`, `bna`,
-`charities-cleanroom` and the single-file subjects (`anti-social.l4`,
-`british-citizen-act.l4`, `ceo-performance-award.l4`, `directive-showcase.l4`,
-`imaginary-alcohol-act.l4`, `ny-environmental-7.3.l4`, `promissory-note.l4`) live here and are
-not scheduled to go anywhere.
-
-~~`chubb/` and `sg-succession/` **are** duplicated in canon today and are the two the migration
-retires.~~ **Done 2026-09-16 — see the section above.** The duplication is gone; what remains here
-under those two names is the material the mirror does not carry, listed above.
+A subject that is in canon **moves** there (moved, not lost). A subject that is not in canon
+**stays here**, and the ruling says that is fine. As of 2026-09-23 that means the single-file
+subjects: `anti-social.l4`, `british-citizen-act.l4`, `ceo-performance-award.l4`,
+`directive-showcase.l4`, `imaginary-alcohol-act.l4`, `ny-environmental-7.3.l4` and
+`promissory-note.l4`.
 
 ## Adding a file here
 
