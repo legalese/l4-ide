@@ -1,0 +1,45 @@
+IMPORT prelude
+
+§ `Housing Act 1988 — Sch 2 Ground 1 — giving notice IS recording it`
+
+-- The unification: giving notice and the ledger write are ONE thing. The contract
+-- author writes the wrapper `giving the Ground 1 notice, then`; never RECORD. It is
+-- a MUST (HENCE fires on PERFORMANCE) with LEST routed to the continuation (soft),
+-- so the fact is recorded IFF the landlord actually gives notice. The court thread
+-- RECALLs it. Two #TRACEs identical but for the notice show the residual flip
+-- (the rigorous "it depends"): notice -> Court MUST; no notice -> Court MAY dispense.
+
+DECLARE Actor IS ONE OF Landlord, Court
+DECLARE Action IS ONE OF giveNotice, apply, dispense, orderPossession
+
+GIVEN onwards IS A DEONTIC Actor Action
+GIVETH A DEONTIC Actor Action
+`giving the Ground 1 notice, then` onwards MEANS
+    PARTY Landlord
+    MUST giveNotice
+    WITHIN 30
+    HENCE RECORD `noticeGiven` IS TRUE HENCE onwards   -- performed -> record, continue
+    LEST  onwards                                       -- not given -> continue, no record, no breach
+
+GIVETH A DEONTIC Actor Action
+courtDecision MEANS
+    CONSIDER RECALL `noticeGiven`
+    WHEN JUST x  THEN IF   x
+                      THEN PARTY Court MUST orderPossession WITHIN 30
+                      ELSE PARTY Court MAY dispense WITHIN 30 HENCE PARTY Court MUST orderPossession WITHIN 30
+    WHEN NOTHING THEN PARTY Court MAY dispense WITHIN 30 HENCE PARTY Court MUST orderPossession WITHIN 30
+
+GIVETH A DEONTIC Actor Action
+agreement MEANS
+    ( `giving the Ground 1 notice, then` FULFILLED )
+    RAND
+    ( PARTY Landlord MAY apply WITHIN 100 HENCE courtDecision )
+
+§ `B — landlord does NOT give notice -> court MAY dispense (it depends), empty ledger`
+#TRACE agreement AT 0 WITH
+    PARTY Landlord DOES apply AT 50
+
+§ `A — landlord gives notice -> wrapper records it, court MUST order possession`
+#TRACE agreement AT 0 WITH
+    PARTY Landlord DOES giveNotice AT 10
+    PARTY Landlord DOES apply AT 50

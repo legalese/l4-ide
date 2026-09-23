@@ -1,0 +1,165 @@
+IMPORT prelude
+IMPORT `housing-act-common`
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 5B (Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 5B — the "employment accommodation held by a private registered
+-- provider of social housing" MANDATORY ground, inserted into Schedule 2 to the
+-- Housing Act 1988 by the Renters' Rights Act 2025 (c. 26), Sch. 1 para. 13
+-- (commencement 1.5.2026 for specified purposes; S.I. 2026/421, reg. 2(b),
+-- marker F18). Part I (mandatory): where made out, the court MUST order
+-- possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- Statutory text encoded ("The landlord seeking possession—", a CONJUNCTION of
+-- (a), (b), (c), followed by a trailing negative limb):
+--   (a) is a private registered provider of social housing,
+--   (b) holds the dwelling-house for the purpose of accommodating persons who
+--       meet requirements connected with their employment, and
+--   (c) requires the dwelling-house to let it under a new tenancy to a person who
+--       meets those requirements,
+--   and the tenant in possession does not fulfil those requirements.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * The trailing "and the tenant in possession does not fulfil those
+--     requirements" is encoded as a fourth, NEGATIVE conjunct on top of (a)-(c):
+--     made out = (a) AND (b) AND (c) AND NOT (tenant fulfils those requirements).
+--   * "those requirements" in (c) and in the trailing limb are the requirements
+--     "connected with their employment" introduced in (b); all three references
+--     are to the same set of requirements.
+-- ===========================================================================
+
+§§ `Domain model`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+-- The operative atoms of (a), (b), (c) and the trailing negative limb.
+DECLARE Ground5BClaim HAS
+  -- (a)
+  `landlord is a private registered provider of social housing`        IS A BOOLEAN
+  -- (b)
+  `landlord holds the dwelling-house for the purpose of accommodating persons who meet requirements connected with their employment`  IS A BOOLEAN
+  -- (c)
+  `landlord requires the dwelling-house to let it under a new tenancy to a person who meets those requirements`  IS A BOOLEAN
+  -- trailing negative limb
+  `tenant in possession fulfils those requirements`                    IS A BOOLEAN
+
+§§ `(a) — private registered provider of social housing`
+
+GIVEN claim IS A Ground5BClaim
+GIVETH A BOOLEAN
+`(a) — private registered provider of social housing` claim MEANS
+        "(a) is a private registered provider of social housing,"
+    ... claim's `landlord is a private registered provider of social housing`
+
+§§ `(b) — holds the dwelling-house to accommodate persons meeting employment requirements`
+
+GIVEN claim IS A Ground5BClaim
+GIVETH A BOOLEAN
+`(b) — holds for accommodating persons meeting employment requirements` claim MEANS
+        "(b) holds the dwelling-house for the purpose of accommodating persons who meet requirements connected with their employment,"
+    ... claim's `landlord holds the dwelling-house for the purpose of accommodating persons who meet requirements connected with their employment`
+
+§§ `(c) — requires the dwelling-house to let to a person who meets those requirements`
+
+GIVEN claim IS A Ground5BClaim
+GIVETH A BOOLEAN
+`(c) — requires the dwelling-house to let to a qualifying person` claim MEANS
+        "(c) requires the dwelling-house to let it under a new tenancy to a person who meets those requirements,"
+    ... claim's `landlord requires the dwelling-house to let it under a new tenancy to a person who meets those requirements`
+
+§§ `Trailing limb — the tenant in possession does not fulfil those requirements (negative)`
+
+GIVEN claim IS A Ground5BClaim
+GIVETH A BOOLEAN
+`tenant in possession does not fulfil those requirements` claim MEANS
+        "and the tenant in possession does not fulfil those requirements."
+    ... NOT claim's `tenant in possession fulfils those requirements`
+
+§§ `Ground 5B made out — (a) AND (b) AND (c) AND tenant does not fulfil`
+
+GIVEN claim IS A Ground5BClaim
+GIVETH A BOOLEAN
+`Ground 5B made out` claim MEANS
+        "The landlord seeking possession—"
+    ... `(a) — private registered provider of social housing` claim
+    AND `(b) — holds for accommodating persons meeting employment requirements` claim
+    AND `(c) — requires the dwelling-house to let to a qualifying person` claim
+    AND `tenant in possession does not fulfil those requirements` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+GIVEN claim IS A Ground5BClaim
+GIVETH A DEONTIC Actor Action
+`ground 5B possession order` claim MEANS
+    IF   `Ground 5B made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Ground made out — all of (a)-(c) met and the tenant does NOT fulfil the requirements`
+
+`claim all-met` MEANS Ground5BClaim WITH
+  `landlord is a private registered provider of social housing`        IS TRUE
+  `landlord holds the dwelling-house for the purpose of accommodating persons who meet requirements connected with their employment`  IS TRUE
+  `landlord requires the dwelling-house to let it under a new tenancy to a person who meets those requirements`  IS TRUE
+  `tenant in possession fulfils those requirements`                    IS FALSE
+
+#ASSERT `(a) — private registered provider of social housing`            `claim all-met`
+#ASSERT `(b) — holds for accommodating persons meeting employment requirements` `claim all-met`
+#ASSERT `(c) — requires the dwelling-house to let to a qualifying person` `claim all-met`
+#ASSERT `tenant in possession does not fulfil those requirements`        `claim all-met`
+#ASSERT `Ground 5B made out`                                             `claim all-met`
+
+§§ `(a) knocked out — landlord is not a private registered provider of social housing`
+
+`claim — (a) fails` MEANS Ground5BClaim WITH
+  `landlord is a private registered provider of social housing`        IS FALSE
+  `landlord holds the dwelling-house for the purpose of accommodating persons who meet requirements connected with their employment`  IS TRUE
+  `landlord requires the dwelling-house to let it under a new tenancy to a person who meets those requirements`  IS TRUE
+  `tenant in possession fulfils those requirements`                    IS FALSE
+
+#ASSERT NOT `(a) — private registered provider of social housing` `claim — (a) fails`
+#ASSERT NOT `Ground 5B made out`                                  `claim — (a) fails`
+
+§§ `(b) knocked out — not held for the employment-accommodation purpose`
+
+`claim — (b) fails` MEANS Ground5BClaim WITH
+  `landlord is a private registered provider of social housing`        IS TRUE
+  `landlord holds the dwelling-house for the purpose of accommodating persons who meet requirements connected with their employment`  IS FALSE
+  `landlord requires the dwelling-house to let it under a new tenancy to a person who meets those requirements`  IS TRUE
+  `tenant in possession fulfils those requirements`                    IS FALSE
+
+#ASSERT NOT `(b) — holds for accommodating persons meeting employment requirements` `claim — (b) fails`
+#ASSERT NOT `Ground 5B made out`                                                    `claim — (b) fails`
+
+§§ `(c) knocked out — does not require the dwelling-house to let to a qualifying person`
+
+`claim — (c) fails` MEANS Ground5BClaim WITH
+  `landlord is a private registered provider of social housing`        IS TRUE
+  `landlord holds the dwelling-house for the purpose of accommodating persons who meet requirements connected with their employment`  IS TRUE
+  `landlord requires the dwelling-house to let it under a new tenancy to a person who meets those requirements`  IS FALSE
+  `tenant in possession fulfils those requirements`                    IS FALSE
+
+#ASSERT NOT `(c) — requires the dwelling-house to let to a qualifying person` `claim — (c) fails`
+#ASSERT NOT `Ground 5B made out`                                             `claim — (c) fails`
+
+§§ `Trailing limb knocked out — the tenant in possession DOES fulfil those requirements`
+
+`claim — tenant fulfils` MEANS Ground5BClaim WITH
+  `landlord is a private registered provider of social housing`        IS TRUE
+  `landlord holds the dwelling-house for the purpose of accommodating persons who meet requirements connected with their employment`  IS TRUE
+  `landlord requires the dwelling-house to let it under a new tenancy to a person who meets those requirements`  IS TRUE
+  `tenant in possession fulfils those requirements`                    IS TRUE
+
+#ASSERT NOT `tenant in possession does not fulfil those requirements` `claim — tenant fulfils`
+#ASSERT NOT `Ground 5B made out`                                      `claim — tenant fulfils`

@@ -1,0 +1,180 @@
+IMPORT prelude
+IMPORT `housing-act-common`
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part II — Ground 10 (some rent arrears)`
+
+-- ===========================================================================
+-- GROUND 10 — the "some rent arrears" ground. UNLIKE Ground 8 (Part I,
+-- MANDATORY, "the court MUST order possession"), Ground 10 sits in PART II of
+-- Schedule 2 — the DISCRETIONARY grounds: "GROUNDS ON WHICH COURT MAY ORDER
+-- POSSESSION". So where the ground is made out the outcome is a PERMISSION, not
+-- a duty: the court MAY order possession (and may, in its discretion, decline).
+--
+-- HYBRID encoding:
+--   * the constitutive conditions (a)-(b) -> predicates carrying the verbatim
+--     statute inline as inert prose; only the operative atoms are lifted;
+--   * the discretionary outcome           -> a guarded deontic clause using MAY
+--     (Court MAY order possession), guarded by the conjunction (a) AND (b).
+--
+-- Statutory text encoded (in force on 21 June 2026):
+--   "Some rent lawfully due from the tenant—
+--      (a) is unpaid on the date on which the proceedings for possession are
+--          begun; and
+--      (b) except where subsection (1)(b) of section 8 of this Act applies, was
+--          in arrears at the date of the service of the notice under that
+--          section relating to those proceedings."
+--
+-- Made out = (a) AND (b-unless-s.8(1)(b)-dispensed). The two limbs are joined by
+-- "and" — a CONJUNCTION.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * The s.8(1)(b) CARVE-OUT in limb (b): "except where subsection (1)(b) of
+--     section 8 of this Act applies". Section 8(1)(b) is the court's power to
+--     dispense with the requirement of a section 8 notice (proceedings begun
+--     without prior service of a notice). Where that power applies, there was
+--     no notice whose service date could carry arrears, so limb (b) is simply
+--     NOT REQUIRED. Modelled as: limb (b) is satisfied EITHER because the
+--     s.8(1)(b) dispensing power applies (the carve-out fires, (b) drops away),
+--     OR because rent was in arrears at the date of service of the s.8 notice.
+--     This is the natural reading: the "except where ... applies" clause excuses
+--     the (b) requirement, it does not bar the ground.
+--   * "Some rent lawfully due" — the qualifier "lawfully due" is carried as
+--     inert prose; the operative atom is whether rent was unpaid / in arrears at
+--     the two operative dates. "Some" means any non-zero amount; the operative
+--     atoms are booleans recording that some such rent was unpaid / in arrears.
+--   * Unlike Ground 8 there is NO threshold (no number of weeks/months): any
+--     unpaid rent at the date proceedings begin engages limb (a).
+-- ===========================================================================
+
+§§ `Domain model`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+-- The operative atoms of Ground 10, gathered on the claim.
+DECLARE Ground10Claim HAS
+  -- (a)
+  `some rent lawfully due is unpaid on the date proceedings for possession are begun`  IS A BOOLEAN
+  -- (b) — the carve-out switch: does the s.8(1)(b) dispensing power apply?
+  `subsection (1)(b) of section 8 applies (notice requirement dispensed with)`         IS A BOOLEAN
+  -- (b) — the substantive limb, tested only when the carve-out does NOT apply
+  `some rent lawfully due was in arrears at the date of service of the section 8 notice`  IS A BOOLEAN
+
+§§ `Limb (a) — rent unpaid on the date proceedings are begun`
+
+GIVEN claim IS A Ground10Claim
+GIVETH A BOOLEAN
+`limb (a) — rent unpaid when proceedings begun` claim MEANS
+        "Some rent lawfully due from the tenant—"
+    ... "(a) is unpaid on the date on which the proceedings for possession are begun;"
+    ... claim's `some rent lawfully due is unpaid on the date proceedings for possession are begun`
+
+§§ `Limb (b) — rent in arrears at service, except where s.8(1)(b) applies`
+
+-- "(b) except where subsection (1)(b) of section 8 of this Act applies, was in
+--      arrears at the date of the service of the notice under that section
+--      relating to those proceedings."
+-- The "except where ... applies" clause is a CARVE-OUT: when the s.8(1)(b)
+-- dispensing power applies, limb (b) is excused (there is no notice-service date
+-- to test against). Otherwise the substantive requirement bites: rent was in
+-- arrears at the date the s.8 notice was served.
+GIVEN claim IS A Ground10Claim
+GIVETH A BOOLEAN
+`limb (b) — in arrears at service (unless s.8(1)(b) dispenses)` claim MEANS
+        "(b) except where subsection (1)(b) of section 8 of this Act applies,"
+    ..  claim's `subsection (1)(b) of section 8 applies (notice requirement dispensed with)`
+    ..      "was in arrears at the date of the service of the notice under that section relating to those proceedings."
+        ... claim's `some rent lawfully due was in arrears at the date of service of the section 8 notice`
+
+§§ `Ground 10 made out — limb (a) AND limb (b)`
+
+GIVEN claim IS A Ground10Claim
+GIVETH A BOOLEAN
+`Ground 10 made out` claim MEANS
+        `limb (a) — rent unpaid when proceedings begun` claim
+    AND `limb (b) — in arrears at service (unless s.8(1)(b) dispenses)` claim
+
+§§ `The discretionary outcome — Court MAY order possession`
+
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+-- Part II is DISCRETIONARY: where the ground is made out the court MAY order
+-- possession. MAY defaults so that omission (the court declining) is FULFILLED —
+-- no breach. Contrast the Part I grounds, where the court MUST.
+GIVEN claim IS A Ground10Claim
+GIVETH A DEONTIC Actor Action
+`ground 10 possession order` claim MEANS
+    IF   `Ground 10 made out` claim
+    THEN PARTY Court MAY `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Ground made out — both limbs, notice actually served`
+
+-- Rent unpaid when proceedings begun (a); s.8(1)(b) power not in play; rent in
+-- arrears at the date the s.8 notice was served (b). Both limbs satisfied.
+`claim all-met (notice served)` MEANS Ground10Claim WITH
+  `some rent lawfully due is unpaid on the date proceedings for possession are begun`  IS TRUE
+  `subsection (1)(b) of section 8 applies (notice requirement dispensed with)`         IS FALSE
+  `some rent lawfully due was in arrears at the date of service of the section 8 notice`  IS TRUE
+
+#ASSERT `limb (a) — rent unpaid when proceedings begun`                  `claim all-met (notice served)`
+#ASSERT `limb (b) — in arrears at service (unless s.8(1)(b) dispenses)`  `claim all-met (notice served)`
+#ASSERT `Ground 10 made out`                                            `claim all-met (notice served)`
+
+§§ `Ground made out — limb (b) excused by the s.8(1)(b) carve-out`
+
+-- Rent unpaid when proceedings begun (a). No s.8 notice was served — the court
+-- exercised its s.8(1)(b) power to dispense with the notice requirement — so
+-- limb (b) is EXCUSED (it is satisfied by the carve-out, not by any
+-- arrears-at-service fact, which is accordingly FALSE here). Ground still made
+-- out.
+`claim all-met (notice dispensed)` MEANS Ground10Claim WITH
+  `some rent lawfully due is unpaid on the date proceedings for possession are begun`  IS TRUE
+  `subsection (1)(b) of section 8 applies (notice requirement dispensed with)`         IS TRUE
+  `some rent lawfully due was in arrears at the date of service of the section 8 notice`  IS FALSE
+
+#ASSERT `limb (a) — rent unpaid when proceedings begun`                  `claim all-met (notice dispensed)`
+#ASSERT `limb (b) — in arrears at service (unless s.8(1)(b) dispenses)`  `claim all-met (notice dispensed)`
+#ASSERT `Ground 10 made out`                                            `claim all-met (notice dispensed)`
+
+§§ `Knocked out — limb (a) fails (no rent unpaid when proceedings begun)`
+
+-- Whatever the position at service, if no rent lawfully due is unpaid on the
+-- date proceedings are begun, limb (a) fails and the ground is not made out.
+`claim — (a) fails` MEANS Ground10Claim WITH
+  `some rent lawfully due is unpaid on the date proceedings for possession are begun`  IS FALSE
+  `subsection (1)(b) of section 8 applies (notice requirement dispensed with)`         IS FALSE
+  `some rent lawfully due was in arrears at the date of service of the section 8 notice`  IS TRUE
+
+#ASSERT NOT `limb (a) — rent unpaid when proceedings begun` `claim — (a) fails`
+#ASSERT NOT `Ground 10 made out`                            `claim — (a) fails`
+
+§§ `Knocked out — limb (b) fails (notice served, but no arrears at service, no dispensation)`
+
+-- Rent unpaid when proceedings begun (a), but a s.8 notice WAS served and the
+-- s.8(1)(b) dispensing power does NOT apply, yet rent was not in arrears at the
+-- date that notice was served. Limb (b) fails; ground not made out.
+`claim — (b) fails` MEANS Ground10Claim WITH
+  `some rent lawfully due is unpaid on the date proceedings for possession are begun`  IS TRUE
+  `subsection (1)(b) of section 8 applies (notice requirement dispensed with)`         IS FALSE
+  `some rent lawfully due was in arrears at the date of service of the section 8 notice`  IS FALSE
+
+#ASSERT NOT `limb (b) — in arrears at service (unless s.8(1)(b) dispenses)` `claim — (b) fails`
+#ASSERT NOT `Ground 10 made out`                                           `claim — (b) fails`
+
+§§ `Exercising the discretionary deontic — Court MAY, declining is no breach`
+
+-- A DEONTIC value cannot be compared with EQUALS in #ASSERT, so we exercise the
+-- permission via #TRACE. With the ground made out, the residual is the standing
+-- permission "PARTY Court MAY order possession". Because MAY's omission defaults
+-- to FULFILLED, a trace in which the court never orders possession reduces to
+-- FULFILLED (no breach) — the hallmark of a DISCRETIONARY ground.
+
+-- The court exercises the permission: orders possession within the deadline.
+#TRACE `ground 10 possession order` `claim all-met (notice served)` AT 0 WITH
+    PARTY Court DOES `order possession` AT 10
+
+-- The court declines (never orders possession): no breach — residual FULFILLED.
+#TRACE `ground 10 possession order` `claim all-met (notice served)` AT 0 WITH

@@ -1,0 +1,158 @@
+IMPORT prelude
+IMPORT `housing-act-common`
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part II — Ground 13 (deterioration of the dwelling-house)`
+
+-- ===========================================================================
+-- GROUND 13 — the "deterioration of the dwelling-house (or common parts) owing
+-- to waste, neglect or default" ground. It is one of the DISCRETIONARY grounds
+-- in Part II of Schedule 2 to the Housing Act 1988 ("GROUNDS ON WHICH COURT MAY
+-- ORDER POSSESSION"): where it is made out, the court MAY order possession (it
+-- is not bound to).
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the discretionary outcome   -> a guarded deontic clause using MAY (not MUST).
+--
+-- Statutory text encoded:
+--   "The condition of the dwelling-house or any of the common parts has
+--    deteriorated owing to acts of waste by, or the neglect or default of, the
+--    tenant or any other person residing in the dwelling-house and, in the case
+--    of an act of waste by, or the neglect or default of, a person lodging with
+--    the tenant or a sub-tenant of his, the tenant has not taken such steps as
+--    he ought reasonably to have taken for the removal of the lodger or
+--    sub-tenant.
+--    For the purposes of this ground, 'common parts' means any part of a building
+--    comprising the dwelling-house and any other premises which the tenant is
+--    entitled under the terms of the tenancy to use in common with the occupiers
+--    of other dwelling-houses in which the landlord has an estate or interest."
+--
+-- STRUCTURE: a top-level CONJUNCTION of two limbs joined by the statute's "and":
+--   LIMB 1 — deterioration owing to waste/neglect/default by the tenant OR any
+--            other person residing in the dwelling-house; and
+--   LIMB 2 — the lodger/sub-tenant REMOVAL PROVISO: "in the case of" an act of
+--            waste/neglect/default by a person lodging with the tenant or a
+--            sub-tenant of his, the tenant has not taken reasonable removal steps.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * The lodger/sub-tenant proviso (LIMB 2) is modelled as an IMPLICATION, per
+--     the statute's "in the case of ..." conditional: IF the responsible actor is
+--     a lodger/sub-tenant THEN the tenant must have failed to take reasonable
+--     removal steps. Where the actor is NOT a lodger/sub-tenant (e.g. the tenant
+--     personally, or another resident who is not a lodger/sub-tenant), the proviso
+--     is vacuously satisfied — there is no removal duty to fail. Encoded as
+--     `(NOT actor-is-lodger-or-subtenant) OR (tenant failed to remove)`, the
+--     material-implication reading of "if P then Q".
+--   * "common parts" is defined inline for this ground; carried as inert prose,
+--     with the operative effect folded into the deterioration atom (which already
+--     reads "dwelling-house or any of the common parts").
+--   * "waste", "neglect" and "default" are not separately lifted; the single
+--     deterioration atom captures "owing to acts of waste by, or the neglect or
+--     default of" the relevant person.
+-- ===========================================================================
+
+§§ `Domain model`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+DECLARE Ground13Claim HAS
+  -- LIMB 1
+  `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house`  IS A BOOLEAN
+  -- LIMB 2 — the lodger/sub-tenant proviso
+  `the responsible actor is a person lodging with the tenant or a sub-tenant of his`  IS A BOOLEAN
+  `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant`  IS A BOOLEAN
+
+§§ `Limb 1 — deterioration owing to waste, neglect or default`
+
+GIVEN claim IS A Ground13Claim
+GIVETH A BOOLEAN
+`deterioration owing to waste, neglect or default` claim MEANS
+        "The condition of the dwelling-house or any of the common parts has deteriorated owing to acts of waste by, or the neglect or default of, the tenant or any other person residing in the dwelling-house"
+    ... claim's `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house`
+
+§§ `Limb 2 — the lodger/sub-tenant removal proviso (an implication)`
+
+-- "and, in the case of an act of waste by, or the neglect or default of, a person
+-- lodging with the tenant or a sub-tenant of his, the tenant has not taken such
+-- steps as he ought reasonably to have taken for the removal of the lodger or
+-- sub-tenant." Read as: IF the responsible actor is a lodger/sub-tenant THEN the
+-- tenant failed to take reasonable removal steps. Encoded as the material
+-- implication (NOT P) OR Q, so it is vacuously TRUE when the actor is not a
+-- lodger/sub-tenant.
+GIVEN claim IS A Ground13Claim
+GIVETH A BOOLEAN
+`lodger or sub-tenant removal proviso` claim MEANS
+        "and, in the case of an act of waste by, or the neglect or default of, a person lodging with the tenant or a sub-tenant of his,"
+    ..  NOT claim's `the responsible actor is a person lodging with the tenant or a sub-tenant of his`
+    ..  "the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant."
+    ..  claim's `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant`
+
+§§ `Ground 13 made out — deterioration AND the removal proviso`
+
+GIVEN claim IS A Ground13Claim
+GIVETH A BOOLEAN
+`Ground 13 made out` claim MEANS
+        `deterioration owing to waste, neglect or default` claim
+    AND `lodger or sub-tenant removal proviso` claim
+
+§§ `The discretionary outcome — Court MAY order possession`
+
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+GIVEN claim IS A Ground13Claim
+GIVETH A DEONTIC Actor Action
+`ground 13 possession order` claim MEANS
+    IF   `Ground 13 made out` claim
+    THEN PARTY Court MAY `order possession` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests`
+
+§§ `Made out — deterioration by the tenant personally (proviso vacuously satisfied)`
+
+-- The tenant is not a lodger/sub-tenant, so the removal proviso is vacuously TRUE
+-- and need not be separately satisfied.
+`claim — tenant's own neglect` MEANS Ground13Claim WITH
+  `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house`  IS TRUE
+  `the responsible actor is a person lodging with the tenant or a sub-tenant of his`  IS FALSE
+  `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant`  IS FALSE
+
+#ASSERT `deterioration owing to waste, neglect or default` `claim — tenant's own neglect`
+#ASSERT `lodger or sub-tenant removal proviso`             `claim — tenant's own neglect`
+#ASSERT `Ground 13 made out`                               `claim — tenant's own neglect`
+
+§§ `Made out — deterioration by a lodger AND the tenant failed to remove him`
+
+`claim — lodger, not removed` MEANS Ground13Claim WITH
+  `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house`  IS TRUE
+  `the responsible actor is a person lodging with the tenant or a sub-tenant of his`  IS TRUE
+  `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant`  IS TRUE
+
+#ASSERT `deterioration owing to waste, neglect or default` `claim — lodger, not removed`
+#ASSERT `lodger or sub-tenant removal proviso`             `claim — lodger, not removed`
+#ASSERT `Ground 13 made out`                               `claim — lodger, not removed`
+
+§§ `Not made out — deterioration by a lodger BUT the tenant DID take reasonable removal steps`
+
+-- The proviso fails: the actor is a lodger/sub-tenant, but the tenant took the
+-- reasonable removal steps, so the implication's consequent is not satisfied.
+`claim — lodger, but removed` MEANS Ground13Claim WITH
+  `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house`  IS TRUE
+  `the responsible actor is a person lodging with the tenant or a sub-tenant of his`  IS TRUE
+  `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant`  IS FALSE
+
+#ASSERT `deterioration owing to waste, neglect or default` `claim — lodger, but removed`
+#ASSERT NOT `lodger or sub-tenant removal proviso`         `claim — lodger, but removed`
+#ASSERT NOT `Ground 13 made out`                           `claim — lodger, but removed`
+
+§§ `Not made out — no deterioration at all`
+
+`claim — no deterioration` MEANS Ground13Claim WITH
+  `the condition of the dwelling-house or any of the common parts has deteriorated owing to waste, neglect or default of the tenant or any other person residing in the dwelling-house`  IS FALSE
+  `the responsible actor is a person lodging with the tenant or a sub-tenant of his`  IS FALSE
+  `the tenant has not taken such steps as he ought reasonably to have taken for the removal of the lodger or sub-tenant`  IS FALSE
+
+#ASSERT NOT `deterioration owing to waste, neglect or default` `claim — no deterioration`
+#ASSERT NOT `Ground 13 made out`                               `claim — no deterioration`
