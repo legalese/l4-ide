@@ -30,6 +30,8 @@ export function monarchTokensProvider(): object {
         [/`[^`]*`/, 'variable.name'],
         // Rational and integer numbers
         [/\d+(\.\d+)?/, 'number'],
+        // Bullet-list marker (• offside symbol; CSymbol → LSP Operator)
+        [/•/, 'operator'],
         // Operators
         [/>=|<=|==|!=|&&|\|\||=>|[+\-*/<>=]/, 'operator'],
         // Identifiers and keywords: uppercase words checked against keyword list

@@ -14,5 +14,10 @@ export * from './layout-ir/node-paths-selection.js'
 
 /** Displayers; in particular, Ladder Flow */
 export { default as LadderFlow } from './displayers/flow/flow.svelte'
+/** The E1 Step 4 displayer: `@repo/ladder-core` + `@repo/ladder-svg`, no Dagre, no
+ *  SvelteFlow, no LIR. Not yet mounted in either IDE — that is Step 5. */
+export { default as LadderSvg } from './displayers/svg/ladder-svg.svelte'
+export * from './model/ladder-model.js'
+export * from './displayers/svg/sidebar-bridge.js'
 export * from './displayers/flow/svelteflow-types.js'
 export * from './displayers/flow/layout.js'
