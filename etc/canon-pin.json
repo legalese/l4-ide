@@ -134,5 +134,11 @@
       "to": "il/ofek-hadash-2008"
     }
   ],
-  "include": ["*.l4", "tests/*.golden", "encoding.json", "SOURCE-LICENSE.md"]
+  "include": [
+    "*.l4",
+    "tests/*.golden",
+    "encoding.json",
+    "SOURCE-LICENSE.md",
+    "registers/*.json"
+  ]
 }

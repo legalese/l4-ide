@@ -1,0 +1,471 @@
+{
+  "kind": "fork-register",
+  "register_version": 1,
+  "subject": "sg-succession",
+  "interpretation_type": "Interpretation",
+  "note": "Seven forks. Two are MATERIALISED as fields of the Interpretation record (F1, F3) because the difference is executable and the test suite shows it. Two are DELEGATED to whoever supplies the facts (F2, F6) -- and F6 is a KNOWN GAP, not a clean delegation: the half-blood ordering in ISA s 6(b) is not implemented, so a naively-entered mixed sibling class divides equally. Three are RESOLVED at encode time (F4, F5, F7). Completeness is not claimed and cannot be: no procedure establishes that every ambiguity in three Acts has been found.",
+  "entries": [
+    {
+      "id": "F1",
+      "kind": "statutory-wording",
+      "materialisation": "interpretation-field",
+      "interpretation_field": "stirpital division starts at the child generation",
+      "site": {
+        "file": "jl4/examples/legal/sg-succession/sg-isa.l4",
+        "anchor": "`distribute` _ `per stirpes among` _ `citing` _",
+        "provisions": [
+          "ISA s 7 rule 3",
+          "ISA s 7 rule 3 Proviso No. (2)"
+        ]
+      },
+      "source": {
+        "quote": "the estate ... of an intestate who leaves issue shall be distributed by equal portions per stirpes to and amongst the children of the person dying intestate and such persons as legally represent those children, in case any of those children be then dead",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "ISA 1967 s 7 rule 3",
+            "url": "https://sso.agc.gov.sg/Act/ISA1967"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "R1",
+          "description": "Division always begins at the CHILD generation. Where every child predeceased leaving issue, the estate still splits into as many stocks as there were represented children, and each stock's share descends. Two grandchildren from one child and one from another take 1/4, 1/4 and 1/2.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "ISA 1967 s 7 rule 3 Proviso No. (2) -- descendants 'stand in the place of their parent or other ancestor, and take according to their stocks the share which he or she would have taken'",
+              "url": "https://sso.agc.gov.sg/Act/ISA1967"
+            }
+          ]
+        },
+        {
+          "id": "R2",
+          "description": "Where NO child survives, the children drop out and division begins per capita at the nearest generation in which anyone survives. On the same facts all three grandchildren take 1/3.",
+          "status": "arguable",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "ISA 1967 s 7 rule 3 -- 'by equal portions per stirpes to and amongst the children ... and such persons as legally represent those children'",
+              "url": "https://sso.agc.gov.sg/Act/ISA1967"
+            }
+          ],
+          "foreclosure": "Nothing forecloses it in the text; it is non-operative here only because R1 is taken as the orthodox reading. This is the reason F1 is materialised rather than resolved."
+        }
+      ],
+      "taken": {
+        "reading": "R1",
+        "mechanism": "TYPICALLY",
+        "rationale": "Proviso No. (2) fixes the stock at the ancestor's level in terms ('the share which he or she would have taken'), which presupposes a share the ancestor would have taken -- i.e. a division at the ancestor's generation. R2 reads 'to and amongst the children' as requiring a surviving child for the children's generation to be a division point at all. Both survive the text; R1 is taken as the orthodox reading and R2 is materialised so the difference is executable."
+      },
+      "status": "open",
+      "divergence": "observable",
+      "witnesses": [
+        "all-children-predeceased-uneven-stocks"
+      ],
+      "cross_refs": []
+    },
+    {
+      "id": "F2",
+      "kind": "fact-convention",
+      "materialisation": "delegated-to-fact",
+      "delegated_field": "Family.children",
+      "site": {
+        "file": "jl4/examples/legal/sg-succession/sg-succession-domain.l4",
+        "anchor": "DECLARE Family",
+        "provisions": [
+          "ISA s 3"
+        ]
+      },
+      "source": {
+        "quote": "\u201cchild\u201d means a legitimate child and includes any child adopted by virtue of an order of court under any written law for the time being in force in Singapore, Malaysia or Brunei Darussalam",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "ISA 1967 s 3",
+            "url": "https://sso.agc.gov.sg/Act/ISA1967"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "R1",
+          "description": "'Child' is confined to a legitimate child and a court-adopted child. An illegitimate child does not take from the father on intestacy, however clearly paternity is established.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "ISA 1967 s 3",
+              "url": "https://sso.agc.gov.sg/Act/ISA1967"
+            },
+            {
+              "kind": "authority",
+              "cite": "Lim Weipin and another v Lim Boh Chuan and others [2010] SGHC 99",
+              "url": "https://www.elitigation.sg/gd/s/2010_SGHC_99"
+            }
+          ]
+        },
+        {
+          "id": "R2",
+          "description": "'Child' extends to any biological child whose paternity is established.",
+          "status": "rejected",
+          "rejection_rationale": "The definition is exhaustive as to legitimacy ('means a legitimate child') and merely inclusive as to adoption ('and includes'). [2010] SGHC 99 applied it as the gate on standing.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "ISA 1967 s 3",
+              "url": "https://sso.agc.gov.sg/Act/ISA1967"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "R1",
+        "mechanism": "fact-supplied",
+        "rationale": "The tool cannot observe legitimacy or adoption; it can only be told. Membership of Family.children is therefore the fact supplier's determination under s 3, and the encoding neither widens nor narrows it. This is recorded because a user who enters an illegitimate child as a 'child' will get an answer the law does not give, and no rule in the encoding will catch it."
+      },
+      "status": "settled",
+      "settled_by": {
+        "authority": "General Division of the High Court",
+        "citation": "Lim Weipin and another v Lim Boh Chuan and others [2010] SGHC 99",
+        "url": "https://www.elitigation.sg/gd/s/2010_SGHC_99",
+        "date": "2010-03-30",
+        "external_modification": "E1"
+      },
+      "divergence": "observable",
+      "witnesses": [
+        "illegitimate-child-not-a-child-under-s3"
+      ],
+      "cross_refs": [
+        "E1",
+        "E4"
+      ]
+    },
+    {
+      "id": "F3",
+      "kind": "statutory-wording",
+      "materialisation": "interpretation-field",
+      "interpretation_field": "a sibling's children take per stirpes",
+      "site": {
+        "file": "jl4/examples/legal/sg-succession/sg-isa.l4",
+        "anchor": "`the section 7 shares of` -- rule 6 arm",
+        "provisions": [
+          "ISA s 7 rule 6"
+        ]
+      },
+      "source": {
+        "quote": "the brothers and sisters and children of deceased brothers or sisters of the intestate shall share the estate in equal portions between the brothers and sisters and the children of any deceased brother or sister shall take according to their stocks the share which the deceased brother or sister would have taken",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "ISA 1967 s 7 rule 6",
+            "url": "https://sso.agc.gov.sg/Act/ISA1967"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "R1",
+          "description": "Stocks are the siblings, exactly as under rule 3: a predeceased sibling's children take that sibling's share between them, and this holds even if no sibling survives.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "ISA 1967 s 7 rule 6 -- 'shall take according to their stocks the share which the deceased brother or sister would have taken'",
+              "url": "https://sso.agc.gov.sg/Act/ISA1967"
+            }
+          ]
+        },
+        {
+          "id": "R2",
+          "description": "Representation reaches only the CHILDREN of a deceased sibling and no further -- rule 6 says 'children', not 'issue' or 'descendants', so a deceased nephew's own children do not represent him.",
+          "status": "arguable",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "ISA 1967 s 7 rule 6 -- 'children of deceased brothers or sisters'",
+              "url": "https://sso.agc.gov.sg/Act/ISA1967"
+            },
+            {
+              "kind": "provision",
+              "cite": "ISA 1967 s 7 rule 3 Proviso No. (1), which by contrast says 'descendants and not their next-of-kin'",
+              "url": "https://sso.agc.gov.sg/Act/ISA1967"
+            }
+          ],
+          "foreclosure": "Nothing forecloses it; rule 6 says 'children' where rule 3's proviso says 'descendants', and no Singapore authority was found resolving the difference. Materialised for that reason."
+        }
+      ],
+      "taken": {
+        "reading": "R1",
+        "mechanism": "TYPICALLY",
+        "rationale": "Rule 6 is encoded by the same per-stirpes helper as rule 3, which recurses to the remotest degree. That is R1. R2 is a real textual argument -- rule 6 says 'children' where rule 3's proviso says 'descendants' -- and is materialised so the difference can be shown rather than argued."
+      },
+      "status": "open",
+      "divergence": "observable",
+      "witnesses": [
+        "deceased-sibling-with-deceased-child"
+      ],
+      "cross_refs": []
+    },
+    {
+      "id": "F4",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/sg-succession/sg-succession-domain.l4",
+        "anchor": "DECLARE Will -- `proportion of the estate beneficially disposed of`",
+        "provisions": [
+          "ISA s 10",
+          "ISA s 3 (definition of 'intestate')"
+        ]
+      },
+      "source": {
+        "quote": "Where any person dies leaving a will beneficially disposing of part of his property, the provisions of this Act shall have effect as respects the part of his property not so disposed of, subject to the provisions contained in the will",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "ISA 1967 s 10",
+            "url": "https://sso.agc.gov.sg/Act/ISA1967"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "R1",
+          "description": "Model the undisposed part as a PROPORTION OF VALUE. Exact where the gap is a residuary share; approximate where the gap is a specific asset whose value differs from its proportion.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "ISA 1967 s 10",
+              "url": "https://sso.agc.gov.sg/Act/ISA1967"
+            }
+          ]
+        },
+        {
+          "id": "R2",
+          "description": "Model the undisposed part as an identified set of assets, requiring the tool to construe the will's dispositive provisions.",
+          "status": "demoted",
+          "rejection_rationale": "Requires reading and construing the will's text, which this tool does not do and cannot do from the facts it collects.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "ISA 1967 s 10",
+              "url": "https://sso.agc.gov.sg/Act/ISA1967"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "R1",
+        "mechanism": "encoded",
+        "rationale": "A proportion is the most the tool can honestly compute from facts a user can supply. Recorded as a fork rather than buried as an implementation detail because it is a place where the encoding is APPROXIMATE and the statute is not."
+      },
+      "status": "resolved",
+      "divergence": "observable",
+      "witnesses": [
+        "partial-intestacy-half-disposed"
+      ],
+      "cross_refs": []
+    },
+    {
+      "id": "F5",
+      "kind": "vagueness",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/sg-succession/sg-isa.l4",
+        "anchor": "`the Singapore immovable share of`",
+        "provisions": [
+          "ISA s 4",
+          "ISA s 5"
+        ]
+      },
+      "source": {
+        "quote": "that property or the proceeds thereof, after payment thereout of the expenses of due administration as prescribed by the Probate and Administration Act 1934, shall be distributed",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "ISA 1967 s 5",
+            "url": "https://sso.agc.gov.sg/Act/ISA1967"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "R1",
+          "description": "Where only the Singapore immovables fall within the Act (a foreign-domiciled deceased), administration expenses and debts are borne RATEABLY by the in-scope part, in proportion to value.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "ISA 1967 s 5",
+              "url": "https://sso.agc.gov.sg/Act/ISA1967"
+            },
+            {
+              "kind": "provision",
+              "cite": "PAA 1934 s 58(2) -- 'shall bear a proportionate part of the charge on the whole thereof'",
+              "url": "https://sso.agc.gov.sg/Act/PAA1934"
+            }
+          ]
+        },
+        {
+          "id": "R2",
+          "description": "Expenses are borne wholly by the movable estate, leaving the Singapore immovables to be distributed gross.",
+          "status": "arguable",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "ISA 1967 s 5",
+              "url": "https://sso.agc.gov.sg/Act/ISA1967"
+            }
+          ],
+          "foreclosure": "Non-operative because PAA s 58(2) applies rateable apportionment to the analogous problem and R2 has no textual support in either Act; no authority forecloses it outright."
+        }
+      ],
+      "taken": {
+        "reading": "R1",
+        "mechanism": "encoded",
+        "rationale": "Section 5 says 'after payment thereout' of the property it governs, and PAA s 58(2) uses rateable apportionment for the analogous problem of a charge over part of an estate. R2 has no textual support in either Act and is recorded only because the section does not expressly resolve it."
+      },
+      "status": "open",
+      "divergence": "observable",
+      "witnesses": [
+        "foreign-domicile-singapore-house-only"
+      ],
+      "cross_refs": []
+    },
+    {
+      "id": "F6",
+      "kind": "statutory-wording",
+      "materialisation": "delegated-to-fact",
+      "delegated_field": "Family.siblings",
+      "site": {
+        "file": "jl4/examples/legal/sg-succession/sg-isa.l4",
+        "anchor": "`the section 7 shares of` -- rule 6 arm",
+        "provisions": [
+          "ISA s 6(b)",
+          "ISA s 7 rule 6",
+          "ISA s 7 rule 8"
+        ]
+      },
+      "source": {
+        "quote": "those related to a person deceased by the half blood shall rank immediately after those of the whole blood related to him in the same degree",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "ISA 1967 s 6(b)",
+            "url": "https://sso.agc.gov.sg/Act/ISA1967"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "R1",
+          "description": "'Rank immediately after' is a PRIORITY: a half-blood sibling takes nothing while any whole-blood sibling of the same degree is represented, and takes only in their absence.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "ISA 1967 s 6(b)",
+              "url": "https://sso.agc.gov.sg/Act/ISA1967"
+            }
+          ]
+        },
+        {
+          "id": "R2",
+          "description": "'Rank immediately after' orders the class for administrative purposes but does not exclude: half- and whole-blood share equally.",
+          "status": "arguable",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "ISA 1967 s 6(b)",
+              "url": "https://sso.agc.gov.sg/Act/ISA1967"
+            }
+          ],
+          "foreclosure": "Non-operative as a matter of construction ('rank immediately after' is priority language), but NOT foreclosed by any authority found, and the encoding does not implement R1 either -- see the taken.rationale."
+        }
+      ],
+      "taken": {
+        "reading": "R1",
+        "mechanism": "fact-supplied",
+        "rationale": "NOT ENCODED AS A RULE, AND THIS IS A KNOWN GAP. The rule-6 and rule-8 arms divide among Family.siblings and Family.`uncles and aunts` without applying any half-blood ordering, so the fact supplier must list only the class that actually takes. An estate with both whole- and half-blood siblings entered naively will divide equally, which is R2. Recorded here rather than silently, and named as the first candidate for the next revision of this encoding."
+      },
+      "status": "open",
+      "divergence": "observable",
+      "witnesses": [
+        "half-blood-and-whole-blood-siblings"
+      ],
+      "cross_refs": []
+    },
+    {
+      "id": "F7",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/sg-succession/sg-paa.l4",
+        "anchor": "letters of administration on intestacy",
+        "provisions": [
+          "PAA s 18(2)",
+          "PAA s 18(4)"
+        ]
+      },
+      "source": {
+        "quote": "In granting such letters of administration the court shall have regard to the rights of all persons interested in the estate of the deceased person or the proceeds of sale thereof",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "PAA 1934 s 18(2)",
+            "url": "https://sso.agc.gov.sg/Act/PAA1934"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "R1",
+          "description": "Priority to a grant of letters of administration follows the ISA s 7 order of entitlement to the estate: those who take most have the strongest claim to administer.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "authority",
+              "cite": "Cheng Tze Tzuen v Dang Lan Anh [2025] SGHC 112",
+              "url": "https://www.elitigation.sg/gd/s/2025_SGHC_112"
+            }
+          ]
+        },
+        {
+          "id": "R2",
+          "description": "Section 18(4)(a)'s list ('the husband or widow or next of kin or any of them') is a free-standing order independent of s 7.",
+          "status": "rejected",
+          "rejection_rationale": "[2025] SGHC 112 states that entitlement to letters of administration is based on priority of entitlement to the estate under ISA s 7.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "PAA 1934 s 18(4)(a)",
+              "url": "https://sso.agc.gov.sg/Act/PAA1934"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "R1",
+        "mechanism": "encoded",
+        "rationale": "The PAA module derives the order of persons entitled to a grant from the ISA s 7 class order rather than restating s 18(4) as an independent list, which is what the authority requires."
+      },
+      "status": "settled",
+      "settled_by": {
+        "authority": "General Division of the High Court",
+        "citation": "Cheng Tze Tzuen v Dang Lan Anh [2025] SGHC 112",
+        "url": "https://www.elitigation.sg/gd/s/2025_SGHC_112",
+        "date": "2025-07-01",
+        "external_modification": "E2"
+      },
+      "divergence": "none",
+      "witnesses": [],
+      "cross_refs": [
+        "E2"
+      ]
+    }
+  ]
+}
