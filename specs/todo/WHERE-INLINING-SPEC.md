@@ -98,6 +98,53 @@ Consequences, in order of importance:
 > zero-arity definitions; a pass that runs automatically over every binding would not be so
 > lucky. §5 checks arity explicitly rather than inheriting this.
 
+### 3.1 What the ladder does with calls today — measured 2026-09-23
+
+This section reports measurements, not rules.
+It asks what the "parameters" row of §3 costs the ladder, and whether a section `GIVEN` changes that.
+
+**Rig.**
+A six-decision probe module, rendered by `~/.cabal/bin/jl4-lsp` (installed 2026-09-23, tree `20e71b65d`) over a websocket, using the same `codeLens` → `workspace/executeCommand` sequence as `ts-shared/ladder-svg/standalone/serve.mjs`'s `/render`.
+The decisions: a two-parameter `` `limb` p q IF p AND q ``; a caller passing it two different pairs of actuals; a caller passing it the same pair twice; a section `GIVEN s, t` with `` `sect limb` IF s AND t ``; a same-section caller reading `` `sect limb` `` twice by name; and a same-section caller reading it once plainly and once `WITH s IS r`.
+
+**1. A named same-section call is already zero-arity.**
+`` `sect limb` `` arrives as a `UBoolVar` with `canInline: true`, and both occurrences carry one `atomId`.
+A section `GIVEN` is elaborated into one binder shared by the section (`desugarSectionGivens`, `L4.Desugar`), so the rule genuinely takes no arguments and the call site passes none.
+The "parameters" row of §3 does not reach this case; the existing `l4/inlineExprs` gesture inlines it today.
+R1 does not, because R1 covers **local** bindings and `` `sect limb` `` is top-level — a scope question, not a capture question.
+
+**2. `WITH` is the case that really substitutes.**
+`` `sect limb` WITH s IS r `` arrives as one opaque `UBoolVar` labelled with the whole expression, `canInline: false`.
+Inlining it means replacing the section binder by `r` throughout the definiens, which is the §3 case.
+
+**3. A parameterised call arrives as `App`, with its actuals as children, and expanding it in the new engine drops them.**
+`ts-shared/ladder-svg/standalone/playground.ts` expands ("hydrates") a call client-side by splicing the callee's body in place of the `App` (`buildDisplay`, lines 126–140).
+The callee's leaves are its formals, so `limb OF a, b` and `limb OF c, d` both expand to `p AND q`, and the `App`'s children — the actuals — are discarded.
+This is by reading; the playground was not driven in a browser.
+
+**4. Expanded copies never share a value, whether or not they should.**
+`ViewSpec.valuation` is keyed by display node id (`ladder-core/src/types.ts`, the `ViewSpec` header; `layout.ts`, "positional per-node").
+Spreading one answer to every box of the same proposition is left to the host — `ts-apps/regcf-wizard/src/lib/components/Ladder.svelte` does it by `Unique` — and the playground does not.
+So two expansions of `limb OF a, b` in one tree can show `p` true in one copy and unknown in the other.
+For different actuals the independence is right and the labels are wrong; for the same actuals the labels are right and the independence is wrong.
+
+**5. Unplanned: an `atomId` collision between a call and an argument.**
+An `App` leaf's `unique` is its **node id** (`jl4-lsp/src/LSP/L4/Viz/Ladder.hs`, `uniq = vid.id` in the `App` case), while a `UBoolVar`'s is a **resolver `Unique`**.
+`annotateLadderWithAtomIdsUsing` (`LSP.L4.Viz.QueryPlan`) re-keys both through `reAtom nm.unique` over one `Map Int Text`, so whenever the two numbers coincide the variable inherits the call's `atomId`.
+Measured: in the different-actuals caller, `b` (resolver `Unique` 6) carried the `atomId` of `App#6`, `limb OF c, d`.
+Positive control: adding one unused leading parameter shifts the resolver numbering by one, and the collision moved to `a` (now `Unique` 6) while `b` became distinct.
+This failure is **silent**: anything that addresses that leaf by `atomId` addresses the call instead, with no diagnostic.
+It sits inside the reconciliation `45ea9f94a` added for smucclaw/l4-ide#935, and is not filed as of this writing.
+
+**What this does to O2.**
+With resolved names, avoiding capture is mostly bookkeeping, not the hard part.
+A substitution that maps each formal's `Unique` to its actual never compares spellings, so it cannot capture.
+It can duplicate the callee's own local binders when one body is expanded twice, which is a freshening chore.
+The part that needs a ruling is **atom identity**: two expansions should share an atom exactly when their actuals are the same terms.
+Findings 3 and 4 show the new engine currently gets that wrong in both directions.
+A named same-section call meets the condition by construction (finding 1), and that is the common house-style case.
+This paragraph is argued, not built.
+
 ## 4. Where it lives
 
 `L4.Transform` (`jl4-core`), whose header already reads "ad-hoc logical transformations of
@@ -179,3 +226,5 @@ not table-shaped. Separate change, separate spec.
   already shows what it saw._
 - **O2.** Parameterised bindings (§3) via proper beta reduction. Wanted eventually; wants a
   capture-avoidance story first.
+  §3.1 argues that avoiding capture is the small part once names are resolved.
+  The open question it leaves is atom identity across expansions, which the new ladder engine currently gets wrong in both directions.
