@@ -232,6 +232,7 @@ test-suite jl4-core-test
     TracePostprocessSpec
     EdgeCrashSpec
     PrintRoundtripSpec
+    PrettyLayoutNlgSpec
     LedgerSubstrateSpec
     LedgerThunkCacheSpec
     RecordLedgerSpec
@@ -258,5 +259,6 @@ test-suite jl4-core-test
     deepseq,
     hspec,
     jl4-core,
+    optics,
     text,
     time
