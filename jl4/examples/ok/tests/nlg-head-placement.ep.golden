@@ -45,6 +45,7 @@
 --  11  herald / `r` p AKA `a` MEANS    own line above          BARE NAME       BARE NAME  herald
 --  12  `r` p q / herald / MEANS ...    own line below the q    herald          herald     herald
 --  13  herald / `r` p / herald / MEANS both                    OUTER           OUTER      OUTER
+--  14  GIVEN p @nlg g / DECIDE `r` IF  trailing the GIVEN name  BARE NAME       gloss      rule's own body
 --
 -- Rows 5, 7, 8 and 12 are the repair. Before it they printed the bare rule name
 -- positionally; rows 1-4, 6 and 9 already read the herald and are unchanged,
@@ -222,3 +223,18 @@ GIVETH A BOOLEAN
 
 #EVAL `row thirteen` 200
 #EVAL `row thirteen` WITH amount IS 200
+
+-- Row 14: the herald is written on the GIVEN name and the head names NO input.
+-- That is a gloss for the input, not a sentence for the rule, and it must read
+-- that way: the bare rule name at a positional call, the gloss as the input's
+-- label in the `where` clause, and `l4 render` describing the rule by its own
+-- body. The type checker hoists GIVEN names into an empty head, so the gloss
+-- used to be found as though it sat on a head input: `l4 render` printed
+-- "Row fourteen holds if the sum of money.", and after #458 `l4 nlg` printed
+-- "the sum of money with 200" (smucclaw/l4-ide#977).
+GIVEN amount IS A NUMBER @nlg the sum of money
+GIVETH A BOOLEAN
+DECIDE `row fourteen` IF amount GREATER THAN 100
+
+#EVAL `row fourteen` 200
+#EVAL `row fourteen` WITH amount IS 200

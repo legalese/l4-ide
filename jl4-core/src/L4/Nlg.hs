@@ -122,9 +122,9 @@ selectLanguage mlang    m = over (gplate @Name) promote m
 
 -- | Which annotation-bearing position of a @DECIDE@ its @\@nlg@ was found in.
 --
--- Only 'decideNlgSite' produces these, and only 'promoteHeadInputNlg' reads
--- them; 'decideNlg' throws the site away. It exists because exactly one caller
--- has to tell an INPUT's annotation apart from the rule's own, and inferring
+-- Only 'decideNlgSite' produces these. 'promoteHeadInputNlg' reads them to
+-- tell an INPUT's annotation apart from the rule's own, and 'decideNlg' reads
+-- them to refuse a @GIVEN@ gloss as the rule's sentence. Inferring
 -- that from the 'Nlg' after the fact is not possible — the same sentence can
 -- legitimately sit in either place.
 data NlgSite
@@ -187,9 +187,33 @@ decideNlgSite mouter (MkDecide decAnno (MkTypeSig _ (MkGivenSig _ names) _) (MkA
     | isJust (rangeOf (getOriginal a)) = NlgOnHeadInput a
     | otherwise                        = NlgOnHoistedInput a
 
--- | 'decideNlgSite' without the position — the shape both exporters want.
+-- | The rule's OWN sentence: 'decideNlgSite', kept only when the herald was
+-- found at a position that means the rule.
+--
+-- __A herald written in the @GIVEN@ is an input gloss, never the rule's
+-- sentence__ ('NlgOnHoistedInput', 'NlgOnGivenName'). A head with no arguments
+-- has the @GIVEN@ names hoisted into it, so without this filter
+-- @GIVEN amount IS A NUMBER \@nlg the sum of money@ over
+-- @DECIDE \`p seven\` IF …@ came back as the rule's sentence, and every
+-- consumer printed it that way: @l4 render@ wrote "P seven holds if the sum of
+-- money.", and @l4 nlg@ (through 'nlgFnInfo') wrote "the sum of money with 200"
+-- at a positional call (smucclaw\/l4-ide#977). The gloss still reaches the
+-- output where it belongs, as the input's label in a @WITH@ call.
+--
+-- Returning 'Nothing' rather than searching on is exact: a hoisted argument
+-- only exists when the head has no argument of its own, and the positions after
+-- it are further hoisted arguments and @GIVEN@ names.
 decideNlg :: Maybe Anno -> Decide Resolved -> Maybe Nlg
-decideNlg mouter = fmap snd . decideNlgSite mouter
+decideNlg mouter d = case decideNlgSite mouter d of
+  Just (site, nlg) | isRuleSite site -> Just nlg
+  _                                  -> Nothing
+ where
+  isRuleSite = \case
+    NlgOnDeclaration    -> True
+    NlgOnHeadName       -> True
+    NlgOnHeadInput _    -> True
+    NlgOnHoistedInput _ -> False
+    NlgOnGivenName _    -> False
 
 -- | Move a herald written on a rule head's INPUT onto the rule, so a call site
 -- linearizes the author's sentence instead of the rule's bare name.
