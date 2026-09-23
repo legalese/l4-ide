@@ -1,0 +1,404 @@
+`the person is an infant on the date in question` with `Wei Ming, the infant` and `YMD` with 2026, 8 and 26 is equal to `JUST` with `TRUE`
+`the person is an infant on the date in question` with `Wei Ming, the infant` and `YMD` with 2035, 1 and 1 is equal to `JUST` with `FALSE`
+`the person is an infant on the date in question` with `Wei Ming, the infant` and `YMD` with 2033, 7 and 18 is equal to `JUST` with `TRUE`
+`the person is an infant on the date in question` with `Wei Ming, the infant` and `YMD` with 2033, 7 and 19 is equal to `JUST` with `FALSE`
+`the person is an infant on the date in question` with `Wei Ming, majority date not in evidence` and `YMD` with 2026, 8 and 26 is equal to `NOTHING`
+`the date on which the person attains the age of majority, computed from the date of birth` with `Wei Ming, the infant` and 21 is equal to `JUST` with `YMD` with 2033, 7 and 19
+`the date on which the person attains the age of majority, computed from the date of birth` with `Wei Ming, the infant` and 18 is equal to `JUST` with `YMD` with 2030, 7 and 19
+`the date on which the person attains the age of majority, computed from the date of birth` with `Lai Peng, the mother` and 21 is equal to `NOTHING`
+`the short title of this Act` is equal to Guardianship of Infants Act 1934
+`the forum is a court within the meaning of section 2` with `the General Division of the High Court or a Family Court` with `a Family Court`
+`the forum is a court within the meaning of section 2` with `the General Division of the High Court or a Family Court` with `the General Division of the High Court`
+not `the forum is a court within the meaning of section 2` with `a District Court`
+not `the forum is a court within the meaning of section 2` with `a Magistrate's Court`
+`section 3 reaches proceedings before the forum` with `the General Division of the High Court or a Family Court` with `a Family Court`
+`section 3 reaches proceedings before the forum` with `a District Court`
+`section 3 reaches proceedings before the forum` with `a Magistrate's Court`
+`the question is one of those section 3 names` with `the custody of an infant`
+`the question is one of those section 3 names` with `the upbringing of an infant`
+`the question is one of those section 3 names` with `the administration of any property belonging to or held in trust for an infant`
+`the question is one of those section 3 names` with `the application of the income thereof`
+not `the question is one of those section 3 names` with `a question of some other kind`
+`section 3 governs the deciding of the question` with `the General Division of the High Court or a Family Court` with `a Family Court` and `the custody of an infant`
+not `section 3 governs the deciding of the question` with `the General Division of the High Court or a Family Court` with `a Family Court` and `a question of some other kind`
+`section 3 governs the deciding of the question` with `a District Court` and `the custody of an infant`
+not `section 3 governs the deciding of the question` with `a Magistrate's Court` and `a question of some other kind`
+`the standing of the father and the mother in deciding the question` with `the General Division of the High Court or a Family Court` with `a Family Court`, `the upbringing of an infant` and `FALSE` is equal to `JUST` with `neither the father nor the mother is deemed to have any right or claim superior to that of the other`
+`the standing of the father and the mother in deciding the question` with `the General Division of the High Court or a Family Court` with `a Family Court`, `the upbringing of an infant` and `TRUE` is equal to `JUST` with `the welfare of the infant otherwise requires, and to that extent the deeming rule in section 3 does not apply`
+`the standing of the father and the mother in deciding the question` with `the General Division of the High Court or a Family Court` with `a Family Court`, `a question of some other kind` and `FALSE` is equal to `NOTHING`
+`the standing of the father and the mother in deciding the question` with `a District Court`, `the custody of an infant` and `FALSE` is equal to `JUST` with `neither the father nor the mother is deemed to have any right or claim superior to that of the other`
+`the mother has the like powers of applying to the court in respect of the matter` with `TRUE` and `TRUE`
+not `the mother has the like powers of applying to the court in respect of the matter` with `TRUE` and `FALSE`
+not `the mother has the like powers of applying to the court in respect of the matter` with `FALSE` and `TRUE`
+not `the mother has the like powers of applying to the court in respect of the matter` with `FALSE` and `FALSE`
+`the mother is guardian of the infant under section 6(1)` with `Wei Ming, the father having died leaving a testamentary guardian`
+not `the father is guardian of the infant under section 6(2)` with `Wei Ming, the father having died leaving a testamentary guardian`
+`the mother is guardian either alone or jointly with any guardian appointed by the father` with `Wei Ming, the father having died leaving a testamentary guardian` is equal to `JUST` with `jointly with` with list of lim
+not `the court may appoint a guardian to act jointly with the mother under section 6(1)` with `Wei Ming, the father having died leaving a testamentary guardian`
+`the persons who are guardians of the infant` with `Wei Ming, the father having died leaving a testamentary guardian` is equal to list of mother and lim
+`the mother is guardian either alone or jointly with any guardian appointed by the father` with `Wei Ming, the testamentary guardian refusing to act` is equal to `JUST` with `alone`
+`the court may appoint a guardian to act jointly with the mother under section 6(1)` with `Wei Ming, the testamentary guardian refusing to act`
+`the persons who are guardians of the infant` with `Wei Ming, the testamentary guardian refusing to act` is equal to list of mother
+`the mother is guardian either alone or jointly with any guardian appointed by the father` with `Wei Ming, the father having appointed no guardian` is equal to `JUST` with `alone`
+`the court may appoint a guardian to act jointly with the mother under section 6(1)` with `Wei Ming, the father having appointed no guardian`
+`the persons who are guardians of the infant` with `Wei Ming, the father having appointed no guardian` is equal to list of mother
+`the guardian is dead or refuses to act` with `Lim, appointed by the father by will, dead`
+not `the guardian is dead or refuses to act` with `Chandra, appointed by the father by will`
+`the mother holds the guardianship section 6(1) gives her` with `Wei Ming, the father having appointed two guardians, one of them dead`
+not `the court may appoint a guardian to act jointly with the mother under section 6(1)` with `Wei Ming, the father having appointed two guardians, one of them dead`
+`the mother is guardian either alone or jointly with any guardian appointed by the father` with `Wei Ming, the father having appointed two guardians, one of them dead` is equal to `JUST` with `jointly with` with list of chandra
+`the persons who are guardians of the infant` with `Wei Ming, the father having appointed two guardians, one of them dead` is equal to list of mother and chandra
+not `the mother is guardian of the infant under section 6(1)` with `Wei Ming, both parents alive, the father having appointed a guardian by will`
+not `the father holds the guardianship section 6(2) gives him` with `Wei Ming, both parents alive, the father having appointed a guardian by will`
+not `the court may appoint a guardian to act jointly with the father under section 6(2)` with `Wei Ming, both parents alive, the father having appointed a guardian by will`
+`the mother is guardian either alone or jointly with any guardian appointed by the father` with `Wei Ming, both parents alive, the father having appointed a guardian by will` is equal to `NOTHING`
+`the persons who are guardians of the infant` with `Wei Ming, both parents alive, the father having appointed a guardian by will` is equal to `EMPTY`
+`the father is guardian of the infant under section 6(2)` with `Wei Ming, the mother having died leaving a testamentary guardian`
+`the father is guardian either alone or jointly with any guardian appointed by the mother` with `Wei Ming, the mother having died leaving a testamentary guardian` is equal to `JUST` with `jointly with` with list of siti
+not `the court may appoint a guardian to act jointly with the father under section 6(2)` with `Wei Ming, the mother having died leaving a testamentary guardian`
+`the persons who are guardians of the infant` with `Wei Ming, the mother having died leaving a testamentary guardian` is equal to list of father and siti
+`the father is guardian either alone or jointly with any guardian appointed by the mother` with `Wei Ming, the mother having died having appointed no guardian` is equal to `JUST` with `alone`
+`the court may appoint a guardian to act jointly with the father under section 6(2)` with `Wei Ming, the mother having died having appointed no guardian`
+`the persons who are guardians of the infant` with `Wei Ming, the mother having died having appointed no guardian` is equal to list of father
+`the guardian is dead or refuses to act` with `Siti, appointed by the mother by will, refusing to act`
+`the father is guardian either alone or jointly with any guardian appointed by the mother` with `Wei Ming, the mother's testamentary guardian refusing to act` is equal to `JUST` with `alone`
+`the court may appoint a guardian to act jointly with the father under section 6(2)` with `Wei Ming, the mother's testamentary guardian refusing to act`
+`the persons who are guardians of the infant` with `Wei Ming, the mother's testamentary guardian refusing to act` is equal to list of father
+`appointed by a parent by deed or will under section 7(1) or (2)` with `Siti, appointed by the mother by will`
+`the appointment under section 7(1) or (2) has taken effect` with `Siti, appointed by the mother by will` and `Wei Ming, the mother having died leaving a testamentary guardian`
+not `the father is guardian of the infant under section 6(2)` with `Wei Ming, the court's appointee acting with the living mother`
+`the father is guardian either alone or jointly with any guardian appointed by the mother` with `Wei Ming, the court's appointee acting with the living mother` is equal to `NOTHING`
+not `the mother is guardian of the infant under section 6(1)` with `Wei Ming, guardians appointed by both parents, both parents dead`
+`the infant has no parent` with `Wei Ming, an orphan with no guardian and nobody with parental rights`
+`the infant has no guardian of the person` with `Wei Ming, an orphan with no guardian and nobody with parental rights`
+`the court may appoint an applicant to be the guardian of the infant under section 6(3)` with `Wei Ming, an orphan with no guardian and nobody with parental rights`
+not `the infant has no parent` with `Wei Ming, the mother dead and the father not in evidence`
+`the infant has no guardian of the person` with `Wei Ming, the mother dead and the father not in evidence`
+not `the court may appoint an applicant to be the guardian of the infant under section 6(3)` with `Wei Ming, the mother dead and the father not in evidence`
+not `the infant has no parent` with `Wei Ming, the father dead and the mother not in evidence`
+`the infant has no guardian of the person` with `Wei Ming, the father dead and the mother not in evidence`
+not `the court may appoint an applicant to be the guardian of the infant under section 6(3)` with `Wei Ming, the father dead and the mother not in evidence`
+not `the infant has a parent or parents` with `Wei Ming, the father dead and the mother not in evidence`
+not `the person is the mother of the infant` with `Tan Boon Huat, the father` and `Wei Ming, the father dead and the mother not in evidence`
+not `the person is the father of the infant` with `Lai Peng, died second` and `Wei Ming, the mother dead and the father not in evidence`
+not `the parent has been removed from his guardianship by the court under section 10` with `Wei Ming, the mother dead and the father not in evidence` and `NOTHING`
+`the infant has no parent` with `Wei Ming, an orphan but another person has parental rights`
+`the infant has no guardian of the person` with `Wei Ming, an orphan but another person has parental rights`
+not `the court may appoint an applicant to be the guardian of the infant under section 6(3)` with `Wei Ming, an orphan but another person has parental rights`
+`the infant has no parent` with `Wei Ming, an orphan with a court-appointed guardian of the person`
+not `the infant has no guardian of the person` with `Wei Ming, an orphan with a court-appointed guardian of the person`
+not `the court may appoint an applicant to be the guardian of the infant under section 6(3)` with `Wei Ming, an orphan with a court-appointed guardian of the person`
+`the infant has no guardian of the person` with `Wei Ming, an orphan whose only guardian of the person has died`
+`the court may appoint an applicant to be the guardian of the infant under section 6(3)` with `Wei Ming, an orphan whose only guardian of the person has died`
+`the persons who are guardians of the infant` with `Wei Ming, an orphan whose only guardian of the person has died` is equal to `EMPTY`
+`the infant has no guardian of the person` with `Wei Ming, an orphan whose only guardian of the person refuses to act`
+`the court may appoint an applicant to be the guardian of the infant under section 6(3)` with `Wei Ming, an orphan whose only guardian of the person refuses to act`
+`the persons who are guardians of the infant` with `Wei Ming, an orphan whose only guardian of the person refuses to act` is equal to `EMPTY`
+`a guardian of the person of the infant` with `Lim, appointed by the father by will, acting jointly with the mother`
+`the infant has no guardian of the person` with `Wei Ming, both parents alive, the father having appointed a guardian by will`
+`a guardian of the person of the infant` with `the mother, her guardianship under section 6(1) recorded`
+`the infant has no guardian of the person` with `Wei Ming, both parents alive with the mother's guardianship recorded`
+`the infant has no guardian of the person` with `Wei Ming, the mother dead and the father not in evidence, with a court-appointed guardian`
+not `the infant has no guardian of the person` with `Wei Ming, the father having died leaving a testamentary guardian`
+`a guardian of the person of the infant` with `Lim, appointed by the father by will, the mother objecting`
+not `the infant has no guardian of the person` with `Wei Ming, the mother objecting to the testamentary guardian`
+`the persons who are guardians of the infant` with `Wei Ming, the mother objecting to the testamentary guardian` is equal to list of mother
+`the persons who are guardians of the infant` with `Wei Ming, the father having appointed no guardian` is equal to list of mother
+not `the infant has no guardian of the person` with `Wei Ming, the father having appointed no guardian`
+not `the infant has no guardian of the person` with `Wei Ming, the mother's guardianship under section 6(1) recorded`
+not `the infant has no guardian of the person` with `Wei Ming, the father's guardianship under section 6(2) recorded`
+`the infant has no guardian of the person` with `Wei Ming, the father removed from his guardianship by the court`
+`the parent has been removed from his guardianship by the court under section 10` with `Wei Ming, the mother removed and a guardian appointed in her place` and `JUST` with `Lai Peng, the mother`
+`the mother is guardian of the infant under section 6(1)` with `Wei Ming, the mother removed and a guardian appointed in her place`
+not `the mother holds the guardianship section 6(1) gives her` with `Wei Ming, the mother removed and a guardian appointed in her place`
+`the mother is guardian either alone or jointly with any guardian appointed by the father` with `Wei Ming, the mother removed and a guardian appointed in her place` is equal to `NOTHING`
+`the persons who are guardians of the infant` with `Wei Ming, the mother removed and a guardian appointed in her place` is equal to list of siti
+not `the court may appoint a guardian to act jointly with the mother under section 6(1)` with `Wei Ming, the mother removed and a guardian appointed in her place`
+not `the parent has been removed from his guardianship by the court under section 10` with `Wei Ming, the mother's guardianship under section 6(1) recorded` and `JUST` with `Lai Peng, the mother`
+`the mother holds the guardianship section 6(1) gives her` with `Wei Ming, the mother's guardianship under section 6(1) recorded`
+`the persons who are guardians of the infant` with `Wei Ming, the mother's guardianship under section 6(1) recorded` is equal to list of mother
+`the parent has been removed from his guardianship by the court under section 10` with `Wei Ming, the father removed and since dead, the mother now holding` and `JUST` with `Tan Boon Huat, the father`
+not `the parent has been removed from his guardianship by the court under section 10` with `Wei Ming, the father removed and since dead, the mother now holding` and `JUST` with `Lai Peng, the mother`
+`the mother holds the guardianship section 6(1) gives her` with `Wei Ming, the father removed and since dead, the mother now holding`
+`the persons who are guardians of the infant` with `Wei Ming, the father removed and since dead, the mother now holding` is equal to list of mother
+`the father holds the guardianship section 6(2) gives him` with `Wei Ming, the father's guardianship under section 6(2) recorded`
+`the persons who are guardians of the infant` with `Wei Ming, the father's guardianship under section 6(2) recorded` is equal to list of father
+`the father is guardian of the infant under section 6(2)` with `Wei Ming, the father removed from his guardianship by the court`
+not `the father holds the guardianship section 6(2) gives him` with `Wei Ming, the father removed from his guardianship by the court`
+`the persons who are guardians of the infant` with `Wei Ming, the father removed from his guardianship by the court` is equal to `EMPTY`
+`the appointment under section 7(1) or (2) has taken effect` with `Lim, appointed by the father by will, acting jointly with the mother` and `Wei Ming, the father having died leaving a testamentary guardian`
+`the guardian so appointed acts jointly with the mother or father under section 7(3)` with `Lim, appointed by the father by will, acting jointly with the mother` and `Wei Ming, the father having died leaving a testamentary guardian`
+`the standing of the guardian under this Act` with `Lim, appointed by the father by will, acting jointly with the mother` and `Wei Ming, the father having died leaving a testamentary guardian` is equal to `he acts jointly with the mother or father, as the case may be`
+`the appointment under section 7(1) or (2) has taken effect` with `Lim, appointed by the father by will, the mother objecting` and `Wei Ming, the mother objecting to the testamentary guardian`
+not `the guardian so appointed acts jointly with the mother or father under section 7(3)` with `Lim, appointed by the father by will, the mother objecting` and `Wei Ming, the mother objecting to the testamentary guardian`
+`the standing of the guardian under this Act` with `Lim, appointed by the father by will, the mother objecting` and `Wei Ming, the mother objecting to the testamentary guardian` is equal to `the mother or father objects to his so acting, and he does not act jointly`
+`the guardian may apply to the court under section 7(4)` with `Lim, appointed by the father by will, the mother objecting` and `Wei Ming, the mother objecting to the testamentary guardian`
+`the persons who are guardians of the infant` with `Wei Ming, the mother objecting to the testamentary guardian` is equal to list of mother
+`the guardian may apply to the court under section 7(4)` with `Lim, appointed by the father by deed, considering the mother unfit` and `Wei Ming, the guardian considering the mother unfit`
+`the guardian so appointed acts jointly with the mother or father under section 7(3)` with `Lim, appointed by the father by deed, considering the mother unfit` and `Wei Ming, the guardian considering the mother unfit`
+`the standing of the guardian under this Act` with `Lim, appointed by the father by deed, considering the mother unfit` and `Wei Ming, the guardian considering the mother unfit` is equal to `he acts jointly with the mother or father, as the case may be`
+not `the guardian may apply to the court under section 7(4)` with `Lim, appointed by the father by will, acting jointly with the mother` and `Wei Ming, the father having died leaving a testamentary guardian`
+`the appointment under section 7(1) or (2) has taken effect` with `Lim, appointed by the father by will, acting jointly with the mother` and `Wei Ming, both parents dead, only the father having appointed a guardian`
+not `the guardian so appointed acts jointly with the mother or father under section 7(3)` with `Lim, appointed by the father by will, acting jointly with the mother` and `Wei Ming, both parents dead, only the father having appointed a guardian`
+`the standing is one in which he acts as guardian of the infant` with `the standing of the guardian under this Act` with `Lim, appointed by the father by will, acting jointly with the mother` and `Wei Ming, both parents dead, only the father having appointed a guardian`
+not `the appointment under section 7(1) or (2) has taken effect` with `Lim, appointed by the father by will, objecting and considering the mother unfit` and `Wei Ming, both parents alive and the appointee pressing both limbs of section 7(4)`
+not `the guardian may apply to the court under section 7(4)` with `Lim, appointed by the father by will, objecting and considering the mother unfit` and `Wei Ming, both parents alive and the appointee pressing both limbs of section 7(4)`
+`the appointment under section 7(1) or (2) has taken effect` with `Lim, appointed by the father by will, objecting and considering the mother unfit` and `Wei Ming, both parents dead and the appointee pressing both limbs of section 7(4)`
+not `the guardian may apply to the court under section 7(4)` with `Lim, appointed by the father by will, objecting and considering the mother unfit` and `Wei Ming, both parents dead and the appointee pressing both limbs of section 7(4)`
+not `appointed by a parent by deed or will under section 7(1) or (2)` with `Rajan, appointed by the court, objecting and considering the parent unfit`
+not `the guardian may apply to the court under section 7(4)` with `Rajan, appointed by the court, objecting and considering the parent unfit` and `Wei Ming, an orphan whose court-appointed guardian presses both limbs of section 7(4)`
+`who is guardian after the order under section 7(4)` with `the court refuses to make any order` is equal to `the mother or father remains sole guardian`
+`who is guardian after the order under section 7(4)` with `the court orders that the guardian so appointed shall act jointly with the mother or father` is equal to `the guardian so appointed acts jointly with the mother or father`
+`who is guardian after the order under section 7(4)` with `the court orders that he shall be sole guardian of the infant` is equal to `the guardian so appointed is sole guardian of the infant`
+not `the court may make the further orders under section 7(4) as to custody, access and maintenance` with `the court refuses to make any order`
+not `the court may make the further orders under section 7(4) as to custody, access and maintenance` with `the court orders that the guardian so appointed shall act jointly with the mother or father`
+`the court may make the further orders under section 7(4) as to custody, access and maintenance` with `the court orders that he shall be sole guardian of the infant`
+not `the appointment under section 7(1) or (2) has taken effect` with `Lim, appointed by the father by will, acting jointly with the mother` and `Wei Ming, both parents alive, the father having appointed a guardian by will`
+not `the guardian so appointed acts jointly with the mother or father under section 7(3)` with `Lim, appointed by the father by will, acting jointly with the mother` and `Wei Ming, both parents alive, the father having appointed a guardian by will`
+`the standing of the guardian under this Act` with `Lim, appointed by the father by will, acting jointly with the mother` and `Wei Ming, both parents alive, the father having appointed a guardian by will` is equal to `the appointment has not taken effect, the parent who appointed him being alive`
+`appointed by the father by deed or will under section 7(1)` with `Lim, appointed by the father by deed`
+not `appointed by the mother by deed or will under section 7(2)` with `Lim, appointed by the father by deed`
+`the mother is guardian either alone or jointly with any guardian appointed by the father` with `Wei Ming, the father having appointed a guardian by deed` is equal to `JUST` with `jointly with` with list of lim
+`the standing of the guardian under this Act` with `Lim, appointed by the father by deed` and `Wei Ming, the father having appointed a guardian by deed` is equal to `he acts jointly with the mother or father, as the case may be`
+`the persons who are guardians of the infant` with `Wei Ming, the father having appointed a guardian by deed` is equal to list of mother and lim
+`the standing of the guardian under this Act` with `Siti, appointed by the mother by will` and `Wei Ming, the father not in evidence, the mother dead having appointed a guardian` is equal to `whether he acts, and with whom, cannot be determined on the facts recorded`
+`the persons who are guardians of the infant` with `Wei Ming, the father not in evidence, the mother dead having appointed a guardian` is equal to `EMPTY`
+`the infant has no guardian of the person` with `Wei Ming, the father not in evidence, the mother dead having appointed a guardian`
+`the standing of the guardian under this Act` with `Lim, appointed by the father by will, refusing to act` and `Wei Ming, the testamentary guardian refusing to act` is equal to `he is dead or refuses to act`
+`the standing of the guardian under this Act` with `Lim, appointed by the father by will, dead` and `Wei Ming, both parents dead and the father's only appointee dead` is equal to `he is dead or refuses to act`
+`guardians are appointed by both parents` with `Wei Ming, guardians appointed by both parents, both parents dead`
+`section 7(5) is engaged` with `Wei Ming, guardians appointed by both parents, both parents dead`
+`the guardians who act jointly under section 7(5)` with `Wei Ming, guardians appointed by both parents, both parents dead` is equal to list of lim and siti
+`the standing of the guardian under this Act` with `Lim, acting jointly with Siti` and `Wei Ming, guardians appointed by both parents, both parents dead` is equal to `after the death of the surviving parent the guardians appointed by both parents act jointly`
+`the persons who are guardians of the infant` with `Wei Ming, guardians appointed by both parents, both parents dead` is equal to list of lim and siti
+`the infant has no parent` with `Wei Ming, both parents dead, only the father having appointed a guardian`
+not `guardians are appointed by both parents` with `Wei Ming, both parents dead, only the father having appointed a guardian`
+not `section 7(5) is engaged` with `Wei Ming, both parents dead, only the father having appointed a guardian`
+`the guardians who act jointly under section 7(5)` with `Wei Ming, both parents dead, only the father having appointed a guardian` is equal to `EMPTY`
+`the standing of the guardian under this Act` with `Lim, appointed by the father by will, acting jointly with the mother` and `Wei Ming, both parents dead, only the father having appointed a guardian` is equal to `after the death of the surviving parent he acts as guardian of the infant`
+`guardians are appointed by both parents` with `Wei Ming, both parents having appointed a guardian, the mother still alive`
+not `the infant has no parent` with `Wei Ming, both parents having appointed a guardian, the mother still alive`
+not `section 7(5) is engaged` with `Wei Ming, both parents having appointed a guardian, the mother still alive`
+`the guardians who act jointly under section 7(5)` with `Wei Ming, both parents having appointed a guardian, the mother still alive` is equal to `EMPTY`
+`the standing of the guardian under this Act` with `Siti, appointed by the mother by will` and `Wei Ming, both parents having appointed a guardian, the mother still alive` is equal to `the appointment has not taken effect, the parent who appointed him being alive`
+`the persons who are guardians of the infant` with `Wei Ming, both parents having appointed a guardian, the mother still alive` is equal to list of mother and lim
+`appointed by the father by deed or will under section 7(1)` with `Lim, appointed by the father by will, dead`
+not `the guardian is able and willing to act and has not been removed` with `Lim, appointed by the father by will, dead`
+`the infant has no parent` with `Wei Ming, both parents dead and the father's only appointee dead`
+not `guardians are appointed by both parents` with `Wei Ming, both parents dead and the father's only appointee dead`
+not `section 7(5) is engaged` with `Wei Ming, both parents dead and the father's only appointee dead`
+`the guardians who act jointly under section 7(5)` with `Wei Ming, both parents dead and the father's only appointee dead` is equal to `EMPTY`
+`the standing of the guardian under this Act` with `Siti, appointed by the mother by will` and `Wei Ming, both parents dead and the father's only appointee dead` is equal to `after the death of the surviving parent he acts as guardian of the infant`
+`the persons who are guardians of the infant` with `Wei Ming, both parents dead and the father's only appointee dead` is equal to list of siti
+`the reference for the parent who survived the other` with `Wei Ming, the court's appointee surviving the mother who appointed a guardian` is equal to list of mother
+`the references for the guardians appointed by the parent who survived the other` with `Wei Ming, the court's appointee surviving the mother who appointed a guardian` is equal to list of siti
+`the standing of the guardian under this Act` with `Rajan, appointed by the court to act jointly with the surviving parent` and `Wei Ming, the court's appointee surviving the mother who appointed a guardian` is equal to `he continues to act after the death of the surviving parent, jointly with the guardian appointed by that parent`
+`the standing of the guardian under this Act` with `Siti, appointed by the mother by will` and `Wei Ming, the court's appointee surviving the mother who appointed a guardian` is equal to `after the death of the surviving parent he acts as guardian of the infant`
+`the persons who are guardians of the infant` with `Wei Ming, the court's appointee surviving the mother who appointed a guardian` is equal to list of rajan and siti
+`the references for the guardians appointed by the parent who survived the other` with `Wei Ming, the court's appointee surviving the mother who appointed nobody` is equal to `EMPTY`
+`the standing of the guardian under this Act` with `Rajan, appointed by the court to act jointly with the surviving parent` and `Wei Ming, the court's appointee surviving the mother who appointed nobody` is equal to `he continues to act after the death of the surviving parent`
+`the reference for the parent who survived the other` with `Wei Ming, the court's appointee acting with the living mother` is equal to list of mother
+`the standing of the guardian under this Act` with `Rajan, appointed by the court to act jointly with the surviving parent` and `Wei Ming, the court's appointee acting with the living mother` is equal to `he acts jointly with the surviving parent, the court having appointed him to do so`
+`the reference for the parent who survived the other` with `Wei Ming, the court's appointee acting with the living father` is equal to list of father
+`the standing of the guardian under this Act` with `Rajan, appointed by the court to act jointly with the surviving parent` and `Wei Ming, the court's appointee acting with the living father` is equal to `he acts jointly with the surviving parent, the court having appointed him to do so`
+`the persons who are guardians of the infant` with `Wei Ming, the court's appointee acting with the living father` is equal to list of father and rajan
+`the reference for the parent who survived the other` with `Wei Ming, the court's appointee surviving the father who appointed a guardian` is equal to list of father
+`the references for the guardians appointed by the parent who survived the other` with `Wei Ming, the court's appointee surviving the father who appointed a guardian` is equal to list of lim
+`the standing of the guardian under this Act` with `Rajan, appointed by the court to act jointly with the surviving parent` and `Wei Ming, the court's appointee surviving the father who appointed a guardian` is equal to `he continues to act after the death of the surviving parent, jointly with the guardian appointed by that parent`
+`the persons who are guardians of the infant` with `Wei Ming, the court's appointee surviving the father who appointed a guardian` is equal to list of rajan and lim
+`the reference for the parent who survived the other` with `Wei Ming, both parents dead but one death undated` is equal to `EMPTY`
+`the standing of the guardian under this Act` with `Rajan, appointed by the court to act jointly with the surviving parent` and `Wei Ming, both parents dead but one death undated` is equal to `he continues to act after the death of the surviving parent, but which parent survived, and so whom he acts jointly with, cannot be determined on the facts recorded`
+`the persons who are guardians of the infant` with `Wei Ming, both parents dead but one death undated` is equal to list of rajan
+not `the infant has no guardian of the person` with `Wei Ming, both parents dead but one death undated`
+`the reference for the parent who survived the other` with `Wei Ming, both parents dead on the same day` is equal to `EMPTY`
+`the standing of the guardian under this Act` with `Rajan, appointed by the court to act jointly with the surviving parent` and `Wei Ming, both parents dead on the same day` is equal to `he continues to act after the death of the surviving parent, but which parent survived, and so whom he acts jointly with, cannot be determined on the facts recorded`
+`the persons who are guardians of the infant` with `Wei Ming, both parents dead on the same day` is equal to list of rajan
+not `the infant has no guardian of the person` with `Wei Ming, both parents dead on the same day`
+`the standing of the guardian under this Act` with `Rajan, appointed by the court to act jointly with the surviving parent` and `Wei Ming, the mother dead and the father not in evidence, with a court-appointed guardian` is equal to `whether he acts, and with whom, cannot be determined on the facts recorded`
+`the persons who are guardians of the infant` with `Wei Ming, the mother dead and the father not in evidence, with a court-appointed guardian` is equal to `EMPTY`
+`the standing of the guardian under this Act` with `Rajan, appointed by the court where the infant has no parent` and `Wei Ming, an orphan with a court-appointed guardian of the person` is equal to `he acts as guardian of the infant, the infant having no parent`
+`the persons who are guardians of the infant` with `Wei Ming, an orphan with a court-appointed guardian of the person` is equal to list of rajan
+`the standing of the guardian under this Act` with `Lim, appointed by the father by will, removed by the court` and `Wei Ming, the testamentary guardian having been removed` is equal to `he has been removed from his guardianship by the court`
+`the persons who are guardians of the infant` with `Wei Ming, the testamentary guardian having been removed` is equal to list of mother
+not `the guardian is dead or refuses to act` with `Lim, appointed by the father by will, removed by the court`
+not `the guardian is able and willing to act and has not been removed` with `Lim, appointed by the father by will, removed by the court`
+`the standing of the guardian under this Act` with `Siti, appointed by the mother by will, removed by the court` and `Wei Ming, the mother's testamentary guardian having been removed` is equal to `he has been removed from his guardianship by the court`
+`the court may appoint a guardian to act jointly with the father under section 6(2)` with `Wei Ming, the mother's testamentary guardian having been removed`
+`the father is guardian either alone or jointly with any guardian appointed by the mother` with `Wei Ming, the mother's testamentary guardian having been removed` is equal to `JUST` with `alone`
+`the persons who are guardians of the infant` with `Wei Ming, the mother's testamentary guardian having been removed` is equal to list of father
+`the court may appoint a guardian to act jointly with the mother under section 6(1)` with `Wei Ming, the testamentary guardian having been removed`
+`the standing of the guardian under this Act` with `the mother, removed from her guardianship by the court` and `Wei Ming, the mother removed and a guardian appointed in her place` is equal to `he has been removed from his guardianship by the court`
+`the standing of the guardian under this Act` with `Siti, appointed by the court in place of a removed guardian` and `Wei Ming, the mother removed and a guardian appointed in her place` is equal to `he acts as guardian in place of a guardian removed by the court`
+`the standing of the guardian under this Act` with `the mother, her guardianship under section 6(1) recorded` and `Wei Ming, the mother's guardianship under section 6(1) recorded` is equal to `he is guardian by virtue of surviving the other parent`
+`the standing of the guardian under this Act` with `the father, his guardianship under section 6(2) recorded` and `Wei Ming, the father's guardianship under section 6(2) recorded` is equal to `he is guardian by virtue of surviving the other parent`
+`the standing of the guardian under this Act` with `the mother, her guardianship under section 6(1) recorded` and `Wei Ming, both parents alive with the mother's guardianship recorded` is equal to `section 6 does not make him guardian by virtue of surviving the other parent`
+`the persons who are guardians of the infant` with `Wei Ming, both parents alive with the mother's guardianship recorded` is equal to `EMPTY`
+`the mother holds the guardianship section 6(1) gives her` with `Wei Ming, a stranger recorded on the parent route, the mother surviving`
+`the standing of the guardian under this Act` with `Lim, wrongly recorded as guardian by virtue of surviving the other parent` and `Wei Ming, a stranger recorded on the parent route, the mother surviving` is equal to `section 6 does not make him guardian by virtue of surviving the other parent`
+`the persons who are guardians of the infant` with `Wei Ming, a stranger recorded on the parent route, the mother surviving` is equal to list of mother
+`the father holds the guardianship section 6(2) gives him` with `Wei Ming, a stranger recorded on the parent route, the father surviving`
+`the standing of the guardian under this Act` with `Lim, wrongly recorded as guardian by virtue of surviving the other parent` and `Wei Ming, a stranger recorded on the parent route, the father surviving` is equal to `section 6 does not make him guardian by virtue of surviving the other parent`
+`the persons who are guardians of the infant` with `Wei Ming, a stranger recorded on the parent route, the father surviving` is equal to list of father
+`the guardian has been removed from his guardianship by the court` with `Lim, appointed by the father by will, removed by the court and since dead`
+`the guardian is dead or refuses to act` with `Lim, appointed by the father by will, removed by the court and since dead`
+`the standing of the guardian under this Act` with `Lim, appointed by the father by will, removed by the court and since dead` and `Wei Ming, the testamentary guardian removed and since dead` is equal to `he has been removed from his guardianship by the court`
+`the persons who are guardians of the infant` with `Wei Ming, the testamentary guardian removed and since dead` is equal to list of mother
+not `the standing is one in which he acts as guardian of the infant` with `he has been removed from his guardianship by the court`
+not `the standing is one in which he acts as guardian of the infant` with `he is dead or refuses to act`
+not `the standing is one in which he acts as guardian of the infant` with `whether he acts, and with whom, cannot be determined on the facts recorded`
+`the standing is one in which he acts as guardian of the infant` with `he continues to act after the death of the surviving parent, but which parent survived, and so whom he acts jointly with, cannot be determined on the facts recorded`
+not `the standing is one in which he acts as guardian of the infant` with `the appointment has not taken effect, the parent who appointed him being alive`
+not `the standing is one in which he acts as guardian of the infant` with `the mother or father objects to his so acting, and he does not act jointly`
+not `the standing is one in which he acts as guardian of the infant` with `section 6 does not make him guardian by virtue of surviving the other parent`
+`the standing is one in which he acts as guardian of the infant` with `he acts jointly with the mother or father, as the case may be`
+`the standing is one in which he acts as guardian of the infant` with `after the death of the surviving parent the guardians appointed by both parents act jointly`
+`the standing is one in which he acts as guardian of the infant` with `after the death of the surviving parent he acts as guardian of the infant`
+`the standing is one in which he acts as guardian of the infant` with `he acts jointly with the surviving parent, the court having appointed him to do so`
+`the standing is one in which he acts as guardian of the infant` with `he continues to act after the death of the surviving parent, jointly with the guardian appointed by that parent`
+`the standing is one in which he acts as guardian of the infant` with `he continues to act after the death of the surviving parent`
+`the standing is one in which he acts as guardian of the infant` with `he acts as guardian of the infant, the infant having no parent`
+`the standing is one in which he acts as guardian of the infant` with `he acts as guardian in place of a guardian removed by the court`
+`the standing is one in which he acts as guardian of the infant` with `he is guardian by virtue of surviving the other parent`
+`the guardian acts jointly with one or more other persons` with `Lim, appointed by the father by will, acting jointly with the mother`
+not `the guardian acts jointly with one or more other persons` with `Lim, appointed by the father by will, refusing to act`
+not `the guardian acts jointly with one or more other persons` with `Lim, appointed by the father by will, recorded as acting jointly with nobody`
+`2 or more persons act as joint guardians of the infant` with `Wei Ming, guardians appointed by both parents, both parents dead`
+`2 or more persons act as joint guardians of the infant` with `Wei Ming, the father having died leaving a testamentary guardian`
+not `2 or more persons act as joint guardians of the infant` with `Wei Ming, the guardian recorded as acting jointly with nobody`
+not `2 or more persons act as joint guardians of the infant` with `Wei Ming, both parents alive, the father having appointed a guardian by will`
+not `2 or more persons act as joint guardians of the infant` with `Wei Ming, the father having appointed no guardian`
+`any of them may apply to the court for its direction under section 8` with `Wei Ming, guardians appointed by both parents, both parents dead` and `TRUE`
+not `any of them may apply to the court for its direction under section 8` with `Wei Ming, guardians appointed by both parents, both parents dead` and `FALSE`
+not `any of them may apply to the court for its direction under section 8` with `Wei Ming, the father having appointed no guardian` and `TRUE`
+`the court has power under section 9(1) to order the attachment` with `an application to attach, everything in place`
+not `the court has power under section 9(1) to order the attachment` with `an application to attach, with no order for payment of money`
+not `the court has power under section 9(1) to order the attachment` with `an application to attach, no pension payable but such pensions attachable`
+not `the court has power under section 9(1) to order the attachment` with `an application to attach a pension not capable of being attached`
+not `the court has power under section 9(1) to order the attachment` with `an application to attach, with no pension or income`
+not `the court has power under section 9(1) to order the attachment` with `an application to attach, the payer not yet heard`
+`the further order is an authority to the person by whom the pension or income is payable to make the payment so ordered` with `TRUE`
+not `the further order is an authority to the person by whom the pension or income is payable to make the payment so ordered` with `FALSE`
+`the receipt is a good discharge to the person by whom the pension or income is payable` with `TRUE` and `TRUE`
+not `the receipt is a good discharge to the person by whom the pension or income is payable` with `TRUE` and `FALSE`
+not `the receipt is a good discharge to the person by whom the pension or income is payable` with `FALSE` and `TRUE`
+`the infant has a parent or parents` with `Wei Ming, the father having died leaving a testamentary guardian`
+`the infant has a parent or parents` with `Wei Ming, the mother having died leaving a testamentary guardian`
+`the matters the court must consider under section 11` with `Wei Ming, the mother having died leaving a testamentary guardian` is equal to list of `the wishes of the parent or both of them, as the case may be` and `the wishes of the infant`
+not `the infant has a parent or parents` with `Wei Ming, an orphan with no guardian and nobody with parental rights`
+not `the infant has a parent or parents` with `Wei Ming, the mother dead and the father not in evidence`
+`the matters the court must consider under section 11` with `Wei Ming, the father having died leaving a testamentary guardian` is equal to list of `the wishes of the parent or both of them, as the case may be` and `the wishes of the infant`
+`the matters the court must consider under section 11` with `Wei Ming, too young to express an independent opinion` is equal to list of `the wishes of the parent or both of them, as the case may be`
+`the matters the court must consider under section 11` with `Wei Ming, an orphan with no guardian and nobody with parental rights` is equal to list of `the wishes of the infant`
+`the matters the court must consider under section 11` with `Wei Ming, an orphan too young to express an independent opinion` is equal to `EMPTY`
+`a person appointed by the court` with `Rajan, appointed by the court to act jointly with the surviving parent`
+`a person appointed by the court` with `Rajan, appointed by the court where the infant has no parent`
+`a person appointed by the court` with `Siti, appointed by the court in place of a removed guardian`
+not `a person appointed by the court` with `Lim, appointed by the father by will, acting jointly with the mother`
+not `a person appointed by the court` with `the mother, her guardianship under section 6(1) recorded`
+`the guardian must give security under section 15(1)` with `a court-appointed guardian of the property who has done nothing`
+`the guardian has not given the security section 15(1) requires` with `a court-appointed guardian of the property who has done nothing`
+not `the guardian has not given the security section 15(1) requires` with `a court-appointed guardian of the property who has given security`
+not `the guardian must give security under section 15(1)` with `a court-appointed guardian of the property excused security by the court`
+not `the guardian has not given the security section 15(1) requires` with `a court-appointed guardian of the property excused security by the court`
+`a guardian of the property of the infant` with `a testamentary guardian of the property`
+not `the guardian must give security under section 15(1)` with `a testamentary guardian of the property`
+`a person appointed by the court` with `a guardian of the person only, who has parted with possession`
+not `the guardian must give security under section 15(1)` with `a guardian of the person only, who has parted with possession`
+not `a guardian of the property of the infant` with `a guardian of the person only, who has parted with possession`
+`a guardian of the property of the infant` with `a court-appointed guardian of the property who has done nothing`
+`a guardian of the property of the infant` with `Lim, appointed by the father by will, acting jointly with the mother`
+`a guardian of the person of the infant` with `a guardian of the person only, who has parted with possession`
+not `a guardian of the person of the infant` with `a court-appointed guardian of the property who has done nothing`
+`a guardian of the person of the infant` with `Lim, appointed by the father by will, acting jointly with the mother`
+`the guardian has contravened section 16(1)` with `a guardian of the property who sold without permission`
+not `the guardian has contravened section 16(1)` with `a guardian of the property who sold with permission`
+`the disposal is one that may be declared void under section 16(2)` with `a guardian of the property who sold without permission`
+not `the disposal is one that may be declared void under section 16(2)` with `a guardian of the property who sold with permission`
+not `the guardian has leased land belonging to the infant for a term exceeding one year` with `a guardian of the property who granted a one-year lease`
+not `the guardian has done a thing section 16(1) forbids` with `a guardian of the property who granted a one-year lease`
+not `the guardian has contravened section 16(1)` with `a guardian of the property who granted a one-year lease`
+`the guardian has leased land belonging to the infant for a term exceeding one year` with `a guardian of the property who granted a three-year lease`
+`the guardian has contravened section 16(1)` with `a guardian of the property who granted a three-year lease`
+not `the guardian has leased land belonging to the infant for a term exceeding one year` with `a guardian of the property who granted a lease of unrecorded term`
+not `the guardian has contravened section 16(1)` with `a guardian of the property who granted a lease of unrecorded term`
+not `the guardian has leased land belonging to the infant for a term exceeding one year` with `a guardian of the property with a three-year term noted but no lease granted`
+not `the guardian has done a thing section 16(1) forbids` with `a guardian of the property with a three-year term noted but no lease granted`
+not `the guardian has contravened section 16(1)` with `a guardian of the property with a three-year term noted but no lease granted`
+`the guardian has done a thing section 16(1) forbids` with `a guardian of the person only, who has parted with possession`
+not `the guardian has contravened section 16(1)` with `a guardian of the person only, who has parted with possession`
+not `section 16(3) forbids the court to permit the dealing` with `TRUE`
+`section 16(3) forbids the court to permit the dealing` with `FALSE`
+`section 17 denies the guardian power to give a good discharge` with `a guardian of the property who gave a discharge with no order of the court`
+`the discharge the guardian purported to give is not a good discharge` with `a guardian of the property who gave a discharge with no order of the court`
+not `section 17 denies the guardian power to give a good discharge` with `a guardian of the property who gave a discharge the court had authorised`
+not `the discharge the guardian purported to give is not a good discharge` with `a guardian of the property who gave a discharge the court had authorised`
+`section 17 denies the guardian power to give a good discharge` with `a court-appointed guardian of the property who has done nothing`
+not `the discharge the guardian purported to give is not a good discharge` with `a court-appointed guardian of the property who has done nothing`
+not `section 17 denies the guardian power to give a good discharge` with `a guardian of the person only, who has parted with possession`
+`whether the provision exceeds the sum applicable without the permission of the court` with `a GIA monthly provision of $80` is equal to `the sum applied does not exceed $100 per month`
+`whether the provision exceeds the sum applicable without the permission of the court` with `a GIA monthly provision of $100` is equal to `the sum applied does not exceed $100 per month`
+`whether the provision exceeds the sum applicable without the permission of the court` with `a GIA monthly provision of $101` is equal to `the sum applied exceeds $100 per month`
+`whether the provision exceeds the sum applicable without the permission of the court` with `a GIA monthly provision of $150` is equal to `the sum applied exceeds $100 per month`
+`whether the provision exceeds the sum applicable without the permission of the court` with `a GIA weekly provision of $20` is equal to `the sum applied does not exceed $100 per month`
+`whether the provision exceeds the sum applicable without the permission of the court` with `a GIA weekly provision of $23` is equal to `the sum applied does not exceed $100 per month`
+`whether the provision exceeds the sum applicable without the permission of the court` with `a GIA weekly provision of $24` is equal to `the sum applied exceeds $100 per month`
+`whether the provision exceeds the sum applicable without the permission of the court` with `a GIA weekly provision of $30` is equal to `the sum applied exceeds $100 per month`
+`whether the provision exceeds the sum applicable without the permission of the court` with `a GIA provision of $90 on some other period` is equal to `the period of the sum applied is neither weekly nor monthly, and the Act supplies no conversion to a monthly rate`
+not `the guardian has applied a sum exceeding $100 per month without the permission of the court` with `a guardian of the property applying $80 a month`
+`the guardian has applied a sum exceeding $100 per month without the permission of the court` with `a guardian of the property applying $150 a month without permission`
+not `the guardian has applied a sum exceeding $100 per month without the permission of the court` with `a guardian of the property applying $150 a month with permission`
+not `the guardian has applied a sum exceeding $100 per month without the permission of the court` with `a guardian of the person only, who has parted with possession`
+`the court may order provision to be made out of the capital of the infant's property under section 18(2)` with `TRUE` and `FALSE`
+`the court may order provision to be made out of the capital of the infant's property under section 18(2)` with `FALSE` and `TRUE`
+`the court may order provision to be made out of the capital of the infant's property under section 18(2)` with `TRUE` and `TRUE`
+not `the court may order provision to be made out of the capital of the infant's property under section 18(2)` with `FALSE` and `FALSE`
+not `the guardian may of his own motion make provision out of the capital of the infant's property`
+`the guardian may apply to the court for its opinion, advice or direction under section 20` with `Rajan, appointed by the court where the infant has no parent`, `Wei Ming, an orphan with a court-appointed guardian of the person` and `TRUE`
+not `the guardian may apply to the court for its opinion, advice or direction under section 20` with `Rajan, appointed by the court where the infant has no parent`, `Wei Ming, an orphan with a court-appointed guardian of the person` and `FALSE`
+not `the guardian may apply to the court for its opinion, advice or direction under section 20` with `Lim, appointed by the father by will, acting jointly with the mother`, `Wei Ming, both parents alive, the father having appointed a guardian by will` and `TRUE`
+not `the guardian may apply to the court for its opinion, advice or direction under section 20` with `Lim, appointed by the father by will, removed by the court`, `Wei Ming, the testamentary guardian having been removed` and `TRUE`
+`section 5A applies` with `a breach of the access order`
+not `section 5A applies` with `an access order that has not been breached`
+not `section 5A applies` with `a breach recorded of an access order that was never made`
+not `X may apply to the court to enforce the access order against Y` with `a breach recorded of an access order that was never made`
+not `section 5A applies` with `no access order at all`
+`X may apply to the court to enforce the access order against Y` with `a breach of the access order`
+not `X may apply to the court to enforce the access order against Y` with `no access order at all`
+`the sentence is one the court may pass under section 5A(3)(e)` with `a fine of $20,000`
+not `the sentence is one the court may pass under section 5A(3)(e)` with `a fine of $20,001`
+not `the sentence is one the court may pass under section 5A(3)(e)` with `a fine of $25,000`
+`the sentence is one the court may pass under section 5A(3)(e)` with `imprisonment for 12 months`
+not `the sentence is one the court may pass under section 5A(3)(e)` with `imprisonment for 13 months`
+not `the sentence is one the court may pass under section 5A(3)(e)` with `imprisonment for 18 months`
+`the sentence is one the court may pass under section 5A(3)(e)` with `a fine of $5,000 and 6 months`
+not `the sentence is one the court may pass under section 5A(3)(e)` with `a fine of $25,000 and 6 months`
+not `the sentence is one the court may pass under section 5A(3)(e)` with `neither a fine nor imprisonment`
+`the order under section 5A(3)(a) is within section 5A(4)` with 4 and 8
+`the order under section 5A(3)(a) is within section 5A(4)` with 8 and 8
+not `the order under section 5A(3)(a) is within section 5A(4)` with 9 and 8
+`the court may return to the question subsequently without X having to make a fresh application` with `TRUE`
+not `the court may return to the question subsequently without X having to make a fresh application` with `FALSE`
+`X has kept within the election permitted by section 5A(6)` with `neither`
+`X has kept within the election permitted by section 5A(6)` with `made an application under subsection (2)`
+`X has kept within the election permitted by section 5A(6)` with `brought proceedings to punish Y for contempt of court in respect of that breach`
+not `X has kept within the election permitted by section 5A(6)` with `both made an application under subsection (2) and brought proceedings for contempt`
+`a Family Court has power to take the step` with `enforcement in accordance with section 5A`
+not `a Family Court has power to take the step` with `variation of the order`
+`whether this Act applies to the money` with `money paid into a District Court to the credit of an infant in any action or proceeding in a District Court` and `FALSE` is equal to `nothing in this Act applies to the money, and the same shall be dealt with according to the Rules of Court`
+`whether this Act applies to the money` with `money paid into a District Court to the credit of an infant in any action or proceeding in a District Court` and `TRUE` is equal to `this Act applies to the money`
+`whether this Act applies to the money` with `money in a District Court ordered to be transferred to the credit of an infant` and `FALSE` is equal to `nothing in this Act applies to the money, and the same shall be dealt with according to the Rules of Court`
+`whether this Act applies to the money` with `money in a District Court ordered to be transferred to the credit of an infant` and `TRUE` is equal to `this Act applies to the money`
+`whether this Act applies to the money` with `money of neither kind described in section 21` and `FALSE` is equal to `this Act applies to the money`
+`whether this Act applies to the money` with `money of neither kind described in section 21` and `TRUE` is equal to `this Act applies to the money`
+`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, the father having died leaving a testamentary guardian` and `YMD` with 2026, 8 and 26 is equal to `the person is an infant on that date, and the guardians of the infant are` with list of mother and lim
+`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, the father having died leaving a testamentary guardian` and `YMD` with 2033, 7 and 18 is equal to `the person is an infant on that date, and the guardians of the infant are` with list of mother and lim
+`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, the father having died leaving a testamentary guardian` and `YMD` with 2033, 7 and 19 is equal to `the person has attained the age of majority on that date, so this Act has no infant to govern`
+`the persons who are guardians of the infant` with `Wei Ming, the father having died leaving a testamentary guardian` is equal to list of mother and lim
+`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, the father having died leaving a testamentary guardian` and `YMD` with 2035, 1 and 1 is equal to `the person has attained the age of majority on that date, so this Act has no infant to govern`
+`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, majority date not in evidence, the father having died leaving a testamentary guardian` and `YMD` with 2026, 8 and 26 is equal to `whether the person is an infant on that date cannot be determined, the date on which he attains the age of majority not being in evidence`
+`who are the guardians of the infant, if this Act has an infant to govern` with `Wei Ming, majority date not in evidence, the father having died leaving a testamentary guardian` and `YMD` with 2035, 1 and 1 is equal to `whether the person is an infant on that date cannot be determined, the date on which he attains the age of majority not being in evidence`
+`every guardian recorded for this infant is recorded against this infant` with `Wei Ming, the father having died leaving a testamentary guardian`
+`every guardian recorded for this infant is recorded against this infant` with `Wei Ming, guardians appointed by both parents, both parents dead`
+`every guardian recorded for this infant is recorded against this infant` with `Wei Ming, the father having appointed no guardian`
+not `every guardian recorded for this infant is recorded against this infant` with `Wei Ming, a guardian recorded against a different infant`
+`the persons who are guardians of the infant` with `Wei Ming, a guardian recorded against a different infant` is equal to list of mother and lim

@@ -1,0 +1,100 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `miles-card-domain`
+IMPORT `dbs-yuu`
+IMPORT `dbs-womans-world`
+IMPORT `citi-rewards`
+IMPORT `hsbc-revolution`
+IMPORT `uob-ladys-solitaire`
+IMPORT `posb-passion`
+IMPORT `flat-cards`
+
+§ `Which card earns what — the composed answer`
+
+-- ===========================================================================
+-- THE COMPOSER. One exported rule, `the rate on`, dispatches on the card to
+-- the issuer module that encodes that card's own document. It adds no rule
+-- of its own: every figure, condition, citation and status in the answer is
+-- the issuer module's, and this file exists so that a caller -- the consumer
+-- app's generator, the MCP surface, the cheat-sheet assertions -- has one
+-- signature to call.
+--
+-- WHY THE DISPATCH IS WRITTEN OUT PER CARD rather than routed through a
+-- helper. The corpus must lower to Catala (spec section 2), and an exported
+-- rule may call another exported rule directly but may not reach one
+-- through a non-exported helper (CATALA-EXPORT-SPEC.md section 8.1.1). So
+-- the CONSIDER lives inside the exported body.
+--
+-- DBS yuu is issued on two networks and its module reads `card` to tell them
+-- apart (Appendix 1 treats the American Express card differently at named
+-- merchants); both constructors route to the one module.
+-- ===========================================================================
+
+@export What a single card transaction earns on a named Singapore miles card, from the issuer's own terms: the rate, its conditions, the cap and its reset basis, the clauses relied on, and how far the answer can be trusted
+GIVEN card       IS A Card
+      cardholder IS A Cardholder
+      month      IS A `Month position`
+      txn        IS A Transaction
+GIVETH A `Rate answer`
+`the rate on` card cardholder month txn MEANS
+    CONSIDER card
+    WHEN `DBS yuu Visa`             THEN `DBS yuu earns on`              card cardholder month txn
+    WHEN `DBS yuu American Express` THEN `DBS yuu earns on`              card cardholder month txn
+    WHEN `DBS Woman's World`        THEN `DBS Woman's World earns on`    card cardholder month txn
+    WHEN `UOB Lady's Solitaire`     THEN `UOB Lady's Solitaire earns on` card cardholder month txn
+    WHEN `HSBC Revolution`          THEN `HSBC Revolution earns on`      card cardholder month txn
+    WHEN `Citi Rewards`             THEN `Citi Rewards earns on`         card cardholder month txn
+    WHEN `POSB PAssion Debit`       THEN `POSB PAssion earns on`         card cardholder month txn
+    WHEN `UOB PRVI Miles`           THEN `UOB PRVI Miles earns on`       card cardholder month txn
+    WHEN `Citi PremierMiles`        THEN `Citi PremierMiles earns on`    card cardholder month txn
+
+
+§§ `Illustrations`
+
+-- A household with Dining and Family elected on Solitaire, the yuu account
+-- linked, no HSBC deposits tier, PAssion linked; a month in which the yuu
+-- threshold has been met and the PAssion thresholds have not.
+GIVETH A Cardholder
+`the household` MEANS Cardholder WITH
+    `Solitaire preferred rewards categories`               IS LIST Dining, Family
+    `yuu account linked to the card`                       IS TRUE
+    `HSBC Everyday Global Account deposits ADB this month` IS 0
+    `PAssion membership registered and card linked in yuu` IS TRUE
+
+GIVETH A `Month position`
+`mid-month, yuu unlocked` MEANS `Month position` WITH
+    `yuu eligible spend so far this calendar month`                     IS 900
+    `yuu participating merchants transacted so far this calendar month` IS 4
+    `PAssion spend at Participating Stores so far this month`           IS 0
+    `PAssion spend at non-Participating Stores so far this month`       IS 0
+
+-- A tap at a Cold Storage checkout with the phone, on a Tuesday.
+GIVETH A Transaction
+`groceries at Cold Storage by phone tap` MEANS Transaction WITH
+    `merchant name`           IS "Cold Storage"
+    `merchant`                IS `Cold Storage`
+    `merchant category code`  IS 5411
+    `transaction description` IS "COLD STORAGE"
+    `description patterns`    IS EMPTY
+    `charge kind`             IS `Retail purchase`
+    `amount`                  IS 80
+    `currency`                IS "SGD"
+    `posted in a foreign currency` IS FALSE
+    `transaction date`        IS YMD 2026 9 22
+    `posting date`            IS YMD 2026 9 23
+    `payment channel`         IS `Tapped at a terminal`
+    `credential`              IS `A mobile wallet token`
+    `merchant indicator`      IS Unknown
+    `made in Singapore`       IS TRUE
+
+#EVAL (`the rate on` `DBS yuu Visa` `the household` `mid-month, yuu unlocked` `groceries at Cold Storage by phone tap`)'s `miles per dollar`
+#EVAL (`the rate on` `UOB Lady's Solitaire` `the household` `mid-month, yuu unlocked` `groceries at Cold Storage by phone tap`)'s `miles per dollar`
+#EVAL (`the rate on` `DBS Woman's World` `the household` `mid-month, yuu unlocked` `groceries at Cold Storage by phone tap`)'s `depends on the merchant indicator`
+#EVAL (`the rate on` `HSBC Revolution` `the household` `mid-month, yuu unlocked` `groceries at Cold Storage by phone tap`)'s `miles per dollar`
+
+-- The same four answers as assertions, so the Catala projection of this module carries test scopes:
+-- a bare #EVAL lowers to nothing a `clerk test` can run, and an emitted module with no tests proves nothing.
+#ASSERT (`the rate on` `DBS yuu Visa` `the household` `mid-month, yuu unlocked` `groceries at Cold Storage by phone tap`)'s `miles per dollar` EQUALS 10.08
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `the household` `mid-month, yuu unlocked` `groceries at Cold Storage by phone tap`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `DBS Woman's World` `the household` `mid-month, yuu unlocked` `groceries at Cold Storage by phone tap`)'s `depends on the merchant indicator`
+#ASSERT (`the rate on` `HSBC Revolution` `the household` `mid-month, yuu unlocked` `groceries at Cold Storage by phone tap`)'s `miles per dollar` EQUALS 0.4

@@ -18,9 +18,10 @@
     "--- the SHA is on a person's shelf, and that is still a known compromise ---",
     "",
     "SPEC §3B.6 says a blessed dir 'lives on canon main'. This pin does not:",
-    "5f248326 is on `mengwong/drafts`, because that is where the content is.",
-    "The target is canon `main`; re-pin there when these directories reach it,",
-    "and delete this paragraph rather than softening it.",
+    "its SHA is on `mengwong/drafts`, because that is where the content is, and",
+    "Meng reaffirmed that on 2026-09-23 (LODGER, M7). The target is canon `main`;",
+    "re-pin there when these directories reach it, and delete this paragraph",
+    "rather than softening it.",
     "",
     "A shelf SHA can be rebased away. If it is, `--pull` fails to fetch it — the",
     "failure is loud, which is the property being relied on.",
@@ -45,14 +46,6 @@
     "",
     "--- what is NOT blessed, and why ----------------------------------------",
     "",
-    "sg/succession/encodings/cleanroom-2026-08 — two of its files",
-    "(family-cases.l4, probate-administration-act.l4) exit non-zero from",
-    "`l4 check` on today's binary, on an Info-level diagnostic at",
-    "daydate.l4:104:8-104:50, WHILE THEIR COMMITTED GOLDENS SAY 'Evaluation",
-    "successful'. The goldens were blessed by an older binary. That is exactly",
-    "the drift this mechanism exists to make visible, so the directory stays out",
-    "until its goldens are re-blessed in canon.",
-    "",
     "sg/pdpa-2012 — no goldens at all. A directory with no goldens cannot be a",
     "regression corpus; `failFirstTime` would write them on the first run and",
     "pass on the second, which tests the harness and not the compiler.",
@@ -76,6 +69,27 @@
     "because that module carries no directive to linearise. It is an accurate",
     "golden, not a missing one — see etc/go/subjects/ofek/subject.json's account",
     "of why p7-tnr is not declared for this subject.",
+    "",
+    "--- LODGER, 2026-09-23: five subjects moved here from jl4/examples/legal/ ---",
+    "",
+    "Ruled by Meng on 2026-09-23. regcf, bna, charities-cleanroom, what was left",
+    "of sg-succession, and miles-card were deposited in canon from l4-ide",
+    "7df7a3ca6, byte-identical (canon 08608fb..ea72ecb, merged as 9ef88a7a), and",
+    "six rows joined the blessed list below. They were blessable on the day",
+    "because their bytes are the ones jl4-test already defended under legal/**.",
+    "",
+    "One of the six was sg/succession/encodings/cleanroom-2026-08, which this",
+    "file had kept unblessed. Canon's copy of it FAILED `l4 check` on the",
+    "current binary, with a NOT-precedence error at",
+    "probate-administration-act.l4:1915:23. l4-ide had fixed that in 106114777,",
+    "but a second copy in another repository does not receive fixes. Canon now",
+    "holds l4-ide's copy.",
+    "",
+    "ORDER MATTERS WHERE A SUBJECT HAS TWO ROWS: etc/check-canon-citations.mjs",
+    "maps a subject (e.g. us/regcf) to ONE mirror directory, the LAST blessed",
+    "entry for it. So a subject's primary row is listed after its other rows,",
+    "and a citation of `regcf.l4:NN` near `subjects/us/regcf` resolves against",
+    "us/regcf rather than us/regcf/cleanroom.",
     "",
     "--- the flattening, which is the one place the mirror is not verbatim ----",
     "",
@@ -105,13 +119,17 @@
     "Migrating the encoding is a canon-side improvement and is not done."
   ],
   "repo": "legalese/canon",
-  "sha": "a61213f951721c5f84c0637c137e466092b1d747",
+  "sha": "9ef88a7ab350e7e163ea37fd46c0c8d2697ce7d2",
   "ref": "mengwong/drafts",
-  "pinned": "2026-09-22",
+  "pinned": "2026-09-23",
   "blessed": [
     {
       "from": "subjects/sg/child-support/encodings/legalese",
       "to": "sg/child-support"
+    },
+    {
+      "from": "subjects/sg/succession/encodings/cleanroom-2026-08",
+      "to": "sg/succession/cleanroom"
     },
     {
       "from": "subjects/sg/succession/encodings/legalese",
@@ -132,6 +150,26 @@
     {
       "from": "subjects/il/ofek-hadash-2008/encodings/legalese",
       "to": "il/ofek-hadash-2008"
+    },
+    {
+      "from": "subjects/us/regcf/encodings/cleanroom-2026-08",
+      "to": "us/regcf/cleanroom"
+    },
+    {
+      "from": "subjects/us/regcf/encodings/legalese",
+      "to": "us/regcf"
+    },
+    {
+      "from": "subjects/uk/bna-1981/encodings/legalese",
+      "to": "uk/bna-1981"
+    },
+    {
+      "from": "subjects/je/charities-2014/encodings/cleanroom-2026-08",
+      "to": "je/charities-2014"
+    },
+    {
+      "from": "subjects/contracts/payments/sg-miles-card/encodings/legalese",
+      "to": "contracts/payments/sg-miles-card"
     }
   ],
   "include": [

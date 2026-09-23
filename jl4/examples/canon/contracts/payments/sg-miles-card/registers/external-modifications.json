@@ -1,0 +1,497 @@
+{
+  "kind": "external-modifications",
+  "register_version": 1,
+  "subject": "sg-miles-card",
+  "swept": "2026-09-21",
+  "note": "READ THE COVERAGE NOTES BEFORE READING THE ENTRIES. This sweep had NO NETWORK ACCESS. Nothing outside the ten documents of the source bundle was consulted: no issuer web page, no press release, no Monetary Authority of Singapore guidance or circular, no court or tribunal docket, no consumer-association or news search, no Wayback comparison against an earlier capture of the same URL. Every search recorded below was performed by reading the pdftotext -layout extractions beside the PDFs and nothing else, which is why every one of them carries method 'manual'. Search S6-external-authority was NOT PERFORMED AT ALL and is recorded as a declared gap rather than omitted, because an absent search and a search that found nothing are different facts and only one of them is evidence.\n\nWHAT THAT MEANS FOR THE CLASS OF THE ENTRIES. There is not a single 'binding' entry here, and that is a statement about the sweep rather than about the world: no court, regulator or ombudsman decision was looked for. These are private contract terms rather than law, so the shape of an external modification is different from a statute's — the usual modifier is the issuer itself, republishing the whole document under a new 'Updated' or 'Effective' line and saying nothing about what changed.\n\nAND WHY THE CURRENCY RISK IS SYSTEMIC RATHER THAN INCIDENTAL. Every operative document in the bundle reserves to its issuer an express, undated right to vary its own terms, in most cases 'without any notice'. That is seven separate prospective entries below and it is the dominant finding of this sweep: the encoding is a snapshot of terms whose authors have reserved the right to move them at any moment without telling anyone, and the spec's own warning (§9) says the same thing — 'These PDFs were downloaded 2026-09-21 and issuers revise them without notice. Before citing one in a dispute, re-fetch and compare.' The local copy is a snapshot; the 'Updated'/'Effective' line inside each document is the thing to check first, and this register records what each of those lines said on the retrieval date.\n\nDISPOSITIONS IS EMPTY BY CONSTRUCTION. The completeness join it exists for runs over the bundle's annotation inventory, and the bundle declares an empty inventory on every document, with the reason given at length in its own note: issuer T&Cs carry no amendment or modification apparatus. There is nothing to dispose of, and an empty array is the honest spelling of that.",
+  "searches": [
+    {
+      "id": "S1-currency-lines",
+      "question": "What currency date, if any, does each document of the bundle state for itself, and which documents state none?",
+      "method": "manual",
+      "scope": "The ten pdftotext -layout extractions beside the PDFs in jl4/examples/legal/miles-card/source/, read in full, looking for 'Updated', 'Effective', 'With effect from', 'Version' and any page footer carrying a date.",
+      "query": "Updated | Effective | With effect from | Version",
+      "performed": "2026-09-21",
+      "outcome": "findings",
+      "findings": ["E-undated-hsbc-faq", "E-undated-uob-faq"],
+      "coverage_note": "Reads only the bytes captured on 2026-09-21. It cannot see a revision published at the same URL after that date, and — because no earlier capture was fetched — it cannot see what changed relative to any previous version either. A document that states a currency line is evidence only that the issuer said so on the page we hold; eight of the ten do state one and those are recorded on each document in the source bundle rather than as findings here. The two findings are the two documents that state no currency line at all."
+    },
+    {
+      "id": "S2-variation-rights",
+      "question": "Does each document reserve to its issuer a right to vary its own terms, and is that right dated or conditioned on notice?",
+      "method": "manual",
+      "scope": "The seven operative documents' extractions (the six primary T&Cs and the Citi exclusion terms), read in full for 'vary', 'amend', 'may be updated', 'reserves the right', 'without prior notice' and 'without any notice'.",
+      "query": "vary | amend | reserves the right | updated from time to time | without prior notice",
+      "performed": "2026-09-21",
+      "outcome": "findings",
+      "findings": [
+        "E-var-dbs-yuu",
+        "E-var-dbs-womans",
+        "E-var-citi-10x",
+        "E-var-citi-exclusion",
+        "E-var-hsbc",
+        "E-var-uob",
+        "E-var-posb"
+      ],
+      "coverage_note": "Establishes only that the right exists and is undated on its face. It does NOT establish whether any issuer has exercised it since the retrieval date — that would need a re-fetch and a diff, and no network access was available. It also does not cover the three FAQs, which state no variation clause of their own but are equally subject to their T&C's."
+    },
+    {
+      "id": "S3-internal-dated-arms",
+      "question": "Does any document carry an in-text 'with effect from' date that changes a rule, and therefore needs a dated arm on the encoding's rule-version axis?",
+      "method": "manual",
+      "scope": "All ten extractions, read in full for 'with effect from', 'w.e.f.', 'wef', 'up till' and 'From 1'.",
+      "query": "with effect from | w.e.f. | wef | up till",
+      "performed": "2026-09-21",
+      "outcome": "findings",
+      "findings": [
+        "E-arm-uob-solitaire-cap",
+        "E-arm-yuu-mcc-2026-05-01",
+        "E-arm-yuu-7eleven-amex"
+      ],
+      "coverage_note": "Three entries are recorded, not the full population. The documents carry many more in-text dated notes than these — UOB clause 32(u) 'w.e.f. 19 June 2023', clause 33 'W.e.f. 1 Nov 2024', clause 34's per-MCC 'wef 1 October 2024' rows, clause 35's 'wef 21 Jul 2024', POSB Appendix 1's 'With effect from 27 October 2024' for Food Republic and Food Junction and 'with effect from 1 February 2024' for PayPal at foodpanda and Gojek, and DBS yuu's '(with effect from 1 Dec 2025)' for 7-Eleven vending machines. Those are enumerated in the roadmap as units of their clauses and will be encoded as dated arms there; only the three that change a headline rate, cap or card eligibility are lifted into this register. A reader must not take the three as the complete set of dated arms in the corpus."
+    },
+    {
+      "id": "S4-faq-divergence",
+      "question": "Does any FAQ in the bundle state an earning rule, a rate, a cap or an eligibility condition that its own T&C does not state, or states differently?",
+      "method": "manual",
+      "scope": "The three guidance documents (citi-rewards-10x-faq, hsbc-revolution-faq, uob-ladys-faq) read question by question against the operative clauses of citi-rewards-10x-tnc, hsbc-revolution-reward-points-tnc and uob-ladys-cards-tnc respectively.",
+      "performed": "2026-09-21",
+      "outcome": "findings",
+      "findings": [
+        "E-faq-hsbc-contactless-1pt",
+        "E-faq-citi-shopping-website",
+        "E-faq-citi-quasi-cash-limb",
+        "E-faq-uob-shared-bonus",
+        "E-faq-uob-upgrade-month",
+        "E-faq-uob-post-cap-and-nocap"
+      ],
+      "coverage_note": "Compares each FAQ only against the single T&C in this bundle that it belongs to. It does not compare an FAQ against the issuer's live web page, a marketing page, an in-app disclosure or a cardmember agreement, none of which was fetched. Nor does it cover DBS or POSB, whose two programmes have no FAQ in the bundle — so the absence of a DBS finding here means no DBS FAQ was available to compare, not that DBS's guidance agrees with its terms."
+    },
+    {
+      "id": "S5-lapsed-periods",
+      "question": "Does any document state a programme period, promotion period or validity window that had already closed by the retrieval date of 2026-09-21?",
+      "method": "manual",
+      "scope": "All ten extractions, read for 'Promotion Period', 'Programme period', 'valid from', 'until terminated' and any explicit date range.",
+      "query": "Promotion Period | Programme period | valid from | until terminated",
+      "performed": "2026-09-21",
+      "outcome": "findings",
+      "findings": ["E-lapsed-posb-promotion"],
+      "coverage_note": "Detects a period the document itself states. It cannot detect a programme withdrawn, replaced or suspended without amending the document, and it cannot find the successor document to a lapsed one — no issuer page was consulted. For the same reason it cannot confirm that the eight documents whose terms run 'until terminated' or carry no end date are in fact still live."
+    },
+    {
+      "id": "S6-external-authority",
+      "question": "Has any court, tribunal, regulator, ombudsman or industry body modified, stayed, read down, restricted or issued interpretive guidance on any of these terms since publication?",
+      "method": "manual",
+      "scope": "NOTHING WAS CONSULTED. This row records a gap, not a search. It is present so that the register's silence about external authority is explicit rather than inferred from an absence of rows.",
+      "performed": "2026-09-21",
+      "outcome": "no-findings",
+      "findings": [],
+      "coverage_note": "NOT PERFORMED. This task had no network access, so no case-law database, no Monetary Authority of Singapore circular or guideline index, no Financial Industry Disputes Resolution Centre publication, no Consumers Association of Singapore material and no news archive was searched. 'no-findings' here therefore means NOT LOOKED FOR, and must not be read as 'nothing found'. Anyone relying on this register for a claim that these terms are unmodified by external authority must run this search themselves; until then the claim is unmade."
+    },
+    {
+      "id": "S7-cheatsheet-currency",
+      "question": "Does any fetched document post-date the household cheat sheet ([S5] of the spec, June 2026), so that the cheat sheet's claims are being tested against terms it never saw?",
+      "method": "manual",
+      "scope": "The currency lines established by S1-currency-lines, compared against the cheat sheet's stated date of June 2026 as recorded in the spec. The cheat sheet itself was NOT read in this task — it is a third party's file, read-only and not committed.",
+      "performed": "2026-09-21",
+      "outcome": "findings",
+      "findings": ["E-yuu-postdates-cheatsheet"],
+      "coverage_note": "Compares dates only. It does not compare content, because the cheat sheet was not read here; whether any specific cheat-sheet row is actually falsified by the newer terms is exactly what the encoding's assertions are for (spec §1) and is not settled by this register. Only DBS yuu is newer than June 2026; DBS Woman's Card, at 'Updated 27 Jul 2026', is also newer and is noted inside the same entry rather than given a row of its own."
+    }
+  ],
+  "entries": [
+    {
+      "id": "E-var-dbs-yuu",
+      "class": "prospective",
+      "summary": "DBS reserves an express, undated right to vary the DBS yuu Card terms and to suspend or terminate the promotions without any notice, and a second such right over the Appendix 1 exclusion list.",
+      "provenance": {
+        "source": "dbs-yuu-card-tnc, clause 3; and the closing paragraph of Appendix 1",
+        "url": "https://www.dbs.com.sg/iwov-resources/media/pdf/cards/promotions/dbs-yuu-cards/dbs-yuu-card-promotion-tncs.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "DBS yuu Card Programme and Promotions T&C cl.3 (updated 7 August 2026)",
+        "quote": "DBS may vary these Terms and Conditions and suspend or terminate the DBS yuu Card Promotions without any notice or liability to any party."
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from_absent_reason": "The right is a standing power, not a change. Nothing states when it will next be exercised, and nothing obliges DBS to announce that it has been."
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on the encoding as at the retrieval date: the clause changes what the terms may become, not what any transaction earned under the terms as captured on 2026-09-21. It is recorded because it is the mechanism by which this encoding goes stale, and because the second limb of it — Appendix 1's 'DBS, yuu, and Participating Merchants reserves the right to amend the exclusion list and/or T&Cs from time to time without prior notice.' — reaches the participating-merchant exclusion list that the yuu earning rules read.",
+      "found_by": ["S2-variation-rights"]
+    },
+    {
+      "id": "E-var-dbs-womans",
+      "class": "prospective",
+      "summary": "DBS reserves an express, undated, sole-discretion right to vary the Woman's Card terms or suspend or terminate the programmes without any notice, and binds cardmembers to the amendments in advance.",
+      "provenance": {
+        "source": "dbs-womans-card-tnc, clause 3",
+        "url": "https://www.dbs.com.sg/iwov-resources/media/pdf/cards/dbs-womans-card-tnc.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "DBS Woman's Card Promotions & Programmes T&C cl.3 (updated 27 July 2026)",
+        "quote": "DBS reserves the right at any time and at its sole discretion to vary these Terms and Conditions or suspend or terminate the Woman’s Card Promotions & Programmes without any notice or liability to any Cardmember, and all Cardmembers shall be bound by these amendments."
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from_absent_reason": "A standing power with no stated trigger, no notice obligation and no commencement date."
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on the encoding as at the retrieval date. It bears on clause 11's online-spend exclusion tables in particular, which are lists the issuer revises at will — spec §4.5 makes the same point about encoding the complement of a list the issuer can change.",
+      "found_by": ["S2-variation-rights"]
+    },
+    {
+      "id": "E-var-citi-10x",
+      "class": "prospective",
+      "summary": "Citibank reserves a reasonable-discretion right to terminate or amend the 10X Rewards Promotion, or vary, delete or add to any of its terms, from time to time.",
+      "provenance": {
+        "source": "citi-rewards-10x-tnc, clause 19",
+        "url": "https://www.citibank.com.sg/credit-cards/rewards/citi-rewards-card/pdf/10x-rewards-promotion-terms-and-conditions-2020.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "Citi Rewards Card – 10X Rewards Promotion T&C cl.19 (effective 1 April 2024)",
+        "quote": "Citibank reserves the right at its reasonable discretion to terminate or amend the Promotion or vary, delete or add to any of these terms and conditions from time to time."
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from_absent_reason": "A standing power exercisable 'from time to time', with no date and no stated notice period."
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on the encoding as at the retrieval date. The currency risk on this document is materially higher than its neighbours' for a reason unrelated to the clause: the terms are dated 'Effective 1 April 2024', which is the oldest primary T&C in the bundle and two and a half years before the retrieval date, and the upstream filename still reads '...terms-and-conditions-2020.pdf'.",
+      "found_by": ["S2-variation-rights"]
+    },
+    {
+      "id": "E-var-citi-exclusion",
+      "class": "prospective",
+      "summary": "The Citi exclusion terms state twice that the excluded MCC list and excluded merchant list are not exhaustive and may be updated at any time at Citibank's discretion, and clause 6 adds a general amendment power.",
+      "provenance": {
+        "source": "citi-rewards-exclusion-list, clauses 4 and 6",
+        "url": "https://www.citibank.com.sg/credit-cards/pdf/rewards-exclusion-list.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "Citi rewards exclusion T&C cl.4 (updated November 2024, with effect from 16 December 2024)",
+        "quote": "Please note that the above excluded Merchant Category Codes (“MCC”) and the above excluded merchant list is not exhaustive and may be updated from time to time at any time at our discretion. Cardmembers are advised to check this list regularly for updates."
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from_absent_reason": "The list is declared open-ended ('not exhaustive') rather than amended on a date, so there is no commencement to record."
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on the encoding as at the retrieval date, but it is the sharpest currency risk in the bundle and the one an encoder is most likely to mis-model. citi-rewards-10x-tnc cl.5(xii) makes a Qualifying Charge turn on this list by reference to a live URL, and this document says the list captured on 2026-09-21 is 'not exhaustive'. An encoding that treats the captured list as closed asserts something the source expressly denies; the honest model is an open list with an unconfirmed residue, which is the same closed-world trap spec §4.3 warns about for cap cycles.",
+      "found_by": ["S2-variation-rights"]
+    },
+    {
+      "id": "E-var-hsbc",
+      "class": "prospective",
+      "summary": "HSBC may update the excluded-MCC list 'from time to time without prior notice' (clause 4.2), and clause 15 sets out a general amendment power with a qualified notice promise rather than a firm one.",
+      "provenance": {
+        "source": "hsbc-revolution-reward-points-tnc, clauses 4.2 and 15.1-15.5",
+        "url": "https://www.hsbc.com.sg/content/dam/hsbc/sg/documents/credit-cards/revolution/offers/revolution-credit-card-reward-points-terms-and-conditions.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "HSBC Revolution Reward Points Programme T&C cl.4.2 (effective from 1 April 2026)",
+        "quote": "For the avoidance of doubt, transactions made at merchants with the following MCCs will not earn Reward Points. The following list of MCCs may be updated by HSBC from time to time without prior notice."
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from_absent_reason": "Two standing powers, neither dated. Clause 15.3's notice promise is itself conditional — 'To the extent reasonably practicable, we'll give you reasonable notice' — so even the notice cannot be relied on to date a future change."
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on the encoding as at the retrieval date. Worth separating from its neighbours in one respect: HSBC is the only issuer here that writes out its amendment grounds at length (cl.15.2's list of operational, regulatory, market and standards-alignment reasons), which makes the power more constrained on its face and no more dateable in practice.",
+      "found_by": ["S2-variation-rights"]
+    },
+    {
+      "id": "E-var-uob",
+      "class": "prospective",
+      "summary": "UOB reserves a sole and absolute discretion to vary, amend, add to or delete the lists of transactions for which UNI$ is not awarded, without reason, without prior notice and without liability, binding cardmembers to the amendments.",
+      "provenance": {
+        "source": "uob-ladys-cards-tnc, clause 36 (see also cl.40 on amendment with reasonable notice where required by law)",
+        "url": "https://www.uob.com.sg/assets/pdfs/ladys-cards-tcs.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "UOB Lady's Cards T&C cl.36 (updated in August 2025, Version 1.1)",
+        "quote": "We reserve the right at any time and from time to time at its sole and absolute discretion to vary, amend, add or delete the above lists of transactions which UNI$ will not be awarded for, without giving any reason or prior notice or assuming any liability to you, and you shall be bound by these amendments."
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from_absent_reason": "A standing power with no date. Clause 40's separate promise of 'reasonable notice' is expressly confined to amendments 'required by any applicable law', so it does not date or constrain the clause 36 power."
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on the encoding as at the retrieval date. Note the scope difference from its neighbours: clause 36's power is aimed specifically at clauses 32, 34 and 35 — the exclusion lists — which are exactly the units the earning rules read most often.",
+      "found_by": ["S2-variation-rights"]
+    },
+    {
+      "id": "E-var-posb",
+      "class": "prospective",
+      "summary": "POSB/DBS may amend the PAssion POSB promotion terms or suspend or terminate the promotion without any notice or liability, and Appendix 1 carries a parallel right for the participating-merchant exclusion list.",
+      "provenance": {
+        "source": "posb-passion-yuu-tnc, clause 16; and the closing note to Appendix 1's DFI section",
+        "url": "https://www.posb.com.sg/iwov-resources/media/pdf/cards/posb-passion-yuu-tnc.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "PAssion POSB Debit Card Promotion T&C cl.16 (updated as of 30 May 2025)",
+        "quote": "POSB/DBS may amend these Terms and Conditions or suspend or terminate the Promotion without any notice or liability to any party."
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from_absent_reason": "A standing power with no stated trigger or commencement."
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on the encoding as at the retrieval date, and it is the least load-bearing of the seven, because this document's larger currency problem is not the variation right but the lapse of its own Promotion Period — see E-lapsed-posb-promotion.",
+      "found_by": ["S2-variation-rights"]
+    },
+    {
+      "id": "E-undated-hsbc-faq",
+      "class": "prospective",
+      "summary": "The HSBC Revolution FAQ carries no currency line at all — no 'Updated', no 'Effective', no version — so nothing in the document says which version of the terms it explains.",
+      "provenance": {
+        "source": "hsbc-revolution-faq, read in full",
+        "url": "https://www.hsbc.com.sg/content/dam/hsbc/sg/documents/credit-cards/revolution/offers/faq-for-hsbc-revolution-credit-card.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "HSBC Revolution Credit Card FAQ, undated"
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from_absent_reason": "There is no date to record. The absence of a currency line is the finding."
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on the encoding as at the retrieval date, because the encoding takes its operative rules from the T&C and not from the FAQ. It matters for a different reason: an undated guidance document cannot be placed on the rule-version axis at all, so when it disagrees with the T&C — and it does, see E-faq-hsbc-contactless-1pt — there is no way to tell from the documents alone whether it is stale guidance or a live carve-out.",
+      "found_by": ["S1-currency-lines"]
+    },
+    {
+      "id": "E-undated-uob-faq",
+      "class": "prospective",
+      "summary": "The UOB Lady's Card FAQ carries no currency line and is published upstream under the generic filename 'faqs-final.pdf', so nothing identifies which version of the terms it explains.",
+      "provenance": {
+        "source": "uob-ladys-faq, read in full",
+        "url": "https://www.uob.com.sg/assets/pdfs/faqs-final.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "UOB Lady's Card FAQ, undated"
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from_absent_reason": "There is no date to record. The absence of a currency line is the finding."
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on the encoding as at the retrieval date. The internal evidence is that this document straddles the August 2025 cap revision rather than post-dating it: Q7's opening sentence states the pre-revision shared-cap position while a note further down the same answer states the post-revision per-category position, which is what E-faq-uob-shared-bonus records.",
+      "found_by": ["S1-currency-lines"]
+    },
+    {
+      "id": "E-lapsed-posb-promotion",
+      "class": "prospective",
+      "summary": "The PAssion POSB promotion's own Promotion Period closed on 30 September 2025, almost a year before the retrieval date, and the document fetched on 2026-09-21 still describes it; the fulfilment table in clause 8(e) likewise stops at the September 2025 qualifying month.",
+      "provenance": {
+        "source": "posb-passion-yuu-tnc, clause 3 (and the clause 8(e) Qualifying Month / Fulfilment Date table, whose last row is '1 to 30 Sep 2025 | 1 to 30 Nov 2025')",
+        "url": "https://www.posb.com.sg/iwov-resources/media/pdf/cards/posb-passion-yuu-tnc.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "PAssion POSB Debit Card Promotion T&C cl.3 (updated as of 30 May 2025)",
+        "quote": "The Promotion is valid from 1 October 2023 to 30 September 2025 (“Promotion Period”)."
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from_absent_reason": "The lapse date is known and is inside the document; what is unknown is the successor. No issuer page was consulted, so whether a replacement promotion exists, and from when, cannot be stated — and inventing a commencement for a document nobody has read would be worse than leaving it unstated."
+      },
+      "disposition": "deferred",
+      "disposition_note": "NOT 'no-effect'. This one does change what should be encoded, and the decision is owed rather than made. The programme these terms describe was not in force on the retrieval date, so an encoding that carries its rates and its S$25 / 5,000 yuu Points cap as current would be asserting a live rule about a dead promotion. The three honest options are: encode it with a closed interval on the rule-version axis, from 2023-10-01 to 2025-09-30, and let a query dated after the lapse return nothing; mark the whole PAssion programme unconfirmed and propagate that, per spec §4.3's requirement that 'unconfirmed' be a real value rather than a default; or scope the card out until a successor document is fetched. Spec §4.3 already records this card's cap basis as unconfirmed, so the second and third options are consistent with what is written down. Nothing is chosen here because the choice belongs with the encoding, and the roadmap carries every clause of this document as deferred accordingly.",
+      "found_by": ["S5-lapsed-periods"]
+    },
+    {
+      "id": "E-arm-uob-solitaire-cap",
+      "class": "prospective",
+      "summary": "With effect from 1 August 2025 the UOB Lady's Solitaire monthly Bonus UNI$ cap was cut from 3,600 UNI$ (S$2,000 of spend) to 2,700 UNI$ (S$1,500), with each Preferred Rewards Category separately capped at 1,350 UNI$ (S$750) — a per-category cap where the previous regime had a single shared pot.",
+      "provenance": {
+        "source": "uob-ladys-cards-tnc, clause 6(b) and its following note; corroborated by uob-ladys-faq Q7 and Q13",
+        "url": "https://www.uob.com.sg/assets/pdfs/ladys-cards-tcs.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "UOB Lady's Cards T&C cl.6(b) (updated in August 2025, Version 1.1)",
+        "quote": "With effect from 1 August 2025, if you hold a Lady’s Solitaire Card, 2,700 UNI$ (which is equivalent to S$1,500 spent), with each Preferred Rewards Category capped at 1,350 UNI$ (which is equivalent to S$750 spent)."
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": false,
+        "effective_from": "2025-08-01"
+      },
+      "disposition": "deferred",
+      "disposition_note": "This is a dated arm the encoding owes on the rule-version axis, with both the prior and current values available from the document's own note, and it is the one place in the corpus where the source hands over a superseded value rather than silently replacing it. It is also the structural change the spec's §4.3 table records for Solitaire — 'two categories, S$750 each, no transfer between them' — so the arm is not merely a different number but a different shape of cap. Deferred because no L4 module exists for this subject yet; the corresponding roadmap units are uob-ladys-cards-tnc:6 and 6(b).",
+      "found_by": ["S3-internal-dated-arms"]
+    },
+    {
+      "id": "E-arm-yuu-mcc-2026-05-01",
+      "class": "prospective",
+      "summary": "With effect from 1 May 2026 DBS added a set of Merchant Category Codes to the DBS yuu Eligible Spend exclusion table (each starred row of the clause 9(f) table), and separately added AXS and SmoovPay to the excluded transaction descriptions in clause 9(f)(i).",
+      "provenance": {
+        "source": "dbs-yuu-card-tnc, the footnote to the clause 9(f) MCC table, and the 'AXS (with effect from 1 May 2026)' and 'SmoovPay (with effect from 1 May 2026)' items in clause 9(f)(i)",
+        "url": "https://www.dbs.com.sg/iwov-resources/media/pdf/cards/promotions/dbs-yuu-cards/dbs-yuu-card-promotion-tncs.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "DBS yuu Card T&C cl.9(f), table footnote (updated 7 August 2026)",
+        "quote": "*With effect from 1 May 2026"
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": false,
+        "effective_from": "2026-05-01"
+      },
+      "disposition": "deferred",
+      "disposition_note": "A dated arm on the exclusion side rather than the rate side: before 1 May 2026 the starred MCCs were not excluded, and spend at them counted toward Eligible Spend and therefore toward clause 7(b)'s S$800 monthly Minimum Spend Requirement. That makes the arm material to a qualification threshold, not just to a single transaction's rate. Deferred because no module exists yet; the roadmap unit is dbs-yuu-card-tnc:9(f).",
+      "found_by": ["S3-internal-dated-arms"]
+    },
+    {
+      "id": "E-arm-yuu-7eleven-amex",
+      "class": "prospective",
+      "summary": "With effect from 13 August 2026 American Express cards are accepted at all 7-Eleven outlets and DBS yuu American Express cardmembers can earn bonus rewards on 7-Eleven transactions, reversing the Appendix 1 rule that no points are awarded for 7-Eleven transactions made with the DBS yuu American Express Card.",
+      "provenance": {
+        "source": "dbs-yuu-card-tnc, Appendix 1, the 7-Eleven row",
+        "url": "https://www.dbs.com.sg/iwov-resources/media/pdf/cards/promotions/dbs-yuu-cards/dbs-yuu-card-promotion-tncs.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "DBS yuu Card T&C Appendix 1, 7-Eleven, 'Applicable to Bonus Rewards' (updated 7 August 2026)",
+        "quote": "With effect from 13 Aug 2026, American Express® Cards will be accepted at all 7-Eleven outlets islandwide. DBS yuu American Express® Cardmembers can earn bonus rewards on 7-Eleven transactions w.e.f. 13 Aug 2026"
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": false,
+        "effective_from": "2026-08-13"
+      },
+      "disposition": "deferred",
+      "disposition_note": "A dated arm that turns on the card product rather than the merchant or the channel, which is a third axis beside spec §4.4's routing and credential. The document holds both readings side by side without saying the earlier one is spent — the exclusion sentence and its reversal sit in the same table cell six days apart — so an encoder reading only the first line would encode a rule that had already been superseded before this document was even published. Deferred because no module exists yet; the roadmap unit is dbs-yuu-card-tnc:Appendix 1.",
+      "found_by": ["S3-internal-dated-arms"]
+    },
+    {
+      "id": "E-faq-hsbc-contactless-1pt",
+      "class": "interpretive",
+      "summary": "The HSBC FAQ says contactless payments earn 1 Reward point with effect from 15 July 2024, while the T&C effective 1 April 2026 defines Selected Contactless Payments — expressly including Apple Pay, Google Pay and Samsung Pay — as Eligible Transactions earning the 10X rate. The two cannot both be right about the same transaction.",
+      "provenance": {
+        "source": "hsbc-revolution-faq Q2, against hsbc-revolution-reward-points-tnc cl.5, cl.7 and cl.7.1",
+        "url": "https://www.hsbc.com.sg/content/dam/hsbc/sg/documents/credit-cards/revolution/offers/faq-for-hsbc-revolution-credit-card.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "HSBC Revolution Credit Card FAQ Q2 (undated), against Reward Points Programme T&C cl.5 (effective from 1 April 2026)",
+        "quote": "• transactions made via contactless payments (payWave, Apple Pay and Google Pay payment methods). With effect from 15 July 2024, contactless payment transactions will earn 1 HSBC Reward point."
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on the encoding as at the retrieval date, because the operative text governs and the T&C is both operative and newer. Recorded because it is the cleanest counter-example in the corpus to spec §4.4's claim that 'Revolution ignores the credential' — the T&C does ignore it, and the issuer's own guidance says the opposite. It is disposed here rather than routed to a fork only because no fork register exists in this deposit; the divergence is carried forward as roadmap unit hsbc-revolution-faq:2, deferred, and a fork should be opened at P4 with the two readings and the reason for preferring the T&C. The FAQ being undated (E-undated-hsbc-faq) is what makes this irreducible from the documents alone: there is no way to show the FAQ sentence is spent rather than a live carve-out.",
+      "found_by": ["S4-faq-divergence"]
+    },
+    {
+      "id": "E-faq-citi-shopping-website",
+      "class": "interpretive",
+      "summary": "The Citi FAQ's first limb reads on 'any department store, or retail store worldwide, or shopping website that sells clothes, shoes and bags as its main business activity', where the T&C's corresponding limb reads only on 'any store that sells shoes and bags and clothes as its main business activity'. The FAQ adds an online channel to the limb that the T&C keys purely to the merchant's MCC.",
+      "provenance": {
+        "source": "citi-rewards-10x-faq Q1(i), against citi-rewards-10x-tnc cl.6(i)",
+        "url": "https://www.citibank.com.sg/credit-cards/rewards/citi-rewards-card/pdf/10x-rewards-promotion-frequently-asked-questions.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "Citi Rewards 10X FAQ Q1(i) (effective 1 April 2024), against 10X T&C cl.6(i) (effective 1 April 2024)",
+        "quote": "(i) a Qualifying Charge made at any department store, or retail store worldwide, or shopping website that sells clothes, shoes and bags as its main business activity, determined by the following Merchant Category Codes (MCC), or:"
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": false
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect as at the retrieval date; both documents carry the same MCC table and the same 'determined by the following Merchant Category Codes' qualifier, so the operative test is identical and the extra words are descriptive. It is recorded because it bears directly on spec §4.2: the whole force of that discrepancy is that the mobile-wallet exclusion attaches to limb (ii) and not to limb (i), and a reader who takes the FAQ's wording would think limb (i) already covers online shopping and would have less reason to notice which limb the exclusion sits on. Carried forward as roadmap unit citi-rewards-10x-faq:1, deferred; a fork belongs at P4 and there is no fork register in this deposit.",
+      "found_by": ["S4-faq-divergence"]
+    },
+    {
+      "id": "E-faq-citi-quasi-cash-limb",
+      "class": "interpretive",
+      "summary": "The Citi FAQ's list of charges that are not Qualifying Charges has thirteen limbs where the T&C has twelve: the FAQ inserts a quasi-cash limb with a definition the T&C never gives, and renumbers the MCC-exclusion limb from (xii) to (xiii).",
+      "provenance": {
+        "source": "citi-rewards-10x-faq Q3(xii), against citi-rewards-10x-tnc cl.5(i)-(xii)",
+        "url": "https://www.citibank.com.sg/credit-cards/rewards/citi-rewards-card/pdf/10x-rewards-promotion-frequently-asked-questions.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "Citi Rewards 10X FAQ Q3(xii) (effective 1 April 2024), against 10X T&C cl.5 (effective 1 April 2024)",
+        "quote": "(xii) quasi-cash transactions. This refers to transactions representing a purchase of foreign currency or items (including but not limited to, gaming chips, money orders, lottery tickets, traveler’s cheques and precious metals) which may be convertible to cash; and"
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": false
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on the outcome as at the retrieval date: the T&C's own limb (i) already excludes 'quasi-cash transactions' by name, so the FAQ supplies a definition rather than a new exclusion. It is recorded for two reasons that outlive that. First, an encoder citing '5(xii)' for the MCC-exclusion rule will be right against the T&C and wrong against the FAQ, which is a provenance trap of exactly the kind P5 string-checks. Second, the definition is the only place in this bundle where 'quasi-cash' is defined at all, so an encoding that needs the term must cite guidance for it and should say so. Carried forward as roadmap unit citi-rewards-10x-faq:3, deferred.",
+      "found_by": ["S4-faq-divergence"]
+    },
+    {
+      "id": "E-faq-uob-shared-bonus",
+      "class": "interpretive",
+      "summary": "The UOB FAQ's Q7 opens by saying the bonus 9X UNI$ 'will be shared amongst your two chosen preferred rewards categories', which is the pre-August-2025 single-pot regime; a note lower in the same answer states the post-August-2025 per-category S$750 cap, which is what the T&C clause 6(b) says. The answer contradicts itself across its own two halves.",
+      "provenance": {
+        "source": "uob-ladys-faq Q7, against uob-ladys-cards-tnc cl.6(b)",
+        "url": "https://www.uob.com.sg/assets/pdfs/faqs-final.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "UOB Lady's Card FAQ Q7 (undated), against UOB Lady's Cards T&C cl.6(b) (with effect from 1 August 2025)",
+        "quote": "Yes, but the bonus 9X UNI$ that you may earn will be shared amongst your two chosen preferred rewards categories."
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on the encoding as at the retrieval date, because the T&C governs and its clause 6(b) is expressly dated 1 August 2025 while the FAQ sentence is undated and is the superseded reading. It matters as evidence about the document rather than about the rule: a guidance document that carries both sides of a revision in one answer, with only one of them dated, is the reason E-undated-uob-faq treats the missing currency line as a finding. Carried forward as roadmap unit uob-ladys-faq:7, deferred.",
+      "found_by": ["S4-faq-divergence"]
+    },
+    {
+      "id": "E-faq-uob-upgrade-month",
+      "class": "interpretive",
+      "summary": "The UOB FAQ's Q8 states that a cardmember upgrading from a Classic, Platinum or World Mastercard from August 2025 earns bonus 9X UNI$ on up to S$750 of spend on the existing selected category in the calendar month of the upgrade. The T&C states no upgrade-month earning rule at all.",
+      "provenance": {
+        "source": "uob-ladys-faq Q8, closing note; against uob-ladys-cards-tnc cl.18-26 (upgrade and downgrade) and cl.20",
+        "url": "https://www.uob.com.sg/assets/pdfs/faqs-final.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "UOB Lady's Card FAQ Q8, closing note (undated), against UOB Lady's Cards T&C cl.20 (updated in August 2025)",
+        "quote": "Note: For existing UOB Lady’s Classic / Platinum / World Mastercard customers whose card upgrade takes place from August 2025, you will start to earn bonus 9X UNI$ on up to S$750 spend on your existing selected preferred rewards category in the calendar month of your card upgrade."
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on the encoding as at the retrieval date only because the encoding does not yet model card upgrades. This is the strongest of the six FAQ findings: it is not a restatement, a definition or a superseded sentence but a rule with a rate, a cap and a temporal scope that has no counterpart anywhere in the operative terms, and the T&C's clause 20 says only that a new card's category selection takes effect in the next calendar quarter. If the encoding ever models an upgrade it will have to choose between guidance that states a rule and terms that are silent, and that choice is a fork. Carried forward as roadmap unit uob-ladys-faq:8, deferred.",
+      "found_by": ["S4-faq-divergence"]
+    },
+    {
+      "id": "E-faq-uob-post-cap-and-nocap",
+      "class": "interpretive",
+      "summary": "Three UOB FAQ answers state earning rules the T&C leaves unstated: that there is no minimum spend to earn 10X UNI$ (Q12), that spend in a preferred category continues to earn base UNI$1 per S$5 after the monthly bonus cap is exhausted (Q14), and that the base award is uncapped (Q15).",
+      "provenance": {
+        "source": "uob-ladys-faq Q12, Q14 and Q15, against uob-ladys-cards-tnc cl.2(b), cl.4 and cl.6",
+        "url": "https://www.uob.com.sg/assets/pdfs/faqs-final.pdf",
+        "retrieved": "2026-09-21",
+        "citation": "UOB Lady's Card FAQ Q14 (undated), against UOB Lady's Cards T&C cl.6 (updated in August 2025)",
+        "quote": "Yes, upon earning the maximum bonus UNI$ per calendar month based on the card type you are holding, all transactions made in the abovementioned categories will earn UNI$1 for every S$5 spent."
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": false
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on the encoding as at the retrieval date. All three are assertions about what the T&C does NOT say, and each is the reading a careful encoder would reach anyway: clause 6 caps Bonus UNI$ only, clause 2(b) defines Base UNI$ with no threshold and no cap, and nothing conditions the base award on the bonus. They are recorded because 'the terms are silent and the guidance fills the silence' is a distinct epistemic status from 'the terms say so', and spec §7 requires the projection to carry that status rather than only the conclusion. Compare the DBS yuu case at spec §4.6, where the same silence about whether clause 7(a) and 7(b) are additive has no FAQ to fill it. Carried forward as roadmap units uob-ladys-faq:12, 14 and 15, all deferred.",
+      "found_by": ["S4-faq-divergence"]
+    },
+    {
+      "id": "E-yuu-postdates-cheatsheet",
+      "class": "prospective",
+      "summary": "The DBS yuu Card T&C in this bundle is dated 'Updated on 7 August 2026', which post-dates the June 2026 household cheat sheet the encoding's assertions are drawn from; the DBS Woman's Card T&C, at 'Updated 27 Jul 2026', also post-dates it.",
+      "provenance": {
+        "source": "dbs-yuu-card-tnc page header, on every page; and dbs-womans-card-tnc page footer, on every page. The cheat sheet's June 2026 date is taken from the spec at ~/src/mengwong/homelab/docs/projects/miles-card/SPEC-miles-card-l4-encoding.md §4.6 and §9, not from the cheat sheet itself.",
+        "url_absent_reason": "The cheat sheet has no URL. It is a private file at 'Dropbox/Chun Wong/Cards/miles-card-cheat-sheet.md', owned by a third party, read-only to this project and deliberately not committed — which is also why it is not a document of the source bundle.",
+        "retrieved": "2026-09-21",
+        "citation": "DBS yuu Card T&C, page header (updated 7 August 2026), against the cheat sheet [S5] of spec §9 (June 2026)",
+        "quote": "Updated on 7 August 2026"
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from": "2026-08-07"
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No effect on the encoding of the terms, and that is the point rather than a let-off: the terms are the model and the cheat sheet is the property set, so a T&C newer than the cheat sheet cannot change the model but can change whether an assertion over it holds. The acceptance test in spec §1 requires the encoding to surface the two pre-registered discrepancies without being told where to look; this entry records that a third class of failure is now possible and is NOT one of the two — a cheat-sheet row may fail not because the summary misread the terms in June but because the terms moved in July and August. Whoever triages a failed assertion has to separate those, and the dates here are what makes that possible. No content comparison was made: the cheat sheet was not read in this task.",
+      "found_by": ["S7-cheatsheet-currency"]
+    }
+  ],
+  "dispositions": []
+}

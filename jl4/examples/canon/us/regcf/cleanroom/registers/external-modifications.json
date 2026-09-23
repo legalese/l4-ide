@@ -1,0 +1,434 @@
+{
+  "kind": "external-modifications",
+  "register_version": 1,
+  "subject": "regcf",
+  "swept": "2026-08-05",
+  "note": "HEADLINE: NO BINDING MODIFICATION EXISTS. No court has struck, stayed or read down any provision of 17 CFR Part 227, and no Federal Register document has amended the part since the bundle's covers.from of 2023-03-01. Both halves of that are CHECKED, not assumed, and each check carries a control. (i) Litigation: CourtListener's REST v4 search answers 1 for the exact phrase \"Regulation Crowdfunding\" in case law and 0 for \"17 C.F.R. § 227\" — figures so low they would ordinarily mean a broken query, so three controls were run on the same endpoint in the same minute: \"Regulation D\" 527, \"Loper Bright\" 885, \"securities\" 1,492,372. The index is healthy; the near-zero count is the finding. The one case-law hit (Grebow v. Client Protection Fund, Md. Ct. Spec. App., 2022-06-29) is unrelated to the part's validity, and all 38 RECAP dockets mentioning the regulation are enforcement or private securities suits, none a petition for review or an APA challenge. (ii) Amendment: api.govinfo.gov/search over collection:FR for publishdate 2023-03-02..2026-08-05 returns 0 documents containing \"17 CFR Part 227\" and 6 containing \"Regulation Crowdfunding\", and all six were opened and disposed — 2026-05-26 \"Registered Offering Reform\" (Release 33-11418, RIN 3235-AN41, File S7-2026-17) is a PROPOSED rule whose own heading lists 17 CFR Parts 210, 229, 230, 232, 239, 240 and 249 and not 227; 2026-03-19 \"Publication or Submission of Quotations Without Specified Information\" is a Rule 15c2-11 matter naming Reg CF in passing; 2025-06-16 is SR-FINRA-2025-005 amending FINRA's Capital Acquisition Broker rules, an SRO rulebook and not this part; and 2025-03-27, 2025-05-09 and 2025-06-11 are Paperwork Reduction Act collection notices for Rules 300-304 and 400-404, which renew an information collection and change no rule text. That is an independent second source agreeing with the eCFR versioner's latest_amendment_date of 2023-03-01, reached by a different route. WHAT THE SWEEP DID FIND is entirely (b)-class and (c)-class: sixteen Corporation Finance Interpretations (the series the SEC used to call C&DIs; the page was last updated 2026-07-09 and six of the sixteen were published or revised in 2025-2026), twenty-seven Trading and Markets FAQs on the intermediary rules, one Commission opinion applying § 227.301(c)(2), one Unified Agenda item at proposed-rule stage, three rulemaking petitions, and a statutory five-yearly indexation that is overdue-in-waiting. Six of those readings are genuine forks and they are the P2 -> P4 CONTRACT: this register commits the fork ids F-INVLIMIT-NONNATURAL, F-CAP-12MONTH-ANCHOR, F-ANNUAL-INCOME-PERIOD, F-REPORTING-DISQUALIFICATION, F-HOLDERS-OF-RECORD and F-ONE-INTERMEDIARY-SCOPE, and P4 must instantiate exactly those ids or the fork-refs-resolve join will fail — SPEC.md §4's rule that a later stage may read only what an earlier stage committed cuts this way round too. ONE WARNING FOR P3 that belongs here rather than in an entry, because it is not an external modification: the bundle captured only the text in force from 2023-03-01, so while the DATES of every historic arm are known from the citation apparatus and from P1's versioner diffing, the historic TEXT is not in the bundle — the 2017 dollar figures, the § 227.100(b)(7) COVID route that ran 2021-01-14 to 2023-03-01, and the six lapsed temporary-relief regimes all live in Federal Register granules the bundle deliberately did not capture. A dated arm written from this bundle alone can carry the boundary but not the superseded words, and any arm that appears to carry them is fabricated. The seven inflation-indexed constants ($5,000,000 and $2,500 and $124,000 in § 227.100(a)(1)-(2), and $124,000 / $618,000 / $1,235,000 in § 227.201(t)) are the ones EM-INFLATION-NEXT says to put on the axis whether or not a historic arm is written.",
+  "searches": [
+    {
+      "id": "SRCH-cfi",
+      "question": "Has the SEC's Division of Corporation Finance settled — or created — any reading of Regulation Crowdfunding through published interpretations, and which of them change what a rule computes?",
+      "method": "agency-index",
+      "scope": "The SEC's own Corporation Finance Interpretations index page for Regulation Crowdfunding, https://www.sec.gov/rules-regulations/staff-guidance/corporation-finance-interpretations/regulation-crowdfunding — the complete page, read in full: all sixteen numbered interpretations across Rules 100, 201, 202, 204 and 205, each with its bracketed publication-or-revision date, the page header 'Oct. 11, 2017 / Last Update: July 9, 2026' and the footer 'Last Reviewed or Updated: July 9, 2026'. Retrieved 2026-08-05 as bytes over HTTPS, not through a summariser.",
+      "query": "direct retrieval of the index page; every question and answer transcribed and read against the corresponding rule text in the bundle's part227.txt",
+      "performed": "2026-08-05",
+      "outcome": "findings",
+      "findings": [
+        "EM-CFI-100-02-ENTITY-LIMITS",
+        "EM-CFI-100-05-ROLLING-CAP",
+        "EM-CFI-100-06-ANNUAL-PERIOD",
+        "EM-CFI-100-04-REPORTING-DQ",
+        "EM-CFI-100-03-PLATFORM-MOVE",
+        "EM-CFI-202-02-HOLDERS",
+        "EM-CFI-RESTATEMENTS"
+      ],
+      "coverage_note": "Covers only interpretations the staff chose to publish on this one page. It does NOT cover: the Securities Act Rules interpretation series, which this page cross-references (CFI 100.01 cites 'Securities Act Rule CFI 256.25') and which was not retrieved, so a Reg-CF-relevant reading living in that series is invisible here; the Trading and Markets FAQs on the intermediary rules (searched separately, SRCH-tmfaq); no-action and exemptive letters (SRCH-noaction); telephone-interpretation practice and unpublished staff positions, which by construction leave no index entry. Three interpretations carry a '[Comparison to prior version]' link to a PDF dated 031225, so the page silently REPLACES text — a reading recorded here as current may have said something else before 2025-03-12, and the superseded wording was not captured. The page also warns of itself that the positions 'are not binding due to their highly informal nature' and 'may change without notice', which is a limit on the weight of every finding below, not on the search."
+    },
+    {
+      "id": "SRCH-tmfaq",
+      "question": "Has the Division of Trading and Markets published interpretations of the intermediary and funding-portal rules (§§ 227.300-305, 227.400-404) that change what those rules require?",
+      "method": "agency-index",
+      "scope": "https://www.sec.gov/rules-regulations/staff-guidance/trading-markets-frequently-asked-questions/cfportal-faqs — 'Frequently Asked Questions Regarding Regulation Crowdfunding and Intermediary Requirements', dated Sept. 25, 2018, footer 'Last Reviewed or Updated: March 17, 2026'. All twenty-seven questions read in full: 300.1-300.2, 301.1-301.3, 302.1, 303.1-303.6, 304.2-304.4, 305.1, 400.1-400.3, 401.1, 402.1-402.5, 403.1, 404.1. Retrieved 2026-08-05 as bytes over HTTPS.",
+      "performed": "2026-08-05",
+      "outcome": "findings",
+      "findings": ["EM-TMFAQ-304-03-CLOSINGS", "EM-TMFAQ-OTHER"],
+      "coverage_note": "Covers only this page. The page states that updated questions are marked 'MODIFIED' or 'NEW' after the answer; no such marker appears anywhere in the served text, so either nothing has been added since 2018 or the markers were dropped in a site migration — the page's 2026-03-17 review stamp cannot distinguish those, and this search cannot tell which. It does not cover FINRA's Funding Portal Rules, which govern the same firms under a separate rulebook and which no reading of Part 227 depends on; nor FINRA interpretive letters; nor the numbering gaps (there is no 304.1 and no 402.6 on the page), which may be deletions rather than never-existing questions — the page carries no history."
+    },
+    {
+      "id": "SRCH-litigation",
+      "question": "Has any court struck down, vacated, stayed, enjoined or read down any provision of 17 CFR Part 227 — or is such a challenge in flight?",
+      "method": "court-docket",
+      "scope": "CourtListener REST v4 search API, https://www.courtlistener.com/api/rest/v4/search/ — case law (type=o, the default corpus of federal and state opinions) and dockets/RECAP (type=r and type=d). Queries: \"Regulation Crowdfunding\", \"17 C.F.R. § 227\", and \"funding portal\" SEC vacate. Run 2026-08-05 with three controls on the same endpoint in the same session to prove the index was not degraded.",
+      "query": "q=\"Regulation Crowdfunding\" (case law: count 1; dockets: count 38) · q=\"17 C.F.R. § 227\" (count 0) · controls q=\"Regulation D\" 527, q=\"Loper Bright\" 885, q=securities 1,492,372",
+      "performed": "2026-08-05",
+      "outcome": "no-findings",
+      "findings": [],
+      "coverage_note": "The single case-law hit is Grebow v. Client Protection Fund (Court of Special Appeals of Maryland, 2022-06-29), which does not concern the validity or construction of Part 227; the 38 dockets are enforcement actions and private securities suits (SEC v. Japhia, SEC v. Destiny Robotics, Mourier v. Massachusetts Securities Division and its First Circuit appeal, and similar), none a petition for review of the rule and none seeking to vacate it. WHAT THIS DOES NOT COVER, and the gaps are real: CourtListener's opinion corpus is broad but not exhaustive, and its recency lags for some courts; RECAP holds only those dockets a user has actually purchased, so a freshly filed challenge with no PACER purchaser is invisible; an unpublished district-court order, a TRO, an administrative stay entered on a motions docket, or a challenge that names the rule by section rather than by title would each escape these queries. State-court coverage is sparse. It also does not cover agency adjudication, which is SRCH-secadjud. A negative here means 'nothing found in this corpus by these phrases on this date', not 'nothing exists'."
+    },
+    {
+      "id": "SRCH-secadjud",
+      "question": "Has the Commission itself construed any provision of Part 227 in an adjudication — which would bind more than staff guidance does?",
+      "method": "web-search",
+      "scope": "Web search restricted to sec.gov for opinions and administrative proceedings mentioning Regulation Crowdfunding, followed by direct retrieval of the one hit as bytes: https://www.sec.gov/files/litigation/opinions/2026/34-106028.pdf, read in full (37 pages of extracted text) rather than summarised.",
+      "performed": "2026-08-05",
+      "outcome": "findings",
+      "findings": ["EM-SEC-OPINION-DREAMFUNDED"],
+      "coverage_note": "One opinion found and read. This search does NOT enumerate the Commission's opinions — sec.gov's opinion index is rendered client-side and the served HTML carries no list, so what was searched was an external index of the site, not the site's own inventory. Initial decisions of administrative law judges, settled orders instituting proceedings (which contain no reasoning), FINRA National Adjudicatory Council decisions that were never appealed to the Commission, and litigation releases were not enumerated at all. An adjudication construing a provision this encoding turns on could exist in any of those and would not appear here."
+    },
+    {
+      "id": "SRCH-fr-amendment",
+      "question": "Has anything published in the Federal Register since the bundle's covers.from amended Part 227 — including a final rule already adopted but not yet effective, which the eCFR would not show?",
+      "method": "federal-register",
+      "scope": "api.govinfo.gov/search over collection:FR (the whole Federal Register as published by GPO) for publishdate:range(2023-03-02,2026-08-05). This is the check the eCFR cannot make about itself: the eCFR states the law in force, so an adopted-but-not-yet-effective amendment is invisible there and visible here.",
+      "query": "collection:FR AND \"17 CFR Part 227\" AND publishdate:range(2023-03-02,2026-08-05) -> count 0 · collection:FR AND \"Regulation Crowdfunding\" AND same range -> count 6, each opened and disposed (see the register note) · collection:FR AND \"Part 227\" AND \"Regulation Crowdfunding\" AND same range -> count 0",
+      "performed": "2026-08-05",
+      "outcome": "no-findings",
+      "findings": [],
+      "coverage_note": "Zero documents in three and a half years contain the string an amendatory SEC rule must print in its heading, and the six that name the regulation at all are a proposed rule touching seven other parts, a Rule 15c2-11 matter, a FINRA SRO filing and three Paperwork Reduction Act notices. The blind spots: the query is a PHRASE match, so a document that wrote 'part 227' with different spacing, or amended the part solely through an amendatory instruction naming sections without the part heading, would be missed; govinfo's FR full text excludes graphics and some tabular material; and this covers publication, not signature — a rule adopted at an open meeting and not yet published would not appear. It says nothing about whether an amendment is coming, which is SRCH-agenda and SRCH-petitions."
+    },
+    {
+      "id": "SRCH-agenda",
+      "question": "Is an amendment to Regulation Crowdfunding proposed or pending on the agency's own forward plan?",
+      "method": "agency-index",
+      "scope": "The Unified Agenda at reginfo.gov: the SEC's current agency rule list (agencyCd=3235, currentPub=true, 'Agency Rule List - 2026'), read in full — 5 prerule, 36 proposed-rule and further final-rule entries — and then the RIN detail page for the one entry that reaches exempt offerings, https://www.reginfo.gov/public/do/eAgendaViewRule?pubId=202510&RIN=3235-AN42. Corroborated against the SEC's own publication of the agenda, File No. S7-2026-16, whose text states the data were 'accurate on May 12, 2026'.",
+      "performed": "2026-08-05",
+      "outcome": "findings",
+      "findings": ["EM-AGENDA-AN42"],
+      "coverage_note": "The agenda is the Chairman's stated priorities, and the SEC's own publication says so in terms: it 'reflect[s] only the priorities of the Chairman' and does 'not necessarily reflect the views and priorities of any individual Commissioner'. It is therefore evidence of intent, not of a rule. It does not cover rulemakings the Commission has not placed on the agenda, and its projected dates are routinely missed; an entry whose CFR Citation reads 'Not Yet Determined' cannot be joined to Part 227 by this search at all — the connection asserted in EM-AGENDA-AN42 rests on the abstract's words, not on a citation. Reginfo's current publication is pubId 202510 while the SEC's own posting is dated May 2026, so the two are not the same snapshot and the newer one may carry entries this did not."
+    },
+    {
+      "id": "SRCH-petitions",
+      "question": "Has anyone asked the Commission to change Regulation Crowdfunding, and has the Commission acted on the request?",
+      "method": "agency-index",
+      "scope": "SEC rulemaking-petition pages, retrieved directly as bytes 2026-08-05: File No. 4-889 (https://www.sec.gov/rules-regulations/2026/03/4-889), File No. 4-914 (https://www.sec.gov/rules-regulations/2026/07/rulemaking-petition-amend-regulation-crowdfunding-offering-limits-pursuant-securities-act-section-3b) and File No. 4-892 (https://www.sec.gov/rules-regulations/2026/03/petn4-892). Each page's Details block was read for file number, issue date and last-reviewed date.",
+      "performed": "2026-08-05",
+      "outcome": "findings",
+      "findings": ["EM-PETITIONS"],
+      "coverage_note": "Three petitions found, located by search rather than by enumerating the SEC's petition index, which is rendered client-side and served no list — so this is not a complete inventory of petitions touching Reg CF and a fourth may exist. The pages record what was filed and when; none records a Commission response, and none of the three has any disposition printed on it. A petition is not a proposed rule and creates no obligation on the Commission to act; treating any of these as forthcoming law would be an error. The petition PDFs themselves were not retrieved, so what the petitioners actually ask for beyond their titles is not in evidence here."
+    },
+    {
+      "id": "SRCH-inflation",
+      "question": "Is any of the money in this regulation on a statutory clock that will move it without anyone filing a petition?",
+      "method": "federal-register",
+      "scope": "The most recent adjustment as printed: FR granule FR-2022-09-20/html/2022-19867.htm (Release Nos. 33-11098; 34-95715, 'Inflation Adjustments Under Titles I and III of the JOBS Act', 87 FR 57394-57398), retrieved directly 2026-08-05, read for the statutory basis and the effective date; and the current dollar figures in the bundle's own part227.txt, § 227.100(a)(1), § 227.100(a)(2)(i)-(ii) and § 227.201(t)(1)-(3).",
+      "performed": "2026-08-05",
+      "outcome": "findings",
+      "findings": ["EM-INFLATION-NEXT"],
+      "coverage_note": "This establishes the mechanism and the last adjustment, not the next one: no proposal for the next adjustment was found, and none is on the Unified Agenda (SRCH-agenda enumerated it). The statute fixes an outer limit, not a date, and the Commission has historically adjusted at 2017 and 2022 without a published schedule, so 'about September 2027' is arithmetic on the five-year cap and not a commitment anyone has made. This search does not cover the CPI-U data that will set the new figures, and does not establish which of the seven constants a future adjustment would move — the 2017 and 2022 releases each moved all of them, but that is precedent, not obligation."
+    },
+    {
+      "id": "SRCH-noaction",
+      "question": "Has the staff granted no-action or exemptive relief that lets someone act inconsistently with a provision of Part 227?",
+      "method": "agency-index",
+      "scope": "Two SEC no-action letter indexes plus an external search. https://www.sec.gov/rules-regulations/staff-guidance/no-action-interpretive-exemptive-letters/division-corporation-finance-no-action-interpretive-exemptive-letters answered HTTP 404. https://www.sec.gov/rules-regulations/no-action-interpretive-exemptive-letters/division-trading-markets-no-action answered HTTP 200 and 569 KB, of which the letter list is none: the page renders its list client-side and the served HTML contains no occurrence of 'crowdfund', 'funding portal' or '227'. Supplemented by a web search restricted to sec.gov.",
+      "performed": "2026-08-05",
+      "outcome": "no-findings",
+      "findings": [],
+      "coverage_note": "THIS SEARCH FAILED TO ENUMERATE ITS CORPUS AND THE NEGATIVE IS CORRESPONDINGLY WEAK. One index was 404 and the other served a page whose list is assembled in the browser, so what was actually consulted was an external search engine's view of sec.gov, not the agency's inventory. A no-action letter to a named funding portal or issuer would very likely not surface that way. Division of Trading and Markets letters on funding portals, and Division of Corporation Finance letters on issuer eligibility, are both plausible places for a live one to exist. Recording 'no-findings' here means the index could not be read, not that the shelf is empty."
+    },
+    {
+      "id": "SRCH-relief",
+      "question": "Is any provision of Part 227 currently suspended, extended or conditioned by a Commission exemptive order or temporary relief?",
+      "method": "web-search",
+      "scope": "Web search for SEC exemptive orders, temporary relief and staff statements naming Regulation Crowdfunding, 2023-2026, cross-read against SRCH-fr-amendment's Federal Register enumeration for the same window — an exemptive order of general application is published in the FR, so the FR enumeration is the real evidence and this search is its corroboration.",
+      "performed": "2026-08-05",
+      "outcome": "no-findings",
+      "findings": [],
+      "coverage_note": "Every exemptive order the search surfaced for the window concerns Regulation NMS, the Consolidated Audit Trail, Rule 13f-2 or security-based swap dealers; none names Regulation Crowdfunding. The FR enumeration agrees: none of the six documents naming the regulation is an order. What is NOT covered: relief granted to a single named applicant is often issued as a letter rather than an FR order (which is SRCH-noaction, and SRCH-noaction could not read its index); and the temporary COVID-era relief that DID exist for this part was granted by rule amendment, which is why it appears in the disposition table below rather than here."
+    },
+    {
+      "id": "SRCH-staffguides",
+      "question": "Do the SEC's plain-language guides for this regulation say anything the rule text does not?",
+      "method": "agency-index",
+      "scope": "https://www.sec.gov/resources-small-businesses/regulation-crowdfunding-guidance-issuers ('Regulation Crowdfunding: Guidance for Issuers', dated Oct. 16, 2024, footer 'Last Reviewed or Updated: July 21, 2025'), read in full including its four footnotes and its investment-limit table; and the two small-entity compliance guides it points to, for issuers and for crowdfunding intermediaries.",
+      "performed": "2026-08-05",
+      "outcome": "findings",
+      "findings": ["EM-STAFF-GUIDES"],
+      "coverage_note": "Covers the staff's own plain-language restatements only. Each disclaims itself in terms — 'it does not alter or amend applicable law, and it creates no new or additional obligations for any person' — so the most these can be is evidence of how the staff reads the rule, never a modification of it. This search does not cover investor-facing bulletins on investor.gov, the SEC's small-business outreach materials, or the Office of the Advocate for Small Business Capital Formation's annual reports, any of which might describe the rule differently; a discrepancy among them would be a signal worth having and was not looked for."
+    }
+  ],
+  "entries": [
+    {
+      "id": "EM-CFI-100-02-ENTITY-LIMITS",
+      "class": "interpretive",
+      "summary": "The investment limit in § 227.100(a)(2) applies to non-natural persons, and they compute it on REVENUE OR NET ASSETS as of the most recent fiscal year end rather than on annual income or net worth. Nothing in the rule says this. The rule's operative words are 'the greater of the investor's annual income or net worth', and Instruction 1 to paragraph (a)(2) supplies a calculation method only 'for a natural person'. An entity investor therefore falls inside the limit and outside the only method the text provides — a gap the interpretation fills with two substituted quantities that appear nowhere in Part 227.",
+      "provenance": {
+        "source": "SEC Division of Corporation Finance, Corporation Finance Interpretations — Regulation Crowdfunding, CFI 100.02",
+        "url": "https://www.sec.gov/rules-regulations/staff-guidance/corporation-finance-interpretations/regulation-crowdfunding",
+        "retrieved": "2026-08-05",
+        "citation": "Reg. Crowdfunding CFI 100.02 [March 12, 2025] (carrying a '[Comparison to prior version]' link to /files/corpfin/regulation-crowdfunding-031225-100-02.pdf, so this text replaced an earlier answer on that date)",
+        "quote": "Yes. The investment limits in Rule 100(a)(2) of Regulation Crowdfunding apply to all non-accredited investors. Instead of calculating investment limits based on annual income or net worth, a non-natural person calculates the limits based on its revenue or net assets (as of its most recent fiscal year end). Accredited investors are not subject to investment limits in Regulation Crowdfunding offerings."
+      },
+      "routing": {
+        "fork_ids": ["F-INVLIMIT-NONNATURAL"],
+        "currency_risk": false
+      },
+      "disposition": "deferred",
+      "disposition_note": "Deferred to P4 as fork F-INVLIMIT-NONNATURAL, because the choice is between readings and not between encodings: reading A takes § 227.100(a)(2) at its word, so an entity investor has no computable limit and the rule is silent; reading B follows the interpretation and threads revenue/net-assets through the same arithmetic. The two disagree on every entity investor, which is not a rare case in this market. P3 must not quietly pick B while presenting it as the text — that is precisely the isomorphism failure the inert style exists to prevent. Note also that the second half of the quote (accredited investors are not subject to the limits) is NOT a gloss: it restates the 'Where the purchaser is not an accredited investor' condition already in the rule, and no fork is opened for it.",
+      "found_by": ["SRCH-cfi"]
+    },
+    {
+      "id": "EM-CFI-100-05-ROLLING-CAP",
+      "class": "interpretive",
+      "summary": "The $5,000,000 issuer cap in § 227.100(a)(1) is measured on a rolling 12 months FROM THE DATE OF EACH CLOSING. The rule's own anchor is different: it counts securities sold 'during the 12-month period preceding the date of such offer or sale'. The interpretation's worked example makes the divergence concrete — an issuer that closed $500,000 on 2025-06-15 and $4,500,000 on 2025-09-30 may offer only $500,000 on 2026-06-16, because only the first closing's anniversary has passed. Read against the rule's words alone, an issuer might instead compute from the date of the new offer and reach a different number.",
+      "provenance": {
+        "source": "SEC Division of Corporation Finance, Corporation Finance Interpretations — Regulation Crowdfunding, CFI 100.05",
+        "url": "https://www.sec.gov/rules-regulations/staff-guidance/corporation-finance-interpretations/regulation-crowdfunding",
+        "retrieved": "2026-08-05",
+        "citation": "Reg. Crowdfunding CFI 100.05 [February 17, 2026]",
+        "quote": "The offering limit in Rule 100(a)(1) is based on a rolling 12-month calculation from the date of each closing. In the example, only the 12-month anniversary of the initial closing has occurred, so the maximum the issuer could offer on June 16, 2026 in reliance on Regulation Crowdfunding would be $500,000."
+      },
+      "routing": {
+        "fork_ids": ["F-CAP-12MONTH-ANCHOR"],
+        "currency_risk": false
+      },
+      "disposition": "deferred",
+      "disposition_note": "Deferred to P4 as fork F-CAP-12MONTH-ANCHOR. This is the highest-value fork the sweep produced, because the cap is the single most-consulted number in the regulation and the two readings give different answers for any issuer that has closed in tranches — which the Trading and Markets FAQ (EM-TMFAQ-304-03-CLOSINGS) confirms is a normal way to run these offerings, not an edge case. The fork is about the ANCHOR of the window, so it is a fact-slot question as much as a rule question: reading A carries one date (the date of the offer or sale) and reading B carries a list of closing dates. P3 must not collapse that difference by giving the encoding a single 'amount raised in the last 12 months' input, which would hide the fork inside a fact the user supplies.",
+      "found_by": ["SRCH-cfi"]
+    },
+    {
+      "id": "EM-CFI-100-06-ANNUAL-PERIOD",
+      "class": "interpretive",
+      "summary": "The 'annual' period in 'annual income' under § 227.100(a)(2) is a CALENDAR year. The rule does not say so; Instruction 1 to paragraph (a)(2) points at the accredited-investor calculation in § 230.501, and § 230.501 itself speaks of income 'in each of the two most recent years' without defining the year. The interpretation closes that by pointing further back, to a 1982 release's footnote.",
+      "provenance": {
+        "source": "SEC Division of Corporation Finance, Corporation Finance Interpretations — Regulation Crowdfunding, CFI 100.06",
+        "url": "https://www.sec.gov/rules-regulations/staff-guidance/corporation-finance-interpretations/regulation-crowdfunding",
+        "retrieved": "2026-08-05",
+        "citation": "Reg. Crowdfunding CFI 100.06 [February 17, 2026], citing Securities Act Release No. 6389 (Mar. 16, 1982) at footnote 15",
+        "quote": "The annual period is a calendar year. Instruction 1 to paragraph (a)(2) of Rule 100 specifically calls for the approach to be consistent with Regulation D. See Securities Act Release No. 6389 (Mar. 16, 1982), at footnote 15."
+      },
+      "routing": {
+        "fork_ids": ["F-ANNUAL-INCOME-PERIOD"],
+        "currency_risk": false
+      },
+      "disposition": "deferred",
+      "disposition_note": "Deferred to P4 as fork F-ANNUAL-INCOME-PERIOD. Smaller than the other two Rule 100 forks but not empty: it decides whether an investor with a non-calendar fiscal year, or one asked for income 'over the past year' by a portal's form, is being asked the same question the rule asks. It also matters to EM-CFI-100-02-ENTITY-LIMITS, since that interpretation sends entities to figures measured 'as of its most recent fiscal year end' — so on the staff's own two readings a natural person is measured on the calendar and an entity on its fiscal year, and an encoding that uses one period for both is wrong on one of them. The 1982 release was not retrieved and its footnote 15 is therefore not in evidence here.",
+      "found_by": ["SRCH-cfi"]
+    },
+    {
+      "id": "EM-CFI-100-04-REPORTING-DQ",
+      "class": "interpretive",
+      "summary": "§ 227.100(b)(2) disqualifies an issuer that 'is subject to the requirement to file reports pursuant to section 13 or section 15(d)' of the Exchange Act. The interpretation holds that a former reporting company whose obligations have been terminated or suspended is NOT disqualified — i.e. 'is subject to' means presently subject, and a lapsed obligation does not count. The answer is the single word 'No.'",
+      "provenance": {
+        "source": "SEC Division of Corporation Finance, Corporation Finance Interpretations — Regulation Crowdfunding, CFI 100.04",
+        "url": "https://www.sec.gov/rules-regulations/staff-guidance/corporation-finance-interpretations/regulation-crowdfunding",
+        "retrieved": "2026-08-05",
+        "citation": "Reg. Crowdfunding CFI 100.04 [February 17, 2026]",
+        "quote": "Question: Would Rule 100(b)(2) disqualify former Exchange Act reporting companies from relying on Regulation Crowdfunding if they no longer have active Exchange Act reporting obligations because such reporting obligations have been terminated or suspended? Answer: No."
+      },
+      "routing": {
+        "fork_ids": ["F-REPORTING-DISQUALIFICATION"],
+        "currency_risk": false
+      },
+      "disposition": "deferred",
+      "disposition_note": "Deferred to P4 as fork F-REPORTING-DISQUALIFICATION. The tense of 'is subject to' is a real ambiguity and the interpretation resolves it in the permissive direction, so the fork's two readings differ on a population that plainly exists (companies that deregistered or whose s 15(d) duty was suspended). Worth recording that the interpretation is a bare 'No.' with no reasoning: it settles the outcome without supplying a rule for the harder neighbouring cases — an obligation suspended mid-year, or one terminated after the offering began — so encoding the interpretation is itself an extrapolation and the fork must say so.",
+      "found_by": ["SRCH-cfi"]
+    },
+    {
+      "id": "EM-CFI-100-03-PLATFORM-MOVE",
+      "class": "interpretive",
+      "summary": "An issuer may move its offering from one intermediary's platform to another before any sales, provided it cancels the offering on the first platform, removes its materials there, and files a NEW Form C to begin again. This construes the Instruction to § 227.100(a)(3) — 'an issuer shall not conduct an offering or concurrent offerings ... using more than one intermediary' — as a constraint on a single offering rather than on the issuer, so that a cancelled-and-refiled offering is a different offering for the purpose of that prohibition.",
+      "provenance": {
+        "source": "SEC Division of Corporation Finance, Corporation Finance Interpretations — Regulation Crowdfunding, CFI 100.03",
+        "url": "https://www.sec.gov/rules-regulations/staff-guidance/corporation-finance-interpretations/regulation-crowdfunding",
+        "retrieved": "2026-08-05",
+        "citation": "Reg. Crowdfunding CFI 100.03 [February 17, 2026]",
+        "quote": "Yes, assuming compliance with Rule 303(a) and Rule 100(a)(3) and the instruction thereto. The issuer should cancel its offering on the initial platform, its offering materials should be removed from that platform, and the issuer should then file a new Form C to begin the offering anew on the new platform."
+      },
+      "routing": {
+        "fork_ids": ["F-ONE-INTERMEDIARY-SCOPE"],
+        "currency_risk": false
+      },
+      "disposition": "deferred",
+      "disposition_note": "Deferred to P4 as fork F-ONE-INTERMEDIARY-SCOPE: does the Instruction bind the OFFERING (so sequential platforms are lawful after a cancel-and-refile) or the ISSUER (so any use of a second intermediary for the same capital-raise is not)? The interpretation takes the first reading, and note that it does so in permissive language — 'should cancel', 'should then file' — which is weaker than the rule's 'shall not', so the fork's second reading is not obviously foreclosed. This also interacts with EM-CFI-100-05-ROLLING-CAP: if a re-filed offering is a new offering, the cap arithmetic still runs across both, because § 227.100(a)(1) aggregates by issuer and not by offering.",
+      "found_by": ["SRCH-cfi"]
+    },
+    {
+      "id": "EM-CFI-202-02-HOLDERS",
+      "class": "interpretive",
+      "summary": "For the purpose of ending the ongoing reporting duty under § 227.202(b)(2) ('fewer than 300 holders of record'), 'record holders' means the investors who invested in the offering — so an issuer whose 300-plus investors all came through a single Rule 3a-9 crowdfunding vehicle may NOT treat the vehicle as one holder. This reads § 227.202(b)(2) against the grain of § 227.100(d), which says in terms that 'a crowdfunding vehicle ... is not considered an investor for the purposes of this part': the interpretation looks through the vehicle to the people behind it for this one count, citing the adopting release's description of vehicles as 'conduit[s]'.",
+      "provenance": {
+        "source": "SEC Division of Corporation Finance, Corporation Finance Interpretations — Regulation Crowdfunding, CFI 202.02",
+        "url": "https://www.sec.gov/rules-regulations/staff-guidance/corporation-finance-interpretations/regulation-crowdfunding",
+        "retrieved": "2026-08-05",
+        "citation": "Reg. Crowdfunding CFI 202.02 [July 9, 2026], citing Securities Act Release No. 10884 (Nov. 2, 2020), Section F.1.c",
+        "quote": "No. For purposes of Rule 202(b), \"record holders\" means investors who invested in the offering. ... Accordingly, the reporting obligation continues until there are less than 300 investors who invested in the offering, or at least one of the events in Rule 202(b)(1), (3), (4), or (5) has occurred."
+      },
+      "routing": {
+        "fork_ids": ["F-HOLDERS-OF-RECORD"],
+        "currency_risk": false
+      },
+      "disposition": "deferred",
+      "disposition_note": "Deferred to P4 as fork F-HOLDERS-OF-RECORD, and it is the most interesting fork in the register because the two readings are not merely different, they pull against two different provisions of the same part. Reading A gives 'holders of record' its ordinary registry meaning, under which the vehicle is one holder and § 227.100(d) reinforces the result. Reading B is the interpretation's look-through. An encoding that picks either silently has decided a live tension between § 227.100(d) and § 227.202(b)(2) without saying so. Dated three weeks before this sweep (2026-07-09), which is also why it is the newest thing in the register.",
+      "found_by": ["SRCH-cfi"]
+    },
+    {
+      "id": "EM-CFI-RESTATEMENTS",
+      "class": "interpretive",
+      "summary": "The remaining ten of the sixteen published Corporation Finance Interpretations restate rule text the encoding will carry anyway, and open no fork: 100.01 (pre-filing communications, restating Rules 206 and 201(z)) [March 12, 2025]; 201.01 (a recently formed issuer may date its balance sheet at inception, with a worked table) [May 13, 2016]; 201.02 (the § 227.201(r) related-party threshold is 5% of target-plus-previously-raised, with arithmetic) [April 5, 2017]; 201.03 (an offering still open more than 120 days after fiscal year end needs a Form C amendment, a Form C-AR and progress updates, expressly 'See Instruction 4 to Rule 201(t) and Rule 202(a)') [February 17, 2026]; 202.01 (count all holders of the same class, however acquired) [April 5, 2017]; 204.01-204.04 (the 'terms of the offering' advertising limit, video, advertisements omitting terms, and third-party media articles) [March 12, 2025 and May 13, 2016]; and 205.01 (compensated third-party promotion must meet Rule 204(b), 'See Rule 205(b)') [May 13, 2016].",
+      "provenance": {
+        "source": "SEC Division of Corporation Finance, Corporation Finance Interpretations — Regulation Crowdfunding (the same page, read in full)",
+        "url": "https://www.sec.gov/rules-regulations/staff-guidance/corporation-finance-interpretations/regulation-crowdfunding",
+        "retrieved": "2026-08-05",
+        "citation": "Reg. Crowdfunding CFIs 100.01, 201.01, 201.02, 201.03, 202.01, 204.01, 204.02, 204.03, 204.04, 205.01",
+        "quote": "The bracketed date following each CFI is the latest date of publication or revision."
+      },
+      "routing": { "fork_ids": [], "currency_risk": false },
+      "disposition": "no-effect",
+      "disposition_note": "One row for ten interpretations, because one argument disposes of all of them and ten copies of it would not be re-read — the same reasoning the schema gives for grouping markers. Each was read against the corresponding rule text in part227.txt and each either quotes it or cites the instruction that already says the same thing, so nothing computes differently and no fork is opened. They are enumerated by number rather than described in bulk so that the count is checkable: six interpretations are carried individually above, these ten here, and the page holds sixteen. The two that come closest to a gloss and were still judged restatement are 201.02, whose worked example applies the rule's own words to numbers, and 204.04, which says a media article the issuer helped prepare can be a Rule 204 notice — a construction of 'notice' that the encoding does not turn on because P3 will encode the advertising restriction as a predicate over the issuer's own communications, not over the world's.",
+      "found_by": ["SRCH-cfi"]
+    },
+    {
+      "id": "EM-TMFAQ-304-03-CLOSINGS",
+      "class": "interpretive",
+      "summary": "In a 'rolling close' — the min/max structure in which an issuer closes on a minimum and keeps going to a cap — 'the applicable requirements of Regulation Crowdfunding must be met at the time of each closing.' This is the intermediary-side twin of CFI 100.05: the same per-closing anchor, stated by a different division eight years earlier, and stated generally rather than only for the offering cap.",
+      "provenance": {
+        "source": "SEC Division of Trading and Markets, Frequently Asked Questions Regarding Regulation Crowdfunding and Intermediary Requirements, Question 304.3",
+        "url": "https://www.sec.gov/rules-regulations/staff-guidance/trading-markets-frequently-asked-questions/cfportal-faqs",
+        "retrieved": "2026-08-05",
+        "citation": "Reg. Crowdfunding intermediary FAQ 304.3 (page dated Sept. 25, 2018; last reviewed Mar. 17, 2026)",
+        "quote": "Regulation Crowdfunding does not specify the type of offering in which an issuer may choose to engage. ... If an issuer chooses to engage in a rolling close, the applicable requirements of Regulation Crowdfunding must be met at the time of each closing."
+      },
+      "routing": {
+        "fork_ids": ["F-CAP-12MONTH-ANCHOR"],
+        "currency_risk": false
+      },
+      "disposition": "deferred",
+      "disposition_note": "Routed to the SAME fork as EM-CFI-100-05-ROLLING-CAP rather than opening a second one, because it is a second authority for one question and not a second question. That join is the useful thing here: the fork is now supported by two divisions and two dates (2018 and 2026), which is evidence about how settled the per-closing reading is and belongs in the fork's own record. The FAQ also confirms that rolling closes are ordinary practice — 'Regulation Crowdfunding does not specify the type of offering' — which is what stops the fork from being dismissed as hypothetical.",
+      "found_by": ["SRCH-tmfaq"]
+    },
+    {
+      "id": "EM-TMFAQ-OTHER",
+      "class": "interpretive",
+      "summary": "The other twenty-six intermediary FAQs (300.1-300.2, 301.1-301.3, 302.1, 303.1-303.6, 304.2, 304.4, 305.1, 400.1-400.3, 401.1, 402.1-402.5, 403.1, 404.1) restate or cross-reference the rule text and open no fork. Two are worth naming because they are the closest to a gloss and were still judged not to be one. 304.2 says Regulation Crowdfunding 'does not directly address' cancellation fees and offers only that an intermediary 'should consider' whether one is consistent with the Rule 304(a) right to cancel for 'any reason' — that is an acknowledged silence, not a filled gap. 303.2 lists optional measures an intermediary may take to check investment limits ('using a centralized data repository (to the extent that one is created)', document upload, a questionnaire) while leaving the rule's own standard — a reasonable basis for believing, with reliance on investor representations — exactly as § 227.303(b)(1) states it.",
+      "provenance": {
+        "source": "SEC Division of Trading and Markets, Frequently Asked Questions Regarding Regulation Crowdfunding and Intermediary Requirements (whole page, twenty-seven questions)",
+        "url": "https://www.sec.gov/rules-regulations/staff-guidance/trading-markets-frequently-asked-questions/cfportal-faqs",
+        "retrieved": "2026-08-05",
+        "citation": "Reg. Crowdfunding intermediary FAQ (page dated Sept. 25, 2018; last reviewed Mar. 17, 2026)",
+        "quote": "The following answers to frequently asked questions were prepared by and represent the views of the staff of the Division of Trading and Markets (\"staff\"). They are not rules, regulations or statements of the Securities and Exchange Commission."
+      },
+      "routing": { "fork_ids": [], "currency_risk": false },
+      "disposition": "no-effect",
+      "disposition_note": "No-effect, and deliberately recorded rather than omitted: the intermediary subparts are half of Part 227 by volume, and 'we read all twenty-seven and only one moved anything' is a claim P9 can print, whereas silence about them would read as though they had not been opened. The numbering has visible gaps (no 304.1, no 402.6, no 300.3) which the page does not explain; if those were deleted questions, their text is gone and this entry cannot speak to what they said.",
+      "found_by": ["SRCH-tmfaq"]
+    },
+    {
+      "id": "EM-SEC-OPINION-DREAMFUNDED",
+      "class": "interpretive",
+      "summary": "The Commission — not the staff — applied § 227.301(c)(2) in a contested adjudication, sustaining FINRA's findings against a funding portal that removed an issuer from its platform on 2017-04-30 while the offering itself remained open, and then closed it and disbursed proceeds after facts arose that gave a reasonable basis to believe the issuer's CEO was seeking personal control of investor money. The holding treats the rule's three acts as a conjunction: removing the offering from the platform does not discharge a duty that also requires cancelling the offering and returning committed funds.",
+      "provenance": {
+        "source": "Opinion of the Commission, In the Matter of the Application of DreamFunded Marketplace, LLC and Manuel Fernandez, for review of disciplinary action taken by FINRA",
+        "url": "https://www.sec.gov/files/litigation/opinions/2026/34-106028.pdf",
+        "retrieved": "2026-08-05",
+        "citation": "Securities Exchange Act of 1934 Release No. 106028 (Aug. 3, 2026), Admin. Proc. File No. 3-20639",
+        "quote": "Commission Crowdfunding Rule 301(c)(2) requires crowdfunding intermediaries, like DreamFunded, to promptly remove an offering, cancel it, and return investor funds if the intermediary \"becomes aware of information . . . that causes it to reasonably believe that the issuer or the offering presents the potential for fraud or otherwise raises concerns about investor protection.\""
+      },
+      "routing": { "fork_ids": [], "currency_risk": false },
+      "disposition": "no-effect",
+      "disposition_note": "No-effect because the holding tracks the text rather than bending it: § 227.301(c)(2) already says the intermediary 'must promptly remove the offering from its platform, cancel the offering, and return (or, for funding portals, direct the return of) any funds that have been committed', so a conjunctive reading is the reading, and an encoding faithful to the words is already correct. Recorded anyway, for three reasons. It is the ONLY adjudicative construction of Part 227 the sweep found, so its existence is itself the checked answer to 'has anyone authoritative read this rule?'. It confirms by demonstration that the conjunction is not decorative — a real intermediary did one of the three and was sanctioned — which is worth having when P3 decides whether to model the duty as one obligation or three. And it is two days old at the date of this sweep and reviewable in a court of appeals under Exchange Act § 25(a), so a later sweep must re-check it; currency_risk is nonetheless false, because an encoding that owes nothing to this opinion cannot go stale when its status changes.",
+      "found_by": ["SRCH-secadjud"]
+    },
+    {
+      "id": "EM-AGENDA-AN42",
+      "class": "prospective",
+      "summary": "RIN 3235-AN42, 'Updating the Exempt Offering Pathways', sits at Proposed Rule Stage on the SEC's Unified Agenda with an NPRM projected for 10/00/2026, priority 'Economically Significant', EO 14192 designation 'Deregulatory', owned by the Division of Corporation Finance. Its CFR Citation reads 'Not Yet Determined' and its Legal Authority likewise, so it does not name Part 227. It reaches this encoding by its subject matter: it proposes to 'simplify the pathways for raising capital for, and investor access to, private businesses, including potential amendments to the definition of accredited investor' — and § 227.100(a)(2) turns on whether the purchaser is an accredited investor 'as defined in Rule 501 (§ 230.501 of this chapter)', so an amendment there changes who is subject to the investment limits without a single word of Part 227 changing.",
+      "provenance": {
+        "source": "Unified Agenda of Federal Regulatory and Deregulatory Actions, SEC agency rule list and RIN detail page",
+        "url": "https://www.reginfo.gov/public/do/eAgendaViewRule?pubId=202510&RIN=3235-AN42",
+        "retrieved": "2026-08-05",
+        "citation": "RIN 3235-AN42, 'Updating the Exempt Offering Pathways', Proposed Rule Stage, NPRM 10/00/2026; corroborated by the SEC's own publication of the agenda, File No. S7-2026-16 (data accurate as of May 12, 2026)",
+        "quote": "The Division is considering recommending that the Commission propose rule amendments to facilitate capital formation and simplify the pathways for raising capital for, and investor access to, private businesses, including potential amendments to the definition of accredited investor."
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from_absent_reason": "There is no effective date to record and no rule text to date. 10/00/2026 is a projected date for a NOTICE OF PROPOSED RULEMAKING, which is the start of a comment period and not a change in law; the entry's own CFR Citation is 'Not Yet Determined', so even the parts it would touch are unstated. Recording an effective_from here would invent one."
+      },
+      "disposition": "no-effect",
+      "disposition_note": "Nothing to encode: no text exists. The reason this is in the register rather than left out is the § 230.501 dependency, which makes Reg CF's investor limits vulnerable to a rulemaking that never mentions Reg CF — exactly the class of change the printed text cannot warn about, which is what P2 is for. Two consequences follow. P9 must report this as the live currency risk on the encoding's accredited-investor input. And P3 should treat the § 230.501 annex in the bundle as an EXTERNAL, separately-versioned dependency (it already carries its own covers.from of 2025-02-18, later than the part's 2023-03-01) rather than folding its content into Part 227's own rule-version arms, so that a future change there is a change to one dated thing and not a rewrite.",
+      "found_by": ["SRCH-agenda"]
+    },
+    {
+      "id": "EM-INFLATION-NEXT",
+      "class": "prospective",
+      "summary": "Every dollar figure in this regulation is on a statutory clock. Securities Act § 4A(h)(1) (15 U.S.C. 77d-1(h)(1)) requires the amounts used in connection with the crowdfunding exemption to be adjusted for CPI-U 'not less frequently than once every five years'. The Commission has done it twice — Release 33-10332 effective 2017-04-12 and Release 33-11098 effective 2022-09-20 — so the current figures are already in their fourth year and the next adjustment falls due by about September 2027. Seven constants move together: $5,000,000 in § 227.100(a)(1); $2,500 and the two occurrences of $124,000 in § 227.100(a)(2)(i)-(ii); and $124,000, $618,000 and $1,235,000 in § 227.201(t)(1)-(3). No adjustment has been proposed.",
+      "provenance": {
+        "source": "SEC, 'Inflation Adjustments Under Titles I and III of the JOBS Act', the most recent adjustment, read for its statutory basis",
+        "url": "https://www.govinfo.gov/content/pkg/FR-2022-09-20/html/2022-19867.htm",
+        "retrieved": "2026-08-05",
+        "citation": "Release Nos. 33-11098; 34-95715, 87 FR 57394, 57398 (Sept. 20, 2022), effective Sept. 20, 2022; statutory basis 15 U.S.C. 77d-1(h)(1)",
+        "quote": "Sections 4(a)(6) and 4A of the Securities Act set forth dollar amounts used in connection with the crowdfunding exemption, and Section 4A(h)(1) states that such dollar amounts shall be adjusted by the Commission not less frequently than once every five years to reflect the change in the CPI-U published by the BLS."
+      },
+      "routing": {
+        "rule_version_arm": "the seven inflation-indexed constants of § 227.100(a)(1), § 227.100(a)(2)(i)-(ii) and § 227.201(t)(1)-(3), carried as a dated arm opening 2022-09-20 and closing at null",
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from_absent_reason": "No adjustment has been proposed or adopted, so no effective date exists. The statute fixes an outer limit rather than a date; 'about September 2027' is arithmetic on the five-year cap, and the Commission has published no schedule. Writing a date here would be a forecast wearing a fact's clothes."
+      },
+      "disposition": "deferred",
+      "disposition_note": "Deferred, with an instruction to P3 that is the point of the entry: put these seven constants on the rule-version axis NOW, as one dated arm opening 2022-09-20 with an @ref to 87 FR 57394, even though only one arm exists. Doing so makes the next adjustment an ADDED ARM rather than an edit to a literal, which is the difference between a corpus that records its own history and one that quietly forgets it — and it is free, because the arm is already true. This is also the one place where the bundle's limits bite: the 2017 figures that would populate a second, earlier arm are NOT in the bundle (only the text in force from 2023-03-01 was captured), so an arm for 2017-04-12 to 2022-09-20 cannot be written from what P1 deposited and must not be invented from memory; the FR granule named in the bundle's annotation inventory under marker FR2017Apr12 is where those numbers live. The rule_version_arm field names the arm that CAN be written today.",
+      "found_by": ["SRCH-inflation"]
+    },
+    {
+      "id": "EM-PETITIONS",
+      "class": "prospective",
+      "summary": "Three rulemaking petitions on file ask for changes in this area, none acted on. File No. 4-889, 'Rulemaking petition to modernize SEC Regulation Crowdfunding (\"Reg CF\")', SEC issue date 2026-03-04. File No. 4-914, 'Rulemaking petition to Amend Regulation Crowdfunding Offering Limits Pursuant to Securities Act Section 3(b)', SEC issue date 2026-07-13, with a supplemental submission. File No. 4-892, seeking amendments to Securities Act Rules 163B and 169 to extend retail testing-the-waters to IPOs 'to Harmonize IPO Communication Rules with Reg Crowdfunding and Reg A+', SEC issue date 2026-03-26 — named for completeness although it targets rules outside Part 227.",
+      "provenance": {
+        "source": "SEC rulemaking-petition pages (three), read for file number, title and issue date",
+        "url": "https://www.sec.gov/rules-regulations/2026/07/rulemaking-petition-amend-regulation-crowdfunding-offering-limits-pursuant-securities-act-section-3b",
+        "retrieved": "2026-08-05",
+        "citation": "File Nos. 4-889 (Mar. 4, 2026), 4-914 (Jul. 13, 2026) and 4-892 (Mar. 26, 2026)",
+        "quote": "Rulemaking petition to Amend Regulation Crowdfunding Offering Limits Pursuant to Securities Act Section 3(b)"
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from_absent_reason": "A petition is a request, not an instrument. None of the three pages records any Commission response, and the Commission is under no obligation to act on any of them; there is therefore no date of any kind to record, not even a projected one."
+      },
+      "disposition": "no-effect",
+      "disposition_note": "No-effect on the encoding, and the reason to keep the row is that 4-914 aims at the $5,000,000 cap by a different mechanism from the one EM-INFLATION-NEXT tracks — Securities Act § 3(b) rather than the § 4A(h)(1) indexation — so the same constant is under pressure from two independent directions, which is a fact about that number that P9 should be able to print. The petition PDFs themselves were not retrieved, so this entry records that the petitions exist and what they are titled, and nothing about what they actually argue. Two of the three were filed in the five months before this sweep, so the area is active; that is a reason to re-run SRCH-petitions on a shorter cycle than the rest of this register.",
+      "found_by": ["SRCH-petitions"]
+    },
+    {
+      "id": "EM-STAFF-GUIDES",
+      "class": "interpretive",
+      "summary": "The SEC's plain-language guides — 'Regulation Crowdfunding: Guidance for Issuers' (Oct. 16, 2024, last reviewed Jul. 21, 2025) and the small-entity compliance guides for issuers and for crowdfunding intermediaries — restate the rules for a lay reader and disclaim any legal effect in terms. The only quantitative gloss found is the issuer guide's footnote 3, which states that 'the maximum aggregate investment limit is $124,000' across all Reg CF offerings in a 12-month period for non-accredited investors; that is consistent with § 227.100(a)(2), where the $124,000 ceiling appears in limb (ii) and limb (i) cannot exceed it.",
+      "provenance": {
+        "source": "SEC Division of Corporation Finance, 'Regulation Crowdfunding: Guidance for Issuers'",
+        "url": "https://www.sec.gov/resources-small-businesses/regulation-crowdfunding-guidance-issuers",
+        "retrieved": "2026-08-05",
+        "citation": "Regulation Crowdfunding: Guidance for Issuers (Oct. 16, 2024; last reviewed or updated Jul. 21, 2025), footnote 3",
+        "quote": "This resource, like all staff statements, has no legal force or effect: it does not alter or amend applicable law, and it creates no new or additional obligations for any person."
+      },
+      "routing": { "fork_ids": [], "currency_risk": false },
+      "disposition": "no-effect",
+      "disposition_note": "No-effect, and no fork: a document that disclaims legal force cannot settle a reading, and this one does not attempt to. Recorded because the guides are what a non-lawyer actually reads, so a divergence between them and the rule would be worth knowing about — the one place they quantify anything, footnote 3's $124,000 ceiling, was checked against § 227.100(a)(2) and agrees. They are also useful to P3 for a different reason than modification: the issuer guide's structure is a worked example of how the staff itself sequences these rules for a lay audience, which is evidence for the wizard's question order, not for the encoding.",
+      "found_by": ["SRCH-staffguides"]
+    }
+  ],
+  "dispositions": [
+    {
+      "document": "ecfr-part227-xml",
+      "markers": ["FR2015Nov16"],
+      "disposition": "subsumed",
+      "note": "80 FR 71537 (Nov. 16, 2015) — the part-level source note, Release Nos. 33-9974; 34-76324, which ADOPTED Regulation Crowdfunding. There is nothing separate to carry: the consolidated text in the bundle IS this document as subsequently amended, so its substance rides inside the text P3 encodes rather than needing an arm of its own. Recorded as subsumed rather than encoded because P3 has not run and this register may not claim on its behalf what the encoding did. The adopting release's 225 pages of preamble are the authoritative source for legislative intent and were deliberately not captured (P1's scope note); the two interpretations that reach back to a release's reasoning, CFI 202.02 and CFI 100.06, cite Releases 10884 and 6389 rather than this one."
+    },
+    {
+      "document": "ecfr-part227-xml",
+      "markers": ["FR2022Sep20"],
+      "disposition": "subsumed",
+      "entry": "EM-INFLATION-NEXT",
+      "note": "87 FR 57398 (Sept. 20, 2022), Release Nos. 33-11098; 34-95715 — the five-yearly indexation that set every dollar figure now in the text: $5,000,000, $2,500 and $124,000 in § 227.100, and $124,000 / $618,000 / $1,235,000 in § 227.201(t). Its substance is entirely present in the captured text, so subsumed; and it is the marker that carries a register entry, because EM-INFLATION-NEXT is about the NEXT application of the same statutory mechanism to the same seven constants. This is the marker whose govinfo resolution the P1 bundle had to verify by content — the naive page-to-granule redirect would have made 87 FR 57398 a Coast Guard safety-zone rule — so the citation on the dated arm P3 writes should be taken from the bundle's inventory and not re-derived."
+    },
+    {
+      "document": "ecfr-part227-xml",
+      "markers": ["FR2021Jan14"],
+      "disposition": "subsumed",
+      "note": "86 FR 3590-3593 (Jan. 14, 2021), Release Nos. 33-10884; 34-90300; IC-34082 — the largest permanent amendment after adoption, and the only marker with two lives. Its PERMANENT half is fully present in the captured text and therefore subsumed: § 227.206 and § 227.504 (which exist in no earlier version), the crowdfunding-vehicle exclusion in § 227.100(d) that EM-CFI-202-02-HOLDERS pulls against, the § 230.152 integration cross-reference in § 227.100(e), and the amendments across §§ 227.201, 227.203, 227.204, 227.301, 227.303, 227.304 and 227.503 — plus § 270.3a-9 itself, at 86 FR 3602, carried in the bundle's annex. Its TEMPORARY half is gone: the § 227.100(b)(7) expedited COVID route it added ran from 2021-01-14 until it reverted to '[Reserved]' on 2023-03-01, which is the dated arm P1's note identified. That arm's BOUNDARY is established (P1 diffed the versioner's renderings at 2023-02-28 and 2023-03-02) but its TEXT is not in the bundle, so P3 can honestly encode a reserved paragraph with a dated boundary and must not reconstruct the lapsed words from anywhere but this granule."
+    },
+    {
+      "document": "ecfr-part227-xml",
+      "markers": ["FR2017Apr12"],
+      "disposition": "scoped-out",
+      "note": "82 FR 17552 (Apr. 12, 2017), Release Nos. 33-10332; 34-80355 — the FIRST five-yearly indexation, amending §§ 227.100 and 227.201. Permanent when made and wholly superseded by FR2022Sep20: not one of its figures survives in the captured text. Scoped out rather than deferred because the bundle contains no text from which its arm could be written — capturing the current text captures the current numbers only — so this is a decision about evidence, not about ambition. If a later pass wants the 2017-04-12 to 2022-09-20 arm of the seven constants EM-INFLATION-NEXT names, the numbers are in this granule and the bundle's inventory gives its verified path; taking them from anywhere else, including from a model's recollection of what the pre-2022 limits were, is the failure this note exists to forbid."
+    },
+    {
+      "document": "ecfr-part227-xml",
+      "markers": [
+        "FR2017Oct02",
+        "FR2018Sep21",
+        "FR2018Oct19",
+        "FR2020Mar31"
+      ],
+      "disposition": "scoped-out",
+      "note": "Four disaster-and-emergency temporary reliefs, all amending § 227.202's filing deadlines, all expired years before the bundle's covers.from of 2023-03-01, and all leaving no text behind: 82 FR 45725 (Release 33-10416, Hurricanes Harvey/Irma/Maria, effective Sept. 28 - Nov. 22, 2017); 83 FR 47836 (Release 33-10556, Hurricane Florence, Sept. 21 - Oct. 29, 2018); 83 FR 52964 (Release 33-10567, Hurricane Michael, Oct. 19 - Nov. 23, 2018); and 85 FR 17751 (Release 33-10768 et al., the first COVID-19 relief, Mar. 30 - July 15, 2020, whose lapse is what P1's versioner diffing showed behind the § 227.202 row dated 2020-07-15). One row for four because one argument disposes of all of them. Two riders. FR2018Oct19 also amended the PART-LEVEL AUTHORITY CITATION permanently — that half did not expire — but an authority citation states the statutory basis for the part rather than any rule an issuer or intermediary obeys, so nothing in the encoding turns on it. And these four are the reason § 227.202 carries the longest citation note in the part while its operative text is short: the apparatus records four regimes that no longer exist."
+    },
+    {
+      "document": "ecfr-part227-xml",
+      "markers": ["FR2020May07", "FR2020Sep02"],
+      "disposition": "scoped-out",
+      "note": "85 FR 27131-27132 (Release 33-10781, 'Temporary Amendments to Regulation Crowdfunding', effective May 4, 2020 through Mar. 1, 2021) and 85 FR 54490 (Release 33-10829, the extension, effective Aug. 31, 2020 through Sept. 1, 2021) — one temporary regime and its extension, reaching §§ 227.100, 227.201, 227.301, 227.303 and 227.304, i.e. the offering conditions, the disclosure requirements and three of the intermediary duties at once. Both lapsed before covers.from and left no text. Scoped out on the same evidence ground as the other temporary rules: the bundle holds the current text only. Worth flagging for anyone who later builds the historic axis that these two are the interesting ones, because unlike the disaster reliefs they suspended SUBSTANTIVE conditions rather than deadlines, and because the second one's sunset of Sept. 1, 2021 is what the FR2021Jan14 revision of § 227.100(b)(7) was drafted to pick up — the two markers interlock, and encoding either arm without the other would misstate the law for the intervening months."
+    }
+  ]
+}

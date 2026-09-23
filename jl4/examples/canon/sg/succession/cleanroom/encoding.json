@@ -1,0 +1,28 @@
+{
+  "id": "cleanroom-2026-08",
+  "encoder": "legalese",
+  "display_name": "Four Acts, one ontology — a cleanroom re-encoding of Singapore's death-in-the-family statutes",
+  "status": "draft",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "maintainer": {
+    "name": "Legalese Pte. Ltd.",
+    "github": "legalese"
+  },
+  "modules": [
+    "family-domain.l4",
+    "wills-act.l4",
+    "intestate-succession-act.l4",
+    "probate-administration-act.l4",
+    "guardianship-of-infants-act.l4",
+    "family-cases.l4"
+  ],
+  "scope": "A SECOND, INDEPENDENT encoding of this subject, written without reading the `legalese` encoding beside it, so that the two can be compared as evidence rather than as one thing checked against itself. It adds a fourth Act the first does not carry: the Guardianship of Infants Act 1934. The Wills Act 1838, Intestate Succession Act 1967 and Probate and Administration Act 1934 are re-encoded from the source PDFs. Law stated as at 26 August 2026; NO rule-version axis and zero dated arms, so it cannot answer about an earlier version. 1,907 scenario assertions, none failing. NOT REVIEWED: the pipeline run behind report/ carries HG1 WAIVED, not granted -- no human has read this against the Acts section by section. Open questions are in registers/fork-register.json (62 forks) and in NOTES.md.",
+  "assertions": 1907,
+  "not_reviewed": {
+    "gate": "HG1",
+    "state": "waived",
+    "run": "2026-08-26-3ab3039f-003",
+    "note": "The waiver text is in report/go-run-report.md's Gates section and on report/go-run-journal.ndjson. It binds to the deposit digest sha256:3ab3039f... and names what it waived: a domain expert reading the encoding against the four Acts, section by section. Every other verdict in that report is machine-checkable fact."
+  }
+}

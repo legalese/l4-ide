@@ -1,0 +1,2568 @@
+{
+  "kind": "fork-register",
+  "register_version": 1,
+  "subject": "sg-miles-card",
+  "note": "P4 for sg-miles-card: forty-one interpretation forks over the six card programmes of this subject. Every one of the ten documents in the P1 bundle supplies at least one quoted fork, compiled from the six encoder reports and verified against both the source texts and the encodings. FOUR THINGS A READER NEEDS. (1) NONE IS MATERIALISED. Every entry is 'resolved-at-encode': each encoder took a reading on its own argument and recorded the alternative, and no fork was threaded as an Interpretation field, so there is no interpretation_type and the R4 1:1 map has nothing to bind. The BNA smoke and the Jersey charities cleanroom likewise materialised none of their twelve, though each of those delegated two to a fact-supplier and this register delegates none: on a contract corpus every fork was taken by the encoder outright. (2) THE SUBJECT IS CONTRACT, NOT LEGISLATION, so 'statutory-wording' is read here as 'wording of the instrument' — the schema's kind vocabulary was fixed on a statute and the other three values needed no stretching. There is no 'instrument' document in the P1 bundle (every T&C is made under a parent cardmember agreement that could not be fetched), so the subject-against-instrument check P4 owes cannot run on this subject; the cross-document forks below are between a T&C and its own FAQ instead. (3) QUOTES ARE EXTRACTED, NOT TYPED. Every source.quote was pulled from the .txt beside the PDF by a script that fails if the text is absent, with whitespace normalised because the pdftotext -layout extraction pads table columns. Citations quoting further text quote it the same way. (4) WITNESSES ARE ONLY CLAIMED WHERE THEY EXIST. divergence 'observable' carries a witness only where the named illustration and its assertion were both found in the module on this branch; where the readings plainly disagree but nothing in the tree exhibits it, divergence is 'unassessed', which is honest at P4 time and is what stops a report claiming interpretation-independence it never measured.",
+  "entries": [
+    {
+      "id": "F-yuu-bonus-additive",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/dbs-yuu.l4",
+        "anchor": "7 — Bonus Rewards",
+        "provisions": [
+          "DBS yuu Card T&C (updated on 7 August 2026) cl.7(a)",
+          "DBS yuu Card T&C (updated on 7 August 2026) cl.7(b)"
+        ]
+      },
+      "source": {
+        "quote": "Cardmembers who have met the Minimum Spend Requirement, will earn the respective Bonus Rewards as tabled below, for every S$1 spent at the following Spend Categories that is charged and posted to your DBS yuu Card.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.7(a), the no-minimum-spend Bonus Rewards table"
+          },
+          {
+            "kind": "provision",
+            "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.7(b), the minimum-spend Bonus Rewards table"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "additive",
+          "description": "The two Bonus Rewards tables stack: a cardmember who meets the Minimum Spend Requirement earns cl.7(a)'s 9 points AND cl.7(b)'s 26 points on top of cl.6's 1 Base Point, so a yuu merchant purchase earns 36 yuu Points per S$1, which at cl.12's 0.28 miles per point is 10.08 miles per dollar.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.7 chapeau — one cap governs both tables: \"Total Bonus Rewards is capped at 28,800 yuu Points (worth up to S$144 cash rebates or 8,000 miles) per calendar month\", which is a single pot over 7(a) and 7(b) rather than two"
+            },
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.7(a) — \"No minimum spend required to earn the following Bonus Rewards\", which sets 7(a) up as an award that does not depend on 7(b)"
+            }
+          ]
+        },
+        {
+          "id": "replacement",
+          "description": "cl.7(b)'s table replaces cl.7(a)'s once the Minimum Spend Requirement is met, so a yuu merchant purchase earns 1 + 26 = 27 yuu Points per S$1.",
+          "status": "rejected",
+          "rejection_rationale": "It would make the reward fall for the very cardmembers who spent more at SimplyGo, where 7(a) pays 9.5 and 7(b) pays 26: the replacement reading gives 26 where the additive reading gives 35.5, and produces a headline rate that matches no figure printed anywhere in the document.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "additive",
+        "mechanism": "encoded",
+        "rationale": "Taken on the arithmetic of the document's own cap, which is stated in POINTS and therefore needs no conversion: 28,800 yuu Points divided by 35 bonus points per S$1 is S$822.86 of monthly bonus-earning spend, and 35 is 9 + 26 on the additive reading and on no other. No clause states the sum, which is why the module marks the answer Unconfirmed on exactly the branch where the summation is load-bearing."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "observable",
+      "witnesses": [
+        "`a groceries run at Cold Storage` in `a month above the threshold` — `points per dollar` EQUALS 36, the additive sum 1 + 9 + 26; the replacement reading answers 27",
+        "the same call's `status` EQUALS Unconfirmed, against `a month below the threshold`'s Verified — the one place the module declares the summation is its own and not the document's"
+      ],
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module OVERSTATES, reporting 10.08 miles per dollar where the replacement reading gives 7.56.",
+        "This is the ambiguity the encoder flagged for overrule: it is the only condition applied anywhere in the module that no clause states.",
+        "ONE OF THE TWO SUPPORTS HAS SINCE BEEN WITHDRAWN. The first pass also argued from miles: 36 points at 8,000/28,800 came to a round 10.0 miles per dollar, offered as a second figure landing on the additive reading. That ratio was rejected when the conversion fork was ruled on 2026-09-21 (see F-yuu-conversion-floor), and at cl.12's 0.28 the same 36 points give 10.08, which is round in nothing. The roundness was an artefact of the rejected reading of cl.7 and corroborates nothing now; the cap-in-points argument above is untouched, because no conversion enters it."
+      ]
+    },
+    {
+      "id": "F-yuu-eligible-spend-gate",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/dbs-yuu.l4",
+        "anchor": "9 — Eligible Spend",
+        "provisions": [
+          "DBS yuu Card T&C (updated on 7 August 2026) cl.6",
+          "DBS yuu Card T&C (updated on 7 August 2026) cl.7(a)",
+          "DBS yuu Card T&C (updated on 7 August 2026) cl.7(b)(i)",
+          "DBS yuu Card T&C (updated on 7 August 2026) cl.9"
+        ]
+      },
+      "source": {
+        "quote": "“Eligible Spend” refers to qualified spend charged on your DBS yuu Card but excludes the following types of transactions:",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.9, the defined term and its exclusion list"
+          },
+          {
+            "kind": "provision",
+            "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.6 and cl.7(a), which condition earning on spend \"charged and posted to your DBS yuu Card\" and never use the defined term"
+          },
+          {
+            "kind": "provision",
+            "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.7(b)(i), the only clause that uses \"Eligible Spend\" operatively"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "gatesEarning",
+          "description": "cl.9 defines what the card earns on at all: a transaction the clause excludes earns nothing, not merely nothing towards the S$800 threshold.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.9 preamble — \"qualified spend charged on your DBS yuu Card\", which describes the earning base rather than a threshold counter"
+            },
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.9(c) — the list excludes \"any fees and charges (including annual fees, interest charges ...)\", on which no reading of cl.6 would award Base Rewards"
+            }
+          ]
+        },
+        {
+          "id": "gatesOnlyTheThreshold",
+          "description": "cl.9 is a counter for cl.7(b)(i)'s S$800 Minimum Spend Requirement only. Earning is governed by cl.6 and cl.7(a), which condition it on spend \"charged and posted\" and never mention the defined term, so an excluded transaction still earns its 0.5 or 1 Base Point and simply does not count towards the threshold.",
+          "status": "arguable",
+          "foreclosure": "The module applies cl.9 at the earning step, so an excluded transaction returns zero and the 0.5 Base Point this reading would award is unreachable. Nothing in the document refutes the reading; it was not taken because it is the higher answer.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.7(b)(i) — \"Minimum S$800 worth of Eligible Spend charged and posted to your Card\", the document's only operative use of the term"
+            },
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.6 — \"For every S$1 spent at the following Spend Categories that is charged and posted to your DBS yuu Card, you will earn the respective Base Rewards\", which states the earning rule without reference to cl.9"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "gatesEarning",
+        "mechanism": "encoded",
+        "rationale": "Taken because it is the lower answer and because the alternative would award Base Rewards on annual fees and interest charges, which cl.9(c) excludes by name. The choice decides whether an excluded-MCC transaction earns 0 or 0.5 points per dollar."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "observable",
+      "witnesses": [
+        "`a tax payment` in `a month above the threshold` — `points per dollar` EQUALS 0; under the narrow reading MCC 9311 still earns 0.5"
+      ],
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES, reporting 0 where 0.5 points per dollar would be earned.",
+        "Not raised anywhere in the subject spec's section 4; found by the encoder reading cl.6 against cl.9."
+      ]
+    },
+    {
+      "id": "F-yuu-scan-condition",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/dbs-yuu.l4",
+        "anchor": "6 — Base Rewards",
+        "provisions": [
+          "DBS yuu Card T&C (updated on 7 August 2026) cl.6",
+          "DBS yuu Card T&C (updated on 7 August 2026) cl.6(ii)"
+        ]
+      },
+      "source": {
+        "quote": "Base Rewards will be credited to Cardmembers’ linked yuu Account in the manner as follows: • yuu Merchant Spend: Within the same day when you scan/link your yuu ID when transacting.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.6(ii), the crediting bullet"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "creditingTimingOnly",
+          "description": "Scanning the yuu ID fixes WHEN the points land, not WHETHER they are earned. The earning rule is cl.6's table; the scan appears only in the crediting bullet.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.6 — \"For every S$1 spent at the following Spend Categories that is charged and posted to your DBS yuu Card, you will earn the respective Base Rewards\", which states the earning condition without a scan"
+            }
+          ]
+        },
+        {
+          "id": "earningCondition",
+          "description": "A cardmember who does not scan or link the yuu ID at the point of sale earns no Base Rewards on yuu Merchant Spend at all, because the bullet gives no crediting date for an unscanned transaction.",
+          "status": "rejected",
+          "rejection_rationale": "It would read an earning condition out of a bullet whose subject is crediting, and cl.6's own earning sentence conditions the award on the spend being charged and posted, nothing else. The clause does not say the alternative to same-day crediting is never.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "creditingTimingOnly",
+        "mechanism": "encoded",
+        "rationale": "Taken because cl.6 states the earning rule and the scan appears only in the crediting bullet. The question changes when the point lands, not the rate, so the module carries it as a condition string and leaves the answer's status untouched."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module OVERSTATES for a cardmember who never scans at the till, promising a rate that would not be credited."
+      ]
+    },
+    {
+      "id": "F-yuu-singtel-contradiction",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/dbs-yuu.l4",
+        "anchor": "Appendix 1 — merchant-specific exclusions",
+        "provisions": [
+          "DBS yuu Card T&C (updated on 7 August 2026) cl.8, the Participating Merchants table",
+          "DBS yuu Card T&C (updated on 7 August 2026) Appendix 1, the Singtel row"
+        ]
+      },
+      "source": {
+        "quote": "Points will not be awarded for all transactions.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "DBS yuu Card T&C (updated on 7 August 2026) Appendix 1, Singtel, \"Applicable to Base Rewards\""
+          },
+          {
+            "kind": "provision",
+            "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.8, which lists \"Singtel\" with \"Singtel Shop\" and \"Singtel Exclusive Retailers\" as a Participating Merchant"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "literalNoPoints",
+          "description": "\"Points will not be awarded for all transactions\" means what it says: a purchase at SingtelShop! or a Singtel Exclusive Retailer earns nothing at all.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) Appendix 1, Singtel — the words \"for all transactions\", which admit no carve-out on their face"
+            }
+          ]
+        },
+        {
+          "id": "harmonisedBaseOnly",
+          "description": "The sentence sits under the heading \"Applicable to Base Rewards\", so it withholds the Base Rewards only, and the Bonus Rewards survive. That reading gives work to the row's own second heading (\"Applicable to Base and Bonus Rewards\", which then lists corporate plans and prepaid top-ups) and to cl.8's listing of Singtel as a Participating Merchant, both of which the literal reading empties.",
+          "status": "arguable",
+          "foreclosure": "The module returns zero on every Singtel transaction, so the surviving bonus this reading would pay is unreachable. Nothing in the document refutes the reading; the literal words were preferred because they are the lower answer and because the document contradicts itself either way.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) Appendix 1, Singtel — the exclusion sits under the heading \"Applicable to Base Rewards\" and a second heading \"Applicable to Base and Bonus Rewards\" follows it with a narrower list"
+            },
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.8 — Singtel is a listed Participating Merchant, which on the literal reading can never be transacted at for reward"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "literalNoPoints",
+        "mechanism": "encoded",
+        "rationale": "Taken as the lower answer, with the contradiction spelled out in the answer's conditions and the status set to Unconfirmed, rather than presenting a self-contradicting document as settled. Material: it takes a listed Participating Merchant to zero."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "observable",
+      "witnesses": [
+        "`a phone at the Singtel Shop` in `a month above the threshold` — `points per dollar` EQUALS 0 and `status` EQUALS Unconfirmed; the harmonised reading answers with the bonus rate"
+      ],
+      "notes": [
+        "An intra-document contradiction, not an ambiguity of one sentence: cl.8 admits Singtel and Appendix 1 withdraws it, and neither provision says which yields.",
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES, reporting 0 where the bonus limbs would still pay.",
+        "PAssion's document carries the same conflict on the same merchant, on its own words: see F-passion-singtel-conflict."
+      ]
+    },
+    {
+      "id": "F-yuu-chargeplus-amex",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/dbs-yuu.l4",
+        "anchor": "Appendix 1 — merchant-specific exclusions",
+        "provisions": [
+          "DBS yuu Card T&C (updated on 7 August 2026) Appendix 1, the Charge+ row",
+          "DBS yuu Card T&C (updated on 7 August 2026) Appendix 1, the 7-Eleven row"
+        ]
+      },
+      "source": {
+        "quote": "Charge+ Charge+ Singapore Applicable to Bonus Rewards",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "DBS yuu Card T&C (updated on 7 August 2026) Appendix 1, Charge+ — \"Points will not be awarded for any transactions made with DBS yuu American Express® Card\", with no date attached"
+          },
+          {
+            "kind": "provision",
+            "cite": "DBS yuu Card T&C (updated on 7 August 2026) Appendix 1, 7-Eleven — the same sentence, followed by an express restoration \"w.e.f. 13 Aug 2026\""
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "permanentDenial",
+          "description": "The Charge+ denial has no end date and therefore continues: American Express cardmembers earn no Bonus Rewards at Charge+ after 13 August 2026 as before it.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) Appendix 1, Charge+ — the row states the denial and states no restoration date, where the 7-Eleven row states both"
+            }
+          ]
+        },
+        {
+          "id": "restoredWithAmexAcceptance",
+          "description": "The 13 August 2026 restoration is about American Express acceptance generally, so it lifts the Charge+ denial too and the row is simply not updated.",
+          "status": "rejected",
+          "rejection_rationale": "The 7-Eleven row ties its restoration to acceptance at 7-Eleven outlets specifically (\"American Express® Cards will be accepted at all 7-Eleven outlets islandwide\"), which says nothing about Charge+; reading a restoration into a row that does not carry one would award points the document does not promise.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "permanentDenial",
+        "mechanism": "encoded",
+        "rationale": "Taken on the contrast the document draws with its own neighbouring row: where DBS meant a denial to end, it said so and gave the date."
+      },
+      "status": "resolved",
+      "cross_refs": [
+        "E-arm-yuu-7eleven-amex"
+      ],
+      "divergence": "observable",
+      "witnesses": [
+        "`a car charge` on the `DBS yuu American Express` in `a month above the threshold` — `points per dollar` EQUALS 1 against the Visa's 36; the restoration reading answers 36 on both from 13 August 2026"
+      ],
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES for American Express cardmembers charging at Charge+ from 13 August 2026."
+      ]
+    },
+    {
+      "id": "F-yuu-matching-terms",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/dbs-yuu.l4",
+        "anchor": "9 — Eligible Spend",
+        "provisions": [
+          "DBS yuu Card T&C (updated on 7 August 2026) cl.9(i)"
+        ]
+      },
+      "source": {
+        "quote": "i. Any transactions matching the terms below:",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.9(i) and its table of excluded transaction terms"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "carriesTheTerm",
+          "description": "A statement line \"matches\" a listed term when it CARRIES that term, case-insensitively: \"AMAZE*NTUC FP\" matches the listed term AMAZE.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.9(i) — \"Any transactions matching the terms below\", where the listed items are transaction terms rather than whole statement descriptions"
+            },
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.9(i) — the list prints \"Sgebiz\" and \"SGeBiz\" as two separate entries, which is the issuer's own evidence that it is matching text rather than comparing identifiers"
+            }
+          ]
+        },
+        {
+          "id": "exactEquality",
+          "description": "A transaction matches only where the printed description equals a listed term exactly.",
+          "status": "rejected",
+          "rejection_rationale": "It would catch almost nothing a real statement prints: the listed terms are payment-instrument tokens that run into a suffix (\"AMAZE*NTUC FP\"), so equality would leave the clause with virtually no work to do, and the clause says \"matching\", not \"equal to\".",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "carriesTheTerm",
+        "mechanism": "encoded",
+        "rationale": "Taken corpus-wide in layer 1 (classify.l4), which reads the printed description by case-insensitive substring and reports which term families the line carries; this module then tests membership. It over-matches in the direction of EXCLUDING, which understates a reward and can never overstate one."
+      },
+      "status": "resolved",
+      "cross_refs": [
+        "E-arm-yuu-mcc-2026-05-01"
+      ],
+      "divergence": "observable",
+      "witnesses": [
+        "`a supermarket run routed through Amaze` in `a month above the threshold` — description \"AMAZE*NTUC FP\", `points per dollar` EQUALS 0; the equality reading would award 0.5"
+      ],
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES, refusing points on a line that merely contains a listed token (an \"AMAZED BOOKS\" line carries AMAZE).",
+        "The encoder's own report recorded the opposite resolution — exact-string matching, on the ground that the prelude has no substring test. The tree has since moved: classify.l4 does the string work with CONTAINS over upper-cased text and hands the modules a closed enumeration of description families. This entry records the tree, not the report."
+      ]
+    },
+    {
+      "id": "F-yuu-threshold-timing",
+      "kind": "fact-convention",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/dbs-yuu.l4",
+        "anchor": "7 — Bonus Rewards",
+        "provisions": [
+          "DBS yuu Card T&C (updated on 7 August 2026) cl.7(b)"
+        ]
+      },
+      "source": {
+        "quote": "To earn the following Bonus Rewards, Cardmembers must meet these spend requirements each calendar month (“Minimum Spend Requirement”): i. Minimum S$800 worth of Eligible Spend charged and posted to your Card, and ii. Transact at 4 Participating Merchants.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.7(b), the Minimum Spend Requirement"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "runningTotalAtTheMoment",
+          "description": "The question \"has the month met the Minimum Spend Requirement\" is answered on the month's totals SO FAR, at the moment the transaction is made. The same transaction therefore answers differently before and after the month's fourth Participating Merchant.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.7(b) — the requirement is stated per calendar month and the document gives no rule for a transaction made before the month closes"
+            }
+          ]
+        },
+        {
+          "id": "wholeMonthTotal",
+          "description": "The requirement is a test on the completed calendar month, so every transaction in a month that ends up qualifying earns the cl.7(b) rate, including the ones made before the thresholds were crossed.",
+          "status": "arguable",
+          "foreclosure": "The module answers about one transaction at the moment it is made and reads the month only through the two running counters the domain carries, so the completed-month figure is not available to it. Nothing in the document refutes this reading; the document's own crediting mechanics point to it.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.7 — Bonus Rewards \"will be credited to qualifying cardmembers’ linked yuu Account within 60 days after the end of each calendar month\", by which time the month is complete and its totals are known"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "runningTotalAtTheMoment",
+        "mechanism": "encoded",
+        "rationale": "Taken because it is what an app can know at decision time and because it understates rather than overstates. Said explicitly in the module header."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES early-month transactions in a month that later qualifies.",
+        "The same shape arises on the PAssion document, where the encoder reached the same resolution: see F-passion-threshold-timing."
+      ]
+    },
+    {
+      "id": "F-yuu-conversion-floor",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/dbs-yuu.l4",
+        "anchor": "7 and 12 — the cap and the conversion to miles",
+        "provisions": [
+          "DBS yuu Card T&C (updated on 7 August 2026) cl.7",
+          "DBS yuu Card T&C (updated on 7 August 2026) cl.12"
+        ]
+      },
+      "source": {
+        "quote": "1 yuu Point is equivalent to 0.5% cash rebate or 0.28 miles or more, depending on the redemption item on the yuu Rewards catalogue.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.12, the clause that states the conversion: \"1 yuu Point is equivalent to 0.5% cash rebate or 0.28 miles or more, depending on the redemption item on the yuu Rewards catalogue.\""
+          },
+          {
+            "kind": "provision",
+            "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.7, the clause that prices the monthly cap twice in one parenthesis: \"Total Bonus Rewards is capped at 28,800 yuu Points (worth up to S$144 cash rebates or 8,000 miles) per calendar month.\""
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "clause12Conversion",
+          "description": "cl.12's 0.28 is the conversion, and cl.7's \"8,000 miles\" is a rounded illustration of the same cap. 28,800 points at 0.28 is 8,064 miles, which the parenthesis's own \"worth up to\" signals it has rounded down to a round number.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.12 — the operative sentence: it is the clause that states the conversion, it states one figure, and it is held"
+            },
+            {
+              "kind": "provision",
+              "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.7 — within the same parenthesis the cash limb is exact (28,800 at 0.5% is S$144 precisely) while the mile limb is not (28,800 at 0.28 is 8,064, printed as 8,000), which is what distinguishes a stated equivalence from a rounded illustration"
+            }
+          ]
+        },
+        {
+          "id": "capPairIsExact",
+          "description": "cl.7's pairing of 28,800 yuu Points with 8,000 miles is an exact equivalence, so one yuu Point is 8,000/28,800 = 0.2777... miles and cl.12's 0.28 overstates the conversion by about 0.8 per cent.",
+          "status": "rejected",
+          "rejection_rationale": "cl.7 is a clause about the cap and its mile figure is a round number inside a parenthesis introduced by \"worth up to\"; cl.12 is the clause that states the conversion. The exactness claim fails on its own terms, because 28,800 at 0.28 is 8,064 while the cash limb of the same parenthesis is exact, so it is the mile figure that has been rounded. A figure below a floor is also not consistent with the floor: 0.2777 is less than the 0.28 cl.12 gives as a minimum, and the first pass had that inequality backwards.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "clause12Conversion",
+        "mechanism": "encoded",
+        "rationale": "RULED BY THE CONDUCTOR, 2026-09-21, reversing the first pass. The first-pass encoding took cl.7's ratio and reasoned that 0.2777 sat \"just below cl.12's 0.28, consistent with 'or more'\"; the cross-module cases file, whose assertions were deliberately written to state cl.12's floor rather than quietly adopt cl.7's ratio, is what exposed the difference. Note what the taken reading imports: cl.12 states 0.28 as a MINIMUM (\"or more, depending on the redemption item\"), so the figure reported is the floor of a range rather than a point value, and the module records the conversion status as Verified against that clause."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "observable",
+      "witnesses": [
+        "`yuu cl.6 -- S$100 of groceries at Cold Storage` in `a month with nothing spent yet` (miles-card-cases.l4) — `miles per point` AT LEAST 0.28, which holds at cl.12's figure and fails at cl.7's 0.2777",
+        "the same case's `miles per dollar` AT LEAST 2.8 — the same divergence carried through to the headline rate"
+      ],
+      "notes": [
+        "An intra-document contradiction, and the only one in this corpus that is arithmetical rather than verbal: the two clauses of one document disagree by about 0.8 per cent, and on the rejected reading no redemption priced off cl.7's own cap could reach the floor cl.12 promises.",
+        "Direction of error if the taken reading is wrong: the module OVERSTATES miles by about 0.8 per cent.",
+        "Recorded as status 'resolved' rather than 'settled' although a ruling exists. The schema reserves 'settled' for an authority — a court or regulator whose word settles — and a project conductor is not one; naming the conductor in settled_by would tell a reader sizing exposure that the underlying question is closed when it is not.",
+        "The ruling moves the headline yuu rate from 10.0 to 10.08 miles per dollar and withdraws one of the two supports recorded for F-yuu-bonus-additive, which is noted there."
+      ]
+    },
+    {
+      "id": "F-citi-online-retail",
+      "kind": "vagueness",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/citi-rewards.l4",
+        "anchor": "6(ii) — the online limb",
+        "provisions": [
+          "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.6(ii)"
+        ]
+      },
+      "source": {
+        "quote": "a Qualifying Charge made at an online retail merchant, excluding mobile wallet and travel-related transactions*. These refer to Qualifying Charges made via the internet or mobile applications, which is determined by system indicators reflecting that it is an online transaction",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.6(ii)"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "indicatorOnly",
+          "description": "The limb is satisfied by the online system indicator alone. \"Retail\" carries no separate work: the clause defines the whole phrase by the indicator in its very next sentence.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.6(ii) — \"These refer to Qualifying Charges made via the internet or mobile applications, which is determined by system indicators ... These indicators are decided by the relevant merchant and/or their acquirer and are not determined by Citibank\""
+            }
+          ]
+        },
+        {
+          "id": "retailKindAlso",
+          "description": "The merchant must additionally be a RETAIL merchant, so an online charge at a non-retail business (a service, a platform) fails the limb even with the indicator set.",
+          "status": "rejected",
+          "rejection_rationale": "Neither held document carries any fact distinguishing retail from non-retail, and the clause supplies its own definition of the phrase in the following sentence, which mentions only the indicator. The stricter reading is also largely moot: online insurers and brokers are already excluded by cl.5(vi) and (vii) and by the exclusion list's MCC 6300 and 6211.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "indicatorOnly",
+        "mechanism": "encoded",
+        "rationale": "Taken as the definition the clause gives itself. An encoder who added a retail conjunct would be adding a test the document does not supply and could not evaluate."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module OVERSTATES, promising 10X at online non-retail merchants that the stricter reading would refuse."
+      ]
+    },
+    {
+      "id": "F-citi-mobile-wallet",
+      "kind": "vagueness",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/citi-rewards.l4",
+        "anchor": "6(ii) — the online limb",
+        "provisions": [
+          "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.6(ii)"
+        ]
+      },
+      "source": {
+        "quote": "a Qualifying Charge made at an online retail merchant, excluding mobile wallet and travel-related transactions*.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.6(ii) — the term \"mobile wallet\" is used and nowhere defined"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "tokenOnly",
+          "description": "\"Mobile wallet\" means a wallet holding this card's credential — Apple Pay, Google Pay, Samsung Pay. A third-party proxy card such as Instarem Amaze is not a wallet: it is a card in its own right that forwards the charge.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.6(ii) — the exclusion is of \"mobile wallet\" transactions, a credential-level description, and the document defines the term nowhere"
+            }
+          ]
+        },
+        {
+          "id": "anyProxyCredential",
+          "description": "Any credential that is not the plastic card, including a proxy card such as Amaze, is a \"mobile wallet\" transaction and is excluded from the online limb.",
+          "status": "rejected",
+          "rejection_rationale": "Amaze is issued as a card and charges this card as a separate transaction; calling it a wallet would read the term as \"anything but plastic\", which the document does not say. The consequence of the narrower reading is asserted in the module rather than hidden.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "tokenOnly",
+        "mechanism": "encoded",
+        "rationale": "Taken because a proxy card is not a container for this card's credential. The consequence — an Amaze charge at a merchant the exclusion list does not name is a Qualifying Charge and reaches cl.6(ii) at 4 miles per dollar — is pinned by an assertion, which is the single place to change if the contrary reading is preferred."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "observable",
+      "witnesses": [
+        "`an Amaze charge at an unlisted merchant` — a Qualifying Charge reaching the online limb; under the wider reading it would be excluded from cl.6(ii) and drop to the base rate"
+      ],
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module OVERSTATES an Amaze charge by a factor of ten."
+      ]
+    },
+    {
+      "id": "F-citi-derivation-match",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/citi-rewards.l4",
+        "anchor": "5(xii) — the excluded merchants and merchant descriptions",
+        "provisions": [
+          "Citi ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion T&C (updated November 2024, with effect from 16 December 2024) paragraph 3",
+          "Citi ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion T&C (updated November 2024, with effect from 16 December 2024) footnote 2"
+        ]
+      },
+      "source": {
+        "quote": "Further, transactions bearing any of the abovementioned merchant descriptions including any combination, permutation or derivation of the abovementioned merchant descriptions, whether in whole or in part, will be excluded from rewards earn",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Citi ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion T&C (updated November 2024, with effect from 16 December 2024) footnote 2 to paragraph 3"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "carriesTheDescription",
+          "description": "A statement line is excluded when it CARRIES one of the listed descriptions, which is what \"in part\" asks for and what the footnote's own example (\"[Company Name]*AXS\") shows.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Citi ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion T&C (updated November 2024, with effect from 16 December 2024) footnote 2 — the worked examples \"[Company Name]*AXS\", \"[Company Name]*BUS\", \"[Company Name]*MRT\", \"[Company Name]*EZ-link\" and \"[Company Name]*TRANSIT\", \"where [Company Name] could refer to any entity\""
+            }
+          ]
+        },
+        {
+          "id": "exactEquality",
+          "description": "Only a statement line equal to one of the twenty printed descriptions is excluded.",
+          "status": "rejected",
+          "rejection_rationale": "It contradicts the footnote's own example: \"[Company Name]*AXS\" is not equal to \"AXS\" and the footnote says it is caught.",
+          "citations": []
+        },
+        {
+          "id": "anyDerivationInPart",
+          "description": "Read to its limit, \"any combination, permutation or derivation ... whether in whole or in part\" excludes any line sharing any part of a listed description — so a line containing \"SAM\" as three letters of a longer word, or \"AMAZE* STARBUCKS\" as a derivation in part of \"AMAZE* AXS\", is excluded.",
+          "status": "arguable",
+          "foreclosure": "Layer 1 matches whole listed tokens within the line rather than arbitrary fragments of them, so a line that merely shares letters with a listed description is not excluded. Nothing refutes the wider reading — the document reserves the decision to the Bank — but no encoding could be written against it, since it makes exclusion unbounded.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Citi ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion T&C (updated November 2024, with effect from 16 December 2024) footnote 2 — the words \"any combination, permutation or derivation ... whether in whole or in part\", and \"The Bank's decision on this is final\""
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "carriesTheDescription",
+        "mechanism": "encoded",
+        "rationale": "Taken as what the footnote's own example requires, implemented in layer 1 (classify.l4) as case-insensitive substring over the printed description, reported as a closed enumeration of description families that this module tests membership in."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: against the exact-equality reading the module UNDERSTATES (it refuses more), and against the unbounded-derivation reading it OVERSTATES.",
+        "The encoder's report recorded exact match as the choice; the tree has since moved to the family test described above. This entry records the tree.",
+        "Paragraph 3's OTHER leg is not a fork and is not recorded as one: footnote 1 excludes transactions at the named merchants \"regardless of how the merchant is described in your credit card statement\", and nothing in the facts identifies a merchant except the statement line, so that leg is an unencoded gap rather than a choice between readings."
+      ]
+    },
+    {
+      "id": "F-citi-attribution-axis",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/citi-rewards.l4",
+        "anchor": "18 — which statement month a charge counts against",
+        "provisions": [
+          "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.13",
+          "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.18"
+        ]
+      },
+      "source": {
+        "quote": "Points reversal will be applied in the statement cycle when the reversal/refunded transaction is posted which may differ from the statement cycle of corresponding Qualifying Charge (for example: the Qualifying Charge could have been made in January 2020 but the reversal/refund of such transaction, whether wholly or partially, could be in March 2020).",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.18"
+          },
+          {
+            "kind": "provision",
+            "cite": "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.13 — \"Bonus Points are subject to a cap of 9,000 Bonus Points per statement month\""
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "byPostingDate",
+          "description": "A charge counts against the statement cycle it POSTS in. cl.18 is the document's only rule for placing a transaction in a cycle, and the contrast it draws presupposes that a Qualifying Charge has a cycle of its own, which for a billing period means the cycle it posts in.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.18 — \"applied in the statement cycle when the reversal/refunded transaction is posted which may differ from the statement cycle of corresponding Qualifying Charge\""
+            }
+          ]
+        },
+        {
+          "id": "byTransactionDate",
+          "description": "The same sentence's parenthetical says the charge \"could have been made in January 2020\", and \"made\" is a transaction-date word; if that verb governs, the axis is by transaction date.",
+          "status": "arguable",
+          "foreclosure": "The module returns the posting-date axis on every answer, so the transaction-date reading is not reachable. It is not refuted: the express rule was preferred over the example's verb, and if the verb governs the honest value is an unconfirmed attribution rather than the other axis.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.18 — the parenthetical \"the Qualifying Charge could have been made in January 2020\""
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "byPostingDate",
+        "mechanism": "encoded",
+        "rationale": "Taken on the express rule rather than the example's verb. Citi is the one card in this corpus whose cap period is not first-to-first of the calendar month, so the axis decides which month a charge near a cycle boundary is capped in."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: neither direction systematically; a charge near a cycle boundary is placed in the wrong capped period, which can overstate or understate."
+      ]
+    },
+    {
+      "id": "F-citi-faq-travel-noun",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/citi-rewards.l4",
+        "anchor": "6, footnote * — travel-related transactions",
+        "provisions": [
+          "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.6, footnote *",
+          "Citi Rewards Card 10X Rewards Promotion FAQ (effective 1 April 2024) Q1(ii), footnote *"
+        ]
+      },
+      "source": {
+        "quote": "i.e. any transactions at merchants with the following MCCs will not be a Qualifying Charge",
+        "citations": [
+          {
+            "kind": "instrument",
+            "cite": "Citi Rewards Card 10X Rewards Promotion FAQ (effective 1 April 2024) Q1(ii) footnote — \"will not be a Qualifying Charge\""
+          },
+          {
+            "kind": "provision",
+            "cite": "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.6 footnote — the same sentence, ending \"will not be a 10X Points Eligible Transaction\""
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "tncGoverns",
+          "description": "The T&C's noun governs: a travel-MCC transaction is not a 10X Points Eligible Transaction, but it remains a Qualifying Charge and so earns the cl.12 base rate of 1 Base Point per S$1.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.6 footnote — \"any transactions at merchants with the following MCCs will not be a 10X Points Eligible Transaction\""
+            },
+            {
+              "kind": "provision",
+              "cite": "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.12 — \"Eligible Cardholders will earn 1 Base Point for every S$1 of Qualifying Charges (which are not 10X Points Eligible Transactions)\", which is the rate a non-10X Qualifying Charge falls to"
+            }
+          ]
+        },
+        {
+          "id": "faqGoverns",
+          "description": "The FAQ's noun governs: a travel-MCC transaction is not a Qualifying Charge at all, and so earns nothing — not the base rate either.",
+          "status": "arguable",
+          "foreclosure": "The module answers on the T&C, so the FAQ's wider exclusion is not applied anywhere. It is not refuted: the FAQ is the issuer's own document, carries the same effective date, and no priority clause in either document says which prevails.",
+          "citations": [
+            {
+              "kind": "instrument",
+              "cite": "Citi Rewards Card 10X Rewards Promotion FAQ (effective 1 April 2024) Q1(ii) footnote — \"any transactions at merchants with the following MCCs will not be a Qualifying Charge\", published by the same issuer under the same effective date of 1 April 2024"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "tncGoverns",
+        "mechanism": "encoded",
+        "rationale": "Taken because the T&C is the operative instrument and the FAQ is guidance about it; a document that answers questions about a promotion does not redefine the promotion's terms. The difference is material: an airline ticket earns 0.4 miles per dollar on the T&C and nothing on the FAQ."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "observable",
+      "witnesses": [
+        "`an airline ticket bought online` — a Qualifying Charge that does not reach the online limb, `miles per dollar` EQUALS 0.4; on the FAQ's noun it earns 0"
+      ],
+      "notes": [
+        "A fork of a distinct kind: not an ambiguity within one text but a disagreement between two documents of the same bundle, with no priority clause in either.",
+        "Direction of error if the taken reading is wrong: the module OVERSTATES, paying the base rate on travel spend that would earn nothing.",
+        "The corresponding cross-document difference on limb (i) — the FAQ's \"or shopping website\" against the T&C's \"any store\" — is NOT a fork: both documents carry the same MCC table and the same \"determined by the following Merchant Category Codes\" qualifier, so the operative test is identical and no reading of either changes an answer. It is recorded in the external-modifications register as E-faq-citi-shopping-website."
+      ]
+    },
+    {
+      "id": "F-citi-exclusion-para1",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/citi-rewards.l4",
+        "anchor": "5(xii) — the excluded Merchant Categories",
+        "provisions": [
+          "Citi ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion T&C (updated November 2024, with effect from 16 December 2024) paragraph 1",
+          "Citi ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion T&C (updated November 2024, with effect from 16 December 2024) paragraph 2"
+        ]
+      },
+      "source": {
+        "quote": "will be excluded from ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion for transactions listed in Paragraph 2 below:",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Citi ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion T&C (updated November 2024, with effect from 16 December 2024) paragraph 1, which lists the Citi Rewards Card at limb (f)"
+          },
+          {
+            "kind": "provision",
+            "cite": "Citi ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion T&C (updated November 2024, with effect from 16 December 2024) paragraph 2"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "theListApplies",
+          "description": "The named cards, the Citi Rewards Card among them, earn no rewards on the paragraph 2 transactions. Paragraph 1's sentence has an editing error — the word \"Exclusion\" belongs to the title of the document, not to the operative clause — and paragraph 2 states the operative rule without it.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Citi ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion T&C (updated November 2024, with effect from 16 December 2024) paragraph 2 — \"ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate will not be awarded to the above Cards with transactions made in the following Merchant Category Codes\""
+            },
+            {
+              "kind": "provision",
+              "cite": "Citi ThankYou Points / Citi Miles / Cash Back / SMRT$ / Citi M1 Rebate / Cash Rebate Exclusion T&C (updated November 2024, with effect from 16 December 2024) paragraph 1(f) — \"Citi Rewards Card\""
+            }
+          ]
+        },
+        {
+          "id": "excludedFromTheExclusion",
+          "description": "Read literally, the listed cards are \"excluded from ... Exclusion\", i.e. the exclusion list does NOT apply to them, and a Citi Rewards charge at a paragraph 2 MCC earns normally.",
+          "status": "rejected",
+          "rejection_rationale": "It empties the document of effect for every card it names, including the only card in scope here, and paragraph 2 states the contrary in terms. A reading that makes an exclusion list apply to no card is not one the issuer can have meant.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "theListApplies",
+        "mechanism": "encoded",
+        "rationale": "Taken as the only coherent reading, which paragraph 2 states expressly. The Citi Rewards Card is paragraph 1(f), so the list bites on it."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "An intra-document contradiction produced by the drafting: the operative sentence borrows the document's title and so says the opposite of what it means.",
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES, refusing rewards the literal reading would allow."
+      ]
+    },
+    {
+      "id": "F-citi-travel-limb-scope",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/citi-rewards.l4",
+        "anchor": "6, footnote * — travel-related transactions",
+        "provisions": [
+          "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.6(i)",
+          "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.6(ii)",
+          "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.6, footnote *"
+        ]
+      },
+      "source": {
+        "quote": "*For clarity, travel-related transactions refer to transactions which are either wholly or partially related to any form of travel, whether local or overseas and include but are not limited to transactions that fall within the following MCCs",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.6, the footnote marked * and the limb its asterisk sits in"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "footnoteBindsTheOnlineLimbOnly",
+          "description": "The footnote qualifies limb (ii), where its asterisk is printed. Limb (i)'s Merchant Category test is untouched by it.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.6(ii) — the asterisk appears in \"excluding mobile wallet and travel-related transactions*\", inside limb (ii)"
+            }
+          ]
+        },
+        {
+          "id": "footnoteBindsTheWholeClause",
+          "description": "The footnote's own words are written about clause 6 as a whole — \"any transactions at merchants with the following MCCs will not be a 10X Points Eligible Transaction\" — which is the defined term both limbs feed, so it reaches limb (i) too.",
+          "status": "arguable",
+          "foreclosure": "The module attaches the footnote to limb (ii). On the lists as printed the choice cannot change an answer: the eleven apparel MCCs of limb (i) and the travel MCCs of the footnote are disjoint, so no charge reaches both.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "Citi Rewards Card 10X Rewards Promotion T&C (effective 1 April 2024) cl.6, footnote * — \"any transactions at merchants with the following MCCs will not be a 10X Points Eligible Transaction\", a statement about the clause-6 term rather than about limb (ii)"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "footnoteBindsTheOnlineLimbOnly",
+        "mechanism": "encoded",
+        "rationale": "Taken on where the asterisk is printed. Recorded although it is currently moot, because a revision of either MCC list could make the two sets overlap and the reading would then decide answers."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "none",
+      "notes": [
+        "Direction of error if the taken reading is wrong: none on the lists as printed; the readings are extensionally identical today because the two MCC sets do not intersect."
+      ]
+    },
+    {
+      "id": "F-hsbc-faq-contactless",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/hsbc-revolution.l4",
+        "anchor": "5. Selected Contactless Payments",
+        "provisions": [
+          "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.5",
+          "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.7",
+          "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.7.1",
+          "HSBC Revolution Credit Card FAQ (undated; the document carries no currency line) Q2"
+        ]
+      },
+      "source": {
+        "quote": "transactions made via contactless payments (payWave, Apple Pay and Google Pay payment methods). With effect from 15 July 2024, contactless payment transactions will earn 1 HSBC Reward point.",
+        "citations": [
+          {
+            "kind": "instrument",
+            "cite": "HSBC Revolution Credit Card FAQ (undated; the document carries no currency line) Q2"
+          },
+          {
+            "kind": "provision",
+            "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.5 — \"'Selected Contactless Payments' refers to Qualifying Transactions made via Visa contactless through a contactless terminal mode which includes Visa payWave, Apple Pay, Google Pay and Samsung Pay\""
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "tncGoverns",
+          "description": "The T&C governs: a contactless tap at an MCC listed in cl.7 is a Selected Contactless Payment and therefore an Eligible Transaction, earning 10 Reward points per SGD1, or 20 for a cardholder at the SGD50,000 Deposits ADB threshold.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.7 — \"'Eligible Transactions' refers to Selected Contactless Payments and Selected Online Transactions that fall within any one of the following MCCs\""
+            },
+            {
+              "kind": "provision",
+              "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.7.1 — the Base Point and Bonus Point limbs that make an Eligible Transaction earn 10 or 20 Reward points per SGD1"
+            }
+          ]
+        },
+        {
+          "id": "faqGoverns",
+          "description": "The FAQ governs: a contactless payment earns 1 Reward point, whatever the MCC, with effect from 15 July 2024.",
+          "status": "arguable",
+          "foreclosure": "The module answers on the T&C, so the FAQ's rate is not applied anywhere. It is not refuted: the FAQ is the issuer's own document and carries its own commencement date; what defeats it here is that the T&C is both operative and later (effective from 1 April 2026), not that the FAQ is wrong.",
+          "citations": [
+            {
+              "kind": "instrument",
+              "cite": "HSBC Revolution Credit Card FAQ (undated; the document carries no currency line) Q2 — the sentence is dated on its face (\"With effect from 15 July 2024\") and is published by the issuer as an answer about this very card"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "tncGoverns",
+        "mechanism": "encoded",
+        "rationale": "Taken because the T&C is the later, dated, operative instrument and the FAQ is guidance. The conflict is carried as a condition string on every contactless answer rather than resolved silently; the answer's status stays Verified because every condition applied is read from the held T&C with a clause cited."
+      },
+      "status": "resolved",
+      "cross_refs": [
+        "E-faq-hsbc-contactless-1pt"
+      ],
+      "divergence": "observable",
+      "witnesses": [
+        "`a wallet tap at a restaurant` for `a Cardholder with no Everyday Global Account deposits` — `points per dollar` EQUALS 10 and `miles per dollar` EQUALS 4; on the FAQ's reading it is 1 point and 0.4 miles",
+        "`a wallet tap at a restaurant` for `a Cardholder at the SGD50,000 Deposits ADB threshold` — `points per dollar` EQUALS 20, against the FAQ's 1"
+      ],
+      "notes": [
+        "A fork of a distinct kind: a disagreement between two documents of the same bundle, on the single most common transaction the card sees. This is the sharpest source conflict in the corpus and it appears nowhere in the subject spec's section 4.",
+        "Direction of error if the taken reading is wrong: the module OVERSTATES a contactless tap tenfold, or twentyfold at the deposits threshold."
+      ]
+    },
+    {
+      "id": "F-hsbc-amaze-credential",
+      "kind": "vagueness",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/hsbc-revolution.l4",
+        "anchor": "5. Selected Contactless Payments",
+        "provisions": [
+          "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.5",
+          "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.8"
+        ]
+      },
+      "source": {
+        "quote": "“Selected Contactless Payments” refers to Qualifying Transactions made via Visa contactless through a contactless terminal mode which includes Visa payWave, Apple Pay, Google Pay and Samsung Pay.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.5"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "proxyIsNotContactless",
+          "description": "A charge forwarded by a third-party proxy card (Instarem Amaze) is not a Selected Contactless Payment: the Card is charged by the proxy's operator as a separate transaction that never reached the merchant's contactless terminal, so cl.5's \"contactless terminal mode\" is not satisfied and the cl.8 base rate of 1 Reward point applies.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.5 — the qualifying condition is the terminal mode (\"made via Visa contactless through a contactless terminal mode\"), not the cardholder's gesture"
+            },
+            {
+              "kind": "provision",
+              "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.8 — \"Cardholders are entitled to earn 1 Reward point for every SGD1 charged on all other Qualifying Transactions that are not Eligible Transactions\""
+            }
+          ]
+        },
+        {
+          "id": "inclusiveListReachesIt",
+          "description": "cl.5's list is inclusive (\"which includes\"), so it does not shut out other contactless credentials; a proxy card tapped at the terminal is within the definition and earns the Eligible Transaction rate.",
+          "status": "arguable",
+          "foreclosure": "The module refuses the contactless limb for this credential and returns the cl.8 rate with status Unconfirmed. The reading is not refuted by anything in the document — the document simply never mentions the product — which is exactly why the answer is not marked Verified.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.5 — the list of named wallets is introduced by \"which includes\", which does not exhaust the class"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "proxyIsNotContactless",
+        "mechanism": "encoded",
+        "rationale": "Taken as an inference from how the product works rather than from anything the document says, which is why the answer's status is Unconfirmed rather than Verified. A second condition string warns that if the proxy posts under its own MCC (6540 or 4829, both in the cl.4.2 table) the charge earns nothing at all rather than 1 point."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "observable",
+      "witnesses": [
+        "`an Amaze tap at a department store` for `a Cardholder with no Everyday Global Account deposits` — `points per dollar` EQUALS 1 with `status` EQUALS Unconfirmed; the inclusive reading answers 10"
+      ],
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES an Amaze tap tenfold."
+      ]
+    },
+    {
+      "id": "F-hsbc-programme-period",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/hsbc-revolution.l4",
+        "anchor": "2. The Programme period",
+        "provisions": [
+          "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.2"
+        ]
+      },
+      "source": {
+        "quote": "The Programme period starts from 1 April 2026 until terminated by HSBC.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.2"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "answerWithTheCurrentTermsUnconfirmed",
+          "description": "A transaction dated before 1 April 2026 is answered with the figures the current terms would give, and the answer's status drops to Unconfirmed with a condition saying the governing terms are not held.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.2 — the Programme period has a start and no end, so the document says what governs from 1 April 2026 and says nothing about what governed before"
+            }
+          ]
+        },
+        {
+          "id": "answerZeroOutsideThePeriod",
+          "description": "A transaction before the Programme period earns nothing under this document, so the answer is zero.",
+          "status": "rejected",
+          "rejection_rationale": "Returning zero would assert that nothing was earned, which the document does not say: the earlier terms are simply not in the bundle. That is defaulting an unknown to a convenient answer, in the direction that misleads a cardholder about spend they have already made.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "answerWithTheCurrentTermsUnconfirmed",
+        "mechanism": "encoded",
+        "rationale": "Taken because the honest answer to a question about an unheld regime is the current figure marked unconfirmed, not a confident zero. Distinct from an expired source: the period has not ended, it had not begun."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module OVERSTATES for pre-commencement spend if the earlier terms were less generous.",
+        "The same question arises on the UOB document from the other end, where dated gates let an earlier transaction be tested against a later text: see F-uob-version-scope."
+      ]
+    },
+    {
+      "id": "F-hsbc-dining-heading",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/hsbc-revolution.l4",
+        "anchor": "7. Eligible Transactions",
+        "provisions": [
+          "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.7, the category headings",
+          "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.7, row 3 of the MCC table"
+        ]
+      },
+      "source": {
+        "quote": "3501 to 3999, 7011 Lodging – Hotels, Motels, Resorts",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.7 — row 3 of the MCC table, which admits 7011, the code hotel dining posts under"
+          },
+          {
+            "kind": "provision",
+            "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.7 — the left-column category heading printed across the rows for MCC 5441 and 5462, reading \"Dining excluding\" / \"hotel dining\" (the two halves sit on separate table rows in the published PDF and cannot be quoted as one run)"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "theTableGoverns",
+          "description": "The MCC table is operative and the headings are labels. A restaurant charge that posts under MCC 7011 is an Eligible Transaction, the heading notwithstanding.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.7 — the operative words are \"that fall within any one of the following MCCs\", which attach the test to the codes and not to the category names"
+            }
+          ]
+        },
+        {
+          "id": "theHeadingCarvesOut",
+          "description": "\"Dining excluding hotel dining\" is a carve-out that the table cannot override, so a meal charged at a hotel earns the base rate even though 7011 is listed.",
+          "status": "arguable",
+          "foreclosure": "The module tests membership of the MCC list alone; the heading is encoded nowhere and survives as a comment. The reading is not refuted — the heading is the issuer's own words — and it is the site where a native defeasibility construct would make the two visibly incomparable rather than resolving them by the encoder's fiat.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.7 — the heading is printed in the clause itself and is the only place the document distinguishes hotel dining from other dining"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "theTableGoverns",
+        "mechanism": "encoded",
+        "rationale": "Taken on the clause's operative words. Recorded by the encoder as a defeasibility site for the same reason: this is a conflict the encoding resolves silently, where a conflict-raising calculus would report it."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "An intra-document contradiction between a heading and the table beneath it.",
+        "Direction of error if the taken reading is wrong: the module OVERSTATES a hotel restaurant charge, paying the 10X or 20X rate where the base rate would apply."
+      ]
+    },
+    {
+      "id": "F-hsbc-clause42-verb",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/hsbc-revolution.l4",
+        "anchor": "4.2 The Merchant Category Codes that earn no Reward points",
+        "provisions": [
+          "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.4",
+          "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.4.2"
+        ]
+      },
+      "source": {
+        "quote": "For the avoidance of doubt, transactions made at merchants with the following MCCs will not earn Reward Points.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.4.2"
+          },
+          {
+            "kind": "provision",
+            "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.4 — which instead makes the listed transactions not \"Qualifying Transactions\" at all"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "oneZeroAnswer",
+          "description": "The two operations are collapsed into a single zero answer: a transaction caught by either list earns no Reward points.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.4.2 — a zero-earning rule laid over the definition, whose effect on any transaction is the same as failing cl.4's definition, the two lists being disjoint"
+            }
+          ]
+        },
+        {
+          "id": "twoDistinctOperations",
+          "description": "cl.4 removes a transaction from the defined class of Qualifying Transactions, while cl.4.2 leaves it a Qualifying Transaction and withholds the points. The distinction would matter for anything that keys off the defined term rather than off the points.",
+          "status": "arguable",
+          "foreclosure": "The two MCC lists were proved disjoint, so on this document no transaction can be caught by one operation and not the other, and the distinction cannot change an outcome. The disjointness is asserted, so a revision that creates an overlap will fail rather than pass silently.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "HSBC Revolution Credit Card Reward Points Programme T&C (effective from 1 April 2026) cl.4.2 — \"will not earn Reward Points\", against cl.4's \"shall exclude the following transactions\" from the definition itself"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "oneZeroAnswer",
+        "mechanism": "encoded",
+        "rationale": "Taken because the lists are disjoint and the collapse is therefore extensionally exact on the held text. The distinction is recorded in a comment and the disjointness is pinned by an assertion."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "none",
+      "notes": [
+        "Direction of error if the taken reading is wrong: none on the held text; the readings are extensionally equivalent while the two lists remain disjoint."
+      ]
+    },
+    {
+      "id": "F-uob-wef-date-axis",
+      "kind": "fact-convention",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/uob-ladys-solitaire.l4",
+        "anchor": "34. UNI$ will not be awarded for the following Merchant Transaction Codes",
+        "provisions": [
+          "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.8",
+          "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.32(u)",
+          "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.34",
+          "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.35"
+        ]
+      },
+      "source": {
+        "quote": "(wef 1 October 2024)",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.34 — five of the table's rows carry their own commencement, \"(with effect from 1 August 2022)\" or \"(wef 1 October 2024)\", and the clause never says which date the commencement runs against"
+          },
+          {
+            "kind": "provision",
+            "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.8 — \"any Base UNI$ and Bonus UNI$ that may be awarded for any transactions charged to your Card will be computed based on the date that the transaction is posted on UOB's systems\""
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "transactionDate",
+          "description": "A dated exclusion bites on transactions whose TRANSACTION date falls on or after the stated day.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.34 and cl.35 — the dated parentheticals attach to the exclusion rows and name no date axis, leaving the reader to supply one"
+            }
+          ]
+        },
+        {
+          "id": "postingDate",
+          "description": "The commencement runs against the POSTING date, the axis cl.8 fixes for computing UNI$ on any transaction.",
+          "status": "arguable",
+          "foreclosure": "The module applies the corpus-wide transaction-date convention to the dated gates while returning the posting-date axis for the cap, so this reading is not reachable for the gates. Nothing refutes it, and on cl.8's wording it is arguably the better reading.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.8 — the document's only stated date axis, and it is stated for the computation of the very UNI$ these clauses withhold"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "transactionDate",
+        "mechanism": "encoded",
+        "rationale": "Taken as the corpus-wide convention so that the same fact decides commencement across all six issuers. A transaction whose transaction and posting dates straddle a commencement answers differently under the other reading; two assertions pin the boundary."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "observable",
+      "witnesses": [
+        "`a cigar shop buy on 30 September 2024` with `Dining and Family` elected — `miles per dollar` EQUALS 0.4, against `a cigar shop buy on 1 October 2024` EQUALS 0: the pair that a straddling posting date would move"
+      ],
+      "notes": [
+        "Direction of error if the taken reading is wrong: either direction, depending on which side of the commencement the posting falls.",
+        "The module returns `By transaction date` for the dated gates while reporting the cap's attribution as `By posting date` from cl.8, which is consistent only because the two axes answer different questions."
+      ]
+    },
+    {
+      "id": "F-uob-unqualified-unidollar",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/uob-ladys-solitaire.l4",
+        "anchor": "The withholding cascade",
+        "provisions": [
+          "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.32",
+          "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.33",
+          "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.34",
+          "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.35"
+        ]
+      },
+      "source": {
+        "quote": "34. UNI$ will not be awarded for the following Merchant Transaction Codes:",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.34, drafted over bare \"UNI$\""
+          },
+          {
+            "kind": "provision",
+            "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.35 — \"You will also not earn UNI$ for transactions with the following transaction descriptions\""
+          },
+          {
+            "kind": "provision",
+            "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.33"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "bothRewards",
+          "description": "An unqualified \"UNI$\" in cl.32, cl.34 and cl.35 withholds BOTH the Base UNI$ and the Bonus UNI$: the excluded transaction earns nothing.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.33 — where UOB means one reward only it says so: \"Base UNI$ will not be awarded for UOB$ transactions (up till 31 Oct 2024). However, Bonus UNI$ will be awarded if the UOB$ transaction falls under your selected Preferred Rewards Category(ies).\""
+            }
+          ]
+        },
+        {
+          "id": "bonusOnly",
+          "description": "The exclusions reach only the Bonus UNI$, leaving the Base UNI$ intact on an excluded transaction.",
+          "status": "rejected",
+          "rejection_rationale": "cl.33 shows the drafter distinguishing the two rewards expressly when that is meant, and in the same run of clauses; an unqualified \"UNI$\" a clause later therefore reads as both.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "bothRewards",
+        "mechanism": "encoded",
+        "rationale": "Taken on the contrast cl.33 draws within the same run of clauses. It is also the lower answer."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES, returning zero where the base rate would still be earned."
+      ]
+    },
+    {
+      "id": "F-uob-travel-category",
+      "kind": "vagueness",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/uob-ladys-solitaire.l4",
+        "anchor": "Schedule 1 — Transaction Categories",
+        "provisions": [
+          "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) Schedule 1, the Travel row"
+        ]
+      },
+      "source": {
+        "quote": "Credit card retail transaction(s) made at major airlines and/or hotels with their main business activity classified as flights and/or hotels only.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) Schedule 1, the Travel row — the only category defined without a Merchant Category Code list"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "mainBusinessActivity",
+          "description": "Travel is what the Schedule says it is: spend at major airlines and hotels whose main business activity is flights or hotels. That fact is not in a statement line, so where a cardmember has elected Travel the module answers at the base rate and marks the answer Unconfirmed rather than guessing.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) Schedule 1, Travel — the definition is by the merchant's main business activity and \"major\" carrier status, with no MCC list, unlike every other row of the Schedule"
+            }
+          ]
+        },
+        {
+          "id": "airlineAndHotelMccProxy",
+          "description": "Travel means the airline and hotel Merchant Category Codes, read across from how every other category in the Schedule is defined and from how other issuers in this corpus define travel.",
+          "status": "arguable",
+          "foreclosure": "The module declines to award the bonus on a Travel election, so the proxy reading is not applied. It is not refuted: nothing in the document forbids reading the row as the obvious code set, and the words \"major\" and \"main business activity\" are what make a code proxy unsafe rather than wrong.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) Schedule 1 — every other row of the same Schedule is defined by an MCC list, which is evidence that a code-based test is what the Schedule contemplates"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "mainBusinessActivity",
+        "mechanism": "encoded",
+        "rationale": "Taken with an Unconfirmed status at the LOWER rate, and only where the cardmember actually elected Travel; a cardmember who did not elect it is unaffected and stays Verified, which the module asserts both ways on the same airline transaction."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES for a cardmember who elected Travel and charges an airline ticket.",
+        "The fact the Schedule asks for is one a cardholder cannot depose to from a statement line, which is why the domain does not carry it; the vagueness sits in the document, not in the fact model."
+      ]
+    },
+    {
+      "id": "F-uob-single-category-cap",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/uob-ladys-solitaire.l4",
+        "anchor": "6(b) and 8 — the cap that governs, and the date it is attributed by",
+        "provisions": [
+          "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.6(b) and its note"
+        ]
+      },
+      "source": {
+        "quote": "With effect from 1 August 2025, if you hold a Lady’s Solitaire Card, 2,700 UNI$ (which is equivalent to S$1,500 spent), with each Preferred Rewards Category capped at 1,350 UNI$ (which is equivalent to S$750 spent).",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.6(b) and the note printed beneath it"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "perCategoryCeilingBinds",
+          "description": "A cardmember who elects only one Preferred Rewards Category is capped at 1,350 UNI$, which is S$750 of spend: the 2,700 UNI$ is a card-wide ceiling that one category can never reach on its own.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.6(b), the note — \"For illustration purposes, if you have selected only one Preferred Rewards Category, you can earn up to 1,350 UNI$ per calendar month on that selected Preferred Rewards Category. If you have selected two Preferred Rewards Categories, you can earn up to 1,350 UNI$ on each of your two selected Preferred Rewards Categories.\""
+            },
+            {
+              "kind": "instrument",
+              "cite": "UOB Lady's Card FAQ (undated; the document carries no currency line) Q7 — the answer's own note states the post-August-2025 per-category S$750 cap, agreeing with cl.6(b)"
+            }
+          ]
+        },
+        {
+          "id": "cardWideCeilingOnly",
+          "description": "The 2,700 UNI$ is the cap that governs, and a cardmember electing one category may earn the whole of it there.",
+          "status": "rejected",
+          "rejection_rationale": "cl.6(b)'s own illustration says the opposite in terms, and nothing in the clause lets one category's unused room serve the other.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "perCategoryCeilingBinds",
+        "mechanism": "encoded",
+        "rationale": "Taken on the clause's own illustration. A reader planning a single category against the headline 2,700 UNI$ would overstate that category's headroom twofold, which is why the module returns the per-category figure."
+      },
+      "status": "resolved",
+      "cross_refs": [
+        "E-arm-uob-solitaire-cap",
+        "E-faq-uob-shared-bonus"
+      ],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES the monthly headroom of a single-category cardmember by half.",
+        "The UOB FAQ's Q7 contradicts itself across its own two halves on this point, its first sentence describing the superseded single-pot regime; that is recorded as E-faq-uob-shared-bonus rather than as a second reading here, because the half that agrees with the T&C is in the same answer."
+      ]
+    },
+    {
+      "id": "F-uob-cl35-trailing-star",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/uob-ladys-solitaire.l4",
+        "anchor": "35. Excluded transaction descriptions",
+        "provisions": [
+          "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.35"
+        ]
+      },
+      "source": {
+        "quote": "You will also not earn UNI$ for transactions with the following transaction descriptions:",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.35 — thirty of the thirty-nine listed descriptions end in an asterisk, for example \"AXS*\" and \"AMAZE* (wef 1 October 2024)\""
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "starIsAPrefixMarker",
+          "description": "The trailing asterisk marks a prefix: the entry \"AXS*\" catches a statement line that begins \"AXS*SP SERVICES\", which is how such a line is actually printed.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.35 — the listed strings are statement-description stems, and a real line carries the stem followed by the payee, so an entry read as a whole description would catch nothing"
+            }
+          ]
+        },
+        {
+          "id": "starIsLiteralText",
+          "description": "The asterisk is part of the description itself, so only a line equal to \"AXS*\" is caught.",
+          "status": "rejected",
+          "rejection_rationale": "It would leave thirty of the thirty-nine entries with no transaction to match, since no statement line consists of a stem and a bare asterisk.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "starIsAPrefixMarker",
+        "mechanism": "encoded",
+        "rationale": "Taken through layer 1's description families, which match the stem anywhere in the upper-cased line. That is wider than a prefix test and narrower than nothing: it catches the lines the clause is aimed at, and it is an exclusion list, so over-matching understates the reward."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES, refusing UNI$ on a line that carries a listed stem other than at its start.",
+        "One listed entry has no family in the shared domain (\"NORWDS*\"), so no rule in this corpus can recognise such a line. That is a gap, not a reading, and the module records it as the one place where its error runs in the overstating direction.",
+        "The encoder's report recorded exact equality as the choice, on the ground that the prelude has no prefix test. The tree has since moved to layer 1's family test; this entry records the tree."
+      ]
+    },
+    {
+      "id": "F-uob-version-scope",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/uob-ladys-solitaire.l4",
+        "anchor": "The clauses this module cites",
+        "provisions": [
+          "UOB Lady's Cards T&C (updated in August 2025, Version 1.1), the document as a whole",
+          "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.34",
+          "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.35"
+        ]
+      },
+      "source": {
+        "quote": "United Overseas Bank Limited Co. Reg. No. 193500026Z. Updated in August 2025 (Version 1.1)",
+        "citations": [
+          {
+            "kind": "instrument",
+            "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) — the only currency line the document carries"
+          },
+          {
+            "kind": "provision",
+            "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.34 — dated rows such as \"(wef 1 October 2024)\" which, being inside this version, invite an earlier transaction to be tested against it"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "thisVersionGovernsThroughout",
+          "description": "The held version is applied to transactions of any date, with its own dated gates honoured. A 2024 transaction is therefore tested against the August 2025 text.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) cl.34 and cl.35 — the document carries its own commencement dates for individual rows, which is the only versioning it offers and which presupposes that the surrounding text is read as current"
+            }
+          ]
+        },
+        {
+          "id": "onlyTheVersionInForceThenGoverns",
+          "description": "A transaction is governed by the version of the terms in force when it was made, so a 2024 transaction cannot be answered from an August 2025 document at all.",
+          "status": "arguable",
+          "foreclosure": "No earlier version is held, so the module has nothing to answer from under this reading; it answers from the held text and carries the limit as a condition. Nothing refutes the reading — it is how a cardholder agreement actually works.",
+          "citations": [
+            {
+              "kind": "instrument",
+              "cite": "UOB Lady's Cards T&C (updated in August 2025, Version 1.1) — the document states a version and a date of its own (\"Updated in August 2025 (Version 1.1)\"), which implies there were earlier versions that governed earlier spend"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "thisVersionGovernsThroughout",
+        "mechanism": "encoded",
+        "rationale": "Taken because the alternative leaves no answer at all for a transaction before August 2025, and because the document's own dated rows are the only versioning it supplies."
+      },
+      "status": "resolved",
+      "cross_refs": [
+        "E-arm-uob-solitaire-cap"
+      ],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: either direction, since the superseded text is unknown except where the document quotes it (the note under cl.6(b) gives both the 3,600 UNI$ and 2,700 UNI$ figures).",
+        "The mirror question on the HSBC document, where the Programme period begins after the transaction rather than before it, is F-hsbc-programme-period."
+      ]
+    },
+    {
+      "id": "F-womans-online-definition",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/dbs-womans-world.l4",
+        "anchor": "13 and 14. How DBS determines an online transaction, and the transaction date",
+        "provisions": [
+          "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.11",
+          "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.13"
+        ]
+      },
+      "source": {
+        "quote": "DBS determines an online transaction based on system indicators. These indicators are decided by the merchant and their banker, and passed to DBS when the transaction is posted to the Card.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.13"
+          },
+          {
+            "kind": "provision",
+            "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.11 — \"'Online spend' refers to retail transaction for goods and services made via the Internet and processed by the respective merchants/acquirers as an online transaction through Mastercard Worldwide networks\""
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "indicatorDecides",
+          "description": "cl.13 governs: whether a transaction is online is decided by the merchant's system indicator, not by how the cardholder paid. The credential and the payment channel decide nothing.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.13 — the clause is expressly about how DBS \"determines an online transaction\", which is the operative question"
+            },
+            {
+              "kind": "provision",
+              "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.11 — the definition itself already requires the transaction to be \"processed by the respective merchants/acquirers as an online transaction\", which is the indicator"
+            }
+          ]
+        },
+        {
+          "id": "viaTheInternetDecides",
+          "description": "cl.11's \"made via the Internet\" is the test, so a purchase the cardholder made on a website is online spend whatever indicator the acquirer sets.",
+          "status": "rejected",
+          "rejection_rationale": "cl.13 is the clause that says how the determination is made, and cl.11's own words already defer to how the merchant and acquirer processed the charge. On the cardholder's-act reading, cl.13 would have nothing to do.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "indicatorDecides",
+        "mechanism": "encoded",
+        "rationale": "Taken so completely that no rule in the module reads the credential or the payment channel at all: that absence IS the encoding of cl.13. A reviewer auditing the file against the document will find cl.11's \"via the Internet\" nowhere in the code, which is deliberate."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "observable",
+      "witnesses": [
+        "`a wallet tap the merchant flags card-present` — `miles per dollar` EQUALS 0.4, against `a wallet payment the merchant flags online` EQUALS 4: the same credential, two indicators, two answers; under the cardholder's-act reading the tap in a shop would still be card-present but a website purchase on the plastic card would become online spend"
+      ],
+      "notes": [
+        "Direction of error if the taken reading is wrong: either direction; the readings disagree in both directions on the same facts.",
+        "This is the site a secondary source is most likely to get wrong: a household cheat sheet that says an in-store wallet tap \"counts as online\" is refuted on cl.11 and cl.13 read together."
+      ]
+    },
+    {
+      "id": "F-womans-table2-matching",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/dbs-womans-world.l4",
+        "anchor": "11. Definitions and Exclusion, Online spend",
+        "provisions": [
+          "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.11(ii)",
+          "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) Table 2"
+        ]
+      },
+      "source": {
+        "quote": "transactions matching the terms listed in Table 2 below;",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.11(ii) and the ninety terms of Table 2"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "unanchoredSubstring",
+          "description": "A transaction \"matches\" a Table 2 term when the statement line CARRIES that term anywhere in it, with no word boundary required: \"AMAZE*NTUC FAIRPRICE\" matches AMAZE.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) Table 2 — the entries are payment-instrument tokens (\"AMAZE\", \"CARDUP\", \"SHOPEEPAY\") that a statement line carries with a suffix and no separator, so a boundary-respecting test would miss the lines the clause is aimed at"
+            }
+          ]
+        },
+        {
+          "id": "exactEquality",
+          "description": "Only a description equal to a Table 2 term is excluded.",
+          "status": "rejected",
+          "rejection_rationale": "It would match almost nothing a statement prints, and the clause says \"matching\", not \"equal to\".",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "unanchoredSubstring",
+        "mechanism": "encoded",
+        "rationale": "Taken deliberately in the over-matching direction: Table 2 is an EXCLUSION list, so an over-match understates the reward and can never overstate it. Two known false positives are asserted in the module so the behaviour is on the record rather than a surprise."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES, refusing the bonus on an \"AMAZED BOOKS\" or \"TRANSITION GYM\" line that carries a listed token inside an ordinary word.",
+        "cl.11(vii) of the same clause needed the OPPOSITE treatment, which is a second fork rather than an inconsistency: see F-womans-cl11vii-boundaries.",
+        "The two assertions that record the false positives pass a STRING to `Table 2 of clause 11 matches the description`, which now takes a Transaction; they were not counted as witnesses here for that reason, and the mismatch is worth a look independently of this register."
+      ]
+    },
+    {
+      "id": "F-womans-case-folding",
+      "kind": "fact-convention",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/classify.l4",
+        "anchor": "Layer 1 — reading the statement line into the domain's enumerations",
+        "provisions": [
+          "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.11(ii) and Table 2",
+          "DBS yuu Card T&C (updated on 7 August 2026) cl.9(i)"
+        ]
+      },
+      "source": {
+        "quote": "Sgebiz",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) Table 2 — the table lists \"Sgebiz\" and \"SGeBiz\" as two separate entries, differing only in case"
+          },
+          {
+            "kind": "provision",
+            "cite": "DBS yuu Card T&C (updated on 7 August 2026) cl.9(i) — the same pair appears in the DBS yuu list of excluded terms, again as two entries"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "caseInsensitive",
+          "description": "Matching ignores case. The issuer's own decision to print the same token twice in two casings is evidence that it is matching text without regard to case, and a statement feed does not guarantee a casing anyway.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) Table 2 — \"Sgebiz\" and \"SGeBiz\" printed as separate entries, which has no work to do on a case-insensitive reading and no coherent purpose on a case-sensitive one"
+            }
+          ]
+        },
+        {
+          "id": "caseSensitive",
+          "description": "The terms are matched exactly as printed, which is why the issuer had to list both casings.",
+          "status": "rejected",
+          "rejection_rationale": "It would make the exclusion turn on a merchant's or acquirer's choice of capitalisation, so \"SGEBIZ\" on a real statement would escape a list that names the merchant twice.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "caseInsensitive",
+        "mechanism": "encoded",
+        "rationale": "Taken once for the whole corpus in layer 1, which upper-cases both the line and the needle before testing."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES, refusing rewards on casings the document did not print.",
+        "The convention is corpus-wide, which is why this entry is sited in classify.l4 rather than in a card module."
+      ]
+    },
+    {
+      "id": "F-womans-sam-truncated",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/classify.l4",
+        "anchor": "Layer 1 — reading the statement line into the domain's enumerations",
+        "provisions": [
+          "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) Table 2, the entry \"SAM –\"",
+          "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.11(vii)"
+        ]
+      },
+      "source": {
+        "quote": "SAM –",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) Table 2 — the entry is printed as \"SAM –\", a token, a space and an en-dash with nothing after it; the truncation is in the PDF itself and is present in both extractions"
+          },
+          {
+            "kind": "provision",
+            "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.11(vii) — which separately names \"SAM online bill payments\""
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "verbatimTruncatedEntry",
+          "description": "The entry is encoded as printed, so it matches a line carrying \"SAM –\" (or its hyphen twin) and almost nothing else. Table 2's neighbouring entry \"SAM PAYMENTS\" and cl.11(vii)'s \"SAM online bill payments\" do the rest of the work.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) Table 2 — the adjacent entry \"SAM PAYMENTS\" shows the list naming SAM in full elsewhere, so reading the truncated entry narrowly does not leave the instrument unlisted"
+            }
+          ]
+        },
+        {
+          "id": "restoreToTheBareToken",
+          "description": "The entry is a truncated \"SAM\" and should be read as the bare token, matching any line carrying SAM.",
+          "status": "rejected",
+          "rejection_rationale": "On an unanchored test the bare token would catch \"SAMSUNG\", \"SAMSONITE\" and every other line containing those three letters, which would withdraw the bonus from ordinary retail spend. The document's own neighbouring entries show it naming the instrument in full when it means it.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "verbatimTruncatedEntry",
+        "mechanism": "encoded",
+        "rationale": "Taken because the safe direction here is the opposite of the usual one: this is an exclusion list, but a three-letter needle matched unanchored would exclude far more than the issuer can have meant, so the truncated entry is kept as printed."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module OVERSTATES, paying the bonus on a SAM-described line that the issuer meant to exclude.",
+        "A defect of the source document rather than of its drafting: the entry is cut off in the published PDF."
+      ]
+    },
+    {
+      "id": "F-womans-cl11vii-boundaries",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/dbs-womans-world.l4",
+        "anchor": "11. Definitions and Exclusion, Online spend",
+        "provisions": [
+          "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.11(vii)"
+        ]
+      },
+      "source": {
+        "quote": "interest, finance charges, cash advances, cash withdrawal, balance transfer, smart cash, AXS payments, SAM online bill payments, bill payments via internet banking, and all fees charged by DBS; and",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.11(vii)"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "wordBoundaries",
+          "description": "cl.11(vii)'s terms are ordinary English words and are matched WITH their boundaries, so a line must carry the word rather than the letters: \"INTEREST CHARGE\" is caught and \"PINTEREST ADS\" is not.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.11(vii) — the limb names financial instruments in ordinary English (\"interest\", \"balance transfer\", \"cash advances\"), not statement tokens, unlike Table 2 in the same clause"
+            }
+          ]
+        },
+        {
+          "id": "unanchoredSubstring",
+          "description": "The same unanchored test used for Table 2 is applied to cl.11(vii) as well.",
+          "status": "rejected",
+          "rejection_rationale": "Measured: an unanchored test makes \"PINTEREST ADS\", \"WINTERESTATE CAFE\" and \"DISINTERESTED LTD\" all interest charges, withdrawing the bonus from ordinary advertising and restaurant spend. The over-matching that is safe for a token list is not safe for a list of English words.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "wordBoundaries",
+        "mechanism": "encoded",
+        "rationale": "Taken because the two lists in one clause are lists of different things: Table 2's entries are statement tokens that run into a suffix, cl.11(vii)'s are words. Three negative assertions lock the boundary behaviour."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module OVERSTATES, paying the bonus on a fee or interest posting whose description does not carry the word with boundaries.",
+        "The three negative assertions name `the instruments named in clause 11 vii appear in`, for which no definition was found in this module or in classify.l4; they were not counted as witnesses here for that reason."
+      ]
+    },
+    {
+      "id": "F-womans-bonus-stacking",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/dbs-womans-world.l4",
+        "anchor": "15 to 19. DBS Woman's World Card, 10X Rewards on Online Spend and 3X Rewards on Overseas Spend",
+        "provisions": [
+          "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.16",
+          "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.18",
+          "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.19"
+        ]
+      },
+      "source": {
+        "quote": "Bonus Rewards – Overseas Spend Additional 2X DBS Points Next working day Bonus Rewards – Online Spend Additional 9X DBS Points Next calendar month for local spend Additional 7X DBS Points for overseas spend",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.16, the mechanics table"
+          },
+          {
+            "kind": "provision",
+            "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.18, Bonus Rewards – Overseas Spend"
+          },
+          {
+            "kind": "provision",
+            "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.19, Bonus Rewards – Online Spend"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "additive",
+          "description": "The overseas bonus and the online bonus stack on the base: overseas online spend earns 1 + 2 + 7 = 10X, and local online spend earns 1 + 9 = 10X.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.16 — the table writes each bonus as \"Additional\", against a Base Rewards row of 1X"
+            },
+            {
+              "kind": "provision",
+              "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.19(a) — the separate 7X figure for OVERSEAS online spend makes sense only on top of cl.18's 2X, since it is otherwise a smaller reward for spend that satisfies more conditions"
+            }
+          ]
+        },
+        {
+          "id": "exclusive",
+          "description": "The online bonus replaces the overseas bonus, so overseas online spend earns 1 + 7 = 8X.",
+          "status": "rejected",
+          "rejection_rationale": "It leaves cl.19(a)'s two figures unexplained: on the exclusive reading overseas online spend would earn less than local online spend for no stated reason, and the document's own table calls both bonuses \"Additional\".",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "additive",
+        "mechanism": "encoded",
+        "rationale": "Taken on the document's own arithmetic: the two figures 9X (local) and 7X (overseas) reconcile to one headline rate of 10X precisely because the overseas 2X is still there. Asserted both ways."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module OVERSTATES overseas online spend by 2X."
+      ]
+    },
+    {
+      "id": "F-womans-unheld-overlay",
+      "kind": "encoding-placement",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/dbs-womans-world.l4",
+        "anchor": "The answer",
+        "provisions": [
+          "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.6",
+          "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.10",
+          "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.12"
+        ]
+      },
+      "source": {
+        "quote": "DBS Rewards Programme Terms and Conditions apply. A copy of which can be found on www.dbs.com.sg/iwov-resources/pdf/cards/rewards_programme_tnc.pdf.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.6"
+          },
+          {
+            "kind": "provision",
+            "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.10 — \"DBS Points will be awarded based on the amount of eligible retail transaction(s) charged\", a term the unheld document defines"
+          },
+          {
+            "kind": "provision",
+            "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.12 — overseas spend excludes \"transactions which are excluded from the awarding of DBS Points as set out in the DBS Rewards Programme Terms and Conditions\""
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "verifiedOnWhatIsHeld",
+          "description": "An answer is Verified as to what the held document says, and the unheld overlay travels as a condition string beside the figure. Every condition actually applied is read from the held text with a clause cited, and the overlay is uniform across answers, so it cannot discriminate between them.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.6 — the incorporation is general and applies equally to every transaction this module answers about"
+            }
+          ]
+        },
+        {
+          "id": "unconfirmedThroughout",
+          "description": "Every answer should be Unconfirmed, because the governing overlay is not held and cl.12 reaches into the very definition being applied.",
+          "status": "arguable",
+          "foreclosure": "The module marks answers Verified and carries the overlay as a condition, so the stricter posture is not reachable. It is not refuted and is defensible; it was not taken because it would empty the status field of information by setting every answer to the same value.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "DBS Woman's Card Promotions and Programmes T&C (updated 27 Jul 2026) cl.12 — the exclusion is inside the definition of overseas spend, not a general incorporation, so an overseas answer depends on a document nobody has read"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "verifiedOnWhatIsHeld",
+        "mechanism": "encoded",
+        "rationale": "Taken so that the status field still discriminates between answers. The encoder flagged the choice for this register: flipping it is a one-line change."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Not an ambiguity of the document's words but of where an unheld incorporated document belongs in the encoding: in the status of every answer, or in a condition string beside it.",
+        "Direction of error if the taken reading is wrong: the module OVERSTATES its own confidence, reporting Verified where an unread document could change the answer."
+      ]
+    },
+    {
+      "id": "F-passion-appendix-scope",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/posb-passion.l4",
+        "anchor": "Appendix 1 — the Exclusion List",
+        "provisions": [
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.7(b)(i)",
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) Appendix 1"
+        ]
+      },
+      "source": {
+        "quote": "The following Exclusion List is applicable for Qualified Spend under clause 7bi, and is subject to changes from time to time without prior notice.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) Appendix 1, its own header"
+          },
+          {
+            "kind": "provision",
+            "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.7(b)(i) — \"1X yuu Point from Participating Merchants (subject to Excluded Product listed in Appendix 1)\""
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "wholeBaseAward",
+          "description": "Where Appendix 1 excludes, the WHOLE 3X base award is withheld, not only cl.7(b)(i)'s 1X limb.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) Appendix 1, the Singtel row — \"Base points will not be awarded for all in-stores and online purchases\", which speaks of the Base points of cl.7 as a whole rather than of the 1X limb"
+            },
+            {
+              "kind": "provision",
+              "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) Appendix 1, the DFI rows — the entries are written in the vocabulary of \"base points\" and \"bonus points\", which are cl.7's and cl.8's names for the whole 3X and the whole 15X"
+            }
+          ]
+        },
+        {
+          "id": "onlyTheOneXLimb",
+          "description": "The Appendix reaches only cl.7(b)(i)'s 1X merchant limb, as its own header says, leaving cl.7(b)(ii)'s 2X from POSB intact at an excluded merchant.",
+          "status": "arguable",
+          "foreclosure": "The module withholds the whole base award wherever the Appendix bites, so the surviving 2X is unreachable. Nothing refutes this reading — it is what the Appendix's own header says — and it was not taken because the entries inside the Appendix speak of the whole award and because withholding more is the lower answer.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) Appendix 1 header — \"The following Exclusion List is applicable for Qualified Spend under clause 7bi\", which names the 1X limb and no other"
+            },
+            {
+              "kind": "provision",
+              "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.7(b)(i) — the only limb the document makes \"subject to Excluded Product listed in Appendix 1\""
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "wholeBaseAward",
+        "mechanism": "encoded",
+        "rationale": "Taken as the lower figure and as what the Singtel entry says on its face. The Appendix contradicts its own header, and one DFI entry (\"All services (bonus points only, base points exclusion)\") reads both ways inside a single parenthetical."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "observable",
+      "witnesses": [
+        "`a Singtel Exclusive Retailers purchase in June 2025` for `a linked Cardmember` in `a month meeting both thresholds` — `points per dollar` EQUALS 0; on the narrow reading the 2X POSB limb survives and the answer is 2"
+      ],
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES by 2X at every excluded merchant."
+      ]
+    },
+    {
+      "id": "F-passion-singtel-conflict",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/posb-passion.l4",
+        "anchor": "Appendix 1 — the Exclusion List",
+        "provisions": [
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.5(iv)",
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) Appendix 1, the Singtel row"
+        ]
+      },
+      "source": {
+        "quote": "Base points will not be awarded for all in-stores and online purchases, and recurring bill payment and bill payment.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) Appendix 1, Singtel"
+          },
+          {
+            "kind": "provision",
+            "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.5(iv) — \"Singtel: SingtelShop! and Singtel Exclusive Retailers, excluding Singtel recurring bill payments\", which admits those very stores as Participating Stores"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "appendixPrevails",
+          "description": "The Appendix prevails on the facts it covers: a purchase at SingtelShop! or a Singtel Exclusive Retailer earns no base points, even though cl.5(iv) admits the store.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) Appendix 1, Singtel — the entry is specific to the merchant and to the award, where cl.5(iv) merely lists the store among six groups"
+            }
+          ]
+        },
+        {
+          "id": "clause5Prevails",
+          "description": "cl.5(iv) prevails: it admits the stores expressly and carves out only recurring bill payments, so an in-store purchase earns the 3X base award and the Appendix entry is inconsistent surplusage.",
+          "status": "arguable",
+          "foreclosure": "The module returns zero on Singtel purchases, so this reading is unreachable. Neither provision says which yields, and nothing refutes reading the specific carve-out in cl.5(iv) as the exhaustive one.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.5(iv) — the clause admits the two Singtel store types and states its own carve-out (\"excluding Singtel recurring bill payments\"), which would be pointless if no Singtel purchase earned anything"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "appendixPrevails",
+        "mechanism": "encoded",
+        "rationale": "Taken as the lower figure, with a condition string naming the conflict in words. The encoder recorded it as the sharpest site in the document and as the one where the hand encoding is least honest: it resolves by rule ordering what the document leaves open, where a conflict-raising calculus would report an unresolved conflict."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "observable",
+      "witnesses": [
+        "`a Singtel Exclusive Retailers purchase in June 2025` for `a linked Cardmember` in `a month meeting both thresholds` — `points per dollar` EQUALS 0; on the cl.5(iv) reading the same purchase earns 3"
+      ],
+      "notes": [
+        "An intra-document contradiction: two provisions reach opposite results on identical facts and the document states no priority.",
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES, returning 0 where 3 points per dollar would be earned.",
+        "The DBS yuu document carries the same conflict on the same merchant in its own words: see F-yuu-singtel-contradiction."
+      ]
+    },
+    {
+      "id": "F-passion-15x-venue",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/posb-passion.l4",
+        "anchor": "Clause 6 and clause 7 — Base Points, and clause 8 — POSB Bonus Points",
+        "provisions": [
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.8",
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.8(a)"
+        ]
+      },
+      "source": {
+        "quote": "Cardmember can earn 15X yuu Points when Cardmember meets all the following Qualified Spend criteria within each Qualifying month i. At least S$300 total spend at Participating Stores ii. At least S$400 total spend at non-Participating Stores",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.8 and cl.8(a) — which state the thresholds and never state where the 15X is earned"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "atParticipatingStores",
+          "description": "The 15X bonus is earned at Participating Stores, the same venue as the 3X base award; the non-Participating limb of cl.8(a) is a qualifying condition, not a place the bonus is paid.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.6 — the document's own headline adds the limbs, \"Base Points 1.5% cash rebates (3X yuu Points)\" and \"POSB Bonus Points 7.5% cash rebates (15X yuu Points)\", summing to the 9% and 18X of the promotion's title, which they can only do at one place"
+            }
+          ]
+        },
+        {
+          "id": "anywhereQualifiedSpendIsMade",
+          "description": "The bonus is earned on all Qualified Spend once the two thresholds are met, including spend at non-Participating Stores, since cl.8 attaches the 15X to the Qualifying month rather than to a venue.",
+          "status": "arguable",
+          "foreclosure": "The module pays the bonus only at Participating Stores, so the wider venue is unreachable. Nothing refutes it: cl.8 simply never states a venue, which is why the question arises at all.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.8(a) — the criteria expressly count spend at non-Participating Stores, which is the only place in the promotion where such spend does any work"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "atParticipatingStores",
+        "mechanism": "encoded",
+        "rationale": "Taken on the document's own title arithmetic: 1.5% + 7.5% is the 9% the promotion is named for, and 3X + 15X is its 18X, which requires the two rates to meet at one venue."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES, paying no bonus on qualifying spend made away from a Participating Store."
+      ]
+    },
+    {
+      "id": "F-passion-threshold-timing",
+      "kind": "fact-convention",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/posb-passion.l4",
+        "anchor": "Clause 6 and clause 7 — Base Points, and clause 8 — POSB Bonus Points",
+        "provisions": [
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.8(a)",
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.8(b)",
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.8(e)"
+        ]
+      },
+      "source": {
+        "quote": "within each Qualifying month",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.8(a) — the two thresholds, tested \"within each Qualifying month\""
+          },
+          {
+            "kind": "provision",
+            "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.8(b) — the bonus is credited \"by the Fulfilment Date for each Qualifying Month as defined in Clause 8e\", which falls a month or more after the month closes"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "runningTotalAtTheMoment",
+          "description": "The thresholds are tested on the month's totals SO FAR, at the moment the question is asked, so a transaction made before the month clears both thresholds is answered at the base rate.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.8(a) — the criteria are stated as monthly totals with no rule for a transaction made before the month closes, and the module answers about one transaction at the moment it is made"
+            }
+          ]
+        },
+        {
+          "id": "wholeMonthTotal",
+          "description": "The thresholds are tested on the COMPLETED Qualifying month, so every transaction in a month that ends up qualifying earns the bonus, whenever in the month it was made.",
+          "status": "arguable",
+          "foreclosure": "The module reads the month through running counters available at decision time and cannot see the completed month. This is the better-supported reading of the document and it is foreclosed by what the answer is for, not by any argument against it.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.8(b) and cl.8(e) — the bonus is credited at a Fulfilment Date one to two months after the Qualifying Month, by which time the month is complete, which is the document's own reading of its own test"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "runningTotalAtTheMoment",
+        "mechanism": "encoded",
+        "rationale": "Taken because it is what an app can know at decision time and because it understates rather than overstates. The encoder recorded it as a genuine divergence rather than a resolved ambiguity: the document's own reading is the other one."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "observable",
+      "witnesses": [
+        "`a Cold Storage swipe in June 2025` in `a month one dollar short of the S$400 limb` — `points per dollar` EQUALS 3, against the same swipe in `a month meeting both thresholds` EQUALS 18: the same purchase, answered by where the month stood when it was made"
+      ],
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES early-month transactions in a month that later qualifies, by 15X.",
+        "The same shape arises on the DBS yuu document: see F-yuu-threshold-timing."
+      ]
+    },
+    {
+      "id": "F-passion-mandai-online",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/posb-passion.l4",
+        "anchor": "Clause 5 — Participating Stores",
+        "provisions": [
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.5(iii)"
+        ]
+      },
+      "source": {
+        "quote": "(with effect from 1 December 2023 only online ticketing sites will be eligible)",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.5(iii), the Mandai Wildlife Group entry"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "cardholderChannel",
+          "description": "\"Online ticketing sites\" is read on the cardholder's payment channel: a ticket bought on a website or in an app is eligible, one bought at the counter is not. Card-on-file and recurring billing are deliberately excluded, a zoo ticket not being a subscription.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.5(iii) — the distinction drawn is between an online ticketing site and the park's own counter, which is a fact the cardholder knows at the moment of payment"
+            }
+          ]
+        },
+        {
+          "id": "merchantIndicator",
+          "description": "The restriction is read on the acquirer's online system indicator, as DBS reads \"online\" elsewhere in this family of documents.",
+          "status": "rejected",
+          "rejection_rationale": "The clause names a SITE (\"online ticketing sites\"), not a processing mode, and this document nowhere adopts the system-indicator machinery that the DBS Woman's Card terms set up in their cl.13. Reading in a latent indicator would make the eligibility of a zoo ticket depend on a fact the buyer cannot see.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "cardholderChannel",
+        "mechanism": "encoded",
+        "rationale": "Taken on what the clause distinguishes: an online ticketing site against an on-site counter."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "observable",
+      "witnesses": [
+        "`a Night Safari ticket bought online in June 2025` EQUALS 3 against `a Night Safari ticket bought at the counter in June 2025` EQUALS 0 — the pair the indicator reading would decide on a different fact"
+      ],
+      "notes": [
+        "Direction of error if the taken reading is wrong: either direction, since the two facts (what the buyer did, what the acquirer flagged) can disagree in both directions on the same ticket."
+      ]
+    },
+    {
+      "id": "F-passion-local-currency",
+      "kind": "vagueness",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/posb-passion.l4",
+        "anchor": "Clause 4 — Qualified Spend, and clauses 7(d) and 8(d) — where it may be made",
+        "provisions": [
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.4",
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.7(d)",
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.8(d)"
+        ]
+      },
+      "source": {
+        "quote": "It includes only retail transactions as defined in clause 7a and clause 8a, that are in local currency, charged to Mastercard, and successfully posted to the Card account.",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.4"
+          },
+          {
+            "kind": "provision",
+            "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.7(d) and cl.8(d) — which exclude transactions \"charged in foreign currencies\", the complement of the same undefined term"
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "singaporeDollars",
+          "description": "\"Local currency\" means Singapore dollars, matched on the posting currency.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.7(d) and cl.8(d) — the promotion excludes foreign-currency charges and spend outside Singapore, so the locality it means is Singapore's"
+            }
+          ]
+        },
+        {
+          "id": "currencyOfThePlaceOfPurchase",
+          "description": "\"Local\" is relative to where the purchase was made, so a charge in the local currency of a foreign country would qualify.",
+          "status": "rejected",
+          "rejection_rationale": "cl.7(d) and cl.8(d) exclude transactions made outside Singapore in the same breath as foreign-currency ones, which leaves no case for this reading to govern.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "singaporeDollars",
+        "mechanism": "encoded",
+        "rationale": "Taken as the only locality the promotion contemplates. The test is on the posting currency, matched case-insensitively against the ISO code."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "observable",
+      "witnesses": [
+        "`a Cold Storage swipe charged in ringgit` for `a linked Cardmember` in `a month meeting both thresholds` — `points per dollar` EQUALS 0"
+      ],
+      "notes": [
+        "Direction of error if the taken reading is wrong: the module UNDERSTATES, refusing a charge in a foreign local currency; on the held clauses no such charge can qualify anyway."
+      ]
+    },
+    {
+      "id": "F-passion-stores-vs-merchants",
+      "kind": "statutory-wording",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/posb-passion.l4",
+        "anchor": "Clause 5 — Participating Stores",
+        "provisions": [
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.5",
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.7(b)(i)",
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) Appendix 1, its title"
+        ]
+      },
+      "source": {
+        "quote": "1X yuu Point from Participating Merchants (subject to Excluded Product listed in Appendix 1), which will be credited to Cardmembers’ yuu Account at point of transaction",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.7(b)(i), which awards the 1X \"from Participating Merchants\""
+          },
+          {
+            "kind": "provision",
+            "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.5, which defines \"Participating Stores\" and never defines \"Participating Merchants\""
+          },
+          {
+            "kind": "provision",
+            "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) Appendix 1 — titled \"Exclusion List for Participating Merchants\""
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "oneConcept",
+          "description": "\"Participating Merchants\" and \"Participating Stores\" name the same thing: the document uses both and defines only the second.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.5 — the only definition the document gives, and the one every operative clause depends on"
+            }
+          ]
+        },
+        {
+          "id": "twoConcepts",
+          "description": "The two terms name different classes, so the 1X limb and the Appendix reach a set of merchants that cl.5 does not define.",
+          "status": "rejected",
+          "rejection_rationale": "Nothing in the document defines the second term or lists its members, so this reading leaves cl.7(b)(i) and the whole of Appendix 1 without a referent.",
+          "citations": []
+        }
+      ],
+      "taken": {
+        "reading": "oneConcept",
+        "mechanism": "encoded",
+        "rationale": "Taken because the alternative leaves two operative provisions with nothing to operate on."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "none",
+      "notes": [
+        "Direction of error if the taken reading is wrong: unknowable, since the second class has no stated membership."
+      ]
+    },
+    {
+      "id": "F-passion-mastercard-untested",
+      "kind": "fact-convention",
+      "materialisation": "resolved-at-encode",
+      "site": {
+        "file": "jl4/examples/legal/miles-card/posb-passion.l4",
+        "anchor": "Clause 4 — Qualified Spend, and clauses 7(d) and 8(d) — where it may be made",
+        "provisions": [
+          "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.4"
+        ]
+      },
+      "source": {
+        "quote": "charged to Mastercard",
+        "citations": [
+          {
+            "kind": "provision",
+            "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.4 — Qualified Spend includes only transactions \"charged to Mastercard\""
+          }
+        ]
+      },
+      "readings": [
+        {
+          "id": "satisfiedByConstruction",
+          "description": "The condition is treated as satisfied and is not tested: the PAssion POSB Debit Card is a Mastercard product, so every transaction this module is asked about is charged to Mastercard. The limitation travels as a condition string on every answer.",
+          "status": "live",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.4 — the requirement is about the card's network, a property of the card rather than of the individual purchase, and the promotion is offered on a single card product"
+            }
+          ]
+        },
+        {
+          "id": "aPerTransactionTest",
+          "description": "The requirement is a per-transaction test that must be evaluated, so a charge routed other than over Mastercard earns nothing under the promotion.",
+          "status": "arguable",
+          "foreclosure": "No fact in the domain records a transaction's card network, so the condition cannot be evaluated and the module does not test it. This is a gap in the fact model forcing the reading, not an argument against the reading.",
+          "citations": [
+            {
+              "kind": "provision",
+              "cite": "PAssion POSB Debit Card 'Up to 9% Cash Rebates (18X yuu Points)' Promotion T&C (updated as of 30 May 2025) cl.4 — the condition is written into the definition of Qualified Spend alongside conditions that are plainly per-transaction (local currency, successfully posted)"
+            }
+          ]
+        }
+      ],
+      "taken": {
+        "reading": "satisfiedByConstruction",
+        "mechanism": "encoded",
+        "rationale": "Taken because the domain carries no card-network fact and the alternative would make every answer a refusal; the assumption is disclosed on every answer rather than made silently."
+      },
+      "status": "resolved",
+      "cross_refs": [],
+      "divergence": "unassessed",
+      "notes": [
+        "Recorded although the choice was forced by a missing fact rather than by the text, because the gap decided a reading: a reviewer needs to see that a stated condition of the promotion is never tested.",
+        "Direction of error if the taken reading is wrong: the module OVERSTATES, awarding points on a charge that did not run over Mastercard."
+      ]
+    }
+  ]
+}

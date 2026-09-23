@@ -11,7 +11,7 @@
       "materialisation": "interpretation-field",
       "interpretation_field": "stirpital division starts at the child generation",
       "site": {
-        "file": "jl4/examples/legal/sg-succession/sg-isa.l4",
+        "file": "jl4/examples/canon/sg/succession/sg-isa.l4",
         "anchor": "`distribute` _ `per stirpes among` _ `citing` _",
         "provisions": [
           "ISA s 7 rule 3",
@@ -73,7 +73,7 @@
       "materialisation": "delegated-to-fact",
       "delegated_field": "Family.children",
       "site": {
-        "file": "jl4/examples/legal/sg-succession/sg-succession-domain.l4",
+        "file": "jl4/examples/canon/sg/succession/sg-succession-domain.l4",
         "anchor": "DECLARE Family",
         "provisions": [
           "ISA s 3"
@@ -149,7 +149,7 @@
       "materialisation": "interpretation-field",
       "interpretation_field": "a sibling's children take per stirpes",
       "site": {
-        "file": "jl4/examples/legal/sg-succession/sg-isa.l4",
+        "file": "jl4/examples/canon/sg/succession/sg-isa.l4",
         "anchor": "`the section 7 shares of` -- rule 6 arm",
         "provisions": [
           "ISA s 7 rule 6"
@@ -214,7 +214,7 @@
       "kind": "encoding-placement",
       "materialisation": "resolved-at-encode",
       "site": {
-        "file": "jl4/examples/legal/sg-succession/sg-succession-domain.l4",
+        "file": "jl4/examples/canon/sg/succession/sg-succession-domain.l4",
         "anchor": "DECLARE Will -- `proportion of the estate beneficially disposed of`",
         "provisions": [
           "ISA s 10",
@@ -275,7 +275,7 @@
       "kind": "vagueness",
       "materialisation": "resolved-at-encode",
       "site": {
-        "file": "jl4/examples/legal/sg-succession/sg-isa.l4",
+        "file": "jl4/examples/canon/sg/succession/sg-isa.l4",
         "anchor": "`the Singapore immovable share of`",
         "provisions": [
           "ISA s 4",
@@ -342,7 +342,7 @@
       "materialisation": "delegated-to-fact",
       "delegated_field": "Family.siblings",
       "site": {
-        "file": "jl4/examples/legal/sg-succession/sg-isa.l4",
+        "file": "jl4/examples/canon/sg/succession/sg-isa.l4",
         "anchor": "`the section 7 shares of` -- rule 6 arm",
         "provisions": [
           "ISA s 6(b)",
@@ -404,7 +404,7 @@
       "kind": "statutory-wording",
       "materialisation": "resolved-at-encode",
       "site": {
-        "file": "jl4/examples/legal/sg-succession/sg-paa.l4",
+        "file": "jl4/examples/canon/sg/succession/sg-paa.l4",
         "anchor": "letters of administration on intestacy",
         "provisions": [
           "PAA s 18(2)",

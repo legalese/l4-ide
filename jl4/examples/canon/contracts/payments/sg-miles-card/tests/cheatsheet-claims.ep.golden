@@ -1,0 +1,989 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `miles-card-domain`
+IMPORT `miles-card`
+
+-- ===========================================================================
+-- THE HOUSEHOLD CHEAT SHEET, RESTATED AS CLAIMS
+--
+-- WHAT THIS FILE IS. Every `#ASSERT` below is a claim made by a SECONDARY
+-- SOURCE: "Miles Card Stack -- Routing Cheat Sheet", updated June 2026, a
+-- private household routing note written from blog posts, bank marketing
+-- pages and the household's own statements. It is NOT an issuer's terms and
+-- conditions. It is deposited in this corpus as the additional encoding
+-- `cheatsheet-2026-06`, alongside the encodings taken from the T&Cs
+-- themselves, so that the two can be compared.
+--
+-- WRITTEN BLIND. Whoever wrote this file read three things: the cheat sheet,
+-- `miles-card-domain.l4` (types only), and the signature of
+-- `the rate on` in `miles-card.l4`. No issuer T&C, no extract of one, and no
+-- card rule module was opened. That is the point: an acceptance test written
+-- from the rules it tests is not a test, it is a transcription of them.
+--
+-- FAILURES ARE EXPECTED, AND ARE THE DELIVERABLE. A cheat sheet is a
+-- compression. It rounds ("~S$822"), it merges conditions the T&C keeps
+-- separate, it states rates that depend on promotions whose terms this corpus
+-- does not hold (the domain module says so of the Solitaire savings uplift),
+-- and it is nine months old in a market that reprices quarterly. Every
+-- assertion that fails is one of four things, and telling them apart is the
+-- work this file exists to make possible:
+--     (a) the cheat sheet is wrong, and the household is routing spend badly;
+--     (b) the cheat sheet is right and the rule module has a defect;
+--     (c) both are defensible and the T&C is genuinely ambiguous;
+--     (d) the T&C that would settle it is not held, so the rule answers
+--         Unconfirmed while the cheat sheet answers with a number.
+-- Nothing here should be "fixed" by editing this file to agree with the
+-- rules. Editing a claim to match the answer destroys the only evidence the
+-- comparison produces.
+--
+-- HOW MANY CLAIMS. 184 assertions as this line is written. The figure is
+-- here because it was asked for, but do not trust it against the file: the
+-- file is the authority, and the command is `grep -c` on `^#ASSERT`. A count
+-- in prose is the first thing to go stale when someone adds a row.
+--
+-- DO NOT CORRECT THE SOURCE. These assertions transcribe the sheet's cells,
+-- including where the transcriber believed a cell to be wrong. The cheat
+-- sheet's own figure is what is asserted, always.
+--
+-- WHAT IS SKIPPED, AND WHY.
+--   * SC Smart is a CASHBACK card: "6% cashback", "~S$60/mo rebate". It has
+--     no rate in miles, and `Rate answer` answers in miles per dollar, so
+--     there is nothing to assert. One waterfall row -- Streaming
+--     (Netflix/Disney+/HBO/Spotify) -- names SC Smart and nothing else, and
+--     is skipped whole. Three further rows (Fast food, Public transport, and
+--     Guardian's SC overlap note) name SC Smart beside miles cards; there the
+--     miles cards are asserted and the SC Smart cell is passed over.
+--   * DBS Live Fresh is listed in the stack as "cashback, outside the miles
+--     stack", is in no waterfall row, and is not in `Card`. Nothing to assert.
+--
+-- WHERE THIS FILE SITS, AND WHY NOT IN A SUBDIRECTORY. It was to live at
+-- `cheatsheet/cheatsheet-claims.l4`. L4's import resolution has no
+-- parent-directory step -- measured: the candidate list it prints for a file
+-- in `cheatsheet/` is project root, the importer's OWN directory,
+-- JL4_LIBRARY_PATH, XDG and the bundle, and never `../`. So a file one level
+-- down cannot reach `miles-card.l4` at all. It sits beside the module it
+-- tests instead.
+--
+-- HOW A PURCHASE IS ENCODED. The cheat sheet tells you how to pay as well as
+-- what to pay with, and the domain separates the two axes the phrase
+-- "contactless" runs together: the CREDENTIAL the cardholder presents, and
+-- the INDICATOR the merchant's acquirer attaches. Only the first of those is
+-- a fixture fact. The transcription rule, applied uniformly and recorded
+-- here so a reader can audit it in one place:
+--     "contactless" / "Apple Pay default"  -> tapped + wallet token
+--     "online" / "if ordered online" / "pay in app" / "in-app billing"
+--                                          -> website-or-app + physical card
+--     row states no channel, purchase is in person
+--                                          -> tapped + physical card
+--     the merchant indicator, on every row -> Unknown
+--
+-- WHY THE INDICATOR IS ALWAYS UNKNOWN -- revised 2026-09-21, and the reason
+-- is worth the paragraph because an earlier draft of this file did it the
+-- other way. A fixture may carry only facts a witness could depose to AT THE
+-- MOMENT OF PAYING. The acquirer's system indicator is not one: the domain
+-- module quotes three issuers saying in terms that they do not determine it
+-- and the merchant's banker does, and it is attached when the charge is
+-- posted, after the cardholder has acted. A transcription that filled it in
+-- from the row's wording -- "online" cells flagged online, "contactless"
+-- cells flagged card-present -- was quietly deciding the very fact the
+-- domain built an explicit `Unknown` for, and every such fixture asserted a
+-- rate against a world the cardholder cannot observe. So `Unknown` is
+-- uniform here. No row is special-cased, the two grocery rows that say "if
+-- ordered online" included, and the one cell that claims a wallet tap
+-- "counts as online" included: that cell is a claim about the OUTCOME, and
+-- the fixture records only the ACT.
+--
+-- WHAT THAT COSTS, STATED SO IT IS NOT MISREAD AS A DEFECT. The domain says
+-- `miles per dollar` carries the LOWER of the two conditional branches when
+-- the indicator is Unknown, so that a headline figure never overstates. The
+-- cheat sheet's cells are written as though the indicator were settled. The
+-- two will therefore disagree on any row whose rate turns on the indicator,
+-- and that disagreement is category (d) above -- not the sheet being wrong
+-- about a rate, and not the rule module having a defect. `Rate answer` also
+-- carries `miles per dollar if the merchant flags online` and its
+-- card-present twin; asserting the sheet's figures against THOSE would be a
+-- different and also interesting comparison, and is deliberately not what
+-- this file does. It asserts the headline.
+--
+-- WHY EVERY NAME HERE STARTS "S5". Every name this file defines -- the
+-- cardholder, the month, the purchase constructors and all 32 purchases --
+-- carries the `S5 ` prefix this file already uses to mark the secondary
+-- source. It is not decoration. The card rule modules define their own
+-- illustration fixtures, they are in scope here through the composer, and
+-- they use the obvious names. Measured 2026-09-21: a fixture called
+-- `foodpanda` collided with a `Merchant` constructor AND with a
+-- `Participating Merchant` constructor, three definitions of one token
+-- resolved by type at each use site; renaming it to `a foodpanda order`
+-- collided with a fixture of that exact name and the SAME type, Transaction,
+-- in a card module -- which type cannot disambiguate, so it is a hard error.
+-- A prefix that names the source fixes the whole class instead of the two
+-- instances found, and those modules are being written right now, so a
+-- name that is free at this moment is not evidence it will stay free.
+--
+-- ONE MONTH, ONE CARDHOLDER. The sheet's rates are the rates AFTER the
+-- monthly unlocks are hit -- its first section is headed "Must hit every
+-- month". So the fixture month is one in which the yuu S$800 / 4-merchant
+-- threshold IS met and the PAssion thresholds ARE met, and the cardholder has
+-- Dining and Family elected on Solitaire with yuu and PAssion linked. Cap
+-- ROOM is not modelled (the domain says allocation is out of scope), so each
+-- row is asserted as though the card named still had room.
+-- ===========================================================================
+
+
+§ `The fixtures`
+
+§§ `The cardholder`
+
+-- Stack table: Solitaire "Dining out, supermarkets, kids' stores" with
+-- "S$750 Dining + S$750 Family" -> Dining and Family are the two elected
+-- categories. yuu: "pay with yuu card and scan yuu app" -> linked. PAssion:
+-- "yuu app linked" -> linked. The HSBC Everyday Global Account is not
+-- mentioned anywhere on the cheat sheet, so its ADB is 0.
+`S5 the cardholder` MEANS
+    Cardholder WITH
+        `Solitaire preferred rewards categories`              IS LIST Dining, Family
+        `yuu account linked to the card`                      IS TRUE
+        `HSBC Everyday Global Account deposits ADB this month` IS 0
+        `PAssion membership registered and card linked in yuu` IS TRUE
+
+§§ `The month`
+
+-- "yuu -- S$800 across 4 different merchants" and PAssion's "~S$500 + 5
+-- categories/mo to unlock", split across the two spend figures the domain
+-- carries. The sheet's rates all assume these are met.
+`S5 the month` MEANS
+    `Month position` WITH
+        `yuu eligible spend so far this calendar month`                     IS 800
+        `yuu participating merchants transacted so far this calendar month` IS 4
+        `PAssion spend at Participating Stores so far this month`           IS 300
+        `PAssion spend at non-Participating Stores so far this month`       IS 400
+
+§§ `How a purchase is built`
+
+-- Four constructors, one per way the cheat sheet tells you to pay, and a
+-- fifth that re-pays a purchase the file already defines. Named fields
+-- throughout: positional `OF` would be shorter but three of the fifteen
+-- fields are STRINGs and a transposition among them is silent.
+--
+-- `merchant indicator` is `Unknown` in every one of them, with no exception
+-- and no per-row override. The header says why at length.
+--
+-- FOUR FIELDS THE DOMAIN ADDED ON 2026-09-21, and what a secondary source
+-- can honestly put in them. (Four, not the three I was told to expect: the
+-- module gained `posted in a foreign currency` while this file was being
+-- updated, and the compiler found it. Anything a later reader takes from
+-- this paragraph should be checked against the module, not against me.) `merchant` is a closed enumeration of the
+-- merchants some HELD T&C names, and it is passed in per fixture rather than
+-- derived from the printed name -- a transcription, never a computation from
+-- a string. Where the cheat sheet's row names a merchant the enumeration
+-- holds, that constructor is used; where it does not, `Another merchant`,
+-- which is the honest answer and not a fallback: the enumeration is a list
+-- of merchants the ISSUERS name, and most of the household's spend is not
+-- at one.
+--
+-- `description patterns` is EMPTY on every fixture. The cheat sheet says
+-- nothing whatever about statement lines -- it never quotes one -- so there
+-- is no pattern to transcribe, and inventing one would be this file
+-- asserting a fact its source does not contain. EMPTY here means "the source
+-- is silent", not "the statement line matched nothing", and a rule that
+-- turns on an exclusion pattern will therefore answer as though none applied.
+--
+-- `charge kind` is `Retail purchase` on every fixture. Every row of the
+-- waterfall is a purchase of goods or services; the sheet routes no fee, no
+-- instalment, no cash advance and no refund, and its one bill-payment row
+-- (StarHub) it explicitly routes "via app/site, not AXS", which is a
+-- purchase-shaped charge and not internet banking.
+--
+-- `posted in a foreign currency` is a boolean the domain keeps separate from
+-- the `currency` string, because a rule may not compare strings. It is TRUE
+-- on exactly the two purchases the sheet itself calls foreign: the Malaysian
+-- Ringgit row, and the overseas half of "Everything else / overseas". It is
+-- FALSE everywhere else, which is what a sheet headed "KrisFlyer-focused"
+-- and priced in S$ throughout is saying. Note this is a THIRD axis, beside
+-- `currency` and `made in Singapore`, and the fixtures set all three
+-- consistently rather than deriving any one from another.
+--
+-- WHAT THE SHEET DOES NOT SAY HERE, recorded because it was nearly written
+-- in. The sheet contains no statement about the currency a charge is BILLED
+-- in -- no dynamic-currency-conversion language, nothing about paying in the
+-- foreign currency rather than in converted S$. Searched 2026-09-21: the
+-- strings "never converted", "converted to SGD" and "pay in the foreign" do
+-- not occur. Its whole foreign-currency vocabulary is four things -- "MYR
+-- online", "o/s", "1.4 local / 2.4 overseas", "~1.2 local / ~2.2 overseas"
+-- -- plus two FX-fee notes, "3.25% FX fee: local use only" on Solitaire and
+-- "3.25% FX, local-only" on Revolution. So TRUE here transcribes only that
+-- the sheet calls the row foreign. Anyone tempted to read a billing-currency
+-- claim into this field should get it from a T&C, not from here.
+--
+-- Those two FX notes did constrain the transcription, and the constraint is
+-- honoured: the sheet tells the household not to take Solitaire or
+-- Revolution abroad, and accordingly neither foreign fixture asserts
+-- anything about either card. Row 23 asserts PAssion and PRVI; row 24
+-- asserts PRVI and PremierMiles.
+
+GIVEN name IS A STRING, `the merchant` IS A Merchant, mcc IS A NUMBER, spend IS A NUMBER
+GIVETH A Transaction
+`S5 a contactless tap at` name `the merchant` mcc spend MEANS
+    Transaction WITH
+        `merchant name`           IS name
+        `merchant`                IS `the merchant`
+        `merchant category code`  IS mcc
+        `transaction description` IS name
+        `description patterns`    IS EMPTY
+        `charge kind`             IS `Retail purchase`
+        `amount`                  IS spend
+        `currency`                IS "SGD"
+        `posted in a foreign currency` IS FALSE
+        `transaction date`        IS YMD 2026 6 10
+        `posting date`            IS YMD 2026 6 12
+        `payment channel`         IS `Tapped at a terminal`
+        `credential`              IS `A mobile wallet token`
+        `merchant indicator`      IS Unknown
+        `made in Singapore`       IS TRUE
+
+GIVEN name IS A STRING, `the merchant` IS A Merchant, mcc IS A NUMBER, spend IS A NUMBER
+GIVETH A Transaction
+`S5 a card tap at` name `the merchant` mcc spend MEANS
+    Transaction WITH
+        `merchant name`           IS name
+        `merchant`                IS `the merchant`
+        `merchant category code`  IS mcc
+        `transaction description` IS name
+        `description patterns`    IS EMPTY
+        `charge kind`             IS `Retail purchase`
+        `amount`                  IS spend
+        `currency`                IS "SGD"
+        `posted in a foreign currency` IS FALSE
+        `transaction date`        IS YMD 2026 6 10
+        `posting date`            IS YMD 2026 6 12
+        `payment channel`         IS `Tapped at a terminal`
+        `credential`              IS `The physical card`
+        `merchant indicator`      IS Unknown
+        `made in Singapore`       IS TRUE
+
+GIVEN name IS A STRING, `the merchant` IS A Merchant, mcc IS A NUMBER, spend IS A NUMBER
+GIVETH A Transaction
+`S5 an online purchase at` name `the merchant` mcc spend MEANS
+    Transaction WITH
+        `merchant name`           IS name
+        `merchant`                IS `the merchant`
+        `merchant category code`  IS mcc
+        `transaction description` IS name
+        `description patterns`    IS EMPTY
+        `charge kind`             IS `Retail purchase`
+        `amount`                  IS spend
+        `currency`                IS "SGD"
+        `posted in a foreign currency` IS FALSE
+        `transaction date`        IS YMD 2026 6 10
+        `posting date`            IS YMD 2026 6 12
+        `payment channel`         IS `Paid in a website or app`
+        `credential`              IS `The physical card`
+        `merchant indicator`      IS Unknown
+        `made in Singapore`       IS TRUE
+
+GIVEN name IS A STRING, `the merchant` IS A Merchant, mcc IS A NUMBER, spend IS A NUMBER, ccy IS A STRING
+GIVETH A Transaction
+`S5 a foreign online purchase at` name `the merchant` mcc spend ccy MEANS
+    Transaction WITH
+        `merchant name`           IS name
+        `merchant`                IS `the merchant`
+        `merchant category code`  IS mcc
+        `transaction description` IS name
+        `description patterns`    IS EMPTY
+        `charge kind`             IS `Retail purchase`
+        `amount`                  IS spend
+        `currency`                IS ccy
+        `posted in a foreign currency` IS TRUE
+        `transaction date`        IS YMD 2026 6 10
+        `posting date`            IS YMD 2026 6 12
+        `payment channel`         IS `Paid in a website or app`
+        `credential`              IS `The physical card`
+        `merchant indicator`      IS Unknown
+        `made in Singapore`       IS FALSE
+
+-- "never via Apple/Google Pay" is a claim about the CREDENTIAL and about
+-- nothing else, so it is tested by re-paying purchases this file already
+-- defines rather than by inventing merchants for it. Every other field, the
+-- payment channel included, carries over unchanged -- an online order
+-- re-paid with a wallet stays an online order, at the same merchant.
+--
+-- L4 has no record-update operator: `someValue WITH field IS v` parses as
+-- function application and errors ("you are giving named inputs to ... but
+-- it is not a function"). So the fields are copied one at a time, each named
+-- on both sides of its `IS`, which is what makes a transposition impossible
+-- to write here.
+GIVEN txn IS A Transaction
+GIVETH A Transaction
+`S5 the same purchase paid with a wallet token` txn MEANS
+    Transaction WITH
+        `merchant name`           IS txn's `merchant name`
+        `merchant`                IS txn's `merchant`
+        `merchant category code`  IS txn's `merchant category code`
+        `transaction description` IS txn's `transaction description`
+        `description patterns`    IS txn's `description patterns`
+        `charge kind`             IS txn's `charge kind`
+        `amount`                  IS txn's `amount`
+        `currency`                IS txn's `currency`
+        `posted in a foreign currency` IS txn's `posted in a foreign currency`
+        `transaction date`        IS txn's `transaction date`
+        `posting date`            IS txn's `posting date`
+        `payment channel`         IS txn's `payment channel`
+        `credential`              IS `A mobile wallet token`
+        `merchant indicator`      IS txn's `merchant indicator`
+        `made in Singapore`       IS txn's `made in Singapore`
+
+
+§ `The spend-to-card waterfall`
+
+-- Twenty-four rows, in the order the sheet prints them. Each row's comment
+-- quotes the cell being restated, prefixed [S5] for the secondary source.
+-- A row that names a card but prints no dollar figure gets a rate assertion
+-- only; "uncap" is asserted as `capped` FALSE.
+
+
+§§ `Row 1 -- Dining out`
+
+`S5 dining out` MEANS `S5 a contactless tap at` "Cedele Restaurant Raffles City" `Another merchant` 5812 60
+
+-- [S5] "Dining out (restaurants, MCC 5811/5812) | Lady's Solitaire -- Dining (6, S$750)"
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 dining out`)'s `miles per dollar` EQUALS 6
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 dining out`)'s `cap`'s `bonus spend per month` EQUALS 750
+-- [S5] "2nd (1st cap full) | Revolution (4, S$1k, contactless)"
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 dining out`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 dining out`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "3rd / overflow | PRVI (1.4, uncap)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 dining out`)'s `miles per dollar` EQUALS 1.4
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 dining out`)'s `cap`'s `capped` EQUALS FALSE
+
+
+§§ `Row 2 -- Cafes, coffee shops, bubble tea`
+
+`S5 a cafe` MEANS `S5 a contactless tap at` "Chye Seng Huat Hardware" `Another merchant` 5812 18
+
+-- [S5] "Cafes / coffee shops / bubble tea (indie; MCC 5812/5814) | Solitaire -- Dining (6, S$750)"
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 a cafe`)'s `miles per dollar` EQUALS 6
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 a cafe`)'s `cap`'s `bonus spend per month` EQUALS 750
+-- [S5] "Revolution (4, S$1k, contactless)"
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 a cafe`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 a cafe`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "PRVI (1.4)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 a cafe`)'s `miles per dollar` EQUALS 1.4
+
+
+§§ `Row 3 -- Cold Storage, CS Fresh, Giant`
+
+-- No channel stated, and these are in-store grocery runs where the yuu app
+-- is scanned at the till: physical card, tapped, card-present.
+`S5 cold storage` MEANS `S5 a card tap at` "Cold Storage Great World" `Cold Storage` 5411 120
+
+-- [S5] "Cold Storage / CS Fresh / Giant (yuu, MCC 5411) | DBS yuu (10, S$822)"
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `miles per dollar` EQUALS 10
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `bonus spend per month` EQUALS 822
+-- [S5] "Solitaire -- Family (6, S$750)"
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `miles per dollar` EQUALS 6
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `bonus spend per month` EQUALS 750
+-- [S5] "PAssion Debit (5, S$507) -> PRVI (1.4)"
+#ASSERT (`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `miles per dollar` EQUALS 5
+#ASSERT (`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `bonus spend per month` EQUALS 507
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `miles per dollar` EQUALS 1.4
+
+
+§§ `Row 4 -- FairPrice, Sheng Siong, Prime`
+
+`S5 fairprice in store` MEANS `S5 a card tap at` "FairPrice Finest Clementi" `Another merchant` 5411 95
+-- The WWC cell is conditional -- "if ordered online" -- so it gets its own
+-- purchase rather than being asserted against the in-store tap.
+`S5 fairprice online` MEANS `S5 an online purchase at` "FairPrice Online" `Another merchant` 5411 95
+
+-- [S5] "FairPrice / Sheng Siong / Prime (MCC 5411, not yuu) | Solitaire -- Family (6, S$750)"
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 fairprice in store`)'s `miles per dollar` EQUALS 6
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 fairprice in store`)'s `cap`'s `bonus spend per month` EQUALS 750
+-- [S5] "WWC if ordered online (4, S$1k)"
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 fairprice online`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 fairprice online`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "PRVI (1.4)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 fairprice in store`)'s `miles per dollar` EQUALS 1.4
+
+
+§§ `Row 5 -- Little Farms and premium grocers`
+
+-- "MCC 5411 *or* 5499" and "Solitaire -- Family **or** Dining": the row makes
+-- the same claim on two codes, so both are encoded.
+`S5 little farms as groceries` MEANS `S5 a card tap at` "Little Farms Tanglin" `Another merchant` 5411 80
+`S5 little farms as misc food` MEANS `S5 a card tap at` "Little Farms Tanglin" `Another merchant` 5499 80
+`S5 premium grocer online` MEANS `S5 an online purchase at` "Little Farms Online" `Another merchant` 5411 80
+
+-- [S5] "Little Farms / premium grocers (MCC 5411 *or* 5499) | Solitaire -- Family **or** Dining (6, S$750 each)"
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 little farms as groceries`)'s `miles per dollar` EQUALS 6
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 little farms as groceries`)'s `cap`'s `bonus spend per month` EQUALS 750
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 little farms as misc food`)'s `miles per dollar` EQUALS 6
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 little farms as misc food`)'s `cap`'s `bonus spend per month` EQUALS 750
+-- [S5] "WWC if online (4, S$1k)"
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 premium grocer online`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 premium grocer online`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "PRVI (1.4)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 little farms as groceries`)'s `miles per dollar` EQUALS 1.4
+
+
+§§ `Row 6 -- foodpanda and food delivery`
+
+-- Ordered and paid in the app. NOT named `foodpanda`: since 2026-09-21 that
+-- is a `Merchant` constructor in the domain module, and a third definition
+-- exists in a card module, so the bare token is overloaded three ways and
+-- resolves by type at each use site. That works until it does not, and the
+-- line it would fail on -- a fixture name, an argument and a string literal
+-- all reading "foodpanda" -- is one nobody would re-read. Renamed instead.
+`S5 a foodpanda order` MEANS `S5 an online purchase at` "foodpanda" foodpanda 5814 45
+
+-- [S5] "foodpanda / food delivery (MCC 5814) | DBS yuu (10, S$822)"
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `miles per dollar` EQUALS 10
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `cap`'s `bonus spend per month` EQUALS 822
+-- [S5] "Solitaire -- Dining (6, S$750, if cap room)"
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `miles per dollar` EQUALS 6
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `cap`'s `bonus spend per month` EQUALS 750
+-- [S5] "PAssion Debit (5, S$507) -> WWC/Citi (4)"
+#ASSERT (`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `miles per dollar` EQUALS 5
+#ASSERT (`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `cap`'s `bonus spend per month` EQUALS 507
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 a foodpanda order`)'s `miles per dollar` EQUALS 4
+
+
+§§ `Row 7 -- Fast food`
+
+-- The 2nd-choice cell on this row is "SC Smart (6% cash, ~S$60)", a cashback
+-- card with no miles rate; passed over.
+`S5 fast food` MEANS `S5 a card tap at` "McDonald's Jurong Point" `Another merchant` 5814 15
+
+-- [S5] "Fast food (McD's, Starbucks, KFC -- MCC 5814) | Solitaire -- Dining (6, S$750, if cap room)"
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 fast food`)'s `miles per dollar` EQUALS 6
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 fast food`)'s `cap`'s `bonus spend per month` EQUALS 750
+-- [S5] "PRVI (1.4)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 fast food`)'s `miles per dollar` EQUALS 1.4
+
+
+§§ `Row 8 -- Kids' and infants' wear`
+
+`S5 kids wear in store` MEANS `S5 a card tap at` "Mothercare Paragon" `Another merchant` 5641 70
+`S5 kids wear online` MEANS `S5 an online purchase at` "Mothercare Online" `Another merchant` 5641 70
+
+-- [S5] "Kids' / infants' wear (MCC 5641) | Solitaire -- Family (6, S$750)"
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 kids wear in store`)'s `miles per dollar` EQUALS 6
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 kids wear in store`)'s `cap`'s `bonus spend per month` EQUALS 750
+-- [S5] "WWC if online (4, S$1k)"
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 kids wear online`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 kids wear online`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "Revolution (4, S$1k) -> PRVI (1.4)"
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 kids wear in store`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 kids wear in store`)'s `cap`'s `bonus spend per month` EQUALS 1000
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 kids wear in store`)'s `miles per dollar` EQUALS 1.4
+
+
+§§ `Row 9 -- Guardian`
+
+`S5 guardian` MEANS `S5 a contactless tap at` "Guardian Bugis Junction" Guardian 5912 25
+`S5 guardian online` MEANS `S5 an online purchase at` "Guardian Online" Guardian 5912 25
+
+-- [S5] "Guardian (yuu merchant; MCC 5912) | DBS yuu (10, S$822)"
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 guardian`)'s `miles per dollar` EQUALS 10
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 guardian`)'s `cap`'s `bonus spend per month` EQUALS 822
+-- [S5] "Revolution (4, S$1k, contactless)"
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 guardian`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 guardian`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "WWC if online (4) -> PRVI (1.4)" -- no cap figure printed in this cell
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 guardian online`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 guardian`)'s `miles per dollar` EQUALS 1.4
+
+
+§§ `Row 10 -- Watsons`
+
+`S5 watsons` MEANS `S5 a contactless tap at` "Watsons Nex" `Another merchant` 5912 30
+`S5 watsons online` MEANS `S5 an online purchase at` "Watsons Online" `Another merchant` 5912 30
+
+-- [S5] "Watsons (NOT yuu; MCC 5912/5977 = Beauty, not elected) | Revolution (4, S$1k, contactless)"
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 watsons`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 watsons`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "WWC if online (4, S$1k)"
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 watsons online`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 watsons online`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "PRVI (1.4)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 watsons`)'s `miles per dollar` EQUALS 1.4
+
+
+§§ `Row 11 -- 7-Eleven`
+
+-- "(yuu merchant, Visa; ...)": the row names the network, so the Visa
+-- constructor rather than the American Express one.
+`S5 seven eleven` MEANS `S5 a contactless tap at` "7-Eleven Tanjong Pagar" `7-Eleven` 5411 8
+
+-- [S5] "7-Eleven (yuu merchant, Visa; MCC 5411/5499) | DBS yuu (10, S$822)"
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 seven eleven`)'s `miles per dollar` EQUALS 10
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 seven eleven`)'s `cap`'s `bonus spend per month` EQUALS 822
+-- [S5] "Revolution (4, S$1k, contactless)"
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 seven eleven`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 seven eleven`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "PRVI (1.4)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 seven eleven`)'s `miles per dollar` EQUALS 1.4
+
+
+§§ `Row 12 -- Cheers and FairPrice Xpress`
+
+`S5 cheers` MEANS `S5 a contactless tap at` "Cheers Bukit Timah" `Another merchant` 5411 12
+
+-- [S5] "Cheers / FairPrice Xpress (NOT yuu; MCC 5411) | Solitaire -- Family (6, S$750)"
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 cheers`)'s `miles per dollar` EQUALS 6
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 cheers`)'s `cap`'s `bonus spend per month` EQUALS 750
+-- [S5] "Revolution (4, S$1k, contactless)"
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 cheers`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 cheers`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "PRVI (1.4)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 cheers`)'s `miles per dollar` EQUALS 1.4
+
+
+§§ `Row 13 -- Contactless and in-person taps`
+
+-- "non-dining, non-Family": an MCC in neither of the two elected Solitaire
+-- categories. A bookshop.
+`S5 a contactless tap` MEANS `S5 a contactless tap at` "Kinokuniya Takashimaya" `Another merchant` 5942 55
+
+-- [S5] "Contactless / in-person tap (non-dining, non-Family) | **Revolution (4, S$1k, Apple Pay default)**"
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 a contactless tap`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 a contactless tap`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "PRVI (1.4, uncap)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 a contactless tap`)'s `miles per dollar` EQUALS 1.4
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 a contactless tap`)'s `cap`'s `capped` EQUALS FALSE
+
+
+§§ `Row 14 -- Lazada and RedMart`
+
+`S5 lazada` MEANS `S5 an online purchase at` "Lazada SG" `Another merchant` 5262 90
+
+-- [S5] "Lazada / RedMart (all -- codes as marketplace, NOT Family) | Woman's World (4, S$1k)"
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "Citi Rewards (4, S$1k)"
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "Revolution online (4, S$1k) -> PRVI (1.4)"
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `cap`'s `bonus spend per month` EQUALS 1000
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `miles per dollar` EQUALS 1.4
+
+
+§§ `Row 15 -- Shopee`
+
+`S5 shopee` MEANS `S5 an online purchase at` "Shopee SG" `Another merchant` 5262 60
+
+-- [S5] "Shopee | Woman's World (4, S$1k)"
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 shopee`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 shopee`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "Citi Rewards (4, S$1k)"
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 shopee`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 shopee`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "PRVI (1.4, uncap)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 shopee`)'s `miles per dollar` EQUALS 1.4
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 shopee`)'s `cap`'s `capped` EQUALS FALSE
+
+
+§§ `Row 16 -- Other online shopping`
+
+`S5 amazon` MEANS `S5 an online purchase at` "Amazon SG" `Another merchant` 5399 75
+
+-- [S5] "Other online shopping (incl. Amazon) | Woman's World (4, S$1k)"
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 amazon`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 amazon`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "Citi Rewards (4, S$1k)"
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 amazon`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 amazon`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "Revolution online (4, S$1k) -> PRVI (1.4)"
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 amazon`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 amazon`)'s `cap`'s `bonus spend per month` EQUALS 1000
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 amazon`)'s `miles per dollar` EQUALS 1.4
+
+
+§§ `Row 17 -- StarHub bill`
+
+-- "via app/site, not AXS".
+`S5 starhub bill` MEANS `S5 an online purchase at` "StarHub" `Another merchant` 4814 130
+
+-- [S5] "StarHub bill (via app/site, not AXS) | Woman's World (4, S$1k)"
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 starhub bill`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 starhub bill`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "Citi Rewards (4, S$1k)"
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 starhub bill`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 starhub bill`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "PRVI (1.4, uncap)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 starhub bill`)'s `miles per dollar` EQUALS 1.4
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 starhub bill`)'s `cap`'s `capped` EQUALS FALSE
+
+
+§§ `Row 18 -- Streaming -- SKIPPED`
+
+-- [S5] "Streaming (Netflix/Disney+/HBO/Spotify) | SC Smart (6% cash, ~S$60 rebate cap) | -- | *keeps Revolution's cap free for dining*"
+-- The only card named is SC Smart, a cashback card: no miles rate, and no
+-- `Card` constructor for it. The third cell is routing advice, not a claim
+-- about what a transaction earns. Nothing assertable; the row is skipped
+-- whole. No fixture is defined, so nothing here can quietly become a test.
+
+
+§§ `Row 19 -- Public transport`
+
+-- The 2nd-choice cell, "SC Smart (6% cash)", is cashback; passed over.
+`S5 simplygo` MEANS `S5 a card tap at` "SimplyGo" SimplyGo 4111 2.20
+
+-- [S5] "Public transport (SimplyGo) | DBS yuu (10, S$822, also a yuu merchant)"
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 simplygo`)'s `miles per dollar` EQUALS 10
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 simplygo`)'s `cap`'s `bonus spend per month` EQUALS 822
+
+
+§§ `Row 20 -- Tesla Supercharger`
+
+-- "(Tesla in-app billing)" -- charged through the Tesla app.
+`S5 tesla supercharger` MEANS `S5 an online purchase at` "Tesla Supercharger" `Another merchant` 5552 35
+
+-- [S5] "Tesla Supercharger (Tesla in-app billing) | PRVI (1.4, uncap)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 tesla supercharger`)'s `miles per dollar` EQUALS 1.4
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 tesla supercharger`)'s `cap`'s `capped` EQUALS FALSE
+-- [S5] "PremierMiles (1.2, uncap)"
+#ASSERT (`the rate on` `Citi PremierMiles` `S5 the cardholder` `S5 the month` `S5 tesla supercharger`)'s `miles per dollar` EQUALS 1.2
+#ASSERT (`the rate on` `Citi PremierMiles` `S5 the cardholder` `S5 the month` `S5 tesla supercharger`)'s `cap`'s `capped` EQUALS FALSE
+
+
+§§ `Row 21 -- Tesla at Charge+ stations`
+
+`S5 charge plus` MEANS `S5 a card tap at` "Charge+" `Charge+` 5552 28
+
+-- [S5] "Tesla at Charge+ stations | DBS yuu (10, S$822, if cap room)"
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 charge plus`)'s `miles per dollar` EQUALS 10
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 charge plus`)'s `cap`'s `bonus spend per month` EQUALS 822
+-- [S5] "PRVI (1.4, uncap)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 charge plus`)'s `miles per dollar` EQUALS 1.4
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 charge plus`)'s `cap`'s `capped` EQUALS FALSE
+
+
+§§ `Row 22 -- Ride-hailing`
+
+-- The row names three services. Gojek is the one the domain enumerates,
+-- so the fixture is a Gojek ride: the printed name and the classified
+-- merchant have to agree, and "Grab" beside `Gojek` would be a fixture
+-- asserting two different facts about one purchase. The row's card
+-- claims are the same for all three services.
+`S5 ride hailing` MEANS `S5 a contactless tap at` "Gojek" Gojek 4121 22
+-- The row's footnote makes its own claim about a different MCC.
+`S5 a zig ride coded as cabcharge` MEANS `S5 a contactless tap at` "Zig ComfortDelGro" `Another merchant` 4789 22
+
+-- [S5] "Ride-hailing (Grab, Gojek, Zig) | Revolution (4, S$1k, contactless)"
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 ride hailing`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 ride hailing`)'s `cap`'s `bonus spend per month` EQUALS 1000
+-- [S5] "PRVI (1.4, uncap)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 ride hailing`)'s `miles per dollar` EQUALS 1.4
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 ride hailing`)'s `cap`'s `capped` EQUALS FALSE
+-- [S5] footnote: "Zig (ComfortDelGro) sometimes codes as MCC 4789 (via Cabcharge), which Revolution does NOT reward"
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 a zig ride coded as cabcharge`)'s `earns the bonus rate` EQUALS FALSE
+-- [S5] footnote: "if it lands as 4789, route to PremierMiles" -- at the stack table's flat local rate
+#ASSERT (`the rate on` `Citi PremierMiles` `S5 the cardholder` `S5 the month` `S5 a zig ride coded as cabcharge`)'s `miles per dollar` EQUALS 1.2
+
+
+§§ `Row 23 -- Malaysian Ringgit`
+
+-- "(JB runs, MYR online)".
+`S5 myr online` MEANS `S5 a foreign online purchase at` "Lotus's Online Malaysia" `Another merchant` 5411 200 "MYR"
+
+-- [S5] "Malaysian Ringgit (JB runs, MYR online) | PAssion Debit (~4.5, S$507)"
+#ASSERT (`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 myr online`)'s `miles per dollar` EQUALS 4.5
+#ASSERT (`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 myr online`)'s `cap`'s `bonus spend per month` EQUALS 507
+-- [S5] "PRVI (2.4 o/s, uncap)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 myr online`)'s `miles per dollar` EQUALS 2.4
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 myr online`)'s `cap`'s `capped` EQUALS FALSE
+
+
+§§ `Row 24 -- Everything else and overseas`
+
+`S5 everything else local` MEANS `S5 a card tap at` "IKEA Tampines" `Another merchant` 5712 150
+`S5 everything else overseas` MEANS `S5 a foreign online purchase at` "UNIQLO Japan" `Another merchant` 5651 150 "JPY"
+
+-- [S5] "Everything else / overseas | PRVI (1.4 / 2.4, uncap)"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 everything else local`)'s `miles per dollar` EQUALS 1.4
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 everything else local`)'s `cap`'s `capped` EQUALS FALSE
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 everything else overseas`)'s `miles per dollar` EQUALS 2.4
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 everything else overseas`)'s `cap`'s `capped` EQUALS FALSE
+-- [S5] "PremierMiles (backup)" -- the waterfall prints no figure here; the
+-- stack table's row does: "Citi PremierMiles | 1.2 / 2.2 | uncapped".
+#ASSERT (`the rate on` `Citi PremierMiles` `S5 the cardholder` `S5 the month` `S5 everything else local`)'s `miles per dollar` EQUALS 1.2
+#ASSERT (`the rate on` `Citi PremierMiles` `S5 the cardholder` `S5 the month` `S5 everything else overseas`)'s `miles per dollar` EQUALS 2.2
+#ASSERT (`the rate on` `Citi PremierMiles` `S5 the cardholder` `S5 the month` `S5 everything else local`)'s `cap`'s `capped` EQUALS FALSE
+
+
+§ `The stack table and the caps-and-mechanics list`
+
+-- Claims the waterfall does not print: the flat backup's overseas rate, and
+-- the reset basis and date-attribution each card counts its cap by. Each is
+-- asserted once, on a purchase the sheet routes to that card, rather than
+-- repeated on every row.
+
+
+§§ `Citi PremierMiles -- the rate the waterfall never prints`
+
+-- [S5] stack table: "Citi PremierMiles | 1.2 / 2.2 | uncapped | Backup flat (demoted by PRVI)"
+-- The 1.2 and the 2.2 are asserted in Row 24 above, against a local and an
+-- overseas purchase. What is added here is the merchant reference's own
+-- restatement of the same figures with its scope.
+-- [S5] "Citi PremierMiles -- flat backup: ~1.2 local / ~2.2 overseas on essentially all spend"
+#ASSERT (`the rate on` `Citi PremierMiles` `S5 the cardholder` `S5 the month` `S5 dining out`)'s `miles per dollar` EQUALS 1.2
+#ASSERT (`the rate on` `Citi PremierMiles` `S5 the cardholder` `S5 the month` `S5 myr online`)'s `miles per dollar` EQUALS 2.2
+
+
+§§ `UOB PRVI Miles -- uncapped overseas too`
+
+-- [S5] stack table: "UOB PRVI Miles | 1.4 / 2.4 | uncapped | Flat catch-all for the big remainder"
+#ASSERT (`the rate on` `UOB PRVI Miles` `S5 the cardholder` `S5 the month` `S5 everything else overseas`)'s `cap`'s `capped` EQUALS FALSE
+
+
+§§ `DBS yuu -- calendar month, transaction date`
+
+-- [S5] "DBS caps reset on the 1st (calendar month), NOT the 14th statement date -- confirmed with DBS."
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `basis` EQUALS `Calendar month`
+-- [S5] "yuu: ... counts by transaction date."
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `attribution` EQUALS `By transaction date`
+-- [S5] stack table: "DBS yuu | 10 mpd | ~S$822 (one shared pool)"
+#ASSERT (`the rate on` `DBS yuu Visa` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `capped` EQUALS TRUE
+
+
+§§ `DBS Woman's World -- calendar month, transaction date`
+
+-- [S5] "Track yuu (~S$822) and Woman's World (S$1,000) by calendar month / transaction date"
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `cap`'s `basis` EQUALS `Calendar month`
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `cap`'s `attribution` EQUALS `By transaction date`
+-- [S5] stack table: "DBS Woman's World | 4 mpd | S$1,000 online"
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `cap`'s `capped` EQUALS TRUE
+
+
+§§ `UOB Lady's Solitaire -- posting date, two S$750 categories`
+
+-- [S5] "Solitaire caps are per CATEGORY: S$750 Dining + S$750 Family = S$1,500 combined. Unused room in one category does NOT transfer to the other. Counts by POSTING date (a 30 Jun purchase posting 1 Jul lands in July's cap)."
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 dining out`)'s `cap`'s `attribution` EQUALS `By posting date`
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `attribution` EQUALS `By posting date`
+-- The two categories carry S$750 each and neither carries S$1,500: a dining
+-- purchase and a grocery purchase are asserted separately, which is the only
+-- way this domain can express "no transfer between".
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 dining out`)'s `cap`'s `bonus spend per month` EQUALS 750
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `bonus spend per month` EQUALS 750
+
+
+§§ `Citi Rewards -- posting date`
+
+-- [S5] "Citi Rewards -- 4 mpd (online + retail by MCC): ... Counts by posting date."
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `cap`'s `attribution` EQUALS `By posting date`
+-- [S5] stack table: "Citi Rewards | 4 mpd | S$1,000 online"
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `cap`'s `capped` EQUALS TRUE
+
+
+§§ `HSBC Revolution -- one combined S$1,000`
+
+-- [S5] stack table: "HSBC Revolution | 4 mpd | S$1,000 online + contactless (combined)"
+-- The sheet's claim is that ONE figure covers both channels, so the same
+-- S$1,000 is asserted against an online purchase and against a tap.
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `cap`'s `bonus spend per month` EQUALS 1000
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 a contactless tap`)'s `cap`'s `bonus spend per month` EQUALS 1000
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 a contactless tap`)'s `cap`'s `capped` EQUALS TRUE
+
+
+§§ `POSB PAssion Debit -- its own cap`
+
+-- [S5] stack table: "PAssion POSB Debit | 5 mpd | ~S$507 yuu spend (own cap)"
+#ASSERT (`the rate on` `POSB PAssion Debit` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `capped` EQUALS TRUE
+
+
+§§ `Which pot -- asserted by comparison, so no string is named`
+
+-- The cap assertions above are about SIZE. These four are the sheet's claims
+-- about pot IDENTITY, and each is written as a comparison between two
+-- answers of the SAME card. No `pool` string appears, so nothing here can
+-- fail on spelling: whatever the rule modules decide to call a pot, the
+-- Dining pot either is or is not the Family pot. That is why these four are
+-- safe for a secondary source to assert while the strings are still moving.
+
+-- [S5] "Solitaire caps are per CATEGORY: S$750 Dining + S$750 Family = S$1,500 combined."
+-- Read forwards, "per category" says each category is ONE pot: two dining
+-- purchases share a pot, and two Family purchases share a pot.
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 dining out`)'s `cap`'s `pool` EQUALS (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 a cafe`)'s `cap`'s `pool`
+#ASSERT (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `pool` EQUALS (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 kids wear in store`)'s `cap`'s `pool`
+-- [S5] "Unused room in one category does NOT transfer to the other."
+-- Read backwards, it says the two pots are not the same pot. Both halves are
+-- needed: one pot per category would satisfy the first two assertions and
+-- still be a single shared S$750.
+#ASSERT NOT ((`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 dining out`)'s `cap`'s `pool` EQUALS (`the rate on` `UOB Lady's Solitaire` `S5 the cardholder` `S5 the month` `S5 cold storage`)'s `cap`'s `pool`)
+-- [S5] stack table: "HSBC Revolution | 4 mpd | S$1,000 online + contactless (combined)"
+-- The mirror image: two channels the sheet says share one pot.
+#ASSERT (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 lazada`)'s `cap`'s `pool` EQUALS (`the rate on` `HSBC Revolution` `S5 the cardholder` `S5 the month` `S5 a contactless tap`)'s `cap`'s `pool`
+
+
+§ `Claims that turn on the credential itself`
+
+-- Three cells make a claim about HOW you pay rather than about what you buy.
+-- Each is encoded exactly as the cell words it, and none of them touches the
+-- merchant indicator, which stays Unknown throughout.
+
+§§ `Woman's World -- a wallet tap in store counts as online`
+
+-- A tap, with a wallet token, at a department store. The cell's words are
+-- that this COUNTS AS online; whether the acquirer flags it so is the
+-- acquirer's business and is not a fact of the fixture, so the indicator is
+-- Unknown here as everywhere. The claim being asserted is the cell's figure.
+`S5 a wallet tap in a department store` MEANS `S5 a contactless tap at` "Takashimaya" `Another merchant` 5311 140
+
+-- [S5] merchant reference: "*Earns:* any transaction processed as **online** (any MCC), ... and Kris+/mobile-wallet in-store (counts as online)"
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 a wallet tap in a department store`)'s `miles per dollar` EQUALS 4
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 a wallet tap in a department store`)'s `cap`'s `bonus spend per month` EQUALS 1000
+
+§§ `Woman's World -- a physical tap does not`
+
+-- [S5] merchant reference: "Physical contactless tap (non-wallet) also doesn't earn."
+-- `S5 kids wear in store` is a tap with the physical card, at an MCC the sheet
+-- otherwise routes to Woman's World when ordered online.
+#ASSERT (`the rate on` `DBS Woman's World` `S5 the cardholder` `S5 the month` `S5 kids wear in store`)'s `earns the bonus rate` EQUALS FALSE
+
+§§ `Citi Rewards -- never via Apple or Google Pay`
+
+-- [S5] stack table: "Citi Rewards | ... | have · never via Apple/Google Pay"
+-- [S5] merchant reference: "Does NOT earn: **mobile wallet (Apple/Google Pay) -- pay by card or card-on-file**"
+--
+-- "NEVER" IS UNIVERSAL, SO IT IS INSTANTIATED UNIVERSALLY. A single witness
+-- would test the claim at one merchant, one MCC and one channel, and pass
+-- while the rule excluded wallets in exactly that one place. The cell
+-- quantifies over all spend, so the assertion quantifies over every purchase
+-- this file already defines -- 32 of them, each re-paid with a wallet
+-- token and otherwise untouched. No merchant is invented for this.
+--
+-- Two notes for whoever reads a failure here. First, the sheet states no
+-- base figure for Citi Rewards anywhere -- the only base rate it prints is
+-- Revolution's "0.4 only" -- so the claim is asserted as the sheet makes it,
+-- that the bonus rate is not earned, and no miles-per-dollar number is
+-- invented for it. Second, this population includes purchases at merchants
+-- and codes the sheet never routes to Citi Rewards at all. That is
+-- deliberate and is not a transcription error: a card that does not earn its
+-- bonus at a petrol-coded merchant anyway will satisfy the assertion for a
+-- reason that has nothing to do with the wallet, so those rows are weak
+-- evidence, and the rows where the sheet DOES route to Citi -- Lazada,
+-- Shopee, Amazon, the StarHub bill, foodpanda -- are the load-bearing ones.
+-- Listing all of them is still right: it is what "never" says, and a later
+-- reader can see which subset carried the weight without re-deriving it.
+--
+-- For a purchase already paid with a wallet token -- every "contactless" row
+-- -- the re-payment is the identity, and the assertion is the same claim
+-- made twice. That is a consequence of not special-casing rows, and is
+-- cheaper than a rule about which rows to exempt.
+
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 dining out`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 a cafe`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 cold storage`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 fairprice in store`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 fairprice online`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 little farms as groceries`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 little farms as misc food`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 premium grocer online`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 a foodpanda order`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 fast food`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 kids wear in store`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 kids wear online`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 guardian`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 guardian online`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 watsons`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 watsons online`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 seven eleven`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 cheers`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 a contactless tap`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 lazada`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 shopee`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 amazon`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 starhub bill`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 simplygo`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 tesla supercharger`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 charge plus`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 ride hailing`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 a zig ride coded as cabcharge`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 myr online`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 everything else local`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 everything else overseas`))'s `earns the bonus rate` EQUALS FALSE
+#ASSERT (`the rate on` `Citi Rewards` `S5 the cardholder` `S5 the month` (`S5 the same purchase paid with a wallet token` `S5 a wallet tap in a department store`))'s `earns the bonus rate` EQUALS FALSE
+
+
+-- ===========================================================================
+-- WHAT THE CHEAT SHEET SAYS THAT THIS DOMAIN CANNOT HOLD
+--
+-- Four claims were read off the sheet and are not asserted below. They are listed rather than dropped, because "not asserted" and
+-- "asserted and passing" are not the same evidence, and a later reader
+-- counting assertions would otherwise conclude the sheet was fully covered.
+--
+-- 1. THE SOLITAIRE SAVINGS UPLIFT. "6 mpd (4 card + 2 savings)", and "Lady's
+--    Savings Account stays >= S$10k -- or Solitaire silently drops to 4 mpd".
+--    `Cardholder` carries no savings-account balance -- the domain module
+--    says why, at length: the T&C held in this corpus states 4 miles per S$1
+--    and is silent on any savings uplift, so the promotion's terms are not
+--    held. The 6 is asserted throughout above anyway, because 6 is what the
+--    sheet claims; the 4-plus-2 decomposition is not assertable, and neither
+--    is the S$10k condition. MISSING FIELD: a Lady's Savings Account balance
+--    on `Cardholder`.
+--
+-- 2. WHICH POT A CAP FIGURE BELONGS TO -- NO LONGER A MISSING FIELD, AND
+--    STILL NOT ASSERTED. Two of the sheet's claims are about pot IDENTITY
+--    rather than pot size. Solitaire: "S$750 Dining + S$750 Family ... Unused
+--    room in one category does NOT transfer" -- two pots that must be
+--    different. Revolution: "S$1,000 online + contactless (combined)" -- two
+--    channels that must share one pot. The assertions above show only that a
+--    dining purchase and a grocery purchase each see S$750, and that an
+--    online purchase and a tap each see S$1,000; sameness and difference are
+--    a further claim.
+--
+--    Until 2026-09-21 this read as a missing field on `Cap`, and that is now
+--    WRONG: `Cap` carries `pool`, a STRING naming which pot the transaction
+--    runs against, and the domain module says in terms that it was added
+--    because "the cheat sheet's claim that two pots do not transfer is only
+--    checkable if the pot is named". So the claim is expressible today.
+--
+--    ASSERTED SINCE 2026-09-21, under "Which pot" in the stack-table section
+--    above. An earlier draft of this note deferred them on the ground that
+--    naming a pot the rule modules had not settled would fail on spelling.
+--    That ground was sound and the conclusion did not follow: a comparison
+--    between two answers of the same card names no string at all. Four
+--    assertions, no rate figures: the Dining pot is one pot, the Family pot
+--    is one pot, those two are not each other, and Revolution's online and
+--    contactless pots are.
+--
+--    What remains genuinely unasserted is the SIZE claim read across pots --
+--    "S$1,500 combined". The assertions say each pot admits S$750 and that
+--    the pots differ, which entails it, but nothing states the total, and
+--    `Cap` has no field that would.
+--
+-- 3. WHICH WAY THE ACQUIRER WILL FLAG IT. The sheet routes by channel --
+--    "if ordered online", "contactless", "Apple Pay default" -- and its
+--    figures are the figures for a transaction that lands the way the row
+--    expects. Nothing in this file asserts that it does, because nothing the
+--    cardholder can depose to settles it, so every fixture leaves the
+--    indicator Unknown. This is NOT a missing field: the domain has the
+--    field and it has an explicit `Unknown` value, and the gap is in the
+--    cheat sheet, which gives the reader no way to tell a row whose rate is
+--    certain from a row whose rate is a hope about someone else's acquirer.
+--    That is the most useful thing this comparison can surface and it is
+--    surfaced by the failures, not by an assertion.
+--
+-- 4. THE CASHBACK CARDS. SC Smart's "6% cashback, ~S$60/mo rebate" and DBS
+--    Live Fresh have no representation at all: no `Card` constructor, and
+--    `Rate answer` answers only in miles. Not a gap to be filled here -- this
+--    is a miles corpus -- but it is why one whole waterfall row and three
+--    second-choice cells are unasserted.
+--
+-- Two further things are expressible but deliberately NOT asserted. The yuu
+-- unlock and the PAssion unlock are baked into `S5 the month` as met, so nothing
+-- below tests what happens when they are missed. The sheet's headline rates
+-- are post-unlock rates and it prints no pre-unlock figures, so there is no
+-- claim to transcribe. A test of the unmet month belongs in the encoding
+-- taken from the T&Cs, which is where the thresholds are actually stated.
+-- And `Rate answer`'s two conditional branches, `miles per dollar if the
+-- merchant flags online` and its card-present twin, are never asserted
+-- against. Transcribing the sheet's figures onto the branch each row implies
+-- would answer a different and narrower question -- "is the sheet right ABOUT
+-- A TRANSACTION THAT LANDS THE WAY IT EXPECTS" -- and would hide the gap
+-- named in (4) by assuming it away. If that comparison is wanted it should be
+-- a second file, deposited under its own name, not a silent change to this
+-- one.
+-- ===========================================================================

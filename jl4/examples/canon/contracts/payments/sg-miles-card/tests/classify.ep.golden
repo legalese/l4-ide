@@ -1,0 +1,117 @@
+IMPORT prelude
+IMPORT `miles-card-domain`
+
+§ `Layer 1 — reading the statement line into the domain's enumerations`
+
+-- ===========================================================================
+-- THE STRING WORK, done once. The issuers' documents name merchants and
+-- statement descriptions in prose; the rules read the closed enumerations
+-- `Merchant` and `Description pattern` and never compare a string, because
+-- the corpus must lower to Catala and Catala has no string type. This module
+-- is the one place the two meet. It is NOT expected to lower.
+--
+-- Matching is by case-insensitive substring: "COLD STORAGE GREAT WORLD" is
+-- Cold Storage, "AMAZE*NTUC FAIRPRICE" carries AMAZE. That is what the
+-- documents describe -- DBS Woman's cl.11 "transactions matching the terms
+-- listed", Citi exclusion list footnote 2 "any combination, permutation or
+-- derivation ... whether in whole or in part" -- and it over-matches in the
+-- direction of EXCLUDING (an "AMAZED BOOKS" line would carry AMAZE), which
+-- understates a reward and never overstates one. A real statement feed may
+-- want a stricter classifier; this one is written to be replaced, not
+-- trusted.
+-- ===========================================================================
+
+GIVEN haystack IS A STRING
+      needle   IS A STRING
+GIVETH A BOOLEAN
+`has` haystack needle MEANS CONTAINS (TOUPPER haystack) (TOUPPER needle)
+
+-- Whole-word containment: the line is padded with spaces so that "SAM" is
+-- found in "SAM PAYMENTS" and "PAYMENT TO SAM" but not in "SAMSUNG". Only
+-- families whose printed term is an ordinary word need it.
+GIVEN haystack IS A STRING
+      needle   IS A STRING
+GIVETH A BOOLEAN
+`has word` haystack needle MEANS CONTAINS (CONCAT " ", (TOUPPER haystack), " ") (CONCAT " ", (TOUPPER needle), " ")
+
+-- yuu cl.8 and PAssion cl.5: the merchant, from the name the statement prints.
+-- Order matters only where one name contains another: "Cold Storage On The
+-- Go" before "Cold Storage", "Giant" after nothing that contains it.
+GIVEN name IS A STRING
+GIVETH A Merchant
+`the merchant named` name MEANS
+    BRANCH
+        IF `has` name "COLD STORAGE ON THE GO" THEN `Cold Storage On The Go`
+        IF `has` name "COLD STORAGE" OR `has` name "CS FRESH" OR `has` name "JASONS" THEN `Cold Storage`
+        IF `has` name "GIANT"                  THEN Giant
+        IF `has` name "GUARDIAN"               THEN Guardian
+        IF `has` name "7-ELEVEN" OR `has` name "7 ELEVEN" OR `has` name "7ELEVEN" THEN `7-Eleven`
+        IF `has` name "FOODPANDA" OR `has` name "PANDAMART" OR `has` name "PANDA MART" THEN foodpanda
+        IF `has` name "GOJEK"                  THEN Gojek
+        IF `has` name "SIMPLYGO"               THEN SimplyGo
+        IF `has` name "CHARGE+" OR `has` name "CHARGE PLUS" THEN `Charge+`
+        IF `has` name "CHAGEE"                 THEN CHAGEE
+        IF `has` name "SINGTEL DASH"           THEN `Another merchant`   -- a wallet top-up line, not SingtelShop! (PAssion cl.5(iv)); it carries the `Singtel Dash` description pattern instead
+        IF `has` name "SINGTEL"                THEN Singtel
+        IF `has` name "BREADTALK"              THEN BreadTalk
+        IF `has` name "TOAST BOX"              THEN `Toast Box`
+        IF `has` name "THYE MOH CHAN"          THEN `Thye Moh Chan`
+        IF `has` name "BUTTER BEAN"            THEN `Butter Bean`
+        IF `has` name "FOOD REPUBLIC"          THEN `Food Republic`
+        IF `has` name "FOOD JUNCTION"          THEN `Food Junction`
+        IF `has` name "MANDAI" OR `has` name "SINGAPORE ZOO" OR `has` name "RIVER WONDERS" OR `has` name "NIGHT SAFARI" OR `has` name "BIRD PARADISE" THEN `Mandai Wildlife Group`
+        OTHERWISE `Another merchant`
+
+-- The description families, from the statement line. Every family that the
+-- line carries is listed; a line may carry several.
+GIVEN d IS A STRING
+GIVETH A LIST OF `Description pattern`
+`the description patterns of` d MEANS
+    filter (GIVEN p YIELD `the line carries` d p)
+           (LIST AXS, AMAZE, `EZ-Link`, TRANSIT, `BUS/MRT`, `SimplyGo description`, FlashPay, YouTrip,
+                 CardUp, iPaymy, FavePay, ShopeePay, SAM, RazerPay, SmoovPay, `Singtel Dash`, PayPal,
+                 `Skrill or Moneybookers`, `Forex or CFD platform`, `Cryptocurrency platform`,
+                 `Payment platform`, `Government levy`)
+
+GIVEN d IS A STRING
+      p IS A `Description pattern`
+GIVETH A BOOLEAN
+`the line carries` d p MEANS
+    CONSIDER p
+    WHEN AXS                       THEN `has` d "AXS"
+    WHEN AMAZE                     THEN `has` d "AMAZE"
+    WHEN `EZ-Link`                 THEN `has` d "EZLINK" OR `has` d "EZ-LINK" OR `has` d "EZ LINK" OR `has` d "MYEZLINK"
+    WHEN TRANSIT                   THEN `has` d "TRANSIT"
+    WHEN `BUS/MRT`                 THEN `has` d "BUS/MRT"
+    WHEN `SimplyGo description`    THEN `has` d "SIMPLYGO"
+    WHEN FlashPay                  THEN `has` d "FLASHPAY" OR `has` d "VCASHCARD"
+    WHEN YouTrip                   THEN `has` d "YOUTRIP"
+    WHEN CardUp                    THEN `has` d "CARDUP"
+    WHEN iPaymy                    THEN `has` d "IPAYMY"
+    WHEN FavePay                   THEN `has` d "FAVEPAY" OR `has` d "FAVE ECARD"
+    WHEN ShopeePay                 THEN `has` d "SHOPEEPAY"
+    WHEN SAM                       THEN `has` d "SAM PAYMENTS" OR `has` d "SINGPOST-SAM" OR `has word` d "SAM"   -- bare "SAM" (Citi paragraph 3 ix) as a whole word, so SAMSUNG does not match
+    WHEN RazerPay                  THEN `has` d "RAZERPAY"
+    WHEN SmoovPay                  THEN `has` d "SMOOV"
+    WHEN `Singtel Dash`            THEN `has` d "SINGTEL DASH"
+    WHEN PayPal                    THEN `has` d "PAYPAL"
+    WHEN `Skrill or Moneybookers`  THEN `has` d "SKRILL" OR `has` d "MONEYBOOKERS" OR `has` d "SKR*"
+    WHEN `Forex or CFD platform`   THEN `has` d "OANDA" OR `has` d "SAXO" OR `has` d "IGMARKETS" OR `has` d "PLUS500" OR `has` d "CITY INDEX" OR `has` d "BANC DE BINARY" OR `has` d "BANCDEBINARY" OR `has` d "SKYFX" OR `has` d "XTRADE" OR `has` d "TOROPTION"
+    WHEN `Cryptocurrency platform` THEN `has` d "COIN" OR `has` d "BITSTAMP" OR `has` d "BITPANDA" OR `has` d "BITTYLICIOUS" OR `has` d "BITIT" OR `has` d "INDACOIN" OR `has` d "SIMPLEX_" OR `has` d "CRYPTO" OR `has` d "XAPO" OR `has` d "PAYBIS" OR `has` d "PAYEER"
+    WHEN `Payment platform`        THEN `has` d "BAGUS" OR `has` d "CANTINE" OR `has` d "SEDAP" OR `has` d "SGEBIZ" OR `has` d "SINGAPORE E-BUSINESS" OR `has` d "KASHMI" OR `has` d "MATCHMOVE" OR `has` d "IPLMILESLIFE"
+    WHEN `Government levy`         THEN `has` d "RWS-LEVY"
+
+
+§§ `Illustrations`
+
+#ASSERT `the merchant named` "COLD STORAGE GREAT WORLD" EQUALS `Cold Storage`
+#ASSERT `the merchant named` "Cold Storage On The Go Esso" EQUALS `Cold Storage On The Go`
+#ASSERT `the merchant named` "CS FRESH TANGLIN" EQUALS `Cold Storage`
+#ASSERT `the merchant named` "NTUC FAIRPRICE" EQUALS `Another merchant`
+#ASSERT `the merchant named` "SINGTEL DASH TOPUP" EQUALS `Another merchant`
+#ASSERT `the merchant named` "SINGTELSHOP ONLINE" EQUALS Singtel
+#ASSERT `the description patterns of` "AMAZE*AXS PTE LTD" EQUALS LIST AXS, AMAZE
+#ASSERT `the description patterns of` "PAYPAL *FOODPANDA" EQUALS LIST PayPal
+#ASSERT `the description patterns of` "COLD STORAGE GREAT WORLD" EQUALS EMPTY
+#ASSERT `the description patterns of` "SAM" EQUALS LIST SAM
+#ASSERT `the description patterns of` "SAMSUNG ONLINE STORE" EQUALS EMPTY

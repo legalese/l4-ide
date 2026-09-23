@@ -1,0 +1,65 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+flat-cards.l4:242:1-148:
+  assertion satisfied
+flat-cards.l4:243:1-134:
+  assertion satisfied
+flat-cards.l4:244:1-154:
+  assertion satisfied
+flat-cards.l4:245:1-140:
+  assertion satisfied
+flat-cards.l4:252:1-146:
+  assertion satisfied
+flat-cards.l4:253:1-132:
+  assertion satisfied
+flat-cards.l4:254:1-152:
+  assertion satisfied
+flat-cards.l4:255:1-138:
+  assertion satisfied
+flat-cards.l4:257:1-157:
+  assertion satisfied
+flat-cards.l4:258:1-163:
+  assertion satisfied
+flat-cards.l4:261:1-145:
+  assertion satisfied
+flat-cards.l4:262:1-131:
+  assertion satisfied
+flat-cards.l4:263:1-151:
+  assertion satisfied
+flat-cards.l4:264:1-137:
+  assertion satisfied
+flat-cards.l4:267:1-148:
+  assertion satisfied
+flat-cards.l4:268:1-140:
+  assertion satisfied
+flat-cards.l4:271:1-141:
+  assertion satisfied
+flat-cards.l4:272:1-147:
+  assertion satisfied
+flat-cards.l4:273:1-161:
+  assertion satisfied
+flat-cards.l4:274:1-173:
+  assertion satisfied
+flat-cards.l4:278:1-309:
+  assertion satisfied
+flat-cards.l4:279:1-146:
+  assertion satisfied
+flat-cards.l4:280:1-152:
+  assertion satisfied
+flat-cards.l4:285:1-132:
+  assertion satisfied
+flat-cards.l4:286:1-138:
+  assertion satisfied
+flat-cards.l4:287:1-147:
+  assertion satisfied
+flat-cards.l4:288:1-153:
+  assertion satisfied
+flat-cards.l4:292:1-265:
+  assertion satisfied
+flat-cards.l4:293:1-277:
+  assertion satisfied
+flat-cards.l4:300:1-98:
+  `Rate answer` OF 2.4, 1, Unconfirmed, 2.4, 2.4, 2.4, FALSE, TRUE, (Cap OF "", FALSE, 0, `Unconfirmed basis`, `Unconfirmed attribution`), (LIST "No UOB terms and conditions for the PRVI Miles card are held in this corpus, so nothing below is read from an issuer document. 1.4 miles per S$1 of Singapore-dollar spend and 2.4 miles per S$1 charged in another currency is the household's working assumption. The card's earning unit, its exclusions, any minimum spend, any cap and any distinction between foreign currency and spend made abroad are all unread. Obtain the T&C before relying on this."), EMPTY, Unconfirmed
+flat-cards.l4:301:1-118:
+  `Rate answer` OF 1.2, 1, Unconfirmed, 1.2, 1.2, 1.2, FALSE, FALSE, (Cap OF "", FALSE, 0, `Unconfirmed basis`, `Unconfirmed attribution`), (LIST "No Citibank terms and conditions for the PremierMiles card are held in this corpus, so nothing below is read from an issuer document. 1.2 miles per S$1 of Singapore-dollar spend and 2.2 miles per S$1 charged in another currency is the household's working assumption. The card's earning unit, its exclusions, any minimum spend, any cap and any distinction between foreign currency and spend made abroad are all unread. Obtain the T&C before relying on this."), EMPTY, Unconfirmed

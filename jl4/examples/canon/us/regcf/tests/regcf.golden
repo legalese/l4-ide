@@ -1,0 +1,265 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+regcf.l4:143:8-84:
+  I found a problem while checking the assumption of `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+    
+      `no Regulation Crowdfunding figure exists before commencement on 2016-05-16`
+    
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+    
+      § <heading>
+          GIVEN `no Regulation Crowdfunding figure exists before commencement on 2016-05-16` IS A NUMBER
+    
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+    
+    The manual explains the move: doc/reference/types/ASSUME.md.
+regcf.l4:494:8-83:
+  I found a problem while checking the assumption of `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here`:
+    ASSUME is an older way of introducing a name, and it is being retired.
+    Nothing is broken: the file still checks, runs and exports as before.
+    This one leaves
+    
+      `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here`
+    
+    open for somebody outside the file to supply. Say that
+    with a GIVEN indented under the heading of the section whose rules
+    read it (add a § heading if the file has none):
+    
+      § <heading>
+          GIVEN `the COVID-19 temporary rules, Rule 201(z) and (bb), are not modelled here` IS A FinancialStatementRequirement
+    
+    (If this ASSUME instead marked a case the rules cannot answer, that is
+    REFUSE "<the reason>" -- see doc/reference/control-flow/REFUSE.md.)
+    
+    The manual explains the move: doc/reference/types/ASSUME.md.
+regcf.l4:1009:1-50:
+  assertion satisfied
+regcf.l4:1010:1-52:
+  assertion satisfied
+regcf.l4:1011:1-55:
+  assertion satisfied
+regcf.l4:1012:1-56:
+  assertion satisfied
+regcf.l4:1015:1-87:
+  assertion satisfied
+regcf.l4:1016:1-82:
+  assertion satisfied
+regcf.l4:1017:1-104:
+  assertion satisfied
+regcf.l4:1022:1-83:
+  assertion satisfied
+regcf.l4:1024:1-87:
+  assertion satisfied
+regcf.l4:1027:1-92:
+  assertion satisfied
+regcf.l4:1028:1-92:
+  assertion satisfied
+regcf.l4:1034:1-68:
+  2500
+regcf.l4:1035:1-80:
+  assertion satisfied
+regcf.l4:1038:1-80:
+  assertion satisfied
+regcf.l4:1043:1-82:
+  assertion satisfied
+regcf.l4:1047:1-118:
+  assertion satisfied
+regcf.l4:1048:1-118:
+  assertion satisfied
+regcf.l4:1051:1-83:
+  assertion satisfied
+regcf.l4:1054:1-86:
+  assertion satisfied
+regcf.l4:1057:1-86:
+  assertion satisfied
+regcf.l4:1061:1-104:
+  assertion satisfied
+regcf.l4:1062:1-104:
+  assertion satisfied
+regcf.l4:1065:1-102:
+  assertion satisfied
+regcf.l4:1081:1-93:
+  assertion satisfied
+regcf.l4:1082:1-92:
+  assertion satisfied
+regcf.l4:1085:1-92:
+  assertion satisfied
+regcf.l4:1088:1-90:
+  assertion satisfied
+regcf.l4:1091:1-92:
+  assertion satisfied
+regcf.l4:1092:1-93:
+  assertion satisfied
+regcf.l4:1093:1-92:
+  assertion satisfied
+regcf.l4:1097:1-103:
+  assertion satisfied
+regcf.l4:1098:1-103:
+  assertion satisfied
+regcf.l4:1102:1-89:
+  assertion satisfied
+regcf.l4:1103:1-89:
+  assertion satisfied
+regcf.l4:1104:1-76:
+  assertion satisfied
+regcf.l4:1106:1-76:
+  assertion satisfied
+regcf.l4:1107:1-102:
+  assertion satisfied
+regcf.l4:1132:1-69:
+  assertion satisfied
+regcf.l4:1133:1-72:
+  assertion satisfied
+regcf.l4:1134:1-80:
+  assertion satisfied
+regcf.l4:1138:1-1139:66:
+  FULFILLED
+regcf.l4:1142:1-1143:66:
+  DEONTIC BREACHED:
+    party
+      Issuer
+    who did action
+      `advertise the terms of the offering`
+    at
+      10
+    surpassed the deadline of party
+      Issuer
+    who had to do obligatory action
+      MUST NOT `advertise the terms of the offering`
+    before their deadline, which was at
+      10
+regcf.l4:1148:1-100:
+  assertion satisfied
+regcf.l4:1149:1-100:
+  assertion satisfied
+regcf.l4:1151:1-127:
+  assertion satisfied
+regcf.l4:1155:1-136:
+  assertion satisfied
+regcf.l4:1156:1-136:
+  assertion satisfied
+regcf.l4:1158:1-136:
+  assertion satisfied
+regcf.l4:1162:1-1163:62:
+  PARTY Issuer MUST `file a Form C-AR annual report` WITHIN `days to file the annual report after fiscal year end` HENCE (`ongoing reporting obligation` OF status, (`annual cycles` MINUS 1))
+regcf.l4:1167:1-1168:71:
+  FULFILLED
+regcf.l4:1171:1-1172:72:
+  DEONTIC BREACHED:
+    party
+      Issuer
+    who did action
+      `file a Form C-TR termination of reporting`
+    at
+      30
+    surpassed the deadline of party
+      Issuer
+    who had to do obligatory action
+      MUST `file a Form C-TR termination of reporting`
+    before their deadline, which was at
+      5
+regcf.l4:1177:1-64:
+  assertion satisfied
+regcf.l4:1179:1-64:
+  assertion satisfied
+regcf.l4:1181:1-63:
+  assertion satisfied
+regcf.l4:1182:1-92:
+  assertion satisfied
+regcf.l4:1183:1-92:
+  assertion satisfied
+regcf.l4:1208:1-120:
+  assertion satisfied
+regcf.l4:1210:1-119:
+  assertion satisfied
+regcf.l4:1212:1-120:
+  assertion satisfied
+regcf.l4:1213:1-119:
+  assertion satisfied
+regcf.l4:1215:1-113:
+  366
+regcf.l4:1216:1-113:
+  365
+regcf.l4:1220:1-1221:58:
+  FULFILLED
+regcf.l4:1224:1-1225:58:
+  DEONTIC BREACHED:
+    party
+      Purchaser
+    who did action
+      `transfer the securities`
+    at
+      200
+    surpassed the deadline of party
+      Purchaser
+    who had to do obligatory action
+      MUST NOT `transfer the securities`
+    before their deadline, which was at
+      200
+regcf.l4:1256:1-161:
+  assertion satisfied
+regcf.l4:1257:1-161:
+  assertion satisfied
+regcf.l4:1258:1-161:
+  assertion satisfied
+regcf.l4:1260:1-161:
+  assertion satisfied
+regcf.l4:1261:1-161:
+  assertion satisfied
+regcf.l4:1262:1-161:
+  assertion satisfied
+regcf.l4:1264:1-161:
+  assertion satisfied
+regcf.l4:1265:1-109:
+  assertion satisfied
+regcf.l4:1276:1-104:
+  assertion satisfied
+regcf.l4:1280:1-1281:58:
+  FULFILLED
+regcf.l4:1325:1-38:
+  assertion satisfied
+regcf.l4:1326:1-51:
+  assertion satisfied
+regcf.l4:1327:1-53:
+  assertion satisfied
+regcf.l4:1328:1-52:
+  assertion satisfied
+regcf.l4:1329:1-58:
+  assertion satisfied
+regcf.l4:1354:1-41:
+  assertion satisfied
+regcf.l4:1355:1-49:
+  assertion satisfied
+regcf.l4:1356:1-46:
+  assertion satisfied
+regcf.l4:1365:1-73:
+  assertion satisfied
+regcf.l4:1366:1-73:
+  assertion satisfied
+regcf.l4:1382:1-54:
+  assertion satisfied
+regcf.l4:1383:1-53:
+  assertion satisfied
+regcf.l4:1394:1-55:
+  assertion satisfied
+regcf.l4:1402:1-63:
+  assertion satisfied
+regcf.l4:1416:1-57:
+  assertion satisfied
+regcf.l4:1417:1-57:
+  assertion satisfied
+regcf.l4:1429:1-62:
+  assertion satisfied
+regcf.l4:1430:1-63:
+  assertion satisfied
+regcf.l4:1443:1-70:
+  assertion satisfied
+regcf.l4:1444:1-68:
+  assertion satisfied

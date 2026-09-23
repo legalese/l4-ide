@@ -1,0 +1,125 @@
+`the Base Points for every SGD1` is equal to 1
+`the Bonus Points for every SGD1` with `a Cardholder at the SGD50,000 Deposits ADB threshold` is equal to 19
+`the total Reward points for every SGD1 of an Eligible Transaction` with `a Cardholder at the SGD50,000 Deposits ADB threshold` is equal to 20
+`the cap on Bonus Points per calendar month` with `a Cardholder at the SGD50,000 Deposits ADB threshold` is equal to 22800
+`the Bonus Points for every SGD1` with `a Cardholder with no Everyday Global Account deposits` is equal to 9
+`the total Reward points for every SGD1 of an Eligible Transaction` with `a Cardholder with no Everyday Global Account deposits` is equal to 10
+`the cap on Bonus Points per calendar month` with `a Cardholder with no Everyday Global Account deposits` is equal to 9000
+`cl.7.1 — the Cardholder maintains the Deposits ADB threshold` with `a Cardholder at the SGD50,000 Deposits ADB threshold`
+not `cl.7.1 — the Cardholder maintains the Deposits ADB threshold` with `a Cardholder just under the threshold`
+`the cl.7.2 cap on an Eligible Transaction` with `a Cardholder at the SGD50,000 Deposits ADB threshold` 's `bonus spend per month` is equal to 1200
+`the cl.7.2 cap on an Eligible Transaction` with `a Cardholder with no Everyday Global Account deposits` 's `bonus spend per month` is equal to 1000
+`the cl.7.2 cap on an Eligible Transaction` with `a Cardholder with no Everyday Global Account deposits` 's `basis` is equal to `Calendar month`
+`the cl.7.2 cap on an Eligible Transaction` with `a Cardholder with no Everyday Global Account deposits` 's `attribution` is equal to `By posting date`
+`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 3000
+`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 3350
+`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 3351
+`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 3999
+`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 4411
+`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 4511
+`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 7011
+not `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 2999
+not `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 4000
+`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 5611
+`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 5699
+not `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 5612
+`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 5942
+`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 5944
+not `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 5943
+not `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 5814
+not `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 5411
+`cl.4.2 — the MCC earns no Reward points` with 6300
+not `cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 6300
+`cl.4.2 — the MCC earns no Reward points` with 7523
+`cl.4.2 — the MCC earns no Reward points` with 7995
+`cl.7 — the MCC falls within any one of the listed Merchant Category Codes` with 7997
+`cl.4.2 — the MCC earns no Reward points` with 5960
+not `cl.4.2 — the MCC earns no Reward points` with 5999
+`cl.4.2 — the MCC earns no Reward points` with 9311
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a wallet tap at a restaurant` 's `points per dollar` is equal to 10
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a wallet tap at a restaurant` 's `miles per dollar` is equal to 4
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a wallet tap at a restaurant` 's `earns the bonus rate`
+not `HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a wallet tap at a restaurant` 's `depends on the merchant indicator`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a wallet tap at a restaurant` 's `status` is equal to `Verified`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a wallet tap at a restaurant` 's `conversion status` is equal to `Unconfirmed`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `a wallet tap at a restaurant` 's `points per dollar` is equal to 20
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `a wallet tap at a restaurant` 's `miles per dollar` is equal to 8
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a physical-card tap at a restaurant` 's `points per dollar` is equal to 10
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `an online bookstore purchase the merchant flags online` 's `points per dollar` is equal to 10
+not `HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `an online bookstore purchase the merchant flags online` 's `depends on the merchant indicator`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a subscription billed to a card on file` 's `points per dollar` is equal to 10
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `an online purchase whose indicator is unknown` 's `depends on the merchant indicator`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `an online purchase whose indicator is unknown` 's `miles per dollar if the merchant flags online` is equal to 4
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `an online purchase whose indicator is unknown` 's `miles per dollar if the merchant flags card-present` is equal to 0.4
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `an online purchase whose indicator is unknown` 's `miles per dollar` is equal to 0.4
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `an online purchase whose indicator is unknown` 's `points per dollar` is equal to 1
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `an online purchase whose indicator is unknown` 's `miles per dollar if the merchant flags online` is equal to 8
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `an online purchase whose indicator is unknown` 's `miles per dollar` is equal to 0.4
+not `HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `an online purchase whose indicator is unknown` 's `earns the bonus rate`
+not `HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `an online purchase whose indicator is unknown` 's `earns the bonus rate`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `an online purchase whose indicator is unknown` 's `miles per dollar if the merchant flags online` is equal to 8
+not `HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a tap whose indicator is unknown` 's `depends on the merchant indicator`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a tap whose indicator is unknown` 's `points per dollar` is equal to 10
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a card inserted at a department store` 's `points per dollar` is equal to 1
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a card inserted at a department store` 's `miles per dollar` is equal to 0.4
+not `HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a card inserted at a department store` 's `earns the bonus rate`
+not `HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a card inserted at a department store` 's `cap` 's `capped`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a tap at a supermarket` 's `points per dollar` is equal to 1
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `an insurance premium paid online` 's `points per dollar` is equal to 0
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `an insurance premium paid online` 's `miles per dollar` is equal to 0
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `an insurance premium paid online` 's `status` is equal to `Verified`
+not `HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `an insurance premium paid online` 's `earns the bonus rate`
+not `HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `an insurance premium paid online` 's `depends on the merchant indicator`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a payment through Paypal` 's `points per dollar` is equal to 0
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a tax payment at a government portal` 's `points per dollar` is equal to 0
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a tax payment through the HSBC Tax Payment Facility` 's `points per dollar` is equal to 0
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a tax payment through the HSBC Tax Payment Facility` 's `points per dollar` is equal to `HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a tax payment at a government portal` 's `points per dollar`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `an Amaze tap at a department store` 's `points per dollar` is equal to 1
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `an Amaze tap at a department store` 's `status` is equal to `Unconfirmed`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a tap at a restaurant the day before the Programme starts` 's `status` is equal to `Unconfirmed`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a tap at a restaurant the day before the Programme starts` 's `points per dollar` is equal to 10
+`cl.2 — the transaction date falls within the Programme period` with `a wallet tap at a restaurant`
+not `cl.2 — the transaction date falls within the Programme period` with `a tap at a restaurant the day before the Programme starts`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `an airline ticket bought online` 's `points per dollar` is equal to 10
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a taxi fare tapped` 's `points per dollar` is equal to 10
+`cl.4 — the description names a transaction the clause excludes` with list of `Forex or CFD platform`
+`cl.4 — the description names a transaction the clause excludes` with list of `Cryptocurrency platform`
+`cl.4 — the description names a transaction the clause excludes` with list of `PayPal`
+`cl.4 — the description names a transaction the clause excludes` with list of `Skrill or Moneybookers`
+`cl.4 — the description names a transaction the clause excludes` with list of `CardUp`
+`cl.4 — the description names a transaction the clause excludes` with list of `SmoovPay`
+`cl.4 — the description names a transaction the clause excludes` with list of `iPaymy`
+`cl.4 — the description names a transaction the clause excludes` with list of `EZ-Link`
+`cl.4 — the description names a transaction the clause excludes` with list of `TRANSIT`
+`cl.4 — the description names a transaction the clause excludes` with list of `FlashPay`
+`cl.4 — the description names a transaction the clause excludes` with list of `YouTrip`
+`cl.4 — the description names a transaction the clause excludes` with list of `AXS`
+`cl.4 — the description names a transaction the clause excludes` with list of `AMAZE` and `AXS`
+not `cl.4 — the description names a transaction the clause excludes` with list of `AMAZE`
+not `cl.4 — the description names a transaction the clause excludes` with list of `FavePay`
+not `cl.4 — the description names a transaction the clause excludes` with list of `ShopeePay`, `BUS/MRT` and `Government levy`
+not `cl.4 — the description names a transaction the clause excludes` with `a wallet tap at a restaurant` 's `description patterns`
+`cl.4 — the kind of charge is one the clause excludes` with `Balance or funds transfer`
+`cl.4 — the kind of charge is one the clause excludes` with `Cash advance or quasi-cash`
+`cl.4 — the kind of charge is one the clause excludes` with `Interest or finance charge`
+`cl.4 — the kind of charge is one the clause excludes` with `Annual fee or bank charge`
+`cl.4 — the kind of charge is one the clause excludes` with `Instalment plan transaction`
+`cl.4 — the kind of charge is one the clause excludes` with `Refund or reversal`
+not `cl.4 — the kind of charge is one the clause excludes` with `Retail purchase`
+not `cl.4 — the kind of charge is one the clause excludes` with `Bill payment via internet banking`
+not `cl.4 — the kind of charge is one the clause excludes` with `Telephone or mail order`
+not `cl.4 — the kind of charge is one the clause excludes` with `Pre-authorisation`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a wallet tap at a restaurant` 's `points per dollar` is equal to 10
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `an instalment on a restaurant purchase` 's `points per dollar` is equal to 0
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a refund of a restaurant tap` 's `points per dollar` is equal to 0
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `the annual fee charged to the Account` 's `points per dollar` is equal to 0
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a Youtrip top-up bought online` 's `points per dollar` is equal to 0
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `an instalment on a restaurant purchase` 's `points per dollar` is equal to 0
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `a Youtrip top-up bought online` 's `miles per dollar` is equal to 0
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a refund of a restaurant tap` 's `status` is equal to `Verified`
+not `HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a Youtrip top-up bought online` 's `depends on the merchant indicator`
+not `HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `a refund of a restaurant tap` 's `cap` 's `capped`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `a wallet tap at a restaurant` 's `cap` 's `capped`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `a wallet tap at a restaurant` 's `cap` 's `bonus spend per month` is equal to 1200
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder with no Everyday Global Account deposits`, `a month position this card does not read` and `an online purchase whose indicator is unknown`
+`HSBC Revolution earns on` with `HSBC Revolution`, `a Cardholder at the SGD50,000 Deposits ADB threshold`, `a month position this card does not read` and `a wallet tap at a restaurant`

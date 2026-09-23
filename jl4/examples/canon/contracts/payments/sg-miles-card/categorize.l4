@@ -1,0 +1,48 @@
+IMPORT prelude
+
+§ `Layer 1 — merchant, MCC, channel and currency to a spend category`
+
+-- GENERATED from categorize.dmn.md by dmnmd (`cabal run -v0 dmnmd -- -t l4
+-- categorize.dmn.md` in <dmnmd>/languages/haskell, emitted name `f1`
+-- renamed to `Categorize`). The .dmn.md beside this file is the source of
+-- truth; edit it and regenerate rather than editing the BRANCH below.
+--
+-- This is the household's OWN categorisation (spec section 5, layer 1): it
+-- names the rows of the consumer app, not any issuer's category. It is
+-- honest as a table because it is total and stateless. The issuers' own
+-- categories (UOB Schedule 1, HSBC cl.7, yuu Participating Merchants) are
+-- rules in the card modules and are keyed off MCC and merchant name
+-- directly, not off this output.
+--
+-- Carried over unchanged from jl4/examples/experiments/miles-card/ (commit
+-- 5cf5d611f). The column-aligned ditto (^) grid copies the token at the same
+-- start column from the previous line.
+
+GIVEN merchant IS A STRING
+      mcc      IS A NUMBER
+      channel  IS A STRING
+      currency IS A STRING
+GIVETH A STRING
+Categorize merchant mcc channel currency MEANS
+  BRANCH
+    IF                                                                                                                                                                                                                                                                                   currency EQUALS "MYR" THEN "MYR"
+    IF (merchant EQUALS "Cold Storage" OR merchant EQUALS "CS Fresh" OR merchant EQUALS "Jasons" OR merchant EQUALS "Giant")                                                                                                                              AND channel EQUALS "inPerson"                        THEN "GroceriesPhysical"
+    IF merchant                                                                                                                                EQUALS "foodpanda"                                                                                                                                              THEN "foodpanda"
+    IF ^                                                                                                                                       ^      "Charge+"                                                                                                                                                THEN "TeslaChargePlus"
+    IF ^                                                                                                                                       ^      "Tesla"                                                                                                                                                  THEN "TeslaSupercharger"
+    IF ^                                                                                                                                       ^      "SimplyGo"                                                                                                                                               THEN "SimplyGo"
+    IF                                                                                                                                                             (mcc EQUALS 4111 OR mcc EQUALS 4112)                                                                                                        THEN "SimplyGo"
+    IF (merchant EQUALS "Netflix" OR merchant EQUALS "Disney+" OR merchant EQUALS "HBO" OR merchant EQUALS "Spotify" OR merchant EQUALS "Viu")                                                                                                                                                                 THEN "Streaming"
+    IF                                                                                                                                                             (mcc EQUALS 4899 OR mcc EQUALS 5815)                                                   AND channel EQUALS "online"                          THEN "Streaming"
+    IF (merchant EQUALS "McDonald's" OR merchant EQUALS "KFC" OR merchant EQUALS "Starbucks" OR merchant EQUALS "Ya Kun")                                                                                                                                                                                      THEN "FastFood"
+    IF                                                                                                                                                             mcc                                                                        EQUALS 5814                                                      THEN "FastFood"
+    IF                                                                                                                                                             (mcc EQUALS 5812 OR mcc EQUALS 5813)                                                                                                        THEN "Dining"
+    IF                                                                                                                                                             mcc                                                                        EQUALS 4121                                                      THEN "RideHailing"
+    IF merchant                                                                                                                                EQUALS "RedMart"                                                                                                                                                THEN "GroceriesOnline"
+    IF                                                                                                                                                             mcc                                                                        EQUALS 5411 AND channel EQUALS "online"                          THEN "GroceriesOnline"
+    IF merchant                                                                                                                                EQUALS "Shopee"                                                                                                                                                 THEN "Shopee"
+    IF ^                                                                                                                                       ^      "StarHub"                                                                                                                                                THEN "StarHub"
+    IF                                                                                                                                                                                                                                                        channel EQUALS "online"                          THEN "OtherOnline"
+    IF                                                                                                                                                             (mcc EQUALS 5311 OR mcc EQUALS 5411 OR mcc EQUALS 5611 OR mcc EQUALS 5651)             AND ^       ^      "inPerson"                        THEN "ContactlessTap"
+    OTHERWISE "Other"
+

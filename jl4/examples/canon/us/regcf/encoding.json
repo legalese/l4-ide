@@ -1,0 +1,25 @@
+{
+  "id": "legalese",
+  "encoder": "legalese",
+  "status": "draft",
+  "status_checked": "2026-09-23",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "maintainer": {
+    "name": "Legalese Pte. Ltd.",
+    "github": "legalese"
+  },
+  "display_name": "Regulation Crowdfunding as one wiki page presents it — eligibility, limits, disclosure, intermediaries, advertising, reporting, resale",
+  "versions_encoded": "Law as in force on 2026-07-23, with a rule-version axis back to commencement: 16 May 2016, 12 April 2017, 15 March 2021 and 20 September 2022 (regcf.l4:114-128). Every constant in a dateable function's read set is dated over the same window, so the module answers under `EVAL UNDER RULES EFFECTIVE AT` for any rule date from commencement.",
+  "modules": [
+    "regcf.l4",
+    "regcf-wizard.l4"
+  ],
+  "scope": "The eight requirement groups of 17 CFR Part 227 that one external wiki page presents, in its order, and no more (regcf.l4:14-26): issuer eligibility, the offering limit, investor limits, disclosure, intermediary obligations, advertising, ongoing reporting and resale. NOT a full formalisation of Part 227 — the funding-portal regime (Rules 400-404), the bad-actor detail (Rule 503) and most of the Rule 201 itemisation are out of scope and say so at regcf.l4:28-31. regcf.l4 carries no @export; regcf-wizard.l4 is the founder/investor façade that does. Interpretive forks are in registers/fork-register.json. 112 assertions (regcf.l4 83, regcf-wizard.l4 29), none failing, with four goldens per module.",
+  "assertions": 112,
+  "not_reviewed": {
+    "gate": "HG1",
+    "state": "none recorded",
+    "note": "No HG1 grant or waiver was found for this encoding in legalese/l4-ide, where it was written. Treat it as unreviewed: no domain expert has read it against Part 227 section by section and signed."
+  }
+}

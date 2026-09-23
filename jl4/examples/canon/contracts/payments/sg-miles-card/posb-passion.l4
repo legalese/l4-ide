@@ -1,0 +1,1120 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `miles-card-domain`
+
+§ `Terms and Conditions Governing the PAssion POSB Debit Card ‘Up to 9% Cash Rebates (18X yuu Points) Promotion’`
+
+-- ===========================================================================
+-- DOCUMENT. source/posb-passion-yuu-tnc.txt, document id `posb-passion-yuu-tnc`,
+-- which dates itself "Updated as of 30 May 2025" in the running footer of every
+-- page. Twenty numbered clauses and one Appendix. Private contract text, not
+-- law, and nothing here is advice about anyone's real card.
+--
+-- WHAT THIS MODULE ANSWERS. For one transaction on a PAssion POSB Debit Card:
+-- how many yuu Points per dollar the Promotion awards, whether the 15X POSB
+-- Bonus limb is earned, what the monthly cap is, and which clauses were read.
+--
+-- WHY EVERY ANSWER IS `Source expired`. Clause 3: "The Promotion is valid from
+-- 1 October 2023 to 30 September 2025 (“Promotion Period”)." That period ended
+-- on 30 September 2025. No document held in this corpus renews or extends it,
+-- and clause 16 lets POSB/DBS terminate the Promotion at any rate. So the
+-- `status` on every answer this module returns is `Source expired`, and a
+-- `conditions` string says so in words the app can print.
+--
+-- The mechanics are still encoded in full, exactly as written. That is the
+-- point: an expired instrument whose machinery is legible is a different
+-- artifact from one that merely says "expired". A reader can see what the
+-- Promotion did, compare it to whatever replaces it, and cite the clause.
+--
+-- WHAT THIS MODULE DELIBERATELY DOES NOT MODEL.
+--
+--   cl.2, cl.12, cl.13   Good standing of the Card account and of the linked
+--                        yuu Account, tested at the Fulfilment Date rather
+--                        than at the transaction. The domain records no fact
+--                        about account standing, and the test is at a later
+--                        moment than the one this module answers about, so it
+--                        is carried as a `conditions` string.
+--   cl.4 "Mastercard"    Qualified Spend must be "charged to Mastercard". The
+--                        domain's Transaction carries no card network and the
+--                        Card enum's `POSB PAssion Debit` does not name one.
+--                        Carried as a `conditions` string; see the gap report.
+--   cl.8(c)              Aggregation of spend across a Cardmember's several
+--                        PAssion Cards. The Month position fields are already
+--                        household totals, so aggregation is assumed done.
+--   cl.11 refund netting "Posted refunds ... will be computed as a negative
+--                        spend." That a refund earns NOTHING is encoded, at
+--                        clause 4's retail-transaction limb; that it is
+--                        SUBTRACTED from the month's running total is not,
+--                        because the Month position fields are given to this
+--                        module already netted.
+--   cl.14 clawback,      Discretionary powers. They defeat an award after the
+--   cl.16, cl.17, cl.20  fact; they do not change what the rate rules say.
+--   Appendix 1 products  The SKU-level exclusions (plastic bags, tobacco,
+--                        delivery charges, gift cards, infant formula, dim
+--                        sum, bundle deals, bill discounts) are facts about a
+--                        basket, and a statement line does not carry them.
+--                        Carried as a `conditions` string on every earning
+--                        answer, because a user who does not know this will
+--                        be surprised by a smaller credit than the rate says.
+--
+-- The `card` parameter is READ BY NOBODY in this module: the composer
+-- dispatches on the rule's name, and this document governs exactly one card
+-- family. `cardholder` is read only by clause 1, `month` only by clause 8(a).
+--
+-- NO RULE HERE COMPARES A STRING. The T&C keys its Participating Stores and
+-- its Appendix 1 exclusions by name, but Catala has no string type, so the
+-- string work is layer 1's (`classify.l4`) and every rule below reads the
+-- domain's closed enumerations: `Merchant` for clause 5, `Description pattern`
+-- for Appendix 1's PayPal entry, `Charge kind` for clause 4's retail limb and
+-- the boolean `posted in a foreign currency` for clauses 4, 7(d) and 8(d). The
+-- transaction's `merchant name` and `transaction description` survive for
+-- display and are read by nothing.
+-- ===========================================================================
+
+
+§§ `Provenance — the document and the clauses this module relies on`
+
+-- The document id, its dating line and the clause quote are all STRINGs, so
+-- they are written INLINE at the point of use: a definition whose result type
+-- is STRING cannot be lowered to Catala, while a string sitting in a record
+-- field is elided. `document date` is the dating line as a DATE — the running
+-- footer of every page reads "Updated as of 30 May 2025".
+GIVEN clause IS A STRING
+      quote  IS A STRING
+GIVETH A Provenance
+`PAssion source` clause quote MEANS
+    Provenance WITH
+        `document`      IS "posb-passion-yuu-tnc"
+        `clause`        IS clause
+        `dated`         IS "Updated as of 30 May 2025"
+        `document date` IS YMD 2025 5 30
+        `quote`         IS quote
+
+GIVETH A Provenance
+`source cl.1` MEANS `PAssion source` "1" "The Promotion is only applicable for all holders (“Cardmember”) of a PAssion POSB Debit Card, PAssion POSB Platinum Debit Card and/or HomeTeamNS-PAssion-POSB Debit Card (“PAssion Card”) who: a. has an existing PAssion membership registered with People’s Association, b. has a yuu Account, and c. has linked his/her PAssion Card in the yuu App."
+
+GIVETH A Provenance
+`source cl.3` MEANS `PAssion source` "3" "The Promotion is valid from 1 October 2023 to 30 September 2025 (“Promotion Period”)."
+
+GIVETH A Provenance
+`source cl.4` MEANS `PAssion source` "4" "“Qualified Spend” refers to retail transactions charged to the PAssion Card within the Promotion Period, and posted into the Card account at the point of computation of yuu Points. It includes only retail transactions as defined in clause 7a and clause 8a, that are in local currency, charged to Mastercard, and successfully posted to the Card account."
+
+GIVETH A Provenance
+`source cl.5` MEANS `PAssion source` "5" "“Participating Stores” refer to: i. DFI Retail Group (DFG): 7-Eleven, Cold Storage, CS Fresh, Giant, Guardian ii. BreadTalk Group (BTG): BreadTalk, Toast Box, Thye Moh Chan, Butter Bean, and selected Food Republic and Food Junction outlets (With effect from 27 October 2024, yuu Points will no longer be awarded at all Food Republic and Food Junction outlets.) iii. Mandai Wildlife Group: Singapore Zoo, River Wonders, Night Safari and Bird Paradise (with effect from 1 December 2023 only online ticketing sites will be eligible) iv. Singtel: SingtelShop! and Singtel Exclusive Retailers, excluding Singtel recurring bill payments v. Gojek Singapore vi. foodpanda Singapore: food delivery, pick up, shops and pandamart"
+
+GIVETH A Provenance
+`source cl.6` MEANS `PAssion source` "6" "Promotion comprises of the following: Awarding type Accelerator; Base Points 1.5% cash rebates (3X yuu Points); POSB Bonus Points 7.5% cash rebates (15X yuu Points)"
+
+GIVETH A Provenance
+`source cl.7a` MEANS `PAssion source` "7a" "Cardmember can earn 3X yuu points on every S$1 Qualified Spend made at Participating Stores charged to a PAssion Card."
+
+GIVETH A Provenance
+`source cl.7b` MEANS `PAssion source` "7b" "3X yuu Points comprise of: i 1X yuu Point from Participating Merchants (subject to Excluded Product listed in Appendix 1), which will be credited to Cardmembers’ yuu Account at point of transaction, and ii 2X yuu Points from POSB, which will be credited to Cardmembers’ yuu Account when transaction has been successfully posted to Cardmembers’ Card Account"
+
+GIVETH A Provenance
+`source cl.7c` MEANS `PAssion source` "7c" "There is no minimum spend required, and no cap to the Base Points awarded."
+
+GIVETH A Provenance
+`source cl.7d` MEANS `PAssion source` "7d" "Retail transactions made at the Participating Merchants located outside of Singapore and/or charged in foreign currencies are not eligible for this Promotion."
+
+GIVETH A Provenance
+`source cl.8a` MEANS `PAssion source` "8a" "Cardmember can earn 15X yuu Points when Cardmember meets all the following Qualified Spend criteria within each Qualifying month i. At least S$300 total spend at Participating Stores ii. At least S$400 total spend at non-Participating Stores"
+
+GIVETH A Provenance
+`source cl.8b` MEANS `PAssion source` "8b" "Capped at a maximum of S$25 cash rebate (5,000 yuu Points) to be awarded per Cardmember per Qualifying Month, which will be credited to Cardmember’s yuu Account by the Fulfilment Date for each Qualifying Month as defined in Clause 8e."
+
+GIVETH A Provenance
+`source cl.8d` MEANS `PAssion source` "8d" "Retail transactions made at Participating Merchants located outside of Singapore and/or charged in foreign currencies, are not eligible for this Promotion."
+
+GIVETH A Provenance
+`source cl.8e` MEANS `PAssion source` "8e" "Qualifying Month and Fulfilment Date are defined as follow: Qualifying Month / Fulfilment Date; 1 to 30 Sep 2024 / 1 to 31 Oct 2024; 1 to 31 Oct 2024 / 1 to 31 Dec 2024; ... 1 to 31 Aug 2025 / 1 to 31 Oct 2025; 1 to 30 Sep 2025 / 1 to 30 Nov 2025"
+
+GIVETH A Provenance
+`source cl.10` MEANS `PAssion source` "10" "All yuu Points are awarded up to 2 decimal places. Example: S$1.50 spend at yuu merchant = 4.50 yuu points (based on 3X Base Points)"
+
+GIVETH A Provenance
+`source cl.11` MEANS `PAssion source` "11" "Only posted transactions will be considered as Qualified Spend. Posted refunds into the Card Account will be computed as a negative spend."
+
+GIVETH A Provenance
+`source Appendix 1` MEANS `PAssion source` "Appendix 1" "The following Exclusion List is applicable for Qualified Spend under clause 7bi, and is subject to changes from time to time without prior notice."
+
+GIVETH A Provenance
+`source Appendix 1 Singtel` MEANS `PAssion source` "Appendix 1 (Singtel)" "1. Base points will not be awarded for all in-stores and online purchases, and recurring bill payment and bill payment. 2. Bonus points will be awarded for selected items. Please visit yuu App to see full list of rewards."
+
+GIVETH A Provenance
+`source Appendix 1 PayPal` MEANS `PAssion source` "Appendix 1 (foodpanda, Gojek)" "Points will not be awarded for any transactions with transaction description “PayPal” with effect from 1 February 2024."
+
+-- NOT a PAssion clause. The conversion from yuu Points to miles is stated in a
+-- DIFFERENT held document: the DBS yuu Card T&C (`dbs-yuu-card-tnc`), clause
+-- 12, "1 yuu Point is equivalent to 0.5% cash rebate or 0.28 miles or more,
+-- depending on the redemption item".
+--
+-- WHY CLAUSE 12 AND NOT CLAUSE 7 (ruled 2026-09-21). Clause 7 of the same
+-- document caps Total Bonus Rewards at "28,800 yuu Points (worth up to S$144
+-- cash rebates or 8,000 miles) per calendar month", and 8,000 / 28,800 is
+-- 0.27777…, which is BELOW the 0.28 floor clause 12 states. Clause 7's 8,000
+-- is a rounded cap figure, not a rate; reading a rate out of it contradicts
+-- the clause that states one. So the conversion here is clause 12's 0.28.
+--
+-- IT IS A FLOOR, NOT A FIGURE. Clause 12 says "0.28 miles OR MORE, depending
+-- on the redemption item", so 0.28 is the least a Point can be worth and the
+-- true rate depends on a redemption this module knows nothing about. Taking
+-- the floor understates and never overstates, which is the rule everywhere in
+-- this corpus.
+--
+-- `conversion status` on every answer here is Unconfirmed for a separate
+-- reason, and the two should not be confused: nothing in the PAssion T&C
+-- states any miles figure at all. The 0.28 comes from `dbs-yuu-card-tnc`,
+-- which governs a DIFFERENT promotion, and this corpus holds no instrument
+-- saying the yuu conversion applies to PAssion-earned Points.
+GIVETH A Provenance
+`source yuu conversion` MEANS
+    Provenance WITH
+        `document`      IS "dbs-yuu-card-tnc"
+        `clause`        IS "12"
+        `dated`         IS "Updated on 7 August 2026"
+        `document date` IS YMD 2026 8 7
+        `quote`         IS "1 yuu Point is equivalent to 0.5% cash rebate or 0.28 miles or more, depending on the redemption item."
+
+
+§§ `Clause 3 — the Promotion Period`
+
+GIVETH A DATE
+`Promotion Period begins` MEANS YMD 2023 10 1
+GIVETH A DATE
+`Promotion Period ends`   MEANS YMD 2025 9 30
+
+GIVEN d IS A DATE
+GIVETH A BOOLEAN
+`cl.3 — the date falls within the Promotion Period` d MEANS
+        "The Promotion is valid from 1 October 2023 to 30 September 2025 (“Promotion Period”)."
+    AND d AT LEAST `Promotion Period begins`
+    AND d AT MOST  `Promotion Period ends`
+
+
+§§ `Clause 1 — who the Promotion applies to`
+
+-- Clause 1 makes three things operative: an existing PAssion membership
+-- registered with People's Association (a), a yuu Account (b), and the PAssion
+-- Card linked in the yuu App (c). The domain carries these as ONE boolean,
+-- `PAssion membership registered and card linked in yuu`, which conflates (a)
+-- and (c) and leaves (b) implicit — a card cannot be linked in the yuu App
+-- without a yuu Account, so (b) is entailed by (c) in practice. A cardholder
+-- who fails any of the three fails all three here, and the app cannot say
+-- which. Recorded as a gap rather than papered over.
+GIVEN cardholder IS A Cardholder
+GIVETH A BOOLEAN
+`cl.1 — the Cardmember is eligible for the Promotion` cardholder MEANS
+        "The Promotion is only applicable for all holders (“Cardmember”) of a PAssion POSB Debit Card ... who: a. has an existing PAssion membership registered with People’s Association, b. has a yuu Account, and c. has linked his/her PAssion Card in the yuu App."
+    AND cardholder's `PAssion membership registered and card linked in yuu`
+
+
+§§ `Clause 4 — Qualified Spend, and clauses 7(d) and 8(d) — where it may be made`
+
+-- "in local currency". Singapore dollars, since the Promotion is a Singapore
+-- retail promotion and clause 7(d) sets "charged in foreign currencies" against
+-- it. Read on the BOOLEAN `posted in a foreign currency`, which is the fact the
+-- statement carries; the `currency` string beside it is for display and no rule
+-- reads it.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.4 — the transaction is in local currency` txn MEANS
+        "It includes only retail transactions as defined in clause 7a and clause 8a, that are in local currency, charged to Mastercard, and successfully posted to the Card account."
+    AND NOT (txn's `posted in a foreign currency`)
+
+-- "retail transactions ... successfully posted to the Card account" (clause 4),
+-- read with clause 11's "Only posted transactions will be considered as
+-- Qualified Spend. Posted refunds into the Card Account will be computed as a
+-- negative spend."
+--
+-- The document does not enumerate what a retail transaction is NOT, so these
+-- ten limbs are a reading, recorded in the fork register:
+--
+--   * A telephone or mail order IS a retail transaction. It is a purchase of
+--     goods at a merchant, and nothing in this document carves it out; writing
+--     it FALSE would assert an exclusion the issuer did not make.
+--   * A pre-authorisation is not "successfully posted", so clause 11 keeps it
+--     out. This is the one limb of clause 11's posting requirement this fact
+--     model can test — a pre-authorisation is the only representable
+--     not-yet-posted state.
+--   * A refund earns nothing under clause 11; that it is also SUBTRACTED from
+--     the month's total is the Month position's business, not this rule's.
+--   * Fees, interest, instalment plans, balance and funds transfers, cash
+--     advances and bill payments made through internet banking are not
+--     purchases at a merchant at all.
+GIVEN k IS A `Charge kind`
+GIVETH A BOOLEAN
+`cl.4 and cl.11 — the posting is a retail transaction that has posted` k MEANS
+        "“Qualified Spend” refers to retail transactions charged to the PAssion Card within the Promotion Period, and posted into the Card account at the point of computation of yuu Points."
+    AND (CONSIDER k
+         WHEN `Retail purchase`                   THEN TRUE
+         WHEN `Telephone or mail order`           THEN TRUE
+         WHEN `Annual fee or bank charge`         THEN FALSE
+         WHEN `Interest or finance charge`        THEN FALSE
+         WHEN `Instalment plan transaction`       THEN FALSE
+         WHEN `Balance or funds transfer`         THEN FALSE
+         WHEN `Cash advance or quasi-cash`        THEN FALSE
+         WHEN `Bill payment via internet banking` THEN FALSE
+         WHEN `Pre-authorisation`                 THEN FALSE
+         WHEN `Refund or reversal`                THEN FALSE)
+
+-- Clauses 7(d) and 8(d) are the same exclusion written twice, once against the
+-- Base limb and once against the Bonus limb, and they are disjunctive in the
+-- text: "outside of Singapore AND/OR charged in foreign currencies". Either
+-- limb alone defeats the transaction.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.7(d) and cl.8(d) — the transaction is neither foreign-currency nor made outside Singapore` txn MEANS
+        "Retail transactions made at the Participating Merchants located outside of Singapore and/or charged in foreign currencies are not eligible for this Promotion."
+    AND txn's `made in Singapore`
+    AND `cl.4 — the transaction is in local currency` txn
+
+
+§§ `Clause 5 — Participating Stores`
+
+-- Clause 5 is a list of six merchant groups. Two of them carry a DATED
+-- withdrawal inside the list entry itself (Food Republic and Food Junction from
+-- 27 October 2024; Mandai on-site purchases from 1 December 2023) and one
+-- carries an untimed carve-out (Singtel recurring bill payments). Each is
+-- encoded as a guard conjoined to the membership test; see the defeasibility
+-- sites at the foot of this file.
+--
+-- MATCHING IS ON THE DOMAIN'S `Merchant` ENUMERATION, not on the printed name.
+-- Layer 1 (`classify.l4`) reads the statement line and decides which merchant
+-- it is, by case-insensitive substring, so "COLD STORAGE TAMPINES" arrives here
+-- as `Cold Storage`. The enumeration collapses the document's own aliases: CS
+-- Fresh is `Cold Storage`, SingtelShop! and Singtel Exclusive Retailers are
+-- both `Singtel`, and the four Mandai parks are `Mandai Wildlife Group`. One
+-- name it does NOT collapse is `Cold Storage On The Go`, the format inside Esso
+-- stations, which clause 5(i) does not list and which is therefore not a
+-- Participating Store here.
+
+GIVEN c IS A `Payment channel`
+GIVETH A BOOLEAN
+`paid in a website or app` c MEANS
+    CONSIDER c
+    WHEN `Paid in a website or app`          THEN TRUE
+    WHEN `Tapped at a terminal`              THEN FALSE
+    WHEN `Inserted or swiped at a terminal`  THEN FALSE
+    WHEN `Card on file or recurring billing` THEN FALSE
+
+GIVEN c IS A `Payment channel`
+GIVETH A BOOLEAN
+`paid by card on file or recurring billing` c MEANS
+    CONSIDER c
+    WHEN `Card on file or recurring billing` THEN TRUE
+    WHEN `Paid in a website or app`          THEN FALSE
+    WHEN `Tapped at a terminal`              THEN FALSE
+    WHEN `Inserted or swiped at a terminal`  THEN FALSE
+
+-- "Cold Storage, CS Fresh" are one constructor in the domain (`Cold Storage`),
+-- which is why only four limbs appear for the document's five names.
+GIVEN m IS A Merchant
+GIVETH A BOOLEAN
+`cl.5(i) — a DFI Retail Group store` m MEANS
+        "DFI Retail Group (DFG): 7-Eleven, Cold Storage, CS Fresh, Giant, Guardian"
+    AND (   m EQUALS `7-Eleven`
+         OR m EQUALS `Cold Storage`
+         OR m EQUALS Giant
+         OR m EQUALS Guardian)
+
+-- "With effect from 27 October 2024, yuu Points will no longer be awarded at
+-- all Food Republic and Food Junction outlets." The four other BreadTalk Group
+-- brands are unaffected. A transaction dated on or after 27 October 2024 at
+-- Food Republic or Food Junction is therefore not at a Participating Store.
+GIVEN m IS A Merchant
+      d IS A DATE
+GIVETH A BOOLEAN
+`cl.5(ii) — a BreadTalk Group store` m d MEANS
+        "BreadTalk Group (BTG): BreadTalk, Toast Box, Thye Moh Chan, Butter Bean, and selected Food Republic and Food Junction outlets (With effect from 27 October 2024, yuu Points will no longer be awarded at all Food Republic and Food Junction outlets.)"
+    AND (   m EQUALS BreadTalk
+         OR m EQUALS `Toast Box`
+         OR m EQUALS `Thye Moh Chan`
+         OR m EQUALS `Butter Bean`
+         OR (    (m EQUALS `Food Republic` OR m EQUALS `Food Junction`)
+             AND d AT MOST (YMD 2024 10 26)))
+
+-- "(with effect from 1 December 2023 only online ticketing sites will be
+-- eligible)". Read against the CARDHOLDER's payment channel, not the merchant
+-- indicator: the distinction the clause draws is between an online ticketing
+-- site and an on-site ticketing counter, which is something the cardholder
+-- knows at the moment of payment. `Card on file or recurring billing` is not
+-- treated as an online ticketing site — a zoo ticket is not a subscription.
+GIVEN m IS A Merchant
+      d IS A DATE
+      c IS A `Payment channel`
+GIVETH A BOOLEAN
+`cl.5(iii) — a Mandai Wildlife Group store` m d c MEANS
+        "Mandai Wildlife Group: Singapore Zoo, River Wonders, Night Safari and Bird Paradise (with effect from 1 December 2023 only online ticketing sites will be eligible)"
+    AND m EQUALS `Mandai Wildlife Group`
+    AND (   d AT MOST (YMD 2023 11 30)
+         OR `paid in a website or app` c)
+
+-- "excluding Singtel recurring bill payments". Read on the payment channel.
+-- Note that Appendix 1 then withdraws base points from EVERY Singtel purchase,
+-- including the ones this clause admits; that conflict is handled in the
+-- earning cascade, not here, because clause 5 is about store membership only.
+GIVEN m IS A Merchant
+      c IS A `Payment channel`
+GIVETH A BOOLEAN
+`cl.5(iv) — a Singtel store` m c MEANS
+        "Singtel: SingtelShop! and Singtel Exclusive Retailers, excluding Singtel recurring bill payments"
+    AND m EQUALS Singtel
+    AND NOT (`paid by card on file or recurring billing` c)
+
+GIVEN m IS A Merchant
+GIVETH A BOOLEAN
+`cl.5(v) — Gojek Singapore` m MEANS
+        "Gojek Singapore"
+    AND m EQUALS Gojek
+
+-- The domain's `foodpanda` constructor already covers "food delivery, pick up,
+-- shops and pandamart": layer 1 maps PANDAMART and PANDA MART onto it.
+GIVEN m IS A Merchant
+GIVETH A BOOLEAN
+`cl.5(vi) — foodpanda Singapore` m MEANS
+        "foodpanda Singapore: food delivery, pick up, shops and pandamart"
+    AND m EQUALS foodpanda
+
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`cl.5 — the transaction is at a Participating Store` txn MEANS
+        `cl.5(i) — a DFI Retail Group store`      (txn's `merchant`)
+    OR  `cl.5(ii) — a BreadTalk Group store`      (txn's `merchant`) (txn's `transaction date`)
+    OR  `cl.5(iii) — a Mandai Wildlife Group store` (txn's `merchant`) (txn's `transaction date`) (txn's `payment channel`)
+    OR  `cl.5(iv) — a Singtel store`              (txn's `merchant`) (txn's `payment channel`)
+    OR  `cl.5(v) — Gojek Singapore`               (txn's `merchant`)
+    OR  `cl.5(vi) — foodpanda Singapore`          (txn's `merchant`)
+
+
+§§ `Appendix 1 — the Exclusion List`
+
+-- SCOPE, AND AN AMBIGUITY THE DOCUMENT DOES NOT SETTLE. The Appendix's own
+-- header scopes it narrowly: "applicable for Qualified Spend under clause
+-- 7bi" — that is the 1X merchant limb of the 3X Base Points, which would leave
+-- the 2X POSB limb intact. But the entries inside the Appendix speak of "Base
+-- points" and "Bonus points", which are clause 7's and clause 8's names for
+-- the whole 3X and the whole 15X, not for the 1X/2X split. The DFI entries
+-- make it worse by writing "All services (bonus points only, base points
+-- exclusion)", a parenthetical that reads both ways.
+--
+-- CHOICE, AND WHY. Where Appendix 1 excludes, this module withholds the WHOLE
+-- base award rather than only the 1X limb. That is the lower figure, and the
+-- rule is never to default an unknown to the convenient answer. It is also
+-- what the Singtel entry says on its face. Recorded in the fork register.
+--
+-- WHAT IS REPRESENTABLE. Only two of the Appendix's exclusions can be tested
+-- against facts a statement carries: the Singtel base-points withdrawal, which
+-- is merchant-level, and the "PayPal" transaction description at foodpanda and
+-- Gojek, which is description-level and dated. The Mandai on-site exclusion is
+-- already enforced at clause 5(iii) and is not repeated here. Everything else
+-- is SKU-level and invisible to this fact model; it rides on a `conditions`
+-- string instead.
+--
+-- One near-miss worth naming: the DFI entries withhold points for "all
+-- services ... including mobile and EZ-Link reload" and for "bill payments,
+-- top-up services" at 7-Eleven. Those read like `Charge kind` facts but are
+-- not: a mobile top-up bought over a 7-Eleven counter posts as an ordinary
+-- retail purchase at that merchant, and what distinguishes it is the item in
+-- the basket. They stay on the conditions string.
+
+GIVEN m IS A Merchant
+GIVETH A BOOLEAN
+`Appendix 1 (Singtel) — base points are withheld on every Singtel purchase` m MEANS
+        "Base points will not be awarded for all in-stores and online purchases, and recurring bill payment and bill payment."
+    AND m EQUALS Singtel
+
+-- The PayPal test is now a MEMBERSHIP test over the description families layer
+-- 1 read off the statement line, so a real "PAYPAL *FOODPANDA" line does trip
+-- it. Under the first encoding the comparison was an exact string match and
+-- that line did not, which understated nothing but excluded nothing either.
+GIVEN txn IS A Transaction
+GIVETH A BOOLEAN
+`Appendix 1 (foodpanda, Gojek) — a PayPal-described transaction from 1 February 2024` txn MEANS
+        "Points will not be awarded for any transactions with transaction description “PayPal” with effect from 1 February 2024."
+    AND (   `cl.5(v) — Gojek Singapore`      (txn's `merchant`)
+         OR `cl.5(vi) — foodpanda Singapore` (txn's `merchant`))
+    AND elem PayPal (txn's `description patterns`)
+    AND txn's `transaction date` AT LEAST (YMD 2024 2 1)
+
+
+§§ `Clause 6 and clause 7 — Base Points, and clause 8 — POSB Bonus Points`
+
+-- Clause 6's table and clause 7's heading both say 3X, and clause 8's heading
+-- says 15X. The document's own title adds them: "Up to 9% Cash Rebates (18X yuu
+-- Points)" — 1.5% + 7.5% = 9%, 3X + 15X = 18X. So the bonus rate is the sum,
+-- not a replacement.
+GIVETH A NUMBER
+`Base Points per dollar`        MEANS 3
+GIVETH A NUMBER
+`POSB Bonus Points per dollar`  MEANS 15
+GIVETH A NUMBER
+`Base and Bonus Points per dollar` MEANS `Base Points per dollar` PLUS `POSB Bonus Points per dollar`
+
+-- 0.28 miles per yuu Point, from the DBS yuu Card T&C clause 12. See the note
+-- on `source yuu conversion` for two things this figure does not say: it is a
+-- FLOOR ("0.28 miles or more"), and it comes from a different document, which
+-- is why `conversion status` is Unconfirmed for PAssion-earned Points.
+GIVETH A NUMBER
+`yuu miles per Point` MEANS 0.28
+
+-- WHETHER AN ANSWER EARNS THE BONUS LIMB IS DERIVED FROM ITS HEADLINE RATE,
+-- never asserted beside it. An answer earns the 15X POSB Bonus exactly when
+-- its miles per dollar exceed what clause 7(a)'s 3X base alone would pay. Both
+-- `earns the bonus rate` and the cap are read off this one test, so an edit
+-- that changes a rate without changing the flag cannot make the answer
+-- contradict itself: a zero answer and a base-only answer are FALSE by
+-- construction rather than by the author having remembered to say so.
+--
+-- It is written on the HEADLINE, not on the points, because the headline is
+-- the figure a reader acts on. The two agree while the conversion is positive,
+-- which it is here.
+GIVEN points IS A NUMBER
+GIVETH A BOOLEAN
+`cl.8 — the headline rate is above clause 7(a)'s base` points MEANS
+    (points TIMES `yuu miles per Point`) GREATER THAN (`Base Points per dollar` TIMES `yuu miles per Point`)
+
+-- Clause 8(a)'s two thresholds. The document says "within each Qualifying
+-- month"; the domain gives running totals "so far this month". A transaction
+-- early in a month that later clears both thresholds is treated here as NOT
+-- earning the bonus, because at the moment the question is asked the month has
+-- not cleared them. The Promotion itself credits the bonus at the Fulfilment
+-- Date, by when the month is complete, so the two readings differ and the
+-- conservative one is taken. Recorded in the fork register.
+GIVEN month IS A `Month position`
+GIVETH A BOOLEAN
+`cl.8(a) — both Qualifying Month thresholds are met` month MEANS
+        "Cardmember can earn 15X yuu Points when Cardmember meets all the following Qualified Spend criteria within each Qualifying month i. At least S$300 total spend at Participating Stores ii. At least S$400 total spend at non-Participating Stores"
+    AND month's `PAssion spend at Participating Stores so far this month`     AT LEAST 300
+    AND month's `PAssion spend at non-Participating Stores so far this month` AT LEAST 400
+
+-- CAP BASIS IS SETTLED BY CLAUSE 8(e), not left open. The spec's section 4.3
+-- records the PAssion cap basis as "unconfirmed"; the document settles it. Every
+-- one of the thirteen rows of the clause 8(e) table is a whole calendar month —
+-- "1 to 30 Sep 2024", "1 to 31 Oct 2024", ... "1 to 30 Sep 2025" — with no row
+-- running from a statement date. A Qualifying Month is a calendar month.
+--
+-- ATTRIBUTION is by posting date: clause 11, "Only posted transactions will be
+-- considered as Qualified Spend", and clause 4, "posted into the Card account
+-- at the point of computation of yuu Points".
+--
+-- The cap is on the BONUS limb only. Clause 7(c): "There is no minimum spend
+-- required, and no cap to the Base Points awarded." 5,000 yuu Points at 15
+-- Points per bonus dollar is S$333.33 of bonus-earning spend, which at 7.5%
+-- is the S$25 cash rebate clause 8(b) states.
+--
+-- ONE POOL. The Promotion keeps a single pot — clause 8(b)'s 5,000 yuu Points
+-- per Qualifying Month — and `pool` names it on both arms, because the pot
+-- exists on the card whether or not THIS transaction runs against it. The
+-- uncapped arm says so through `capped` FALSE, which is the field that makes
+-- the dollar figure meaningless.
+GIVEN bonus IS A BOOLEAN
+GIVETH A Cap
+`the PAssion cap` bonus MEANS
+    IF   bonus
+    THEN Cap WITH
+             `pool`                  IS "PAssion 15X bonus (calendar month)"
+             `capped`                IS TRUE
+             `bonus spend per month` IS 5_000 DIVIDED BY `POSB Bonus Points per dollar`
+             `basis`                 IS `Calendar month`
+             `attribution`           IS `By posting date`
+    ELSE Cap WITH
+             `pool`                  IS "PAssion 15X bonus (calendar month)"
+             `capped`                IS FALSE
+             `bonus spend per month` IS 0
+             `basis`                 IS `Calendar month`
+             `attribution`           IS `By posting date`
+
+
+§§ `The answer`
+
+-- WHY THERE IS AN OUTCOME ENUMERATION HERE. The conditions an answer carries
+-- are plain English, and Catala has no string type: a definition whose result
+-- is a STRING (or a LIST OF STRING) cannot be lowered, and neither can a
+-- parameter of that type, but a string sitting in a record FIELD is elided and
+-- costs nothing. So the notes cannot be named constants passed in, and they
+-- cannot be passed as an argument either; they have to be built where the
+-- record is built.
+--
+-- This enumeration is what lets that happen without copying the whole
+-- twelve-field constructor into each arm of the cascade. Each constructor
+-- names one outcome of `POSB PAssion earns on`, in the order the cascade
+-- tries them, and the one place below that reads it turns it into the notes
+-- for that outcome. The cascade stays a list of one-line arms and the twelve
+-- fields still cannot drift between branches.
+DECLARE `PAssion outcome` IS ONE OF
+    `Not a Cardmember`                                -- cl.1
+    `Outside the Promotion Period`                    -- cl.3
+    `Not a posted retail transaction`                 -- cl.4, cl.11
+    `Foreign currency or spend made abroad`           -- cl.4, cl.7(d), cl.8(d)
+    `Not at a Participating Store`                    -- cl.5, cl.7(a)
+    `A PayPal-described order at foodpanda or Gojek`  -- Appendix 1
+    `Singtel base points withheld`                    -- Appendix 1 (Singtel)
+    `Base and POSB Bonus`                             -- cl.7(a) + cl.8(a)
+    `Base only`                                       -- cl.7(a)
+
+-- ONE constructor for every answer, so the twelve fields cannot drift between
+-- branches. `depends on the merchant indicator` is FALSE throughout and both
+-- conditional rates equal `miles per dollar`: nothing in this document turns on
+-- the acquirer's online/card-present indicator. The one channel test it does
+-- make (clause 5(iii), Mandai) is on the CARDHOLDER's payment channel, which is
+-- not latent.
+--
+-- The conditions are assembled in three parts, so that a sentence said on
+-- every answer is written once: clause 3's expiry first, then the notes
+-- particular to this outcome, then the four caveats that only an answer which
+-- actually earns needs to carry. `points AT LEAST 1` is the test for that —
+-- the two earning outcomes are the only ones with a non-zero rate.
+GIVEN points  IS A NUMBER
+      outcome IS A `PAssion outcome`
+      cites   IS A LIST OF Provenance
+GIVETH A `Rate answer`
+`the PAssion answer of` points outcome cites MEANS
+    `Rate answer` WITH
+        `points per dollar`                                   IS points
+        `miles per point`                                     IS `yuu miles per Point`
+        `conversion status`                                   IS Unconfirmed
+        `miles per dollar`                                    IS points TIMES `yuu miles per Point`
+        `miles per dollar if the merchant flags online`       IS points TIMES `yuu miles per Point`
+        `miles per dollar if the merchant flags card-present` IS points TIMES `yuu miles per Point`
+        `depends on the merchant indicator`                   IS FALSE
+        `earns the bonus rate`                                IS `cl.8 — the headline rate is above clause 7(a)'s base` points
+        `cap`                                                 IS `the PAssion cap` (`cl.8 — the headline rate is above clause 7(a)'s base` points)
+        `conditions`                                          IS
+            append
+                (LIST "Clause 3 fixes a Promotion Period of 1 October 2023 to 30 September 2025. That period has ended and no document in this corpus renews it, so treat every figure below as a record of what the Promotion did, not as what the card pays today.")
+                (append
+                    (CONSIDER outcome
+                     WHEN `Not a Cardmember` THEN
+                         LIST "The Promotion is only open to a Cardmember with an existing PAssion membership registered with People’s Association, a yuu Account, and the PAssion Card linked in the yuu App (clause 1)."
+                     WHEN `Outside the Promotion Period` THEN
+                         LIST "This transaction is dated outside 1 October 2023 to 30 September 2025, so it is not Qualified Spend: clause 4 counts only transactions charged within the Promotion Period."
+                     WHEN `Not a posted retail transaction` THEN
+                         LIST "Clause 4 admits only retail transactions successfully posted to the Card account, and clause 11 counts only posted ones. An annual fee or bank charge, interest, an instalment plan, a balance or funds transfer, a cash advance, a bill payment made through internet banking and a pre-authorisation that has not yet posted are all outside Qualified Spend.",
+                              "A posted refund earns nothing and is computed as a negative spend in the same month (clause 11), which lowers the month's totals for the clause 8(a) thresholds."
+                     WHEN `Foreign currency or spend made abroad` THEN
+                         LIST "Clauses 7(d) and 8(d) exclude retail transactions made outside Singapore and transactions charged in a foreign currency; clause 4 admits local currency only."
+                     WHEN `Not at a Participating Store` THEN
+                         LIST "Clause 7(a) awards Base Points only on spend at a Participating Store, and clause 5 lists them: the DFI, BreadTalk, Mandai, Singtel, Gojek and foodpanda groups, with Food Republic and Food Junction dropped from 27 October 2024, Mandai online ticketing only from 1 December 2023, and Singtel recurring bill payments carved out.",
+                              "This spend is not wasted for the Promotion: clause 8(a)(ii) counts it toward the S$400 of non-Participating Stores spend that the 15X bonus requires.",
+                              "Only posted transactions count as Qualified Spend (clause 11); a posted refund counts as negative spend in the same month."
+                     WHEN `A PayPal-described order at foodpanda or Gojek` THEN
+                         LIST "Appendix 1 withholds yuu Points at foodpanda and Gojek for any transaction whose description is “PayPal”, with effect from 1 February 2024. Paying these merchants through PayPal forfeits the Promotion; charging the card directly does not."
+                     WHEN `Singtel base points withheld` THEN
+                         LIST "Clause 5(iv) makes SingtelShop! and Singtel Exclusive Retailers Participating Stores, and Appendix 1 then withholds base points on every Singtel purchase, in store and online alike. The two provisions point opposite ways on the same facts and this answer takes the lower one.",
+                              "Appendix 1 does say bonus points are awarded at Singtel for selected items, listed in the yuu App. This document does not enumerate them, so no bonus rate can be stated here."
+                     WHEN `Base and POSB Bonus` THEN
+                         LIST "Both clause 8(a) thresholds are met this Qualifying Month: at least S$300 at Participating Stores and at least S$400 at non-Participating Stores. The rate is 3X base plus 15X POSB bonus, the 18X of the promotion's title.",
+                              "The bonus is capped at 5,000 yuu Points — S$25 of cash rebate — per Qualifying Month, which is S$333.33 of bonus-earning spend. The 3X base limb is not capped (clause 7(c)).",
+                              "Of the 3X base, 1X is credited by the merchant at the point of transaction and 2X by POSB once the transaction posts (clause 7(b)). The 15X bonus is credited by the Fulfilment Date for the month, which clause 8(e) sets one to two months later."
+                     WHEN `Base only` THEN
+                         LIST "3X yuu Points per S$1 of Qualified Spend at a Participating Store, with no minimum spend and no cap on the base award (clauses 7(a) and 7(c)).",
+                              "The 15X POSB bonus is not earned: clause 8(a) needs at least S$300 at Participating Stores AND at least S$400 at non-Participating Stores within the same Qualifying Month.",
+                              "Of the 3X, 1X is credited by the merchant at the point of transaction and 2X by POSB once the transaction posts (clause 7(b)).")
+                    (IF   points AT LEAST 1
+                     THEN LIST "Only posted transactions count as Qualified Spend (clause 11); a posted refund counts as negative spend in the same month.",
+                               "The Card account and the linked yuu Account must be in good standing at the moment the yuu Points are credited, not merely when the purchase is made (clauses 2, 12 and 13).",
+                               "Qualified Spend must be charged to Mastercard (clause 4); this encoding cannot see the card network on a transaction and does not test it.",
+                               "Appendix 1 withholds points for named products and situations a statement line does not show — plastic bags, tobacco, delivery charges, all services including mobile and EZ-Link reloads, cash-like items, gift card purchases, infant formula, sushi and sashimi, dim sum, cut fruit, set meals, bundle deals, bill discounts and third-party voucher redemptions — so the credit may be smaller than this rate."
+                     ELSE EMPTY))
+        `sources`                                             IS cites
+        `status`                                              IS `Source expired`
+
+@export What one transaction earns on a PAssion POSB Debit Card under POSB's 18X yuu Points promotion, in yuu Points per dollar, with the clauses relied on — and the fact that the promotion's own Promotion Period ended on 30 September 2025.
+GIVEN card       IS A Card
+      cardholder IS A Cardholder
+      month      IS A `Month position`
+      txn        IS A Transaction
+GIVETH A `Rate answer`
+`POSB PAssion earns on` card cardholder month txn MEANS
+    BRANCH
+      IF   NOT (`cl.1 — the Cardmember is eligible for the Promotion` cardholder)
+      THEN `the PAssion answer of` 0 `Not a Cardmember`
+               (LIST `source cl.1`, `source cl.3`)
+
+      IF   NOT (`cl.3 — the date falls within the Promotion Period` (txn's `transaction date`))
+      THEN `the PAssion answer of` 0 `Outside the Promotion Period`
+               (LIST `source cl.3`, `source cl.4`)
+
+      IF   NOT (`cl.4 and cl.11 — the posting is a retail transaction that has posted` (txn's `charge kind`))
+      THEN `the PAssion answer of` 0 `Not a posted retail transaction`
+               (LIST `source cl.4`, `source cl.7a`, `source cl.8a`, `source cl.11`)
+
+      IF   NOT (`cl.7(d) and cl.8(d) — the transaction is neither foreign-currency nor made outside Singapore` txn)
+      THEN `the PAssion answer of` 0 `Foreign currency or spend made abroad`
+               (LIST `source cl.4`, `source cl.7d`, `source cl.8d`)
+
+      IF   NOT (`cl.5 — the transaction is at a Participating Store` txn)
+      THEN `the PAssion answer of` 0 `Not at a Participating Store`
+               (LIST `source cl.5`, `source cl.7a`, `source cl.8a`)
+
+      IF   `Appendix 1 (foodpanda, Gojek) — a PayPal-described transaction from 1 February 2024` txn
+      THEN `the PAssion answer of` 0 `A PayPal-described order at foodpanda or Gojek`
+               (LIST `source Appendix 1`, `source Appendix 1 PayPal`, `source cl.5`)
+
+      IF   `Appendix 1 (Singtel) — base points are withheld on every Singtel purchase` (txn's `merchant`)
+      THEN `the PAssion answer of` 0 `Singtel base points withheld`
+               (LIST `source cl.5`, `source Appendix 1`, `source Appendix 1 Singtel`)
+
+      IF   `cl.8(a) — both Qualifying Month thresholds are met` month
+      THEN `the PAssion answer of` `Base and Bonus Points per dollar` `Base and POSB Bonus`
+               (LIST `source cl.6`, `source cl.7a`, `source cl.7b`, `source cl.8a`, `source cl.8b`, `source cl.8e`, `source cl.11`, `source Appendix 1`, `source yuu conversion`)
+
+      OTHERWISE
+           `the PAssion answer of` `Base Points per dollar` `Base only`
+               (LIST `source cl.6`, `source cl.7a`, `source cl.7b`, `source cl.7c`, `source cl.8a`, `source cl.10`, `source cl.11`, `source Appendix 1`, `source yuu conversion`)
+
+
+§§ `Illustrations`
+
+-- Fixtures and assertions. Clause 10 supplies the document's own worked
+-- example; everything else exercises one branch of the cascade each, plus the
+-- two dated withdrawals inside clause 5 and the cross-document arithmetic that
+-- ties clause 6's percentages to the yuu Points they are quoted in.
+--
+-- EVERY fixture carries `merchant indicator` = Unknown on purpose. This card's
+-- answer never turns on the acquirer's indicator, and the assertions below
+-- prove it: both conditional rates equal the headline rate and the flag is
+-- FALSE, even though the indicator is the one fact the cardholder cannot see.
+
+-- The full constructor. `name` and `desc` are the printed statement strings and
+-- no rule reads them; `merch` and `patterns` are what layer 1 would have made
+-- of them and are what the rules do read. The two are kept consistent by hand
+-- here, which is the fixture's job — `classify.l4` has its own assertions that
+-- the mapping is the one written below.
+GIVEN merch    IS A Merchant
+      name     IS A STRING
+      mcc      IS A NUMBER
+      desc     IS A STRING
+      patterns IS A LIST OF `Description pattern`
+      kind     IS A `Charge kind`
+      foreign  IS A BOOLEAN
+      d        IS A DATE
+      ch       IS A `Payment channel`
+      sg       IS A BOOLEAN
+GIVETH A Transaction
+`a PAssion purchase at` merch name mcc desc patterns kind foreign d ch sg MEANS
+    Transaction WITH
+        `merchant name`                IS name
+        `merchant`                     IS merch
+        `merchant category code`       IS mcc
+        `transaction description`      IS desc
+        `description patterns`         IS patterns
+        `charge kind`                  IS kind
+        `amount`                       IS 50
+        `currency`                     IS (IF foreign THEN "MYR" ELSE "SGD")
+        `posted in a foreign currency` IS foreign
+        `transaction date`             IS d
+        `posting date`                 IS d
+        `payment channel`              IS ch
+        `credential`                   IS `The physical card`
+        `merchant indicator`           IS Unknown
+        `made in Singapore`            IS sg
+
+-- The common case, so the table below stays readable: an ordinary retail
+-- purchase in Singapore dollars whose statement line carries no
+-- exclusion-list description family.
+GIVEN merch IS A Merchant
+      name  IS A STRING
+      mcc   IS A NUMBER
+      desc  IS A STRING
+      d     IS A DATE
+      ch    IS A `Payment channel`
+      sg    IS A BOOLEAN
+GIVETH A Transaction
+`a PAssion retail purchase at` merch name mcc desc d ch sg MEANS
+    `a PAssion purchase at` merch name mcc desc EMPTY `Retail purchase` FALSE d ch sg
+
+GIVETH A Cardholder
+`a linked Cardmember` MEANS
+    Cardholder WITH
+        `Solitaire preferred rewards categories`               IS EMPTY
+        `yuu account linked to the card`                       IS TRUE
+        `HSBC Everyday Global Account deposits ADB this month` IS 0
+        `PAssion membership registered and card linked in yuu` IS TRUE
+
+GIVETH A Cardholder
+`a Cardmember who has not linked the PAssion Card` MEANS
+    Cardholder WITH
+        `Solitaire preferred rewards categories`               IS EMPTY
+        `yuu account linked to the card`                       IS TRUE
+        `HSBC Everyday Global Account deposits ADB this month` IS 0
+        `PAssion membership registered and card linked in yuu` IS FALSE
+
+GIVEN participating    IS A NUMBER
+      `non participating` IS A NUMBER
+GIVETH A `Month position`
+`a month standing at` participating `non participating` MEANS
+    `Month position` WITH
+        `yuu eligible spend so far this calendar month`                     IS 0
+        `yuu participating merchants transacted so far this calendar month` IS 0
+        `PAssion spend at Participating Stores so far this month`           IS participating
+        `PAssion spend at non-Participating Stores so far this month`       IS `non participating`
+
+GIVETH A `Month position`
+`a month below both thresholds`               MEANS `a month standing at` 0   0
+GIVETH A `Month position`
+`a month meeting both thresholds`             MEANS `a month standing at` 300 400
+GIVETH A `Month position`
+`a month one dollar short of the S$400 limb`  MEANS `a month standing at` 300 399
+
+GIVETH A Transaction
+`a Cold Storage swipe in June 2025`                        MEANS `a PAssion retail purchase at` `Cold Storage`          "COLD STORAGE TAMPINES"       5411 "COLD STORAGE"      (YMD 2025 6 15)  `Tapped at a terminal`              TRUE
+GIVETH A Transaction
+`a Cold Storage swipe today`                               MEANS `a PAssion retail purchase at` `Cold Storage`          "COLD STORAGE TAMPINES"       5411 "COLD STORAGE"      (YMD 2026 9 21)  `Tapped at a terminal`              TRUE
+GIVETH A Transaction
+`a Guardian purchase made outside Singapore`               MEANS `a PAssion retail purchase at` Guardian                "GUARDIAN JB"                 5912 "GUARDIAN"          (YMD 2025 6 15)  `Tapped at a terminal`              FALSE
+GIVETH A Transaction
+`a bookshop purchase in June 2025`                         MEANS `a PAssion retail purchase at` `Another merchant`      "KINOKUNIYA"                  5942 "KINOKUNIYA"        (YMD 2025 6 15)  `Tapped at a terminal`              TRUE
+GIVETH A Transaction
+`a Food Republic meal in September 2024`                   MEANS `a PAssion retail purchase at` `Food Republic`         "FOOD REPUBLIC VIVOCITY"      5814 "FOOD REPUBLIC"     (YMD 2024 9 20)  `Tapped at a terminal`              TRUE
+GIVETH A Transaction
+`a Food Republic meal in June 2025`                        MEANS `a PAssion retail purchase at` `Food Republic`         "FOOD REPUBLIC VIVOCITY"      5814 "FOOD REPUBLIC"     (YMD 2025 6 15)  `Tapped at a terminal`              TRUE
+GIVETH A Transaction
+`a Toast Box coffee in June 2025`                          MEANS `a PAssion retail purchase at` `Toast Box`             "TOAST BOX RAFFLES"           5814 "TOAST BOX"         (YMD 2025 6 15)  `Tapped at a terminal`              TRUE
+GIVETH A Transaction
+`a Night Safari ticket bought online in June 2025`         MEANS `a PAssion retail purchase at` `Mandai Wildlife Group` "MANDAI NIGHT SAFARI"         7991 "MANDAI"            (YMD 2025 6 15)  `Paid in a website or app`          TRUE
+GIVETH A Transaction
+`a Night Safari ticket bought at the counter in June 2025` MEANS `a PAssion retail purchase at` `Mandai Wildlife Group` "MANDAI NIGHT SAFARI"         7991 "MANDAI"            (YMD 2025 6 15)  `Tapped at a terminal`              TRUE
+GIVETH A Transaction
+`a Singtel Exclusive Retailers purchase in June 2025`      MEANS `a PAssion retail purchase at` Singtel                 "SINGTEL EXCLUSIVE RETAILER"  4814 "SINGTEL"           (YMD 2025 6 15)  `Tapped at a terminal`              TRUE
+GIVETH A Transaction
+`a Singtel recurring bill payment in June 2025`            MEANS `a PAssion retail purchase at` Singtel                 "SINGTELSHOP"                 4814 "SINGTEL BILL"      (YMD 2025 6 15)  `Card on file or recurring billing` TRUE
+GIVETH A Transaction
+`a foodpanda order charged directly in June 2025`          MEANS `a PAssion retail purchase at` foodpanda               "FOODPANDA SINGAPORE"         5812 "FOODPANDA SG"      (YMD 2025 6 15)  `Paid in a website or app`          TRUE
+GIVETH A Transaction
+`a Gojek ride in June 2025`                                MEANS `a PAssion retail purchase at` Gojek                   "GOJEK SINGAPORE"             4121 "GOJEK"             (YMD 2025 6 15)  `Paid in a website or app`          TRUE
+
+-- The fixtures that need a field the common case fixes. The ringgit line is
+-- the only foreign-currency one; the two PayPal lines carry the description
+-- family layer 1 reads off "PAYPAL *..."; the last four are charge kinds.
+GIVETH A Transaction
+`a Cold Storage swipe charged in ringgit`                  MEANS `a PAssion purchase at` `Cold Storage` "COLD STORAGE JB"     5411 "COLD STORAGE"      EMPTY        `Retail purchase`             TRUE  (YMD 2025 6 15) `Tapped at a terminal`     TRUE
+GIVETH A Transaction
+`a foodpanda order billed as PayPal in June 2025`          MEANS `a PAssion purchase at` foodpanda      "FOODPANDA SINGAPORE" 5812 "PAYPAL *FOODPANDA" (LIST PayPal) `Retail purchase`             FALSE (YMD 2025 6 15) `Paid in a website or app` TRUE
+GIVETH A Transaction
+`a Gojek ride billed as PayPal in June 2025`               MEANS `a PAssion purchase at` Gojek          "GOJEK SINGAPORE"     4121 "PAYPAL *GOJEK"     (LIST PayPal) `Retail purchase`             FALSE (YMD 2025 6 15) `Paid in a website or app` TRUE
+GIVETH A Transaction
+`a Cold Storage instalment plan in June 2025`              MEANS `a PAssion purchase at` `Cold Storage` "COLD STORAGE TAMPINES" 5411 "COLD STORAGE"    EMPTY        `Instalment plan transaction` FALSE (YMD 2025 6 15) `Tapped at a terminal`     TRUE
+GIVETH A Transaction
+`a Cold Storage pre-authorisation in June 2025`            MEANS `a PAssion purchase at` `Cold Storage` "COLD STORAGE TAMPINES" 5411 "COLD STORAGE"    EMPTY        `Pre-authorisation`           FALSE (YMD 2025 6 15) `Tapped at a terminal`     TRUE
+GIVETH A Transaction
+`a Cold Storage refund in June 2025`                       MEANS `a PAssion purchase at` `Cold Storage` "COLD STORAGE TAMPINES" 5411 "COLD STORAGE"    EMPTY        `Refund or reversal`          FALSE (YMD 2025 6 15) `Tapped at a terminal`     TRUE
+GIVETH A Transaction
+`a Cold Storage mail order in June 2025`                   MEANS `a PAssion purchase at` `Cold Storage` "COLD STORAGE TAMPINES" 5411 "COLD STORAGE"    EMPTY        `Telephone or mail order`     FALSE (YMD 2025 6 15) `Tapped at a terminal`     TRUE
+GIVETH A Transaction
+`a Cold Storage annual fee in June 2025`                   MEANS `a PAssion purchase at` `Cold Storage` "COLD STORAGE TAMPINES" 5411 "COLD STORAGE"    EMPTY        `Annual fee or bank charge`   FALSE (YMD 2025 6 15) `Tapped at a terminal`     TRUE
+
+-- THE ASSERTIONS BELOW CALL THE EXPORTED RULE DIRECTLY, which is why they are
+-- long. Two convenience wrappers used to stand here, fixing the card and
+-- reaching for `points per dollar`, and they had to go: Catala allows a scope
+-- call only from inside another scope, so a definition that is not itself
+-- @export'd may not call one that is (R1, §8.1). Exporting the wrappers would
+-- have published test fixtures as part of this module's interface, so the
+-- calls are inlined instead. Do not reintroduce a wrapper here.
+
+-- ---------------------------------------------------------------------------
+-- Clause 10's own worked example: "S$1.50 spend at yuu merchant = 4.50 yuu
+-- points (based on 3X Base Points)".
+-- ---------------------------------------------------------------------------
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Cold Storage swipe in June 2025`)'s `points per dollar` TIMES 1.50 EQUALS 4.50
+
+-- ---------------------------------------------------------------------------
+-- Clause 6's table, cross-checked against the yuu Points it is quoted in. The
+-- PAssion T&C states the accelerators in cash-rebate percentages AND in yuu
+-- Points; the DBS yuu Card T&C clause 12 states "1 yuu Point is equivalent to
+-- 0.5% cash rebate". The two documents agree, and these assertions say so.
+-- ---------------------------------------------------------------------------
+#ASSERT `Base Points per dollar`            TIMES 0.5% EQUALS 1.5%
+#ASSERT `POSB Bonus Points per dollar`      TIMES 0.5% EQUALS 7.5%
+#ASSERT `Base and Bonus Points per dollar`  TIMES 0.5% EQUALS 9%
+
+-- ---------------------------------------------------------------------------
+-- One assertion per branch of the cascade, in the order the branches are tried.
+-- ---------------------------------------------------------------------------
+
+-- Clause 1 — the Cardmember has not linked the PAssion Card in the yuu App.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a Cardmember who has not linked the PAssion Card` `a month meeting both thresholds` `a Cold Storage swipe in June 2025`)'s `points per dollar` EQUALS 0
+
+-- Clause 3 — a transaction dated after the Promotion Period closed.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a Cold Storage swipe today`)'s `points per dollar` EQUALS 0
+
+-- Clauses 4, 7(d) and 8(d) — foreign currency, then a purchase made abroad.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a Cold Storage swipe charged in ringgit`)'s `points per dollar` EQUALS 0
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a Guardian purchase made outside Singapore`)'s `points per dollar` EQUALS 0
+
+-- Clause 5 — a merchant on no limb of the Participating Stores list.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a bookshop purchase in June 2025`)'s `points per dollar` EQUALS 0
+
+-- Appendix 1 — foodpanda billed through PayPal, from 1 February 2024, against
+-- the same order charged directly, which earns. The excluded line's printed
+-- description is "PAYPAL *FOODPANDA", which is what a real statement shows and
+-- what the first encoding of this rule could not match.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a foodpanda order billed as PayPal in June 2025`)'s `points per dollar` EQUALS 0
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a foodpanda order charged directly in June 2025`)'s `points per dollar` EQUALS 3
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Gojek ride billed as PayPal in June 2025`)'s `points per dollar` EQUALS 0
+
+-- Appendix 1 — Singtel: a Participating Store under clause 5(iv) from which
+-- Appendix 1 withholds base points anyway.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a Singtel Exclusive Retailers purchase in June 2025`)'s `points per dollar` EQUALS 0
+
+-- Clause 8(a) — both thresholds met, so 3X + 15X = 18X.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a Cold Storage swipe in June 2025`)'s `points per dollar` EQUALS 18
+
+-- Clause 8(a) — one dollar short of the S$400 non-Participating limb, so the
+-- bonus is not earned and the base 3X stands. This is the OTHERWISE arm.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month one dollar short of the S$400 limb` `a Cold Storage swipe in June 2025`)'s `points per dollar` EQUALS 3
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Cold Storage swipe in June 2025`)'s `points per dollar` EQUALS 3
+
+-- ---------------------------------------------------------------------------
+-- The two dated withdrawals inside clause 5, and the Singtel carve-out.
+-- ---------------------------------------------------------------------------
+
+-- Food Republic earned before 27 October 2024 and does not after.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Food Republic meal in September 2024`)'s `points per dollar` EQUALS 3
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Food Republic meal in June 2025`)'s `points per dollar` EQUALS 0
+
+-- The BreadTalk Group brands the withdrawal did not touch are unaffected.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Toast Box coffee in June 2025`)'s `points per dollar` EQUALS 3
+
+-- Mandai: online ticketing earns, the on-site counter does not, from 1 Dec 2023.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Night Safari ticket bought online in June 2025`)'s `points per dollar` EQUALS 3
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Night Safari ticket bought at the counter in June 2025`)'s `points per dollar` EQUALS 0
+
+-- A Singtel recurring bill payment is carved out of clause 5(iv) itself, so it
+-- is not at a Participating Store at all.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Singtel recurring bill payment in June 2025`)'s `points per dollar` EQUALS 0
+
+-- Gojek earns the base rate.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Gojek ride in June 2025`)'s `points per dollar` EQUALS 3
+
+-- ---------------------------------------------------------------------------
+-- The shape of the answer, not just its headline number.
+-- ---------------------------------------------------------------------------
+
+-- The merchant indicator is Unknown in every fixture and changes nothing: the
+-- two conditional rates are equal and the flag is FALSE.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Cold Storage swipe in June 2025`)'s `miles per dollar if the merchant flags online` EQUALS (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Cold Storage swipe in June 2025`)'s `miles per dollar if the merchant flags card-present`
+#ASSERT NOT ((`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Cold Storage swipe in June 2025`)'s `depends on the merchant indicator`)
+
+-- The bonus limb is flagged and capped; the base limb is neither.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a Cold Storage swipe in June 2025`)'s `earns the bonus rate`
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a Cold Storage swipe in June 2025`)'s `cap`'s `capped`
+#ASSERT NOT ((`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Cold Storage swipe in June 2025`)'s `cap`'s `capped`)
+
+-- ---------------------------------------------------------------------------
+-- `earns the bonus rate` is derived from the headline, so no answer can claim
+-- a bonus it is not paying. One assertion per way of not paying it: the
+-- Promotion Period has closed, the thresholds were missed, the merchant is not
+-- a Participating Store, and the posting is not retail. The first two are the
+-- ones that would have gone wrong silently had the flag been a separate
+-- argument, because their months DO clear the clause 8(a) thresholds.
+-- ---------------------------------------------------------------------------
+#ASSERT NOT ((`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds`            `a Cold Storage swipe today`)'s `earns the bonus rate`)
+#ASSERT NOT ((`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month one dollar short of the S$400 limb` `a Cold Storage swipe in June 2025`)'s `earns the bonus rate`)
+#ASSERT NOT ((`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds`              `a Cold Storage swipe in June 2025`)'s `earns the bonus rate`)
+#ASSERT NOT ((`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds`            `a bookshop purchase in June 2025`)'s `earns the bonus rate`)
+#ASSERT NOT ((`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds`            `a Cold Storage instalment plan in June 2025`)'s `earns the bonus rate`)
+
+-- The cap is read off the same test, so it cannot disagree with the flag: the
+-- two answers above that clear the thresholds are uncapped as well as unflagged.
+#ASSERT NOT ((`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a Cold Storage swipe today`)'s `cap`'s `capped`)
+#ASSERT NOT ((`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a bookshop purchase in June 2025`)'s `cap`'s `capped`)
+
+-- The derivation itself, at the three rates this module can return.
+#ASSERT      `cl.8 — the headline rate is above clause 7(a)'s base` `Base and Bonus Points per dollar`
+#ASSERT NOT (`cl.8 — the headline rate is above clause 7(a)'s base` `Base Points per dollar`)
+#ASSERT NOT (`cl.8 — the headline rate is above clause 7(a)'s base` 0)
+
+-- Clause 8(b)'s own arithmetic: the 5,000 yuu Point cap, expressed as dollars
+-- of bonus-earning spend, is worth exactly the S$25 cash rebate it states.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a Cold Storage swipe in June 2025`)'s `cap`'s `bonus spend per month` TIMES 7.5% EQUALS 25
+
+-- Miles per dollar at both rates, at clause 12's floor of 0.28 miles per yuu
+-- Point: 3 Points is 0.84 and the 18X limb is 5.04. Written as the arithmetic
+-- rather than as the answer, so that a later change to the conversion moves
+-- both sides together and these assertions keep testing the cascade rather
+-- than the constant.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds`   `a Cold Storage swipe in June 2025`)'s `miles per dollar` EQUALS 3  TIMES `yuu miles per Point`
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a Cold Storage swipe in June 2025`)'s `miles per dollar` EQUALS 18 TIMES `yuu miles per Point`
+
+-- And the constant itself, pinned once against clause 12's words, so that the
+-- two assertions above cannot both drift silently with it.
+#ASSERT `yuu miles per Point` EQUALS 0.28
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a Cold Storage swipe in June 2025`)'s `miles per point` EQUALS 0.28
+
+-- Clause 7 of the same document would give 8,000 / 28,800, which is BELOW the
+-- floor clause 12 states. This assertion records why that reading was rejected.
+#ASSERT (8_000 DIVIDED BY 28_800) LESS THAN `yuu miles per Point`
+
+-- ---------------------------------------------------------------------------
+-- Clause 3 as a predicate, at the two boundaries and one day past each.
+-- ---------------------------------------------------------------------------
+#ASSERT      `cl.3 — the date falls within the Promotion Period` (YMD 2023 10 1)
+#ASSERT      `cl.3 — the date falls within the Promotion Period` (YMD 2025 9 30)
+#ASSERT NOT (`cl.3 — the date falls within the Promotion Period` (YMD 2023 9 30))
+#ASSERT NOT (`cl.3 — the date falls within the Promotion Period` (YMD 2025 10 1))
+
+-- ---------------------------------------------------------------------------
+-- Clause 4's retail limb, read with clause 11. Each posting kind, once at the
+-- predicate and once through the cascade at a merchant that would otherwise
+-- earn the base rate, so the two cannot drift apart.
+-- ---------------------------------------------------------------------------
+#ASSERT      `cl.4 and cl.11 — the posting is a retail transaction that has posted` `Retail purchase`
+#ASSERT      `cl.4 and cl.11 — the posting is a retail transaction that has posted` `Telephone or mail order`
+#ASSERT NOT (`cl.4 and cl.11 — the posting is a retail transaction that has posted` `Annual fee or bank charge`)
+#ASSERT NOT (`cl.4 and cl.11 — the posting is a retail transaction that has posted` `Interest or finance charge`)
+#ASSERT NOT (`cl.4 and cl.11 — the posting is a retail transaction that has posted` `Instalment plan transaction`)
+#ASSERT NOT (`cl.4 and cl.11 — the posting is a retail transaction that has posted` `Balance or funds transfer`)
+#ASSERT NOT (`cl.4 and cl.11 — the posting is a retail transaction that has posted` `Cash advance or quasi-cash`)
+#ASSERT NOT (`cl.4 and cl.11 — the posting is a retail transaction that has posted` `Bill payment via internet banking`)
+#ASSERT NOT (`cl.4 and cl.11 — the posting is a retail transaction that has posted` `Pre-authorisation`)
+#ASSERT NOT (`cl.4 and cl.11 — the posting is a retail transaction that has posted` `Refund or reversal`)
+
+-- The same four postings at Cold Storage, which earns 3X when it is a retail
+-- purchase. A mail order earns; the other three do not.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Cold Storage mail order in June 2025`)'s `points per dollar`          EQUALS 3
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Cold Storage instalment plan in June 2025`)'s `points per dollar`     EQUALS 0
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Cold Storage pre-authorisation in June 2025`)'s `points per dollar`   EQUALS 0
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Cold Storage refund in June 2025`)'s `points per dollar`              EQUALS 0
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Cold Storage annual fee in June 2025`)'s `points per dollar`          EQUALS 0
+
+-- Clause 8(a)'s thresholds do not rescue a non-retail posting: the retail limb
+-- is tried above them, so an instalment plan earns nothing in a month that has
+-- cleared both.
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a Cold Storage instalment plan in June 2025`)'s `points per dollar`   EQUALS 0
+
+-- ---------------------------------------------------------------------------
+-- The conditions an answer carries. These are the shape of the explanation the
+-- app prints, and the counts are load-bearing: an edit to the outcome table
+-- that drops a note trips here rather than in front of a reader.
+-- ---------------------------------------------------------------------------
+#ASSERT count ((`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds`   `a Cold Storage swipe in June 2025`)'s `conditions`)              EQUALS 8
+#ASSERT count ((`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a Cold Storage swipe in June 2025`)'s `conditions`)              EQUALS 8
+#ASSERT count ((`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds`   `a bookshop purchase in June 2025`)'s `conditions`)               EQUALS 4
+#ASSERT count ((`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds`   `a Cold Storage instalment plan in June 2025`)'s `conditions`)   EQUALS 3
+#ASSERT count ((`POSB PAssion earns on` `POSB PAssion Debit` `a Cardmember who has not linked the PAssion Card` `a month below both thresholds` `a Cold Storage swipe in June 2025`)'s `conditions`) EQUALS 2
+
+-- Every answer is `Source expired`, whichever arm produced it (clause 3).
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a Cold Storage swipe in June 2025`)'s `status` EQUALS `Source expired`
+#ASSERT (`POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds`   `a bookshop purchase in June 2025`)'s  `status` EQUALS `Source expired`
+
+-- ---------------------------------------------------------------------------
+-- Two directives that call the EXPORTED rule directly rather than a field of
+-- its result, so `clerk test` has whole answers to compare: one earning arm
+-- and one refusing arm.
+-- ---------------------------------------------------------------------------
+#EVAL `POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month meeting both thresholds` `a Cold Storage swipe in June 2025`
+#EVAL `POSB PAssion earns on` `POSB PAssion Debit` `a linked Cardmember` `a month below both thresholds` `a Cold Storage refund in June 2025`
+
+
+-- ===========================================================================
+-- DEFEASIBILITY SITES (spec section 4.5). Where a native DESPITE / SUBJECT TO /
+-- exception construct would have collapsed several guards into one rule.
+-- One entry per site: the clause, the shape in the text (general rule +
+-- exception list), the L4 shape used instead, and what a native construct
+-- would have bought.
+-- ===========================================================================
+--
+-- SITE 1 — clause 5(ii), the Food Republic and Food Junction withdrawal.
+--   Shape in the text: a list of six BreadTalk Group brands that are
+--     Participating Stores, followed by a parenthetical withdrawing two of
+--     them "[w]ith effect from 27 October 2024".
+--   L4 shape used: the membership disjunction carries a date guard on its last
+--     arm — the Food Republic and Food Junction constructors are admitted only
+--     while the transaction date is AT MOST 26 October 2024. The general rule
+--     and its exception are fused into one boolean, and the "26 October"
+--     boundary is an artefact of expressing "from the 27th" as "at most the
+--     26th": the document never mentions that date.
+--   A native construct would have bought: the list stays a plain list of six
+--     names, and the withdrawal is its own dated rule that defeats two of them.
+--     The reader sees the amendment as an amendment. So does a diff, when the
+--     issuer withdraws a seventh brand.
+--
+-- SITE 2 — clause 5(iii), Mandai on-site purchases.
+--   Shape in the text: four parks are Participating Stores, "(with effect from
+--     1 December 2023 only online ticketing sites will be eligible)". Appendix
+--     1 says the same thing again in different words, under "DBS funded
+--     Stores".
+--   L4 shape used: a second conjunct on the membership test, disjoining a
+--     before-the-date escape with a payment-channel test.
+--   A native construct would have bought: one rule for membership, one dated
+--     exception for the channel — and the Appendix's restatement could be
+--     attached to the SAME exception instead of being silently dropped as a
+--     duplicate, which is what this encoding does.
+--
+-- SITE 3 — clause 5(iv), Singtel recurring bill payments.
+--   Shape in the text: a general admission of two Singtel channels with an
+--     untimed carve-out, "excluding Singtel recurring bill payments".
+--   L4 shape used: `AND NOT (paid by card on file or recurring billing c)` —
+--     an inline negated guard, which is where a `NOT` has to be parenthesised
+--     by hand or it will swallow the rest of the conjunction.
+--   A native construct would have bought: the carve-out as a named exception
+--     that can be cited on its own in the answer's conditions, rather than
+--     collapsing into a generic "not a Participating Store".
+--
+-- SITE 4 — Appendix 1 against clause 7, the scope question.
+--   Shape in the text: a general earning rule (3X at Participating Stores)
+--     and a separate Exclusion List whose header scopes it to clause 7(b)(i)
+--     while its entries speak of clause 7's and clause 8's own vocabulary.
+--   L4 shape used: an exclusion predicate tested as its own BRANCH arm placed
+--     BEFORE the earning arms. Nothing in the language records that the arm is
+--     an exception to clause 7 rather than an independent rule, and nothing
+--     checks that it was placed early enough.
+--   A native construct would have bought: the exclusion written as subordinate
+--     to clause 7, so its priority is stated rather than encoded as line
+--     order. Ordering that is load-bearing and invisible is the failure mode.
+--
+-- SITE 5 — Appendix 1 (Singtel) against clause 5(iv). The sharpest one.
+--   Shape in the text: clause 5(iv) admits SingtelShop! and Singtel Exclusive
+--     Retailers as Participating Stores; Appendix 1 then says "Base points
+--     will not be awarded for all in-stores and online purchases" at those
+--     same stores. Two provisions of one document reach opposite results on
+--     identical facts, and neither says which yields.
+--   L4 shape used: a dedicated BRANCH arm above the earning arms, returning
+--     0 with a conditions string that names the conflict in words.
+--   A native construct would have bought: exactly the thing Catala's default
+--     calculus does — two applicable rules with no stated priority should
+--     RAISE A CONFLICT rather than let the author pick one by writing it
+--     higher up the file. This is the site that most wants the construct, and
+--     the one where the hand encoding is least honest, because it silently
+--     resolves what the document leaves open.
+--
+-- SITE 6 — Appendix 1 (foodpanda, Gojek), the PayPal description.
+--   Shape in the text: two Participating Stores whose points are withheld for
+--     transactions carrying a particular description, from a stated date.
+--   L4 shape used: a three-conjunct predicate in its own BRANCH arm —
+--     the merchant, membership of the PayPal description family in the
+--     transaction's description patterns, and the date.
+--   A native construct would have bought: little on the logic, but the site is
+--     worth recording because it is the cheapest exception in the document and
+--     it still costs a whole rule plus an ordering commitment.
+--
+-- SITE 7 — clause 3 against the whole instrument.
+--   Shape in the text: every operative clause is written unconditionally, and
+--     clause 3 defeats all of them outside a stated period.
+--   L4 shape used: the first-match cascade tests the period as one arm among
+--     eight, which makes a temporal scope over the whole document look like a
+--     peer of "this merchant is not on the list".
+--   A native construct would have bought: a temporal scope on the section, so
+--     that expiry is a property of the instrument rather than a guard every
+--     rule has to remember to consult. The cost of getting this wrong is a
+--     module that keeps answering confidently about a dead promotion.
+--
+-- NOT A SITE, recorded so it is not mistaken for one — Appendix 1's SKU-level
+-- exclusions (plastic bags, tobacco, delivery charges, gift cards, infant
+-- formula, sushi, dim sum, bundle deals, bill discounts). These are exceptions
+-- in form, but no defeasibility construct would help: the facts they turn on
+-- are basket contents, and the Transaction model has no basket. The gap is in
+-- the fact model, not in the logic. They ride on a conditions string.
+--
+-- ALSO NOT A SITE, and worth recording because it USED to look like one.
+-- Clause 4's "retail transactions" limb and clause 11's "only posted
+-- transactions" were carried as prose caveats while the fact model had no way
+-- to say what kind of posting a transaction was. The domain's `Charge kind`
+-- supplies it, so both are now guards rather than notes. What clause 11 still
+-- cannot say is that a refund is SUBTRACTED from the month's total: this
+-- module is handed the Month position already netted, and an answer about one
+-- transaction is the wrong place to net a different one.
+--
+-- COUNT: 7 defeasibility sites, plus 2 recorded non-sites.
