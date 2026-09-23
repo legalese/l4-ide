@@ -20,6 +20,7 @@ import Text.Megaparsec.Char
 import Text.Megaparsec.State ( initialPosState )
 import qualified Text.Megaparsec.Char.Lexer as Lexer
 import L4.Parser.SrcSpan
+import qualified L4.SmartPunctuation as SP
 
 type Lexer = Parsec Void Text
 
@@ -918,7 +919,116 @@ execLexer :: NormalizedUri -> Text -> Either (NonEmpty PError) [PosToken]
 execLexer uri input =
   case parse (rawTokens <* eof) (showNormalizedUri uri) input of
     Right rtoks -> Right (mkPosTokens Nothing uri input rtoks)
-    Left errs   -> Left (fmap (mkPError "lexer") $ errorBundleToErrorMessages errs)
+    Left errs   ->
+      Left $ case confusableLexError input errs of
+        -- A confusable character gets the word-processor-aware message and
+        -- structured fixes instead of megaparsec's default "unexpected …,
+        -- expecting …" list — see 'confusableLexError'. Megaparsec stops at
+        -- the first lexer error (its token stream is 'many'-based, not
+        -- backtracking), so there is at most one lexer 'PError' either way.
+        Just pErr -> pErr :| []
+        Nothing   -> fmap (mkPError "lexer") $ errorBundleToErrorMessages errs
+
+-- | When the lexer's first failure sits on a character
+-- 'L4.SmartPunctuation.lookupConfusable' recognises, build the
+-- word-processor-aware 'PError' for it instead of megaparsec's default: name
+-- the glyph, offer a quick fix that replaces it, and — for an opening curly
+-- quote — look ahead on the same line for its matching closer and offer a
+-- single fix that straightens the whole pair at once (the same pairing
+-- rustc gives @“…”@). 'Nothing' when the failure is not on a confusable
+-- character, in which case the caller falls back to megaparsec's own
+-- message: this is additive only on the failure path, so a document that
+-- lexes today keeps lexing exactly as it did.
+confusableLexError :: Text -> ParseErrorBundle Text Void -> Maybe PError
+confusableLexError input ParseErrorBundle{ bundleErrors, bundlePosState } = do
+  err <- case bundleErrors of
+    e :| _ -> Just e
+  off <- case err of
+    TrivialError o _ _ -> Just o
+    FancyError _ _      -> Nothing
+  guard (off < Text.length input)
+  let ch = Text.index input off
+  c <- SP.lookupConfusable ch
+  let pst1     = reachOffsetNoLine off bundlePosState
+      pst2     = reachOffsetNoLine (off + 1) pst1
+      startPos = convertPos (pstateSourcePos pst1)
+      endPos   = convertPos (pstateSourcePos pst2)
+      span_    = MkSrcSpan startPos endPos
+      singleFix = MkLexFix
+        { title = "Replace with `" <> c.replacement <> "`"
+        , edits = [(span_, c.replacement)]
+        }
+      altFixes = case c.altReplacement of
+        Nothing              -> []
+        Just (alt, altTitle) -> [MkLexFix altTitle [(span_, alt)]]
+      pairFixes = maybe [] (: []) (pairedQuoteFix input off ch startPos)
+  pure PError
+    { message = SP.confusableMessage c
+    , range = span_
+    , origin = "lexer"
+    , fixes = pairFixes <> [singleFix] <> altFixes
+    }
+
+-- | For an OPENING curly quote (@‘@ or @“@), look ahead on the REST OF THE
+-- LINE for its matching CLOSING curly quote and, if found, offer one fix
+-- that straightens both characters at once — so accepting it repairs a
+-- whole string literal or backtick name in one action, the way rustc and
+-- swiftc pair @“@/@”@. Column arithmetic (rather than a second
+-- 'reachOffsetNoLine' walk) is safe here precisely because both characters
+-- are asserted to be on the same line.
+pairedQuoteFix :: Text -> Offset -> Char -> SrcPos -> Maybe LexFix
+pairedQuoteFix input off ch startPos = do
+  closeCh <- SP.pairedQuoteCloser ch
+  let restOfLine = Text.takeWhile (/= '\n') (Text.drop (off + 1) input)
+  relIdx <- Text.findIndex (== closeCh) restOfLine
+  openC  <- SP.lookupConfusable ch
+  closeC <- SP.lookupConfusable closeCh
+  let openSpan  = MkSrcSpan startPos (startPos { column = startPos.column + 1 })
+      closeCol  = startPos.column + 1 + relIdx
+      closeStart = MkSrcPos startPos.line closeCol
+      closeSpan  = MkSrcSpan closeStart (closeStart { column = closeCol + 1 })
+  pure MkLexFix
+    { title = "Straighten this pair of quotes"
+    , edits = [(openSpan, openC.replacement), (closeSpan, closeC.replacement)]
+    }
+
+-- | The whole-document repair described atop "L4.SmartPunctuation": the
+-- concrete, real-lexer-backed instantiation of
+-- 'L4.SmartPunctuation.straightenWith' (see that module's header for why
+-- this wiring lives here rather than there). Lexes; while the first failure
+-- sits on a confusable, replaces it and lexes again; then, once the
+-- document lexes cleanly, also replaces every no-break space found inside a
+-- successfully-lexed whitespace ('TSpace') token. Returns the number of
+-- replacements made and the final text — the accepted design is one
+-- whole-document 'Language.LSP.Protocol.Types.TextEdit', because @…@ -> @...@
+-- and @—@ -> @--@ both change the text's length, so per-edit ranges could
+-- not be mapped back through earlier replacements.
+straightenDocument :: NormalizedUri -> Text -> (Int, Text)
+straightenDocument uri input = (n + m, final)
+  where
+    (n, straightened) = SP.straightenWith SP.defaultStraightenIterationCap firstErrorPos input
+    (m, final)         = replaceNbsp straightened
+
+    firstErrorPos t = case execLexer uri t of
+      Right _         -> Nothing
+      Left (e :| _)   -> Just e.range.start
+
+    replaceNbsp t = case execLexer uri t of
+      -- Still fails after the fixed point (a non-confusable error, or the
+      -- iteration cap was hit): leave whitespace alone rather than guess.
+      Left _     -> (0, t)
+      Right toks -> replaceAt nbspOffsets t
+        where
+          nbspOffsets = Set.fromList
+            [ SP.offsetOfSrcPos t range.start
+            | pt <- toks
+            , TSpaces (TSpace txt) <- [computedPayload pt]
+            , range <- SP.nbspHitsInToken uri pt.range.start txt
+            ]
+          replaceAt offs txt =
+            ( Set.size offs
+            , Text.pack [ if i `Set.member` offs then ' ' else ch | (i, ch) <- zip [0 ..] (Text.unpack txt) ]
+            )
 
 execNlgLexer :: SourcePos -> NormalizedUri -> Text -> Either (ParseErrorBundle Text Void) [PosToken]
 execNlgLexer offset uri input = do
@@ -1148,8 +1258,32 @@ data PError
     { message :: Text
     , range :: SrcSpan
     , origin :: Text
+    , fixes :: [LexFix]
+      -- ^ Structured quick fixes for this error, currently only populated by
+      -- 'confusableLexError'. Every other producer of a 'PError' — 'mkPError'
+      -- itself, and every parser-level error in "L4.Parser" that goes
+      -- through it — sets this to @[]@; a diagnostic with no fixes simply
+      -- offers no code action.
     }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+  deriving anyclass (NFData)
+  -- ^ 'NFData' (and, via 'Generic', 'Typeable' for free) so a 'PError' can be
+  -- attached to a 'LSP.Core.Types.Diagnostics.FileDiagnostic' as its typed
+  -- source ('LSP.Core.Types.Diagnostics.messageOfL'), the way
+  -- 'L4.TypeCheck.Types.CheckErrorWithContext' already is — that is how
+  -- "LSP.L4.Handlers" recovers a lexer error's structured 'fixes' to build
+  -- its code actions.
+
+-- | One quick fix a lexer 'PError' can carry: a title for the editor's menu
+-- and the (possibly several — see 'pairedQuoteFix') text replacements that
+-- carry it out, each a span in the ORIGINAL source and its replacement text.
+data LexFix
+  = MkLexFix
+    { title :: Text
+    , edits :: [(SrcSpan, Text)]
+    }
+  deriving (Show, Eq, Ord, Generic)
+  deriving anyclass (NFData)
 
 mkPError :: Text -> (Text, SourcePos, SourcePos) -> PError
 mkPError orig (m, s, e) =
@@ -1168,6 +1302,7 @@ mkPError orig (m, s, e) =
             }
       }
     , origin = orig
+    , fixes = []
     }
 
 errorBundleToErrorMessages ::
