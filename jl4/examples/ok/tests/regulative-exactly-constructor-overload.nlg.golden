@@ -1,4 +1,4 @@
-executing contract `the colour supplied` with `green` at 0 with the following events:  party `Buyer` did `paint` with `green` at 1
-executing contract `the colour red` with `green` at 0 with the following events:  party `Buyer` did `paint` with `green` at 1
-executing contract `the colour supplied` with `green` at 0 with the following events:  party `Buyer` did `paint` with `red` at 1
-executing contract `the colour red` with `green` at 0 with the following events:  party `Buyer` did `paint` with `red` at 1
+executing contract `the colour supplied` with `green` at 0 with the following events: party `Buyer` did `paint` with `green` at 1
+executing contract `the colour red` with `green` at 0 with the following events: party `Buyer` did `paint` with `green` at 1
+executing contract `the colour supplied` with `green` at 0 with the following events: party `Buyer` did `paint` with `red` at 1
+executing contract `the colour red` with `green` at 0 with the following events: party `Buyer` did `paint` with `red` at 1

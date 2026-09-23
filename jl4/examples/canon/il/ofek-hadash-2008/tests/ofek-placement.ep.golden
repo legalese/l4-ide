@@ -37,7 +37,7 @@ IMPORT `ofek-salary-table`
 GIVEN `the recognised prior seniority` IS A NUMBER
 GIVETH A NUMBER
 `the seniority a new academic teacher is placed at with` `the recognised prior seniority`
-    @nlg the seniority a new academic teacher with %the recognised prior seniority% years of recognised service is placed at
+    @nlg the seniority a new academic teacher with %`the recognised prior seniority`% years of recognised service is placed at
     MEANS
     IF `the recognised prior seniority` AT MOST 0
         THEN `the seniority a new academic teacher starts at`
@@ -55,7 +55,7 @@ GIVEN `the teacher` IS A `a teacher`
       `the combined salary` IS A NUMBER
 GIVETH A NUMBER
 `the doctorate supplement for` `the teacher` `the combined salary`
-    @nlg the doctorate supplement payable to %the teacher%
+    @nlg the doctorate supplement payable to %`the teacher`%
     MEANS
     IF `the teacher holds a doctorate` `the teacher`
         THEN `the combined salary` TIMES `the doctorate supplement rate`
@@ -115,7 +115,7 @@ GIVEN `the teacher` IS A `a teacher`
       `the seniority recognised before the crossover` IS A NUMBER
 GIVETH A NUMBER
 `the seniority carried into the reform by` `the teacher` `the seniority recognised before the crossover`
-    @nlg the seniority %the teacher% carries into the reform
+    @nlg the seniority %`the teacher`% carries into the reform
     MEANS
     CONSIDER `the teacher`'s `how they entered`
     WHEN `an existing teacher converted under sections 43 to 50` THEN
@@ -130,7 +130,7 @@ GIVETH A NUMBER
 GIVEN `the rank being left` IS A NUMBER
 GIVETH A NUMBER
 `the years of standing required to leave rank` `the rank being left`
-    @nlg the years of standing required to leave rank %the rank being left%
+    @nlg the years of standing required to leave rank %`the rank being left`%
     MEANS
     -- § 38(b)(1)-(5) for ranks 1 to 6; § 38(f)(1)-(3) for ranks 6 to 9. The
     -- cadence is two years for the first two steps and three thereafter.
@@ -158,7 +158,7 @@ DECLARE `a period away from the classroom` IS ONE OF
 GIVEN `the period` IS A `a period away from the classroom`
 GIVETH A NUMBER
 `the years of standing contributed by a year of` `the period`
-    @nlg the years of standing a year of %the period% contributes
+    @nlg the years of standing a year of %`the period`% contributes
     MEANS
     CONSIDER `the period`
     WHEN `maternity leave under statute`                                 THEN 1
@@ -189,7 +189,7 @@ DECIDE `the rank is rationed by quota` `the rank being entered` IF
 GIVEN `the rank being entered` IS A NUMBER
 GIVETH A NUMBER
 `the share of all teaching posts the quota allows at rank` `the rank being entered`
-    @nlg the share of all teaching posts the quota allows at rank %the rank being entered%
+    @nlg the share of all teaching posts the quota allows at rank %`the rank being entered`%
     MEANS
     -- § 38(g): rank 7 — 10%; rank 8 — 5%; rank 9 — 3%. Ranks 1 to 6 are not
     -- rationed, which this expresses as the whole of the establishment.
@@ -221,7 +221,7 @@ DECIDE `a place in the quota is free at rank` `the posts already at that rank` `
 GIVEN `the rank being entered` IS A NUMBER
 GIVETH A NUMBER
 `the years a qualifying teacher may be kept waiting for rank` `the rank being entered`
-    @nlg the years a qualifying teacher may be kept waiting for rank %the rank being entered%
+    @nlg the years a qualifying teacher may be kept waiting for rank %`the rank being entered`%
     MEANS
     BRANCH IF `the rank being entered` AT MOST 7 THEN 3   -- § 38(i)(1)
            IF `the rank being entered` EQUALS 8  THEN 4   -- § 38(i)(2)
@@ -241,7 +241,7 @@ DECLARE `an application for promotion in rank` HAS
 GIVEN `the application` IS AN `an application for promotion in rank`
 GIVETH A NUMBER
 `the rank sought by` `the application`
-    @nlg the rank sought by %the application%
+    @nlg the rank sought by %`the application`%
     MEANS `the application`'s `the current rank` PLUS 1
 
 -- § 38(a) and § 38(e): the CUMULATIVE conditions, so called in both articles.

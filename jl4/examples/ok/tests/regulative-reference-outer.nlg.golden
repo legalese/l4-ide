@@ -1,4 +1,4 @@
-executing contract `top level reference` at 0 with the following events:  party `Buyer` did `pay` with 1 at 10
-executing contract `top level reference` at 0 with the following events:  party `Buyer` did `pay` with 500 at 10
-executing contract `imported reference` at 0 with the following events:  party `Buyer` did `pay` with 1 at 10
-executing contract `imported reference` at 0 with the following events:  party `Buyer` did `pay` with 250 at 10
+executing contract `top level reference` at 0 with the following events: party `Buyer` did `pay` with 1 at 10
+executing contract `top level reference` at 0 with the following events: party `Buyer` did `pay` with 500 at 10
+executing contract `imported reference` at 0 with the following events: party `Buyer` did `pay` with 1 at 10
+executing contract `imported reference` at 0 with the following events: party `Buyer` did `pay` with 250 at 10

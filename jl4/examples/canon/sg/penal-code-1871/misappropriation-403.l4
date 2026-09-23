@@ -1,0 +1,586 @@
+-- Singapore Penal Code 1871 — criminal misappropriation.
+--
+--   s 403  defines AND punishes dishonest misappropriation of property
+--
+-- This is the row's FIRST single-section offence. Everywhere else a defining
+-- section states the elements and a punishing section attaches the sentence
+-- (378/379, 383/384, 405/406, 415/417, 503/506, 321/323A), and the module
+-- exports THREE things: the defining ladder, `offence under s N`, and
+-- `charge under s N`. s 403 does both jobs in one sentence, so this module
+-- exports TWO: `offence under s 403` — which IS the defining ladder, the
+-- enacting words themselves — and `charge under s 403`.
+--
+-- An ISOMORPHIC encoding in INERT STYLE — see culpable-homicide-301.l4 for the
+-- conventions and theft-378-379.l4 for the charge machinery. Verbatim statutory
+-- prose rides as inert strings; only the operative atoms are lifted into named
+-- leaves; the inert strings are mortar, never shadow copies of the leaf beside
+-- them.
+--
+-- ---------------------------------------------------------------------------
+-- The text
+-- ---------------------------------------------------------------------------
+--
+-- 403. Whoever dishonestly misappropriates or converts to his own use movable
+--      property, shall be punished with imprisonment for a term which may
+--      extend to 2 years, or with fine, or with both.
+--
+--      Illustrations
+--      (a) A takes property belonging to Z out of Z's possession in good faith
+--          believing, at the time when he takes it, that the property belongs
+--          to himself. A is not guilty of theft; but if A, after discovering
+--          his mistake, dishonestly appropriates the property to his own use,
+--          he is guilty of an offence under this section.
+--      (b) A, being on friendly terms with Z, goes into Z's house in Z's
+--          absence and takes away a book without Z's express consent. Here, if
+--          A was under the impression that he had Z's implied consent to take
+--          the book for the purpose of reading it, A has not committed theft.
+--          But if A afterwards sells the book for his own benefit, he is
+--          guilty of an offence under this section.
+--      (c) A and B being joint owners of a horse, A takes the horse out of B's
+--          possession, intending to use it. Here, as A has a right to use the
+--          horse, he does not dishonestly misappropriate it. But if A sells the
+--          horse and appropriates the whole proceeds to his own use, he is
+--          guilty of an offence under this section.
+--
+--      Explanation 1.—A dishonest misappropriation for a time only is a
+--      misappropriation within the meaning of this section.
+--      Illustration
+--          A finds a Government promissory note belonging to Z, bearing a blank
+--          endorsement. A, knowing that the note belongs to Z, pledges it with
+--          a banker as a security for a loan, intending at a future time to
+--          restore it to Z. A has committed an offence under this section.
+--
+--      Explanation 2.—A person who finds property not in the possession of any
+--      other person, and takes such property for the purpose of protecting it
+--      for, or of restoring it to the owner, does not take or misappropriate it
+--      dishonestly, and is not guilty of an offence; but he is guilty of the
+--      offence above defined, if he appropriates it to his own use, when he
+--      knows or has the means of discovering the owner, or before he has used
+--      reasonable means to discover and give notice to the owner, and has kept
+--      the property a reasonable time to enable the owner to claim it. What are
+--      reasonable means, or what is a reasonable time in such a case, is a
+--      question of fact. It is not necessary that the finder should know who is
+--      the owner of the property, or that any particular person is the owner of
+--      it; it is sufficient if, at the time of appropriating it, he does not
+--      believe it to be his own property, or in good faith believe that the
+--      real owner cannot be found.
+--      Illustrations
+--      (a) A finds a dollar on the high road, not knowing to whom the dollar
+--          belongs. A picks up the dollar. Here A has not committed the offence
+--          defined in this section.
+--      (b) A finds a letter on the high road, containing a bank note. From the
+--          direction and contents of the letter he learns to whom the note
+--          belongs. He appropriates the note. He is guilty of an offence under
+--          this section.
+--      (c) A finds a cheque payable to bearer. He can form no conjecture as to
+--          the person who has lost the cheque. But the name of the person who
+--          has drawn the cheque appears. A knows that this person can direct him
+--          to the person in whose favour the cheque was drawn. A appropriates
+--          the cheque without attempting to discover the owner. He is guilty of
+--          an offence under this section.
+--      (d) A sees Z drop his purse with money in it. A picks up the purse with
+--          the intention of restoring it to Z, but afterwards appropriates it
+--          to his own use. A has committed an offence under this section.
+--      (e) A finds a purse with money, not knowing to whom it belongs; he
+--          afterwards discovers that it belongs to Z, and appropriates it to
+--          his own use. A is guilty of an offence under this section.
+--      (f) A finds a valuable ring, not knowing to whom it belongs. A sells it
+--          immediately without attempting to discover the owner. A is guilty of
+--          an offence under this section.
+--      (g) A receives money transferred to his bank account from Z's bank
+--          account. A discovers that Z did not intend to transfer the money to
+--          him. A retains the money and appropriates it to his own use. A is
+--          guilty of an offence under this section.
+--                                                                    [15/2019]
+--
+-- ---------------------------------------------------------------------------
+-- The shape of the section
+-- ---------------------------------------------------------------------------
+--
+-- Three element groups over four leaves, and exactly one disjunction:
+--
+--   MENS REA   dishonestly (s 24)
+--   THE ACT    misappropriates OR converts to his own use
+--   THE THING  movable property (s 22 — the NARROW term)
+--
+-- The adverb stands in FRONT of both verbs in the enacting words, so it governs
+-- the conversion branch as well as the misappropriation branch. Illustration
+-- (c) shows it governing the first: the joint owner who takes the horse
+-- intending to use it "does not dishonestly misappropriate it", because he has
+-- a right to use it.
+--
+-- The alternative factoring — dishonesty attached to `misappropriates` only,
+-- `converts to his own use` left bare — is a WRONG-ANSWER defect, and note
+-- exactly where it bites, because Illustration (c) does NOT catch it. On those
+-- facts `converts to his own use` is FALSE anyway, so the mis-factored ladder
+-- acquits him too, for the wrong reason. It bites on a record where the acts
+-- are made out and the adverb is not: `the umbrella sold before the mistake was
+-- discovered`, below, which is the one fixture in this module that separates
+-- the two factorings. Measured by mutation: re-factoring the ladder turns
+-- exactly two of the twenty-one assertions red, and both are that fixture's.
+--
+-- ---------------------------------------------------------------------------
+-- Four calls this encoding makes, recorded rather than hidden
+-- ---------------------------------------------------------------------------
+--
+-- 1. THE OBJECT IS `movable property`, NOT `property`. s 403 is the narrow one.
+--    s 22 defines the three terms separately: "immovable property" means land,
+--    BENEFITS TO ARISE OUT OF LAND and things attached to the earth or
+--    permanently fastened to anything attached to the earth; "movable property"
+--    includes property of every description, EXCEPT immovable property;
+--    "property" means money and all other property, MOVABLE OR IMMOVABLE,
+--    including things in action, other intangible or incorporeal property and
+--    virtual currency. ss 404 and 405 say "property"; s 403 says "movable
+--    property". Do NOT reuse `CBT Facts`'s `property` @desc here — it quotes
+--    the wide definition, which is the wrong one for this section.
+--
+-- 2. THERE IS NO ENTRUSTMENT ELEMENT, and this is the trap. s 403 is s 405's
+--    first limb MINUS entrustment, with "that property" relaxed to "movable
+--    property". cbt-405-406.l4's ladder opens with
+--    `entrusted with property` OR `entrusted with dominion over property` in
+--    SERIES before everything else, and its first limb is otherwise word for
+--    word this section — which makes it the tempting template and the wrong
+--    one. An entrustment leaf carried across would be FALSE in every finder
+--    case in Explanation 2, i.e. in the bulk of this section's illustrations,
+--    and would silently REFUSE charges that ought to frame. `Misappropriation
+--    Facts` is therefore built from scratch, on the shape of `Theft Facts`.
+--
+-- 3. ONE property field, for an ordinary grammatical reason. The two verbs
+--    share one object, so there is one thing to name. This is NOT the s 405
+--    reason: that section says "that property" because it has an entrustment
+--    clause for the demonstrative to point back at, which is what Carl Elias
+--    Moses turns on (see cbt-405-406.l4). s 403 has no antecedent and no
+--    demonstrative, so it has no such trap, and the Carl Elias Moses
+--    explanation is deliberately NOT repeated here.
+--
+-- 4. NO `commits dishonest misappropriation` WRAPPER. s 378 says "is said to
+--    commit theft" and s 405 says "commits 'criminal breach of trust'"; s 403
+--    says neither. It runs straight from "Whoever dishonestly misappropriates"
+--    to "shall be punished". Woon's rightmost consequent box reads "Commits
+--    Dishonest misappropriation", but that wording comes from the section's
+--    heading, not from its enacting words, and it is there to keep his diagrams
+--    uniform across the chapter. A wrapper rule would add nothing — it would
+--    draw as a single box on the ladder — so `offence under s 403` IS the
+--    defining ladder. Do not "restore" the missing half.
+--
+-- The Code offers two names for this offence and neither is in the enacting
+-- words: the heading, "dishonest misappropriation of property", and s 378
+-- Illustration (g)'s "criminal misappropriation of property". The heading is
+-- used below. Nothing turns on the choice except the wording of the refusal.
+--
+-- ---------------------------------------------------------------------------
+-- Misappropriation and conversion are not equals, and the ladder does not say so
+-- ---------------------------------------------------------------------------
+--
+-- Neither verb is defined in the Code. In Wong Seng Kwan v PP [2012] SGHC 81 at
+-- [42]–[46] the High Court took the view that the two mean different things.
+-- Chong J, at [46]: "conversion is a subset of misappropriation with the result
+-- that a person who has committed conversion would have also committed criminal
+-- misappropriation but not necessarily the other way round … Unlike
+-- misappropriation, conversion requires the additional element of acting in a
+-- manner inconsistent with the rights of the true owner."
+--
+-- Both leaves are kept, because both words are in the section and the encoding
+-- is isomorphic. The entailment is NOT encoded as a rule: it is doctrine, not
+-- statutory words, and hard-wiring `converts` => `misappropriates` would
+-- over-constrain a fact-finder whom the section leaves free. Two consequences
+-- worth saying out loud:
+--
+--   * the OR is doctrinally redundant — if conversion entails misappropriation
+--     then `misappropriates OR converts` decides as `misappropriates` alone
+--     does. An OR is indifferent to a subset relation among its disjuncts, so
+--     nothing in the arithmetic changes either way;
+--   * `converts to his own use` TRUE with `misappropriates` FALSE is a fact
+--     pattern the doctrine says should not arise. The ladder admits it, and
+--     one fixture below probes it on purpose, labelled as a probe of this
+--     encoding rather than as a case.
+--
+-- ---------------------------------------------------------------------------
+-- Explanations 1 and 2 ride as @desc, and Explanation 2 hides a FORK
+-- ---------------------------------------------------------------------------
+--
+-- The row's convention (encoding.json `scope`) is that Illustrations and
+-- Explanations are carried as comments and as @desc text, not as rules, and
+-- that is what is done here. Explanation 1 widens `misappropriates` and lives
+-- in its @desc. Explanation 2 operates on `dishonestly` — it DEEMS the
+-- protective finder's taking not dishonest — so it lives in that leaf's @desc,
+-- and the four-leaf ladder answers the finder cases correctly in both
+-- directions through that leaf.
+--
+-- What the @desc cannot do is settle Explanation 2's bracketing, and the
+-- bracketing is a genuine fork. The guilt clause reads:
+--
+--   "…he is guilty of the offence above defined, if he appropriates it to his
+--    own use, WHEN HE KNOWS OR HAS THE MEANS OF DISCOVERING THE OWNER, OR
+--    BEFORE HE HAS USED REASONABLE MEANS TO DISCOVER AND GIVE NOTICE TO THE
+--    OWNER, AND HAS KEPT THE PROPERTY A REASONABLE TIME TO ENABLE THE OWNER TO
+--    CLAIM IT."
+--
+-- READING 1 — the final "and" binds INSIDE the second disjunct:
+--     (knows or has the means)  OR  before (reasonable means AND reasonable time)
+-- READING 2 — the final "and" binds OUTSIDE, over the whole disjunction:
+--     ((knows or has the means) OR before-reasonable-means)  AND  before-reasonable-time
+--
+-- THE TWO CASES THAT TELL THEM APART:
+--
+--   | the finder                                        | reading 1  | reading 2  |
+--   | ------------------------------------------------- | ---------- | ---------- |
+--   | knows the owner; appropriates the same afternoon,  | guilty     | guilty     |
+--   | having kept the property no reasonable time        |            |            |
+--   | knows the owner; HAS kept the property a           | guilty     | NOT guilty |
+--   | reasonable time; then appropriates it              |            |            |
+--
+-- READING 1 IS PREFERRED HERE, and the argument is from Illustrations (d), (e)
+-- and (g) to Explanation 2 — the ones where guilt is stated FLATLY although the
+-- finder may well have held the property a while:
+--
+--   (d) A sees Z drop his purse, picks it up meaning to restore it, "but
+--       AFTERWARDS appropriates it to his own use". He knows the owner — he
+--       watched him drop it — and the illustration does not say how long
+--       "afterwards" is.
+--   (e) A finds a purse, "AFTERWARDS DISCOVERS that it belongs to Z", and
+--       appropriates it. Time has visibly passed before he even learns who the
+--       owner is, and nothing is said about whether a reasonable time has run.
+--   (g) A receives a mistaken transfer, discovers the mistake, and RETAINS the
+--       money before appropriating it. Retention over a period is the
+--       illustration's own word for what he did.
+--
+-- On reading 1 the knows-or-has-the-means limb decides all three on its own and
+-- the timing never arises. On reading 2 each of them turns on a timing fact the
+-- illustration does not supply, and (g) may fail outright. An illustration that
+-- states guilt flatly is poor evidence for a construction that makes guilt
+-- conditional on something the illustration is silent about.
+--
+-- NOTE WHAT IS *NOT* THE ARGUMENT. Illustrations (b) and (f) — the bank note
+-- read from the letter, the ring sold immediately — are guilty on BOTH readings
+-- and so discriminate nothing. Every timing-bearing illustration has the finder
+-- appropriating quickly, which is why the preference has to be argued from (d),
+-- (e) and (g) and not from the more vivid pair.
+--
+-- WHERE THE READING LIVES IN THIS MODULE. Because Explanation 2 is @desc and
+-- not a rule, the fork is not mechanically encoded: it is carried in the
+-- `dishonestly` INPUT of one fixture below, `the purse kept a reasonable time`.
+-- A ruling for reading 2 flips that one boolean and changes nothing else — not
+-- the ladder, not another fixture, not the charge builder.
+--
+-- ---------------------------------------------------------------------------
+-- s 125 and the recital: which manner, and an open question
+-- ---------------------------------------------------------------------------
+--
+-- CPC 2010 s 125 makes recital depth section-dependent, and s 403 sits between
+-- the row's two groups. It has no manner limbs of the s 405 kind, which argues
+-- for the bare theft treatment (s 125 Illustration (a)); but it names TWO
+-- distinct acts, and a charge that does not say which of them is alleged leaves
+-- the accused guessing, which argues for the criminal-breach-of-trust
+-- treatment. This module takes the middle: it recites the verb or verbs that
+-- are TRUE, reading them off the leaves the way cbt-405-406.l4 does, and names
+-- the thing.
+--
+--   did dishonestly misappropriate movable property, to wit, <the property>
+--
+-- OPEN FOR MENG: whether that is the right depth, or whether s 403 should
+-- follow theft and recite nothing of the manner at all.
+--
+-- CONSTRUCTED, NOT REPORTED. There is no s 403 charge on this row's validation
+-- bench — none of its seven reported cases is one — so this wording is not
+-- taken from a judgment. Treat the asserted body below as a fixture of this
+-- encoding, not as an oracle.
+
+IMPORT prelude
+IMPORT `penal-code-general`
+
+§ `Penal Code 1871 — criminal misappropriation`
+
+§§ `The facts of one misappropriation`
+
+@ref Penal Code 1871 s 403 — the operative atoms, and the particulars CPC s 124 requires
+DECLARE `Misappropriation Facts` HAS
+    particulars           IS A Particulars @desc Who is charged, and when and where the offence was committed
+    `the property`        IS A STRING  @desc What was misappropriated or converted, as it is to read after "movable property, to wit," — for example "a valuable ring". There is deliberately no owner field: unlike theft, this section does not ask whose possession the thing was in, and most of its illustrations are of property in nobody's possession at all.
+
+    -- "dishonestly" — s 24
+    dishonestly           IS A BOOLEAN @desc Did the accused act dishonestly — intending a wrongful gain or a wrongful loss, or in a way reasonable and honest people would call dishonest, knowing that (s 24)? THE FINDER'S SAFE HARBOUR IS HERE: a person who finds property in nobody's possession and takes it in order to protect it for the owner or restore it to the owner does NOT take or misappropriate it dishonestly and is not guilty (Explanation 2); he becomes guilty if he appropriates it to his own use when he knows or has the means of discovering the owner, or before he has used reasonable means to find and notify the owner and has kept it a reasonable time for the owner to claim it. What is reasonable is a question of fact. He need not know who the owner is — it is enough that when he appropriates it he does not believe it to be his own and does not in good faith believe the real owner cannot be found. Illustration (c) to the section: a joint owner who takes the horse merely to use it, as he is entitled to, is not dishonest.
+
+    -- "misappropriates or converts to his own use"
+    misappropriates       IS A BOOLEAN @desc Did the accused misappropriate the property — set it apart or assign it to the wrong person or the wrong use (Wong Seng Kwan v PP [2012] SGHC 81 at [42]–[46])? A misappropriation FOR A TIME ONLY counts: intending to give the thing back later does not take you outside this section (Explanation 1, and its illustration — pledging another's promissory note with a banker, meaning to redeem it, is an offence).
+    `converts to his own use`
+                          IS A BOOLEAN @desc Did the accused convert the property to his own use — deal with it in a manner INCONSISTENT WITH THE RIGHTS OF THE TRUE OWNER (Wong Seng Kwan v PP [2012] SGHC 81 at [42]–[46])? Conversion is a subset of misappropriation, so an answer of YES here should normally carry YES above; the converse does not follow. Illustration (c): the joint owner who sells the horse and takes the proceeds.
+
+    -- "movable property" — s 22, the NARROW term
+    `movable property`    IS A BOOLEAN @desc Was the thing movable property — property of every description EXCEPT immovable property, that is, except land, benefits to arise out of land, things attached to the earth, and things permanently fastened to anything attached to the earth (s 22)? Note that this section is narrower than ss 404 and 405, which reach "property" of any kind, movable or immovable. Writings relating to property or rights are movable property (s 22 Illustration); so is money in a bank account.
+
+§§ `s 403 — dishonest misappropriation of property`
+
+-- Three elements and one disjunction. This IS the defining ladder: s 403 has no
+-- "is said to commit" clause for a wrapper rule to be named after (see the
+-- fourth recorded call above). The inert strings are the sentence's own glue,
+-- and reading the rule top to bottom reconstructs the enacting words with no
+-- word appearing twice.
+@export Whether the accused has committed an offence punishable under section 403 of the Penal Code 1871 (dishonest misappropriation of property)
+GIVEN f IS A `Misappropriation Facts` @desc What was misappropriated or converted, and with what state of mind
+GIVETH A BOOLEAN
+DECIDE `offence under s 403` f IF
+        "Whoever"
+   ...  f's dishonestly
+   ...  (    f's misappropriates
+        OR   f's `converts to his own use` )
+   ...  f's `movable property`
+   ...  ", shall be punished"
+
+§§ `The charge`
+
+-- The verb or verbs that are TRUE, read off the leaves, then the thing. See the
+-- s 125 discussion in the header: the depth is a call, and it is open.
+GIVEN f IS A `Misappropriation Facts`
+GIVETH A STRING
+`the recital of the misappropriation` f MEANS
+    CONCAT "did dishonestly ", (`what the accused did with it` f),
+           " movable property, to wit, ", f's `the property`
+
+GIVEN f IS A `Misappropriation Facts`
+GIVETH A STRING
+`what the accused did with it` f MEANS
+    `joined with` " and " (concat (LIST
+        (`included if` (f's misappropriates) "misappropriate"),
+        (`included if` (f's `converts to his own use`) "convert to your own use")))
+
+-- The elements, named for the refusal. The middle entry names both verbs,
+-- because it is the disjunction that fails, not either leaf on its own.
+GIVEN f IS A `Misappropriation Facts`
+GIVETH A LIST OF STRING
+`elements of misappropriation not made out` f MEANS
+    concat (LIST
+        (`missing unless` (f's dishonestly) "dishonestly (section 24)"),
+        (`missing unless` (f's misappropriates OR f's `converts to his own use`) "misappropriates or converts to his own use"),
+        (`missing unless` (f's `movable property`) "movable property (section 22)"))
+
+@export Frame a charge under section 403 of the Penal Code 1871 (dishonest misappropriation of property), or say why none can be framed
+GIVEN f IS A `Misappropriation Facts` @desc The misappropriation, and the particulars of the charge
+GIVETH A Charge
+`charge under s 403` f MEANS
+    `frame the charge` (f's particulars) "403" "dishonest misappropriation of property"
+        "imprisonment for a term which may extend to 2 years, or with fine, or with both"
+        (`offence under s 403` f)
+        (`the recital of the misappropriation` f)
+        (`elements of misappropriation not made out` f)
+
+§§ `Fixtures`
+
+-- Invented particulars, so the recital has a time and a place to recite. The
+-- section itself cares about none of them.
+`high road particulars, s 403` MEANS Particulars WITH
+    accused            IS "Tan Boon Huat"
+    date               IS "the 12th day of June 2022"
+    time               IS "4.30 pm"
+    place              IS "Lorong Chuan"
+    `co-accused`       IS ""
+    `common intention` IS FALSE
+
+-- Illustration (a) to the section: A takes Z's property in good faith thinking
+-- it his own — no theft, because the taking was not dishonest — and then, after
+-- discovering his mistake, appropriates it to his own use.
+--
+-- The illustration's words are "appropriates the property to his own use",
+-- which track NEITHER statutory verb exactly. This fixture assigns them to
+-- `misappropriates`, on Wong Seng Kwan's gloss: keeping as your own a thing you
+-- now know is another's is assigning it to the wrong use. Nothing turns on the
+-- assignment — the two leaves are in an OR — but the call is recorded rather
+-- than made silently.
+`the umbrella taken by mistake` MEANS `Misappropriation Facts` WITH
+    particulars           IS `high road particulars, s 403`
+    `the property`        IS "one umbrella valued at about $120/-"
+    dishonestly           IS TRUE
+    misappropriates       IS TRUE
+    `converts to his own use` IS FALSE
+    `movable property`    IS TRUE
+
+-- Illustration (a), FIRST half, carried one step further: A sells the thing
+-- while still believing in good faith that it is his own, before the mistake
+-- comes to light. Selling another's property is dealing with it inconsistently
+-- with the rights of the true owner, and assigning it to the wrong use — so
+-- BOTH act leaves are TRUE, objectively. What is absent is the adverb.
+--
+-- This is the fixture that pins the section's factoring. `dishonestly` stands
+-- in SERIES in front of both verbs, so it defeats the conversion branch as well
+-- as the misappropriation branch. Attach the adverb to `misappropriates` only —
+-- the natural-looking alternative, and the one Woon's series placement rules
+-- out — and this record convicts a man who did nothing dishonest.
+`the umbrella sold before the mistake was discovered` MEANS `Misappropriation Facts` WITH
+    particulars           IS `high road particulars, s 403`
+    `the property`        IS `the umbrella taken by mistake`'s `the property`
+    dishonestly           IS FALSE
+    misappropriates       IS TRUE
+    `converts to his own use` IS TRUE
+    `movable property`    IS TRUE
+
+-- Illustration (c), second half: A and B jointly own a horse; A sells it and
+-- appropriates the whole proceeds. Selling a thing that is not yours alone is
+-- dealing with it inconsistently with the rights of the true owner, so it is a
+-- conversion — and, conversion being a subset of misappropriation, it is a
+-- misappropriation too. Both leaves are TRUE, which is what the doctrine
+-- predicts.
+`the horse sold by a joint owner` MEANS `Misappropriation Facts` WITH
+    particulars           IS `high road particulars, s 403`
+    `the property`        IS "one horse jointly owned with Lim Ah Seng"
+    dishonestly           IS TRUE
+    misappropriates       IS TRUE
+    `converts to his own use` IS TRUE
+    `movable property`    IS TRUE
+
+-- Illustration (c), FIRST half: the same joint owner takes the horse intending
+-- only to use it, which he has a right to do. "He does not dishonestly
+-- misappropriate it." One leaf falls, and it is the adverb — which is why the
+-- adverb has to sit in front of BOTH verbs rather than in front of the first.
+`the horse merely used by a joint owner` MEANS `Misappropriation Facts` WITH
+    particulars           IS `high road particulars, s 403`
+    `the property`        IS `the horse sold by a joint owner`'s `the property`
+    dishonestly           IS FALSE
+    misappropriates       IS TRUE
+    `converts to his own use` IS FALSE
+    `movable property`    IS TRUE
+
+-- A PROBE OF THIS ENCODING, NOT A CASE. `converts to his own use` TRUE with
+-- `misappropriates` FALSE is the combination Wong Seng Kwan says cannot happen
+-- (conversion is a subset of misappropriation). The ladder admits it anyway,
+-- because the entailment is doctrine and is deliberately not encoded as a rule.
+-- This fixture exists to show that the right-hand disjunct carries the ladder
+-- on its own, so that a later edit which quietly drops it would be caught.
+`the horse, on the conversion limb alone` MEANS `Misappropriation Facts` WITH
+    particulars           IS `high road particulars, s 403`
+    `the property`        IS `the horse sold by a joint owner`'s `the property`
+    dishonestly           IS TRUE
+    misappropriates       IS FALSE
+    `converts to his own use` IS TRUE
+    `movable property`    IS TRUE
+
+-- Explanation 2, Illustration (a): A finds a dollar on the high road, not
+-- knowing whose it is, and picks it up. "Here A has not committed the offence
+-- defined in this section." Picking a thing up is not appropriating it to your
+-- own use, and Explanation 2 deems the protective finder's taking not
+-- dishonest, so three leaves fall together.
+`the dollar on the high road` MEANS `Misappropriation Facts` WITH
+    particulars           IS `high road particulars, s 403`
+    `the property`        IS "one $1 coin"
+    dishonestly           IS FALSE
+    misappropriates       IS FALSE
+    `converts to his own use` IS FALSE
+    `movable property`    IS TRUE
+
+-- Explanation 2, Illustration (f): A finds a valuable ring, not knowing whose
+-- it is, and sells it immediately without attempting to discover the owner.
+-- Guilty. This is the other half of the pairing s 378 Illustration (g) makes in
+-- terms — "A finds a ring lying on the high road, not in the possession of any
+-- person. A by taking it commits no theft, though he may commit criminal
+-- misappropriation of property" — and it is the fixture the charge sheet uses
+-- to put the two sections side by side.
+--
+-- Guilty on BOTH readings of Explanation 2's bracketing, which is exactly why
+-- the header does not argue the fork from this illustration.
+`the ring sold at once` MEANS `Misappropriation Facts` WITH
+    particulars           IS `high road particulars, s 403`
+    `the property`        IS "one ring valued at about $3,000/-"
+    dishonestly           IS TRUE
+    misappropriates       IS TRUE
+    `converts to his own use` IS TRUE
+    `movable property`    IS TRUE
+
+-- THE FORK CASE. A sees Z drop his purse and picks it up meaning to restore it,
+-- so the taking is within Explanation 2's safe harbour. He knows who the owner
+-- is. He then keeps the purse long enough for Z to have claimed it, and only
+-- after that appropriates it to his own use.
+--
+-- Reading 1 (preferred; see the header): the knows-or-has-the-means limb is
+-- satisfied on its own, so he is guilty and `dishonestly` is TRUE, as set here.
+-- Reading 2: the second conjunct requires that he appropriate BEFORE keeping it
+-- a reasonable time, and he did not, so he would not be guilty and this one
+-- boolean would be FALSE. Nothing else in the module moves either way.
+`the purse kept a reasonable time` MEANS `Misappropriation Facts` WITH
+    particulars           IS `high road particulars, s 403`
+    `the property`        IS "one purse containing moneys amounting to $260/-"
+    dishonestly           IS TRUE
+    misappropriates       IS TRUE
+    `converts to his own use` IS FALSE
+    `movable property`    IS TRUE
+
+-- The immovable-property negative, and the reason s 403 is not s 405. A tenant
+-- dishonestly fences a strip of the landlord's garden into his own and holds it
+-- as his. Dishonest, and an appropriation — but land is immovable property
+-- (s 22), and this section reaches movable property only. The same facts over
+-- entrusted property would be reachable under s 405, which says "property".
+`the strip of garden` MEANS `Misappropriation Facts` WITH
+    particulars           IS `high road particulars, s 403`
+    `the property`        IS "a strip of land measuring about 30 square metres forming part of the garden at 7 Lorong Chuan"
+    dishonestly           IS TRUE
+    misappropriates       IS TRUE
+    `converts to his own use` IS TRUE
+    `movable property`    IS FALSE
+
+-- Nothing established. The charge sheet nests one of these for a complaint in
+-- which no misappropriation is alleged.
+`no misappropriation` MEANS `Misappropriation Facts` WITH
+    particulars           IS `high road particulars, s 403`
+    `the property`        IS ""
+    dishonestly           IS FALSE
+    misappropriates       IS FALSE
+    `converts to his own use` IS FALSE
+    `movable property`    IS FALSE
+
+§§ `Directives`
+
+#EVAL `offence under s 403` `the umbrella taken by mistake`
+#EVAL (`charge under s 403` `the umbrella taken by mistake`)'s text
+#EVAL (`charge under s 403` `the horse sold by a joint owner`)'s text
+#EVAL (`charge under s 403` `the horse merely used by a joint owner`)'s refusal
+#EVAL (`charge under s 403` `the strip of garden`)'s refusal
+
+-- Illustration (a): the mistake discovered, then the appropriation. Every
+-- element holds on the left disjunct alone, and the charge frames.
+#ASSERT `offence under s 403` `the umbrella taken by mistake`
+#ASSERT (`charge under s 403` `the umbrella taken by mistake`)'s `made out`
+#ASSERT `the recital of the misappropriation` `the umbrella taken by mistake` EQUALS "did dishonestly misappropriate movable property, to wit, one umbrella valued at about $120/-"
+#ASSERT (`charge under s 403` `the umbrella taken by mistake`)'s text EQUALS "You, Tan Boon Huat, are charged that you, on or about the 12th day of June 2022, at about 4.30 pm, at Lorong Chuan, Singapore, did dishonestly misappropriate movable property, to wit, one umbrella valued at about $120/-, and you have thereby committed an offence punishable under section 403 of the Penal Code 1871."
+#ASSERT (`charge under s 403` `the umbrella taken by mistake`)'s punishment EQUALS "imprisonment for a term which may extend to 2 years, or with fine, or with both"
+
+-- Illustration (a), first half: both act leaves hold and the adverb does not.
+-- The one assertion in this module that distinguishes `dishonestly` in series
+-- from `dishonestly` attached to the first verb alone.
+#ASSERT NOT (`offence under s 403` `the umbrella sold before the mistake was discovered`)
+#ASSERT (`charge under s 403` `the umbrella sold before the mistake was discovered`)'s refusal EQUALS "A charge under section 403 would assert that the facts fulfil every legal condition of dishonest misappropriation of property (CPC s 123(5)). On the facts given they do not: dishonestly (section 24)."
+
+-- Illustration (c), second half: both verbs are TRUE, as the subset doctrine
+-- predicts, and the recital names both.
+#ASSERT `offence under s 403` `the horse sold by a joint owner`
+#ASSERT `the recital of the misappropriation` `the horse sold by a joint owner` EQUALS "did dishonestly misappropriate and convert to your own use movable property, to wit, one horse jointly owned with Lim Ah Seng"
+
+-- Illustration (c), first half: a right to use is not dishonesty. The adverb is
+-- the only leaf that moves, and the refusal names it alone.
+#ASSERT NOT (`offence under s 403` `the horse merely used by a joint owner`)
+#ASSERT (`charge under s 403` `the horse merely used by a joint owner`)'s text EQUALS ""
+#ASSERT (`charge under s 403` `the horse merely used by a joint owner`)'s refusal EQUALS "A charge under section 403 would assert that the facts fulfil every legal condition of dishonest misappropriation of property (CPC s 123(5)). On the facts given they do not: dishonestly (section 24)."
+
+-- The structural probe: the conversion limb carries the ladder by itself.
+#ASSERT `offence under s 403` `the horse, on the conversion limb alone`
+#ASSERT `the recital of the misappropriation` `the horse, on the conversion limb alone` EQUALS "did dishonestly convert to your own use movable property, to wit, one horse jointly owned with Lim Ah Seng"
+
+-- Explanation 2, Illustration (a): the protective finder. Two of the three
+-- element rows fail, and the refusal names the disjunction as one thing.
+#ASSERT NOT (`offence under s 403` `the dollar on the high road`)
+#ASSERT (`charge under s 403` `the dollar on the high road`)'s refusal EQUALS "A charge under section 403 would assert that the facts fulfil every legal condition of dishonest misappropriation of property (CPC s 123(5)). On the facts given they do not: dishonestly (section 24); misappropriates or converts to his own use."
+
+-- Explanation 2, Illustration (f): the ring sold at once. Guilty on both
+-- readings of the bracketing.
+#ASSERT `offence under s 403` `the ring sold at once`
+
+-- THE FORK. This assertion records READING 1 and would be the one to flip if
+-- reading 2 were ruled — by changing `dishonestly` in the fixture, not the
+-- ladder. It is stated here so that the reading is visible in the run rather
+-- than only in a comment.
+#ASSERT `offence under s 403` `the purse kept a reasonable time`
+
+-- Immovable property: the section does not reach it, however dishonest the
+-- dealing. This is the leaf that separates s 403 from ss 404 and 405.
+#ASSERT NOT (`offence under s 403` `the strip of garden`)
+#ASSERT (`charge under s 403` `the strip of garden`)'s refusal EQUALS "A charge under section 403 would assert that the facts fulfil every legal condition of dishonest misappropriation of property (CPC s 123(5)). On the facts given they do not: movable property (section 22)."
+
+-- Nothing established: no offence, and all three element rows are named.
+#ASSERT NOT (`offence under s 403` `no misappropriation`)

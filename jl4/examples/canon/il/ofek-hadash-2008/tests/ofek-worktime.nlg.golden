@@ -1,28 +1,28 @@
 `the hours in a full-post month` is equal to 155.88
-`ROUND` with the product of `the value of an hour on a base of` with 10000 and 1 and 100 is equal to 6415
-`ROUND` with the product of the product of `the value of an hour on a base of` with 10000 and 1 and `the rate for a substitution hour` and 100 is equal to 8019
-`the value of an hour on a base of` with 5000 and 50 %  is equal to `the value of an hour on a base of` with 10000 and 1
-`the pay for one extra hour where` with `it replaced a presence hour made up on another day` and 100 is equal to 225
-`the pay for one extra hour where` with `it replaced a presence hour that was not made up` and 100 is equal to 125
-`the pay for one extra hour where` with `it fell on the teacher's free day` and 100 is equal to 125
-`the hours in` with `the ordinary full-post week in` with `a primary school` is equal to 36
-`the hours in` with `the ordinary full-post week in` with `a junior high school` is equal to 36
-`the hours in` with `the full-post week of a grade coordinator in` with `a primary school` and 3 is equal to 36
-`the hours in` with `the full-post week of a grade coordinator in` with `a primary school` and 6 is equal to 36
-`the hours in` with `the full-post week of a grade coordinator in` with `a primary school` and 8 is equal to 36
-`the hours in` with `the full-post week of a grade coordinator in` with `a primary school` and 12 is equal to 36
-`the hours in` with `the full-post week of a grade coordinator in` with `a junior high school` and 3 is equal to 36
-`the hours in` with `the full-post week of a grade coordinator in` with `a junior high school` and 6 is equal to 36
-`the hours in` with `the full-post week of a grade coordinator in` with `a junior high school` and 8 is equal to 36
-`the hours in` with `the full-post week of a grade coordinator in` with `a junior high school` and 12 is equal to 36
-`the full-post week of a grade coordinator in` with `a junior high school` and 12 's `frontal hours` is equal to 20
-`the ordinary full-post week in` with `a junior high school` 's `frontal hours` is equal to 23
-`the ordinary full-post week in` with `a primary school` 's `frontal hours` is equal to 26
-`the hours in` with `the week after the age reduction for` with `Dvora`, 56 and `the ordinary full-post week in` with `a primary school` is equal to 32
-`the hours in` with `the week after the age reduction for` with `Yael`, 56 and `the ordinary full-post week in` with `a junior high school` is equal to 34
-`the hours in` with `the week after the age reduction for` with `Dvora`, 52 and `the ordinary full-post week in` with `a primary school` is equal to 34
-`the hours in` with `the week after the age reduction for` with `Dvora`, 49 and `the ordinary full-post week in` with `a primary school` is equal to 36
-`the hours in` with `the week after the age reduction for` with `Yael`, 49 and `the ordinary full-post week in` with `a junior high school` is equal to 36
+`ROUND` with the product of the value of one hour on a monthly base of 10000 with 1 and 100 is equal to 6415
+`ROUND` with the product of the product of the value of one hour on a monthly base of 10000 with 1 and `the rate for a substitution hour` and 100 is equal to 8019
+the value of one hour on a monthly base of 5000 with 50 %  is equal to the value of one hour on a monthly base of 10000 with 1
+the pay for one extra hour where `it replaced a presence hour made up on another day` with 100 is equal to 225
+the pay for one extra hour where `it replaced a presence hour that was not made up` with 100 is equal to 125
+the pay for one extra hour where `it fell on the teacher's free day` with 100 is equal to 125
+the total weekly hours in the ordinary full-post week in `a primary school` is equal to 36
+the total weekly hours in the ordinary full-post week in `a junior high school` is equal to 36
+the total weekly hours in the full-post week of a grade coordinator in `a primary school` with 3 is equal to 36
+the total weekly hours in the full-post week of a grade coordinator in `a primary school` with 6 is equal to 36
+the total weekly hours in the full-post week of a grade coordinator in `a primary school` with 8 is equal to 36
+the total weekly hours in the full-post week of a grade coordinator in `a primary school` with 12 is equal to 36
+the total weekly hours in the full-post week of a grade coordinator in `a junior high school` with 3 is equal to 36
+the total weekly hours in the full-post week of a grade coordinator in `a junior high school` with 6 is equal to 36
+the total weekly hours in the full-post week of a grade coordinator in `a junior high school` with 8 is equal to 36
+the total weekly hours in the full-post week of a grade coordinator in `a junior high school` with 12 is equal to 36
+the full-post week of a grade coordinator in `a junior high school` with 12 's `frontal hours` is equal to 20
+the ordinary full-post week in `a junior high school` 's `frontal hours` is equal to 23
+the ordinary full-post week in `a primary school` 's `frontal hours` is equal to 26
+the total weekly hours in the weekly pattern of `Dvora` after the section 26 age reduction with 56 and the ordinary full-post week in `a primary school` is equal to 32
+the total weekly hours in the weekly pattern of `Yael` after the section 26 age reduction with 56 and the ordinary full-post week in `a junior high school` is equal to 34
+the total weekly hours in the weekly pattern of `Dvora` after the section 26 age reduction with 52 and the ordinary full-post week in `a primary school` is equal to 34
+the total weekly hours in the weekly pattern of `Dvora` after the section 26 age reduction with 49 and the ordinary full-post week in `a primary school` is equal to 36
+the total weekly hours in the weekly pattern of `Yael` after the section 26 age reduction with 49 and the ordinary full-post week in `a junior high school` is equal to 36
 `the post is large enough` with `Noa`, `FALSE` and `FALSE`
 `the post is large enough` with `Yael`, `FALSE` and `FALSE`
 `the post is large enough` with `Dvora`, `FALSE` and `FALSE`

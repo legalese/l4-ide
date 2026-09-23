@@ -1,15 +1,39 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-charge-sheet.l4:89:1-57:
+charge-sheet.l4:281:1-57:
   LIST "420", "417"
-charge-sheet.l4:90:1-63:
+charge-sheet.l4:282:1-63:
   LIST "394", "392", "379"
-charge-sheet.l4:91:1-76:
+charge-sheet.l4:283:1-76:
   LIST "394", "393"
-charge-sheet.l4:94:1-84:
+charge-sheet.l4:284:1-54:
+  LIST "380", "379"
+charge-sheet.l4:285:1-67:
+  LIST "379"
+charge-sheet.l4:286:1-54:
+  LIST "408", "406"
+charge-sheet.l4:287:1-54:
+  LIST "409", "406"
+charge-sheet.l4:288:1-84:
+  LIST "406"
+charge-sheet.l4:291:1-84:
   assertion satisfied
-charge-sheet.l4:96:1-97:
+charge-sheet.l4:293:1-97:
   assertion satisfied
-charge-sheet.l4:99:1-103:
+charge-sheet.l4:296:1-103:
+  assertion satisfied
+charge-sheet.l4:298:1-81:
+  assertion satisfied
+charge-sheet.l4:300:1-87:
+  assertion satisfied
+charge-sheet.l4:302:1-81:
+  assertion satisfied
+charge-sheet.l4:304:1-78:
+  assertion satisfied
+charge-sheet.l4:308:1-81:
+  assertion satisfied
+charge-sheet.l4:309:1-81:
+  assertion satisfied
+charge-sheet.l4:311:1-104:
   assertion satisfied

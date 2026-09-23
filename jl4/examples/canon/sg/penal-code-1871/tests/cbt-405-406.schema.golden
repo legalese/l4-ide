@@ -35,7 +35,7 @@
                     "type": "boolean"
                 },
                 "intentionally suffers any other person to do so": {
-                    "description": "Did the accused deliberately allow someone else to do any of those things with the property? Mere carelessness is not enough — the section says \"intentionally\".",
+                    "description": "Did the accused deliberately allow someone else to do — DISHONESTLY, and with THE PROPERTY NAMED ABOVE — any of the things the first two limbs describe: to misappropriate it or convert it to his own use, or to use or dispose of it IN VIOLATION OF a direction of law prescribing how the trust was to be discharged, or of a legal contract, express or implied, touching the discharge of the trust? The section's \"so\" carries all of that, so answering TRUE asserts the other person's dishonesty as well, and, where what he did was a use or a disposal, the violation too. Mere carelessness is not enough — the section says \"intentionally\".",
                     "type": "boolean"
                 },
                 "misappropriates that property": {

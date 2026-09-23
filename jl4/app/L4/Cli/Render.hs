@@ -25,7 +25,6 @@ import Base
 import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy.Char8 as BSL8
-import qualified Data.List as List
 import Options.Applicative
 import System.Exit (exitFailure, exitSuccess)
 
@@ -35,10 +34,10 @@ import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
 import L4.Export.Document
 import L4.Lexer (LangTag (..))
+import L4.Syntax (defaultModuleLang)
 import qualified L4.Nlg as Nlg
 import qualified L4.Parser as Parser
 import L4.Export.Render (RenderConfig(..), renderAkn, renderHtml, renderText)
-import L4.Syntax
 
 import L4.Cli.Common
 
@@ -238,12 +237,3 @@ emitBytes opts b = case opts.renderOutput of
   Nothing -> BSL8.putStrLn b
 
 -- | All transitively-imported modules (the resolved dependency forest).
-transitiveDeps :: Rules.TypeCheckResult -> [Module Resolved]
-transitiveDeps tc = go tc.dependencies
- where
-  go = concatMap (\d -> d.module' : go d.dependencies)
-
-dedupModules :: [Module Resolved] -> [Module Resolved]
-dedupModules = List.nubBy (\a b -> muri a == muri b)
- where
-  muri (MkModule _ u _) = u

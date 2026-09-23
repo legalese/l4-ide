@@ -1,0 +1,149 @@
+{
+    "$defs": {
+        "Aggravated CBT Facts": {
+            "properties": {
+                "a banker": {
+                    "description": "… carried on as a banker? None of the six words in paragraph (b) is defined in the section, so each bears its ordinary meaning.",
+                    "type": "boolean"
+                },
+                "a broker": {
+                    "description": "… as a broker?",
+                    "type": "boolean"
+                },
+                "a factor": {
+                    "description": "… as a factor — an agent entrusted with possession of goods for sale in his own name?",
+                    "type": "boolean"
+                },
+                "a merchant": {
+                    "description": "… as a merchant?",
+                    "type": "boolean"
+                },
+                "an agent": {
+                    "description": "… as an agent? Illustration (c) to s 405, the Penang agent, is a person entrusted in the way of his business as an agent.",
+                    "type": "boolean"
+                },
+                "an attorney": {
+                    "description": "… as an attorney?",
+                    "type": "boolean"
+                },
+                "being an employee": {
+                    "description": "Was the accused an employee? \"Employee\" includes a person engaged in a capacity with the same fundamental qualities as an employee (s 408(2)(a)), and a person can be an employee or so engaged even though they receive no salary or other remuneration for the employment or engagement (s 408(2)(b)). Whether someone is an employee is a question of fact; CPF contributions are a strong indicator but not the test.",
+                    "type": "boolean"
+                },
+                "breach of trust": {
+                    "$ref": "#/$defs/CBT Facts",
+                    "description": "The entrustment and what became of the property — the section 405 case these sections are built on. Its own `particulars` are not read by the charges below."
+                },
+                "entrusted in such capacity": {
+                    "description": "Was the entrustment made to the accused IN THAT CAPACITY — as the employee he was? It is NOT enough that a person who happened to be an employee was entrusted with something; a manager who is handed a neighbour's house keys is entrusted in a private capacity, and section 408 does not reach it.",
+                    "type": "boolean"
+                },
+                "for the purpose of storage for rent or charge": {
+                    "description": "Was the property entrusted to the accused FOR THE PURPOSE of storing it for rent or for a charge? The section's own Illustration gives a warehouse owner or warehouse operator as the example.",
+                    "type": "boolean"
+                },
+                "for the purpose of transportation for hire": {
+                    "description": "Was the property entrusted to the accused FOR THE PURPOSE of transporting it for hire? The section's own Illustration gives a carrier as the example. The purpose is the test, not the occupation: before 2019 the section named \"a carrier, wharfinger or keeper of a warehouse\", and it no longer does.",
+                    "type": "boolean"
+                },
+                "his business": {
+                    "description": "Was it made in the way of his BUSINESS?",
+                    "type": "boolean"
+                },
+                "his profession": {
+                    "description": "Was it made in the way of his PROFESSION?",
+                    "type": "boolean"
+                },
+                "his trade": {
+                    "description": "Was the entrustment made in the way of the accused's TRADE?",
+                    "type": "boolean"
+                },
+                "in his capacity as a director of a corporation": {
+                    "description": "Was the entrustment made to the accused as a director of a corporation? \"Director\" includes anyone occupying the position of director by whatever name called, a person on whose directions the directors are accustomed to act, an alternate or substitute director, and — where a corporation's affairs are managed by its members — such a member (s 409(2)). An unpaid director is still a director (s 409(3)(a)).",
+                    "type": "boolean"
+                },
+                "in his capacity as a fiduciary": {
+                    "description": "Was it made to him as a fiduciary — a person who has undertaken to act for or on behalf of another in circumstances giving rise to a relationship of trust, confidence and loyalty, including an executor, administrator, liquidator, receiver or trustee (but not the trustee of an implied, constructive or resulting trust) (s 409(2))? A person may be a fiduciary even though the contract between the parties says a fiduciary relationship does not arise (s 409(3)(b)).",
+                    "type": "boolean"
+                },
+                "in his capacity as a key executive": {
+                    "description": "Was it made to him as a key executive — a person who, whether or not an employee, and whether alone or with others, has general control and management of the administration of the body (s 409(2))? An unpaid key executive is still a key executive (s 409(3)(a)).",
+                    "type": "boolean"
+                },
+                "in his capacity as a partner in a partnership": {
+                    "description": "Was it made to him as a partner in a partnership? \"Partner\" includes a person purporting to act as a partner, and \"partnership\" includes a limited partnership and a limited liability partnership within the meaning of section 2(1) of the Limited Liability Partnerships Act 2005 (s 409(2)). An unpaid partner is still a partner (s 409(3)(a)).",
+                    "type": "boolean"
+                },
+                "in his capacity as a public servant": {
+                    "description": "Was the entrustment made to the accused in his capacity as a public servant (defined in s 21)?",
+                    "type": "boolean"
+                },
+                "in his capacity as an officer of an unincorporated association": {
+                    "description": "Was it made to him as an officer of an unincorporated association other than a partnership? \"Officer\" means the president, the secretary or any committee member, and includes anyone holding an analogous position, anyone on whose directions they are accustomed to act, and anyone purporting to act in such a capacity (s 409(2)). An unpaid officer is still an officer (s 409(3)(a)).",
+                    "type": "boolean"
+                },
+                "in his professional capacity, other than by way of a trade, profession or business mentioned in paragraph (b)": {
+                    "description": "Was the entrustment made to the accused in a PROFESSIONAL capacity that is NOT one of the ways paragraph (b) names? The exclusion is what makes this limb residual: if the accused was entrusted in the way of his trade, profession or business as a banker, merchant, factor, broker, attorney or agent, that is paragraph (b) and this leaf is FALSE. Answer TRUE only for a professional capacity paragraph (b) does not reach.",
+                    "type": "boolean"
+                },
+                "of a corporation": {
+                    "description": "… and the body he is key executive of is a corporation?",
+                    "type": "boolean"
+                },
+                "of a partnership": {
+                    "description": "… or a partnership?",
+                    "type": "boolean"
+                },
+                "of an unincorporated association": {
+                    "description": "… or an unincorporated association?",
+                    "type": "boolean"
+                },
+                "particulars": {
+                    "$ref": "#/$defs/Particulars",
+                    "description": "Who is charged, and when and where the offence was committed"
+                }
+            },
+            "required": [
+                "particulars",
+                "breach of trust",
+                "for the purpose of transportation for hire",
+                "for the purpose of storage for rent or charge",
+                "being an employee",
+                "entrusted in such capacity",
+                "in his capacity as a public servant",
+                "his trade",
+                "his profession",
+                "his business",
+                "a banker",
+                "a merchant",
+                "a factor",
+                "a broker",
+                "an attorney",
+                "an agent",
+                "in his professional capacity, other than by way of a trade, profession or business mentioned in paragraph (b)",
+                "in his capacity as a director of a corporation",
+                "in his capacity as an officer of an unincorporated association",
+                "in his capacity as a partner in a partnership",
+                "in his capacity as a key executive",
+                "of a corporation",
+                "of an unincorporated association",
+                "of a partnership",
+                "in his capacity as a fiduciary"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Whether the accused has committed an offence punishable under section 407 of the Penal Code 1871 (criminal breach of trust of property entrusted for the purpose of transportation or storage)",
+    "properties": {
+        "c": {
+            "$ref": "#/$defs/Aggravated CBT Facts",
+            "description": "The entrustment, the purpose it was made for, and what became of the property"
+        }
+    },
+    "required": [
+        "c"
+    ],
+    "title": "offence under s 407",
+    "type": "object"
+}

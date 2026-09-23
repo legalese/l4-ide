@@ -1,49 +1,61 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
-cbt-405-406.l4:498:1-72:
+cbt-405-406.l4:629:1-72:
   FALSE
-cbt-405-406.l4:499:1-70:
+cbt-405-406.l4:630:1-70:
   "A charge under section 406 would assert that the facts fulfil every legal condition of criminal breach of trust (CPC s 123(5)). On the facts given they do not: dishonestly misappropriates or converts to his own use THAT property, dishonestly uses or disposes of THAT property in violation of a direction of law or of a legal contract, or intentionally suffers any other person to do so — where “that property” is the property entrusted and nothing else; the elements of section 405 taken together."
-cbt-405-406.l4:500:1-90:
+cbt-405-406.l4:631:1-90:
   "You, Carl Elias Moses, are charged that you, on or about 23 October 1989, at the premises of Trans-Pacific Credit Pte Ltd, Singapore, being entrusted with property, namely, 2,000 Overseas Union Bank Warrant 1994 for the purpose of delivering these warrants on behalf of Trans-Pacific Credit Pte Ltd (“the company”) to DBS Securities Pte Ltd pursuant to a sale (per contract number 414270/501) of the said warrants, and thereafter to pay the proceeds of the said sale to the company, did dishonestly misappropriate the said warrants, and you have thereby committed an offence punishable under section 406 of the Penal Code 1871."
-cbt-405-406.l4:501:1-75:
+cbt-405-406.l4:632:1-75:
   "You, Carl Elias Moses, are charged that you, on or about 23 October 1989, at the premises of Trans-Pacific Credit Pte Ltd, Singapore, being entrusted by Trans-Pacific Credit Pte Ltd (“the company”) with property, namely, the proceeds of the sale of 2,000 Overseas Union Bank Warrant 1994 received by you from DBS Securities Pte Ltd pursuant to a sale (per contract number 414270/501) of the said warrants, for the purpose of paying the same to the company, did dishonestly misappropriate the said proceeds, and you have thereby committed an offence punishable under section 406 of the Penal Code 1871."
-cbt-405-406.l4:502:1-73:
+cbt-405-406.l4:633:1-73:
   "You, A, are charged that you, on or about a date unknown, at A's place of business, Singapore, being entrusted by one Z of Penang with property, namely, $5,000 remitted to you by the said Z with directions to you to invest the same in Government securities, pursuant to an express or implied contract between you and the said Z that all sums remitted by the said Z to you shall be invested by you according to his direction, did dishonestly use the said moneys in violation of a legal contract, express or implied, which you had made touching the discharge of the said trust, and you have thereby committed an offence punishable under section 406 of the Penal Code 1871."
-cbt-405-406.l4:503:1-90:
+cbt-405-406.l4:634:1-90:
   "A charge under section 406 would assert that the facts fulfil every legal condition of criminal breach of trust (CPC s 123(5)). On the facts given they do not: dishonestly — which governs misappropriation, conversion, use and disposal — or intentionally, which governs suffering any other person to do so; dishonestly misappropriates or converts to his own use THAT property, dishonestly uses or disposes of THAT property in violation of a direction of law or of a legal contract, or intentionally suffers any other person to do so — where “that property” is the property entrusted and nothing else; the elements of section 405 taken together."
-cbt-405-406.l4:509:1-80:
+cbt-405-406.l4:640:1-80:
   assertion satisfied
-cbt-405-406.l4:510:1-81:
+cbt-405-406.l4:641:1-81:
   assertion satisfied
-cbt-405-406.l4:511:1-79:
+cbt-405-406.l4:642:1-79:
   assertion satisfied
-cbt-405-406.l4:512:1-579:
+cbt-405-406.l4:643:1-579:
   assertion satisfied
-cbt-405-406.l4:518:1-98:
+cbt-405-406.l4:649:1-98:
   assertion satisfied
-cbt-405-406.l4:519:1-729:
+cbt-405-406.l4:650:1-729:
   assertion satisfied
-cbt-405-406.l4:523:1-82:
+cbt-405-406.l4:654:1-82:
   assertion satisfied
-cbt-405-406.l4:524:1-69:
+cbt-405-406.l4:655:1-69:
   assertion satisfied
-cbt-405-406.l4:525:1-83:
+cbt-405-406.l4:656:1-83:
   assertion satisfied
-cbt-405-406.l4:526:1-688:
+cbt-405-406.l4:657:1-688:
   assertion satisfied
-cbt-405-406.l4:527:1-172:
+cbt-405-406.l4:658:1-172:
   assertion satisfied
-cbt-405-406.l4:530:1-80:
+cbt-405-406.l4:661:1-80:
   assertion satisfied
-cbt-405-406.l4:531:1-81:
+cbt-405-406.l4:662:1-81:
   assertion satisfied
-cbt-405-406.l4:532:1-755:
+cbt-405-406.l4:663:1-755:
   assertion satisfied
-cbt-405-406.l4:537:1-100:
+cbt-405-406.l4:668:1-100:
   assertion satisfied
-cbt-405-406.l4:538:1-101:
+cbt-405-406.l4:669:1-101:
   assertion satisfied
-cbt-405-406.l4:539:1-745:
+cbt-405-406.l4:670:1-745:
+  assertion satisfied
+cbt-405-406.l4:678:1-102:
+  assertion satisfied
+cbt-405-406.l4:679:1-106:
+  assertion satisfied
+cbt-405-406.l4:685:1-103:
+  assertion satisfied
+cbt-405-406.l4:686:1-562:
+  assertion satisfied
+cbt-405-406.l4:692:1-235:
+  assertion satisfied
+cbt-405-406.l4:693:1-621:
   assertion satisfied

@@ -1,0 +1,54 @@
+{
+    "$defs": {
+        "Misappropriation Facts": {
+            "properties": {
+                "converts to his own use": {
+                    "description": "Did the accused convert the property to his own use — deal with it in a manner INCONSISTENT WITH THE RIGHTS OF THE TRUE OWNER (Wong Seng Kwan v PP [2012] SGHC 81 at [42]–[46])? Conversion is a subset of misappropriation, so an answer of YES here should normally carry YES above; the converse does not follow. Illustration (c): the joint owner who sells the horse and takes the proceeds.",
+                    "type": "boolean"
+                },
+                "dishonestly": {
+                    "description": "Did the accused act dishonestly — intending a wrongful gain or a wrongful loss, or in a way reasonable and honest people would call dishonest, knowing that (s 24)? THE FINDER'S SAFE HARBOUR IS HERE: a person who finds property in nobody's possession and takes it in order to protect it for the owner or restore it to the owner does NOT take or misappropriate it dishonestly and is not guilty (Explanation 2); he becomes guilty if he appropriates it to his own use when he knows or has the means of discovering the owner, or before he has used reasonable means to find and notify the owner and has kept it a reasonable time for the owner to claim it. What is reasonable is a question of fact. He need not know who the owner is — it is enough that when he appropriates it he does not believe it to be his own and does not in good faith believe the real owner cannot be found. Illustration (c) to the section: a joint owner who takes the horse merely to use it, as he is entitled to, is not dishonest.",
+                    "type": "boolean"
+                },
+                "misappropriates": {
+                    "description": "Did the accused misappropriate the property — set it apart or assign it to the wrong person or the wrong use (Wong Seng Kwan v PP [2012] SGHC 81 at [42]–[46])? A misappropriation FOR A TIME ONLY counts: intending to give the thing back later does not take you outside this section (Explanation 1, and its illustration — pledging another's promissory note with a banker, meaning to redeem it, is an offence).",
+                    "type": "boolean"
+                },
+                "movable property": {
+                    "description": "Was the thing movable property — property of every description EXCEPT immovable property, that is, except land, benefits to arise out of land, things attached to the earth, and things permanently fastened to anything attached to the earth (s 22)? Note that this section is narrower than ss 404 and 405, which reach \"property\" of any kind, movable or immovable. Writings relating to property or rights are movable property (s 22 Illustration); so is money in a bank account.",
+                    "type": "boolean"
+                },
+                "particulars": {
+                    "$ref": "#/$defs/Particulars",
+                    "description": "Who is charged, and when and where the offence was committed"
+                },
+                "the property": {
+                    "description": "What was misappropriated or converted, as it is to read after \"movable property, to wit,\" — for example \"a valuable ring\". There is deliberately no owner field: unlike theft, this section does not ask whose possession the thing was in, and most of its illustrations are of property in nobody's possession at all.",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "particulars",
+                "the property",
+                "dishonestly",
+                "misappropriates",
+                "converts to his own use",
+                "movable property"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Whether the accused has committed an offence punishable under section 403 of the Penal Code 1871 (dishonest misappropriation of property)",
+    "properties": {
+        "f": {
+            "$ref": "#/$defs/Misappropriation Facts",
+            "description": "What was misappropriated or converted, and with what state of mind"
+        }
+    },
+    "required": [
+        "f"
+    ],
+    "title": "offence under s 403",
+    "type": "object"
+}

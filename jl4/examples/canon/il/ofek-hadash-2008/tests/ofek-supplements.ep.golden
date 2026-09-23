@@ -37,7 +37,7 @@ GIVEN `the role` IS A `a role carrying a supplement`
       `the classes in the grade` IS A NUMBER
 GIVETH A NUMBER
 `the section 39 rate for` `the role` `the stage` `the classes in the grade`
-    @nlg the section 39 rate for %the role%
+    @nlg the section 39 rate for %`the role`%
     MEANS
     CONSIDER `the role`
     WHEN `homeroom teacher of a class other than the first grade` THEN 10%    -- § 39(a)(1)
@@ -103,7 +103,7 @@ DECIDE `the number of role supplements is allowed` IF
 GIVEN `the role` IS A `a role carrying a supplement`
 GIVETH A NUMBER
 `the shekel floor under` `the role`
-    @nlg the shekel floor under %the role%
+    @nlg the shekel floor under %`the role`%
     MEANS
     -- 2022 § 10 reaches five supplements. Three of them — young-division
     -- management, deputy headship and kindergarten management — are roles
@@ -123,7 +123,7 @@ GIVEN `the role` IS A `a role carrying a supplement`
       `the date` IS A DATE
 GIVETH A NUMBER
 `the role supplement for` `the role` `the stage` `the classes in the grade` `the combined salary for a full post` `the date`
-    @nlg the supplement payable for %the role%
+    @nlg the supplement payable for %`the role`%
     MEANS
     IF `the date` `is before` `the date the shekel floors take effect`
         THEN `the percentage amount`
@@ -164,7 +164,7 @@ GIVEN `the table` IS A `a salary table`
       `the rank` IS A NUMBER
 GIVETH A NUMBER
 `tosefet ofek 2022 from september 2022 in` `the table` `the rank`
-    @nlg Tosefet Ofek 2022 as it stood from September 2022 for rank %the rank%
+    @nlg Tosefet Ofek 2022 as it stood from September 2022 for rank %`the rank`%
     MEANS
     CONSIDER `the table`
     WHEN `the BA table — rating code 101` THEN
@@ -192,7 +192,7 @@ GIVEN `the table` IS A `a salary table`
       `the rank` IS A NUMBER
 GIVETH A NUMBER
 `tosefet ofek 2022 from september 2023 in` `the table` `the rank`
-    @nlg Tosefet Ofek 2022 as increased from September 2023 for rank %the rank%
+    @nlg Tosefet Ofek 2022 as increased from September 2023 for rank %`the rank`%
     MEANS
     CONSIDER `the table`
     WHEN `the BA table — rating code 101` THEN
@@ -226,7 +226,7 @@ GIVEN `the table` IS A `a salary table`
       `the date` IS A DATE
 GIVETH A NUMBER
 `tosefet ofek 2022 for` `the table` `the rank` `the fraction of a full post` `the date`
-    @nlg Tosefet Ofek 2022 payable at rank %the rank%
+    @nlg Tosefet Ofek 2022 payable at rank %`the rank`%
     MEANS
     IF `the date` `is before` `the date tosefet ofek 2022 takes effect`
         THEN 0
@@ -270,7 +270,7 @@ GIVEN `the units` IS A NUMBER
       `the date` IS A DATE
 GIVETH A NUMBER
 `the school-role supplement for` `the units` `the fraction of a full post` `the date`
-    @nlg the school-role supplement for %the units% units
+    @nlg the school-role supplement for %`the units`% units
     MEANS
     IF       `the date` `is before` `the date section 22 takes effect as postponed`
          OR  NOT (`the units are within the section 22 range` `the units`)

@@ -1,4 +1,4 @@
-`ExcelDays` with `US 30/360 end` and `US 30/360 start`
+the number of days from `US 30/360 start` to `US 30/360 end`
 `ExcelDays360` with `US 30/360 start` and `US 30/360 end`
 `ExcelDays360` with `US 30/360 start`, `US 30/360 end` and `TRUE`
 `ExcelYearFrac` with `Basis start`, `Basis end` and 0

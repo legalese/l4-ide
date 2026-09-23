@@ -249,9 +249,9 @@ not `s 18 — a conveyance or other act made or done subsequently to the executi
 not `s 26 — the devise or bequest shall not lapse` with `the plain case of Amrita` and `a specific devise to Ismail, determinable at his death`
 not `s 26 — the devise or bequest shall not lapse` with `the case of a will showing a contrary intention as to lapse` and `a specific devise to Ismail`
 not `s 26 — the devise or bequest shall not lapse` with `the plain case of Amrita` and `a pecuniary legacy of $10,000 to Devi`
-not `null` with `the donee, so far as he is a child or other issue of the testator` with `the plain case of Amrita` and `a specific devise to Ismail`
+not `the donee, so far as he is a child or other issue of the testator` with `the plain case of Amrita` and `a specific devise to Ismail` is empty
 `the donee, so far as he is a child or other issue of the testator` with `the plain case of Amrita` and `a specific devise to Ismail`
-`null` with `the donee, so far as he is a child or other issue of the testator` with `the plain case of Amrita` and `a pecuniary legacy of $10,000 to Devi`
+`the donee, so far as he is a child or other issue of the testator` with `the plain case of Amrita` and `a pecuniary legacy of $10,000 to Devi` is empty
 not `s 26 — the devise or bequest shall not lapse` with `the case of a devise to a reference two of the testator’s children share` and `a specific devise to the reference Yasmin and Zainab share`
 `s 27 — this section applies to the person` with `the WA Farid`
 `s 27 — this section applies to the person` with `the WA Osman`

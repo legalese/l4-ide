@@ -1,5 +1,5 @@
-`count` with `alle Arten des Fristbeginns` is equal to 3
-`all` with given `a` then `genau eine Regel des § 187 greift bei` with `a` and `alle Arten des Fristbeginns`
+the number of items in `alle Arten des Fristbeginns` is equal to 3
+given `a` then `genau eine Regel des § 187 greift bei` with `a` holds for every item of `alle Arten des Fristbeginns`
 `§ 187 Abs. 1 ist einschlägig bei`
 `das Fristende zu` with `Beispiel 1` is equal to `YMD` with 2026, 6 and 15
 `das Fristende zu` with `Beispiel 2` is equal to `YMD` with 2026, 7 and 1
@@ -61,10 +61,10 @@ not `§ 193 ist anwendbar auf` with `eine Rechtsfolge tritt lediglich ein`
 not `§ 193 ist unmittelbar anwendbar auf` with `eine Verjährungsfrist läuft ab`
 not `Invariante I1 — das Fristende liegt nach dem Anknüpfungstag bei` with `Gegenbeispiel zu I1`
 `Invariante I1' — das Fristende liegt nicht vor dem Anknüpfungstag bei` with `Gegenbeispiel zu I1`
-`all` with given `d` then `Invariante I1' — das Fristende liegt nicht vor dem Anknüpfungstag bei` with `eine Monatsereignisfrist ab` with `d` and `die Tage des Jahres` with 2026
-`all` with given `d` then `Invariante I2 — § 193 verschiebt nur vorwärts bei` with `eine Monatsereignisfrist ab` with `d` and `die Tage des Jahres` with 2026
-`all` with given `d` then `Invariante I1' — das Fristende liegt nicht vor dem Anknüpfungstag bei` with `eine Monatsbeginnfrist ab` with `d` and `die Tage des Jahres` with 2026
-`all` with given `d` then `Invariante I2 — § 193 verschiebt nur vorwärts bei` with `eine Monatsbeginnfrist ab` with `d` and `die Tage des Jahres` with 2026
+given `d` then `Invariante I1' — das Fristende liegt nicht vor dem Anknüpfungstag bei` with `eine Monatsereignisfrist ab` with `d` holds for every item of `die Tage des Jahres` with 2026
+given `d` then `Invariante I2 — § 193 verschiebt nur vorwärts bei` with `eine Monatsereignisfrist ab` with `d` holds for every item of `die Tage des Jahres` with 2026
+given `d` then `Invariante I1' — das Fristende liegt nicht vor dem Anknüpfungstag bei` with `eine Monatsbeginnfrist ab` with `d` holds for every item of `die Tage des Jahres` with 2026
+given `d` then `Invariante I2 — § 193 verschiebt nur vorwärts bei` with `eine Monatsbeginnfrist ab` with `d` holds for every item of `die Tage des Jahres` with 2026
 not `Invariante I1' — das Fristende liegt nicht vor dem Anknüpfungstag bei` with `Beispiel 17b`
 not `Invariante I2 — § 193 verschiebt nur vorwärts bei` with `Beispiel 17b`
 `das Fristende zu` with `§ 190 — der Fristfall der um _ verlängerten Frist zu _` with `zehn Tage` and `Beispiel 4`
@@ -80,7 +80,7 @@ not `Invariante I2 — § 193 verschiebt nur vorwärts bei` with `Beispiel 17b`
 `Teil III.A — das Fristende (wörtlich) bei` with `Beispiel 6d`
 `Teil III.A — das Fristende (wohlwollend) bei` with `Beispiel 9` is equal to `YMD` with 2026, 9 and 21
 `Teil III.A — das Fristende (wohlwollend) bei` with `Beispiel 10` is equal to `YMD` with 2026, 10 and 19
-`count` with `filter` with given `d` then not `Gesetz und Teil III.A stimmen vor § 193 überein am` with `d` and `die Tage des Jahres` with 2026
-`filter` with given `d` then not `Gesetz und Teil III.A stimmen vor § 193 überein am` with `d` and `die Tage des Jahres` with 2026
-`filter` with given `d` then not `Gesetz und Teil III.A stimmen im Ergebnis überein am` with `d` and `die Tage des Jahres` with 2026
-`filter` with given `d` then not `die Beginnfrist endet einen Tag früher am` with `d` and `die Tage des Jahres` with 2026
+the number of items in the items of `die Tage des Jahres` with 2026 for which given `d` then not `Gesetz und Teil III.A stimmen vor § 193 überein am` with `d` holds
+the items of `die Tage des Jahres` with 2026 for which given `d` then not `Gesetz und Teil III.A stimmen vor § 193 überein am` with `d` holds
+the items of `die Tage des Jahres` with 2026 for which given `d` then not `Gesetz und Teil III.A stimmen im Ergebnis überein am` with `d` holds
+the items of `die Tage des Jahres` with 2026 for which given `d` then not `die Beginnfrist endet einen Tag früher am` with `d` holds

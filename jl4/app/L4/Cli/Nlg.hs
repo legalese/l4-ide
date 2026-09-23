@@ -1,13 +1,9 @@
 -- | @l4 nlg FILE@ — linearize a module's directives to natural-language prose.
 --
 -- This is the CLI footing for the TNR/NLG round-trip leg. It is deliberately a
--- thin wrapper: the renderer is 'L4.Nlg.simpleLinearizer' in @jl4-core@, and
--- the payload is exactly what @jl4-test@'s @jl4NlgAnnotationsGolden@ writes into
--- @\<stem\>.nlg.golden@ —
---
--- @
--- Text.unlines (fmap Nlg.simpleLinearizer (toListOf (gplate \@(Directive Resolved)) mod'))
--- @
+-- thin wrapper: the payload is 'L4.Nlg.linearizeDirectives', which is the same
+-- function @jl4-test@'s @jl4NlgAnnotationsGolden@ calls to write
+-- @\<stem\>.nlg.golden@.
 --
 -- Sameness with the golden producer is the whole point of the command, and it is
 -- load-bearing rather than incidental: before this existed, the only way to
@@ -17,16 +13,16 @@
 -- @NOT-REGENERATED@. With this command the leg gets a real differential oracle:
 -- regenerate, then diff against the committed golden.
 --
--- So: if you change the payload expression below, you have moved @p7-tnr@ off
--- its golden and broken @jl4-test@ at the same time. Change both, in one commit,
--- or neither.
+-- __Both sides used to spell the payload out__, and this comment asked whoever
+-- edited one to remember the other. They now call one function, so the invariant
+-- is held by the compiler instead of by the reader. That mattered as soon as
+-- there were three rewrites to apply in order rather than one.
 --
--- @--lang@ does not breach that. 'L4.Nlg.selectLanguage' 'Nothing' is the
--- identity, so the no-flag payload is byte-identical to the golden producer's
--- and stays that way by construction; the flag only moves an already-attached
--- rendering into the slot the payload already reads. Producing a bilingual
--- document SET is then two runs of this command differing in one argument,
--- which is the point of the flag.
+-- @--lang@ rides on the same function, so the flag cannot drift from the golden
+-- either: 'L4.Nlg.selectLanguage' 'Nothing' is the identity, and the flag only
+-- moves an already-attached rendering into the slot the payload already reads.
+-- Producing a bilingual document SET is then two runs of this command differing
+-- in one argument, which is the point of the flag.
 --
 -- Two post-processing steps the golden producer applies are deliberately NOT
 -- applied here, because on this payload both are the identity:
@@ -48,7 +44,6 @@ module L4.Cli.Nlg
 
 import Base
 import qualified Base.Text as Text
-import qualified Optics
 import Options.Applicative
 import System.Exit (exitFailure, exitSuccess)
 
@@ -105,17 +100,17 @@ nlgCmd opts = do
       exitFailure
     Just tc -> do
       putDiagnostics errs
+      let payload = linearizeModule opts.nlgLang tc.module' (dedupModules (transitiveDeps tc))
       case opts.nlgOutput of
-        Just f  -> Text.writeFile f (linearizeModule opts.nlgLang tc.module')
-        Nothing -> Text.putStr (linearizeModule opts.nlgLang tc.module')
+        Just f  -> Text.writeFile f payload
+        Nothing -> Text.putStr payload
       exitSuccess
 
 -- | The payload. Byte-identical to @jl4NlgAnnotationsGolden@'s @output_@ when
 -- no language is requested — 'Nlg.selectLanguage' 'Nothing' is the identity,
 -- so that holds by construction rather than by care.
-linearizeModule :: Maybe LangTag -> Module Resolved -> Text
-linearizeModule mlang mod'' =
-  Text.unlines (fmap Nlg.simpleLinearizer directives)
-  where
-    mod' = Nlg.selectLanguage mlang mod''
-    directives = Optics.toListOf (Optics.gplate @(Directive Resolved)) mod'
+--
+-- The dependencies ride along because a heralded call in a directive can name
+-- a rule an imported module defines ('Nlg.linearizeDirectives').
+linearizeModule :: Maybe LangTag -> Module Resolved -> [Module Resolved] -> Text
+linearizeModule mlang mod' deps = Text.unlines (Nlg.linearizeDirectives mlang mod' deps)

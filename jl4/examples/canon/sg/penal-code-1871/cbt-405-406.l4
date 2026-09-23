@@ -218,7 +218,7 @@ DECLARE `CBT Facts` HAS
 
     -- third limb: "or intentionally suffers any other person to do so"
     `intentionally suffers any other person to do so`
-                          IS A BOOLEAN @desc Did the accused deliberately allow someone else to do any of those things with the property? Mere carelessness is not enough — the section says "intentionally".
+                          IS A BOOLEAN @desc Did the accused deliberately allow someone else to do — DISHONESTLY, and with THE PROPERTY NAMED ABOVE — any of the things the first two limbs describe: to misappropriate it or convert it to his own use, or to use or dispose of it IN VIOLATION OF a direction of law prescribing how the trust was to be discharged, or of a legal contract, express or implied, touching the discharge of the trust? The section's "so" carries all of that, so answering TRUE asserts the other person's dishonesty as well, and, where what he did was a use or a disposal, the violation too. Mere carelessness is not enough — the section says "intentionally".
 
 §§ `s 405 — criminal breach of trust`
 
@@ -267,13 +267,17 @@ DECIDE `offence under s 406` f IF
 -- from `property, in short`, which is a short form of `property`. The charge as
 -- laid could say "proceeds" there while the entrustment said "warrants". This
 -- builder cannot.
+--
+-- ONE PHRASE PER LIMB. The recital is built limb by limb, each limb carrying
+-- its own adverb, and the phrases joined with ", and did ". That is not a
+-- presentational choice: it is what keeps "dishonestly" off the third limb and
+-- "intentionally" off the first two. See `the limbs relied on` below.
 GIVEN f IS A `CBT Facts`
 GIVETH A STRING
 `the manner of the breach of trust` f MEANS
     CONCAT "being entrusted", (`by whom entrusted` f), " with ", (`what the accused was entrusted with` f),
            ", namely, ", f's property, " ", f's `purpose of the entrustment`,
-           ", did ", (`the adverb` f), " ", (`what the accused did with it` f),
-           " the said ", (`the property, in short` f), (`in violation of what` f)
+           ", did ", (`the limbs relied on` f)
 
 GIVEN f IS A `CBT Facts`
 GIVETH A STRING
@@ -289,13 +293,76 @@ GIVETH A STRING
         (`included if` (f's `entrusted with property`) "property"),
         (`included if` (f's `entrusted with dominion over property`) "dominion over property")))
 
--- "dishonestly" governs the first two limbs; "intentionally" the third.
+-- "dishonestly" governs the first two limbs; "intentionally" the third, and
+-- the section keeps them on separate rails — Woon, Essential Criminal Law ch 8
+-- p 192, draws "Dishonesty" as the head of the upper branch and "Intentionally
+-- suffers another person to" as the head of the lower one, with nothing in the
+-- figure letting one adverb reach the other branch's verbs.
+--
+-- This used to be built as two independent lists — every adverb that held,
+-- then every verb that held — concatenated as "did <adverbs> <verbs>". That
+-- flattens the two rails into one. A record with the first and third limbs both
+-- TRUE recited "did dishonestly and intentionally misappropriate, and suffer
+-- another person to misappropriate the said furniture", which alleges an
+-- INTENTIONAL misappropriation and a DISHONEST suffering — two manners the
+-- section does not state, on a charge whose manner CPC s 125 requires to be
+-- stated. So each limb now carries its own adverb and they are joined.
 GIVEN f IS A `CBT Facts`
 GIVETH A STRING
-`the adverb` f MEANS
-    `joined with` " and " (concat (LIST
-        (`included if` (f's dishonestly) "dishonestly"),
-        (`included if` (f's `intentionally suffers any other person to do so`) "intentionally")))
+`the limbs relied on` f MEANS
+    `joined with` ", and did " (concat (LIST
+        (`included if` (`the first or second limb is made out` f) (`what the accused himself did` f)),
+        (`included if` (f's `intentionally suffers any other person to do so`) (`what the accused suffered another to do` f))))
+
+-- The first two limbs, as the ladder tests them, named once because both the
+-- recital and the refusal ask the same question. This is the same expression
+-- the ladder builds out of inert prose; it is stated again here rather than
+-- called, because a call would draw the first two limbs as one box and the
+-- ladder exists to be clicked leaf by leaf.
+GIVEN f IS A `CBT Facts`
+GIVETH A BOOLEAN
+`the first or second limb is made out` f MEANS
+        f's dishonestly
+    AND (    (    f's `misappropriates that property`
+             OR   f's `converts that property to his own use` )
+         OR  (    (    f's `uses that property`
+                  OR   f's `disposes of that property` )
+             AND  (    f's `any direction of law prescribing the mode in which such trust is to be discharged`
+                  OR   f's `any legal contract, express or implied, which he has made touching the discharge of such trust` ) ) )
+
+-- The accused's own dealing with the property: "dishonestly", then the verbs
+-- that hold, then the property, then the violation clause the second limb
+-- needs. The violation clause rides here because "in violation of" qualifies
+-- the use-or-disposal limb and nothing else.
+GIVEN f IS A `CBT Facts`
+GIVETH A STRING
+`what the accused himself did` f MEANS
+    CONCAT "dishonestly ", (`what the accused did with it` f),
+           " the said ", (`the property, in short` f), (`in violation of what` f)
+
+-- THE ANAPHOR. The third limb is "intentionally suffers any other person to do
+-- so", and "so" reaches back over everything before it: "dishonestly", the four
+-- acts, "that property", and — for the use-or-disposal alternative — "in
+-- violation of" as well. `CBT Facts` records THAT the accused suffered another
+-- person to do so; it does not record WHICH of the four acts the other person
+-- chose, and no field here can be made to say. So the recital carries the
+-- anaphor rather than picking one of the four.
+--
+-- It used to pick, and it always picked the same one: the third limb mapped to
+-- the fixed phrase "suffer another person to misappropriate", so a record on
+-- which the other person had used or disposed of the property still recited a
+-- misappropriation. That states a manner that did not happen, which is a defect
+-- of form of the same species as the one this module exists to foreclose.
+--
+-- Carrying the other person's act instead would mean new fields on `CBT Facts`
+-- — his dishonesty, which of the four acts he did, and the violation where he
+-- used or disposed — and the ladder would have to test them. That is a larger
+-- change than this one, and it is not made here: the anaphor is recited
+-- faithfully instead, which is what the statute itself does.
+GIVEN f IS A `CBT Facts`
+GIVETH A STRING
+`what the accused suffered another to do` f MEANS
+    CONCAT "intentionally suffer another person so to do in respect of the said ", (`the property, in short` f)
 
 GIVEN f IS A `CBT Facts`
 GIVETH A STRING
@@ -304,8 +371,7 @@ GIVETH A STRING
         (`included if` (f's `misappropriates that property`) "misappropriate"),
         (`included if` (f's `converts that property to his own use`) "convert to your own use"),
         (`included if` (f's `uses that property`) "use"),
-        (`included if` (f's `disposes of that property`) "dispose of"),
-        (`included if` (f's `intentionally suffers any other person to do so`) "suffer another person to misappropriate")))
+        (`included if` (f's `disposes of that property`) "dispose of")))
 
 -- The back-reference is a short form of the ONE property, never a second one.
 -- Blank means "repeat it in full", which is always safe.
@@ -334,7 +400,7 @@ GIVETH A LIST OF STRING
     concat (LIST
         (`missing unless` (f's `entrusted with property` OR f's `entrusted with dominion over property`) "being in any manner entrusted with property, or with any dominion over property"),
         (`missing unless` (f's dishonestly OR f's `intentionally suffers any other person to do so`) "dishonestly — which governs misappropriation, conversion, use and disposal — or intentionally, which governs suffering any other person to do so"),
-        (`missing unless` ((f's dishonestly AND (f's `misappropriates that property` OR f's `converts that property to his own use`)) OR (f's dishonestly AND (f's `uses that property` OR f's `disposes of that property`) AND (f's `any direction of law prescribing the mode in which such trust is to be discharged` OR f's `any legal contract, express or implied, which he has made touching the discharge of such trust`)) OR f's `intentionally suffers any other person to do so`) "dishonestly misappropriates or converts to his own use THAT property, dishonestly uses or disposes of THAT property in violation of a direction of law or of a legal contract, or intentionally suffers any other person to do so — where “that property” is the property entrusted and nothing else"),
+        (`missing unless` ((`the first or second limb is made out` f) OR f's `intentionally suffers any other person to do so`) "dishonestly misappropriates or converts to his own use THAT property, dishonestly uses or disposes of THAT property in violation of a direction of law or of a legal contract, or intentionally suffers any other person to do so — where “that property” is the property entrusted and nothing else"),
         (`missing unless` (`commits criminal breach of trust` f) "the elements of section 405 taken together"))
 
 @export Frame a charge under section 406 of the Penal Code 1871 (criminal breach of trust), or say why none can be framed
@@ -493,6 +559,71 @@ GIVETH A Charge
     `any legal contract, express or implied, which he has made touching the discharge of such trust` IS TRUE
     `intentionally suffers any other person to do so` IS FALSE
 
+§§ `The third limb, on facts constructed from Illustration (b)`
+
+-- NO illustration to section 405 turns on the third limb, and no charge on this
+-- row's bench was laid under it, so these two records are CONSTRUCTED, not
+-- reported. They take Illustration (b)'s entrustment — the warehouse operator
+-- and Z's furniture — and put the dealing in someone else's hands. They exist
+-- because the recital of the third limb had no fixture at all, and two defects
+-- of form lived there undisturbed for want of one.
+--
+-- (b) A is a warehouse owner or warehouse operator. Z, going on a journey,
+--     entrusts his furniture to A, under a contract that it shall be returned
+--     on payment of a stipulated sum for warehouse room. A dishonestly sells
+--     the goods. A has committed breach of trust.
+--
+-- The accused here does nothing to the furniture himself. He intentionally
+-- suffers another person to do so, and "so" carries that other person's
+-- dishonesty with it (s 405; the leaf's @desc says so). `dishonestly` on this
+-- record is the ACCUSED's own dishonesty in his own dealing, and he had none,
+-- because he had no dealing — which is exactly why the section gives the third
+-- limb its own adverb.
+`the warehouse operator who suffered another, constructed` MEANS `CBT Facts` WITH
+    particulars           IS Particulars WITH
+                               accused            IS "A"
+                               date               IS "a date unknown"
+                               time               IS ""
+                               place              IS "your warehouse"
+                               `co-accused`       IS ""
+                               `common intention` IS FALSE
+    `entrusted by`        IS "one Z"
+    property              IS "the furniture of the said Z"
+    `property, in short`  IS "furniture"
+    `purpose of the entrustment`
+                          IS "under a contract that the same shall be returned to the said Z on payment of a stipulated sum for warehouse room"
+    `entrusted with property` IS TRUE
+    `entrusted with dominion over property` IS FALSE
+    dishonestly           IS FALSE
+    `misappropriates that property` IS FALSE
+    `converts that property to his own use` IS FALSE
+    `uses that property`  IS FALSE
+    `disposes of that property` IS FALSE
+    `any direction of law prescribing the mode in which such trust is to be discharged` IS FALSE
+    `any legal contract, express or implied, which he has made touching the discharge of such trust` IS FALSE
+    `intentionally suffers any other person to do so` IS TRUE
+
+-- The same operator, who also helped himself to part of the furniture. Both
+-- the FIRST and the THIRD limb are made out, which is the only arrangement of
+-- facts on which the two adverbs can collide.
+`the warehouse operator who also misappropriated, constructed` MEANS `CBT Facts` WITH
+    particulars           IS `the warehouse operator who suffered another, constructed`'s particulars
+    `entrusted by`        IS `the warehouse operator who suffered another, constructed`'s `entrusted by`
+    property              IS `the warehouse operator who suffered another, constructed`'s property
+    `property, in short`  IS `the warehouse operator who suffered another, constructed`'s `property, in short`
+    `purpose of the entrustment`
+                          IS `the warehouse operator who suffered another, constructed`'s `purpose of the entrustment`
+    `entrusted with property` IS TRUE
+    `entrusted with dominion over property` IS FALSE
+    dishonestly           IS TRUE
+    `misappropriates that property` IS TRUE
+    `converts that property to his own use` IS FALSE
+    `uses that property`  IS FALSE
+    `disposes of that property` IS FALSE
+    `any direction of law prescribing the mode in which such trust is to be discharged` IS FALSE
+    `any legal contract, express or implied, which he has made touching the discharge of such trust` IS FALSE
+    `intentionally suffers any other person to do so` IS TRUE
+
 §§ `Directives`
 
 #EVAL `commits criminal breach of trust` `Carl Elias Moses, as charged`
@@ -537,3 +668,26 @@ GIVETH A Charge
 #ASSERT NOT (`commits criminal breach of trust` `the Penang agent in good faith, Illustration (d)`)
 #ASSERT NOT ((`charge under s 406` `the Penang agent in good faith, Illustration (d)`)'s `made out`)
 #ASSERT (`charge under s 406` `the Penang agent in good faith, Illustration (d)`)'s refusal EQUALS "A charge under section 406 would assert that the facts fulfil every legal condition of criminal breach of trust (CPC s 123(5)). On the facts given they do not: dishonestly — which governs misappropriation, conversion, use and disposal — or intentionally, which governs suffering any other person to do so; dishonestly misappropriates or converts to his own use THAT property, dishonestly uses or disposes of THAT property in violation of a direction of law or of a legal contract, or intentionally suffers any other person to do so — where “that property” is the property entrusted and nothing else; the elements of section 405 taken together."
+
+-- THE THIRD LIMB, RECITED. Neither of the next two assertions could be written
+-- before 2026-09-21, because no fixture reached the third limb; both would have
+-- FAILED against the recital as it then stood.
+--
+-- The ladder is untouched by this change, and these two lines say so: both
+-- records made out section 405 before and make it out now.
+#ASSERT `commits criminal breach of trust` `the warehouse operator who suffered another, constructed`
+#ASSERT `commits criminal breach of trust` `the warehouse operator who also misappropriated, constructed`
+
+-- The anaphor. The recital used to read "did intentionally suffer another
+-- person to MISAPPROPRIATE the said furniture" on this record — a manner
+-- nobody alleged, since the record does not say which of the four acts the
+-- other person did. It now recites the section's own "so".
+#ASSERT (`charge under s 406` `the warehouse operator who suffered another, constructed`)'s `made out`
+#ASSERT (`charge under s 406` `the warehouse operator who suffered another, constructed`)'s text EQUALS "You, A, are charged that you, on or about a date unknown, at your warehouse, Singapore, being entrusted by one Z with property, namely, the furniture of the said Z under a contract that the same shall be returned to the said Z on payment of a stipulated sum for warehouse room, did intentionally suffer another person so to do in respect of the said furniture, and you have thereby committed an offence punishable under section 406 of the Penal Code 1871."
+
+-- The adverbs. With the first and third limbs both made out the recital used to
+-- read "did dishonestly and intentionally misappropriate, and suffer another
+-- person to misappropriate the said furniture", putting each adverb in front of
+-- the other limb's verb. Each limb now carries its own.
+#ASSERT `the limbs relied on` `the warehouse operator who also misappropriated, constructed` EQUALS "dishonestly misappropriate the said furniture, and did intentionally suffer another person so to do in respect of the said furniture"
+#ASSERT (`charge under s 406` `the warehouse operator who also misappropriated, constructed`)'s text EQUALS "You, A, are charged that you, on or about a date unknown, at your warehouse, Singapore, being entrusted by one Z with property, namely, the furniture of the said Z under a contract that the same shall be returned to the said Z on payment of a stipulated sum for warehouse room, did dishonestly misappropriate the said furniture, and did intentionally suffer another person so to do in respect of the said furniture, and you have thereby committed an offence punishable under section 406 of the Penal Code 1871."

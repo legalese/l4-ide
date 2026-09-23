@@ -3,8 +3,8 @@
         "Complaint": {
             "properties": {
                 "breach of trust": {
-                    "$ref": "#/$defs/CBT Facts",
-                    "description": "The entrustment and what became of the property, if any"
+                    "$ref": "#/$defs/Aggravated CBT Facts",
+                    "description": "The entrustment, what became of the property, and the capacity the entrustment was made in, if any"
                 },
                 "cheating": {
                     "$ref": "#/$defs/Cheating Facts",
@@ -22,6 +22,10 @@
                     "$ref": "#/$defs/Criminal Intimidation Facts",
                     "description": "The threat meant to alarm, if any"
                 },
+                "misappropriation": {
+                    "$ref": "#/$defs/Misappropriation Facts",
+                    "description": "The dishonest dealing with movable property that was never taken wrongfully, if any"
+                },
                 "robbery": {
                     "$ref": "#/$defs/Robbery Facts",
                     "description": "The theft or extortion with violence, if any"
@@ -29,13 +33,19 @@
                 "theft": {
                     "$ref": "#/$defs/Theft Facts",
                     "description": "The taking, if any"
+                },
+                "theft in dwelling": {
+                    "$ref": "#/$defs/Theft in Dwelling Facts",
+                    "description": "The same taking with the place it happened in, if any — s 380 is the aggravated form, and its nested theft should be the same record as `theft`"
                 }
             },
             "required": [
                 "cheating",
                 "theft",
+                "theft in dwelling",
                 "extortion",
                 "robbery",
+                "misappropriation",
                 "breach of trust",
                 "intimidation",
                 "hurt"

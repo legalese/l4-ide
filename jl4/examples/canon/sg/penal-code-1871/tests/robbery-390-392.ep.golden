@@ -118,7 +118,7 @@
 -- nothing is instant and the offender is not present. Every leaf s 390(3) adds
 -- over s 383 exists to draw that line.
 --
--- Six calls this encoding makes, recorded rather than hidden:
+-- Seven calls this encoding makes, recorded rather than hidden:
 --
 --   1. `for that end` is its own leaf. The words are easy to read past, but they
 --      are the purposive link between the violence and the taking, and
@@ -164,10 +164,18 @@
 --      property obtained by the theft” names TWO occasions, not one, so the
 --      occasion group has four parallel limbs and not three. Woon, Essential
 --      Criminal Law ch 8 p 187 draws s 390(2) exactly this way. Nothing on
---      this bench changes answer: every fixture has both carrying-away leaves
---      FALSE, and wherever the old fused leaf was TRUE both of its halves are.
---      What changes is the size of the section as the encoding states it —
---      36 ways to satisfy s 390(2) become 48.
+--      the bench AS IT THEN STOOD changed answer: every fixture then had both
+--      carrying-away leaves FALSE, and wherever the old fused leaf was TRUE
+--      both of its halves are. What changed is the size of the section as the
+--      encoding states it — 36 ways to satisfy s 390(2) become 48.
+--   7. Those two leaves were therefore exercised by NOTHING until the getaway
+--      fixtures below were written, and neither had they been before the
+--      split: no fixture in this row had ever set either carrying-away leaf
+--      TRUE, so the third and fourth occasions of s 390(2) carried no answer
+--      that any assertion defended. `Chen Weixiong Jerriek, the getaway` and
+--      `Chen Weixiong Jerriek, the getaway attempted` set one of them each,
+--      with a shared control that sets neither. The calls those fixtures make
+--      — `for that end` on a getaway above all — are recorded beside them.
 --
 -- ---------------------------------------------------------------------------
 -- s 125 and the recital: robbery states NO manner, s 394 states "to wit"
@@ -754,6 +762,166 @@ GIVETH A Charge
     `such person`               IS FALSE
     `any other person jointly concerned in committing or attempting to commit such robbery` IS FALSE
 
+§§ `The getaway — the third and fourth occasions in section 390(2)`
+
+-- CONSTRUCTED, NOT REPORTED. Chen Weixiong Jerriek was decided on violence
+-- done WHILE the handphone was being taken; these three fixtures move the
+-- violence to AFTER it and change nothing else.
+--
+-- They exist because until now no fixture in this row set either
+-- carrying-away leaf TRUE. Every fixture above has both
+-- `in carrying away property obtained by the theft` and
+-- `in attempting to carry away property obtained by the theft` FALSE, so the
+-- third and fourth occasions of s 390(2) had never carried an answer, before
+-- or after they were split apart on 2026-09-21. A leaf no fixture reaches is
+-- a leaf no assertion defends.
+--
+-- The shape being probed is the occasion group, which Woon draws as four
+-- parallel boxes joining before "For that end" (Essential Criminal Law ch 8
+-- p 187). Each of the two getaway fixtures leaves exactly ONE of the four
+-- TRUE, and exactly one of the six harms, so whichever of them satisfies
+-- `theft is robbery` satisfies it ALONE. The third fixture is the same facts
+-- with that one leaf switched off, and it is what makes the other two mean
+-- something.
+--
+-- Three interpretation calls, on facts no judgment supplies:
+--
+--   `in committing the theft` FALSE — the taking was complete before the
+--                             violence. p 187 draws the occasions as separate
+--                             boxes; a fixture holding two of them TRUE would
+--                             prove nothing about either.
+--   `for that end`      TRUE — violence done to keep what has just been taken
+--                             is done for the end of the theft. This is the
+--                             leaf that does the work on a getaway: violence
+--                             during the carrying away done for some
+--                             unrelated reason leaves s 390(2) unsatisfied,
+--                             and it fails there rather than on the occasion.
+--   `moves that property` TRUE in the nested theft, for both — s 378 is
+--                             complete on the moving, so a person can be
+--                             carrying away, or attempting to carry away,
+--                             property already "obtained by the theft".
+--
+-- The recital does NOT name the occasion. It reads "did rob one Ng Juin Chye
+-- Joel of a handphone valued at about $450/-" on these facts exactly as it
+-- does on Chen's, which is CPC s 125 illustration (a) and the same call this
+-- module records for s 392's night limb: the charge recites the offence, not
+-- the manner of it. The assertions below pin that by comparing the two charge
+-- texts in full — the form that breaks if anyone makes the recital name the
+-- limb.
+
+-- The handphone is taken, the group makes off with it, the victim gives chase
+-- and is punched. The theft is over; the robbery is made out by what happened
+-- next.
+`Chen Weixiong Jerriek, the getaway` MEANS `Robbery Facts` WITH
+    particulars IS `Chen Weixiong Jerriek particulars`
+    theft       IS `the handphone taken from Ng Juin Chye Joel`
+    extortion   IS `no extortion`
+    `the hurt`  IS "punching him as you made off with the handphone"
+    `in order to commit theft`  IS FALSE
+    `in committing the theft`   IS FALSE
+    `in carrying away property obtained by the theft` IS TRUE
+    `in attempting to carry away property obtained by the theft` IS FALSE
+    `for that end`              IS TRUE
+    voluntarily                 IS TRUE
+    causes                      IS TRUE
+    `attempts to cause`         IS FALSE
+    death                       IS FALSE
+    hurt                        IS TRUE
+    `wrongful restraint`        IS FALSE
+    `fear of instant death`     IS FALSE
+    `fear of instant hurt`      IS FALSE
+    `fear of instant wrongful restraint` IS FALSE
+    `in the presence of the person put in fear` IS FALSE
+    `instant death`             IS FALSE
+    `instant hurt`              IS FALSE
+    `instant wrongful restraint` IS FALSE
+    `to that person`            IS FALSE
+    `to some other person`      IS FALSE
+    `then and there`            IS FALSE
+    `committed after 7 p.m. and before 7 a.m.` IS FALSE
+    `attempting to commit robbery` IS FALSE
+    `voluntarily causes hurt`   IS TRUE
+    `such person`               IS TRUE
+    `any other person jointly concerned in committing or attempting to commit such robbery` IS TRUE
+
+-- The same encounter one moment earlier: the handphone has been taken but the
+-- group is still trying to get clear with it when the victim is punched.
+-- `in attempting to carry away property obtained by the theft` replaces
+-- `in carrying away property obtained by the theft`; nothing else moves. Note
+-- what is NOT attempted here — the theft is complete, so this is not s 393
+-- and `attempting to commit robbery` stays FALSE.
+`Chen Weixiong Jerriek, the getaway attempted` MEANS `Robbery Facts` WITH
+    particulars IS `Chen Weixiong Jerriek particulars`
+    theft       IS `Chen Weixiong Jerriek, the getaway`'s theft
+    extortion   IS `Chen Weixiong Jerriek, the getaway`'s extortion
+    `the hurt`  IS "punching him as you tried to make off with the handphone"
+    `in order to commit theft`  IS FALSE
+    `in committing the theft`   IS FALSE
+    `in carrying away property obtained by the theft` IS FALSE
+    `in attempting to carry away property obtained by the theft` IS TRUE
+    `for that end`              IS TRUE
+    voluntarily                 IS TRUE
+    causes                      IS TRUE
+    `attempts to cause`         IS FALSE
+    death                       IS FALSE
+    hurt                        IS TRUE
+    `wrongful restraint`        IS FALSE
+    `fear of instant death`     IS FALSE
+    `fear of instant hurt`      IS FALSE
+    `fear of instant wrongful restraint` IS FALSE
+    `in the presence of the person put in fear` IS FALSE
+    `instant death`             IS FALSE
+    `instant hurt`              IS FALSE
+    `instant wrongful restraint` IS FALSE
+    `to that person`            IS FALSE
+    `to some other person`      IS FALSE
+    `then and there`            IS FALSE
+    `committed after 7 p.m. and before 7 a.m.` IS FALSE
+    `attempting to commit robbery` IS FALSE
+    `voluntarily causes hurt`   IS TRUE
+    `such person`               IS TRUE
+    `any other person jointly concerned in committing or attempting to commit such robbery` IS TRUE
+
+-- The control: `Chen Weixiong Jerriek, the getaway` with the one leaf that was
+-- carrying the section switched off, and all four occasions therefore FALSE.
+-- The punch is still voluntary, still hurt, still done for the end of the
+-- theft — it simply happened on none of the occasions s 390(2) names, and on
+-- these facts the section is not satisfied. The theft itself is untouched, so
+-- the refusal names the aggravation and nothing else. s 394 goes with it: its
+-- own first limb is "in committing or in attempting to commit robbery", and
+-- there is now neither.
+`Chen Weixiong Jerriek, the getaway, no occasion` MEANS `Robbery Facts` WITH
+    particulars IS `Chen Weixiong Jerriek particulars`
+    theft       IS `Chen Weixiong Jerriek, the getaway`'s theft
+    extortion   IS `Chen Weixiong Jerriek, the getaway`'s extortion
+    `the hurt`  IS `Chen Weixiong Jerriek, the getaway`'s `the hurt`
+    `in order to commit theft`  IS FALSE
+    `in committing the theft`   IS FALSE
+    `in carrying away property obtained by the theft` IS FALSE
+    `in attempting to carry away property obtained by the theft` IS FALSE
+    `for that end`              IS TRUE
+    voluntarily                 IS TRUE
+    causes                      IS TRUE
+    `attempts to cause`         IS FALSE
+    death                       IS FALSE
+    hurt                        IS TRUE
+    `wrongful restraint`        IS FALSE
+    `fear of instant death`     IS FALSE
+    `fear of instant hurt`      IS FALSE
+    `fear of instant wrongful restraint` IS FALSE
+    `in the presence of the person put in fear` IS FALSE
+    `instant death`             IS FALSE
+    `instant hurt`              IS FALSE
+    `instant wrongful restraint` IS FALSE
+    `to that person`            IS FALSE
+    `to some other person`      IS FALSE
+    `then and there`            IS FALSE
+    `committed after 7 p.m. and before 7 a.m.` IS FALSE
+    `attempting to commit robbery` IS FALSE
+    `voluntarily causes hurt`   IS TRUE
+    `such person`               IS TRUE
+    `any other person jointly concerned in committing or attempting to commit such robbery` IS TRUE
+
 §§ `The same encounter, one step short — section 393`
 
 -- CONSTRUCTED, NOT REPORTED. Chen Weixiong Jerriek was convicted of the
@@ -988,6 +1156,51 @@ GIVETH A Charge
 -- s 393 refuses on the very facts s 392 frames.
 #ASSERT NOT (`offence under s 393` `Chen Weixiong Jerriek`)
 #ASSERT (`charge under s 393` `Chen Weixiong Jerriek`)'s refusal EQUALS "A charge under section 393 would assert that the facts fulfil every legal condition of attempting to commit robbery (CPC s 123(5)). On the facts given they do not: an attempt to commit robbery."
+
+-- The getaway. Three fixtures, and the third is the reason the first two are
+-- evidence: one occasion leaf apart, they are the same facts, so each pair of
+-- lines below is a differential on a single leaf of s 390(2).
+--
+-- NONE of these can pass by accident of another limb. On all three fixtures
+-- `in order to commit theft` and `in committing the theft` are FALSE, the
+-- extortion slot is empty, and `hurt` is the only one of the six harms TRUE.
+#EVAL (`charge under s 392` `Chen Weixiong Jerriek, the getaway`)'s text
+#EVAL (`charge under s 392` `Chen Weixiong Jerriek, the getaway, no occasion`)'s refusal
+
+-- Violence in carrying away what had been taken: the third occasion, alone.
+#ASSERT `theft is robbery` `Chen Weixiong Jerriek, the getaway`
+#ASSERT NOT (`extortion is robbery` `Chen Weixiong Jerriek, the getaway`)
+#ASSERT `commits robbery` `Chen Weixiong Jerriek, the getaway`
+#ASSERT `offence under s 392` `Chen Weixiong Jerriek, the getaway`
+#ASSERT (`charge under s 392` `Chen Weixiong Jerriek, the getaway`)'s `made out`
+#ASSERT `the recital of the robbery` `Chen Weixiong Jerriek, the getaway` EQUALS "did rob one Ng Juin Chye Joel of a handphone valued at about $450/-"
+-- CPC s 125 illustration (a): the occasion is not recited. Word for word the
+-- charge Chen Weixiong Jerriek faced, on violence done at a different moment.
+#ASSERT (`charge under s 392` `Chen Weixiong Jerriek, the getaway`)'s text EQUALS (`charge under s 392` `Chen Weixiong Jerriek`)'s text
+-- s 394 follows the robbery: the hurt was caused in committing it.
+#ASSERT `offence under s 394` `Chen Weixiong Jerriek, the getaway`
+
+-- Violence in ATTEMPTING to carry it away: the fourth occasion, alone. The
+-- theft is complete either way, so this is s 392 and not s 393.
+#ASSERT `theft is robbery` `Chen Weixiong Jerriek, the getaway attempted`
+#ASSERT `commits robbery` `Chen Weixiong Jerriek, the getaway attempted`
+#ASSERT `offence under s 392` `Chen Weixiong Jerriek, the getaway attempted`
+#ASSERT NOT (`offence under s 393` `Chen Weixiong Jerriek, the getaway attempted`)
+#ASSERT (`charge under s 392` `Chen Weixiong Jerriek, the getaway attempted`)'s `made out`
+#ASSERT (`charge under s 392` `Chen Weixiong Jerriek, the getaway attempted`)'s text EQUALS (`charge under s 392` `Chen Weixiong Jerriek`)'s text
+
+-- The control. Same violence, same theft, no occasion: not robbery. The first
+-- line is what makes the rest of the block a differential rather than a
+-- coincidence, and the refusal is where it is visible — the theft still
+-- stands, so only the second row of `elements of robbery not made out` fires.
+#ASSERT `commits theft` (`Chen Weixiong Jerriek, the getaway, no occasion`'s theft)
+#ASSERT NOT (`theft is robbery` `Chen Weixiong Jerriek, the getaway, no occasion`)
+#ASSERT NOT (`commits robbery` `Chen Weixiong Jerriek, the getaway, no occasion`)
+#ASSERT NOT (`offence under s 392` `Chen Weixiong Jerriek, the getaway, no occasion`)
+#ASSERT NOT ((`charge under s 392` `Chen Weixiong Jerriek, the getaway, no occasion`)'s `made out`)
+#ASSERT (`charge under s 392` `Chen Weixiong Jerriek, the getaway, no occasion`)'s text EQUALS ""
+#ASSERT (`charge under s 392` `Chen Weixiong Jerriek, the getaway, no occasion`)'s refusal EQUALS "A charge under section 392 would assert that the facts fulfil every legal condition of robbery (CPC s 123(5)). On the facts given they do not: neither the aggravation that makes a theft robbery (section 390(2)) nor the one that makes an extortion robbery (section 390(3))."
+#ASSERT NOT (`offence under s 394` `Chen Weixiong Jerriek, the getaway, no occasion`)
 
 -- s 392 in Woon's shape. Eight assertions, of which FIVE are tests and THREE
 -- are not, and the file should say which is which rather than leave a reader

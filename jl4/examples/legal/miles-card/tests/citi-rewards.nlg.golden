@@ -55,7 +55,7 @@ not `paragraph 3 of the exclusion list reaches this charge` with `a charge descr
 `a Qualifying Charge` with `a charge described as SAM`
 `paragraph 3 of the exclusion list reaches this charge` with `a charge described as SAM PAYMENTS`
 not `a Qualifying Charge` with `a charge described as SAM PAYMENTS`
-`elem` with five descriptions on Citibank's list — SAM, SPL AUTO*, SPL ATU*, SPL ONLINE* and TL-ABT — are not recognised by the statement-line classifier as it prints them, so a charge bearing one of them is not caught here and `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a charge described as SAM` 's `conditions`
+five descriptions on Citibank's list — SAM, SPL AUTO*, SPL ATU*, SPL ONLINE* and TL-ABT — are not recognised by the statement-line classifier as it prints them, so a charge bearing one of them is not caught here is one of `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a charge described as SAM`'s `conditions`
 not `paragraph 3 of the exclusion list reaches this charge` with `a charge described as TL-ABT`
 `a Qualifying Charge` with `a charge described as TL-ABT`
 not `the exclusion list excludes MCC` with 5812
@@ -81,10 +81,10 @@ not `this revision of the exclusion list was in force` with `an AXS charge befor
 `a Qualifying Charge` with `an AXS charge before the list commenced`
 `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store charge in 2023` 's `status` is equal to `Unconfirmed`
 `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `status` is equal to `Verified`
-`elem` with this charge predates the 1 April 2024 effective date of the held terms; the revision that governed it is not held and `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store charge in 2023` 's `conditions`
-not `elem` with this charge predates the 1 April 2024 effective date of the held terms; the revision that governed it is not held and `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `conditions`
-`count` with `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `sources` is equal to 5
-`count` with `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a top-up through AXS` 's `sources` is equal to 4
+this charge predates the 1 April 2024 effective date of the held terms; the revision that governed it is not held is one of `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store charge in 2023`'s `conditions`
+not this charge predates the 1 April 2024 effective date of the held terms; the revision that governed it is not held is one of `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store`'s `conditions`
+the number of items in `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store`'s `sources` is equal to 5
+the number of items in `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a top-up through AXS`'s `sources` is equal to 4
 `a Qualifying Charge` with `a department store posting booked as` with `Retail purchase`
 `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store posting booked as` with `Retail purchase` 's `miles per dollar` is equal to 4
 not `a Qualifying Charge` with `a department store posting booked as` with `Annual fee or bank charge`
@@ -98,13 +98,13 @@ not `a Qualifying Charge` with `a department store posting booked as` with `Bill
 `a clause 5(iii) kind of charge` with `Bill payment via internet banking`
 `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store posting booked as` with `Annual fee or bank charge` 's `miles per dollar` is equal to 0
 `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store posting booked as` with `Annual fee or bank charge` 's `points per dollar` is equal to 0
-`count` with `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store posting booked as` with `Annual fee or bank charge` 's `sources` is equal to 1
-`count` with `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store posting booked as` with `Annual fee or bank charge` 's `conditions` is equal to 1
+the number of items in `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store posting booked as` with `Annual fee or bank charge`'s `sources` is equal to 1
+the number of items in `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store posting booked as` with `Annual fee or bank charge`'s `conditions` is equal to 1
 `a Qualifying Charge` with `a department store posting booked as` with `Pre-authorisation`
 `a Qualifying Charge` with `a department store posting booked as` with `Telephone or mail order`
 `a Qualifying Charge` with `a department store posting booked as` with `Refund or reversal`
 `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a department store posting booked as` with `Pre-authorisation` 's `miles per dollar` is equal to 4
-`elem` with clause 5 also excludes GST, and bill payments made through a channel or agent other than internet banking; the statement line does not distinguish either and `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `the plastic card at a restaurant` 's `conditions`
+clause 5 also excludes GST, and bill payments made through a channel or agent other than internet banking; the statement line does not distinguish either is one of `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `the plastic card at a restaurant`'s `conditions`
 `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `cap` 's `basis` is equal to `Statement month`
 `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `cap` 's `attribution` is equal to `By posting date`
 `Citi Rewards earns on` with `any card`, `any cardholder`, `any month` and `a phone tap at a department store` 's `cap` 's `capped`
