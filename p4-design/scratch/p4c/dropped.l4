@@ -1,0 +1,19 @@
+DECLARE R HAS
+  x IS A BOOLEAN
+
+@export a decision
+GIVEN r IS A R
+GIVETH A BOOLEAN
+DECIDE p IF r's x
+
+`scenario` MEANS R WITH x IS TRUE
+
+#EVAL p
+        (R WITH x IS TRUE)
+
+#ASSERT NOT p OF
+                R
+                WITH
+                    x IS FALSE
+
+#ASSERT p `scenario`

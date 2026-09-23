@@ -1,0 +1,15 @@
+DECLARE R HAS
+  x IS A BOOLEAN
+
+@export
+GIVEN r IS A R
+GIVETH A BOOLEAN
+DECIDE p IF r's x
+
+#EVAL p
+        (R WITH x IS TRUE)
+
+#ASSERT p OF
+            R
+            WITH
+                x IS TRUE
