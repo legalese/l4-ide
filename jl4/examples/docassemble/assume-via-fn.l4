@@ -1,7 +1,7 @@
 -- Review repair pinned by this corpus (2026-08-16): a module-level ASSUME
 -- referenced ONLY from inside an inlined parameterized DECIDE must still
 -- survive as a question block. Before the repair, the emitted code resolved
--- `base rate` to a variable while no block defined it: `l4 docassemble`
+-- `base rate` to a variable while no block defined it: `l4 export docassemble`
 -- exited 0 and the interview died at runtime with DAErrorMissingVariable —
 -- no compile-time diagnostic anywhere.
 --
