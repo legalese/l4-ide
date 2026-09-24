@@ -1,0 +1,47 @@
+§ `Eligibility for the winter allowance`
+
+DECLARE Status IS ONE OF
+    pensioner
+    carer
+    other
+
+DECLARE Household HAS
+    status        IS A Status
+    weeklyIncome  IS A NUMBER
+    hasDependants IS A BOOLEAN
+
+§§ `Section 1 — the qualifying condition`
+
+@ref s1(1)
+@export A household qualifies unless its weekly income exceeds the cap.
+GIVEN h IS A Household
+GIVETH A BOOLEAN
+DECIDE `qualifies` IF
+        "Subject to subsection (2), a household qualifies for the allowance if"
+    AND     `is a priority household` h
+        OR  h's hasDependants
+  UNLESS h's weeklyIncome GREATER THAN 400
+
+@export
+GIVEN h IS A Household
+GIVETH A BOOLEAN
+DECIDE `is a priority household` IF
+    CONSIDER h's status
+      WHEN pensioner THEN TRUE
+      WHEN carer     THEN TRUE
+      WHEN other     THEN FALSE
+
+§§ `Section 2 — the amount`
+
+@ref s2(1)
+@export
+GIVEN h IS A Household
+GIVETH A NUMBER
+`allowance` h MEANS
+  BRANCH
+    IF NOT `qualifies` h                 THEN 0
+    IF h's hasDependants                 THEN 300
+    OTHERWISE                                 200
+
+#EVAL `allowance` (Household WITH status IS pensioner, weeklyIncome IS 100, hasDependants IS TRUE)
+#EVAL `qualifies` (Household WITH status IS other, weeklyIncome IS 100, hasDependants IS FALSE)

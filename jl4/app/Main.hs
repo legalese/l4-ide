@@ -32,6 +32,7 @@ import System.IO (hSetEncoding, stdin, stdout, stderr)
 
 import L4.Cli.Ast (AstOptions, astCmd, astOptionsParser)
 import L4.Cli.Batch (BatchOptions, batchCmd, batchOptionsParser)
+import L4.Cli.Catala (CatalaOptions, catalaCmd, catalaOptionsParser)
 import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
 import L4.Cli.Export (ExportOptions, exportBpmnOptionsParser, exportCmd, exportDmnMarkdownOptionsParser, exportDmnOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
@@ -58,6 +59,7 @@ data Command
   | CmdRender     RenderOptions
   | CmdExport     ExportOptions
   | CmdOpenFisca  OpenFiscaOptions
+  | CmdCatala     CatalaOptions
   | CmdNlg        NlgOptions
   | CmdVerify     VerifyOptions
 
@@ -136,6 +138,9 @@ commandParser =
         <> command "openfisca"
              (info (helper <*> (CmdOpenFisca <$> openFiscaOptionsParser))
                (progDesc "A runnable OpenFisca Python module of the decision-rule subset"))
+        <> command "catala"
+             (info (helper <*> (CmdCatala <$> catalaOptionsParser))
+               (progDesc "A literate Catala module of the constitutive subset"))
         )
 
 -- | A footer that keeps the line breaks it was written with.
@@ -191,6 +196,7 @@ main = do
     CmdRender     opts -> renderCmd     opts
     CmdExport     opts -> exportCmd     opts
     CmdOpenFisca  opts -> openFiscaCmd  opts
+    CmdCatala     opts -> catalaCmd     opts
     CmdNlg        opts -> nlgCmd        opts
     CmdVerify     opts -> verifyCmd     opts
 

@@ -1,0 +1,16 @@
+-- REJECTED (§8.11). R11 elides a STRING field that nothing inspects, which
+-- makes the emitted `P` narrower than its L4 source. Whole-record equality
+-- reads every field implicitly, so the emitted `(a = b)` compares the narrowed
+-- structures and answers `true` where L4 answers `false`. §8.11 conditions the
+-- elision on the string being "never compared"; this compares it.
+
+DECLARE P HAS name IS A STRING
+              age  IS A NUMBER
+
+@export
+GIVEN a IS A P
+      b IS A P
+GIVETH A BOOLEAN
+same a b MEANS a EQUALS b
+
+#EVAL same OF (P WITH name IS "x", age IS 1), (P WITH name IS "y", age IS 1)   -- FALSE in L4
