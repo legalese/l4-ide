@@ -21,7 +21,7 @@ If you already know what error you are looking at, use the table of contents bel
 - [Type Errors](#type-errors)
   - [Branch type mismatch](#branch-type-mismatch)
   - [Undefined field access](#undefined-field-access)
-  - [Function arity mismatch](#function-arity-mismatch)
+  - [Wrong number of inputs](#wrong-number-of-inputs)
   - [APPEND vs append](#append-vs-append)
 - [Compiler Warnings](#compiler-warnings)
   - [Non-exhaustive pattern match](#non-exhaustive-pattern-match)
@@ -295,15 +295,15 @@ result MEANS
 
 ---
 
-### Function arity mismatch
+### Wrong number of inputs
 
-**Error message:** `Error: function expects N arguments, got M`
+**Error message:** `The function … expects 2 inputs, but here it is given 1 input.`
 
-**What you wrote:** A function call with too many or too few arguments.
+**What you wrote:** A rule used with too many or too few inputs.
 
-**What went wrong:** The function was defined with a certain number of GIVEN parameters, and you provided a different number of arguments.
+**What went wrong:** The rule was defined with a certain number of `GIVEN` inputs, and a different number was supplied where it was used.
 
-**How to fix it:** Check the function's definition to see how many arguments it expects, and provide exactly that many. If you intentionally want to supply fewer arguments (partial application), make sure the context supports it.
+**How to fix it:** Check the rule's definition to see how many inputs it expects, and supply exactly that many. If you meant to supply fewer (partial application), make sure the context supports it.
 
 ---
 
@@ -486,7 +486,16 @@ See [Libraries](../libraries/README.md) for the full list of available libraries
 
 ### Module not found
 
-**Error message:** `Error: cannot resolve import 'modulename'`
+**Error message:**
+
+```
+I could not find a module with this name: modulename
+Nothing it defines is in scope here; names you expected from it are reported as undefined.
+I have tried the following locations:
+...
+```
+
+This is an error, not a warning: it fails `l4 check` and `l4 run` even when nothing in your file reads anything from the missing module. The message lists every place that was searched, once each, in the same tier order as the resolution table. Other commands — `l4 render`, `l4 nlg` and the transpilers among them — print the same error and still exit 0; [When nothing resolves](../libraries/resolution.md#which-commands-fail-on-it) has the measured list.
 
 **What went wrong:** L4 could not find the module you are trying to import. L4 searches for modules in this order (first match wins):
 
@@ -502,7 +511,7 @@ Project-scoped locations (2–4) outrank the embedded stdlib, so intentional ove
 
 **How to fix it:**
 
-- Check the module name for typos.
+- Check the module name for typos. This is usually not the first error on screen: a failed import also produces one "I could not find a definition for the identifier" per name it was meant to supply, so read the top of the output.
 - For your own modules, place them in the project directory or set `JL4_LIBRARY_PATH`.
 - For third-party (non-stdlib) libraries, install them to `~/.local/share/jl4/libraries/`
 - If `JL4_LIBRARY_PATH` is set, ensure it contains the standard libraries you need (e.g., `prelude.l4`).

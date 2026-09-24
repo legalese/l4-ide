@@ -105,8 +105,8 @@ will not see it: no paths filter matches a `.l4` under `jl4/examples/`, so the H
 run on your PR, and the failure surfaces on the next person's branch instead.
 
 **Which globs, exactly** (`jl4/tests/Main.hs:78-90`, kept in step by `etc/check-corpus-goldens.mjs:32-43`):
-`ok/**`, `legal/**`, `not-ok/tc/**`, `not-ok/nlg/**`, `not-ok/export-*.l4`, `lsp/semantic-tokens/**`,
-`lsp/hover/**`, and `jl4-core/libraries/*.l4`. **`jl4/examples/docassemble/` and
+`ok/**`, `legal/**`, `not-ok/tc/**`, `not-ok/nlg/**`, `not-ok/export-*.l4`, `not-ok/import/unresolved-*.l4`,
+`lsp/semantic-tokens/**`, `lsp/hover/**`, and `jl4-core/libraries/*.l4`. **`jl4/examples/docassemble/` and
 `jl4/examples/openfisca/` are in NO glob**, which is why their `.l4` files carry no `tests/`
 directory and adding one there needs no goldens. State this rule with its scope: an earlier
 unqualified reading of this paragraph sent a session hunting a golden trap in `docassemble/` that
@@ -191,19 +191,40 @@ with _itself_ across two runs. Eight more files exit non-zero on both sides by d
 It is deliberately **not** a test: it is slow, and the clock-dependent files would need exactly the
 known-failure list §3.2 forbids. It is a tool you run by hand.
 
-#### 3.2.2 The one thing `prettyLayout` still cannot render
+#### 3.2.2 Mixfix names, and the head-keyword collision that used to break them
 
-Two mixfix operators that share a **head keyword, an arity and an argument type vector** print to
-the same text, because a call site is resolved to the canonical pattern (`_ tax on _ …`) and the
-printer can only re-emit the head keyword — no definition can be spelled any other way. The witness
-is `ok/mixfix-garden-path.l4`, whose own comment predicted it: `tax on _ item costing _ as GST in _`
-beside `… as VAT in _`. It fails **loudly** ("multiple definitions for the identifier"), and only
-via the unfiltered print — `l4 batch` strips `#EVAL`, which is where both call sites live.
+**Fixed on this line by the backport of legalese/l4-ide#440 (smucclaw/l4-ide#967); this section is kept because the failure mode is instructive and because one case remains.**
 
-Re-emitting the surface form instead (`` `tax on` c `item costing` p ``) was built and measured and
-**does not work**: definitions print from their restructured AppForm (`DECIDE andop a b c IS …`), so
-the printed module has no later keywords to match, and `fixity-nary-guard.l4`'s `1 andop 2 hadop 3`
-stopped resolving. A real fix has to thread `L4.Mixfix.MixfixRegistry` into the printer.
+Two mixfix operators that share a **head keyword** used to print to the same text, because a call site is resolved to the canonical pattern (`_ tax on _ …`) and the printer could only re-emit the head keyword.
+`l4 batch` and the REPL re-print a module and re-run it, so that was a correctness path, not a cosmetic one: `ok/mixfix-garden-path.l4` — whose own comment predicted the limitation — printed to a module that would not resolve, and `jl4/tests-cli/fixtures/batch-mixfix-shared-head.l4` made `l4 batch` report "multiple definitions for the identifier `the will`".
+
+Both now round-trip.
+`L4.Print.restoreMixfixPatterns` stamps each mixfix application and definition with its canonical pattern from the typechecker's `MixfixRegistry`, keyed by `Unique`, and the printer re-emits the full surface form on both sides.
+Run it wherever you print a whole module; `l4 batch`, the REPL and the round-trip harness already do.
+
+**Three things a future reader should not have to rediscover.**
+
+_The pattern really is gone from the AST, not merely suppressed._
+Upstream measured that removing the `mixfixHeadKeyword` reduction from `LayoutPrinter RawName` produces byte-identical output.
+The registry is the only thing that still has it, which is why a pass is needed at all.
+An earlier note here proposed threading `MixfixRegistry` through `LayoutPrinter`; stamping the `Anno` instead avoids touching ~100 instances.
+
+_Both sides must change together._
+Re-emitting the surface form at the CALL SITE alone was built and measured and breaks `fixity-nary-guard.l4`: definitions print from their restructured `AppForm`, so the printed module has no later keywords to match.
+
+_Only mixfixes DEFINED IN THE MODULE get the surface form._
+The infix spelling parses only where the parser can see the definition, because the mixfix hint registry is built from definitions; the `OF` fallback needs no hint.
+Upstream, including imported operators made a module that imports one print text that checked fine in place and failed to re-parse standing alone.
+The residue — two IMPORTED operators sharing a head keyword — is **smucclaw/l4-ide#968**, and it fails LOUDLY ("multiple definitions for the identifier"), unlike the in-module case it replaces.
+
+**The risk check on a file is one line**, and still worth running before trusting printed output from anything this section does not cover:
+
+```
+grep -oE '^`[^`]+`' <file> | sort | uniq -d
+```
+
+**No golden captures `prettyLayout` output**, which is how this survived for as long as it did.
+The guard is therefore a CLI test (`l4 batch` over `tests-cli/fixtures/batch-mixfix-shared-head.l4`) plus the §3.2.1 differential, not a golden.
 
 ---
 
@@ -286,3 +307,99 @@ Nothing mechanical will tell you this rule was skipped.
 > The trap is that the work felt heavily documented, because it was — in `specs/`, which had grown
 > past a hundred files, none of them addressed to a user. Volume of developer-facing writing is
 > what made the user-facing hole invisible.
+
+---
+
+## 7. Retired vocabulary
+
+L4's user-facing text is written for a **non-technical first-time critical thinker**. Most of that
+is judgement. One part of it is not: a few words are ones **we coined and then retired**, and for
+those, any occurrence in user-facing prose is a defect rather than a style preference.
+
+**This section records rulings; it does not make them.** Each row below is a decision already
+taken, written down here so that `etc/check-retired-terms.mjs` has something to cite. The
+citation points outward — the script cites the ruling, and this section merely holds it. A row
+whose only support is this section is not a ruling, it is a preference wearing one.
+
+**The list, with the date each was retired.** It is short on purpose.
+
+| word       | retired    | say instead                                                                         |
+| ---------- | ---------- | ----------------------------------------------------------------------------------- |
+| **binder** | 2026-09-04 | "section `GIVEN`" or "rule `GIVEN`" for the construct; "input" for what it supplies |
+
+Meng ruled it on **2026-09-04**, and his reason is the one worth keeping, because it is about the
+reader rather than about us:
+
+> never "binder" — to lawyers a binder is a ream of paper with ink and holes.
+
+That is why the word fails **this audience** specifically, which is the only kind of argument that
+survives being re-litigated. "Jargon" would not have been.
+
+**The list binds the learning-oriented pages, not every page.** Meng ruled on **2026-09-05**:
+the retired list is _"excluded from the tutorial and cookbook guides, but if they find their way
+into a Diataxis theory reference we could allow that iff we appropriately introduce PLT
+alongside"_ — `binder` being _"a PLT term for variable binding or symbol binding"_ that "will mean
+nothing to a beginner L4 programmer".
+
+| quadrant                                                      | rule                                                                                                                                                         |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `doc/tutorials/`, `doc/courses/`, the cookbook when it exists | **excluded.** Swept by CI.                                                                                                                                   |
+| `doc/reference/`, `doc/concepts/`                             | **permitted iff the page introduces the term** — lay words first, then the technical label as a bold-quoted defined term, the house pattern from 2026-09-04. |
+
+The mechanical test for "introduces" already exists in prose — _used before a bold-quoted
+definition on the same page_ — but **it is not yet enforced**; there is no script for it in the
+tree. Reference and concepts pages are clean of _unintroduced_ uses today only because two
+sweeps happened to clear them. **A green CI run says nothing about a reference page.** Whoever
+builds that check gets to delete this paragraph.
+
+One narrowing worth stating, because the ruling's subject is broader than the list: the entry
+matches `binder` and deliberately **not** `binding`. "Symbol binding" is the phrase the ruling
+describes, but "a binding contract" is ordinary legal English and is everywhere in the corpus.
+Only the coined noun was retired.
+
+**Quoting is not using.** A page that documents an error message has to show it, and a page that
+teaches a construct has to spell it. Fenced blocks, inline code spans and link targets are
+therefore exempt, and `etc/check-retired-terms.mjs` blanks them before it looks. Where prose must
+name a retired word outside those, put `<!-- RETIRED-TERM-OK: reason -->` on the line; the marker
+is honoured only where there was a finding to suppress, and every use is printed so they stay
+countable.
+
+**But quoting couples the page to the wording.** A verbatim screen is only correct while the binary
+still prints it, and nothing mechanical compares the two — `doc/test-docs.sh` checks links and
+type-checks `.l4` files and has no opinion about the text inside a fence. So **whoever changes a
+diagnostic owns every page that quotes it, in the same PR.**
+
+**Adding a word here needs a ruling, not a preference.** Cite the date and the document. The
+distinction that makes this list checkable by plain search is that a retired term is suspect
+_everywhere_, and a merely discouraged one is not. Measured over `doc/`, with the checker's own
+stripping, on `props/discharge` @ `3625b533`: `binder` 9 lines, `parameter` 140 lines across 49
+files. A list that admitted the second word could only ever be advisory; this one can gate CI.
+`discharge` and `assumed term` are current, in-use terms. `read-set`, `elaboration` and
+`section binder` have no retiring ruling to cite, so they are not here.
+
+**Plainer is not always truer, and one diagnostic is kept as evidence of that.**
+`NonDistinctQuantifiers` in `jl4-core/src/L4/TypeCheck.hs` still says "All quantified variables in
+a polymorphic type must have distinct names", sitting between four sibling messages that were
+re-voiced into `constructors` / `fields` / `inputs`. Its subject is the type variables of a
+polymorphic signature rather than a rule's inputs, so "input" there would be _false_, and
+"quantified" and "polymorphic" each carry meaning no shorter word carries. It is deliberately
+untouched, with a `Note [Vocabulary of the NonDistinct messages]` at the site saying so. A future
+sweep that tidies it to match its neighbours would be trading a correct sentence for a consistent
+one. If you have a better sentence, take it; a shorter one is not the same thing.
+
+> **Why.** Note what the incident below is and is not evidence of. The ruling is from 2026-09-04;
+> the incident is from the day after. So this is not a case of a rule being invented after a
+> mistake — it is a case of **an existing ruling not being held, by people who believed they were
+> holding it**. That is a stronger argument for a mechanical check than any new policy would be,
+> because it is the only failure mode a rule cannot fix by being clearer.
+>
+> On 2026-09-05 the word was removed from `doc/reference/syntax/section-given.md` by #336 and put
+> back into that same page **five times within hours** by #338. Nothing caught it, and no
+> `paths:` filter could have: the PR that reintroduced it was not a docs PR.
+>
+> The second half of the incident is the coupling. The same ruling had been enforced on every page
+> a reviewer could reach and **ratified** on the text those pages quote, because quoted tool output
+> is exempt — so the compiler went on saying the retired word, and the pages went on glossing it as
+> "L4's own wording". When the diagnostics were finally re-voiced, four quoted screens and four
+> glosses across four pages became false at once, silently. They were repaired in the same PR that
+> re-voiced the messages. That is the rule above, and it is why it is a rule.

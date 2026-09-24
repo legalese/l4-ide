@@ -117,6 +117,47 @@ Natural language generation hints.
 
 See [annotation-example.l4](annotation-example.l4)
 
+#### Where to put it
+
+An annotation describes the thing it sits with, and there are two places to
+sit:
+
+```l4
+GIVEN amount IS A NUMBER @nlg the claim amount   -- trailing: describes `amount`
+
+GIVETH A BOOLEAN
+@nlg the claim of %amount% is large              -- own line: describes the rule
+DECIDE `is large` IF amount GREATER THAN 100
+```
+
+**Trailing a line, it describes what is on that line. Starting a line of its
+own, it describes what follows.** That is the whole rule, and it holds whether
+the thing is a rule, a parameter, a field or a type declaration.
+
+**An empty `@nlg` is ignored, and says so.** A rendering replaces what it
+annotates, so `@nlg` with nothing after it would erase the name from the
+output rather than leave it alone. L4 drops it and warns instead.
+
+**A record field can carry two.** `head [the first item] IS AN a [an element]`
+glosses the field and its type separately, because each annotation sits with
+the token it follows.
+
+**And a field list is the one exception to "own line describes what
+follows".** Underneath a field, an annotation describes _that_ field — the one
+above it — not the next one:
+
+```l4
+DECLARE Employee
+  HAS `full name`  IS A STRING
+      @nlg the employee's full name     -- describes `full name`
+      `start date` IS A DATE
+```
+
+A field list is a column of things rather than a sequence of declarations, and
+writing the gloss under the field it belongs to is what authors do. The
+exception is confined to field lists: above a `DECIDE`, an annotation on its
+own line still describes the rule below it.
+
 ### @ref
 
 Cross-references to legal sources.

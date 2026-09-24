@@ -20,8 +20,8 @@ File: fixity-no-leak.l4
 
       leakTarget (predefined)
 
-    expects 2 arguments,
-    but you are applying it to 4 arguments here.
+    expects 2 inputs,
+    but here it is given 4 inputs.
 
 File: fixity-no-leak.l4
   Hidden: no

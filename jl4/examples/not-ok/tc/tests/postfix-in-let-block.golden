@@ -8,7 +8,7 @@ File: postfix-in-let-block.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The first argument of function 
+    The first input of function 
 
       `__TIMES__` (predefined)
 
@@ -27,7 +27,7 @@ File: postfix-in-let-block.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    The second argument of function 
+    The second input of function 
 
       `__TIMES__` (predefined)
 
@@ -46,11 +46,11 @@ File: postfix-in-let-block.l4
   Severity: DiagnosticSeverity_Error
   Code: <none>
   Message:
-    You are trying to apply
+    You are giving 1 input to
 
       radius (defined at postfix-in-let-block.l4:11:18-24) of type NUMBER
 
-    (which is not a function) to 1 argument here.
+    but it is not a function, so it takes none.
 
 File: postfix-in-let-block.l4
   Hidden: no

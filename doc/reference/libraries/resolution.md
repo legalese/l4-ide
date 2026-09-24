@@ -8,9 +8,11 @@ store, one shipped inside the VSCode extension. This page explains, in order:
 1. [the resolution order and why each tier exists](#the-resolution-order)
 2. [the dev/prod playbook — what to set in each situation](#the-devprod-playbook)
 3. [how to read the resolver's logs and warnings](#reading-the-resolvers-output)
-4. [the embed-staleness gotcha](#the-embed-staleness-gotcha) (why `cabal build`
+4. [what happens when nothing resolves](#when-nothing-resolves), and which
+   module names are allowed
+5. [the embed-staleness gotcha](#the-embed-staleness-gotcha) (why `cabal build`
    doesn't pick up your prelude edit)
-5. [the shadow saga](#the-shadow-saga-how-we-got-here) — the two incidents that
+6. [the shadow saga](#the-shadow-saga-how-we-got-here) — the two incidents that
    forced this design, preserved so future devs understand _why_ the rules are
    what they are
 
@@ -155,6 +157,63 @@ runs.
    be older than your checkout.
 3. When in doubt, `export JL4_LIBRARY_PATH="$PWD/jl4-core/libraries"` and
    re-run. If behaviour changes, you were not loading the file you thought.
+
+---
+
+## When nothing resolves
+
+An `IMPORT` whose module cannot be found is an **error**, not a warning, and it is reported even when nothing in your file reads anything from that import.
+
+```
+I could not find a module with this name: myhelpers
+Nothing it defines is in scope here; names you expected from it are reported as undefined.
+I have tried the following locations:
+project:/myhelpers.l4,
+/work/proj/myhelpers.l4,
+the stdlib embedded in this binary (22 modules, not among them),
+/home/dev/.local/share/jl4/libraries/myhelpers.l4,
+/opt/l4/bin/../../libraries/myhelpers.l4
+```
+
+The list is every candidate from [the table above](#the-resolution-order), in that same tier order, so a typo shows up as a name you do not recognise and a mis-set store shows up as a path you do not recognise.
+Each location is listed **once**, however many tiers name it — the in-memory tier keys a file by URI and the filesystem tiers key it by path, so for a project whose root is the importing file's own directory (which is what the CLI uses) the same file arrives twice — and it is printed as the plain path, at the rank of the tier that spells it that way.
+The embedded stdlib sits at its own rank too — tier 4 in the table above — rather than at the end, which is where it used to be printed whatever its rank.
+
+The second line of the message is there because this is usually not the first error you see.
+A failed import produces one `I could not find a definition for the identifier` for every name it was supposed to supply, and those read like broken source rather than like a failed import.
+So if you are looking at a screen full of undefined identifiers, read the top of it.
+
+### Which commands fail on it
+
+**`l4 check` and `l4 run` exit non-zero** — and so does the bare `l4 <file>` form, which is `run`.
+Those two are the commands to gate a build or a pipeline on.
+
+**Ten commands print the same error and still exit 0.**
+Measured on this tree, on a module that is otherwise fine and that `l4 export blawx` can lower: `render`, `nlg`, `trace`, `verify`, `openfisca`, `blawx`, `catala`, `docassemble`, and `export --to=dmn` / `export dmn-md`.
+
+**Four do not mention it at all.**
+`l4 format` and `l4 ast` never typecheck.
+`l4 state-graph` does not print it either.
+`l4 batch` reports diagnostics per input row, and this one is not among them — it streams results for a module with an unresolved import and exits 0, which is worth knowing if a pipeline reads its output.
+
+Two commands do exit non-zero here, and it is not because of the import: `l4 state-graph` and `l4 export bpmn` refuse this module identically with the `IMPORT` line deleted.
+
+The reason is that only `check` and `run` weigh the whole set of diagnostics; every other command takes a successful typecheck as its verdict, and an unresolvable `IMPORT` does not stop a module from typechecking — which is the same blindness the repository's own corpus suite had until it was taught to fail on any structural error (`checkFile` in `jl4/tests/Main.hs`), so a corpus fixture can no longer go green with an unresolvable import.
+
+### Module names that are not plain ASCII
+
+A module's basename may contain spaces, non-ASCII letters, or a percent sign.
+Write the name in backticks in the `IMPORT` line, exactly as you would for a hyphen:
+
+```l4
+IMPORT `my helpers`
+IMPORT `hvac-law-he`
+```
+
+This is worth knowing about if you are on an older build, because it used to fail, and fail quietly.
+On a build predating the fix for [smucclaw/l4-ide#971](https://github.com/smucclaw/l4-ide/issues/971), such an import resolved to nothing whenever the entry file was named without a directory component — `l4 check main.l4` rather than `l4 check sub/main.l4` — and no import error was reported at all.
+The symptom was a module full of undefined identifiers, or, when nothing read from the import, no symptom whatsoever.
+The file itself was fine: a module with such a name checks and runs perfectly well on its own, and can import others; it was only as an import _target_ that it was lost.
 
 ---
 

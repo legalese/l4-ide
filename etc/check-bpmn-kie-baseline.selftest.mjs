@@ -58,6 +58,13 @@ FILE  offering.bpmn
 [PHASE 2 execute] ABORTED via error end event [Breach] — a modelled terminal state, not a liveness defect
 
 =========================================================
+FILE  option.bpmn
+=========================================================
+[PHASE 0 adapt] 3 adaptation(s) — see the header for which are flavor axes and which are gaps
+[PHASE 1 compile] errors=0 warnings=0
+[PHASE 2 execute] COMPLETED — reaches an end state on the path explored
+
+=========================================================
 FILE  regcf-advertising.bpmn
 =========================================================
 [PHASE 0 adapt] 3 adaptation(s) — see the header for which are flavor axes and which are gaps

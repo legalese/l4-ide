@@ -209,6 +209,18 @@ So the rule above renders as _"The greater of means the greater of x and y"_ in
 its own definition, and a call `` `the greater of` `start date` `end date` ``
 renders as _"the greater of the start date and the end date"_.
 
+A slot is **tight**: `%amount%`, with no spaces inside the delimiters. That is
+what keeps a written-out percentage from being mistaken for one. In
+
+```l4
+@nlg a 5% levy on %amount%
+```
+
+the `%` after `5` is ordinary text, because `% levy on %` has spaces inside it
+and so is not a slot; `%amount%` still is one. Where a percent sign would end up
+flush against a word — `5%levy` — wrap it in backticks (`` `5%` ``) or spell it
+out ("5 percent"), either of which puts it beyond doubt.
+
 ### It replaces the implementation
 
 A function with an `@nlg` renders **as its sentence**, not as its body. This is

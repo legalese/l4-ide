@@ -122,8 +122,8 @@ Test the rule with specific scenarios.
 There is a catch. The rule in Step 3 takes no parameters—its inputs are `ASSUME`s—and no
 directive can supply a value for an `ASSUME`. `WITH` passes _named arguments to a
 function_, so ``#EVAL `the person must not sell alcohol` WITH ...`` is a type error
-("You are trying to apply ... of type BOOLEAN (which is not a function) to (named)
-arguments"). To test the rule here, give it its inputs as a parameter. As in
+("You are giving named inputs to ... of type BOOLEAN but it is not a function, so it
+takes none"). To test the rule here, give it its inputs as a parameter. As in
 [Your First L4 File](first-l4-file.md), bundle the facts into a record and pass it as one
 `GIVEN`. This is also the house style for the larger encodings in this repository, for the
 same reason: a rule over a `GIVEN` record can be evaluated in full, while one over

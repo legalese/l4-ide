@@ -12,9 +12,10 @@ did not. Predicates are a different matter, and belong to the ladder; see
 | Fixture           | Covers                                                                                                                                       |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `offering.l4`     | Three parties, a four-way `RAND` (concurrent obligations with different bearers), two `SHANT`s, timer boundary events, a breach terminal      |
-| `handover.l4`     | A deadline that is a _name_ (no timer, no invented duration), a `RAND` and a `ROR`, and permissions whose deadlines are drawn as lapse timers |
+| `handover.l4`     | A deadline that is a _name_ (no timer, no invented duration), a `RAND` and a `ROR`, and four permissions whose deadlines are drawn as lapse arms |
 | `consultation.l4` | The only one that draws a converging parallel gateway: a `RAND` of deadline-free permissions, one branch of which is a chain                  |
 | `../legal/regcf/regcf.l4` | The real 992-line Reg CF corpus — **three** rules, so three golden pairs (`regcf-reporting`, `regcf-advertising`, `regcf-resale`): a renewing obligation drawn as a loop, `IF`-headed duties with guarded gateway arms, named deadlines, two prohibitions. Read from `examples/legal/`, not copied here — see below |
+| `option.l4`       | A single `PARTY … MAY` whose `HENCE` is another party's obligation: the one shape in which a permission's lapse and its `HENCE` have different destinations. The witness that the lapse arm ends the rule fulfilled instead of creating the seller's duty; see below |
 
 ## The Reg CF goldens are cut from the corpus itself
 
@@ -76,6 +77,43 @@ Three directories of `.bpmn`, read by `etc/check-bpmn-soundness.selftest.mjs`:
 | `expected/` | exporter goldens, reproducible byte-for-byte by `l4 export` | SOUND       |
 | `sound/`    | hand-written diagrams the gate must **not** flag            | SOUND       |
 | `unsound/`  | hand-written and historical diagrams the gate **must** catch | UNSOUND, on a named property |
+
+## A permission's lapse is its own arm
+
+`option.l4` is an option to purchase. Exercise it and the seller owes a transfer; let it expire and
+nobody owes anything. Those are two destinations, and which one you reach is decided by the
+deadline:
+
+```
+PARTY  theBuyer
+MAY    Exercise (EXACTLY theBuyer)
+WITHIN 30
+HENCE  (PARTY theSeller MUST Transfer (EXACTLY theSeller) (EXACTLY theBuyer) WITHIN 14)
+```
+
+The emitted diagram hangs an interrupting timer on the buyer's task and sends its arm to the
+**Fulfilled** end event, while the task's own outgoing flow goes on to the seller's obligation:
+
+```
+<bpmn:boundaryEvent id="Boundary_0" name="after P30D" attachedToRef="Task_0" cancelActivity="true">
+  <bpmn:documentation>the permission lapses: it is not exercised within 30, so the rule ends fulfilled</bpmn:documentation>
+<bpmn:sequenceFlow id="Flow_Task_0__Task_1"     sourceRef="Task_0"     targetRef="Task_1" />
+<bpmn:sequenceFlow id="Flow_Boundary_0__End_2"  sourceRef="Boundary_0" targetRef="End_2" />
+```
+
+Until 2026-09-17 it drew the timer's arm into `Task_1` instead — the seller's obligation — so the
+file said that a buyer who let the option expire obliged the seller to transfer the shares anyway.
+The cause was upstream: `L4.StateGraph` emitted no `LEST` edge for a single-party `MAY`, so the
+exporter had nothing to follow and synthesised a timer of its own, routed "wherever `HENCE` lands".
+
+It survived every golden in this directory because no other fixture has the shape. A permission
+with no `HENCE`, or with `HENCE FULFILLED`, sends both arms to the same end event — `handover`'s
+four permissions all do — and there the guess is invisible. That is why this file exists: it is
+small, it is the only fixture where the two arms disagree, and it is the one that would go wrong
+again first.
+
+It is also the second file here that jBPM compiles and runs without an objection (the other is
+`consultation`).
 
 ## What can be joined, and why so little of it
 
@@ -166,7 +204,7 @@ npx --yes --package=bpmn-moddle@10 node etc/validate-bpmn.mjs \
 
 It reports parse errors, moddle warnings, unresolved references, boundary events
 without a trigger, and any flow node or sequence flow missing its diagram
-interchange. All six goldens parse with zero warnings.
+interchange. All seven goldens parse with zero warnings.
 
 A third checker answers the question neither of the other two can — **does the
 `businessRuleTask` point at a decision that exists?** Zero install, zero
@@ -206,7 +244,7 @@ It translates the process to a workflow net — places are sequence flows, plus
 one "this activity is running" place per activity carrying a boundary event —
 and explores every reachable marking. Four properties, in van der Aalst's
 vocabulary: **S1** option to complete, **S2** no deadlock, **S3** no dead flow
-node, **S4** safe. All six goldens pass all four — and a fifth, structural check
+node, **S4** safe. All seven goldens pass all four — and a fifth, structural check
 now rides alongside them; see `unsound/mislabelled-gateway-direction.bpmn`.
 
 **S3 is about wiring, not about triggers, and the difference matters.** A node
@@ -258,7 +296,7 @@ including the sound ones — as disconnected. Measured 2026-07-28 with
 | **total**              | **148** | **21** (14 errors, 7 warnings) |
 
 **No golden in the tree carries back-references** — `grep -c '<bpmn:incoming>'`
-returns 0 for all six in `expected/` and for `sound/joined-beside-breach.bpmn`.
+returns 0 for all seven in `expected/` and for `sound/joined-beside-breach.bpmn`.
 So the right-hand column is a *prediction*, measured by injecting the
 back-references into scratch copies, not a state this repo has ever shipped.
 

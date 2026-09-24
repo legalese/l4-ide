@@ -788,26 +788,40 @@ extractDeonton mFromState MkDeonton{..} = do
     Nothing -> do
       -- No LEST specified - use default based on modal
       case action.modal of
-        -- MAY without LEST: the permission lapses to FULFILLED, and for the
-        -- common shape — no HENCE, or HENCE FULFILLED — that is where the HENCE
-        -- edge already goes, so there is no second arrow to draw.
+        -- MAY without LEST: the permission lapses to FULFILLED, and that is a
+        -- real edge, drawn here rather than left for a consumer to synthesise.
         --
-        -- NOTE (not fixed here): when a bare MAY's HENCE points at another
-        -- OBLIGATION the two arms genuinely part company, and this draws only
-        -- one of them. Measured:
+        -- Where HENCE is absent or is FULFILLED the lapse lands on the same
+        -- state the HENCE edge lands on, by a second route and under its own
+        -- caption. Where HENCE points at another OBLIGATION the two arms part
+        -- company, and this is then the only route to FULFILLED there is.
+        -- Measured:
         --
         --   PARTY Alice MAY pay WITHIN 5 HENCE (PARTY Bob MUST deliver WITHIN 10)
         --     (`WAIT UNTIL` 100)          ==> FULFILLED
         --     PARTY Alice DOES pay AT 3   ==> PARTY Bob MUST deliver WITHIN 10
         --
-        -- so expiry reaches FULFILLED (@fromMaybe fulfilExpr lest@) while HENCE
-        -- reaches Bob's obligation, and the graph shows no route to FULFILLED at
-        -- all. L4.Bpmn.Lower inherits the gap and makes it worse, sending its
-        -- synthesised lapse timer "wherever HENCE lands" — which in this shape
-        -- is the wrong place. Fixing it means emitting a real lapse edge here
-        -- and retiring that synthesis, which moves BPMN output for every
-        -- permission; it is a separate change from smucclaw/l4-ide#927.
-        DMay -> pure ()
+        -- so expiry reaches FULFILLED (@fromMaybe fulfilExpr lest@ in
+        -- L4.EvaluateLazy.Machine) while HENCE reaches Bob's obligation. Until
+        -- 2026-09-17 the single-party case drew nothing here, so the graph
+        -- showed no route to FULFILLED at all; L4.Bpmn.Lower inherited the gap
+        -- and made it worse, synthesising a lapse timer that routed "wherever
+        -- HENCE lands", which in this shape is the wrong place. Drawing the edge
+        -- here retires that synthesis (smucclaw\/l4-ide#927 is a different bug
+        -- in the same area).
+        --
+        -- THE DEADLINE DECIDES WHETHER THERE IS AN ARM AT ALL, which is
+        -- 'lestArmWording's rule read back: with no @WITHIN@ there is no expiry
+        -- event, so nothing can take this edge. An explicit @LEST@ with no
+        -- @WITHIN@ is still drawn, captioned 'noTriggerWording', because the
+        -- author wrote one and the graph says why it cannot fire; a synthesised
+        -- arm has no such author, and inventing an unreachable edge where the
+        -- source is silent would be the graph asserting something of its own.
+        DMay
+          | isJust due -> do
+              fulfilledId <- getTerminalState "Fulfilled" TerminalFulfilled
+              addTransition fromState fulfilledId lestLabel LestTransition
+          | otherwise -> pure ()
         -- MUST/SHANT without LEST default to Breach; only the way in differs,
         -- and 'lestArmWording' is where that difference is spelled.
         DMust -> defaultToBreach

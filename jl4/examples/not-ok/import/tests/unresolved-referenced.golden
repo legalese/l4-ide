@@ -1,0 +1,51 @@
+Parsing successful
+Typechecking successful
+Info | [Import Resolution] Resolving import: zz-no-such-module-971 from unresolved-referenced.l4Debug | [Import Resolution] Checking VFS URIs: project:/zz-no-such-module-971.l4, zz-no-such-module-971.l4, zz-no-such-module-971.l4Debug | [Import Resolution] VFS MISS: project:/zz-no-such-module-971.l4Debug | [Import Resolution] VFS MISS: zz-no-such-module-971.l4Debug | [Import Resolution] VFS MISS: zz-no-such-module-971.l4Warning | [Import Resolution] Module not found (JL4_LIBRARY_PATH is set, embedded libs skipped): zz-no-such-module-971Info | [Import Resolution] Resolving import: zz-no-such-module-971 from unresolved-referenced.l4Debug | [Import Resolution] Checking VFS URIs: project:/zz-no-such-module-971.l4, zz-no-such-module-971.l4, zz-no-such-module-971.l4Debug | [Import Resolution] VFS MISS: project:/zz-no-such-module-971.l4Debug | [Import Resolution] VFS MISS: zz-no-such-module-971.l4Debug | [Import Resolution] VFS MISS: zz-no-such-module-971.l4Warning | [Import Resolution] Module not found (JL4_LIBRARY_PATH is set, embedded libs skipped): zz-no-such-module-971Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: unresolved-referenced.l4
+  Hidden: no
+  Range: 17:1-17:31
+  Source: unresolved-referenced.l4
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I could not find a module with this name: zz-no-such-module-971
+    Nothing it defines is in scope here; names you expected from it are reported as undefined.
+    I have tried the following locations:
+    project:/zz-no-such-module-971.l4,
+    $JL4_LIBRARY_PATH/zz-no-such-module-971.l4,
+    $JL4_EXAMPLES/not-ok/import/zz-no-such-module-971.l4,
+    the stdlib embedded in this binary (skipped: JL4_LIBRARY_PATH is set),
+    $XDG_DATA_JL4/libraries/zz-no-such-module-971.l4,
+    $EXE_DIR/../../libraries/zz-no-such-module-971.l4
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: unresolved-referenced.l4
+  Hidden: no
+  Range: 21:37-21:55
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I could not find a definition for the identifier
+
+      `the missing rate`
+
+    which I have inferred to be of type: 
+
+      NUMBER
+
+File: unresolved-referenced.l4
+  Hidden: no
+  Range: 17:1-17:31
+  Source: unresolved-referenced.l4
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    I could not find a module with this name: zz-no-such-module-971
+    Nothing it defines is in scope here; names you expected from it are reported as undefined.
+    I have tried the following locations:
+    project:/zz-no-such-module-971.l4,
+    $JL4_LIBRARY_PATH/zz-no-such-module-971.l4,
+    $JL4_EXAMPLES/not-ok/import/zz-no-such-module-971.l4,
+    the stdlib embedded in this binary (skipped: JL4_LIBRARY_PATH is set),
+    $XDG_DATA_JL4/libraries/zz-no-such-module-971.l4,
+    $EXE_DIR/../../libraries/zz-no-such-module-971.l4

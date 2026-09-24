@@ -2,6 +2,7 @@ module L4.Print where
 
 import Base
 import qualified Base.Map as Map
+import qualified Base.Set as Set
 import qualified Base.Text as Text
 import L4.Evaluate.ValueLazy as Lazy
 import qualified L4.Lexer as Lexer
@@ -197,10 +198,115 @@ class LayoutPrinter a where
 type LayoutPrinterWithName name = (LayoutPrinter name, HasName name)
 
 instance LayoutPrinter Name where
-  printWithLayout n = printWithLayout (rawName n)
+  printWithLayout n = printWithLayout (rawName n) <> inlineNlgOf n
 
 instance LayoutPrinter Resolved where
   printWithLayout r = printWithLayout (getActual r)
+
+-- | Every 'Unique' that names a mixfix function, mapped to its CANONICAL
+-- pattern (@the will _ is duly executed without _@).
+--
+-- Keyed by 'Unique' for the same reason
+-- 'L4.Export.Document.mixfixHeadingsFromRegistry' is: name resolution discards
+-- the pattern from the AST, and the registry is the only thing that still has
+-- it.
+mixfixCanonicalByUnique :: TC.MixfixRegistry -> Map Unique RawName
+mixfixCanonicalByUnique reg = Map.fromList
+  [ (getUnique nm, canonical)
+  | (canonical, ftss) <- Map.toList reg.byCanonicalName
+  , fts <- ftss
+  , nm <- fts.name.names
+  ]
+
+-- | Stamp each mixfix application and definition with its canonical pattern,
+-- so the printer can re-emit the interior keywords.
+--
+-- __Run this before 'prettyLayout' wherever a registry is available.__
+-- Without it the printer can only emit a mixfix name's HEAD keyword, and two
+-- operators sharing a head collapse onto each other: the printed module
+-- parses, type-checks, and then resolves a call to the wrong operator or
+-- fails to terminate (smucclaw\/l4-ide#967). With it, definition and call
+-- site both round-trip their full surface form.
+--
+-- A pass rather than an environment threaded through 'LayoutPrinter': the
+-- class has ~100 instances and none of the others wants a registry.
+restoreMixfixPatterns :: TC.MixfixRegistry -> Module Resolved -> Module Resolved
+restoreMixfixPatterns reg m0 =
+    ( Optics.over (Optics.gplate @(AppForm Resolved)) stampAppForm
+    . Optics.over (Optics.gplate @(Expr Resolved)) deepExpr
+    ) m0
+ where
+  -- ONLY mixfixes DEFINED IN THIS MODULE get the surface form, and that
+  -- restriction is what keeps the printed text self-contained.
+  --
+  -- The surface spelling of an imported mixfix — @x \`is after\` y@ for
+  -- @daydate.l4@'s @_ is after _@ — parses only where the parser can see the
+  -- definition, because the mixfix hint registry is built from definitions.
+  -- The @OF@ fallback needs no hint. Printing the surface form for an
+  -- imported operator therefore makes the output parseable in context and
+  -- NOT parseable on its own, which is a property the round-trip check
+  -- rightly refuses: measured upstream on
+  -- @ok\/closing-the-loop/fristberechnung.l4@ (not in this tree), whose
+  -- printed form checked fine in place and failed to re-parse standing alone.
+  --
+  -- #967's collisions are all within one module, so nothing is lost. A
+  -- cross-module head-keyword collision would still mis-resolve; that needs
+  -- the imports to be in scope for whatever re-reads the output, and is a
+  -- separate question from this one.
+  localUniques =
+    Set.fromList
+      [ getUnique n | MkAppForm _ n _ _ <- Optics.toListOf (Optics.gplate @(AppForm Resolved)) m0 ]
+  -- 'gplate' reaches a module's OUTERMOST expressions only; 'Expr' is
+  -- recursive, so a call nested in a CONSIDER arm or a WHERE needs
+  -- 'transformOf' to reach it. Missing that is not a quiet half-fix: the
+  -- DEFINITION gets its surface form and the nested call site keeps the `OF`
+  -- spelling, the two disagree, and the printed module stops resolving —
+  -- measured upstream on `canon/sg/succession/sg-wills.l4` (not in this tree)
+  -- before this line existed.
+  -- Idiom borrowed from 'L4.Transform.inlineLocalBindings'.
+  deepExpr = Optics.transformOf (Optics.gplate @(Expr Resolved)) stampExprAndForms
+  stampExprAndForms =
+    stampExpr . Optics.over (Optics.gplate @(AppForm Resolved)) stampAppForm
+  canon = mixfixCanonicalByUnique reg
+  look r
+    | Set.member (getUnique r) localUniques = Map.lookup (getUnique r) canon
+    | otherwise = Nothing
+  stampExpr e = case e of
+    App ann n es@(_ : _) | Just c <- look n -> App (Optics.set annMixfixCanonical (Just c) ann) n es
+    _ -> e
+  stampAppForm a = case a of
+    MkAppForm ann n ns@(_ : _) maka | Just c <- look n ->
+      MkAppForm (Optics.set annMixfixCanonical (Just c) ann) n ns maka
+    _ -> a
+
+-- | A canonical pattern split into its keyword runs and its slots.
+--
+-- @the will _ is duly executed without _@ becomes
+-- @[Left "the will", Right (), Left "is duly executed without", Right ()]@.
+mixfixPatternTokens :: Text -> Maybe [Either Text ()]
+mixfixPatternTokens t = chunk <$> mixfixSlots t
+ where
+  chunk ws = case span (/= "_") ws of
+    ([], "_" : rest) -> Right () : chunk rest
+    ([], [])         -> []
+    (kw, rest)       -> Left (Text.unwords kw) : chunk rest
+
+-- | Re-emit a mixfix call or definition in its SURFACE form, interleaving the
+-- pattern's keywords with the already-printed arguments.
+--
+-- 'Nothing' when the pattern's slot count does not match the arguments
+-- given — a partial application, say — in which case the caller falls back to
+-- the @OF@ spelling, which is wrong only in the way it was already wrong.
+mixfixSurface :: RawName -> [Doc ann] -> Maybe (Doc ann)
+mixfixSurface canonical args = do
+  toks <- mixfixPatternTokens (rawNameToText canonical)
+  let slots = length [ () | Right () <- toks ]
+  if slots /= length args then Nothing else Just (hsep (go toks args))
+ where
+  go [] _ = []
+  go (Left kw : ts) as = pretty (quoteIfNeeded kw) : go ts as
+  go (Right () : ts) (a : as) = a : go ts as
+  go (Right () : ts) [] = go ts []
 
 -- | The prefix spelling of a canonical mixfix name, if this is one.
 --
@@ -237,27 +343,30 @@ instance LayoutPrinter Resolved where
 -- reason, and indeed does not type-check today: @`mag` n `stop` MEANS …@ is
 -- read as a one-argument @mag@ applied to two arguments.
 --
--- KNOWN BOUND. Two operators that share a head keyword, an arity and an
--- argument type vector print to the same text and the module then fails to
--- re-check with "There are multiple definitions for the identifier". The corpus
--- witness is @ok/mixfix-garden-path.l4@ — @tax on _ item costing _ as GST in _@
--- beside @tax on _ item costing _ as VAT in _@ — and it only stays green
--- because both call sites live in @#EVAL@ directives, which
--- 'L4.DirectiveFilter.filterIdeDirectives' strips before @l4 batch@ prints. It
--- is a LOUD failure, and it is not a regression: before the head-keyword repair
--- the same file printed @`_ tax on _ item costing _ as VAT in _`@, an
--- identifier defined nowhere.
+-- WHAT THIS IS STILL FOR, now that 'restoreMixfixPatterns' exists. Two
+-- operators that share a head keyword, an arity and an argument type vector
+-- used to print to the same text, and the module then failed to re-check with
+-- "There are multiple definitions for the identifier". That is fixed
+-- (smucclaw\/l4-ide#967): a pass stamps each call site and definition with its
+-- canonical pattern from the 'L4.Mixfix.MixfixRegistry' and the printer emits
+-- the full surface form on both sides. This function is the FALLBACK, taken
+-- for any name the pass did not stamp — an operator imported from another
+-- module, chiefly, where the surface form would not re-parse standing alone
+-- because the importing module has no hint for it.
 --
--- Re-emitting the SURFACE form instead (interleaving the arguments back into
--- the pattern, @`tax on` c `item costing` p `as GST in` k@) was built and
--- MEASURED, and it does not work: a DEFINITION prints from its restructured
--- AppForm, i.e. @DECIDE andop a b c IS …@, so the printed module registers a
--- plain n-ary function and no longer has the later keywords to match against.
--- @ok/fixity-nary-guard.l4@'s @1 andop 2 hadop 3@ went from evaluating to 1006
--- to failing resolution outright. Call sites and definitions have to agree, and
--- the head keyword is the only spelling both can produce. A real fix needs the
--- mixfix registry ('L4.Mixfix.MixfixRegistry', already threaded into
--- 'L4.Export.Document' by 'mixfixHeadingsFromRegistry') to reach the printer.
+-- Two findings from building the fix, kept because each cost a measured
+-- attempt. Re-emitting the surface form at the CALL SITE alone does not work:
+-- a DEFINITION prints from its restructured AppForm, @DECIDE andop a b c IS …@,
+-- so the printed module registers a plain n-ary function with no later
+-- keywords to match, and @ok\/fixity-nary-guard.l4@'s @1 andop 2 hadop 3@ went
+-- from evaluating to 1006 to failing resolution outright. Call sites and
+-- definitions have to agree. And the pattern is genuinely absent from the AST
+-- rather than merely suppressed here: deleting this reduction entirely leaves
+-- the printed corpus byte-identical.
+--
+-- The residue is two IMPORTED operators sharing a head keyword, which this
+-- fallback still collapses — smucclaw\/l4-ide#968. It fails LOUDLY, with the
+-- message above.
 mixfixHeadKeyword :: Text -> Maybe Text
 mixfixHeadKeyword t = case mixfixSlots t of
   Just ws | kws@(_ : _) <- takeWhile (/= "_") (dropWhile (== "_") ws)
@@ -292,7 +401,12 @@ instance LayoutPrinterWithName a => LayoutPrinter (Type' a) where
     -- OF NUMBER, NUMBER` re-parses as a four-argument PAIR. The source keeps
     -- them apart with layout; on one line only brackets will do. (Measured:
     -- `PAIR OF (PAIR OF NUMBER, NUMBER), (PAIR OF NUMBER, NUMBER)` checks.)
-    TyApp _ n ps -> printWithLayout n <> case ps of
+    -- 'bareName', not 'printWithLayout': a TYPE never carries an annotation
+    -- into print. See 'inlineNlgOf' for why that is a narrowing and not an
+    -- inconsistency — a type is printed in evaluation results and diagnostics
+    -- as well as in source, and @#CHECK@ answering
+    -- @BOOLEAN [5% with %amount%]@ is the shape that made the point.
+    TyApp _ n ps -> bareName n <> case ps of
       [] -> mempty
       params@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap parensIfNeeded params))
     -- `FUNCTION FROM … AND … TO …` needs no brackets: its separators are
@@ -349,7 +463,13 @@ displayTypeVarNames =
 goDisplayTy :: Map Int Text -> Type' Resolved -> Doc ann
 goDisplayTy m = \ case
   Type _ -> "TYPE"
-  TyApp _ n ps -> printWithLayout n <> case ps of
+  -- 'bareName' here for the same reason as in the 'Type'' instance, and this
+  -- is the copy that actually reaches the user: a @#CHECK@ reports its
+  -- inferred type through THIS function, and it answered
+  -- @BOOLEAN [5% with %amount%]@ until it did. Being "a mirror of the 'Type''
+  -- layout instance" is what let it be missed — the instance was fixed first
+  -- and the golden did not move.
+  TyApp _ n ps -> bareName n <> case ps of
     [] -> mempty
     params@(_ : _) -> space <> "OF" <+> hsep (punctuate comma (fmap (goDisplayTy m) params))
   Fun _ args ty' ->
@@ -458,6 +578,15 @@ instance LayoutPrinterWithName a => LayoutPrinter (Declare a) where
 
 instance LayoutPrinterWithName a => LayoutPrinter (AppForm a) where
   printWithLayout = \ case
+    -- The DEFINITION has to spell the pattern out too, or the printed module
+    -- has no later keywords for its call sites to match — which is exactly
+    -- how an earlier attempt at this failed (CLAUDE.md §3.2.2).
+    MkAppForm ann _n ns@(_:_) maka
+      | Just c <- Optics.view annMixfixCanonical ann
+      , Just d <- mixfixSurface c (fmap printWithLayout ns) ->
+          d <> case maka of
+            Nothing  -> mempty
+            Just aka -> space <> printWithLayout aka
     MkAppForm _ n ns maka ->
       (printWithLayout n <> case ns of
         [] -> mempty
@@ -660,6 +789,12 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
     -- with a prefix grammar, so that never re-parses.
     App        _ n [e] | Just kw <- prefixKeywordBuiltin (rawName (getName n)) ->
       kw <+> parensIfNeeded e
+    -- A mixfix CALL SITE re-emits its surface form when the pattern is on the
+    -- node ('restoreMixfixPatterns'). Without that stamp only the head
+    -- keyword survives, and two operators sharing one collapse together.
+    App      ann _n es@(_:_)
+      | Just c <- Optics.view annMixfixCanonical ann
+      , Just d <- mixfixSurface c (fmap parensIfNeeded es) -> d
     App        _ n es -> printWithLayout n <> case es of
       [] -> mempty
       exprs@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap parensIfNeeded exprs))
@@ -980,6 +1115,88 @@ instance LayoutPrinter Desc where
   printWithLayout = \ case
     MkDesc _ann n -> pretty n
 
+-- | Re-emit the @\@nlg@ annotation carried by a name, in the bare inline form.
+--
+-- Measured 2026-09-19: an @\@nlg@ annotation attaches to a 'Name' node and to
+-- nothing else. That includes a trailing annotation which reads as though it
+-- sat on an expression — in @ok\/nlg_decide2.l4@ the @\@nlg Expression@ under
+-- @(a PLUS c)@ lands on the USE occurrence of @c@, not on the 'Expr'. So the
+-- name printer is the one hook that recovers all of them, and until it existed
+-- 'prettyLayout' dropped every annotation in the corpus (smucclaw\/l4-ide#966).
+--
+-- __The bracket form, not the @\@nlg@ herald, and that is forced.__ A heralded
+-- line annotation runs to the end of the line, so emitting one for a name in
+-- the middle of @DECIDE foo a b c IS@ would swallow the rest of the line, @IS@
+-- included, and the result would not re-parse. The bracket form is
+-- self-delimiting and therefore composes wherever a name is printed. Checked
+-- against the parser in every position a name occurs: appform head, appform
+-- parameter, GIVEN parameter, a type name, a record field, an enum constructor,
+-- and a use occurrence inside a body.
+--
+-- __Not on a type name, and that exclusion is load-bearing.__ A 'Type'' is
+-- printed in places that are not source — an evaluation result, a diagnostic,
+-- an LSP hover — so an annotation re-emitted there is noise rather than
+-- fidelity. @ok\/nlg-percent.l4@ made the point concretely: its @#CHECK@
+-- answered @BOOLEAN [5% with %amount%]@, because the annotation the author
+-- wrote above the @DECIDE@ had attached to the @GIVETH@ type. Which is the
+-- second reason for the exclusion — measured upstream on 2026-09-19, an
+-- annotation that reaches a type name is essentially always that misplacement
+-- (11 of 116 across ten sampled files; @prelude.l4@ has 0 of 67), so what is suppressed
+-- here is an annotation that renders nowhere anyway.
+inlineNlgOf :: Name -> Doc ann
+inlineNlgOf n = case Optics.view (annoOf Optics.% annNlg) n >>= printInlineNlg of
+  Nothing  -> mempty
+  Just doc -> space <> brackets doc
+
+-- | An annotation rendered for the bracket form, or 'Nothing' where it has no
+-- bracket spelling at all.
+--
+-- Deliberately not 'LayoutPrinter' 'Nlg', which is the hover\/diagnostic
+-- rendering: that one separates a reference fragment from its neighbour with
+-- @\<+\>@, and since whitespace between words is ALREADY its own text
+-- fragment, doing so here would add a space on every round trip — @%b%\'s@
+-- would print as @%b% \'s@, which re-parses into different fragments. A stray
+-- space is cosmetic in a hover and a defect in printed source.
+--
+-- __Two annotations have no bracket spelling, and are left out rather than
+-- corrupted.__ An invalid one has no text to re-emit ('LayoutPrinter' 'Nlg'
+-- prints the placeholder @Invalid Nlg@, which is right in a hover and wrong
+-- here, where it would land in the file as prose). And a LINE annotation that
+-- contains a @]@: a line annotation runs to end of line, so it may hold one
+-- (@\@nlg see note [3] here@), but the bracket form ends at the first @]@ and
+-- this tree has no escape for it, so re-emitting it would leave the rest of
+-- the line as stray source that does not re-parse. Leaving that one
+-- annotation out is what 'prettyLayout' did to every annotation before, so it
+-- narrows this fix rather than regressing anything.
+printInlineNlg :: Nlg -> Maybe (Doc ann)
+printInlineNlg = \ case
+  MkInvalidNlg _        -> Nothing
+  MkParsedNlg _ frags   -> inlineFrags frags
+  MkResolvedNlg _ frags -> inlineFrags frags
+ where
+  inlineFrags :: (LayoutPrinter a, HasName a) => [NlgFragment a] -> Maybe (Doc ann')
+  inlineFrags frags
+    | any closesEarly frags = Nothing
+    | otherwise             = Just (foldMap inlineNlgFragment frags)
+  closesEarly = \ case
+    MkNlgText _ t -> Text.any (== ']') t
+    MkNlgRef{}    -> False
+
+inlineNlgFragment :: (LayoutPrinter a, HasName a) => NlgFragment a -> Doc ann
+inlineNlgFragment = \ case
+  MkNlgText _ t -> pretty t
+  -- Bare on purpose: going through 'LayoutPrinter' 'Name' would recurse into
+  -- this name\'s own annotation if it ever carried one.
+  MkNlgRef  _ n -> "%" <> bareName n <> "%"
+
+-- | A name with nothing attached — no @\@nlg@, just the identifier.
+--
+-- Still goes through 'LayoutPrinter' 'RawName', which is where the mixfix
+-- canonical-name repair lives, so this suppresses the annotation and nothing
+-- else.
+bareName :: (LayoutPrinter a, HasName a) => a -> Doc ann
+bareName = printWithLayout . rawName . getName
+
 instance LayoutPrinterWithName a => LayoutPrinter (NlgFragment a) where
   printWithLayout = \ case
     MkNlgText _ t -> pretty t
@@ -988,6 +1205,12 @@ instance LayoutPrinterWithName a => LayoutPrinter (NlgFragment a) where
 instance (LayoutPrinter a, LayoutPrinter b) => LayoutPrinter (Either a b) where
   printWithLayout = either printWithLayout printWithLayout
 
+-- The name-bearing arms print BARE names. A value is a RESULT, not source:
+-- @#EVAL foo@ answering @foo [the foo]@ would be handing the reader an
+-- authoring annotation where it asked for an answer. Same reason as the
+-- 'Type'' instance above; see 'inlineNlgOf'. (Those fields are 'Resolved'
+-- whatever @a@ is — @a@ is the recursive payload — so this needs no extra
+-- constraint.)
 instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
   printWithLayout = \ case
     Lazy.ValNumber i               -> pretty (prettyRatio i)
@@ -1009,9 +1232,9 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
     Lazy.ValTernaryBuiltinFun{}    -> "<builtin-function>"
     Lazy.ValPartialTernary{}       -> "<partial-function>"
     Lazy.ValPartialTernary2{}      -> "<partial-function>"
-    Lazy.ValAssumed r              -> printWithLayout r
-    Lazy.ValUnappliedConstructor r -> printWithLayout r
-    Lazy.ValConstructor r vs       -> printWithLayout r <> case vs of
+    Lazy.ValAssumed r              -> bareName r
+    Lazy.ValUnappliedConstructor r -> bareName r
+    Lazy.ValConstructor r vs       -> bareName r <> case vs of
       [] -> mempty
       vals@(_:_) -> space <> "OF" <+> hsep (punctuate comma (fmap parensIfNeeded vals))
     Lazy.ValEnvironment _env       -> "<environment>"
@@ -1038,7 +1261,7 @@ instance LayoutPrinter a => LayoutPrinter (Lazy.Value a) where
     Lazy.ValClosure{}              -> printWithLayout v
     Lazy.ValUnappliedConstructor{} -> printWithLayout v
     Lazy.ValAssumed{}              -> printWithLayout v
-    Lazy.ValConstructor r []       -> printWithLayout r
+    Lazy.ValConstructor r []       -> bareName r
     _ -> surround (printWithLayout v) "(" ")"
 
 -- | Pretty-print an 'NF' value, using named fields (WITH / IS syntax) for

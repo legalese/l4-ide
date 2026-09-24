@@ -18,7 +18,15 @@ digraph {
       ,style=filled
       ,shape=doublecircle
       ,fillcolor="#f8d7da"];
+    2 [label=Fulfilled
+      ,fillcolor=white
+      ,style=filled
+      ,shape=doublecircle
+      ,fillcolor="#d4edda"];
     0 -> 1 [label="Alice MAY smoke [30]"
            ,color="#28a745"
            ,style=solid];
+    0 -> 2 [label=lapses
+           ,color="#dc3545"
+           ,style=dashed];
 }

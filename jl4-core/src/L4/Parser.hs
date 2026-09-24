@@ -201,13 +201,19 @@ nlgAnnotationP = do
 nameRefP :: Parser (NlgFragment Name)
 nameRefP = do
   (open, n, close) <- P.between
-    (hidden $ spacedSymbol_ $ TPercent)
+    -- The delimiters are tight: a reference is @%name%@ with no whitespace inside.
+    -- Annotation prose contains literal percent signs ("a 5% levy on %amount%"),
+    -- and a spaced opening delimiter would let one of those pair with the opening
+    -- delimiter of the next real reference, capturing the word between them as an
+    -- identifier -- silently, when that word happens to be in scope, and taking the
+    -- intended reference down to plain text with it. See smucclaw/l4-ide#957.
+    (hidden $ plainToken_ $ TSymbols TPercent)
     -- We don't want to consume trailing whitespace, because we would need to "reproduce"
     -- the whitespace during natural language generation. Otherwise, the text looks scuffed.
     -- Thus, only parse the 'TPercent' here, and let the 'textFragment' parser
     -- take care of any leading whitespace.
     (plainToken_ $ TSymbols TPercent)
-    name
+    tightName
   attachAnno $
     MkNlgRef emptyAnno
       <$  annoLexeme (pure open)
@@ -363,6 +369,39 @@ qualifiedName = do
 
 name :: Parser Name
 name = attachEpa (try qualifiedName <|> quotedName <|> simpleName) <?> "identifier"
+
+-- | Like 'spacedToken', but does not consume trailing whitespace.
+--
+-- For syntax where adjacency is meaningful rather than incidental -- see 'tightName'.
+tightToken :: Is k An_AffineFold => Optic' k is TokenType a -> String -> Parser (Epa a)
+tightToken cond lbl =
+  lexToEpa' . mkLexeme [] <$>
+    token
+      (\ t -> (t,) <$> preview cond (computedPayload t))
+      Set.empty
+    <?> lbl
+
+tightQuotedName :: Parser (Epa Name)
+tightQuotedName =
+  (MkName emptyAnno . NormalName) <<$>> tightToken (#_TIdentifiers % #_TQuoted) "quoted identifier"
+
+tightSimpleName :: Parser (Epa Name)
+tightSimpleName =
+  (MkName emptyAnno . NormalName) <<$>> tightToken (#_TIdentifiers % #_TIdentifier) "identifier"
+
+-- | 'name', but without consuming the whitespace that follows it.
+--
+-- Only 'nameRefP' wants this: an nlg reference is delimited on both sides by @%@,
+-- and if the name swallowed the space before the closing delimiter then @% word %@
+-- would parse as a reference, which is how a literal percent sign in prose captures
+-- the following word. See smucclaw/l4-ide#957.
+--
+-- There is deliberately no qualified-name alternative here. 'nlgTokenPayload' lexes
+-- no symbols, so an annotation never contains a @.@ token and @qualifiedName@ could
+-- not match inside one: @p.a@ arrives as the identifier @p@ followed by the text
+-- @.a@, which the closing delimiter then fails against.
+tightName :: Parser Name
+tightName = attachEpa (tightQuotedName <|> tightSimpleName) <?> "identifier"
 
 tokenAsName :: TokenType -> Parser Name
 tokenAsName tt =
