@@ -152,6 +152,13 @@ test-suite l4-cli-test
   hs-source-dirs: tests-cli
   main-is: Main.hs
   other-modules:
+    CliTest.Blawx
+    CliTest.Catala
+    CliTest.Common
+    CliTest.DmnBpmn
+    CliTest.Docassemble
+    CliTest.OpenFisca
+    CliTest.Yscript
     Paths_jl4
   autogen-modules:
     Paths_jl4
