@@ -4622,6 +4622,11 @@ dmnFlavorReader = eitherReader \input ->
 `--flavor` is legal on `--to=dmn` **only**, and `checkTargetFlags` rejects it on both other
 targets.
 
+> **Updated 2026-09-24.** Each target is now its own subcommand (`CLI-SURFACE-SPEC.md` C1, C4):
+> `--flavor` exists on `l4 export dmn` and nowhere else, so `checkTargetFlags` is gone and the
+> refusal is the parser's own `Invalid option`. The reasoning below is unchanged, and it now lives on
+> the parsers' Haddock in `L4.Cli.Export`.
+
 > **Corrected 2026-07-27 under review.** This paragraph used to admit `--flavor` on `--to=dmn-md`
 > as well, reasoning that "the flavor lives in the `Drg`, which both emitters read". Review checked
 > the markdown side and it reads it **nowhere**: `emitMarkdown` mentions no field of `drgFlavor`,

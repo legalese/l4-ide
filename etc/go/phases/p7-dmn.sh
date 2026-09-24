@@ -85,7 +85,7 @@ GOLDEN="${GO_S_DMN_GOLDEN:-}"
 # ACQUIRED a golden would ride the arm below untouched. Two further things would
 # have to move first — subject.mjs's ALT_LEG_KEYS/ALT_LEG_ENV, which today
 # REFUSE a `golden` key on an additional encoding (etc/go/selftest.mjs asserts
-# exactly that refusal), and the arm's `$L4 export "$GO_S_ENCODING"`, which
+# exactly that refusal), and the arm's `$L4 export dmn "$GO_S_ENCODING"`, which
 # names the committed entry module rather than the selected encoding's. What
 # this test buys today is that the leg no longer decides on a label, and that
 # whichever of those lands, the decision here needs no re-derivation.
@@ -156,7 +156,7 @@ if [[ -z "$GOLDEN" ]]; then
     STEM="$(basename "$m" .l4)"
     OUT="$GO_OUT/$STEM.dmn"
     set +e
-    "$L4" export "$m" --to dmn -o "$OUT" --fidelity-report 2>"$GO_OUT/$STEM.dmn.emit.stderr"
+    "$L4" export dmn "$m" -o "$OUT" --fidelity-report 2>"$GO_OUT/$STEM.dmn.emit.stderr"
     EXPORT_RC=$?
     set -e
     cat "$GO_OUT/$STEM.dmn.emit.stderr"
@@ -176,7 +176,7 @@ if [[ -z "$GOLDEN" ]]; then
         CERT="a deposited module that typechecks (p3-encode certified it this run)"
       fi
       go_receipt --status DEGRADED \
-        --reason "l4 export --to dmn exited $EXPORT_RC on $STEM.l4, $CERT. That is an exporter gap over this encoding's constructs, not a defect in the deposit; see $GO_OUT/$STEM.dmn.emit.stderr. This is the §8.1 exhibit: the de novo encoding cannot yet ride run 1's projection suite." \
+        --reason "l4 export dmn exited $EXPORT_RC on $STEM.l4, $CERT. That is an exporter gap over this encoding's constructs, not a defect in the deposit; see $GO_OUT/$STEM.dmn.emit.stderr. This is the §8.1 exhibit: the de novo encoding cannot yet ride run 1's projection suite." \
         --artifact "$GO_OUT/$STEM.dmn.emit.stderr" \
         --metric "encoding_id=${GO_S_ENCODING_ID:-primary}" --metric "export_exit=$EXPORT_RC"
       exit "$GO_EXIT_FINDING"
@@ -294,10 +294,10 @@ DIFFLOG="$GO_OUT/p7-dmn.canon-diff.txt"
 
 # --- 1. regenerate -----------------------------------------------------------
 set +e
-"$L4" export "$GO_S_ENCODING" --to dmn -o "$OUT" --fidelity-report 2>"$GO_OUT/p7-dmn.fidelity.stderr"
+"$L4" export dmn "$GO_S_ENCODING" -o "$OUT" --fidelity-report 2>"$GO_OUT/p7-dmn.fidelity.stderr"
 EXPORT_RC=$?
 set -e
-[[ $EXPORT_RC -eq 0 ]] || go_broken "l4 export --to dmn exited $EXPORT_RC on a module that typechecks"
+[[ $EXPORT_RC -eq 0 ]] || go_broken "l4 export dmn exited $EXPORT_RC on a module that typechecks"
 cat "$GO_OUT/p7-dmn.fidelity.stderr"
 
 # `--fidelity-report` with `-o out.dmn` writes a sibling out.fidelity.txt.
