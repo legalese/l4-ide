@@ -36,6 +36,7 @@ import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
 import L4.Cli.Export (ExportOptions, exportBpmnOptionsParser, exportCmd, exportDmnMarkdownOptionsParser, exportDmnOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
 import L4.Cli.Nlg (NlgOptions, nlgCmd, nlgOptionsParser)
+import L4.Cli.OpenFisca (OpenFiscaOptions, openFiscaCmd, openFiscaOptionsParser)
 import L4.Cli.Render (RenderOptions, renderCmd, renderOptionsParser)
 import L4.Cli.Run (RunOptions, runCmd, runOptionsParser)
 import L4.Cli.StateGraph (StateGraphOptions, stateGraphCmd, stateGraphOptionsParser)
@@ -56,6 +57,7 @@ data Command
   | CmdStateGraph StateGraphOptions
   | CmdRender     RenderOptions
   | CmdExport     ExportOptions
+  | CmdOpenFisca  OpenFiscaOptions
   | CmdNlg        NlgOptions
   | CmdVerify     VerifyOptions
 
@@ -131,6 +133,9 @@ commandParser =
         <> command "bpmn"
              (info (helper <*> (CmdExport <$> exportBpmnOptionsParser))
                (progDesc "BPMN 2.0 XML process for one regulative rule, with a fidelity report"))
+        <> command "openfisca"
+             (info (helper <*> (CmdOpenFisca <$> openFiscaOptionsParser))
+               (progDesc "A runnable OpenFisca Python module of the decision-rule subset"))
         )
 
 -- | A footer that keeps the line breaks it was written with.
@@ -185,6 +190,7 @@ main = do
     CmdStateGraph opts -> stateGraphCmd opts
     CmdRender     opts -> renderCmd     opts
     CmdExport     opts -> exportCmd     opts
+    CmdOpenFisca  opts -> openFiscaCmd  opts
     CmdNlg        opts -> nlgCmd        opts
     CmdVerify     opts -> verifyCmd     opts
 
