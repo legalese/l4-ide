@@ -1,0 +1,107 @@
+{
+  "description": "Assess whether a tenant can be evicted for rent arrears under the Housing Act 1988 (Grounds 8, 10 and 11), distinguishing the mandatory ground (the court must order possession) from the discretionary grounds (the court may).",
+  "isDeontic": false,
+  "name": "assess possession for rent arrears",
+  "parameters": {
+    "properties": {
+      "situation": {
+        "description": "The tenant's rent and payment situation",
+        "properties": {
+          "arrears expected at the hearing": {
+            "description": " `By the date of the court hearing, how much unpaid rent will there be (in pounds)?`",
+            "type": "number",
+            "x-sanitized-name": "arrears-expected-at-the-hearing"
+          },
+          "arrears when the notice was served": {
+            "description": " `When your landlord served the formal Section 8 notice, how much unpaid rent had built up (in pounds)?`",
+            "type": "number",
+            "x-sanitized-name": "arrears-when-the-notice-was-served"
+          },
+          "has persistently paid rent late": {
+            "description": " `Have you frequently paid your rent late — even if you are now up to date?`",
+            "type": "boolean",
+            "x-sanitized-name": "has-persistently-paid-rent-late"
+          },
+          "how often rent is due": {
+            "description": " `How often is your rent due?`",
+            "enum": ["weekly or fortnightly", "monthly", "other"],
+            "type": "string",
+            "x-l4-type": "RentPeriod",
+            "x-sanitized-name": "how-often-rent-is-due"
+          },
+          "rent amount each time": {
+            "description": " `How much rent do you pay each time it is due (in pounds)?`",
+            "type": "number",
+            "x-sanitized-name": "rent-amount-each-time"
+          }
+        },
+        "propertyOrder": [
+          "how often rent is due",
+          "rent amount each time",
+          "arrears when the notice was served",
+          "arrears expected at the hearing",
+          "has persistently paid rent late"
+        ],
+        "required": [
+          "how often rent is due",
+          "rent amount each time",
+          "arrears when the notice was served",
+          "arrears expected at the hearing",
+          "has persistently paid rent late"
+        ],
+        "type": "object",
+        "x-l4-type": "Situation"
+      }
+    },
+    "required": ["situation"],
+    "type": "object"
+  },
+  "returnSchema": {
+    "properties": {
+      "grounds made out": {
+        "description": " `Which rent-arrears grounds are made out`",
+        "items": { "type": "string" },
+        "type": "array",
+        "x-sanitized-name": "grounds-made-out"
+      },
+      "it is mandatory": {
+        "description": " `Is a Part I (mandatory) ground made out, so the court MUST order possession?`",
+        "type": "boolean",
+        "x-sanitized-name": "it-is-mandatory"
+      },
+      "possession can be ordered": {
+        "description": " `Is at least one rent-arrears ground for possession made out?`",
+        "type": "boolean",
+        "x-sanitized-name": "possession-can-be-ordered"
+      },
+      "reasons": {
+        "description": " `Why, in plain English, with statutory citations`",
+        "items": { "type": "string" },
+        "type": "array"
+      },
+      "what this means": {
+        "description": " `A one-line summary for the tenant`",
+        "type": "string",
+        "x-sanitized-name": "what-this-means"
+      }
+    },
+    "propertyOrder": [
+      "possession can be ordered",
+      "it is mandatory",
+      "grounds made out",
+      "reasons",
+      "what this means"
+    ],
+    "required": [
+      "possession can be ordered",
+      "it is mandatory",
+      "grounds made out",
+      "reasons",
+      "what this means"
+    ],
+    "type": "object",
+    "x-l4-type": "PossessionAssessment"
+  },
+  "returnType": "PossessionAssessment",
+  "section": null
+}
