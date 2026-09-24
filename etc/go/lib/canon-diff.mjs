@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Canonicalise-then-diff: the differential oracle for the export legs.
 //
-// A bare byte-diff of `l4 export … --to dmn` against the committed golden is
+// A bare byte-diff of `l4 export dmn …` against the committed golden is
 // RED on day one, and the reason is a defect in the GOLDEN RUNNER, not in the
 // exporter. Every canonicalisation below therefore carries a `because` naming
 // the file:line that causes it and a `delete_when` naming the condition under
@@ -18,7 +18,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 /**
  * MEASURED 2026-08-02 on this worktree (HEAD 162e5070):
- *   l4 export jl4/examples/legal/regcf/regcf.l4 --to dmn -o /tmp/x.dmn
+ *   l4 export dmn jl4/examples/legal/regcf/regcf.l4 -o /tmp/x.dmn
  *   diff /tmp/x.dmn jl4/examples/dmn/expected/regcf-corpus.dmn | wc -l   →  92
  * That is 92 lines of diff OUTPUT over 23 differing lines: `NNcNN`, `<`, `---`
  * and `>` per changed line, 23 × 4. Do not "correct" the 92 — the `wc -l`

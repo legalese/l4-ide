@@ -41,7 +41,7 @@ high-fidelity — and unusually useful as a cross-check.
 ## The command
 
 ```
-l4 catala FILE
+l4 export catala FILE
 ```
 
 Compiles the constitutive subset of `FILE` to a literate Catala module, printed to standard output.
@@ -53,7 +53,7 @@ Compiles the constitutive subset of `FILE` to a literate Catala module, printed 
 
 One sharp edge worth knowing before it bites: Catala takes a module's name from the **output
 file's** basename, capitalised — not CamelCased. A file named `flat-tax.catala_en` therefore
-cannot host any module at all, so `l4 catala --output` rejects a basename that could not be a legal
+cannot host any module at all, so `l4 export catala --output` rejects a basename that could not be a legal
 Catala module name rather than writing a file the toolchain would refuse.
 
 ## What it consumes

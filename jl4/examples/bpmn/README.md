@@ -23,7 +23,7 @@ The three `regcf-*` golden pairs are exported from
 Part 227 — not from a fixture beside it:
 
 ```
-$ l4 export jl4/examples/legal/regcf/regcf.l4 --to bpmn \
+$ l4 export bpmn jl4/examples/legal/regcf/regcf.l4 \
      --rule "ongoing reporting obligation" --fidelity-report
 ```
 
@@ -114,12 +114,12 @@ byte-for-byte through `l4 export`, from a repo checkout with `jl4/` as the worki
 directory:
 
 ```sh
-l4 export --to=bpmn offering.l4 -o /tmp/offering.bpmn --fidelity-report
+l4 export bpmn offering.l4 -o /tmp/offering.bpmn --fidelity-report
 diff /tmp/offering.bpmn          expected/offering.bpmn
 diff /tmp/offering.fidelity.txt  expected/offering.fidelity.txt
 
 # the Reg CF trio, from the corpus in examples/legal/ rather than from here
-l4 export ../legal/regcf/regcf.l4 --to bpmn --rule "ongoing reporting obligation" \
+l4 export bpmn ../legal/regcf/regcf.l4 --rule "ongoing reporting obligation" \
    -o /tmp/regcf-reporting.bpmn --fidelity-report
 diff /tmp/regcf-reporting.bpmn         expected/regcf-reporting.bpmn
 diff /tmp/regcf-reporting.fidelity.txt expected/regcf-reporting.fidelity.txt
