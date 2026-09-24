@@ -43,21 +43,25 @@ This is the export for handing your rules to an organisation rather than an indi
 ## The command
 
 ```
-l4 export --to dmn FILE
-l4 export --to bpmn FILE
+l4 export dmn FILE
+l4 export dmn-md FILE
+l4 export bpmn FILE
 ```
 
-| Flag                     | Effect                                                                                 |
-| ------------------------ | -------------------------------------------------------------------------------------- |
-| `--to NOTATION`          | `dmn` (DMN 1.3 XML) · `dmn-md` (dmnmd markdown) · `bpmn` (BPMN 2.0 XML)                |
-| `--output FILE`          | write the document to `FILE` instead of stdout                                         |
-| `--fidelity-report`      | also emit the full fidelity report; a one-line tally prints either way                 |
-| `--fail-on SEVERITY`     | exit non-zero at `blocking`, `lossy` or `advisory`; default `none`                     |
-| `--model-name NAME`      | DMN only: the `<definitions>` name and namespace seed                                  |
-| `--flavor ENGINE`        | DMN only: `camunda` (default) or `kie`                                                 |
-| `--include-tests`        | DMN only: also emit decisions that are test scaffolding — off by default               |
-| `--rule NAME`            | BPMN only: which regulative rule to export, required when the file holds more than one |
-| `--deadline-unit POLICY` | BPMN only: how to read a unitless `WITHIN` — `days` (default) or `refuse`              |
+Each notation is its own subcommand: `dmn` writes DMN 1.3 XML, `dmn-md` dmnmd markdown, and
+`bpmn` BPMN 2.0 XML. Each one accepts only the flags it reads, and `l4 export dmn --help` lists
+them.
+
+| Flag                     | Effect                                                                                   |
+| ------------------------ | ---------------------------------------------------------------------------------------- |
+| `--output FILE`          | write the document to `FILE` instead of stdout                                           |
+| `--fidelity-report`      | also emit the full fidelity report; a one-line tally prints either way                   |
+| `--fail-on SEVERITY`     | exit non-zero at `blocking`, `lossy` or `advisory`; default `none`                       |
+| `--model-name NAME`      | `dmn`, `dmn-md`: the `<definitions>` name and namespace seed                             |
+| `--flavor ENGINE`        | `dmn` only: `camunda` (default) or `kie`                                                 |
+| `--include-tests`        | `dmn`, `dmn-md`: also emit decisions that are test scaffolding — off by default          |
+| `--rule NAME`            | `bpmn` only: which regulative rule to export, required when the file holds more than one |
+| `--deadline-unit POLICY` | `bpmn` only: how to read a unitless `WITHIN` — `days` (default) or `refuse`              |
 
 `--flavor` exists because the two major engines disagree on exactly one point: whether a
 `<decisionService>` may be the target of a `<knowledgeRequirement>`. Camunda 8 rejects the entire

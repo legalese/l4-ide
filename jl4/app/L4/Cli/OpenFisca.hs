@@ -1,4 +1,4 @@
--- | @l4 openfisca FILE@ — compile the decision-rule subset of an L4 file to a
+-- | @l4 export openfisca FILE@ — compile the decision-rule subset of an L4 file to a
 -- runnable OpenFisca Python module.
 --
 -- Selection, lowering and emission live in @jl4-core@ ('L4.OpenFisca.Lower' /
@@ -62,7 +62,7 @@ openFiscaCmd opts = do
       case lowerModule tc.module' of
         Left lerrs -> do
           putDiagnostics
-            ( "l4 openfisca: cannot compile these decisions to OpenFisca:"
+            ( "l4 export openfisca: cannot compile these decisions to OpenFisca:"
             : map (("  - " <>) . renderLowerError) lerrs
             )
           exitFailure
