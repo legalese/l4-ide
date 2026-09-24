@@ -1,4 +1,4 @@
--- | Target intermediate representation for the @l4 yscript@ backend.
+-- | Target intermediate representation for the @l4 export yscript@ backend.
 --
 -- yscript's own executable fragment is pure propositional logic (see
 -- @specs\/research\/DATALEX-YSCRIPT-RESEARCH.md@ §B\/§D and

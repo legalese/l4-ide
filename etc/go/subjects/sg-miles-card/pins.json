@@ -23,7 +23,7 @@
   "measured_on": "2026-09-21",
   "measured_against": "jl4/examples/legal/miles-card/miles-card.l4",
   "enums": {
-    "export_to": ["dmn", "dmn-md", "bpmn"],
+    "export_formats": ["dmn", "dmn-md", "bpmn"],
     "export_flavor": ["camunda", "kie"],
     "export_fail_on": ["none", "blocking", "lossy", "advisory"],
     "render_format": ["json", "plan", "text", "html", "akn"]

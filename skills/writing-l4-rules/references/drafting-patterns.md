@@ -254,7 +254,7 @@ expression language is FEEL, and retiring them silently would lose the measureme
 > `unstable`, that there was no `jl4-core/src/L4/Dmn/`, and that the behaviour below could not be
 > verified in situ. **That line has since merged and all three claims are now false**: the directory
 > holds `Analysis.hs`, `Emit.hs`, `IR.hs`, `Lower.hs` and `Markdown.hs`, and the exporter is reached
-> as `l4 export --to dmn|dmn-md|bpmn` (there is no bare `dmn` subcommand, which is what the old
+> as `l4 export dmn|dmn-md|bpmn` (there is no bare `dmn` subcommand, which is what the old
 > wording was probably reaching for). So this **is** checkable against the `l4-ide` tree now — note
 > that if you are reading this from the packaged plugin bundle rather than the monorepo, the
 > exporter's source is not beside you and you will need the `l4-ide` checkout. Note also that the two

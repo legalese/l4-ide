@@ -23,7 +23,7 @@
 # declaring it as an input, and `p7-dmn` separately establishes that the emitted
 # DMN is that golden byte for byte, or reports that it is not.
 #
-# The rule names are DISCOVERED, not transcribed: `l4 export FILE --to bpmn`
+# The rule names are DISCOVERED, not transcribed: `l4 export bpmn FILE`
 # with no --rule exits 1 and enumerates them. The rule -> output-filename map
 # is a REPO convention, not a CLI fact, so it is written down — in the subject
 # sidecar (subject.json, legs['p7-bpmn'].rules), read here via the resolver —
@@ -79,10 +79,10 @@ for rule in "${RULES[@]}"; do
   stem="${RULE_FILE[$rule]}"
   out="$GO_OUT/$stem.bpmn"
   set +e
-  "$L4" export "$GO_S_ENCODING" --to bpmn --rule "$rule" -o "$out" --fidelity-report >>"$LOG" 2>&1
+  "$L4" export bpmn "$GO_S_ENCODING" --rule "$rule" -o "$out" --fidelity-report >>"$LOG" 2>&1
   rc=$?
   set -e
-  [[ $rc -eq 0 ]] || go_broken "l4 export --to bpmn --rule '$rule' exited $rc"
+  [[ $rc -eq 0 ]] || go_broken "l4 export bpmn --rule '$rule' exited $rc"
   FILES+=("$out")
 
   # --- 2. differential oracle against the committed golden ------------------
@@ -215,7 +215,7 @@ fi
 # checker is green. PROCESS-TRACK.md §8's bar is acceptance + soundness + DMN
 # wiring; engine execution of the process is a declared non-goal (R0).
 go_receipt --status PASS \
-  --oracle-cmd "l4 export --to bpmn, one per discovered rule, then cmp against each committed golden; check-bpmn-soundness.mjs; bpmn-moddle validate-bpmn.mjs; check-bpmn-dmn-refs.mjs against the committed DMN" \
+  --oracle-cmd "l4 export bpmn, one per discovered rule, then cmp against each committed golden; check-bpmn-soundness.mjs; bpmn-moddle validate-bpmn.mjs; check-bpmn-dmn-refs.mjs against the committed DMN" \
   --oracle-exit 0 \
   --oracle-class differential \
   --oracle-because "all ${#FILES[@]} emitted processes reproduce their committed goldens byte for byte, pass soundness (S1 option-to-complete, S2 deadlock-free, S3 no dead node, S4 1-bounded), pass the bpmn-moddle interchange gate, and $WIRE_SAYS. Because the output IS the committed goldens, CI's jBPM baseline verdict over those goldens applies to it" \

@@ -8,9 +8,9 @@ that Blawx compiles to, because s(CASP) is where Blawx's most distinctive
 capabilities (justification trees, hypothetical reasoning, "why not?"
 queries) actually come from.
 
-L4 ships a two-way bridge to Blawx: `l4 blawx` compiles the decision-rule
+L4 ships a two-way bridge to Blawx: `l4 export blawx` compiles the decision-rule
 subset of an L4 module into an importable Blawx project, and
-`l4 blawx --import` lifts a Blawx project back into L4. This page is the
+`l4 import blawx` lifts a Blawx project back into L4. This page is the
 _explanation_ half of that story — what Blawx is and how its logic works.
 The _how-to_ half, with the full export/import pipeline and a capstone
 example, is the tutorial
@@ -184,7 +184,7 @@ asserting a fourth sign, and a draw is the _absence of an answer_. In the
 other direction, Blawx's open, relational world is exactly what lets it
 answer questions L4's evaluator does not ask, as the next section shows.
 (This typed, functional spelling is also deliberately _outside_ the L4→Blawx
-bridge's export fragment — `l4 blawx doc/concepts/neighbours/rps.l4` refuses
+bridge's export fragment — `l4 export blawx doc/concepts/neighbours/rps.l4` refuses
 with `no @export-annotated DECIDE found to lower` rather than guessing. The
 [tutorial](../../tutorials/blawx/l4-to-blawx.md) shows the input-record
 idiom the bridge does export.)
@@ -333,7 +333,7 @@ Two things are worth noticing from the L4 side:
   `holds`, `blawx_defeated`, and `blawx_applies` are ordinary predicates in
   the emitted s(CASP), which is why justification trees can narrate defeat
   ("…would defeat it, but section 4 defeats section 3") and why
-  `l4 blawx --import` can lift the whole arrangement into explicit L4
+  `l4 import blawx` can lift the whole arrangement into explicit L4
   decisions — one per (section, conclusion) pair. The defeat _relation_
   survives that lift as ordinary boolean logic; the priority _structure_
   survives as `@ref` provenance comments rather than as structure, because
@@ -350,7 +350,7 @@ isomorphically, cite sections in explanations, treat tests as part of the
 encoding. It is the most accessible live demonstration of s(CASP)'s
 justification trees, duals, and abducibles, which are capabilities worth
 knowing exist even when your daily tool reaches explanation differently.
-And since `l4 blawx` ships, it is a _deployment target_: an L4 module can
+And since `l4 export blawx` ships, it is a _deployment target_: an L4 module can
 become a Blawx project whose interviews, hypotheticals, and English
 explanations run against rules that L4's own evaluator has already tested
 — the same two-engine discipline the bridge itself is validated by.

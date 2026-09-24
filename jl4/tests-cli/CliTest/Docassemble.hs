@@ -1,7 +1,7 @@
--- | Black-box tests for @l4 docassemble@ (the bare interview, @--package@,
--- citations and the glossary, the M2 repairs, and M4 breadth), with the
--- fixtures and helpers only they use. Split out of @Main.hs@ so a release
--- can be sliced per backend.
+-- | Black-box tests for @l4 export docassemble@ (the bare interview,
+-- @--package@, citations and the glossary, the M2 repairs, and M4 breadth),
+-- with the fixtures and helpers only they use. Split out of @Main.hs@ so a
+-- release can be sliced per backend.
 module CliTest.Docassemble (spec, fixtures) where
 
 import Control.Monad (unless, when)
@@ -26,12 +26,12 @@ import qualified L4.Docassemble.Emit as DAEmit
 import CliTest.Common
 
 ----------------------------------------------------------------------------
--- `l4 docassemble` (M2): the package tree, citations and the glossary
+-- `l4 export docassemble` (M2): the package tree, citations and the glossary
 --
 -- Everything in this section pins DOCASSEMBLE-EXPORT-SPEC.md §10 (M2) and the
 -- two rulings it leans on, R11 (§8.11, artifact shape) and R9 (§8.9, emission
 -- hygiene). The M1 surface — six byte-golden examples plus the not-ok/
--- refusals — is pinned separately, in `describe "l4 docassemble"`, and must
+-- refusals — is pinned separately, in `describe "l4 export docassemble"`, and must
 -- stay green through M2: packaging is an ADDITIONAL artifact shape, not a
 -- change to the bare one.
 ----------------------------------------------------------------------------
@@ -111,12 +111,12 @@ daM4Refused =
 -- verbatim stderr is what makes a REGRESSION legible rather than merely red.
 daEmit :: FilePath -> FilePath -> IO String
 daEmit bin src = do
-  Output code sout serr <- runL4 bin ["docassemble", src]
+  Output code sout serr <- runL4 bin ["export", "docassemble", src]
   case code of
     ExitSuccess   -> pure sout
     ExitFailure n -> do
       expectationFailure $
-        "`l4 docassemble " ++ src ++ "` exited " ++ show n
+        "`l4 export docassemble " ++ src ++ "` exited " ++ show n
         ++ ": the M4 construct this example exists for is still refused."
         ++ "\n--- stderr ---\n" ++ serr
       pure ""
@@ -199,7 +199,7 @@ emptyTreeDirs root = sort <$> go ""
     isDir <- doesDirectoryExist (root </> r)
     if isDir then go r else pure []
 
--- | Run @l4 docassemble FILE --package DIR@ into a FRESH directory and return
+-- | Run @l4 export docassemble FILE --package DIR@ into a FRESH directory and return
 -- the written tree's sorted file list.
 --
 -- The failure message names the milestone deliberately: until M2 lands the
@@ -208,10 +208,10 @@ emptyTreeDirs root = sort <$> go ""
 expectPackage :: FilePath -> FilePath -> FilePath -> IO [FilePath]
 expectPackage bin src outDir = do
   removePathForcibly outDir
-  Output code sout serr <- runL4 bin ["docassemble", src, "--package", outDir]
+  Output code sout serr <- runL4 bin ["export", "docassemble", src, "--package", outDir]
   unless (code == ExitSuccess) $
     expectationFailure $
-      "`l4 docassemble " ++ src ++ " --package " ++ outDir ++ "` did not succeed: exited "
+      "`l4 export docassemble " ++ src ++ " --package " ++ outDir ++ "` did not succeed: exited "
       ++ show code
       ++ "\n(M2/R11: --package DIR must write an installable PEP 420 package tree)"
       ++ "\n--- stdout ---\n" ++ sout
@@ -263,39 +263,39 @@ fixtures =
 
 spec :: FilePath -> Spec
 spec bin = do
-  describe "l4 docassemble" $ do
+  describe "l4 export docassemble" $ do
     it "compiles the WHERE-heavy rodents example to its golden interview (R3 survival)" $
-      expectGolden bin ["docassemble", "examples/docassemble/rodents-and-vermin.l4"]
+      expectGolden bin ["export", "docassemble", "examples/docassemble/rodents-and-vermin.l4"]
                        "examples/docassemble/expected/rodents-and-vermin.yml"
 
     it "compiles the top-level IMPLIES seam example (R4 verdict driver)" $
-      expectGolden bin ["docassemble", "examples/docassemble/seam.l4"]
+      expectGolden bin ["export", "docassemble", "examples/docassemble/seam.l4"]
                        "examples/docassemble/expected/seam.yml"
 
     it "compiles a 3-way enum CONSIDER to a radio question + elif chain (R6)" $
-      expectGolden bin ["docassemble", "examples/docassemble/enum-triage.l4"]
+      expectGolden bin ["export", "docassemble", "examples/docassemble/enum-triage.l4"]
                        "examples/docassemble/expected/enum-triage.yml"
 
     it "compiles TYPICALLY prefills + MAYBE optionality with Mako-hostile @desc (R7/R8/R9)" $
-      expectGolden bin ["docassemble", "examples/docassemble/defaults.l4"]
+      expectGolden bin ["export", "docassemble", "examples/docassemble/defaults.l4"]
                        "examples/docassemble/expected/defaults.yml"
 
     it "keeps attributes out of the DAObject namespace + inlines a computed field (R2)" $
-      expectGolden bin ["docassemble", "examples/docassemble/computed-and-shadow.l4"]
+      expectGolden bin ["export", "docassemble", "examples/docassemble/computed-and-shadow.l4"]
                        "examples/docassemble/expected/computed-and-shadow.yml"
 
     it "emits a question for an ASSUME referenced only through an inlined function (R3)" $
-      expectGolden bin ["docassemble", "examples/docassemble/assume-via-fn.l4"]
+      expectGolden bin ["export", "docassemble", "examples/docassemble/assume-via-fn.l4"]
                        "examples/docassemble/expected/assume-via-fn.yml"
 
     it "drives the seam scope-first, never as the classical short-circuit (R4)" $ do
-      Output code sout _ <- runL4 bin ["docassemble", "examples/docassemble/seam.l4"]
+      Output code sout _ <- runL4 bin ["export", "docassemble", "examples/docassemble/seam.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("if notice_rule_satisfied_scope:" `isInfixOf`)
       sout `shouldSatisfy` (not . ("not notice_rule_satisfied_scope or" `isInfixOf`))
 
     it "refuses a deontic body by name (Regulative, Blocking)" $ do
-      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/deontic-body.l4"]
+      Output code _ serr <- runL4 bin ["export", "docassemble", "examples/docassemble/not-ok/deontic-body.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("deontic/regulative rule (PARTY MUST/MAY/SHANT) has no docassemble form" `isInfixOf`)
 
@@ -307,30 +307,30 @@ spec bin = do
     -- against the false claim M4 would otherwise leave behind.
 
     it "refuses a post-sanitisation name collision, naming both originals" $ do
-      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/name-collision.l4"]
+      Output code _ serr <- runL4 bin ["export", "docassemble", "examples/docassemble/not-ok/name-collision.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("name collision: `t.notice_period`" `isInfixOf`)
       serr `shouldSatisfy` ("L4 `notice period`" `isInfixOf`)
       serr `shouldSatisfy` ("L4 `notice_period`" `isInfixOf`)
 
     it "refuses a function value passed as data, by the function's own name (R3)" $ do
-      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/higher-order.l4"]
+      Output code _ serr <- runL4 bin ["export", "docassemble", "examples/docassemble/not-ok/higher-order.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("higher-order use of function `is positive`" `isInfixOf`)
 
     it "refuses a seam-goal reference that travels through an inlined function (R4 guard)" $ do
-      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/seam-ref-via-fn.l4"]
+      Output code _ serr <- runL4 bin ["export", "docassemble", "examples/docassemble/not-ok/seam-ref-via-fn.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("seam-shaped export (top-level IMPLIES) is referenced by another decision" `isInfixOf`)
 
     it "gates on advisory fidelity notes with --fail-on=advisory" $
-      expectFail bin ["docassemble", "examples/docassemble/defaults.l4", "--fail-on=advisory"]
+      expectFail bin ["export", "docassemble", "examples/docassemble/defaults.l4", "--fail-on=advisory"]
 
     it "emits only block keys docassemble 1.10.7 recognises (R9.5 vocabulary)" $
       DAEmit.emitterVocabularyViolations `shouldBe` []
 
     it "fails on a file that does not typecheck" $
-      expectFail bin ["docassemble", errorFixture]
+      expectFail bin ["export", "docassemble", errorFixture]
 
     -- M1 regression, tightened for M2: the six goldens above pin STDOUT.
     -- `-o` is a different code path (it also drops the fidelity report into a
@@ -345,7 +345,7 @@ spec bin = do
         removePathForcibly outFile
         removePathForcibly sidecar
         Output code sout serr <-
-          runL4 bin ["docassemble", daExampleDir </> (stem ++ ".l4"), "-o", outFile]
+          runL4 bin ["export", "docassemble", daExampleDir </> (stem ++ ".l4"), "-o", outFile]
         unless (code == ExitSuccess) $
           expectationFailure (stem ++ ": -o run failed\n--- stderr ---\n" ++ serr)
         sout `shouldBe` ""
@@ -372,7 +372,7 @@ spec bin = do
   -- so every assertion below is about the SHAPE of the written tree: which
   -- files exist, which must NOT exist, what they say, and that two runs agree.
   ----------------------------------------------------------------------------
-  describe "l4 docassemble --package (M2/R11: the installable package tree)" $ do
+  describe "l4 export docassemble --package (M2/R11: the installable package tree)" $ do
     it "writes the PEP 420 shape, including the namespace __init__.py that must be ABSENT" $ do
       tmp <- getTemporaryDirectory
       let dir = tmp </> "l4-da-pkg-shape"
@@ -512,7 +512,7 @@ spec bin = do
       copyFile daCitationsSource beta
       _ <- expectPackage bin alpha dir
       -- expectPackage clears the directory first, so regenerate by hand.
-      Output code _ serr <- runL4 bin ["docassemble", beta, "--package", dir]
+      Output code _ serr <- runL4 bin ["export", "docassemble", beta, "--package", dir]
       unless (code == ExitSuccess) $
         expectationFailure ("regeneration failed\n--- stderr ---\n" ++ serr)
       files <- treeFiles dir
@@ -541,7 +541,7 @@ spec bin = do
       let dir = tmp </> "l4-da-regen-keep"
       _ <- expectPackage bin daCitationsSource dir
       writeFile (dir </> "NOTES.md") "hand-written, not ours\n"
-      Output code _ serr <- runL4 bin ["docassemble", daCitationsSource, "--package", dir]
+      Output code _ serr <- runL4 bin ["export", "docassemble", daCitationsSource, "--package", dir]
       unless (code == ExitSuccess) $
         expectationFailure ("regeneration failed\n--- stderr ---\n" ++ serr)
       kept <- readUtf8 (dir </> "NOTES.md")
@@ -620,7 +620,7 @@ spec bin = do
       removePathForcibly dir
       removePathForcibly file
       Output code _ serr <-
-        runL4 bin ["docassemble", daCitationsSource, "-o", file, "--package", dir]
+        runL4 bin ["export", "docassemble", daCitationsSource, "-o", file, "--package", dir]
       code `shouldBe` ExitFailure 1
       shouldContain' "stderr" serr "--package cannot be combined with --output"
       wroteFile <- doesFileExist file
@@ -681,9 +681,9 @@ spec bin = do
   -- law that ACTUALLY decided the case. Short-circuited rules did not decide
   -- anything, so citing them would be citing law that never fired.
   ----------------------------------------------------------------------------
-  describe "l4 docassemble citations (M2: @ref citations and the glossary)" $ do
+  describe "l4 export docassemble citations (M2: @ref citations and the glossary)" $ do
     it "attaches each rule's own @ref to that rule's own code block, via explain()" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daCitationsSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
 
@@ -743,7 +743,7 @@ spec bin = do
         shouldContain' ("the " ++ bid ++ " code block") blk cite
 
     it "renders logic_explanation() on every verdict screen" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daCitationsSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       for_ ["ev_offering_exempt_screen_holds", "ev_offering_exempt_screen_fails"] \sid -> do
@@ -751,7 +751,7 @@ spec bin = do
         shouldContain' ("the " ++ sid ++ " screen") blk "logic_explanation()"
 
     it "emits one `auto terms:` glossary block, keyed on the L4 defined terms" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daCitationsSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       case [ b | b <- yamlBlocks sout, "auto terms:" `isInfixOf` b ] of
@@ -778,7 +778,7 @@ spec bin = do
           ++ "\n--- emitted interview ---\n" ++ sout
 
     it "strips L4's own `@ref ` herald and the inline `<< >>` delimiters" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daCitationsSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       -- The inline form's text must ARRIVE …
@@ -791,7 +791,7 @@ spec bin = do
       shouldNotContain' "the emitted interview" sout "intermediary only>>"
 
     it "escapes Mako-hostile citation text (R9.1, the `defaults` discipline applied to @ref)" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daCitationsSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       -- carried at all
@@ -818,7 +818,7 @@ spec bin = do
     -- rendering has to be deliberate. It is the same `expectGolden` contract
     -- the six M1 examples ride on.
     it "compiles the @ref citations + glossary example to its golden interview" $
-      expectGolden bin ["docassemble", daCitationsSource]
+      expectGolden bin ["export", "docassemble", daCitationsSource]
                        "examples/docassemble/expected/citations.yml"
 
     it "declares the M2 block keys in its own emitter vocabulary (R9.5)" $ do
@@ -851,9 +851,9 @@ spec bin = do
   -- M2 repair cases: losses that used to be silent, and one that used to
   -- change the answer.
   ----------------------------------------------------------------------------
-  describe "l4 docassemble (M2 repairs: declared losses and reserved names)" $ do
+  describe "l4 export docassemble (M2 repairs: declared losses and reserved names)" $ do
     it "declares both ways an `auto terms:` entry cannot survive, and drops them" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daGlossLossSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daGlossLossSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
 
@@ -863,7 +863,7 @@ spec bin = do
       -- group whose pattern no longer matches its own term, and an unbalanced
       -- one raises re.error while the Interview is constructed, so the emitted
       -- interview cannot be LOADED at all — while `l4 check` and
-      -- `l4 docassemble` both report success and the report said
+      -- `l4 export docassemble` both report success and the report said
       -- "(nothing lost)".
       shouldContain'    "stderr" serr "DA-GLOSS-REGEX"
       shouldContain'    "stderr" serr "s 12(1)"
@@ -893,7 +893,7 @@ spec bin = do
       -- the opposite verdict to the bare one (R11 decision 6 says the two
       -- shapes must mean the same thing). The bare artifact reserves the name
       -- too, so the shapes cannot disagree about a variable's NAME either.
-      Output code sout serr <- runL4 bin ["docassemble", daRuntimeCollisionSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daRuntimeCollisionSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       shouldContain' "the emitted interview" sout "l4_source_text_ = d.filed_on_time"
@@ -921,7 +921,7 @@ spec bin = do
   --
   -- Every test in this block was RED at the commit that introduced it, and each
   -- was red for a reason the tool stated in words: M1 refused each of these
-  -- constructs BY NAME, so the failure was `l4 docassemble` exiting 1 with
+  -- constructs BY NAME, so the failure was `l4 export docassemble` exiting 1 with
   -- prose naming the milestone that owed the answer — not a missing symbol,
   -- not a typo, not a compile error. `daEmit` still prints that stderr verbatim,
   -- which is what makes a regression legible. The block is GREEN as of
@@ -947,7 +947,7 @@ spec bin = do
   --
   -- No M4 example carries a byte golden here. See `daListSource` for why.
   ----------------------------------------------------------------------------
-  describe "l4 docassemble (M4: breadth — acceptance)" $ do
+  describe "l4 export docassemble (M4: breadth — acceptance)" $ do
 
     ------------------------------------------------------------------------
     -- A. `LIST OF` via DAList gathering
@@ -1113,7 +1113,7 @@ spec bin = do
       -- and DATE land, which is precisely the drift CLAUDE.md warns about. So
       -- the diagnostic is required to name what it is refusing.
       Output code _ serr <-
-        runL4 bin ["docassemble", "examples/docassemble/not-ok/maybe-enum.l4"]
+        runL4 bin ["export", "docassemble", "examples/docassemble/not-ok/maybe-enum.l4"]
       code `shouldBe` ExitFailure 1
       shouldContain' "the refusal" serr "MAYBE"
       shouldContain' "the refusal" serr "Severity"
@@ -1356,13 +1356,13 @@ spec bin = do
       for_ [ daListSource, daPayloadSource, daMaybeSource, daDateSource
            , daReviewSource, daLetterSource ] \src -> do
         let stem = takeWhile (/= '.') (drop (length daExampleDir + 1) src)
-        expectGolden bin ["docassemble", src]
+        expectGolden bin ["export", "docassemble", src]
           (daExampleDir </> "expected" </> (stem ++ ".yml"))
 
     it "leaves the four refusals M4 does not own refusing, by their own names (G)" $
       for_ daStillRefused \(fixture, diagnostic) -> do
         Output code _ serr <-
-          runL4 bin ["docassemble", "examples/docassemble/not-ok" </> fixture]
+          runL4 bin ["export", "docassemble", "examples/docassemble/not-ok" </> fixture]
         unless (code == ExitFailure 1) $
           expectationFailure $
             fixture ++ " no longer refuses (exit " ++ show code
@@ -1385,7 +1385,7 @@ spec bin = do
       -- template prose where an `attachment:` sub-key must be. Measured against
       -- real docassemble 1.10.7: `parse.Interview` raises `DASourceError` from
       -- parse.py:8352-8360, so the whole interview is unloadable — every
-      -- question, in BOTH artifact shapes — while `l4 docassemble` exits 0.
+      -- question, in BOTH artifact shapes — while `l4 export docassemble` exits 0.
       --
       -- `|2`, not `|4`: the indicator is an offset from the PARENT node's
       -- indentation and the `attachment:` mapping sits at two.
@@ -1471,7 +1471,7 @@ spec bin = do
       -- user_dict for real, via `from docassemble.base.util import *`
       -- (parse.py:131, exec'd at :8523-8524), which the emitter deliberately
       -- does not suppress.
-      Output code sout serr <- runL4 bin ["docassemble", daGlobalShadowSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daGlobalShadowSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       shouldContain' "the emitted interview" sout "all_ = f.the_box_was_ticked"
@@ -1490,7 +1490,7 @@ spec bin = do
       -- `<list>[i].<attr>` spelling would reach `undefine()` with the iterator
       -- unresolved. The emitter therefore emits none there — and says so, which
       -- is the difference between a bounded repair and a silent one.
-      Output code sout serr <- runL4 bin ["docassemble", daGatheredMaybeSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daGatheredMaybeSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       -- the guard IS emitted on the element's value question …
@@ -1503,7 +1503,7 @@ spec bin = do
       let ymlPath = tmp </> "l4-da-gathered-maybe.yml"
           repPath = tmp </> "l4-da-gathered-maybe.fidelity.txt"
       Output code2 _ serr2 <-
-        runL4 bin ["docassemble", daGatheredMaybeSource, "-o", ymlPath]
+        runL4 bin ["export", "docassemble", daGatheredMaybeSource, "-o", ymlPath]
       unless (code2 == ExitSuccess) $
         expectationFailure ("emit -o failed\n--- stderr ---\n" ++ serr2)
       report <- readUtf8 repPath
@@ -1515,7 +1515,7 @@ spec bin = do
     it "refuses M4's own two new collisions, by their own names (I)" $
       for_ daM4Refused \(fixture, diagnostic) -> do
         Output code _ serr <-
-          runL4 bin ["docassemble", "examples/docassemble/not-ok" </> fixture]
+          runL4 bin ["export", "docassemble", "examples/docassemble/not-ok" </> fixture]
         unless (code == ExitFailure 1) $
           expectationFailure $
             fixture ++ " no longer refuses (exit " ++ show code ++ ")"

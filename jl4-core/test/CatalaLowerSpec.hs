@@ -510,7 +510,7 @@ spec = do
     -- smucclaw/l4-ide#958, both emission sites. R1 puts an @export'd decision in
     -- a Catala SCOPE and every other reachable decision in a TOPLEVEL, and
     -- Catala allows `output of S with { … }` only inside a scope. Until these
-    -- refusals, both shapes below lowered clean, `l4 catala` exited 0 in
+    -- refusals, both shapes below lowered clean, `l4 export catala` exited 0 in
     -- silence, and `catala typecheck` rejected the file it had just written with
     -- "Scope calls are not allowed outside of a scope" (measured on the pristine
     -- tree at 6e9b57bb against catala 1.2.1, exit 123).

@@ -1,6 +1,6 @@
--- | Black-box tests for @l4 blawx@, @l4 blawx --import@ and the lift, with the
--- helpers only they use. Split out of @Main.hs@ so a release can be sliced
--- per backend.
+-- | Black-box tests for @l4 export blawx@, @l4 import blawx@ and the lift,
+-- with the helpers only they use. Split out of @Main.hs@ so a release can be
+-- sliced per backend.
 module CliTest.Blawx (spec, fixtures) where
 
 import Control.Monad (unless)
@@ -25,7 +25,7 @@ import CliTest.Common
 -- absence of the emitter's own stderr diagnostic for it.
 noBlankedBlawxRow :: FilePath -> String -> IO ()
 noBlankedBlawxRow bin stem = do
-  Output code sout serr <- runL4 bin ["blawx", "examples/blawx/" ++ stem ++ ".l4"]
+  Output code sout serr <- runL4 bin ["export", "blawx", "examples/blawx/" ++ stem ++ ".l4"]
   code `shouldBe` ExitSuccess
   (stem, "no Blockly image" `isInfixOf` serr) `shouldBe` (stem, False)
   let fields = [f | l <- lines sout, Just f <- [blawxStoredField l]]
@@ -52,8 +52,8 @@ noBlankedBlawxRow bin stem = do
 -- a drifting field name a red test rather than a quietly weaker harness.
 twinsAgree :: FilePath -> (String, String) -> IO ()
 twinsAgree bin (seed, twin) = do
-  Output codeA soutA _ <- runL4 bin ["blawx", "examples/blawx/" ++ seed ++ ".l4", "--scasp"]
-  Output codeB soutB _ <- runL4 bin ["blawx", "examples/blawx/" ++ twin ++ ".l4", "--scasp"]
+  Output codeA soutA _ <- runL4 bin ["export", "blawx", "examples/blawx/" ++ seed ++ ".l4", "--scasp"]
+  Output codeB soutB _ <- runL4 bin ["export", "blawx", "examples/blawx/" ++ twin ++ ".l4", "--scasp"]
   codeA `shouldBe` ExitSuccess
   codeB `shouldBe` ExitSuccess
   let body = drop 1 . lines
@@ -78,77 +78,77 @@ fixtures = []
 
 spec :: FilePath -> Spec
 spec bin = do
-  describe "l4 blawx" $ do
+  describe "l4 export blawx" $ do
     it "compiles the Appendix-A benefit example to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/benefit.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/benefit.l4"]
                        "examples/blawx/expected/benefit.blawx"
 
     it "dumps benefit's concatenated s(CASP) (--scasp) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/benefit.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/benefit.l4", "--scasp"]
                        "examples/blawx/expected/benefit.pl"
 
     it "compiles the minimal mortality example to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/mortality.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/mortality.l4"]
                        "examples/blawx/expected/mortality.blawx"
 
     it "dumps mortality's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/mortality.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/mortality.l4", "--scasp"]
                        "examples/blawx/expected/mortality.pl"
 
     it "compiles the aggregates example (findall + *_blawx_list) to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/scores.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/scores.l4"]
                        "examples/blawx/expected/scores.blawx"
 
     it "dumps scores' s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/scores.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/scores.l4", "--scasp"]
                        "examples/blawx/expected/scores.pl"
 
     it "compiles the structural-recursion example to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/sumlist.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/sumlist.l4"]
                        "examples/blawx/expected/sumlist.blawx"
 
     it "dumps sumlist's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/sumlist.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/sumlist.l4", "--scasp"]
                        "examples/blawx/expected/sumlist.pl"
 
     it "compiles the rodents-and-vermin exclusion to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/rodents.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/rodents.l4"]
                        "examples/blawx/expected/rodents.blawx"
 
     it "dumps rodents' s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/rodents.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/rodents.l4", "--scasp"]
                        "examples/blawx/expected/rodents.pl"
 
     it "compiles the ASSUME-shaped anti-social example to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/antisocial.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/antisocial.l4"]
                        "examples/blawx/expected/antisocial.blawx"
 
     it "dumps antisocial's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/antisocial.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/antisocial.l4", "--scasp"]
                        "examples/blawx/expected/antisocial.pl"
 
     it "compiles antisocial's record-spelled semantic twin to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/antisocial-twin.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/antisocial-twin.l4"]
                        "examples/blawx/expected/antisocial-twin.blawx"
 
     it "dumps the antisocial twin's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/antisocial-twin.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/antisocial-twin.l4", "--scasp"]
                        "examples/blawx/expected/antisocial-twin.pl"
 
     it "compiles the ASSUME-shaped alcohol act to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/alcohol.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/alcohol.l4"]
                        "examples/blawx/expected/alcohol.blawx"
 
     it "dumps alcohol's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/alcohol.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/alcohol.l4", "--scasp"]
                        "examples/blawx/expected/alcohol.pl"
 
     it "compiles alcohol's record-spelled semantic twin to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/alcohol-twin.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/alcohol-twin.l4"]
                        "examples/blawx/expected/alcohol-twin.blawx"
 
     it "dumps the alcohol twin's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/alcohol-twin.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/alcohol-twin.l4", "--scasp"]
                        "examples/blawx/expected/alcohol-twin.pl"
 
     -- P4c, the statute showcase: Housing Act 1988 Sch 2 grounds 8, 13, 15 and
@@ -157,11 +157,11 @@ spec bin = do
     -- exist). Four records in one Blawx namespace, 49 oracle-anchored
     -- directives, and the corpus's only arity-2 computed predicate.
     it "compiles the four Housing Act grounds to their golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/housing-grounds.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/housing-grounds.l4"]
                        "examples/blawx/expected/housing-grounds.blawx"
 
     it "compiles the four Housing Act grounds to their golden s(CASP) dump" $
-      expectGolden bin ["blawx", "examples/blawx/housing-grounds.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/housing-grounds.l4", "--scasp"]
                        "examples/blawx/expected/housing-grounds.pl"
 
     -- The arity-2 gap, pinned rather than assumed. `per-period threshold met`
@@ -176,7 +176,7 @@ spec bin = do
     -- harness re-saves every one of them. If a later change starts declaring
     -- arity-2 predicates, this test is the one to delete.
     it "emits an undeclared but imaged arity-2 predicate (the recorded gap)" $ do
-      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/housing-grounds.l4"]
+      Output code sout _ <- runL4 bin ["export", "blawx", "examples/blawx/housing-grounds.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("per_period_threshold_met(Claim,Arrears)" `isInfixOf`)
       sout `shouldSatisfy` ("?- per_period_threshold_met(g1,1300)." `isInfixOf`)
@@ -213,7 +213,7 @@ spec bin = do
         , "housing-grounds" ]
 
     it "carries the @export prose into rule_text, and falls back to @ref (structural)" $ do
-      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/antisocial.l4"]
+      Output code sout _ <- runL4 bin ["export", "blawx", "examples/blawx/antisocial.l4"]
       code `shouldBe` ExitSuccess
       -- arm A: a decision carrying BOTH @export prose and @ref shows the prose
       sout `shouldSatisfy`
@@ -232,13 +232,13 @@ spec bin = do
       sout `shouldSatisfy` (not . ("effect_target" `isInfixOf`))
 
     it "gives NOT over an ASSUMEd input classical negation, not NAF (R5)" $ do
-      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/alcohol.l4", "--scasp"]
+      Output code sout _ <- runL4 bin ["export", "blawx", "examples/blawx/alcohol.l4", "--scasp"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("-the_proprietor_corrects_the_price_list(Pr)." `isInfixOf`)
       sout `shouldSatisfy` (not . ("not the_proprietor_corrects_the_price_list" `isInfixOf`))
 
     it "rejects a subjectless ASSUMEd input rather than blanking its row" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/zero-arity.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/zero-arity.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("no category subject" `isInfixOf`)
       -- the refused band is an ARITY band; the message must say so, because
@@ -251,7 +251,7 @@ spec bin = do
       -- The other half of the refused band. `classifyPred` places an input as
       -- an attribute only at (category) or (category) -> value; relationship
       -- blocks start at total arity 3; a two-place input falls between them.
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/arity-two.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/arity-two.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("no category subject" `isInfixOf`)
       serr `shouldSatisfy` ("`severity exceeds` is an input of total arity 2" `isInfixOf`)
@@ -260,7 +260,7 @@ spec bin = do
       serr `shouldSatisfy` (not . ("first parameter is not a category" `isInfixOf`))
 
     it "emits the ruledoc first, then workspaces with the dedup-marked triple (structural smoke)" $ do
-      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/benefit.l4"]
+      Output code sout _ <- runL4 bin ["export", "blawx", "examples/blawx/benefit.l4"]
       code `shouldBe` ExitSuccess
       -- R1: exactly one ruledoc row, FIRST — before any workspace row
       firstLineWith "- model: blawx.ruledoc" sout
@@ -280,18 +280,18 @@ spec bin = do
       sout `shouldSatisfy` ("?- eligible_for_benefit(X)." `isInfixOf`)
 
     it "refuses -o FILE.pl without --scasp (the dump would clobber its own YAML)" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/benefit.l4",
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/benefit.l4",
                                        "-o", "examples/blawx/refused.pl"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("--scasp" `isInfixOf`)
 
     it "rejects a DATE-sorted field by name (Blawx v1)" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/dates.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/dates.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("dates (Blawx v1)" `isInfixOf`)
 
     it "rejects an unstratified module (the middle-end records, this leg refuses)" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/unstratified.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/unstratified.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("unstratified negation (Blawx v1)" `isInfixOf`)
 
@@ -302,7 +302,7 @@ spec bin = do
       -- value. A wrong answer with a green exit code is the worst outcome a
       -- transpiler has, so the refusal is loud and both operand positions of
       -- the IF/ELSE (the REq and its complement RNeq) are covered.
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/record-identity.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/record-identity.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("record identity (Blawx)" `isInfixOf`)
       serr `shouldSatisfy` ("EQUALS on operands of record type `Player`" `isInfixOf`)
@@ -316,7 +316,7 @@ spec bin = do
       -- rules in this fixture are refused now, and each diagnostic names the
       -- operand's OWN sort, because "of record type `Player`" would be a false
       -- description of a list.
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/record-identity-list.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/record-identity-list.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("type `LIST OF Player`, which contains the record type `Player`" `isInfixOf`)
       serr `shouldSatisfy` ("type `LIST OF MAYBE Player`, which contains the record type `Player`" `isInfixOf`)
@@ -330,14 +330,14 @@ spec bin = do
     -- lowered at exit 0, emitting the `A = B` identity W1 exists to refuse.
     it "rejects EQUALS on an IMPORTed record, whose sort reaches us opaque" $ do
       Output code _ serr <- runL4 bin
-        ["blawx", "tests-cli/fixtures/blawx-opaque/imported-record-identity.l4"]
+        ["export", "blawx", "tests-cli/fixtures/blawx-opaque/imported-record-identity.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("record identity (Blawx)" `isInfixOf`)
       serr `shouldSatisfy` ("opaque type `Shared Ontology.Player`" `isInfixOf`)
       serr `shouldSatisfy` ("no name to look up" `isInfixOf`)
 
     it "rejects a relationship above the arity-10 block ceiling" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/arity.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/arity.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("above the block ceiling of 10" `isInfixOf`)
 
@@ -346,7 +346,7 @@ spec bin = do
     -- -- eId sec_4_5 against the workspace sec_4_section we wrote, i.e. an
     -- orphaned canvas in a document that imports and stores without complaint.
     it "rejects a pinned section whose text opens with another index" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/sub-provision-index.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/sub-provision-index.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("sub-provision index (Blawx v1)" `isInfixOf`)
       serr `shouldSatisfy` ("orphaning" `isInfixOf`)
@@ -357,7 +357,7 @@ spec bin = do
     -- parse there and orphans every later canvas. `asciiFold` folds what
     -- legislation actually contains; the residue is refused.
     it "rejects a section text carrying a character clean-law cannot lex" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/section-text-non-ascii.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/section-text-non-ascii.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("non-ASCII section text (Blawx v1)" `isInfixOf`)
       serr `shouldSatisfy` ("U+00A3" `isInfixOf`)
@@ -368,24 +368,24 @@ spec bin = do
     -- unemittable. The fixture above pins the refusal; this pins the fold, on
     -- the seed corpus, which carries ten U+2014 em dashes across five files.
     it "folds the punctuation legislation carries rather than refusing it" $ do
-      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/antisocial.l4"]
+      Output code sout _ <- runL4 bin ["export", "blawx", "examples/blawx/antisocial.l4"]
       code `shouldBe` ExitSuccess
       -- the ten U+2014 em dashes across the seed corpus become hyphens, and
       -- none of them reaches the emitted rule_text
       sout `shouldSatisfy` (not . ("\x2014" `isInfixOf`))
 
     it "fails on a file that does not typecheck" $
-      expectFail bin ["blawx", errorFixture]
+      expectFail bin ["export", "blawx", errorFixture]
 
   -- The import direction (R14, spec §10 P5). `lift . emit = id` has two
   -- halves; this is the parse half, and it is checked in the only way that
   -- needs no foreign toolchain and no external corpus: emit a real document,
   -- read it back through every layer, and compare both the IR and the bytes.
-  describe "l4 blawx --import" $ do
+  describe "l4 import blawx" $ do
     it "round-trips each P1/P3 seed: emit -> parse -> the same block IR and the same bytes" $
       mapM_
         (\stem -> do
-            Output code sout serr <- runL4 bin ["blawx", "examples/blawx/" ++ stem ++ ".l4", "--roundtrip"]
+            Output code sout serr <- runL4 bin ["export", "blawx", "examples/blawx/" ++ stem ++ ".l4", "--roundtrip"]
             unless (code == ExitSuccess) $
               expectationFailure (stem ++ ": --roundtrip failed\n--- stderr ---\n" ++ serr)
             sout `shouldSatisfy` ("IR and bytes unchanged" `isInfixOf`))
@@ -393,7 +393,7 @@ spec bin = do
 
     it "parses an emitted .blawx back and reports a clean census" $ do
       Output code sout serr <- runL4 bin
-        ["blawx", "--import", "--parse-only", "examples/blawx/expected/mortality.blawx"]
+        ["import", "blawx", "--parse-only", "examples/blawx/expected/mortality.blawx"]
       unless (code == ExitSuccess) $
         expectationFailure ("--import --parse-only failed\n--- stderr ---\n" ++ serr)
       -- One machine-readable line, so the census harness need not scrape prose.
@@ -404,7 +404,7 @@ spec bin = do
 
     it "names the row and the block when a document is outside the liftable fragment" $ do
       Output code _ serr <- runL4 bin
-        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/unsupported.blawx"]
+        ["import", "blawx", "--parse-only", "tests-cli/fixtures/blawx-import/unsupported.blawx"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("blawx-parse/unsupported-block" `isInfixOf`)
       serr `shouldSatisfy` ("sec_1_section" `isInfixOf`)
@@ -412,41 +412,44 @@ spec bin = do
 
     it "warns per skipped disabled block rather than silently dropping it (P5-3)" $ do
       Output code _ serr <- runL4 bin
-        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/disabled.blawx"]
+        ["import", "blawx", "--parse-only", "tests-cli/fixtures/blawx-import/disabled.blawx"]
       code `shouldBe` ExitSuccess
       serr `shouldSatisfy` ("blawx-parse/disabled-block-skipped" `isInfixOf`)
       serr `shouldSatisfy` ("skipped disabled <query>" `isInfixOf`)
 
     it "refuses a stream whose first row is not the ruledoc" $ do
       Output code _ serr <- runL4 bin
-        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/no-ruledoc.blawx"]
+        ["import", "blawx", "--parse-only", "tests-cli/fixtures/blawx-import/no-ruledoc.blawx"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("blawx-parse/row-order" `isInfixOf`)
 
     it "refuses XML outside the Blockly subset by name and offset" $ do
       Output code _ serr <- runL4 bin
-        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/bad-xml.blawx"]
+        ["import", "blawx", "--parse-only", "tests-cli/fixtures/blawx-import/bad-xml.blawx"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("blawx-parse/xml-malformed" `isInfixOf`)
       serr `shouldSatisfy` ("mismatched close tag" `isInfixOf`)
 
-    -- `l4 blawx` has no --help of its own (the subcommand parsers carry no
-    -- helper), so the usage banner optparse prints on a bad option is where
-    -- the surface is documented. Asserting on it keeps the new flags from
-    -- being added to the parser and forgotten in the spec.
-    it "documents the new flags in the usage banner" $ do
-      Output code _ serr <- runL4 bin ["blawx", "--help"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("--import" `isInfixOf`)
-      serr `shouldSatisfy` ("--parse-only" `isInfixOf`)
-      serr `shouldSatisfy` ("--reemit" `isInfixOf`)
+    -- Each direction's --help lists that direction's flags and nothing else:
+    -- the import-only flags are not offered on an export, and vice versa.
+    it "documents each direction's flags in its own --help" $ do
+      Output ecode esout _ <- runL4 bin ["export", "blawx", "--help"]
+      ecode `shouldBe` ExitSuccess
+      esout `shouldSatisfy` ("--scasp" `isInfixOf`)
+      esout `shouldSatisfy` ("--roundtrip" `isInfixOf`)
+      esout `shouldSatisfy` (not . ("--parse-only" `isInfixOf`))
+      Output icode isout _ <- runL4 bin ["import", "blawx", "--help"]
+      icode `shouldBe` ExitSuccess
+      isout `shouldSatisfy` ("--parse-only" `isInfixOf`)
+      isout `shouldSatisfy` ("--reemit" `isInfixOf`)
+      isout `shouldSatisfy` (not . ("--scasp" `isInfixOf`))
 
   -- The lift (R14's other half). Its evidence is `jl4/examples/blawx/imported/`,
   -- both halves of which the pipeline produced: `bird.l4` is what the lift
   -- emitted from upstream's own bird.yaml, and `bird.blawx` is what the
   -- renderers re-emitted from the same parsed blocks. The reference checkout
   -- is NOT a test dependency -- these tests read only what is committed.
-  describe "l4 blawx --import (the lift)" $ do
+  describe "l4 import blawx (the lift)" $ do
     it "the committed bird artifact evaluates to the oracles recorded in it" $ do
       Output code sout serr <- runL4 bin ["run", "--trace", "none", "examples/blawx/imported/bird.l4"]
       unless (code == ExitSuccess) $
@@ -460,7 +463,7 @@ spec bin = do
       results `shouldBe` ["LIST \"pingu\"", "TRUE", "TRUE", "TRUE"]
 
     it "re-lifting the re-emitted .blawx reproduces the same rules and the same oracles" $ do
-      Output code sout serr <- runL4 bin ["blawx", "--import", "examples/blawx/imported/bird.blawx"]
+      Output code sout serr <- runL4 bin ["import", "blawx", "examples/blawx/imported/bird.blawx"]
       unless (code == ExitSuccess) $
         expectationFailure ("--import on the re-emitted bird failed\n--- stderr ---\n" ++ serr)
       -- The applies-idiom, the unfolded defeat layer, and the recorded answers.
@@ -471,7 +474,7 @@ spec bin = do
       length (filter ("-- L4 oracle ==> " `isPrefixOf`) (lines sout)) `shouldBe` 4
 
     it "refuses a document outside the liftable fragment, naming every construct" $ do
-      Output code _ serr <- runL4 bin ["blawx", "--import", "examples/blawx/expected/sumlist.blawx"]
+      Output code _ serr <- runL4 bin ["import", "blawx", "examples/blawx/expected/sumlist.blawx"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("cannot lift this document to L4" `isInfixOf`)
       -- an n-ary relation is not a unary predicate over the object universe
@@ -488,7 +491,7 @@ spec bin = do
     -- (benefit.blawx concludes `benefit_amount(A, Tmp)` from `Tmp is
     -- 1000 + Bonus`), and it is refused by its own name.
     it "refuses a value-typed attribute a rule CONCLUDES, by name" $ do
-      Output code _ serr <- runL4 bin ["blawx", "--import", "examples/blawx/expected/benefit.blawx"]
+      Output code _ serr <- runL4 bin ["import", "blawx", "examples/blawx/expected/benefit.blawx"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("blawx-lift/value-attribute-concluded" `isInfixOf`)
       serr `shouldSatisfy` ("blawx-lift/conclusion-shape" `isInfixOf`)
@@ -500,7 +503,7 @@ spec bin = do
     -- workspaces, and the free-variable test query.
     it "lifts Blawx's own beard_tax, comparisons and paragraphs included" $ do
       Output code sout serr <- runL4 bin
-        ["blawx", "--import", "examples/blawx/imported/beard_tax.blawx"]
+        ["import", "blawx", "examples/blawx/imported/beard_tax.blawx"]
       unless (code == ExitSuccess) $
         expectationFailure ("beard_tax did not lift\n--- stderr ---\n" ++ serr)
       -- the number attribute: one MAYBE NUMBER field, one definedness
@@ -538,7 +541,7 @@ spec bin = do
     -- the lift exited 0 with warnings only.
     it "keeps a defeat whose sections are paragraphs (§11 W5)" $ do
       Output code sout serr <- runL4 bin
-        ["blawx", "--import", "tests-cli/fixtures/blawx-import/paragraph-defeat-ok.blawx"]
+        ["import", "blawx", "tests-cli/fixtures/blawx-import/paragraph-defeat-ok.blawx"]
       unless (code == ExitSuccess) $
         expectationFailure ("paragraph-defeat-ok did not lift\n--- stderr ---\n" ++ serr)
       sout `shouldSatisfy`
@@ -559,7 +562,7 @@ spec bin = do
     -- by name instead.
     it "refuses an `overrules` the fold would activate, by name (§11 W5)" $ do
       Output code _ serr <- runL4 bin
-        ["blawx", "--import", "tests-cli/fixtures/blawx-import/paragraph-defeat.blawx"]
+        ["import", "blawx", "tests-cli/fixtures/blawx-import/paragraph-defeat.blawx"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("blawx-lift/defeat-target" `isInfixOf`)
       serr `shouldSatisfy` ("holds(sec_1_section,qualifies_s1b,X)" `isInfixOf`)
@@ -579,14 +582,14 @@ spec bin = do
     -- flipping it back. Refused by name now, exactly as `defeat-target` is.
     it "refuses an `inapplicable` rule the fold would re-gate, by name" $ do
       Output code _ serr <- runL4 bin
-        ["blawx", "--import", "tests-cli/fixtures/blawx-import/paragraph-applies.blawx"]
+        ["import", "blawx", "tests-cli/fixtures/blawx-import/paragraph-applies.blawx"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("blawx-lift/applies-target" `isInfixOf`)
       serr `shouldSatisfy` ("blawx_applies(sec_5__para_a_section,X)" `isInfixOf`)
 
     it "--reemit writes the .blawx regenerated from the parsed blocks" $ do
       Output code sout serr <- runL4 bin
-        ["blawx", "--import", "--reemit", "examples/blawx/expected/mortality.blawx"]
+        ["import", "blawx", "--reemit", "examples/blawx/expected/mortality.blawx"]
       unless (code == ExitSuccess) $
         expectationFailure ("--reemit failed\n--- stderr ---\n" ++ serr)
       -- Our own emission parsed and re-emitted is byte-identical to itself;

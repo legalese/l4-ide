@@ -288,10 +288,33 @@ spec bin = do
       sout `shouldSatisfy` ("trace" `isInfixOf`)
       sout `shouldSatisfy` ("state-graph" `isInfixOf`)
       sout `shouldSatisfy` ("export" `isInfixOf`)
-      sout `shouldSatisfy` ("openfisca" `isInfixOf`)
-      sout `shouldSatisfy` ("blawx" `isInfixOf`)
+      sout `shouldSatisfy` ("import" `isInfixOf`)
       sout `shouldSatisfy` ("nlg" `isInfixOf`)
       sout `shouldSatisfy` ("verify" `isInfixOf`)
+
+  -- CLI-SURFACE-SPEC C1: every foreign notation is a subcommand of `export`
+  -- or `import`, and those two help screens are the catalogue. The old
+  -- top-level verbs are gone, not aliased: an unknown first word is read as a
+  -- FILENAME by the bare `l4 FILE` form, so the assertion is that each one
+  -- fails, not what it says.
+  describe "l4 export / l4 import" $ do
+    it "`l4 export --help` lists every format" $ do
+      Output code sout _ <- runL4 bin ["export", "--help"]
+      code `shouldBe` ExitSuccess
+      for_ ["dmn", "dmn-md", "bpmn", "openfisca", "blawx", "catala", "docassemble", "yscript"] \fmt ->
+        sout `shouldSatisfy` (("\n  " <> fmt <> " ") `isInfixOf`)
+
+    it "`l4 import --help` lists blawx" $ do
+      Output code sout _ <- runL4 bin ["import", "--help"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\n  blawx " `isInfixOf`)
+
+    it "requires a format" $
+      expectFail bin ["export"]
+
+    it "no longer has a top-level verb per backend" $
+      for_ ["openfisca", "blawx", "catala", "docassemble", "yscript"] \verb ->
+        expectFail bin [verb, "x.l4"]
 
   describe "l4 run" $ do
     it "succeeds on a clean file" $
@@ -727,7 +750,7 @@ spec bin = do
       -- top-level declaration claims it" is the behaviour this replaced, not a
       -- hypothetical — and the fixture's next declaration deliberately carries
       -- no @desc of its own, so a mis-attachment would show up as its key.
-      Output code sout serr <- runL4 bin ["docassemble", descAttachmentFixture]
+      Output code sout serr <- runL4 bin ["export", "docassemble", descAttachmentFixture]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       case [ b | b <- yamlBlocks sout, "auto terms:" `isInfixOf` b ] of

@@ -151,7 +151,7 @@ runL4In mCwd mEnv bin args = do
   -- stdout to EOF and only then reading stderr deadlocks the moment the child
   -- writes more to stderr than the pipe buffer holds (~16 KB on macOS): the
   -- child blocks on the stderr write, so it never closes stdout, so the parent
-  -- never returns. That is not hypothetical — `l4 blawx` on a seed whose
+  -- never returns. That is not hypothetical — `l4 export blawx` on a seed whose
   -- assumed predicates are refused for publication emits ~22 KB of diagnostics
   -- on a run that exits 0, and it hung this suite until it was killed, with no
   -- output and no failure to point at.

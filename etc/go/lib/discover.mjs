@@ -4,15 +4,21 @@
 // Two facts the stage table depends on are discoverable at runtime, and both
 // were transcribed by hand somewhere in this repo before now:
 //
-//   1. the module's regulative rule names — `l4 export FILE --to bpmn` with no
+//   1. the module's regulative rule names — `l4 export bpmn FILE` with no
 //      --rule exits 1 and ENUMERATES them in the error message;
-//   2. the accepted values of --to / --flavor / --fail-on / render --format —
-//      each rejects a deliberately-bad value with the accepted set in the
-//      message. There is no help text that lists them: `l4 <cmd> --help` is
-//      `Invalid option '--help'` for every subcommand.
+//   2. the formats `l4 export` offers — listed under "Formats:" by
+//      `l4 export --help`, since each format became its own subcommand
+//      (CLI-SURFACE-SPEC C1, 2026-09-24; before that they were `--to` values);
+//   3. the accepted values of --flavor / --fail-on / render --format — each
+//      rejects a deliberately-bad value with the accepted set in the message.
+//      Most older subcommands still answer `--help` with `Invalid option`,
+//      so this is the only route that reaches every one of them.
 //
 // So the stage table asserts SET EQUALITY against these calls rather than
-// hardcoding strings, and a rename fails loudly naming the exact strings.
+// hardcoding strings, and a rename fails loudly naming the exact strings. The
+// one exception is the export formats, which are checked as a SUBSET: the pin
+// names the formats the phases run, and a format added for some other reader
+// is not a change to anything the stage table depends on.
 //
 // This is deliberately NARROWER than hashing `l4 --help` wholesale. A pin over
 // the whole help text fires on any unrelated reflow, and a tripwire that cries
@@ -36,9 +42,9 @@ function run(args) {
   return { status: r.status, out: (r.stdout || "") + (r.stderr || "") };
 }
 
-/** `l4 export FILE --to bpmn` with no --rule enumerates the regulative rules. */
+/** `l4 export bpmn FILE` with no --rule enumerates the regulative rules. */
 export function discoverRules(file) {
-  const { out } = run(["export", file, "--to", "bpmn"]);
+  const { out } = run(["export", "bpmn", file]);
   const m = out.match(/NAME is one of:\s*(.+)/s);
   if (!m) {
     // The single-rule case is legitimate and produces no enumeration: the
@@ -61,16 +67,29 @@ export function discoverRules(file) {
 }
 
 const ENUM_PROBES = {
-  export_to: {
-    args: (f) => ["export", f, "--to", "__probe__"],
-    re: /expected ([a-z0-9|.\-]+)\)/,
+  export_formats: {
+    args: () => ["export", "--help"],
+    // The names listed under `Formats:`, two-space indented, up to the first
+    // blank line. A description that wraps continues on a deeper indent and
+    // does not start with a name, so it cannot be mistaken for one.
+    parse: (text) => {
+      const block = text.split(/^Formats:\s*$/m)[1];
+      if (!block) return null;
+      const names = [];
+      for (const line of block.split("\n").slice(1)) {
+        if (!line.trim()) break;
+        const m = line.match(/^ {2}([a-z0-9][a-z0-9-]*)(?:\s|$)/);
+        if (m) names.push(m[1]);
+      }
+      return names.length ? names : null;
+    },
   },
   export_flavor: {
-    args: (f) => ["export", f, "--to", "dmn", "--flavor", "__probe__"],
+    args: (f) => ["export", "dmn", f, "--flavor", "__probe__"],
     re: /expected ([a-z0-9|.\-]+)\)/,
   },
   export_fail_on: {
-    args: (f) => ["export", f, "--to", "dmn", "--fail-on", "__probe__"],
+    args: (f) => ["export", "dmn", f, "--fail-on", "__probe__"],
     re: /expected ([a-z0-9|.\-]+)\)/,
   },
   render_format: {
@@ -83,11 +102,18 @@ export function discoverEnums(file) {
   const out = {};
   for (const [name, p] of Object.entries(ENUM_PROBES)) {
     const { out: text } = run(p.args(file));
+    if (p.parse) {
+      out[name] = p.parse(text);
+      continue;
+    }
     const m = text.match(p.re);
     out[name] = m ? m[1].split("|") : null;
   }
   return out;
 }
+
+// Checked as pinned ⊆ offered rather than set equality; see the header.
+const SUBSET_ENUMS = new Set(["export_formats"]);
 
 function setEq(a, b) {
   if (!a || !b) return false;
@@ -108,7 +134,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const r = discoverRules(file);
     if (!r.rules) {
       process.stderr.write(
-        `discover.mjs: BROKEN — 'l4 export ${file} --to bpmn' did not enumerate rule names.\nThe CLI's discovery shape changed; re-verify the stage table. Saw:\n${r.raw}\n`,
+        `discover.mjs: BROKEN — 'l4 export bpmn ${file}' did not enumerate rule names.\nThe CLI's discovery shape changed; re-verify the stage table. Saw:\n${r.raw}\n`,
       );
       process.exit(4);
     }
@@ -143,6 +169,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         problems.push(
           `${k}: no accepted-value set recovered at all — the CLI's error shape changed`,
         );
+        continue;
+      }
+      if (SUBSET_ENUMS.has(k)) {
+        const gone = want.filter((w) => !enums[k].includes(w));
+        if (gone.length)
+          problems.push(
+            `${k}: pinned {${want.join(", ")}} but the CLI no longer offers {${gone.join(", ")}} (it offers {${enums[k].join(", ")}})`,
+          );
         continue;
       }
       if (!setEq(enums[k], want))

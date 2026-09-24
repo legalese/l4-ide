@@ -693,7 +693,7 @@ the delegating rule's `GIVEN`-parameterised twin and not on the section `GIVEN`;
 `GIVEN` there is a check error, not a parse error.
 [Entry 1.5](01-definitions-and-scope.md#e1-5) has the detail.
 
-**Not, yet, in a module whose deliverable is a Catala export.** `l4 catala` refuses a section
+**Not, yet, in a module whose deliverable is a Catala export.** `l4 export catala` refuses a section
 `GIVEN` read by anything other than the exported decision itself, so the delegating twin does not
 rescue you there unless every delegating rule is `@export`. The parser elaborates a section `GIVEN`
 into a 0-ary `ASSUME` at the head of its section (`jl4-core/src/L4/Names.hs:61-65`), and the
@@ -704,7 +704,7 @@ exported decision's own lowering (`jl4-core/src/L4/Catala/Lower.hs:1677-1683`, s
 The refusal reads:
 
 ```
-l4 catala: cannot compile these decisions to Catala:
+l4 export catala: cannot compile these decisions to Catala:
   - in `the rank of the teacher`: ASSUMEd input `the teacher` is only readable inside an
     @export decision's scope (where it becomes a scope `input`); pass it to this helper as
     a parameter instead

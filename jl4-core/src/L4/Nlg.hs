@@ -745,7 +745,7 @@ instance Linearize Nlg where
 -- revision of this comment claimed the 'Linearize' instance below was "the
 -- single point where annotation text becomes output". That was false, and it
 -- shipped a half-wired feature: @l4 render@ (text, html, json and akn), the
--- LSP document webview and @l4 blawx@ all rendered the backslash literally.
+-- LSP document webview and @l4 export blawx@ all rendered the backslash literally.
 -- The current call sites are this instance, 'L4.Export.Document.renderNlgWith'
 -- and 'L4.Blawx.Lower.nlgChunks'. The two abstainers, and why:
 --

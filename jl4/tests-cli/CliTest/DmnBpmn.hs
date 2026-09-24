@@ -1,4 +1,4 @@
--- | Black-box tests for @l4 export@ (DMN, DMN-markdown and BPMN) and the
+-- | Black-box tests for @l4 export dmn@, @dmn-md@ and @bpmn@, and the
 -- opt-in DMN engine checks, with the fixtures and engine-harness machinery
 -- only they use. Split out of @Main.hs@ so a release can be sliced per
 -- backend; 'Main.spec' calls 'spec' where these describes always ran.
@@ -420,7 +420,7 @@ fixtures =
 
 spec :: FilePath -> Spec
 spec bin = do
-  -- Track S0: `l4 export --to=dmn|dmn-md|bpmn [--fidelity-report]`.
+  -- Track S0: `l4 export dmn|dmn-md|bpmn [--fidelity-report]`.
   --
   -- The interesting property of these goldens is that they are not new files.
   -- `jl4/tests/BpmnExport.hs` and `jl4/tests/DmnExport.hs` build the same
@@ -429,14 +429,14 @@ spec bin = do
   -- pipeline). Byte equality across those two paths is the actual claim.
   describe "l4 export" $ do
     it "reproduces the BPMN golden byte-for-byte on stdout" $
-      expectGolden bin ["export", "--to=bpmn", bpmnOfferingSource] bpmnOfferingGolden
+      expectGolden bin ["export", "bpmn", bpmnOfferingSource] bpmnOfferingGolden
 
     it "reproduces the DMN 1.3 XML golden byte-for-byte on stdout" $
-      expectGolden bin ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName]
+      expectGolden bin ["export", "dmn", dmnSource, "--model-name", dmnModelName]
                        dmnGolden
 
     it "reproduces the dmnmd markdown golden byte-for-byte on stdout" $
-      expectGolden bin ["export", "--to=dmn-md", dmnSource, "--model-name", dmnModelName]
+      expectGolden bin ["export", "dmn-md", dmnSource, "--model-name", dmnModelName]
                        dmnMarkdownGolden
 
     it "writes the fidelity report as a sibling file, not into the document" $ do
@@ -449,7 +449,7 @@ spec bin = do
       removePathForcibly outDir
       createDirectoryIfMissing True outDir
       Output code sout serr <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "-o", outFile, "--fidelity-report"]
+        ["export", "bpmn", bpmnOfferingSource, "-o", outFile, "--fidelity-report"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` null                       -- the document went to the file
       serr `shouldSatisfy` ("fidelity report written to" `isInfixOf`)
@@ -464,10 +464,10 @@ spec bin = do
       removePathForcibly outDir
 
     it "keeps stdout a pure document when --fidelity-report goes to stderr" $ do
-      -- `l4 export --to=bpmn f.l4 --fidelity-report > f.bpmn` must still
+      -- `l4 export bpmn f.l4 --fidelity-report > f.bpmn` must still
       -- produce an importable file.
       Output code sout serr <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "--fidelity-report"]
+        ["export", "bpmn", bpmnOfferingSource, "--fidelity-report"]
       code `shouldBe` ExitSuccess
       goldenXml <- readUtf8 bpmnOfferingGolden
       sout `shouldBe` goldenXml
@@ -477,7 +477,7 @@ spec bin = do
     it "tallies what was lost on stderr even without --fidelity-report" $ do
       -- The report is not optional in spirit: an export never silently drops
       -- what the source said just because the caller did not know to ask.
-      Output code _ serr <- runL4 bin ["export", "--to=bpmn", bpmnOfferingSource]
+      Output code _ serr <- runL4 bin ["export", "bpmn", bpmnOfferingSource]
       code `shouldBe` ExitSuccess
       serr `shouldSatisfy` ("could not carry everything" `isInfixOf`)
       serr `shouldSatisfy` ("blocking" `isInfixOf`)
@@ -489,11 +489,11 @@ spec bin = do
       -- Blocking means "the target notation has no form for this", which is
       -- true of every realistic export (F1 fires for every task in every BPMN
       -- file). A gate that always fires would be no gate at all.
-      Output code _ _ <- runL4 bin ["export", "--to=bpmn", bpmnOfferingSource]
+      Output code _ _ <- runL4 bin ["export", "bpmn", bpmnOfferingSource]
       code `shouldBe` ExitSuccess
 
     it "exits non-zero on a Blocking note under --fail-on=blocking" $
-      expectFail bin ["export", "--to=bpmn", bpmnOfferingSource, "--fail-on=blocking"]
+      expectFail bin ["export", "bpmn", bpmnOfferingSource, "--fail-on=blocking"]
 
     -- --fail-on is a THRESHOLD ("a note this severe or worse"), over a lattice
     -- ordered Blocking < Lossy < Advisory. `expectFail ... --fail-on=blocking`
@@ -508,7 +508,7 @@ spec bin = do
     -- any note regardless of severity and the advisory-only
     -- `--fail-on=blocking`/`=lossy` rows do.
     describe "--fail-on thresholds" $ do
-      let dmnGate fixture gate = runL4 bin (["export", "--to=dmn", fixture] <> gate)
+      let dmnGate fixture gate = runL4 bin (["export", "dmn", fixture] <> gate)
           exitsNonZero fixture gate = do
             Output code _ _ <- dmnGate fixture gate
             code `shouldSatisfy` (/= ExitSuccess)
@@ -517,7 +517,7 @@ spec bin = do
             code `shouldBe` ExitSuccess
 
       it "a blocking-only report is caught by every threshold" $ do
-        -- `l4 export --to=dmn export-blocking-only.l4` reports 2 blocking,
+        -- `l4 export dmn export-blocking-only.l4` reports 2 blocking,
         -- 0 lossy, 0 advisory: the pure-Blocking end of the lattice. Assert
         -- that first, so the rows below cannot go green for the wrong reason
         -- if the fixture's notes ever change severity.
@@ -530,7 +530,7 @@ spec bin = do
           ["blocking", "lossy", "advisory"]
 
       it "an advisory-only report is caught by --fail-on=advisory and nothing stricter" $ do
-        -- `l4 export --to=dmn export-advisory-only.l4` reports 1 advisory and
+        -- `l4 export dmn export-advisory-only.l4` reports 1 advisory and
         -- nothing else. Notes ARE present throughout, so "exit 0" here means
         -- "no note reached the threshold", not "no notes".
         Output tally _ serr <- dmnGate exportAdvisoryOnlyFixture []
@@ -553,7 +553,7 @@ spec bin = do
       -- writing a decision-free document. This is the behaviour change that
       -- retired export-two-rules.l4 from the blocking-only role above.
       it "refuses an all-regulative module as DMN (empty model after the population filter)" $
-        expectFail bin ["export", "--to=dmn", exportTwoRulesFixture]
+        expectFail bin ["export", "dmn", exportTwoRulesFixture]
 
     -- FIXTURE(d)'s importer view must see a BACKTICKED import. A hyphenated
     -- module name can only be imported as IMPORT `interp-common`, and the
@@ -566,54 +566,53 @@ spec bin = do
     -- shape, unreferenced by the importer, so it must still drop — proving
     -- the scan discriminates by name rather than failing open.
     it "keeps a fixture-shaped decision whose importer spells the IMPORT with backticks" $ do
-      Output code sout _ <- runL4 bin ["export", "--to=dmn", importViewFixture]
+      Output code sout _ <- runL4 bin ["export", "dmn", importViewFixture]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("decision_statute" `isInfixOf`)
       sout `shouldSatisfy` (not . ("local sample" `isInfixOf`))
 
     it "still writes the document when --fail-on trips" $ do
       Output code sout _ <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "--fail-on=blocking"]
+        ["export", "bpmn", bpmnOfferingSource, "--fail-on=blocking"]
       code `shouldSatisfy` (/= ExitSuccess)
       goldenXml <- readUtf8 bpmnOfferingGolden
       sout `shouldBe` goldenXml
 
     it "honours --deadline-unit=refuse (no invented ISO duration)" $ do
       Output code _ serr <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "--deadline-unit=refuse"]
+        ["export", "bpmn", bpmnOfferingSource, "--deadline-unit=refuse"]
       code `shouldBe` ExitSuccess
       -- Under the default the unitless WITHINs are read as days and reported as
       -- P-DEADLINE-UNIT advisories; under `refuse` they become P-DEADLINE.
       serr `shouldSatisfy` ("P-DEADLINE" `isInfixOf`)
-      Output _ soutDefault _ <- runL4 bin ["export", "--to=bpmn", bpmnOfferingSource]
+      Output _ soutDefault _ <- runL4 bin ["export", "bpmn", bpmnOfferingSource]
       Output _ soutRefuse  _ <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "--deadline-unit=refuse"]
+        ["export", "bpmn", bpmnOfferingSource, "--deadline-unit=refuse"]
       soutDefault `shouldSatisfy` ("timerEventDefinition" `isInfixOf`)
       soutRefuse `shouldSatisfy` (not . ("timerEventDefinition" `isInfixOf`))
 
-    it "rejects an unknown --to with a message naming the accepted targets" $ do
-      Output code _ serr <- runL4 bin ["export", "--to=xml", dmnSource]
+    it "rejects an unknown format" $ do
+      Output code _ serr <- runL4 bin ["export", "xml", dmnSource]
       code `shouldSatisfy` (/= ExitSuccess)
-      serr `shouldSatisfy` ("Invalid export target" `isInfixOf`)
-      serr `shouldSatisfy` ("dmn|dmn-md|bpmn" `isInfixOf`)
+      serr `shouldSatisfy` ("Invalid argument `xml'" `isInfixOf`)
 
-    it "requires --to" $
+    it "requires a format before the file" $
       expectFail bin ["export", dmnSource]
 
     it "refuses BPMN when the module has no regulative rules" $ do
-      Output code _ serr <- runL4 bin ["export", "--to=bpmn", exportNothingFixture]
+      Output code _ serr <- runL4 bin ["export", "bpmn", exportNothingFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("regulative" `isInfixOf`)
 
     it "refuses DMN when the module has no decisions" $ do
-      Output code _ serr <- runL4 bin ["export", "--to=dmn", exportNothingFixture]
+      Output code _ serr <- runL4 bin ["export", "dmn", exportNothingFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("No decisions found" `isInfixOf`)
 
     it "refuses to guess which process to draw, and names the candidates" $ do
       -- renderBpmn writes its own XML prolog, so two processes concatenated is
       -- not a document. Refusing beats emitting something no tool can read.
-      Output code _ serr <- runL4 bin ["export", "--to=bpmn", exportTwoRulesFixture]
+      Output code _ serr <- runL4 bin ["export", "bpmn", exportTwoRulesFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("--rule" `isInfixOf`)
       serr `shouldSatisfy` ("the filing" `isInfixOf`)
@@ -621,7 +620,7 @@ spec bin = do
 
     it "selects one process with --rule" $ do
       Output code sout _ <- runL4 bin
-        ["export", "--to=bpmn", exportTwoRulesFixture, "--rule", "the fee"]
+        ["export", "bpmn", exportTwoRulesFixture, "--rule", "the fee"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("<?xml" `isInfixOf`)
       sout `shouldSatisfy` ("the fee" `isInfixOf`)
@@ -629,25 +628,24 @@ spec bin = do
 
     it "fails on an unknown --rule and lists what is available" $ do
       Output code _ serr <- runL4 bin
-        ["export", "--to=bpmn", exportTwoRulesFixture, "--rule", "no such rule"]
+        ["export", "bpmn", exportTwoRulesFixture, "--rule", "no such rule"]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("no such rule" `isInfixOf`)
       serr `shouldSatisfy` ("the filing" `isInfixOf`)
 
     it "rejects --rule on a DMN export instead of ignoring it" $ do
-      Output code _ serr <- runL4 bin ["export", "--to=dmn", dmnSource, "--rule", "x"]
+      Output code _ serr <- runL4 bin ["export", "dmn", dmnSource, "--rule", "x"]
       code `shouldSatisfy` (/= ExitSuccess)
-      serr `shouldSatisfy` ("--rule" `isInfixOf`)
-      serr `shouldSatisfy` ("--to=bpmn" `isInfixOf`)
+      serr `shouldSatisfy` ("Invalid option `--rule'" `isInfixOf`)
 
     it "rejects --model-name on a BPMN export instead of ignoring it" $ do
       Output code _ serr <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "--model-name", "X"]
+        ["export", "bpmn", bpmnOfferingSource, "--model-name", "X"]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("--model-name" `isInfixOf`)
 
     it "fails on a file that does not typecheck" $
-      expectFail bin ["export", "--to=dmn", errorFixture]
+      expectFail bin ["export", "dmn", errorFixture]
 
     -- --flavor (R7). The two flavors differ on exactly one construct, and that
     -- construct is not emitted until Phase 5, so today the flag is observable
@@ -657,14 +655,14 @@ spec bin = do
     describe "--flavor" $ do
       it "defaults to camunda, and says so in the report rather than just 'DMN'" $ do
         Output code _ serr <- runL4 bin
-          ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName, "--fidelity-report"]
+          ["export", "dmn", dmnSource, "--model-name", dmnModelName, "--fidelity-report"]
         code `shouldBe` ExitSuccess
         serr `shouldSatisfy` ("DMN 1.3 (XML), camunda flavor" `isInfixOf`)
 
       it "accepts kie, and drools as a synonym for it" $
         for_ ["kie", "drools"] \flavor -> do
           Output code _ serr <- runL4 bin
-            [ "export", "--to=dmn", dmnSource, "--model-name", dmnModelName
+            [ "export", "dmn", dmnSource, "--model-name", dmnModelName
             , "--flavor=" ++ flavor, "--fidelity-report" ]
           code `shouldBe` ExitSuccess
           serr `shouldSatisfy` ("DMN 1.3 (XML), kie flavor" `isInfixOf`)
@@ -679,8 +677,8 @@ spec bin = do
         -- a requiredKnowledge onto a decisionService; the camunda bytes do
         -- not (that one edge is fatal to Camunda 8's parse(), spec §13.4),
         -- and each equals its committed golden.
-        Output _ svcCam _ <- runL4 bin ["export", "--to=dmn", svcSource]
-        Output _ svcKie _ <- runL4 bin ["export", "--to=dmn", svcSource, "--flavor=kie"]
+        Output _ svcCam _ <- runL4 bin ["export", "dmn", svcSource]
+        Output _ svcKie _ <- runL4 bin ["export", "dmn", svcSource, "--flavor=kie"]
         svcKie `shouldSatisfy`
           ("<requiredKnowledge href=\"#service_special_assessment\"/>" `isInfixOf`)
         svcCam `shouldSatisfy` (not . ("requiredKnowledge href=\"#service_" `isInfixOf`))
@@ -693,44 +691,41 @@ spec bin = do
         -- both equal the one unsuffixed golden. A drift here means the flavor
         -- bit grew a second observable, which wants its own golden split.
         Output _ camunda _ <- runL4 bin
-          ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName, "--flavor=camunda"]
+          ["export", "dmn", dmnSource, "--model-name", dmnModelName, "--flavor=camunda"]
         Output _ kie _ <- runL4 bin
-          ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName, "--flavor=kie"]
+          ["export", "dmn", dmnSource, "--model-name", dmnModelName, "--flavor=kie"]
         kie `shouldBe` camunda
         golden <- readUtf8 dmnGolden
         camunda `shouldBe` golden
 
-      it "rejects --flavor on --to=dmn-md, because nothing on that path reads it" $ do
+      it "rejects --flavor on dmn-md, because nothing on that path reads it" $ do
         -- It was admitted here at first, on the theory that "the flavor lives
         -- in the Drg, which both emitters read". It does not: emitMarkdown
         -- mentions no field of it and markdownReport hard-codes the target
         -- "dmnmd", so --flavor=kie produced a byte-identical document AND a
-        -- byte-identical fidelity report. That is the silent ignore
-        -- checkTargetFlags exists to refuse.
+        -- byte-identical fidelity report. That is the silent ignore the
+        -- per-format parsers now refuse by not offering the flag at all.
         Output code _ serr <- runL4 bin
-          ["export", "--to=dmn-md", dmnSource, "--model-name", dmnModelName, "--flavor=kie"]
+          ["export", "dmn-md", dmnSource, "--model-name", dmnModelName, "--flavor=kie"]
         code `shouldSatisfy` (/= ExitSuccess)
-        serr `shouldSatisfy` ("--flavor" `isInfixOf`)
-        serr `shouldSatisfy` ("--to=dmn-md" `isInfixOf`)
-        serr `shouldSatisfy` ("--to=dmn" `isInfixOf`)
+        serr `shouldSatisfy` ("Invalid option `--flavor=kie'" `isInfixOf`)
 
-      it "still accepts --model-name on --to=dmn-md, which does belong to both" $ do
+      it "still accepts --model-name on dmn-md, which does belong to both" $ do
         Output code sout _ <- runL4 bin
-          ["export", "--to=dmn-md", dmnSource, "--model-name", dmnModelName]
+          ["export", "dmn-md", dmnSource, "--model-name", dmnModelName]
         code `shouldBe` ExitSuccess
         golden <- readUtf8 dmnMarkdownGolden
         sout `shouldBe` golden
 
       it "rejects --flavor on a BPMN export instead of ignoring it" $ do
         Output code _ serr <- runL4 bin
-          ["export", "--to=bpmn", bpmnOfferingSource, "--flavor=kie"]
+          ["export", "bpmn", bpmnOfferingSource, "--flavor=kie"]
         code `shouldSatisfy` (/= ExitSuccess)
-        serr `shouldSatisfy` ("--flavor" `isInfixOf`)
-        serr `shouldSatisfy` ("--to=bpmn" `isInfixOf`)
+        serr `shouldSatisfy` ("Invalid option `--flavor=kie'" `isInfixOf`)
 
       it "rejects an unknown flavor, naming the accepted ones" $ do
         Output code _ serr <- runL4 bin
-          ["export", "--to=dmn", dmnSource, "--flavor=camunda7"]
+          ["export", "dmn", dmnSource, "--flavor=camunda7"]
         code `shouldSatisfy` (/= ExitSuccess)
         serr `shouldSatisfy` ("Invalid --flavor" `isInfixOf`)
         serr `shouldSatisfy` ("camunda|kie" `isInfixOf`)

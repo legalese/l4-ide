@@ -2,7 +2,7 @@
 -- namespace and we emit them unqualified, so `deep red` and deepRed — which
 -- both mangle to `DeepRed` — are ambiguous to Catala ("it can belong to Colour
 -- or Fruit"). Before the constructor namespace joined the collision check,
--- `l4 catala` exited 0 and the toolchain rejected the artifact instead.
+-- `l4 export catala` exited 0 and the toolchain rejected the artifact instead.
 
 DECLARE Colour IS ONE OF `deep red`, green
 DECLARE Fruit  IS ONE OF deepRed, apple

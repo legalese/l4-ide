@@ -230,7 +230,7 @@ if (declared("p7-catala") && !probes.catala?.present) {
   // R9 of specs/todo/CATALA-EXPORT-SPEC.md makes Catala optional when present
   // and never a build dependency — but it is worth knowing before the run
   // rather than from a receipt afterwards, because the emission on its own
-  // proves nothing: `l4 catala` exits 0 on modules `catala typecheck` rejects.
+  // proves nothing: `l4 export catala` exits 0 on modules `catala typecheck` rejects.
   const missing = (probes.catala?.missing ?? ["catala", "clerk"]).join(" and ");
   findings.push({
     stage: "p7-catala",

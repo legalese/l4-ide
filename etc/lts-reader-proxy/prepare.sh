@@ -34,8 +34,8 @@ d="$here/contracts"; src="$root/jl4/examples/ok/contracts.l4"
 "$L4" lts "$src"        | lts_block 1                          > "$d/A.txt"
 "$L4" lts "$src" --json | jq '.[0]'                            > "$d/lts.json"
 "$L4" state-graph "$src" | dot_for 'aContract'                 > "$d/B.dot"
-"$L4" export "$src" --to bpmn --rule aContract                 > "$d/C.bpmn" 2>/dev/null
-"$L4" export "$src" --to bpmn --rule aContract --fidelity-report 2>&1 >/dev/null | sed -n '/^fidelity report/,$p' > "$d/C.fidelity.txt"
+"$L4" export bpmn "$src" --rule aContract                 > "$d/C.bpmn" 2>/dev/null
+"$L4" export bpmn "$src" --rule aContract --fidelity-report 2>&1 >/dev/null | sed -n '/^fidelity report/,$p' > "$d/C.fidelity.txt"
 "$L4" lts "$d/probes.l4" --steps                               > "$d/probes.out"
 
 # ---- 2. every-run-example.l4 / `the tenancy` (barrier), a position the file
@@ -49,7 +49,7 @@ cp "$root/jl4/examples/bpmn/expected/tenancy-barrier.bpmn"       "$d/C.bpmn"
 cp "$root/jl4/examples/bpmn/expected/tenancy-barrier.fidelity.txt" "$d/C.fidelity.txt"
 # the golden is cut from jl4/examples/bpmn/tenancy.l4; prove the doc file's
 # rule exports byte-identically, so C is the P1 golden for THIS rule too
-"$L4" export "$src" --to bpmn --rule 'the tenancy' 2>/dev/null | diff -q - "$d/C.bpmn" >/dev/null \
+"$L4" export bpmn "$src" --rule 'the tenancy' 2>/dev/null | diff -q - "$d/C.bpmn" >/dev/null \
   || { echo "every-run-example: 'the tenancy' no longer matches tenancy-barrier.bpmn" >&2; exit 1; }
 "$L4" lts "$d/probes.l4" --steps                               > "$d/probes.out"
 
@@ -68,8 +68,8 @@ d="$here/promissory-note"; src="$root/jl4/examples/legal/promissory-note.l4"
 "$L4" lts "$src"        | lts_block 2                          > "$d/A.txt"
 "$L4" lts "$src" --json | jq '.[1]'                            > "$d/lts.json"
 "$L4" state-graph "$src" | dot_for '"Payment Obligations"'     > "$d/B.dot"
-"$L4" export "$src" --to bpmn --rule 'Payment Obligations'     > "$d/C.bpmn" 2>/dev/null
-"$L4" export "$src" --to bpmn --rule 'Payment Obligations' --fidelity-report 2>&1 >/dev/null | sed -n '/^fidelity report/,$p' > "$d/C.fidelity.txt"
+"$L4" export bpmn "$src" --rule 'Payment Obligations'     > "$d/C.bpmn" 2>/dev/null
+"$L4" export bpmn "$src" --rule 'Payment Obligations' --fidelity-report 2>&1 >/dev/null | sed -n '/^fidelity report/,$p' > "$d/C.fidelity.txt"
 "$L4" run "$d/probes.l4" 2>&1 | grep -E '^  (Range|  Message|Message)' > "$d/probes.out" || true
 "$L4" lts "$d/probes.l4"                                       >> "$d/probes.out"
 

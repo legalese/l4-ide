@@ -1,5 +1,5 @@
--- | Black-box tests for @l4 catala@. Split out of @Main.hs@ so a release can
--- be sliced per backend.
+-- | Black-box tests for @l4 export catala@. Split out of @Main.hs@ so a
+-- release can be sliced per backend.
 module CliTest.Catala (spec, fixtures) where
 
 import Data.List (isInfixOf, isPrefixOf)
@@ -16,21 +16,21 @@ fixtures = []
 
 spec :: FilePath -> Spec
 spec bin = do
-  -- `l4 catala` (specs/todo/CATALA-EXPORT-SPEC.md). Each golden below has been
+  -- `l4 export catala` (specs/todo/CATALA-EXPORT-SPEC.md). Each golden below has been
   -- run through the real toolchain — `catala typecheck` and `clerk test`
   -- against catala 1.2.1 — so the goldens are not merely "what the emitter
   -- currently prints"; see examples/catala/README.md.
-  describe "l4 catala" $ do
+  describe "l4 export catala" $ do
     it "compiles the spec's Appendix A example to its golden Catala module" $
-      expectGolden bin ["catala", "examples/catala/benefit.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/benefit.l4"]
                        "examples/catala/expected/benefit.catala_en"
 
     it "compiles a nested-guard rate table (the ladder-direction exhibit)" $
-      expectGolden bin ["catala", "examples/catala/bands.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/bands.l4"]
                        "examples/catala/expected/bands.catala_en"
 
     it "compiles the literate weave: § headings, inert law text, @ref, enums" $
-      expectGolden bin ["catala", "examples/catala/statute.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/statute.l4"]
                        "examples/catala/expected/statute.catala_en"
 
     -- The two OpenFisca seed-corpus ports named in the spec's P1 exit
@@ -38,15 +38,15 @@ spec bin = do
     -- what makes them Catala-clean is R11's elision of the `period` plumbing
     -- string (and, in household, of `Person.name`).
     it "compiles the flat-tax port, eliding the OpenFisca period string (R11)" $
-      expectGolden bin ["catala", "examples/catala/flat-tax.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/flat-tax.l4"]
                        "examples/catala/expected/flat-tax.catala_en"
 
     it "compiles the household port: group entity, LIST OF, absorbed sum (R5)" $
-      expectGolden bin ["catala", "examples/catala/household.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/household.l4"]
                        "examples/catala/expected/household.catala_en"
 
     it "compiles CONSIDER-on-enum plus TYPICALLY → context (R10)" $
-      expectGolden bin ["catala", "examples/catala/tariff.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/tariff.l4"]
                        "examples/catala/expected/tariff.catala_en"
 
     -- The coverage exhibit. An adversarial review found the other six goldens
@@ -55,7 +55,7 @@ spec bin = do
     -- `contains`, `impossible`, a private toplevel or the R3 date helper would
     -- have been caught by nothing in the tree.
     it "compiles the coverage exhibit: dates, MAYBE, folds, a private toplevel" $
-      expectGolden bin ["catala", "examples/catala/registry.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/registry.l4"]
                        "examples/catala/expected/registry.catala_en"
 
     -- The @export-everything hatch, and the only file in this corpus carrying a
@@ -66,7 +66,7 @@ spec bin = do
     -- fixpoint carries it TRANSITIVELY (`the top` never names the binder, reaches
     -- it only through `the middle`, and must still declare and forward it).
     it "compiles the @export chain, threading a section GIVEN as a scope input" $
-      expectGolden bin ["catala", "examples/catala/export-chain.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/export-chain.l4"]
                        "examples/catala/expected/export-chain.catala_en"
 
     -- The lowering scans the whole IMPORT closure, not just the entry module.
@@ -74,7 +74,7 @@ spec bin = do
     -- door was reported as "outside the v1 Catala fragment (§6)" — a message
     -- about the language, for a defect in the scan.
     it "compiles a decision built out of imported declarations and an imported helper" $
-      expectGolden bin ["catala", "examples/catala/imports.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/imports.l4"]
                        "examples/catala/expected/imports.catala_en"
 
     -- Reading the closure means the prelude's own declarations are visible too.
@@ -82,7 +82,7 @@ spec bin = do
     -- only when the emitted code reaches it. Assert on what is absent, because
     -- the golden above can only show what is present.
     it "emits no stdlib declaration for a module that merely imports the prelude" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/imports.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/imports.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("declaration structure Assessment:" `isInfixOf`)
       sout `shouldSatisfy` ("declaration enumeration Band:" `isInfixOf`)
@@ -97,11 +97,11 @@ spec bin = do
     -- it was not collected and the directive was dropped, so only directives
     -- with literal arguments became tests.
     it "collects a fixture reached only from a directive and tests against it" $
-      expectGolden bin ["catala", "examples/catala/fixtures.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/fixtures.l4"]
                        "examples/catala/expected/fixtures.catala_en"
 
     it "emits every directive as a test scope when its arguments name fixtures" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/fixtures.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/fixtures.l4"]
       code `shouldBe` ExitSuccess
       -- The three fixture-argument directives convert. The file's last two are
       -- skipped on purpose, so this asserts the absence of the CAUSE rather
@@ -123,7 +123,7 @@ spec bin = do
     -- vanished rather than appearing under the wrong number. The last two
     -- directives of `fixtures.l4` are both skipped, so this catches either half.
     it "numbers a skipped directive by its own position, and reports every one" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/fixtures.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/fixtures.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("- directive 4 did not become a Catala" `isInfixOf`)
       sout `shouldSatisfy` ("- directive 5 did not become a Catala" `isInfixOf`)
@@ -137,11 +137,11 @@ spec bin = do
     -- structure and the fields carrying it are both gone, and the test below it
     -- pins that both disappearances are disclosed rather than silent.
     it "elides a record whose every field is a STRING, and the fields that carry it" $
-      expectGolden bin ["catala", "examples/catala/all-string-record.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/all-string-record.l4"]
                        "examples/catala/expected/all-string-record.catala_en"
 
     it "discloses an elided structure and the fields that vanish with it" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/all-string-record.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/all-string-record.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("structure `Provenance` is not emitted at all" `isInfixOf`)
       sout `shouldSatisfy`
@@ -161,7 +161,7 @@ spec bin = do
     -- reader must be told about, so it goes in the notes block, not just on
     -- stderr.
     it "discloses every R11 elision in the emitted document's notes block" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/household.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/household.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("field `name` of `Person` is a STRING" `isInfixOf`)
       sout `shouldSatisfy` ("parameter `period` of `household income` is a STRING" `isInfixOf`)
@@ -170,7 +170,7 @@ spec bin = do
     -- source, because Catala lets a caller omit a `context` variable and L4
     -- does not let a caller omit anything.
     it "emits TYPICALLY as `context` + an in-scope default, and says so" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/tariff.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/tariff.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("context cap content decimal" `isInfixOf`)
       sout `shouldSatisfy` ("A Catala caller may omit it; an L4 caller may not." `isInfixOf`)
@@ -182,7 +182,7 @@ spec bin = do
     -- and nothing fails. The twin scope omits it, over a directive whose cap
     -- actually binds, which is what makes the default observable.
     it "pins the R10 default with a twin test scope that omits the argument" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/tariff.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/tariff.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("#[test] declaration scope Test3Default:" `isInfixOf`)
       sout `shouldSatisfy`
@@ -192,7 +192,7 @@ spec bin = do
     -- R2 (§8.2) promised a lowering note at each coercion; R7 (§8.7) promised a
     -- human-legible companion to the exact-rational JSON block.
     it "emits R2's per-coercion note and R7's human-format companion line" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/registry.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/registry.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("# R2 coercion: `decimal of` was inserted" `isInfixOf`)
       sout `shouldSatisfy` ("is ROUNDED here rather than refused" `isInfixOf`)
@@ -203,7 +203,7 @@ spec bin = do
     -- the emitter writes the conditional form. `benefit.l4`'s disjunction is
     -- the one the spec's Appendix A example turns on.
     it "emits AND/OR as short-circuiting conditionals, never Catala `and`/`or`" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/benefit.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/benefit.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy`
         ("(if (a.age >= 65.0) then true else a.is_veteran)" `isInfixOf`)
@@ -212,7 +212,7 @@ spec bin = do
     -- R4: the exception ladder is the PRIMARY emission, and it never ships
     -- without the apparatus that re-checks it.
     it "emits Mode B ladders together with their equivalence grid" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/bands.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/bands.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("label rate_band_r1 exception rate_band_r2" `isInfixOf`)
       sout `shouldSatisfy` ("#[test] declaration scope RateBandEqvGrid:" `isInfixOf`)
@@ -222,14 +222,14 @@ spec bin = do
     -- `clerk test --reset`. 0.25 is L4's answer for a 60000 income, and Catala
     -- prints exact rationals in JSON, so it has to appear as 1/4.
     it "fills test blocks with values L4 computed, as exact rationals" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/bands.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/bands.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("$ catala test-scope Test1 --disable-warnings -F json" `isInfixOf`)
       sout `shouldSatisfy` ("{\"result\":\"1/4\"}" `isInfixOf`)
       sout `shouldSatisfy` ("{\"result\":\"2/5\"}" `isInfixOf`)
 
     it "--boolean-only drops the ladders and the grids that check them" $ do
-      Output code sout _ <- runL4 bin ["catala", "--boolean-only", "examples/catala/bands.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "--boolean-only", "examples/catala/bands.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldNotSatisfy` ("EqvGrid" `isInfixOf`)
       sout `shouldNotSatisfy` ("label rate_band_r1" `isInfixOf`)
@@ -240,7 +240,7 @@ spec bin = do
     -- etc/validate-catala.mjs walks `expected/`, so the flag's output is under
     -- `catala typecheck`, `catala proof` and `clerk test` like everything else.
     it "pins the --boolean-only rendering as a golden the R9 harness checks" $
-      expectGolden bin ["catala", "--boolean-only", "examples/catala/bands.l4"]
+      expectGolden bin ["export", "catala", "--boolean-only", "examples/catala/bands.l4"]
                        "examples/catala/expected/bands-boolean-only.catala_en"
 
     -- Catala wants the module name to be the file's basename with its first
@@ -248,7 +248,7 @@ spec bin = do
     -- than by the toolchain after the file has been written.
     it "rejects an -o basename that cannot be a Catala module name" $ do
       Output code _ serr <- runL4 bin
-        ["catala", "examples/catala/flat-tax.l4", "-o", "ft-out.catala_en"]
+        ["export", "catala", "examples/catala/flat-tax.l4", "-o", "ft-out.catala_en"]
       code `shouldNotBe` ExitSuccess
       serr `shouldSatisfy` ("cannot be a Catala module name" `isInfixOf`)
 
@@ -256,11 +256,11 @@ spec bin = do
     -- conflate in Catala's flat per-structure namespace; the OpenFisca fixture
     -- has the same shape and serves both backends.
     it "rejects a name collision (distinct L4 names → same Catala identifier)" $
-      expectFail bin ["catala", "examples/openfisca/not-ok/name-collision.l4"]
+      expectFail bin ["export", "catala", "examples/openfisca/not-ok/name-collision.l4"]
 
     -- Six shapes that used to compile to Catala saying something other than
     -- what the L4 says. Each fixture's header names the divergence; the point
-    -- of the group is that `l4 catala` refuses rather than emitting quietly.
+    -- of the group is that `l4 export catala` refuses rather than emitting quietly.
     -- `duplicate-type-name` became possible only once the lowering read the
     -- import closure (§8.1.2): two imported modules each declaring a `Thing`,
     -- which `l4 check` accepts and one flat Catala namespace cannot hold.
@@ -272,12 +272,12 @@ spec bin = do
          , "duplicate-type-name"
          ] $ \name ->
       it ("rejects " ++ name ++ " rather than changing its denotation") $
-        expectFail bin ["catala", "examples/catala/not-ok/" ++ name ++ ".l4"]
+        expectFail bin ["export", "catala", "examples/catala/not-ok/" ++ name ++ ".l4"]
 
     -- smucclaw/l4-ide#958. R1 emits an @export'd decision as a Catala SCOPE and
     -- every other reachable decision as a TOPLEVEL, and Catala allows a scope
     -- call only inside a scope — so a non-exported caller of an exported callee
-    -- cannot be expressed. Until this refusal, `l4 catala` emitted that module,
+    -- cannot be expressed. Until this refusal, `l4 export catala` emitted that module,
     -- printed nothing at all, and exited 0; the invalid output was found only by
     -- running `catala typecheck` over it by hand, which reports "Scope calls are
     -- not allowed outside of a scope" (catala 1.2.1, exit 123).
@@ -296,7 +296,7 @@ spec bin = do
          ] $ \(name, caller, callee) ->
       it ("refuses " ++ name ++ ": a scope call would land outside a scope") $ do
         Output code _ serr <- runL4 bin
-          ["catala", "examples/catala/not-ok/" ++ name ++ ".l4"]
+          ["export", "catala", "examples/catala/not-ok/" ++ name ++ ".l4"]
         code `shouldNotBe` ExitSuccess
         -- names the caller, the callee, the rule, and the way out
         serr `shouldSatisfy` (("`" ++ caller ++ "`") `isInfixOf`)
@@ -306,6 +306,6 @@ spec bin = do
         serr `shouldSatisfy` ("Mark this caller @export too" `isInfixOf`)
 
     it "fails on a file that does not typecheck" $
-      expectFail bin ["catala", errorFixture]
+      expectFail bin ["export", "catala", errorFixture]
   where
     for_ xs f = mapM_ f xs
