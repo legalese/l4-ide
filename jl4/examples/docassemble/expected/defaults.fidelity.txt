@@ -1,0 +1,7 @@
+fidelity report — docassemble
+  [DA-TYPICALLY] advisory — defaults.l4
+      TYPICALLY defaults prefill these fields (the user still submits the screen, so the entering value is user-confirmed): p.was_concluded_at_a_distance
+      lost: L4's evaluator would have asked with no prefill; a prefilled widget biases the answer
+  [DA-MAYBE-STRING] advisory — defaults.l4
+      MAYBE STRING fields are optional text inputs; an empty submission is read as NOTHING: p.promotional_code_used
+      lost: a deliberately empty answer is indistinguishable from an absent one

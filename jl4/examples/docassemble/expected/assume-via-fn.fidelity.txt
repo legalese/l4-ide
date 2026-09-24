@@ -1,0 +1,4 @@
+fidelity report — docassemble
+  [DA-FLOAT] advisory — assume-via-fn.l4
+      NUMBER is emitted as docassemble `datatype: number` and Python float arithmetic; L4 evaluates numbers as exact Rationals
+      lost: exact decimal arithmetic — do not rely on exact equality of computed sums

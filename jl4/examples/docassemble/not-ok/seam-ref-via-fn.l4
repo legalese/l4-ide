@@ -1,0 +1,23 @@
+-- A seam-shaped (top-level IMPLIES) export whose goal variable is
+-- deliberately never emitted (R4) is referenced by another decision — but
+-- only THROUGH an inlined parameterized function. The dangling-reference
+-- guard must see references that travel through inlined bodies, or the
+-- emitter exits 0 and the interview dies at runtime with
+-- DAErrorMissingVariable on `seam_rule` (the direct-reference control is
+-- already refused; this fixture pins the inlined path).
+
+ASSUME `scope flag` IS A BOOLEAN
+ASSUME `req flag` IS A BOOLEAN
+
+@export the main gate
+GIVEN amount IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `main gate` amount IF `wrap` amount
+
+GIVEN x IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `wrap` x IS x GREATER THAN 0 AND `seam rule`
+
+@export the seam rule
+GIVETH A BOOLEAN
+DECIDE `seam rule` IF `scope flag` IMPLIES `req flag`

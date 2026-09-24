@@ -1,0 +1,35 @@
+-- REFUSED (M4, spec §8.8): `WHEN JUST ""` on a `MAYBE STRING`.
+--
+-- M4 ruled payload-VALUE matches IN, on one recorded condition: "`WHEN JUST
+-- <value>` must NOT compile to a presence test." A `MAYBE STRING` rides as a
+-- plain optional text field, and its NOTHING encoding IS the empty string —
+-- `<var> == ''`. So `WHEN JUST ""` is the one literal for which that condition
+-- cannot be honoured: it lowers to exactly the absence test, and the interview
+-- would answer NOTHING and JUST "" the same way.
+--
+-- Worse than conflation, and this is why it refuses rather than warns. The
+-- module's own DA-MAYBE-STRING advisory declares the erasure direction — "an
+-- empty submission is read as NOTHING" — so the only interview state the test
+-- can reach is the state L4 calls NOTHING. The emitted answer would have been
+-- INVERTED, not merely ambiguous, on the one input that reaches it.
+--
+-- Every NON-empty literal is fine: `WHEN JUST "lost my job"` lowers to
+-- `c.the_stated_reason == 'lost my job'` and is exact. So is binding the
+-- payload and testing it in the arm body.
+
+DECLARE Claim
+    HAS
+      @desc The reason the claimant gave, if any
+      `the stated reason` IS A MAYBE STRING
+
+@export whether the claim needs review
+GIVEN c IS A Claim @desc The claim under assessment
+GIVETH A BOOLEAN
+`needs review` c MEANS
+    CONSIDER c's `the stated reason`
+    WHEN JUST "" THEN TRUE
+    OTHERWISE FALSE
+
+#EVAL `needs review` OF Claim WITH `the stated reason` IS NOTHING
+-- FALSE (and `JUST ""` is TRUE — the two L4 answers this lowering cannot tell
+-- apart)

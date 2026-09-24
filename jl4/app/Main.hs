@@ -35,6 +35,7 @@ import L4.Cli.Batch (BatchOptions, batchCmd, batchOptionsParser)
 import L4.Cli.Blawx (BlawxOptions, blawxCmd, blawxExportOptionsParser, blawxImportOptionsParser)
 import L4.Cli.Catala (CatalaOptions, catalaCmd, catalaOptionsParser)
 import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
+import L4.Cli.Docassemble (DocassembleOptions, docassembleCmd, docassembleOptionsParser)
 import L4.Cli.Export (ExportOptions, exportBpmnOptionsParser, exportCmd, exportDmnMarkdownOptionsParser, exportDmnOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
 import L4.Cli.Nlg (NlgOptions, nlgCmd, nlgOptionsParser)
@@ -62,6 +63,7 @@ data Command
   | CmdOpenFisca  OpenFiscaOptions
   | CmdBlawx      BlawxOptions
   | CmdCatala     CatalaOptions
+  | CmdDocassemble DocassembleOptions
   | CmdNlg        NlgOptions
   | CmdVerify     VerifyOptions
 
@@ -149,6 +151,9 @@ commandParser =
         <> command "catala"
              (info (helper <*> (CmdCatala <$> catalaOptionsParser))
                (progDesc "A literate Catala module of the constitutive subset"))
+        <> command "docassemble"
+             (info (helper <*> (CmdDocassemble <$> docassembleOptionsParser))
+               (progDesc "A docassemble interview (YAML) of the decision-rule subset, with a fidelity report"))
         )
 
     importFormats =
@@ -215,6 +220,7 @@ main = do
     CmdOpenFisca  opts -> openFiscaCmd  opts
     CmdBlawx      opts -> blawxCmd      opts
     CmdCatala     opts -> catalaCmd     opts
+    CmdDocassemble opts -> docassembleCmd opts
     CmdNlg        opts -> nlgCmd        opts
     CmdVerify     opts -> verifyCmd     opts
 
