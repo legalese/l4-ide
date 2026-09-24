@@ -1,0 +1,138 @@
+{
+  "kind": "external-modifications",
+  "register_version": 1,
+  "subject": "bna",
+  "swept": "2026-08-02",
+  "note": "FIXTURE, NOT A COMMITTED REGISTER. The BNA smoke run's P2 (SMOKE-REPORT.md §2, p2-sweep) was a SCOPE decision over the publisher's own annotation apparatus, not the outward sweep SPEC.md §4 P2 describes: no litigation search, no Home Office guidance search, no Bills-before-Parliament search was performed. This file records exactly what was consulted and nothing else, with the blind spots in each coverage_note — which is what the searches[] section is for. A reader must not read it as a completed sweep.",
+  "searches": [
+    {
+      "id": "SRCH-outstanding",
+      "question": "Are there changes to British Nationality Act 1981 s 1 that are known but not yet in force?",
+      "method": "publisher-page",
+      "scope": "The \"Changes to Legislation\" / \"yet to be applied\" panel printed on the legislation.gov.uk s 1 revised-text page, read via Wayback capture 20260705112453.",
+      "performed": "2026-08-02",
+      "outcome": "findings",
+      "findings": ["EM-YTBA"],
+      "coverage_note": "Covers only what legislation.gov.uk had recorded as outstanding as at that capture. It is not a search for litigation in flight, for Home Office guidance or caseworker instructions, or for Bills before Parliament; none of those was searched in this run."
+    },
+    {
+      "id": "SRCH-annotations",
+      "question": "What does the publisher's own annotation apparatus record as having modified s 1 without altering its text?",
+      "method": "publisher-page",
+      "scope": "The \"Textual Amendments\" (F1-F19) and \"Modifications etc. (not altering text)\" (C1-C5) lists printed below s 1 in the same capture.",
+      "performed": "2026-08-02",
+      "outcome": "findings",
+      "findings": ["EM-C3", "EM-C2"],
+      "coverage_note": "Covers only annotations the publisher printed. Judicial glosses, unincorporated guidance and pending amendments do not appear in this apparatus and were not searched for. The apparatus is also the publisher's editorial judgement about what counts as a modification, not an exhaustive record of legal effect."
+    }
+  ],
+  "entries": [
+    {
+      "id": "EM-YTBA",
+      "class": "prospective",
+      "summary": "The page's banner records that \"there are changes that may be brought into force at a future date\". The outstanding changes listed all target OTHER provisions — s 6(3)(4), s 41 and Sch. 1, via Borders, Citizenship and Immigration Act 2009 ss 39-41, themselves prospectively repealed by Nationality and Borders Act 2022 (c. 36) s 9(3)(a). None amends the s 1 text.",
+      "provenance": {
+        "source": "legislation.gov.uk, s 1 revised text: currency banner and \"Changes to Legislation\" panel",
+        "url": "https://web.archive.org/web/20260705112453/https://www.legislation.gov.uk/ukpga/1981/61/section/1",
+        "retrieved": "2026-08-02",
+        "citation": "Nationality and Borders Act 2022 (c. 36) s 9(3)(a); Borders, Citizenship and Immigration Act 2009 (c. 11) ss 39-41",
+        "quote": "There are changes that may be brought into force at a future date."
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": true,
+        "effective_from_absent_reason": "No commencement date is appointed for the outstanding changes; the publisher lists them as not yet applied without a date."
+      },
+      "disposition": "no-effect",
+      "disposition_note": "Nothing here touches s 1, so the encoding is unaffected. The entry exists so that \"no prospective change affects s 1\" is a recorded, dated finding rather than an absence, and so that P9 can report the currency risk that the undated outstanding list represents for the Act as a whole.",
+      "found_by": ["SRCH-outstanding"]
+    },
+    {
+      "id": "EM-C3",
+      "class": "binding",
+      "binding_effect": "restricted",
+      "summary": "s 1(3) and (4) are restricted (4 December 2006) by the good-character requirement of British Nationality Act 1981 s 41A, inserted by Immigration, Asylum and Nationality Act 2006 (c. 13) s 58. The s 41A text itself was not fetched in this run, so nothing here paraphrases its operative words; what is recorded is the publisher's modification note and the restriction's existence.",
+      "provenance": {
+        "source": "legislation.gov.uk, \"Modifications etc. (not altering text)\" note C3 on s 1",
+        "url": "https://web.archive.org/web/20260705112453/https://www.legislation.gov.uk/ukpga/1981/61/section/1",
+        "retrieved": "2026-08-02",
+        "citation": "Immigration, Asylum and Nationality Act 2006 (c. 13) ss 58, 62; S.I. 2006/2838 art. 4(1) (subject to art. 4(2))",
+        "quote": "C3 S. 1(3)(4) restricted (4.12.2006) by Immigration, Asylum and Nationality Act 2006 (c. 13), ss. 58, 62; S.I. 2006/2838, art. 4(1) (subject to art. 4(2))"
+      },
+      "routing": { "fork_ids": ["A12"], "currency_risk": false },
+      "disposition": "encoded",
+      "disposition_note": "Encoded as the separate `registration may be granted` grant-gate predicate, so the s 1 entitlement predicates stay textually pure. WHERE it belongs in the encoding is itself contested; that argument is fork A12.",
+      "found_by": ["SRCH-annotations"]
+    },
+    {
+      "id": "EM-C2",
+      "class": "interpretive",
+      "summary": "S.I. 1972/1613 art. 6, as inserted by S.I. 1982/1649 art. 3, \"explains\" s 1(1) by treating certain persons exempt from immigration control as settled.",
+      "provenance": {
+        "source": "legislation.gov.uk, \"Modifications etc. (not altering text)\" note C2 on s 1",
+        "url": "https://web.archive.org/web/20260705112453/https://www.legislation.gov.uk/ukpga/1981/61/section/1",
+        "retrieved": "2026-08-02",
+        "citation": "S.I. 1972/1613 art. 6 (as inserted by S.I. 1982/1649 art. 3)",
+        "quote": "C2 S. 1(1) explained by S.I. 1972/1613, art. 6 (as inserted by S.I. 1982/1649, art. 3)"
+      },
+      "routing": { "fork_ids": [], "currency_risk": false },
+      "disposition": "subsumed",
+      "disposition_note": "Its substance — persons exempt from immigration control treated as settled for s 1(1) — rides inside the scope-out of \"settled\" as an already-construed input field, so nothing computes differently and no fork is opened. This is the annotation the hand sweep neither encoded nor scoped out (SMOKE-REPORT.md §3.5), which is why the completeness join below exists at all.",
+      "found_by": ["SRCH-annotations"]
+    }
+  ],
+  "dispositions": [
+    {
+      "document": "bna-s1-revised",
+      "markers": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5",
+        "F6",
+        "F7",
+        "F8",
+        "F9",
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14",
+        "F15",
+        "F16",
+        "F17",
+        "F18",
+        "F19"
+      ],
+      "disposition": "scoped-out",
+      "note": "Textual-amendment markers: they record how the consolidated text reached its current form. This encoding formalises the consolidated text as in force on 4 July 2026 and builds no rule-version axis, so the pre-2002, pre-2010 and pre-2021 versions are not encoded (README, \"Historic texts\" scope-out). The F-key dates are the raw material if a later pass adds the axis. One row rather than nineteen, because one argument disposes of all of them and nineteen copies of it would not be re-read."
+    },
+    {
+      "document": "bna-s1-revised",
+      "markers": ["C1"],
+      "disposition": "scoped-out",
+      "note": "HFEA parental-order modification (S.I. 2018/1412 reg. 1(2), Sch. 4 para. 10) — not modelled."
+    },
+    {
+      "document": "bna-s1-revised",
+      "markers": ["C2"],
+      "disposition": "subsumed",
+      "entry": "EM-C2",
+      "note": "Subsumed by the scope-out of \"settled\" as an already-construed input; see entry EM-C2."
+    },
+    {
+      "document": "bna-s1-revised",
+      "markers": ["C3"],
+      "disposition": "encoded",
+      "entry": "EM-C3",
+      "note": "Encoded as the `registration may be granted` grant gate; placement argued at fork A12."
+    },
+    {
+      "document": "bna-s1-revised",
+      "markers": ["C4", "C5"],
+      "disposition": "scoped-out",
+      "note": "HFEA parental-order modifications to s 1(5)(a) and s 1(5A)(a) (S.I. 2010/985 regs. 1(1), 5, Sch. 4) — not modelled."
+    }
+  ]
+}
