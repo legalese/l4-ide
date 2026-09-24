@@ -62,7 +62,12 @@ fi
 
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   echo "export PATH=\"$GHCUP_BIN:\$PATH\"" >>"$CLAUDE_ENV_FILE"
+  # The container's locale is POSIX, and jl4-core embeds its .l4 libraries with
+  # a Template Haskell splice that reads them in the locale's encoding. The
+  # first `§` then fails the build: "hGetContents: invalid argument (cannot
+  # decode byte sequence starting from 194)". Measured 2026-09-24.
+  echo "export LANG=C.UTF-8 LC_ALL=C.UTF-8" >>"$CLAUDE_ENV_FILE"
 fi
 
 # SessionStart stdout becomes session context: say what is now available.
-echo "Haskell toolchain ready: $("$GHCUP_BIN/ghc" --numeric-version | sed 's/^/GHC /'), $("$GHCUP_BIN/cabal" --numeric-version | sed 's/^/cabal /'), on PATH via $GHCUP_BIN. Dependencies are not prebuilt; the first cabal build compiles them."
+echo "Haskell toolchain ready: $("$GHCUP_BIN/ghc" --numeric-version | sed 's/^/GHC /'), $("$GHCUP_BIN/cabal" --numeric-version | sed 's/^/cabal /'), on PATH via $GHCUP_BIN, locale C.UTF-8. Dependencies are not prebuilt; the first cabal build compiles them."
