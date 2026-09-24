@@ -32,6 +32,7 @@ import System.IO (hSetEncoding, stdin, stdout, stderr)
 
 import L4.Cli.Ast (AstOptions, astCmd, astOptionsParser)
 import L4.Cli.Batch (BatchOptions, batchCmd, batchOptionsParser)
+import L4.Cli.Blawx (BlawxOptions, blawxCmd, blawxExportOptionsParser, blawxImportOptionsParser)
 import L4.Cli.Catala (CatalaOptions, catalaCmd, catalaOptionsParser)
 import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
 import L4.Cli.Export (ExportOptions, exportBpmnOptionsParser, exportCmd, exportDmnMarkdownOptionsParser, exportDmnOptionsParser)
@@ -59,6 +60,7 @@ data Command
   | CmdRender     RenderOptions
   | CmdExport     ExportOptions
   | CmdOpenFisca  OpenFiscaOptions
+  | CmdBlawx      BlawxOptions
   | CmdCatala     CatalaOptions
   | CmdNlg        NlgOptions
   | CmdVerify     VerifyOptions
@@ -117,6 +119,9 @@ commandParser =
       <> command "export"
            (info (helper <*> exportFormats)
              (progDesc "Write an L4 module out in another notation: an interchange document, a runnable program, or an interview. Run `l4 export --help` for the formats, `l4 export FORMAT --help` for each one's options"))
+      <> command "import"
+           (info (helper <*> importFormats)
+             (progDesc "Read another notation into L4 source. Run `l4 import --help` for the formats"))
 
     -- One subcommand per foreign notation (CLI-SURFACE-SPEC C1). Each was a
     -- top-level verb, or a `--to` value on `l4 export`, until 2026-09-24.
@@ -138,9 +143,21 @@ commandParser =
         <> command "openfisca"
              (info (helper <*> (CmdOpenFisca <$> openFiscaOptionsParser))
                (progDesc "A runnable OpenFisca Python module of the decision-rule subset"))
+        <> command "blawx"
+             (info (helper <*> (CmdBlawx <$> blawxExportOptionsParser))
+               (progDesc "A Blawx project (.blawx YAML + s(CASP) dump) of the decision-rule subset"))
         <> command "catala"
              (info (helper <*> (CmdCatala <$> catalaOptionsParser))
                (progDesc "A literate Catala module of the constitutive subset"))
+        )
+
+    importFormats =
+      subparser
+        (  metavar "FORMAT"
+        <> commandGroup "Formats:"
+        <> command "blawx"
+             (info (helper <*> (CmdBlawx <$> blawxImportOptionsParser))
+               (progDesc "Lift a .blawx project to L4 source"))
         )
 
 -- | A footer that keeps the line breaks it was written with.
@@ -196,6 +213,7 @@ main = do
     CmdRender     opts -> renderCmd     opts
     CmdExport     opts -> exportCmd     opts
     CmdOpenFisca  opts -> openFiscaCmd  opts
+    CmdBlawx      opts -> blawxCmd      opts
     CmdCatala     opts -> catalaCmd     opts
     CmdNlg        opts -> nlgCmd        opts
     CmdVerify     opts -> verifyCmd     opts

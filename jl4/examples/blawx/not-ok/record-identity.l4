@@ -1,0 +1,70 @@
+-- The W1 fixture (BLAWX-EXPORT-SPEC §11 W1, measured 2026-09-02): the FIRST
+-- Rock Paper Scissors encoding, the one that reads s.4 the way the Act reads —
+-- "the player who throws a sign that beats the sign of the OTHER player" — and
+-- finds the other player by comparing two Player records with `EQUALS`.
+--
+-- It is refused, and the refusal is the point. L4 compares records BY VALUE;
+-- Blawx compares objects BY ATOM. R11's query flattening emits one Blawx object
+-- per occurrence of a record value, so the `#EVAL` below hands the query a
+-- Player object `p1` while the game's `first player` slot is filled by a second
+-- object `p2` with the same `throws` — structurally equal, atomically distinct.
+-- `P = Firstplayer` then fails, `other player` derives nothing, and `wins`
+-- has no model. L4 says TRUE, s(CASP) says "no models": the §3.2.1 failure
+-- class — source that parses, checks, and answers DIFFERENTLY — which is
+-- visible here only because R11 keeps the oracle outside the artifact.
+--
+-- Measured that day: this module lowered clean and the tier-1 harness returned
+-- no model for the `bobjane` query. Silence is the worst possible outcome for a
+-- transpiler, so the lowering now refuses `EQUALS`/disequality on record-typed
+-- operands with a named diagnostic (`record identity (Blawx)`).
+--
+-- What a user does about it: state the rule once per SLOT, which needs no
+-- identity at all — `first player wins` / `second player wins`, which is what
+-- the shipped `jl4/examples/blawx/rps.l4` does and which passes tier-1 4/4 — or
+-- compare an enum- or scalar-valued FIELD (`p's throws EQUALS q's throws`)
+-- instead of the records themselves, since enums and numbers ARE atoms in
+-- Blawx and do survive the flattening.
+--
+-- The later fix, deliberately not taken in v1: hash-cons structurally-equal
+-- record arguments in the query flattening so one distinct value becomes one
+-- object, and lift the refusal. Recorded in §11 W1 as the next step.
+
+§ `Rock Paper Scissors Act`
+
+DECLARE Sign IS ONE OF Rock, Paper, Scissors
+
+DECLARE Player HAS
+    throws IS A Sign
+
+DECLARE Game HAS
+    `first player`  IS A Player
+    `second player` IS A Player
+
+@export 4. The winner of a game is the player who throws a sign that beats the sign of the other player.
+GIVEN p IS A Player
+      g IS A Game
+GIVETH A BOOLEAN
+DECIDE `wins` p g IF
+  `beats` (p's throws) EQUALS (`other player` g p)'s throws
+
+@export 3. The signs are related in the following ways: (a) Rock beats Scissors, (b) Scissors beats Paper, and (c) Paper beats Rock.
+GIVEN s IS A Sign
+GIVETH A Sign
+DECIDE `beats` s IS
+  CONSIDER s
+    WHEN Rock THEN Scissors
+    WHEN Scissors THEN Paper
+    WHEN Paper THEN Rock
+
+@export 1. A game of rock paper scissors has two players. The other player is whichever of the two is not the one in question.
+GIVEN g IS A Game
+      p IS A Player
+GIVETH A Player
+DECIDE `other player` g p IS
+  IF p EQUALS g's `first player` THEN g's `second player` ELSE g's `first player`
+
+-- Jason's `bobjane` test: jane throws rock, bob throws scissors.
+#EVAL `wins` (Player WITH throws IS Rock)
+             (Game WITH `first player` IS Player WITH throws IS Rock
+                        `second player` IS Player WITH throws IS Scissors)
+-- L4 oracle ==> TRUE; tier-1 ==> NO model (the divergence)

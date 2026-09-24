@@ -1,0 +1,20 @@
+-- Named rejection: a LOCAL ASSUME, which the top-level widening deliberately
+-- did not travel to.
+--
+-- A top-level ASSUME now lowers to an input predicate: it has a module-level
+-- name, so a target can declare it, a scenario editor can state it and an
+-- interview can abduce it. A local one has none of that — it is scoped to one
+-- definition's WHERE block, there is nothing to declare it as, and nothing for
+-- an interview to ask about. The two sites are a few hundred lines apart in
+-- `L4.Relational.Lower` and the careless version of the widening takes both;
+-- this fixture is what fails if it does.
+--
+-- The diagnostic is `local ASSUME`, distinct from every kind the top-level path
+-- can produce, because #258 §6.1's rejection census counts by kind.
+
+@export
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `above the threshold` IF n AT LEAST threshold
+  WHERE
+    ASSUME threshold IS A NUMBER

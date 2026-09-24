@@ -1,0 +1,110 @@
+-- The ASSUME seed: the second source of an `RInput` predicate.
+--
+-- A top-level ASSUME is a name the module states a signature for and never
+-- defines — which is exactly what an input predicate is, so it lowers to one
+-- (`L4.Relational.IR`, RInput). This file is the golden for that widening, and
+-- carries one instance of every shape it has to get right:
+--
+--   * `ASSUME T IS A TYPE` becomes an ABSTRACT CATEGORY, printed in its own
+--     block. It is category-shaped like a DECLAREd record (same `RSRecord`
+--     sort, so no consumer gains a case) and has no fields, so it is not in
+--     `records:` — a reader of a golden has to be able to tell "declared, no
+--     field projected" from "assumed, has none".
+--
+--   * A BOOLEAN-valued ASSUME lowers with `rpResult = Nothing`: the output
+--     argument is dropped, exactly as for a boolean DECIDE, which is what lets
+--     `NOT` over it become a signed goal rather than an equation. Read the
+--     golden: `is authorised` is `input …/1 : (goal)` and appears in a clause
+--     as a bare `is authorised(Person_0)`.
+--
+--   * A VALUE-valued ASSUME keeps its output argument: `conduct/1 : Behaviour`.
+--
+--   * `NOT` over an ASSUMEd boolean is an `RNotCall`, and signs its dependency
+--     edge NEGATIVE — which is what lifts `may issue a notice` into stratum 1.
+--     The Blawx leg turns that into classical `-p` (R5) precisely BECAUSE the
+--     callee's kind is `RInput`: an input that was never stated must fail
+--     loudly rather than read as false.
+--
+--   * `@desc` and `@ref` on an ASSUME are carried to the predicate, separately
+--     (`desc:` / `ref:` in the golden). Without them an ASSUME-style module
+--     would hand an ontology-bearing target a declaration with no prose and no
+--     citation — and this corpus shape has nothing else to offer, since there
+--     are no field declarations to annotate.
+--
+--   * REACHABILITY. `affects the quality of life` is ASSUMEd and never called;
+--     `Locality` is ASSUMEd as a type and sorts nothing. Neither appears in the
+--     golden. That gate is what makes the widening additive — a module with no
+--     ASSUMEs cannot gain a predicate — and it mirrors what a DECLAREd field
+--     that no projection reads already does.
+--
+-- The two exported decisions differ in their annotations on purpose: the first
+-- carries prose and a citation, the second a citation only. The Blawx leg's
+-- section text falls back `@desc` -> `@ref` -> stub, so the pair pins two of
+-- those three arms in one file.
+--
+-- == Why every ASSUME here is written `GIVEN p ... ASSUME f p IS A BOOLEAN`
+--
+-- The other spelling, `ASSUME f IS A FUNCTION FROM Person TO BOOLEAN`, lowers
+-- identically (the arrow spine is flattened) but cannot appear in a module the
+-- relational leg can reach: `L4.Export.validateExportInputs` makes a
+-- function-typed ASSUME referenced by an `@export`ed DECIDE a type error
+-- (`ExportFunctionTypeInput` — a function cannot cross the web app's JSON
+-- boundary), and the lowering is export-rooted, so such a module has no root to
+-- lower from. `jl4/examples/legal/anti-social.l4` is written in that spelling
+-- and is therefore not exportable as written; re-spelling it is corpus work,
+-- not a middle-end change. Both forms are admitted by the lowering, so the day
+-- that export rule is relaxed nothing here has to move.
+--
+-- There are no #EVAL / #ASSERT directives, and that is not an oversight: ASSUME
+-- is uninterpreted, so `l4 run` cannot anchor an expectation here at all. A
+-- differential harness for a module in this style takes its oracle from a
+-- semantically equivalent GIVEN-record spelling of the same logic, not from
+-- this file.
+
+§ `Community protection notices`
+
+ASSUME Person IS A TYPE
+ASSUME Behaviour IS A TYPE
+
+-- Sorts nothing: no admitted signature mentions it, so it earns no `abstract
+-- categories:` entry.
+ASSUME Locality IS A TYPE
+
+@desc an authorised person within the meaning of section 53
+@ref s 43(1) Anti-social Behaviour, Crime and Policing Act 2014
+GIVEN p IS A Person
+ASSUME `is authorised` p IS A BOOLEAN
+
+@ref s 53(1)(a)
+GIVEN p IS A Person
+ASSUME `has surrendered authority` p IS A BOOLEAN
+
+@desc the conduct the person is engaged in
+GIVEN p IS A Person
+ASSUME conduct p IS A Behaviour
+
+GIVEN b IS A Behaviour
+ASSUME `is unreasonable` b IS A BOOLEAN
+
+GIVEN b IS A Behaviour
+ASSUME `is of a persistent nature` b IS A BOOLEAN
+
+-- Called by nothing: absent from `predicates:`.
+GIVEN b IS A Behaviour
+ASSUME `affects the quality of life` b IS A BOOLEAN
+
+@export whether the person may issue a community protection notice
+@ref s 43(1)
+GIVEN person IS A Person
+GIVETH A BOOLEAN
+DECIDE `may issue a notice` IF
+       `is authorised` person
+  AND      NOT `has surrendered authority` person
+  AND  `is unreasonable` (conduct person)
+
+@export
+@ref s 43(1)(a)
+GIVEN person IS A Person
+GIVETH A BOOLEAN
+DECIDE `is a persistent nuisance` IF
+  `is of a persistent nature` (conduct person)

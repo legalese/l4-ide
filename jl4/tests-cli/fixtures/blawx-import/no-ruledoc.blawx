@@ -1,0 +1,19 @@
+# Blawx's own import view re-parents positionally (views.py:126-155 takes
+# new_object_list[0] as the ruledoc), so a stream whose first row is not the
+# ruledoc would not import into Blawx either.
+- model: blawx.workspace
+  pk: 1
+  fields:
+    ruledoc: 1
+    workspace_name: root_section
+    xml_content: ''
+    scasp_encoding: ''
+- model: blawx.ruledoc
+  pk: 1
+  fields:
+    ruledoc_name: Backwards
+    rule_text: "Backwards"
+    scasp_encoding: ''
+    tutorial: ''
+    owner: 1
+    published: true

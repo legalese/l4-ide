@@ -1,0 +1,174 @@
+§ `Imaginary Alcohol Act`
+
+-- The second P4b `ASSUME` seed, and the one that shows where Blawx's ontology
+-- puts its floor. Adapted from `jl4/examples/legal/imaginary-alcohol-act.l4`
+-- (which is NOT modified); all three provisions carry over with their logic
+-- untouched.
+--
+-- THE ONE DEVIATION, AND IT IS FORCED. The original's `ASSUME`s and `DECIDE`s
+-- are all NULLARY — `ASSUME `the person is a body corporate` IS BOOLEAN`, then
+-- `DECIDE `the person must not sell alcohol` IF …` with no subject anywhere.
+-- The middle end is happy with that (a nullary `RInput` is a perfectly good
+-- Horn predicate, and `jl4/examples/relational/assumed-nullary.l4` has the
+-- golden to prove it). The Blawx leg is not, and says so by name — measured on
+-- the original with `@export` added and nothing else changed:
+--
+--     in `the person is a body corporate`: input predicate with no category
+--     subject (Blawx): … is an input of total arity 0, which Blawx has no
+--     declaration block for. At total arity 2 or below an input must be
+--     ATTRIBUTE-shaped — exactly one parameter, category-sorted (an ASSUMEd
+--     TYPE, a record or an enum), plus at most a result — because a fact is
+--     stated in Blawx by hanging an attribute off its subject. Relationship
+--     blocks, whose arguments need not be categories, start at total arity 3
+--
+-- That is not a gap to work around; it is the ontology AT THAT END of the arity
+-- range. Blawx is category-centric where it hangs an attribute off a subject,
+-- so a proposition with no subject has no declaration, no scenario-editor
+-- block, and no `#abducible` line the interview could offer.
+-- `EmitXml.predicateNode` has no block for a zero-argument goal at all, and
+-- emitting one anyway would blank the row's `xml_content` while its
+-- `scasp_encoding` stayed non-empty — the R12 data loss that
+-- `noBlankedBlawxRow` and the headless fixpoint harness both exist to catch.
+-- The refusal is kept as a fixture at `not-ok/zero-arity.l4`, and the arity-2
+-- half of the same band at `not-ok/arity-two.l4`.
+--
+-- The condition is NOT "every ASSUME needs a category first parameter", which
+-- is what this header used to say. From total arity 3 up an input is declared
+-- as a relationship instead, and a relationship's arguments need not be
+-- categories at all (BLAWX-EXPORT-SPEC §6.1, second bullet).
+--
+-- So this seed gives the Act the two subjects its own prose already names: the
+-- PERSON who may not sell alcohol (provisions (1)–(2)), and the PREMISES whose
+-- price list and registration provisions (3) and (4) are about. Every `ASSUME`
+-- becomes a one-place predicate of one of them, which is what the original's
+-- sentences mean anyway — "the person is a body corporate" is a statement about
+-- a person. Nothing else changed.
+--
+-- WHY THE `ASSUME`s READ `GIVEN p IS A Person / ASSUME … p IS A BOOLEAN` rather
+-- than `FUNCTION FROM Person TO BOOLEAN`: `L4.Export` refuses a function-typed
+-- `ASSUME` on an `@export`ed decision, and lowering is export-rooted, so the
+-- arrow spelling never reaches the middle end. `antisocial.l4`'s header records
+-- the measurement in full.
+--
+-- PROVISION (4) IS THE ONE TO READ. Its `NOT ( … AND … AND … )` over three
+-- `ASSUME`d inputs is where R5's epistemics show: an input is not open to
+-- negation-as-failure, so each conjunct comes out as a CLASSICAL `-p`, and the
+-- De Morgan split gives three clauses rather than one negated goal. A proprietor
+-- about whom nothing has been said yields NO MODEL — loudly — instead of
+-- silently counting as one who failed to correct the list.
+--
+-- THE ORACLE. `ASSUME` is uninterpreted, so nothing here evaluates under
+-- `l4 run` and this file carries no directives; its `.blawx` has the
+-- `interview` test and nothing else. `alcohol-twin.l4` is the semantic twin
+-- that supplies the expectations — same decision names, same predicate names,
+-- spelled with `DECLARE` records — and `etc/blawx-tier1-harness.py` replays the
+-- twin's fact rows against THIS file's workspaces and requires the same answer.
+-- See that file's header for the full discipline.
+--
+-- EXPORT ORDER IS AUTHORING: the interview's goal is the FIRST `@export`, so
+-- provision (1)–(2) comes first.
+
+ASSUME Person IS A TYPE
+ASSUME Premises IS A TYPE
+
+-- Provision (1)-(2)
+--
+-- IF the person is a body corporate
+-- AND the person engages in business for profit
+-- AND NOT the person is a public house
+-- AND NOT the person is a hotel
+-- AND ( the person has an unspent conviction for fraud
+--       OR the person has an unspent conviction for providing misleading
+--          information in relation to an application for a licence under an
+--          enactment
+--       OR the person has an alcohol banning order )
+-- THEN the person must not sell alcohol
+
+GIVEN p IS A Person
+ASSUME `the person is a body corporate` p IS A BOOLEAN
+
+GIVEN p IS A Person
+ASSUME `the person engages in business for profit` p IS A BOOLEAN
+
+GIVEN p IS A Person
+ASSUME `the person is a public house` p IS A BOOLEAN
+
+GIVEN p IS A Person
+ASSUME `the person is a hotel` p IS A BOOLEAN
+
+GIVEN p IS A Person
+ASSUME `the person has an unspent conviction for fraud` p IS A BOOLEAN
+
+GIVEN p IS A Person
+ASSUME `the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment` p IS A BOOLEAN
+
+GIVEN p IS A Person
+ASSUME `the person has an alcohol banning order` p IS A BOOLEAN
+
+-- Provision (3)
+--
+-- IF a price list for alcohol is displayed on the premises
+-- AND the premises are registered as a hotel
+-- AND the enforcement officer believes that the price list is misleading to
+--     customers
+-- THEN the enforcement officer may issue a warning to the proprietor of premises
+
+GIVEN pr IS A Premises
+ASSUME `a price list for alcohol is displayed on the premises` pr IS A BOOLEAN
+
+GIVEN pr IS A Premises
+ASSUME `the premises are registered as a hotel` pr IS A BOOLEAN
+
+GIVEN pr IS A Premises
+ASSUME `the enforcement officer believes that the price list is misleading to customers` pr IS A BOOLEAN
+
+-- Provision (4)
+--
+-- IF the enforcement officer has issued a warning to the proprietor of premises
+-- AND NOT ( the proprietor corrects the price list
+--           AND the proprietor does so to the satisfaction of the enforcement
+--               officer
+--           AND the proprietor does so within 5 days after the warning was
+--               issued )
+-- THEN the enforcement officer may cancel the registration of the hotel
+
+GIVEN pr IS A Premises
+ASSUME `the enforcement officer has issued a warning to the proprietor of premises` pr IS A BOOLEAN
+
+GIVEN pr IS A Premises
+ASSUME `the proprietor corrects the price list` pr IS A BOOLEAN
+
+GIVEN pr IS A Premises
+ASSUME `the proprietor does so to the satisfaction of the enforcement officer` pr IS A BOOLEAN
+
+GIVEN pr IS A Premises
+ASSUME `the proprietor does so within 5 days after the warning was issued` pr IS A BOOLEAN
+
+@export Imaginary Alcohol Act ss (1)-(2): a body corporate engaging in business for profit, other than a public house or a hotel, must not sell alcohol if it has an unspent conviction for fraud, or an unspent conviction for providing misleading information in relation to an application for a licence under an enactment, or an alcohol banning order.
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `the person must not sell alcohol` IF
+        `the person is a body corporate` p
+    AND `the person engages in business for profit` p
+    AND NOT `the person is a public house` p
+    AND NOT `the person is a hotel` p
+    AND (    `the person has an unspent conviction for fraud` p
+          OR `the person has an unspent conviction for providing misleading information in relation to an application for a licence under an enactment` p
+          OR `the person has an alcohol banning order` p)
+
+@export Imaginary Alcohol Act s (3): where a price list for alcohol is displayed on premises registered as a hotel and the enforcement officer believes the list is misleading to customers, the officer may issue a warning to the proprietor of the premises.
+GIVEN pr IS A Premises
+GIVETH A BOOLEAN
+DECIDE `the enforcement officer may issue a warning to the proprietor of premises` IF
+        `a price list for alcohol is displayed on the premises` pr
+    AND `the premises are registered as a hotel` pr
+    AND `the enforcement officer believes that the price list is misleading to customers` pr
+
+@export Imaginary Alcohol Act s (4): where a warning has been issued and it is not the case that the proprietor corrected the price list, to the satisfaction of the enforcement officer, within 5 days after the warning was issued, the officer may cancel the registration of the hotel. All three limbs must hold for the proprietor to escape — correcting the list late, or to nobody's satisfaction, leaves the registration cancellable.
+GIVEN pr IS A Premises
+GIVETH A BOOLEAN
+DECIDE `the enforcement officer may cancel the registration of the hotel` IF
+        `the enforcement officer has issued a warning to the proprietor of premises` pr
+    AND NOT (    `the proprietor corrects the price list` pr
+             AND `the proprietor does so to the satisfaction of the enforcement officer` pr
+             AND `the proprietor does so within 5 days after the warning was issued` pr)

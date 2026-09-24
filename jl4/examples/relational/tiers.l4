@@ -1,0 +1,77 @@
+-- The guarded-chain seed: the two shapes `expandRows` treats ASYMMETRICALLY,
+-- and the only fixture that puts either of them under a golden.
+--
+-- `expandRows`'s own haddock calls that asymmetry "the one thing in this
+-- function to test directly", and until this file existed nothing did: every
+-- guarded chain in the corpus was a two-arm value-position IF, whose prefix is
+-- at most one guard long, so the `j >= 1` half of the prefix loop never ran and
+-- `grDisjoint = True` was never taken. Two decisions, one for each half:
+--
+--   * `loyalty bonus` is a four-arm BRANCH over numeric comparisons. They are
+--     not pairwise exclusive by syntax (`guardsDisjoint` is conservative and
+--     says so), so arm i materialises the negations of guards 1..i-1 — one for
+--     the second arm, TWO for the third, three for the OTHERWISE. Read the
+--     golden's `[ … ]` brackets: they are the prefix, and the third arm is
+--     where a prefix loop that stopped at j = 0 would show it.
+--
+--   * `discount rate` is a CONSIDER over a payload-free enum with an OTHERWISE.
+--     Distinct constructors against one scrutinee cannot both hold, so
+--     `grDisjoint` IS true here and the rows carry NO prefix — but the
+--     OTHERWISE still carries the negation of every guard, which is the
+--     asymmetry. Its rows lower to `match(V, ctor)`; its OTHERWISE lowers to
+--     inequalities against the same constructors, because `RMatch` has no
+--     negative form. Note how those print: `\==`, not `=\=`, since `=\=` is
+--     ARITHMETIC inequality and raises a type error on an atom in every
+--     Prolog-family target (see `L4.Relational.IR`, RCmp).
+--
+-- The `@ref` and `@nlg` annotations are here because BLAWX-EXPORT-SPEC R4
+-- (workspace anchoring) and R10 (the mandatory `#pred` strings) consume them
+-- and nothing else in this corpus carries either, so the two IR fields would go
+-- silently empty with every golden still green.
+--
+-- Each directive below carries its L4-oracle value on the line after it, as a
+-- `-- L4 oracle ==>` comment produced by `l4 run tiers.l4` — the differential
+-- harness's expectation, kept outside the emitted program per
+-- BLAWX-EXPORT-SPEC R11 and kept in exactly one place per directive.
+
+DECLARE Band IS ONE OF
+    bronze
+    silver
+    gold
+
+DECLARE Member HAS
+    band  IS A Band
+    years IS A NUMBER
+
+@export
+@ref https://example.com/rules/section-3
+GIVEN m IS A Member
+GIVETH A NUMBER
+`discount rate` m MEANS
+  CONSIDER m's band
+    WHEN gold   THEN 30
+    WHEN silver THEN 20
+    OTHERWISE        10
+
+@export
+GIVEN m IS A Member
+GIVETH A NUMBER
+`loyalty bonus` m @nlg the loyalty bonus earned by %m%
+  MEANS
+  BRANCH
+    IF m's years AT LEAST 10 THEN 100
+    IF m's years AT LEAST 5  THEN 50
+    IF m's years AT LEAST 1  THEN 10
+    OTHERWISE 0
+
+#EVAL `discount rate` (Member WITH band IS gold, years IS 12)
+-- L4 oracle ==> 30
+
+#EVAL `discount rate` (Member WITH band IS bronze, years IS 12)
+-- L4 oracle ==> 10
+
+#EVAL `loyalty bonus` (Member WITH band IS silver, years IS 7)
+-- L4 oracle ==> 50
+
+#EVAL `loyalty bonus` (Member WITH band IS silver, years IS 0)
+-- L4 oracle ==> 0

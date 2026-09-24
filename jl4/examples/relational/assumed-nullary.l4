@@ -1,0 +1,36 @@
+-- The nullary ASSUME: an input predicate with NO subject.
+--
+-- `ASSUME p IS A BOOLEAN` is a proposition, not a property of anything. It
+-- lowers, and the golden says so: `input …/0 : (goal)`, called as a bare atom
+-- with no arguments. That is an ordinary — if unusual — Horn-clause program,
+-- and a swipl, ASP or Logical English leg has a perfectly good image for it.
+--
+-- __The Blawx leg refuses exactly this shape, and the refusal lives THERE.__
+-- Blawx's ontology is category-centric: every declaration block hangs off a
+-- subject, so a proposition with no subject has no category, no attribute
+-- block, no scenario-editor row and no XML image at all — which is the R12
+-- blank-row loss its fixpoint harness exists to fail on. This file is the
+-- witness that the refusal is one target's block palette and not the shared
+-- middle end's fragment: narrowing the middle end to fit it would take the
+-- shape away from three legs that can emit it (#258 §2.5 — the middle end
+-- records, each leg rejects).
+--
+-- It also pins the TYPICALLY drop. `days allowed` carries a default; the
+-- lowering does not read it, and says so in the fidelity report rather than
+-- silently seeding the input. An input predicate is a fact the target asks
+-- about, and answering it in advance is not a lossless carry — it is a
+-- different program.
+--
+-- No #EVAL / #ASSERT: ASSUME is uninterpreted (see ./assumed.l4).
+
+@desc the notice was served on the recipient
+ASSUME `the notice was served` IS A BOOLEAN
+
+ASSUME `days allowed` IS A NUMBER TYPICALLY 28
+
+@export whether the recipient is in time to appeal
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is in time` n IF
+      `the notice was served`
+  AND n AT MOST `days allowed`

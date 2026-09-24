@@ -1,0 +1,31 @@
+-- A BOOLEAN-valued call's output argument is dropped (the unary idiom every
+-- leg shares), so in value position it denotes nothing. Both spellings are
+-- batch-rejected here — a named boolean decision applied as an argument, and
+-- a computed BOOLEAN field, whose desugared selector is the same shape.
+-- Ruled at M1 close-out (review finding R2-1): the drop stays mandatory in
+-- M1 and this narrowing is part of the fragment statement; the M2 path is a
+-- per-predicate drop flag driven by a whole-program value-position analysis.
+
+DECLARE Member HAS
+    age      IS A NUMBER
+    isSenior IS A BOOLEAN
+        MEANS age AT LEAST 65
+
+GIVEN b IS A BOOLEAN
+GIVETH A NUMBER
+`as number` b MEANS IF b THEN 1 ELSE 0
+
+@export
+GIVEN m IS A Member
+GIVETH A BOOLEAN
+DECIDE `is eligible` IF m's age AT LEAST 65
+
+@export
+GIVEN m IS A Member
+GIVETH A NUMBER
+`eligibility flag` m MEANS `as number` (`is eligible` m)
+
+@export
+GIVEN m IS A Member
+GIVETH A NUMBER
+`seniority flag` m MEANS `as number` (m's isSenior)

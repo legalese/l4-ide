@@ -1,0 +1,57 @@
+relational program — assumed.l4
+title: Community protection notices
+
+abstract categories:
+  Person  % assumed.l4:66:1-24
+  Behaviour  % assumed.l4:67:1-27
+
+predicates:
+  input is authorised/1 : (goal)  % assumed.l4:75:1-76:38
+    params: Person
+    desc: an authorised person within the meaning of section 53
+    ref: s 43(1) Anti-social Behaviour, Crime and Policing Act 2014
+    (no clauses)
+  input has surrendered authority/1 : (goal)  % assumed.l4:79:1-80:50
+    params: Person
+    ref: s 53(1)(a)
+    (no clauses)
+  input conduct/1 : Behaviour  % assumed.l4:83:1-84:32
+    params: Person
+    desc: the conduct the person is engaged in
+    (no clauses)
+  input is unreasonable/1 : (goal)  % assumed.l4:86:1-87:40
+    params: Behaviour
+    (no clauses)
+  input is of a persistent nature/1 : (goal)  % assumed.l4:89:1-90:50
+    params: Behaviour
+    (no clauses)
+  computed exported may issue a notice/1 : (goal)  % assumed.l4:98:1-103:42
+    params: Person
+    desc: whether the person may issue a community protection notice
+    ref: s 43(1)
+    may issue a notice(Person_0) :- is authorised(Person_0), not has surrendered authority(Person_0), conduct(Person_0, Conduct_1), is unreasonable(Conduct_1).  % assumed.l4:101:8-103:42
+  computed exported is a persistent nuisance/1 : (goal)  % assumed.l4:107:1-110:47
+    params: Person
+    ref: s 43(1)(a)
+    is a persistent nuisance(Person_2) :- conduct(Person_2, Conduct_3), is of a persistent nature(Conduct_3).  % assumed.l4:110:3-47
+
+dependencies:
+  may issue a notice -> is authorised (+)
+  may issue a notice -> has surrendered authority (-)
+  may issue a notice -> conduct (+)
+  may issue a notice -> is unreasonable (+)
+  is a persistent nuisance -> conduct (+)
+  is a persistent nuisance -> is of a persistent nature (+)
+
+stratification:
+  stratified
+    0  conduct
+    0  has surrendered authority
+    0  is a persistent nuisance
+    0  is authorised
+    0  is of a persistent nature
+    0  is unreasonable
+    1  may issue a notice
+
+fidelity report — relational
+  (nothing lost)

@@ -1,0 +1,383 @@
+§ `Home insurance policy — the rodents, insects, vermin and birds exclusion`
+
+-- The isomorphism seed: an insurance exclusion, restyled from
+-- `jl4/examples/ok/rodentsAndVermin.l4` (which is NOT modified) into the Blawx
+-- seed conventions -- `@export`-with-prose on every decision, the WHERE helpers
+-- lifted so each carries its own policy language, and an oracle comment on
+-- every directive.
+--
+-- WHERE THE POLICY WORDS COME FROM. `ok/rodentsAndVermin.l4` carries the logic
+-- but no prose at all. The prose is in the tree's OTHER copy of this rule,
+-- `jl4/experiments/classic/vermin_and_rodent.l4:14`, as a single `@export`
+-- sentence over the identical `Inputs` record:
+--
+--     We do not cover any loss or damage caused by rodents, insects, vermin, or
+--     birds. However, this exclusion does not apply to: (a) loss or damage to
+--     your contents caused by birds; or (b) ensuing covered loss unless any
+--     other exclusion applies or where an animal causes water to escape from a
+--     household appliance, swimming pool or plumbing, heating or air
+--     conditioning system.
+--
+-- Every span below inside `"…"` is a contiguous substring of THAT sentence.
+-- Anything outside the quotes is this file's own gloss and is written as such.
+-- The policy carries NO clause number anywhere in the tree, so none is invented
+-- here: an earlier draft of this seed labelled all five citations
+-- "Exclusion 5(b)", which no source supports.
+--
+-- Note in particular what the three appliance/pool/plumbing inputs mean. The
+-- proviso's condition is "where an ANIMAL CAUSES WATER TO ESCAPE FROM a
+-- household appliance, swimming pool or plumbing, heating or air conditioning
+-- system" -- it is not loss or damage TO those items. The L4 disjunction in
+-- `an exclusion applies` is the policy's own "unless … or where …", one limb
+-- per item, and the field names are the original's.
+--
+-- WHY THE PROSE RIDES ON THE `@export` LINE. `@export` and `@desc` are the SAME
+-- annotation slot: `L4.Relational.Lower` reads one `annDesc` per declaration and
+-- strips a leading `export` keyword off it. Writing `@export` on one line and
+-- `@desc <prose>` on the next therefore keeps one and silently discards the
+-- other, and the Blawx `rule_text` section comes out as the stub
+-- "Definition of <name>." So every citation in this file is written as
+-- `@export <prose>`, which is the form the openfisca corpus already uses
+-- (`jl4/examples/openfisca/basic-income.l4:22`). Reported as a finding: a bare
+-- `@desc` beside an `@export` should merge or diagnose, not vanish.
+--
+-- THREE DEVIATIONS FROM THE ORIGINAL, all measured on this tree:
+--
+--   * the four WHERE helpers are lifted to top-level decisions, so each gets a
+--     `rule_text` section, a scenario-editor image and a tier-1 query;
+--   * `not covered if` (which is `GIVEN x YIELD x`, an identity whose only job
+--     is to make the source sentence scan) is dropped -- lowered it would be an
+--     arity-2 auxiliary with no declaration block, i.e. noise in the emitted
+--     ontology;
+--   * the grouping is written with parentheses rather than by layout, and
+--     `exclusion apply` is renamed `an exclusion applies` because Blawx
+--     synthesises its NLG postfix from the mangled atom and the original would
+--     read "<object> exclusion apply" in the scenario editor.
+--
+-- The third deviation needs its measurement recorded, because the original's
+-- layout admits two readings and they disagree:
+--
+--     P1  animals AND NOT (contentsBirds OR (ensuing AND NOT exclusion))
+--     P2  animals AND ((NOT contentsBirds) OR (ensuing AND NOT exclusion))
+--
+-- They differ exactly where `animals AND ensuing AND NOT exclusion` holds. Run
+-- against the UNTOUCHED original, `rodents + ensuing covered loss, all else
+-- FALSE` evaluates to FALSE, and `birds + contents + ensuing` likewise -- so the
+-- original parses as P1, which is also the reading the policy wording intends.
+-- Both rows are kept below and marked as grouping pins. Every other scenario in
+-- this file agrees under both readings and so proves nothing about the grouping;
+-- those two are the ones that do.
+--
+-- POLARITY, preserved deliberately: `insurance covered` is TRUE when the
+-- exclusion BITES -- when the loss is NOT covered. The name is the original's
+-- and is kept for isomorphism; a `covered` wrapper would be an interpretive step
+-- the policy text does not take, and inventing one in a fidelity showcase is
+-- exactly the wrong move.
+--
+-- EXPORT ORDER IS AUTHORING, NOT LAYOUT: exactly one `interview` test is emitted
+-- per file and its goal is the FIRST `@export` in the file, so the headline
+-- decision comes first. L4 is order-independent at the top level, so the forward
+-- references below are fine.
+--
+-- The `§` title is added: the original has none, so `ruledoc_name` came out as
+-- the filename (`Rodents`), which is what a Blawx reader sees at the top of the
+-- document and as the first line of `rule_text`. Naming the instrument is worth
+-- one line -- but it names only what the source names, which is the subject
+-- matter and not a clause.
+--
+-- Each directive carries its L4-oracle value on the line after it, per
+-- BLAWX-EXPORT-SPEC R11: one copy, outside the emitted artifact.
+
+DECLARE Inputs
+  HAS
+    `Loss or Damage.caused by rodents` IS A BOOLEAN
+    `Loss or Damage.caused by insects` IS A BOOLEAN
+    `Loss or Damage.caused by vermin` IS A BOOLEAN
+    `Loss or Damage.caused by birds` IS A BOOLEAN
+    `Loss or Damage.to Contents` IS A BOOLEAN
+    `any other exclusion applies` IS A BOOLEAN
+    `a household appliance` IS A BOOLEAN
+    `a swimming pool` IS A BOOLEAN
+    `a plumbing, heating, or air conditioning system` IS A BOOLEAN
+    `Loss or Damage.ensuing covered loss` IS A BOOLEAN
+
+@export Home insurance policy, the animal-damage exclusion: "We do not cover any loss or damage caused by rodents, insects, vermin, or birds. However, this exclusion does not apply to: (a) loss or damage to your contents caused by birds; or (b) ensuing covered loss unless any other exclusion applies or where an animal causes water to escape from a household appliance, swimming pool or plumbing, heating or air conditioning system." TRUE here means the exclusion BITES -- the loss is NOT covered.
+GIVEN i IS AN Inputs
+GIVETH A BOOLEAN
+DECIDE `insurance covered` IF
+         `loss or damage by animals` i
+     AND NOT (       `damage to contents and caused by birds` i
+                 OR (`ensuing covered loss` i AND NOT `an exclusion applies` i))
+
+@export The trigger: "We do not cover any loss or damage caused by rodents, insects, vermin, or birds."
+GIVEN i IS AN Inputs
+GIVETH A BOOLEAN
+DECIDE `loss or damage by animals` IF
+        i's `Loss or Damage.caused by rodents`
+     OR i's `Loss or Damage.caused by insects`
+     OR i's `Loss or Damage.caused by vermin`
+     OR i's `Loss or Damage.caused by birds`
+
+@export Carve-out (a): "this exclusion does not apply to: (a) loss or damage to your contents caused by birds". Both limbs must hold -- contents damage by anything else, or damage by birds to anything else, is still excluded.
+GIVEN i IS AN Inputs
+GIVETH A BOOLEAN
+DECIDE `damage to contents and caused by birds` IF
+        i's `Loss or Damage.to Contents`
+    AND i's `Loss or Damage.caused by birds`
+
+@export Carve-out (b), first limb: the exclusion does not apply to "(b) ensuing covered loss", subject to the proviso that follows it.
+GIVEN i IS AN Inputs
+GIVETH A BOOLEAN
+DECIDE `ensuing covered loss` IF
+    i's `Loss or Damage.ensuing covered loss`
+
+@export Carve-out (b), proviso: (b) is itself disapplied "unless any other exclusion applies or where an animal causes water to escape from a household appliance, swimming pool or plumbing, heating or air conditioning system". Each of the last three limbs is a condition about an ANIMAL CAUSING WATER TO ESCAPE from the item, not about loss or damage to the item.
+GIVEN i IS AN Inputs
+GIVETH A BOOLEAN
+DECIDE `an exclusion applies` IF
+        i's `any other exclusion applies`
+     OR i's `a household appliance`
+     OR i's `a swimming pool`
+     OR i's `a plumbing, heating, or air conditioning system`
+
+-- the original file's own #EVAL, carried over: nothing happened
+#EVAL `insurance covered` OF
+        Inputs
+        WITH
+            `Loss or Damage.caused by rodents` IS FALSE
+            `Loss or Damage.caused by insects` IS FALSE
+            `Loss or Damage.caused by vermin` IS FALSE
+            `Loss or Damage.caused by birds` IS FALSE
+            `Loss or Damage.to Contents` IS FALSE
+            `any other exclusion applies` IS FALSE
+            `a household appliance` IS FALSE
+            `a swimming pool` IS FALSE
+            `a plumbing, heating, or air conditioning system` IS FALSE
+            `Loss or Damage.ensuing covered loss` IS FALSE
+-- L4 oracle ==> FALSE
+
+-- rats in the loft -- the bare exclusion
+#EVAL `insurance covered` OF
+        Inputs
+        WITH
+            `Loss or Damage.caused by rodents` IS TRUE
+            `Loss or Damage.caused by insects` IS FALSE
+            `Loss or Damage.caused by vermin` IS FALSE
+            `Loss or Damage.caused by birds` IS FALSE
+            `Loss or Damage.to Contents` IS FALSE
+            `any other exclusion applies` IS FALSE
+            `a household appliance` IS FALSE
+            `a swimming pool` IS FALSE
+            `a plumbing, heating, or air conditioning system` IS FALSE
+            `Loss or Damage.ensuing covered loss` IS FALSE
+-- L4 oracle ==> TRUE
+
+-- carve-out (a): contents damage caused by birds
+#EVAL `insurance covered` OF
+        Inputs
+        WITH
+            `Loss or Damage.caused by rodents` IS FALSE
+            `Loss or Damage.caused by insects` IS FALSE
+            `Loss or Damage.caused by vermin` IS FALSE
+            `Loss or Damage.caused by birds` IS TRUE
+            `Loss or Damage.to Contents` IS TRUE
+            `any other exclusion applies` IS FALSE
+            `a household appliance` IS FALSE
+            `a swimming pool` IS FALSE
+            `a plumbing, heating, or air conditioning system` IS FALSE
+            `Loss or Damage.ensuing covered loss` IS FALSE
+-- L4 oracle ==> FALSE
+
+-- (a) needs BOTH limbs -- birds, but not to Contents
+#EVAL `insurance covered` OF
+        Inputs
+        WITH
+            `Loss or Damage.caused by rodents` IS FALSE
+            `Loss or Damage.caused by insects` IS FALSE
+            `Loss or Damage.caused by vermin` IS FALSE
+            `Loss or Damage.caused by birds` IS TRUE
+            `Loss or Damage.to Contents` IS FALSE
+            `any other exclusion applies` IS FALSE
+            `a household appliance` IS FALSE
+            `a swimming pool` IS FALSE
+            `a plumbing, heating, or air conditioning system` IS FALSE
+            `Loss or Damage.ensuing covered loss` IS FALSE
+-- L4 oracle ==> TRUE
+
+-- (a) needs BOTH limbs -- Contents, but not by birds
+#EVAL `insurance covered` OF
+        Inputs
+        WITH
+            `Loss or Damage.caused by rodents` IS FALSE
+            `Loss or Damage.caused by insects` IS TRUE
+            `Loss or Damage.caused by vermin` IS FALSE
+            `Loss or Damage.caused by birds` IS FALSE
+            `Loss or Damage.to Contents` IS TRUE
+            `any other exclusion applies` IS FALSE
+            `a household appliance` IS FALSE
+            `a swimming pool` IS FALSE
+            `a plumbing, heating, or air conditioning system` IS FALSE
+            `Loss or Damage.ensuing covered loss` IS FALSE
+-- L4 oracle ==> TRUE
+
+-- GROUPING PIN: carve-out (b) with no other exclusion.
+-- Under reading P2 this would be TRUE; the original says FALSE.
+#EVAL `insurance covered` OF
+        Inputs
+        WITH
+            `Loss or Damage.caused by rodents` IS TRUE
+            `Loss or Damage.caused by insects` IS FALSE
+            `Loss or Damage.caused by vermin` IS FALSE
+            `Loss or Damage.caused by birds` IS FALSE
+            `Loss or Damage.to Contents` IS FALSE
+            `any other exclusion applies` IS FALSE
+            `a household appliance` IS FALSE
+            `a swimming pool` IS FALSE
+            `a plumbing, heating, or air conditioning system` IS FALSE
+            `Loss or Damage.ensuing covered loss` IS TRUE
+-- L4 oracle ==> FALSE
+
+-- GROUPING PIN: (a) and (b) together.
+-- Under reading P2 this would be TRUE; the original says FALSE.
+#EVAL `insurance covered` OF
+        Inputs
+        WITH
+            `Loss or Damage.caused by rodents` IS FALSE
+            `Loss or Damage.caused by insects` IS FALSE
+            `Loss or Damage.caused by vermin` IS FALSE
+            `Loss or Damage.caused by birds` IS TRUE
+            `Loss or Damage.to Contents` IS TRUE
+            `any other exclusion applies` IS FALSE
+            `a household appliance` IS FALSE
+            `a swimming pool` IS FALSE
+            `a plumbing, heating, or air conditioning system` IS FALSE
+            `Loss or Damage.ensuing covered loss` IS TRUE
+-- L4 oracle ==> FALSE
+
+-- (b)'s proviso: the swimming-pool exclusion revives the exclusion
+#EVAL `insurance covered` OF
+        Inputs
+        WITH
+            `Loss or Damage.caused by rodents` IS TRUE
+            `Loss or Damage.caused by insects` IS FALSE
+            `Loss or Damage.caused by vermin` IS FALSE
+            `Loss or Damage.caused by birds` IS FALSE
+            `Loss or Damage.to Contents` IS FALSE
+            `any other exclusion applies` IS FALSE
+            `a household appliance` IS FALSE
+            `a swimming pool` IS TRUE
+            `a plumbing, heating, or air conditioning system` IS FALSE
+            `Loss or Damage.ensuing covered loss` IS TRUE
+-- L4 oracle ==> TRUE
+
+-- no animal cause: the exclusion list alone does nothing
+#EVAL `insurance covered` OF
+        Inputs
+        WITH
+            `Loss or Damage.caused by rodents` IS FALSE
+            `Loss or Damage.caused by insects` IS FALSE
+            `Loss or Damage.caused by vermin` IS FALSE
+            `Loss or Damage.caused by birds` IS FALSE
+            `Loss or Damage.to Contents` IS FALSE
+            `any other exclusion applies` IS TRUE
+            `a household appliance` IS FALSE
+            `a swimming pool` IS FALSE
+            `a plumbing, heating, or air conditioning system` IS FALSE
+            `Loss or Damage.ensuing covered loss` IS FALSE
+-- L4 oracle ==> FALSE
+
+-- helper: insects count as an animal cause
+#EVAL `loss or damage by animals` OF
+        Inputs
+        WITH
+            `Loss or Damage.caused by rodents` IS FALSE
+            `Loss or Damage.caused by insects` IS TRUE
+            `Loss or Damage.caused by vermin` IS FALSE
+            `Loss or Damage.caused by birds` IS FALSE
+            `Loss or Damage.to Contents` IS TRUE
+            `any other exclusion applies` IS FALSE
+            `a household appliance` IS FALSE
+            `a swimming pool` IS FALSE
+            `a plumbing, heating, or air conditioning system` IS FALSE
+            `Loss or Damage.ensuing covered loss` IS FALSE
+-- L4 oracle ==> TRUE
+
+-- helper: Contents damage without birds is not the carve-out
+#EVAL `damage to contents and caused by birds` OF
+        Inputs
+        WITH
+            `Loss or Damage.caused by rodents` IS FALSE
+            `Loss or Damage.caused by insects` IS TRUE
+            `Loss or Damage.caused by vermin` IS FALSE
+            `Loss or Damage.caused by birds` IS FALSE
+            `Loss or Damage.to Contents` IS TRUE
+            `any other exclusion applies` IS FALSE
+            `a household appliance` IS FALSE
+            `a swimming pool` IS FALSE
+            `a plumbing, heating, or air conditioning system` IS FALSE
+            `Loss or Damage.ensuing covered loss` IS FALSE
+-- L4 oracle ==> FALSE
+
+-- helper: the swimming-pool limb
+#EVAL `an exclusion applies` OF
+        Inputs
+        WITH
+            `Loss or Damage.caused by rodents` IS TRUE
+            `Loss or Damage.caused by insects` IS FALSE
+            `Loss or Damage.caused by vermin` IS FALSE
+            `Loss or Damage.caused by birds` IS FALSE
+            `Loss or Damage.to Contents` IS FALSE
+            `any other exclusion applies` IS FALSE
+            `a household appliance` IS FALSE
+            `a swimming pool` IS TRUE
+            `a plumbing, heating, or air conditioning system` IS FALSE
+            `Loss or Damage.ensuing covered loss` IS TRUE
+-- L4 oracle ==> TRUE
+
+-- helper: the bare field read
+#EVAL `ensuing covered loss` OF
+        Inputs
+        WITH
+            `Loss or Damage.caused by rodents` IS TRUE
+            `Loss or Damage.caused by insects` IS FALSE
+            `Loss or Damage.caused by vermin` IS FALSE
+            `Loss or Damage.caused by birds` IS FALSE
+            `Loss or Damage.to Contents` IS FALSE
+            `any other exclusion applies` IS FALSE
+            `a household appliance` IS FALSE
+            `a swimming pool` IS TRUE
+            `a plumbing, heating, or air conditioning system` IS FALSE
+            `Loss or Damage.ensuing covered loss` IS TRUE
+-- L4 oracle ==> TRUE
+
+-- the #ASSERT path on the headline decision (boolean shape)
+#ASSERT `insurance covered` OF
+            Inputs
+            WITH
+                `Loss or Damage.caused by rodents` IS TRUE
+                `Loss or Damage.caused by insects` IS FALSE
+                `Loss or Damage.caused by vermin` IS FALSE
+                `Loss or Damage.caused by birds` IS FALSE
+                `Loss or Damage.to Contents` IS FALSE
+                `any other exclusion applies` IS FALSE
+                `a household appliance` IS FALSE
+                `a swimming pool` IS FALSE
+                `a plumbing, heating, or air conditioning system` IS FALSE
+                `Loss or Damage.ensuing covered loss` IS FALSE
+-- L4 oracle ==> assertion satisfied
+
+-- a second #ASSERT, on a helper
+#ASSERT `an exclusion applies` OF
+            Inputs
+            WITH
+                `Loss or Damage.caused by rodents` IS FALSE
+                `Loss or Damage.caused by insects` IS FALSE
+                `Loss or Damage.caused by vermin` IS FALSE
+                `Loss or Damage.caused by birds` IS FALSE
+                `Loss or Damage.to Contents` IS FALSE
+                `any other exclusion applies` IS TRUE
+                `a household appliance` IS FALSE
+                `a swimming pool` IS FALSE
+                `a plumbing, heating, or air conditioning system` IS FALSE
+                `Loss or Damage.ensuing covered loss` IS FALSE
+-- L4 oracle ==> assertion satisfied

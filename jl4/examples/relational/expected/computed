@@ -1,0 +1,44 @@
+relational program — computed.l4
+
+records:
+  Member  % computed.l4:14:1-17:30
+    age : NUMBER
+
+predicates:
+  input age/1 : NUMBER  % <no source range>
+    params: Member
+    (no clauses)
+  computed exported ticket price/1 : NUMBER  % computed.l4:20:1-23:35
+    params: Member
+    ticket price(M_0, 8) :- isSenior(M_0).  % computed.l4:23:26-27
+    ticket price(M_0, 15) :- [ not isSenior(M_0) ].  % computed.l4:23:33-35
+  computed exported pays full price/1 : (goal)  % computed.l4:26:1-29:21
+    params: Member
+    pays full price(M_1) :- not isSenior(M_1).  % computed.l4:29:5-21
+  computed isSenior/1 : (goal)  % computed.l4:16:5-17:30
+    params: Member
+    isSenior(_self_2) :- proj(_self_2, age, Age_3), Age_3 >= 65.  % computed.l4:17:19-30
+
+queries:
+  EVAL q1: ticket price(M0_4) -> Ticketprice_5 => (expectation from the L4 evaluator)  % computed.l4:31:1-45
+    facts: age(M0_4, 70)
+  EVAL q2: ticket price(M0_6) -> Ticketprice_7 => (expectation from the L4 evaluator)  % computed.l4:33:1-45
+    facts: age(M0_6, 30)
+  EVAL q3: pays full price(M0_8) => (expectation from the L4 evaluator)  % computed.l4:35:1-48
+    facts: age(M0_8, 30)
+
+dependencies:
+  ticket price -> isSenior (+)
+  ticket price -> isSenior (-)
+  pays full price -> isSenior (-)
+  isSenior -> age (+)
+
+stratification:
+  stratified
+    0  age
+    0  isSenior
+    1  pays full price
+    1  ticket price
+
+fidelity report — relational
+  (nothing lost)
