@@ -61,7 +61,7 @@
 --
 -- What `refuse.dmn.md` DOES carry is one `<!-- OMITTED: … -->` marker per
 -- dropped decision, naming it and saying why. That was added 2026-09-05 after
--- measuring what a user actually gets: `l4 export --to dmn-md` exits 0, prints
+-- measuring what a user actually gets: `l4 export dmn-md` exits 0, prints
 -- a one-line tally on stderr, and used to write a file containing a heading and
 -- nothing else — so the committed artifact, the thing a reader opens and a
 -- reviewer diffs, said nothing whatever about the tables it was missing.
@@ -73,7 +73,7 @@
 -- That migration is a separate change, and this file is what makes it safe to
 -- attempt.
 --
--- The heading below is load-bearing: `l4 export --to=dmn` with no
+-- The heading below is load-bearing: `l4 export dmn` with no
 -- `--model-name` takes the model name from the outermost `§`.
 
 IMPORT prelude

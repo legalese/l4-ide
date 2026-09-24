@@ -135,7 +135,7 @@ MAX_BIJECTION_ATOMS = 7
 
 
 class Emitted:
-    """The blocks of one emitted interview, in the shapes `l4 docassemble`
+    """The blocks of one emitted interview, in the shapes `l4 export docassemble`
     actually produces. Deliberately narrow: it understands the emitter's output,
     not docassemble's whole block vocabulary."""
 
@@ -696,7 +696,7 @@ def main():
             srcpath = derived
 
         yml = os.path.join(args.tmp, f"{ex}.yml")
-        r = subprocess.run([args.l4, "docassemble", srcpath, "-o", yml], env=env,
+        r = subprocess.run([args.l4, "export", "docassemble", srcpath, "-o", yml], env=env,
                            capture_output=True, text=True)
         if r.returncode != 0:
             report.append({"case": ex, "why": case["why"], "emitted": False,

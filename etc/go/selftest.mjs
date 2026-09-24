@@ -5500,10 +5500,10 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
 
   // --- 7d. p7-catala: the emitted basename IS the Catala module name --------
   //
-  // `l4 catala -o FILE` derives the emitted `> Module X` from FILE's basename,
+  // `l4 export catala -o FILE` derives the emitted `> Module X` from FILE's basename,
   // and a Catala identifier admits only letters, digits and `_`, starting with
   // a letter. Naming the emission after the L4 stem therefore REFUSES on any
-  // hyphenated module — `l4 catala: -o dbs-yuu: … cannot be a Catala module
+  // hyphenated module — `l4 export catala: -o dbs-yuu: … cannot be a Catala module
   // name` — with the emitter exiting 1 before writing anything, which the leg
   // then reports as a finding about the encoding. It is not one; it is a leg
   // defect. It shipped because every module in the leg's own controls happened
@@ -5518,7 +5518,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     const stub = resolve(T, "l4-catala-basename-stub.sh");
     wr(
       stub,
-      '#!/usr/bin/env bash\nif [ "$1" = "catala" ] && [ "$2" = "--help" ]; then\n  echo "Usage: $(basename \\"$0\\") catala FILE [-o|--output FILE] [--boolean-only] [--fixed-now ISO8601]"\n  exit 0\nfi\nout=""; prev=""\nfor a in "$@"; do\n  if [ "$prev" = "-o" ]; then out="$a"; fi\n  prev="$a"\ndone\n[ -n "$out" ] || exit 9\nprintf \'> Module Stub\\n\' > "$out"\nexit 0\n',
+      '#!/usr/bin/env bash\nif [ "$1" = "export" ] && [ "$2" = "catala" ] && [ "$3" = "--help" ]; then\n  echo "Usage: $(basename \\"$0\\") export catala FILE [-o|--output FILE] [--boolean-only] [--fixed-now ISO8601]"\n  exit 0\nfi\nout=""; prev=""\nfor a in "$@"; do\n  if [ "$prev" = "-o" ]; then out="$a"; fi\n  prev="$a"\ndone\n[ -n "$out" ] || exit 9\nprintf \'> Module Stub\\n\' > "$out"\nexit 0\n',
     );
     spawnSync("chmod", ["+x", stub]);
     // `dbsyuu` collides with what `dbs-yuu` strips to, which is a collision the
@@ -5540,7 +5540,7 @@ process.stdout.write("\n-- the de novo diff oracle --\n");
     // THE STUB IS NOT NAMED `l4`, AND IT PRINTS ITS OWN BASENAME, as
     // optparse-applicative does. That makes this fixture cover a second defect
     // for free: the subcommand probe used to anchor on the literal string
-    // `Usage: l4 catala `, so it called BROKEN — which stops the whole run —
+    // `Usage: l4 export catala `, so it called BROKEN — which stops the whole run —
     // on any binary not named exactly `l4`. Snapshotting the binary under a
     // unique name is what CLAUDE.md §3.2.1 tells you to do before probing with
     // it, so that is a normal configuration and not an exotic one.

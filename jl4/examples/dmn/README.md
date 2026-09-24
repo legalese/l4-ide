@@ -244,7 +244,7 @@ range, or a bare token, with no `null` and no date, so all three tables are omit
 omission.
 
 What `refuse.dmn.md` **does** carry is one `<!-- OMITTED: … -->` marker per dropped decision.
-That was added 2026-09-05 on a measurement: `l4 export --to dmn-md` exits 0, prints a
+That was added 2026-09-05 on a measurement: `l4 export dmn-md` exits 0, prints a
 one-line tally on stderr, and used to write a file holding a heading and nothing else — so
 the committed artifact said nothing whatever about what was missing, and a reader or a
 reviewer diffing it had no way to tell. Every `.dmn.md` golden in this directory gained
@@ -551,12 +551,12 @@ reproducible **byte-for-byte** through `l4 export`, from a repo checkout with
 `jl4/examples/dmn/` as the working directory (`jl4/tests-cli` mirrors the `.dmn` leg).
 
 ```sh
-l4 export --to=dmn    reg-cf.l4 | diff - expected/reg-cf.dmn
-l4 export --to=dmn-md reg-cf.l4 | diff - expected/reg-cf.dmn.md
+l4 export dmn    reg-cf.l4 | diff - expected/reg-cf.dmn
+l4 export dmn-md reg-cf.l4 | diff - expected/reg-cf.dmn.md
 
 # the corpus, likewise with no flags
-l4 export --to=dmn    ../canon/us/regcf/regcf.l4 | diff - expected/regcf-corpus.dmn
-l4 export --to=dmn-md ../canon/us/regcf/regcf.l4 | diff - expected/regcf-corpus.dmn.md
+l4 export dmn    ../canon/us/regcf/regcf.l4 | diff - expected/regcf-corpus.dmn
+l4 export dmn-md ../canon/us/regcf/regcf.l4 | diff - expected/regcf-corpus.dmn.md
 ```
 
 **The corpus `.dmn` (and `gst-rate.dmn`) do NOT reproduce byte-for-byte, and the
@@ -588,7 +588,7 @@ Add `--fidelity-report` for the loss list — written to `<output>.fidelity.txt`
 `-o` is given, and to stderr otherwise, so that a redirected document stays a document.
 A one-line tally goes to stderr either way, whether or not the flag was passed.
 
-`l4 export --to=dmn` refuses a module with no decisions in it, rather than emitting a
+`l4 export dmn` refuses a module with no decisions in it, rather than emitting a
 `<definitions>` that opens as an empty canvas. It does **not** fail merely because the
 report holds `blocking` notes — `blocking` describes what DMN cannot express (see
 below), and this exhibit has one. Pass `--fail-on=blocking|lossy|advisory` if a

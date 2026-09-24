@@ -3,7 +3,7 @@ IMPORT prelude
 § `A domain module, imported by its neighbour`
 
 -- The other half of `imports.l4`. Nothing here is `@export`ed and nothing here
--- is compiled on its own: `l4 catala imported-domain.l4` refuses it for having
+-- is compiled on its own: `l4 export catala imported-domain.l4` refuses it for having
 -- no exported decision, which is correct. It exists so that `imports.l4` has
 -- something to import, and so that the three things an importer can reach —
 -- a record, an enumeration, and a plain helper function — each have a witness.

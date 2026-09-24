@@ -26,10 +26,10 @@ OUT="$GO_OUT/$(basename "$GOLDEN")"
 DIFFLOG="$GO_OUT/p7-dmn-md.canon-diff.txt"
 
 set +e
-"$L4" export "$GO_S_ENCODING" --to dmn-md -o "$OUT" --fidelity-report 2>"$GO_OUT/p7-dmn-md.fidelity.stderr"
+"$L4" export dmn-md "$GO_S_ENCODING" -o "$OUT" --fidelity-report 2>"$GO_OUT/p7-dmn-md.fidelity.stderr"
 RC=$?
 set -e
-[[ $RC -eq 0 ]] || go_broken "l4 export --to dmn-md exited $RC on a module that typechecks"
+[[ $RC -eq 0 ]] || go_broken "l4 export dmn-md exited $RC on a module that typechecks"
 cat "$GO_OUT/p7-dmn-md.fidelity.stderr"
 
 # `-o out.dmn.md --fidelity-report` writes the sibling report next to it,

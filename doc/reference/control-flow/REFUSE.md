@@ -206,7 +206,7 @@ us or from a wrong answer.
     computed" with it, so no reader of the artifact alone can recover which was meant.
     [The DMN and BPMN page](../../exports/dmn-bpmn.md#when-a-decision-can-refuse) has the whole
     image, including the enum case where the two target engines disagreed.
-  - **The dmnmd markdown carrier** (`--to dmn-md`) cannot carry one. Its cell grammar is a number,
+  - **The dmnmd markdown carrier** (`export dmn-md`) cannot carry one. Its cell grammar is a number,
     an integer range, or a bare token, with no `null`, so a refusing table is **omitted**; a bare
     `null` cell would be read back as the string `"null"`. The markdown says so itself, with an
     `<!-- OMITTED: … -->` marker per dropped decision, and the fidelity report locates each one.

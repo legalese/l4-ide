@@ -83,7 +83,7 @@ runnable `#TRACE`. None exists: `jl4/examples/canon/us/regcf/regcf.l4`'s three r
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `A.txt`                | the `l4 lts` block for the position, default flags (no `--steps`, no `--json`)                                                                                                      |
 | `B.dot`                | the one `digraph` for the rule from `l4 state-graph FILE`. **Kept current, so it is no longer the B text the readers saw** — that is in `manifest.json`; see the status block above |
-| `C.bpmn`               | the P1 BPMN: the golden from `jl4/examples/bpmn/expected/` where one exists (`tenancy`, `every-run-example`), else `l4 export FILE --to bpmn --rule NAME`                           |
+| `C.bpmn`               | the P1 BPMN: the golden from `jl4/examples/bpmn/expected/` where one exists (`tenancy`, `every-run-example`), else `l4 export bpmn FILE --rule NAME`                                |
 | `C.fidelity.txt`       | the exporter's fidelity report for `C.bpmn` (golden or freshly cut); not shown to readers                                                                                           |
 | `history.txt`          | the position in plain words, for B and C readers                                                                                                                                    |
 | `truth.json`           | the five questions, the five answers, and per answer the evidence it was read from                                                                                                  |

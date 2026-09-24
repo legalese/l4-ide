@@ -341,6 +341,11 @@ invent a third — verified in `jl4/app/Main.hs:76-130` **[E 2026-09-07]**:
 
 Workable answers: `l4 export --to=ts|go`, or `l4 typescript` / `l4 golang`. Not `l4 go`.
 
+**Answered 2026-09-24** by `specs/todo/CLI-SURFACE-SPEC.md` C1, which picked one convention for
+every target: `l4 export typescript` and `l4 export golang`. A format name cannot collide with the
+`etc/go/go.sh` pipeline the way a top-level `l4 go` verb would, but `golang` stays the unambiguous
+spelling.
+
 **Q8 — Distribution and regeneration.** This question exists only because of the library framing,
 and it is the one with no in-tree precedent at all, since every existing backend emits an artifact
 we hand over once.

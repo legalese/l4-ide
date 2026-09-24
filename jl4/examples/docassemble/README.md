@@ -1,8 +1,8 @@
 # L4 → docassemble bridge — example corpus
 
-`l4 docassemble FILE` compiles the **decision-rule subset** of an L4 file into
+`l4 export docassemble FILE` compiles the **decision-rule subset** of an L4 file into
 a single docassemble interview YAML that a stock docassemble server (or the
-headless harness below) runs unmodified. `l4 docassemble FILE --package DIR`
+headless harness below) runs unmodified. `l4 export docassemble FILE --package DIR`
 compiles the same thing into an installable docassemble package instead.
 Design and rulings R1–R11: `specs/done/DOCASSEMBLE-EXPORT-SPEC.md` (discharged 2026-08-20; moved
 out of `specs/todo/` when all four milestones were resolved).
@@ -20,7 +20,7 @@ by `logic_explanation()` on every verdict screen, and the `auto terms:`
 glossary. An adversarial review pass the same day repaired what survived
 refutation, and corrected what it found to be false (see "What the M2 review
 pass changed"). The seven `expected/` goldens are committed and
-pinned by the `l4 docassemble` cases in `jl4/tests-cli/Main.hs` (39 cases across
+pinned by the `l4 export docassemble` cases in `jl4/tests-cli/Main.hs` (39 cases across
 the four M2-era `describe` blocks — 41 when M2 landed; M4's RED phase retired
 two of them, `refuses MAYBE NUMBER by name` and ``refuses `WHEN JUST TRUE` ``,
 because M4 makes both constructs work), and every example below was run green
@@ -111,7 +111,7 @@ recognise the same program.
   round-trip expectations for this one example are hand-computed in the
   fixture table.
 - `expected/*.yml` (+ `*.fidelity.txt` sidecars) — committed golden output,
-  pinned byte-exact by the `l4 docassemble` cases in `jl4/tests-cli/Main.hs`.
+  pinned byte-exact by the `l4 export docassemble` cases in `jl4/tests-cli/Main.hs`.
 - `not-ok/` — fixtures the backend must REFUSE, each with a named diagnostic:
   - `deontic-body.l4` — regulative body (`PARTY`/`MUST`): `Regulative`,
     Blocking.
@@ -196,7 +196,7 @@ recognise the same program.
     letter, which is the point: an attachment EXTENDS the interview's question
     set. The hazard it defends against is not an exception but a successful
     empty render.
-- A test outside this directory, worth knowing about: `l4 docassemble` on
+- A test outside this directory, worth knowing about: `l4 export docassemble` on
   `jl4/examples/canon/je/charities-2014/charity-test.l4` — 700 lines of the
   Jersey charities encoding, not written for this backend — now emits, because
   its `Entity.purposes` is a `LIST OF Purpose` and ONE such field anywhere in a
@@ -225,12 +225,12 @@ for stem in rodents-and-vermin seam enum-triage defaults \
             computed-and-shadow assume-via-fn citations \
             tenant-list payload-enum maybe-scalars statutory-age \
             review-checklist notice-letter; do
-  cabal run -v0 l4 -- docassemble "jl4/examples/docassemble/$stem.l4" \
+  cabal run -v0 l4 -- export docassemble "jl4/examples/docassemble/$stem.l4" \
       -o "jl4/examples/docassemble/expected/$stem.yml"
 done
 ```
 
-(With an installed binary: `l4 docassemble X.l4 -o expected/X.yml`.)
+(With an installed binary: `l4 export docassemble X.l4 -o expected/X.yml`.)
 
 **Read the diff before committing a regenerated golden.** Blessing output you
 have not looked at is how a wrong answer becomes the expected answer.
@@ -238,7 +238,7 @@ have not looked at is how a wrong answer becomes the expected answer.
 ## Emit an installable package instead (M2, R11)
 
 ```sh
-l4 docassemble jl4/examples/docassemble/citations.l4 --package /tmp/citepkg
+l4 export docassemble jl4/examples/docassemble/citations.l4 --package /tmp/citepkg
 ```
 
 writes the modern PEP 420 tree — exemplar `docassemble_demo/` at the 1.10.7
@@ -311,7 +311,7 @@ itself, and `https://pypi.org/simple/docassemble-cli/` is a 404 while
 tool the next lines invoke. Point it at the generated directory:
 
 ```sh
-l4 docassemble myrules.l4 --package /tmp/myrulespkg
+l4 export docassemble myrules.l4 --package /tmp/myrulespkg
 dainstall --playground --watch /tmp/myrulespkg     # iterate
 dainstall /tmp/myrulespkg                          # install server-wide
 ```
@@ -328,7 +328,7 @@ cite: `docassemble_webapp/docassemble/webapp/packages/api.py:36` at
 `/api/package_update_status` (`api.py:214`).
 
 ```sh
-l4 docassemble myrules.l4 --package /tmp/myrulespkg
+l4 export docassemble myrules.l4 --package /tmp/myrulespkg
 ( cd /tmp && zip -qr /tmp/myrulespkg.zip myrulespkg )
 curl -X POST https://YOUR-SERVER/api/package \
      -H "X-API-Key: $DA_API_KEY" \
@@ -367,7 +367,7 @@ uv pip install --python /tmp/da-venv/bin/python /Volumes/transcend/src/jhpyle/do
 Then:
 
 ```sh
-cabal run l4 -- docassemble jl4/examples/docassemble/seam.l4 -o /tmp/seam.yml
+cabal run l4 -- export docassemble jl4/examples/docassemble/seam.l4 -o /tmp/seam.yml
 /tmp/da-venv/bin/python jl4/examples/docassemble/roundtrip_check.py /tmp/seam.yml seam
 # == round-trip: seam == (13 blocks, debug=True)
 #   [Complies] notice_rule_satisfied_verdict = 'Complies'  OK
@@ -426,7 +426,7 @@ build dependency.
 python roundtrip_check.py <source> <example-name> [--also=<source>] [--quiet]
 ```
 
-`<source>` is **either** a bare interview YAML **or** a `l4 docassemble FILE
+`<source>` is **either** a bare interview YAML **or** a `l4 export docassemble FILE
 --package DIR` tree (M2/R11); the two are told apart by `os.path.isdir`, and a
 package tree is resolved to its
 `docassemble/l4<slug>/data/questions/<stem>.yml`, with the package name and
@@ -440,8 +440,8 @@ identical. That is the M2 claim _packaging must not change meaning_, tested as
 a claim:
 
 ```sh
-l4 docassemble jl4/examples/docassemble/citations.l4 -o /tmp/citations.yml
-l4 docassemble jl4/examples/docassemble/citations.l4 --package /tmp/citepkg
+l4 export docassemble jl4/examples/docassemble/citations.l4 -o /tmp/citations.yml
+l4 export docassemble jl4/examples/docassemble/citations.l4 --package /tmp/citepkg
 /tmp/da-venv/bin/python jl4/examples/docassemble/roundtrip_check.py \
     /tmp/citations.yml citations --also=/tmp/citepkg --quiet
 ```
@@ -545,7 +545,7 @@ failing cases) and the implementation was written against them. They are the
 contract M2 had to meet, and they now pass; what follows is what each block
 pins, so a later change knows what it is breaking._
 
-- `jl4/tests-cli/Main.hs`, `describe "l4 docassemble --package (M2/R11: …)"`
+- `jl4/tests-cli/Main.hs`, `describe "l4 export docassemble --package (M2/R11: …)"`
   — fourteen shape assertions over the written tree (PEP 420 shape including
   the namespace `__init__.py` that must be **absent**, `pyproject.toml`,
   `MANIFEST.in`, byte-identical `data/sources` provenance, the `modules:`
@@ -554,7 +554,7 @@ pins, so a later change knows what it is breaking._
   fidelity report's placement and bytes, the `MANIFEST.in` line that ships it,
   `l4runtime.py`'s provenance API, the `# do not pre-load` marker, and
   regeneration replacing a previous run rather than accumulating beside it).
-- `jl4/tests-cli/Main.hs`, `describe "l4 docassemble citations (M2: …)"` —
+- `jl4/tests-cli/Main.hs`, `describe "l4 export docassemble citations (M2: …)"` —
   eight assertions over the emitted interview (per-rule `explain()` with that
   rule's own citation and **not** its neighbour's, the goal block carrying the
   exported `DECIDE`'s own `@ref`, `explain()` sitting **after** the assignment
@@ -564,7 +564,7 @@ pins, so a later change knows what it is breaking._
   block keys and field modifiers), plus the `expected/citations.yml` byte
   golden that the RED phase deferred to the implementation and the GREEN phase
   supplied.
-- `jl4/tests-cli/Main.hs`, `describe "l4 docassemble (M2 repairs: …)"` — the
+- `jl4/tests-cli/Main.hs`, `describe "l4 export docassemble (M2 repairs: …)"` — the
   two losses that used to be silent (`DA-GLOSS-REGEX`, `DA-GLOSS-COLLIDE`) and
   the one that used to change the answer (an L4 name landing on a name
   `modules:` star-imports).
@@ -592,7 +592,7 @@ _Same discipline again: the tests landed first (commit `ec9850f6`, 15 failing
 CLI cases and 7 of 7 examples not round-tripping) and the implementation was
 written against them._
 
-- `jl4/tests-cli/Main.hs`, `describe "l4 docassemble (M4: breadth — acceptance)"`
+- `jl4/tests-cli/Main.hs`, `describe "l4 export docassemble (M4: breadth — acceptance)"`
   — twenty-five assertions, one or two per §10 clause: the `DAList` and its
   `object_type`, a gather-control question, a per-element question and a goal
   that QUANTIFIES; the per-element predicate keeping its short-circuit and the
@@ -645,7 +645,7 @@ scalar with no indentation indicator takes its indentation from its own first
 non-empty line — so one leading space set the block indent above the emitter's
 flat four, and the next line at four terminated the scalar. `parse.Interview`
 then raises `DASourceError`: not one question survives, in **both** artifact
-shapes, while `l4 docassemble` exits 0. Now `content: |2`, and
+shapes, while `l4 export docassemble` exits 0. Now `content: |2`, and
 `notice-letter.letter.md` opens on an indented address block so the corpus
 carries the trigger.
 

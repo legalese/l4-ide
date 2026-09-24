@@ -1,6 +1,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 
--- | @l4 catala FILE@ — compile the constitutive subset of an L4 file to a
+-- | @l4 export catala FILE@ — compile the constitutive subset of an L4 file to a
 -- literate Catala @.catala_en@ module.
 --
 -- Selection, lowering and emission live in @jl4-core@ ('L4.Catala.Lower' /
@@ -102,7 +102,7 @@ catalaCmd opts = do
       case lowerModuleWith lowerOpts (importClosure tc) tc.module' of
         Left lerrs -> do
           putDiagnostics
-            ( "l4 catala: cannot compile these decisions to Catala:"
+            ( "l4 export catala: cannot compile these decisions to Catala:"
             : map (("  - " <>) . renderLowerError) lerrs
             )
           exitFailure
@@ -112,12 +112,12 @@ catalaCmd opts = do
               (m1, tNotes) = fillTests fields oracle m0
           case nameFor opts.catOutput m1 of
             Left err -> do
-              putDiagnostics ["l4 catala: " <> err]
+              putDiagnostics ["l4 export catala: " <> err]
               exitFailure
             Right m -> do
               -- Warnings are advice, not failure: fallbacks and elisions must
               -- be visible (R4, R11), but they do not stop emission.
-              mapM_ (\w -> hPutStrLn stderr ("l4 catala: " <> Text.unpack w))
+              mapM_ (\w -> hPutStrLn stderr ("l4 export catala: " <> Text.unpack w))
                     (m.modWarnings <> tNotes)
               let out = renderModule m
               case opts.catOutput of
