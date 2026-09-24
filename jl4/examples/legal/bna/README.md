@@ -107,7 +107,7 @@ exit code: `l4 run` exits 0 even when an assertion fails (measured; see `SMOKE-R
 
 ## Projection artifacts
 
-- `bna.dmn` + `bna.fidelity.txt` — the DMN 1.3 export (`l4 export --to dmn --flavor camunda
+- `bna.dmn` + `bna.fidelity.txt` — the DMN 1.3 export (`l4 export dmn --flavor camunda
 --fidelity-report`): 43 decisions, one decision table, **zero blocking notes**, and it **executes
   green on both engines** against `bna.cases.json` (KIE 1075/1075 + 325/325 service outputs,
   Camunda 1075/1075). Until #196 landed the YMD lowering, the 3 dated constants emitted raw L4 and

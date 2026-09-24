@@ -3,7 +3,7 @@
 
 Captures everything LIVE so the site can't drift from the code:
   * reads each example's .l4 source,
-  * runs `l4 openfisca` to emit the OpenFisca Python,
+  * runs `l4 export openfisca` to emit the OpenFisca Python,
   * runs roundtrip_check.py to capture the validating output numbers,
   * renders L4-OPENFISCA.md to HTML.
 
@@ -57,7 +57,7 @@ def run(cmd):
 
 
 def emit_py(name):
-    return run([L4BIN, "openfisca", str(EXDIR / f"{name}.l4")]).stdout
+    return run([L4BIN, "export", "openfisca", str(EXDIR / f"{name}.l4")]).stdout
 
 
 def roundtrip(name, py_text):
