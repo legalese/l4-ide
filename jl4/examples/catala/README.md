@@ -1,9 +1,9 @@
-# `l4 catala` exhibits
+# `l4 export catala` exhibits
 
 Seven L4 sources and the literate Catala they compile to, plus the
 `--boolean-only` rendering of one of them. The goldens under `expected/` are
-byte-for-byte what `l4 catala <file>.l4` prints, and `jl4/tests-cli/Main.hs`
-pins them. `not-ok/` holds five sources that `l4 catala` **refuses**, each
+byte-for-byte what `l4 export catala <file>.l4` prints, and `jl4/tests-cli/Main.hs`
+pins them. `not-ok/` holds five sources that `l4 export catala` **refuses**, each
 because emitting it would have made the Catala say something other than the L4
 says; `tests-cli` pins the refusals.
 
@@ -55,7 +55,7 @@ same module — `bands.catala_en` and `bands-boolean-only.catala_en` are two
 renderings of one source and both say `> Module Bands`. The goldens themselves
 are compared against stdout, where the module name comes from the L4 basename.
 
-`l4 catala -o` rejects an output basename that cannot be a Catala module name,
+`l4 export catala -o` rejects an output basename that cannot be a Catala module name,
 rather than writing a file the toolchain will refuse.
 
 ### `not-ok/`
