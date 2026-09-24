@@ -37,7 +37,7 @@
 -- TWO TYPES ARE RENAMED, and the reason is a hard Blawx error, not taste.
 -- The original has both a TYPE `Conduct` and an accessor `conduct`, and both a
 -- TYPE `Effect` and an accessor `effect`. Measured on this tree, `l4 check`
--- accepts that and `l4 blawx` refuses it:
+-- accepts that and `l4 export blawx` refuses it:
 --
 --     in `conduct`: name collision (Blawx): distinct L4 definitions `Conduct`
 --     and `conduct` both mangle to the Blawx atom `conduct` — rename one

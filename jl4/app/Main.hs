@@ -12,6 +12,7 @@ import Options.Applicative
   ( Parser
   , ParserInfo
   , command
+  , commandGroup
   , customExecParser
   , footer
   , footerDoc
@@ -19,6 +20,7 @@ import Options.Applicative
   , header
   , helper
   , info
+  , metavar
   , progDesc
   , prefs
   , showHelpOnEmpty
@@ -30,10 +32,10 @@ import System.IO (hSetEncoding, stdin, stdout, stderr)
 
 import L4.Cli.Ast (AstOptions, astCmd, astOptionsParser)
 import L4.Cli.Batch (BatchOptions, batchCmd, batchOptionsParser)
-import L4.Cli.Blawx (BlawxOptions, blawxCmd, blawxOptionsParser)
+import L4.Cli.Blawx (BlawxOptions, blawxCmd, blawxExportOptionsParser, blawxImportOptionsParser)
 import L4.Cli.Catala (CatalaOptions, catalaCmd, catalaOptionsParser)
 import L4.Cli.Check (CheckOptions, checkCmd, checkOptionsParser)
-import L4.Cli.Export (ExportOptions, exportCmd, exportOptionsParser)
+import L4.Cli.Export (ExportOptions, exportBpmnOptionsParser, exportCmd, exportDmnMarkdownOptionsParser, exportDmnOptionsParser)
 import L4.Cli.Format (FormatOptions, formatCmd, formatOptionsParser)
 import L4.Cli.Nlg (NlgOptions, nlgCmd, nlgOptionsParser)
 import L4.Cli.OpenFisca (OpenFiscaOptions, openFiscaCmd, openFiscaOptionsParser)
@@ -99,18 +101,6 @@ commandParser =
       <> command "render"
            (info (CmdRender <$> renderOptionsParser)
              (progDesc "Render an L4 file to a formatted document (html|text|json|plan)"))
-      <> command "export"
-           (info (CmdExport <$> exportOptionsParser)
-             (progDesc "Export an L4 file to a foreign interchange notation (dmn|dmn-md|bpmn) with a fidelity report"))
-      <> command "openfisca"
-           (info (CmdOpenFisca <$> openFiscaOptionsParser)
-             (progDesc "Compile the decision-rule subset of an L4 file to a runnable OpenFisca Python module"))
-      <> command "blawx"
-           (info (CmdBlawx <$> blawxOptionsParser)
-             (progDesc "Compile the decision-rule subset of an L4 file to a Blawx project (.blawx YAML + s(CASP) dump)"))
-      <> command "catala"
-           (info (helper <*> (CmdCatala <$> catalaOptionsParser))
-             (progDesc "Compile the constitutive subset of an L4 file to a literate Catala module"))
       <> command "nlg"
            (info (helper <*> (CmdNlg <$> nlgOptionsParser))
              (progDesc "Linearize a module's directives to natural-language prose (the .nlg golden payload)"))
@@ -126,6 +116,49 @@ commandParser =
            (info (helper <*> (CmdVerify <$> verifyOptionsParser))
              (progDesc "Look for unsatisfiable rules, dead branches, vacuous guards and unreachable outcomes in the boolean decision skeleton"
                <> footerDoc (Just (verbatim propositionalBound))))
+      <> command "export"
+           (info (helper <*> exportFormats)
+             (progDesc "Write an L4 module out in another notation: an interchange document, a runnable program, or an interview. Run `l4 export --help` for the formats, `l4 export FORMAT --help` for each one's options"))
+      <> command "import"
+           (info (helper <*> importFormats)
+             (progDesc "Read another notation into L4 source. Run `l4 import --help` for the formats"))
+
+    -- One subcommand per foreign notation (CLI-SURFACE-SPEC C1). Each was a
+    -- top-level verb, or a `--to` value on `l4 export`, until 2026-09-24.
+    -- Adding a backend adds one entry here, and `l4 export --help` is the
+    -- catalogue of every notation L4 can write.
+    exportFormats =
+      subparser
+        (  metavar "FORMAT"
+        <> commandGroup "Formats:"
+        <> command "dmn"
+             (info (helper <*> (CmdExport <$> exportDmnOptionsParser))
+               (progDesc "DMN 1.3 XML decision model, with a fidelity report"))
+        <> command "dmn-md"
+             (info (helper <*> (CmdExport <$> exportDmnMarkdownOptionsParser))
+               (progDesc "dmnmd markdown decision tables, with a fidelity report"))
+        <> command "bpmn"
+             (info (helper <*> (CmdExport <$> exportBpmnOptionsParser))
+               (progDesc "BPMN 2.0 XML process for one regulative rule, with a fidelity report"))
+        <> command "openfisca"
+             (info (helper <*> (CmdOpenFisca <$> openFiscaOptionsParser))
+               (progDesc "A runnable OpenFisca Python module of the decision-rule subset"))
+        <> command "blawx"
+             (info (helper <*> (CmdBlawx <$> blawxExportOptionsParser))
+               (progDesc "A Blawx project (.blawx YAML + s(CASP) dump) of the decision-rule subset"))
+        <> command "catala"
+             (info (helper <*> (CmdCatala <$> catalaOptionsParser))
+               (progDesc "A literate Catala module of the constitutive subset"))
+        )
+
+    importFormats =
+      subparser
+        (  metavar "FORMAT"
+        <> commandGroup "Formats:"
+        <> command "blawx"
+             (info (helper <*> (CmdBlawx <$> blawxImportOptionsParser))
+               (progDesc "Lift a .blawx project to L4 source"))
+        )
 
 -- | A footer that keeps the line breaks it was written with.
 --
@@ -142,7 +175,7 @@ commandInfo :: ParserInfo Command
 commandInfo = info (helper <*> commandParser)
   ( fullDesc
   <> header "l4 — the L4 computational-law CLI"
-  <> progDesc "Typecheck, evaluate, format, and visualize .l4 files. Run `l4 <command> --help` for per-command options."
+  <> progDesc "Typecheck, evaluate, format and visualize .l4 files, and export them to (or import them from) other notations. Run `l4 <command> --help` for per-command options."
   <> footer "Part of the L4 tool family from Legalese.com"
   )
 

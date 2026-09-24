@@ -3999,7 +3999,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 --
 -- There is deliberately no model-name column. The model's name comes from the
 -- module's own outermost @§@ heading, else from the file's base name — the
--- same precedence @l4 export --to=dmn@ applies — so these goldens are what a
+-- same precedence @l4 export dmn@ applies — so these goldens are what a
 -- bare CLI invocation writes, with no flag and no string retyped here. It used
 -- to be a hand-typed column, and the result was that the Reg CF corpus's model
 -- had three names at once: @SEC Regulation Crowdfunding — 17 CFR Part 227@ in
@@ -4130,7 +4130,7 @@ goldenOf examplesRoot srcPath name render = do
   src <- Text.readFile (examplesRoot </> srcPath)
   pure (mkGolden examplesRoot name (render (drgAsCli srcPath src)))
 
--- | 'goldenOf' at the KIE flavor: what `l4 export --to=dmn --flavor=kie FILE`
+-- | 'goldenOf' at the KIE flavor: what `l4 export dmn --flavor=kie FILE`
 -- writes, with the same model-name precedence.
 goldenKieOf :: FilePath -> FilePath -> FilePath -> (Drg -> Text) -> IO (Golden Text)
 goldenKieOf examplesRoot srcPath name render = do
@@ -4140,7 +4140,7 @@ goldenKieOf examplesRoot srcPath name render = do
               src
   pure (mkGolden examplesRoot name (render drg))
 
--- | Lower exactly as @l4 export --to=dmn FILE@ does with no @--model-name@:
+-- | Lower exactly as @l4 export dmn FILE@ does with no @--model-name@:
 -- the module's outermost @§@ heading if it has one, else the file's base name.
 -- Keeping this in step with 'L4.Cli.Export.exportDmn' is what makes every DMN
 -- golden reproducible from the command line.
