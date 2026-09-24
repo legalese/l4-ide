@@ -1,0 +1,21 @@
+{
+  "note": [
+    "Cases for collide-param-shadow-visible.dmn (probe E7). 2 cases x 3",
+    "decisions = 6 value checks per engine. Case B moves x, and therefore y,",
+    "while both shadowed answers must stay at 10000: a decision that MOVED with",
+    "the context is reading the outer name, which is exactly the fault this",
+    "probe is shaped to make visible without relying on a null."
+  ],
+  "cases": [
+    {
+      "name": "A. x = 7, y = 70",
+      "context": { "x": 7 },
+      "expect": { "y": 70, "shadow_input": 10000, "shadow_decision": 10000 }
+    },
+    {
+      "name": "B. x = 3, y = 30; the shadowed answers must NOT move",
+      "context": { "x": 3 },
+      "expect": { "y": 30, "shadow_input": 10000, "shadow_decision": 10000 }
+    }
+  ]
+}

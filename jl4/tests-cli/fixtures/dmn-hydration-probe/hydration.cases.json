@@ -1,0 +1,63 @@
+{
+  "note": [
+    "Cases for hydration-context.dmn. Three cases x two decisions = 6 value",
+    "checks, which is the 6/6 both engine legs in jl4/tests-cli/Main.hs assert.",
+    "EVERY case asserts the full hydrated record as a nested object, so the",
+    "context-as-value return path (no final result entry) is measured and not",
+    "merely inferred from the downstream decision agreeing. Boundary case C",
+    "pins >= at exactly 100000."
+  ],
+  "cases": [
+    {
+      "name": "A. income dominates; full hydrated record asserted",
+      "context": {
+        "investor_raw": {
+          "annual_income": 150000,
+          "net_worth": 80000
+        }
+      },
+      "expect": {
+        "investor": {
+          "annual_income": 150000,
+          "net_worth": 80000,
+          "greater_of": 150000
+        },
+        "eligible": true
+      }
+    },
+    {
+      "name": "B. net worth dominates but both under the line",
+      "context": {
+        "investor_raw": {
+          "annual_income": 60000,
+          "net_worth": 90000
+        }
+      },
+      "expect": {
+        "eligible": false,
+        "investor": {
+          "annual_income": 60000,
+          "net_worth": 90000,
+          "greater_of": 90000
+        }
+      }
+    },
+    {
+      "name": "C. boundary: greater_of exactly 100000 satisfies >=",
+      "context": {
+        "investor_raw": {
+          "annual_income": 100000,
+          "net_worth": 50000
+        }
+      },
+      "expect": {
+        "eligible": true,
+        "investor": {
+          "annual_income": 100000,
+          "net_worth": 50000,
+          "greater_of": 100000
+        }
+      }
+    }
+  ]
+}

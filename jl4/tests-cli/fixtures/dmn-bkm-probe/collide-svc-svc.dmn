@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE E6. Two <decisionService> elements sharing a @name (and a variable
+  @name), over different member decisions. Distinct @id, as the XSD requires;
+  nothing in the XSD requires distinct names.
+
+  This is the service-side analogue of the inputData x inputData collision in
+  section 13.7-1's table, and it is the case that decides whether decisionService
+  names need their OWN uniquifyIn scope (Lower.hs:3712-3716's first unmeasured
+  claim) or can be left alone.
+
+  Both services are GROUPING-ONLY, for probe E5's reason: a knowledgeRequirement
+  to a service is fatal to the Camunda parse, and that would mask this question.
+
+  KIE prints `decisionSvcs [...]` and calls evaluateDecisionService BY NAME
+  (KieDmnCheck.java:418-430), so if two services share a name, one of two things
+  happens and both are informative: either the validator complains, or the
+  by-name call silently reaches only one of them, twice.
+
+  MEASURED 2026-07-31, and BOTH things happen:
+    KIE 8.44  : validator raises DUPLICATE_NAME twice (svc_one, svc_two). Build
+                clean. Both decisions answer correctly. And the two
+                evaluateDecisionService calls, made against the two DISTINCT
+                service NODES, both print
+
+                    SVC    twin -> {n=4, left=8}
+
+                i.e. BOTH resolve to the FIRST service. The second service is
+                unreachable by name and answers with the first one's contents;
+                `right = 120` never appears in either SVC line. A caller that
+                asked for the second service would receive the first one's answer
+                with no error of any kind at runtime.
+    Camunda 8 : silent; both decisions correct; services unaddressable anyway.
+
+  CONSEQUENCE. decisionService names DO need their own uniquifyIn scope, which is
+  the first of the two claims at Lower.hs:3712-3716 and is now measured rather
+  than asserted. The failure mode without it is a caller silently getting a
+  different service's answer.
+
+  Wired HarnessMustFail on the KIE leg, HarnessMustPass on the Camunda leg.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_collide_svc_svc" name="collide_svc_svc" namespace="https://legalese.com/l4/dmn/collide_svc_svc" exporter="hand">
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_left" name="left">
+    <variable id="decision_left_var" name="left" typeRef="number"/>
+    <informationRequirement id="ir_left_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <literalExpression id="decision_left_lit">
+      <text>n * 2</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_right" name="right">
+    <variable id="decision_right_var" name="right" typeRef="number"/>
+    <informationRequirement id="ir_right_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <literalExpression id="decision_right_lit">
+      <text>n * 30</text>
+    </literalExpression>
+  </decision>
+  <decisionService id="svc_one" name="twin">
+    <variable id="svc_one_var" name="twin" typeRef="number"/>
+    <outputDecision href="#decision_left"/>
+    <inputData href="#input_n"/>
+  </decisionService>
+  <decisionService id="svc_two" name="twin">
+    <variable id="svc_two_var" name="twin" typeRef="number"/>
+    <outputDecision href="#decision_right"/>
+    <inputData href="#input_n"/>
+  </decisionService>
+</definitions>

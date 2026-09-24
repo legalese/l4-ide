@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PLACEMENT A, and the POSITIVE half of the intersection finding: the same
+  per-spouse predicate as spouse-context-table.dmn, as the same DECISION TABLE,
+  but living in the encapsulatedLogic of a Business Knowledge Model - DMN's own
+  lambda - and invoked per element from the quantifier via a
+  knowledgeRequirement.
+
+  Measured 2026-07-30: BOTH engines take this file 5/5 (KIE 8.44 with zero
+  warnings, zeebe-dmn 8.7.6 clean), while the boxed-context placement next door
+  is schema-valid and Camunda-unparseable. So the two-engine-portable spellings
+  of a per-element predicate are exactly: an opaque inline `satisfies` string
+  (spouse-inline.dmn), or THIS - and only this one is a table that gap/overlap
+  analysis can reach. That is what promotes BKM emission (spec Phase 5,
+  section 6) from fidelity-nice to portability-critical.
+
+  If the Camunda leg of spouse-context-table.dmn ever starts passing, the
+  claim above narrows: see the UPGRADE RISK note in that file.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_spouse_bkm_table" name="spouse_bkm_table" namespace="https://legalese.com/l4/dmn/spouse_bkm_table" exporter="hand">
+  <itemDefinition id="itemdef_spouse" name="Spouse">
+    <itemComponent id="itemdef_spouse_c1" name="income">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_spouse_c2" name="qualifying_candidate">
+      <typeRef>boolean</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_spouses" name="Spouses" isCollection="true">
+    <typeRef>Spouse</typeRef>
+  </itemDefinition>
+  <inputData id="input_spouses" name="spouses">
+    <variable id="input_spouses_var" name="spouses" typeRef="Spouses"/>
+  </inputData>
+  <businessKnowledgeModel id="bkm_eligible" name="eligible">
+    <variable id="bkm_eligible_var" name="eligible" typeRef="boolean"/>
+    <encapsulatedLogic id="bkm_eligible_logic">
+      <formalParameter id="bkm_eligible_p1" name="s" typeRef="Spouse"/>
+      <decisionTable id="dt_eligible" hitPolicy="UNIQUE" outputLabel="eligible">
+        <input id="dt_eligible_i1">
+          <inputExpression id="dt_eligible_i1e" typeRef="number">
+            <text>s.income</text>
+          </inputExpression>
+        </input>
+        <input id="dt_eligible_i2">
+          <inputExpression id="dt_eligible_i2e" typeRef="boolean">
+            <text>s.qualifying_candidate</text>
+          </inputExpression>
+        </input>
+        <output id="dt_eligible_o1"/>
+        <rule id="dt_eligible_r1">
+          <inputEntry id="dt_eligible_r1i1"><text>&lt; 100000</text></inputEntry>
+          <inputEntry id="dt_eligible_r1i2"><text>-</text></inputEntry>
+          <outputEntry id="dt_eligible_r1o"><text>true</text></outputEntry>
+        </rule>
+        <rule id="dt_eligible_r2">
+          <inputEntry id="dt_eligible_r2i1"><text>&gt;= 100000</text></inputEntry>
+          <inputEntry id="dt_eligible_r2i2"><text>true</text></inputEntry>
+          <outputEntry id="dt_eligible_r2o"><text>true</text></outputEntry>
+        </rule>
+        <rule id="dt_eligible_r3">
+          <inputEntry id="dt_eligible_r3i1"><text>&gt;= 100000</text></inputEntry>
+          <inputEntry id="dt_eligible_r3i2"><text>false</text></inputEntry>
+          <outputEntry id="dt_eligible_r3o"><text>false</text></outputEntry>
+        </rule>
+      </decisionTable>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <decision id="decision_children_eligible" name="children_eligible" label="children eligible">
+    <variable id="decision_children_eligible_var" name="children_eligible" typeRef="boolean"/>
+    <informationRequirement id="ir_spouses">
+      <requiredInput href="#input_spouses"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_eligible">
+      <requiredKnowledge href="#bkm_eligible"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_children_eligible_literal">
+      <text>some s in spouses satisfies eligible(s)</text>
+    </literalExpression>
+  </decision>
+</definitions>

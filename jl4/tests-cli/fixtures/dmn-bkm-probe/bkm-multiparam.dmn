@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE A1. What this asks: does a BKM with THREE formalParameters, invoked
+  POSITIONALLY, bind argument i to parameter i on each engine?
+
+  Spec section 6.2 rules that DMN binds by NAME and L4 by POSITION, and that the
+  emitter must emit bindings position to name at the seam. Every measurement
+  behind that ruling so far (section 13.3 row 1) used a SINGLE parameter, where a
+  binding bug is invisible by construction.
+
+  The body is deliberately NON commutative in all three slots:
+
+      f(a, b, c) = if b then (if c = "x" then a - 1 else a - 100) else (100 - a)
+
+  so a swap of any two arguments changes the answer or fails to type. That is
+  the section 13.6 lesson applied: the earlier probes used `+` and `min`, which
+  hide an argument swap completely.
+
+  WHAT A FLIP MEANS. If either engine stops answering the values in
+  bkm-multiparam.cases.json, positional invocation is not a portable spelling and
+  the emitter must go named (see A2, which measures whether named is available at
+  all). If BOTH legs flip together, suspect the FEEL parser, not the binding.
+
+  No negative control: this asks whether an idiom EVALUATES, which a positive
+  answers completely. Compare dmn-xsd-order, which asks whether a gate REJECTS
+  and therefore needs one.
+
+  MEASURED 2026-07-31 on KIE 8.44.0.Final and zeebe-dmn 8.7.6: 8/8 values on
+  both, KIE validator and build clean, Camunda parse clean. Positional
+  invocation at arity 3 is portable, and section 13.3 row 1 now holds beyond
+  arity 1.
+
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_bkm_multiparam" name="bkm_multiparam" namespace="https://legalese.com/l4/dmn/bkm_multiparam" exporter="hand">
+  <businessKnowledgeModel id="bkm_f" name="f">
+    <variable id="bkm_f_var" name="f" typeRef="number"/>
+    <encapsulatedLogic id="bkm_f_logic">
+      <formalParameter id="bkm_f_p1" name="a" typeRef="number"/>
+      <formalParameter id="bkm_f_p2" name="b" typeRef="boolean"/>
+      <formalParameter id="bkm_f_p3" name="c" typeRef="string"/>
+      <literalExpression id="bkm_f_lit">
+        <text>if b then (if c = "x" then a - 1 else a - 100) else (100 - a)</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <decision id="decision_pos_xtrue" name="pos_xtrue">
+    <variable id="decision_pos_xtrue_var" name="pos_xtrue" typeRef="number"/>
+    <knowledgeRequirement id="kr_pos_xtrue">
+      <requiredKnowledge href="#bkm_f"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_pos_xtrue_lit">
+      <text>f(2, true, "x")</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_pos_xfalse" name="pos_xfalse">
+    <variable id="decision_pos_xfalse_var" name="pos_xfalse" typeRef="number"/>
+    <knowledgeRequirement id="kr_pos_xfalse">
+      <requiredKnowledge href="#bkm_f"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_pos_xfalse_lit">
+      <text>f(2, false, "x")</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_pos_ytrue" name="pos_ytrue">
+    <variable id="decision_pos_ytrue_var" name="pos_ytrue" typeRef="number"/>
+    <knowledgeRequirement id="kr_pos_ytrue">
+      <requiredKnowledge href="#bkm_f"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_pos_ytrue_lit">
+      <text>f(5, true, "y")</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_pos_from_input" name="pos_from_input">
+    <variable id="decision_pos_from_input_var" name="pos_from_input" typeRef="number"/>
+    <informationRequirement id="ir_pos_from_input">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_pos_from_input">
+      <requiredKnowledge href="#bkm_f"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_pos_from_input_lit">
+      <text>f(n, true, "x")</text>
+    </literalExpression>
+  </decision>
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+</definitions>

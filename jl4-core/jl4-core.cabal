@@ -110,10 +110,19 @@ library
     Base.Text
     Paths_jl4_core
     L4.Annotation
+    L4.Bpmn.IR
+    L4.Bpmn.Lower
+    L4.Bpmn.Emit
+    L4.Bpmn.Wiring
     L4.Citations
     L4.Desugar
     L4.Diagnostic
     L4.DirectiveFilter
+    L4.Dmn.Analysis
+    L4.Dmn.IR
+    L4.Dmn.Lower
+    L4.Dmn.Emit
+    L4.Dmn.Markdown
     L4.Evaluate.Operators
     L4.Evaluate.ValueLazy
     L4.Evaluate.ValueLazyJSON

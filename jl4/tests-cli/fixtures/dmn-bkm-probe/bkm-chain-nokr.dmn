@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE C3. NEGATIVE CONTROL for C1/C2, and the file that answers section 13.8's
+  named gap. Byte-for-byte C1/C2's model, except that NOBODY declares the
+  outer-to-inner edge:
+
+      result -> outer   declared on the decision
+      outer  -> inner   NOT DECLARED ANYWHERE, though outer's body calls inner
+
+  Section 6.2 says the knowledgeRequirement is "load bearing and unenforced by
+  the XSD; omit it and KIE errors at both compile and eval time", which section
+  13.3 row 5 measured at DECISION level. Section 13.8 records that the Camunda
+  side of the same question was never asked and says "Worth a probe before
+  Phase 5 ships BKM." This is that probe.
+
+  EXPECTED KIE: loud. This fixture is wired HarnessMustFail on the KIE leg; a
+  day when it starts passing is a day the emitter lost its engine backstop
+  without anyone noticing.
+
+  WHAT THE CAMUNDA LEG MEANS. If Camunda 8 is SILENT here (parses, evaluates,
+  answers the right number), then on the DEFAULT flavor section 6.2's invariant
+  is checked by nobody but us, and a checkDrg assertion over knowledgeRequirement
+  completeness becomes MANDATORY rather than belt-and-braces. If Camunda is also
+  loud, the assertion is still worth having but is no longer the only guard.
+
+  The cases assert the CORRECT answer deliberately, not an error: if an engine
+  answers correctly without the edge, the value leg passes and the difference
+  between the engines shows up in the error count, which is exactly the
+  distinction being measured.
+
+  MEASURED 2026-07-31, answering section 13.8's open question:
+
+    KIE 8.44  : ERROR [ERR_COMPILING_FEEL] ... Unknown variable 'inner', at
+                validator AND build. Loud, at compile time, exactly as section 6.2
+                claims and section 13.3 row 5 measured at decision level.
+    Camunda 8 : parses cleanly, no message, and `result` is NULL in every case.
+
+  So section 13.8's worry is HALF confirmed. Camunda does not accept the file
+  and answer correctly, which would have been the worst case; but it does not
+  DIAGNOSE anything either. It degrades to null, which the harness catches only
+  because a SUCCEEDED-yet-null value is a failure by the harness's own rule, and
+  which a production deployment would experience as a decision that quietly
+  stopped having an answer.
+
+  CONSEQUENCE. On the DEFAULT flavor there is no compile-time backstop for
+  knowledgeRequirement completeness. A checkDrg assertion over it is MANDATORY,
+  not belt-and-braces. Wired HarnessMustFail on both legs.
+
+  Note that this file and bkm-chain-flat.dmn (C2) produce the IDENTICAL
+  diagnostic on both engines, which is itself the finding: adding the transitive
+  edge to the caller changes nothing, so C2 is C3 with a decoration.
+
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_bkm_chain_nokr" name="bkm_chain_nokr" namespace="https://legalese.com/l4/dmn/bkm_chain_nokr" exporter="hand">
+  <businessKnowledgeModel id="bkm_inner" name="inner">
+    <variable id="bkm_inner_var" name="inner" typeRef="number"/>
+    <encapsulatedLogic id="bkm_inner_logic">
+      <formalParameter id="bkm_inner_p1" name="v" typeRef="number"/>
+      <literalExpression id="bkm_inner_lit">
+        <text>v + 1</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <businessKnowledgeModel id="bkm_outer" name="outer">
+    <variable id="bkm_outer_var" name="outer" typeRef="number"/>
+    <encapsulatedLogic id="bkm_outer_logic">
+      <formalParameter id="bkm_outer_p1" name="v" typeRef="number"/>
+      <literalExpression id="bkm_outer_lit">
+        <text>inner(v) * 10</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_result" name="result">
+    <variable id="decision_result_var" name="result" typeRef="number"/>
+    <informationRequirement id="ir_result_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_result_outer">
+      <requiredKnowledge href="#bkm_outer"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_result_lit">
+      <text>outer(n)</text>
+    </literalExpression>
+  </decision>
+</definitions>

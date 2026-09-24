@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_bkm_exhibit" name="BKM exhibit" namespace="https://legalese.com/l4/dmn/bkm_exhibit" exporter="jl4">
+  <itemDefinition id="itemdef_pay" name="Pay">
+    <itemComponent id="itemdef_pay_c1" name="base">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_pay_c2" name="bonus">
+      <typeRef>number</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_pay_hydrated" name="Pay_hydrated" label="Pay">
+    <itemComponent id="itemdef_pay_hydrated_c1" name="base">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_pay_hydrated_c2" name="bonus">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_pay_hydrated_c3" name="total">
+      <typeRef>number</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <inputData id="input_pay" name="pay">
+    <variable id="input_pay_var" name="pay" typeRef="Pay"/>
+  </inputData>
+  <decision id="decision_case_one" name="case_one" label="case one">
+    <variable id="decision_case_one_var" name="case_one" label="case one" typeRef="number"/>
+    <knowledgeRequirement id="decision_case_one_kr1">
+      <requiredKnowledge href="#bkm_boosted"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_case_one_literal">
+      <text>boosted(x: 10)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_case_two" name="case_two" label="case two">
+    <variable id="decision_case_two_var" name="case_two" label="case two" typeRef="number"/>
+    <knowledgeRequirement id="decision_case_two_kr1">
+      <requiredKnowledge href="#bkm_boosted"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_case_two_literal">
+      <text>boosted(x: 20)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_pay_check" name="pay_check" label="pay check">
+    <variable id="decision_pay_check_var" name="pay_check" label="pay check" typeRef="number"/>
+    <informationRequirement id="decision_pay_check_ir1">
+      <requiredDecision href="#hydration_pay"/>
+    </informationRequirement>
+    <literalExpression id="decision_pay_check_literal">
+      <text>pay_hydrated.total + 3</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_baseline" name="baseline">
+    <variable id="decision_baseline_var" name="baseline" typeRef="number"/>
+    <literalExpression id="decision_baseline_literal">
+      <text>7</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_adj_one" name="adj_one" label="adj one">
+    <variable id="decision_adj_one_var" name="adj_one" label="adj one" typeRef="number"/>
+    <informationRequirement id="decision_adj_one_ir1">
+      <requiredDecision href="#decision_baseline"/>
+    </informationRequirement>
+    <knowledgeRequirement id="decision_adj_one_kr1">
+      <requiredKnowledge href="#bkm_adjusted"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_adj_one_literal">
+      <text>adjusted(y: 1, baseline: baseline)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_adj_two" name="adj_two" label="adj two">
+    <variable id="decision_adj_two_var" name="adj_two" label="adj two" typeRef="number"/>
+    <informationRequirement id="decision_adj_two_ir1">
+      <requiredDecision href="#decision_baseline"/>
+    </informationRequirement>
+    <knowledgeRequirement id="decision_adj_two_kr1">
+      <requiredKnowledge href="#bkm_adjusted"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_adj_two_literal">
+      <text>adjusted(y: 2, baseline: baseline)</text>
+    </literalExpression>
+  </decision>
+  <decision id="hydration_pay" name="pay_hydrated" label="pay">
+    <variable id="hydration_pay_var" name="pay_hydrated" label="pay" typeRef="Pay_hydrated"/>
+    <informationRequirement id="hydration_pay_ir1">
+      <requiredInput href="#input_pay"/>
+    </informationRequirement>
+    <knowledgeRequirement id="hydration_pay_kr1">
+      <requiredKnowledge href="#bkm_weighted_sum"/>
+    </knowledgeRequirement>
+    <context id="hydration_pay_ctx">
+      <contextEntry id="hydration_pay_ce1">
+        <variable id="hydration_pay_ce1_var" name="base" typeRef="number"/>
+        <literalExpression id="hydration_pay_ce1_lit">
+          <text>pay.base</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_pay_ce2">
+        <variable id="hydration_pay_ce2_var" name="bonus" typeRef="number"/>
+        <literalExpression id="hydration_pay_ce2_lit">
+          <text>pay.bonus</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="hydration_pay_ce3">
+        <variable id="hydration_pay_ce3_var" name="total" typeRef="number"/>
+        <literalExpression id="hydration_pay_ce3_lit">
+          <text>weighted_sum(a: base, b: bonus)</text>
+        </literalExpression>
+      </contextEntry>
+    </context>
+  </decision>
+  <businessKnowledgeModel id="bkm_weighted_sum" name="weighted_sum" label="weighted sum">
+    <variable id="bkm_weighted_sum_var" name="weighted_sum" label="weighted sum" typeRef="number"/>
+    <encapsulatedLogic id="bkm_weighted_sum_logic">
+      <formalParameter id="bkm_weighted_sum_p1" name="a" typeRef="number"/>
+      <formalParameter id="bkm_weighted_sum_p2" name="b" typeRef="number"/>
+      <literalExpression id="bkm_weighted_sum_literal">
+        <text>a * 2 + b</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <businessKnowledgeModel id="bkm_boosted" name="boosted">
+    <variable id="bkm_boosted_var" name="boosted" typeRef="number"/>
+    <encapsulatedLogic id="bkm_boosted_logic">
+      <formalParameter id="bkm_boosted_p1" name="x" typeRef="number"/>
+      <literalExpression id="bkm_boosted_literal">
+        <text>weighted_sum(a: x, b: 1) + 1</text>
+      </literalExpression>
+    </encapsulatedLogic>
+    <knowledgeRequirement id="bkm_boosted_kr1">
+      <requiredKnowledge href="#bkm_weighted_sum"/>
+    </knowledgeRequirement>
+  </businessKnowledgeModel>
+  <businessKnowledgeModel id="bkm_adjusted" name="adjusted">
+    <variable id="bkm_adjusted_var" name="adjusted" typeRef="number"/>
+    <encapsulatedLogic id="bkm_adjusted_logic">
+      <formalParameter id="bkm_adjusted_p1" name="y" typeRef="number"/>
+      <formalParameter id="bkm_adjusted_p2" name="baseline" typeRef="number"/>
+      <literalExpression id="bkm_adjusted_literal">
+        <text>y + baseline</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <decisionService id="service_bkm_exhibit" name="BKM_exhibit" label="BKM exhibit">
+    <variable id="service_bkm_exhibit_var" name="BKM_exhibit" label="BKM exhibit" typeRef="Any"/>
+    <outputDecision href="#decision_case_one"/>
+    <outputDecision href="#decision_case_two"/>
+    <outputDecision href="#decision_pay_check"/>
+    <outputDecision href="#decision_adj_one"/>
+    <outputDecision href="#decision_adj_two"/>
+    <encapsulatedDecision href="#decision_baseline"/>
+    <encapsulatedDecision href="#hydration_pay"/>
+    <inputData href="#input_pay"/>
+  </decisionService>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="definitions_bkm_exhibit_diagram" name="BKM exhibit">
+      <dmndi:DMNShape id="input_pay_shape" dmnElementRef="input_pay">
+        <dc:Bounds x="60" y="540" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_case_one_shape" dmnElementRef="decision_case_one">
+        <dc:Bounds x="60" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_case_two_shape" dmnElementRef="decision_case_two">
+        <dc:Bounds x="280" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_baseline_shape" dmnElementRef="decision_baseline">
+        <dc:Bounds x="500" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="hydration_pay_shape" dmnElementRef="hydration_pay">
+        <dc:Bounds x="720" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_pay_check_shape" dmnElementRef="decision_pay_check">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_adj_one_shape" dmnElementRef="decision_adj_one">
+        <dc:Bounds x="280" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_adj_two_shape" dmnElementRef="decision_adj_two">
+        <dc:Bounds x="500" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="bkm_weighted_sum_shape" dmnElementRef="bkm_weighted_sum">
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="bkm_boosted_shape" dmnElementRef="bkm_boosted">
+        <dc:Bounds x="280" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="bkm_adjusted_shape" dmnElementRef="bkm_adjusted">
+        <dc:Bounds x="500" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_bkm_exhibit_shape" dmnElementRef="service_bkm_exhibit">
+        <dc:Bounds x="40" y="200" width="880" height="280"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="decision_pay_check_ir1_edge" dmnElementRef="decision_pay_check_ir1">
+        <di:waypoint x="810" y="380"/>
+        <di:waypoint x="150" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_adj_one_ir1_edge" dmnElementRef="decision_adj_one_ir1">
+        <di:waypoint x="590" y="380"/>
+        <di:waypoint x="370" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_adj_two_ir1_edge" dmnElementRef="decision_adj_two_ir1">
+        <di:waypoint x="590" y="380"/>
+        <di:waypoint x="590" y="300"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="hydration_pay_ir1_edge" dmnElementRef="hydration_pay_ir1">
+        <di:waypoint x="150" y="540"/>
+        <di:waypoint x="810" y="460"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_case_one_kr1_edge" dmnElementRef="decision_case_one_kr1">
+        <di:waypoint x="370" y="140"/>
+        <di:waypoint x="150" y="380"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_case_two_kr1_edge" dmnElementRef="decision_case_two_kr1">
+        <di:waypoint x="370" y="140"/>
+        <di:waypoint x="370" y="380"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_adj_one_kr1_edge" dmnElementRef="decision_adj_one_kr1">
+        <di:waypoint x="590" y="140"/>
+        <di:waypoint x="370" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_adj_two_kr1_edge" dmnElementRef="decision_adj_two_kr1">
+        <di:waypoint x="590" y="140"/>
+        <di:waypoint x="590" y="220"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="hydration_pay_kr1_edge" dmnElementRef="hydration_pay_kr1">
+        <di:waypoint x="150" y="140"/>
+        <di:waypoint x="810" y="380"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="bkm_boosted_kr1_edge" dmnElementRef="bkm_boosted_kr1">
+        <di:waypoint x="150" y="140"/>
+        <di:waypoint x="370" y="60"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

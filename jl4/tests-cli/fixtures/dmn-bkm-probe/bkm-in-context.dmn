@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE B1. What this asks: can a boxed CONTEXT entry (a section 4.4 hydrator
+  entry) INVOKE a business knowledge model?
+
+  This is the highest consequence question in the Phase 5 matrix. Phase 3.6
+  already ships hydrators, Phase 5 ships BKMs, and every record with a computed
+  field that calls a tier 2 decide is exactly this shape. A Camunda 8 failure
+  here kills the corpus at the DEFAULT flavor, not at an opt in.
+
+  Shape:
+
+      decision `investor` = boxed context
+          annual_income : investor_raw.annual_income   (plain projection)
+          net_worth     : investor_raw.net_worth       (plain projection)
+          grade         : classify(investor_raw.annual_income)   <<< BKM CALL
+      decision `eligible` = investor.grade = "A"
+
+  DELIBERATELY DISTINCT from PR #176's spouse-context-table.dmn, which put a
+  decisionTable (a tFunctionDefinition) INSIDE the context entry and which
+  Camunda 8 rejected at parse with `expected literal expression but found
+  '...DecisionTableImpl...'`. Here the entry IS a literalExpression, and the
+  table, if any, lives inside the BKM where DMN puts it. Only NAME RESOLUTION
+  across the context boundary is in question: does a BKM name declared by a
+  knowledgeRequirement on the ENCLOSING decision reach into the context body?
+
+  WHAT A FLIP MEANS. If either engine cannot resolve the BKM from inside the
+  context, hydrators and BKMs cannot compose, and the emitter must either (a)
+  un-hydrate any record with a calling computed field back into separate
+  decisions, or (b) inline the BKM body at every call site, defeating the whole
+  point of Phase 5. Both are large, and the choice would be forced by this one
+  measurement.
+
+  MEASURED 2026-07-31: 6/6 values on BOTH engines, KIE clean, Camunda clean.
+  The highest-consequence unknown in the Phase 5 matrix resolves favourably: a
+  boxed context entry MAY invoke a BKM declared by a knowledgeRequirement on the
+  enclosing decision, on the default flavor as well as on kie. Hydration and
+  Phase 5 compose, and no un-hydration or inlining fallback is needed.
+
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_bkm_in_context" name="bkm_in_context" namespace="https://legalese.com/l4/dmn/bkm_in_context" exporter="hand">
+  <itemDefinition id="itemdef_investor_raw" name="InvestorRaw">
+    <itemComponent id="itemdef_investor_raw_c1" name="annual_income">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_investor_raw_c2" name="net_worth">
+      <typeRef>number</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_investor" name="Investor">
+    <itemComponent id="itemdef_investor_c1" name="annual_income">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_investor_c2" name="net_worth">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_investor_c3" name="grade">
+      <typeRef>string</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <businessKnowledgeModel id="bkm_classify" name="classify">
+    <variable id="bkm_classify_var" name="classify" typeRef="string"/>
+    <encapsulatedLogic id="bkm_classify_logic">
+      <formalParameter id="bkm_classify_p1" name="income" typeRef="number"/>
+      <literalExpression id="bkm_classify_lit">
+        <text>if income &gt;= 200000 then "A" else (if income &gt;= 100000 then "B" else "C")</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <inputData id="input_investor_raw" name="investor_raw">
+    <variable id="input_investor_raw_var" name="investor_raw" typeRef="InvestorRaw"/>
+  </inputData>
+  <decision id="decision_investor" name="investor" label="investor (hydrated, calls a BKM)">
+    <variable id="decision_investor_var" name="investor" typeRef="Investor"/>
+    <informationRequirement id="ir_investor_raw">
+      <requiredInput href="#input_investor_raw"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_investor_classify">
+      <requiredKnowledge href="#bkm_classify"/>
+    </knowledgeRequirement>
+    <context id="ctx_investor">
+      <contextEntry id="ce_annual_income">
+        <variable id="ce_annual_income_var" name="annual_income" typeRef="number"/>
+        <literalExpression id="ce_annual_income_lit">
+          <text>investor_raw.annual_income</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="ce_net_worth">
+        <variable id="ce_net_worth_var" name="net_worth" typeRef="number"/>
+        <literalExpression id="ce_net_worth_lit">
+          <text>investor_raw.net_worth</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="ce_grade">
+        <variable id="ce_grade_var" name="grade" typeRef="string"/>
+        <literalExpression id="ce_grade_lit">
+          <text>classify(investor_raw.annual_income)</text>
+        </literalExpression>
+      </contextEntry>
+    </context>
+  </decision>
+  <decision id="decision_eligible" name="eligible">
+    <variable id="decision_eligible_var" name="eligible" typeRef="boolean"/>
+    <informationRequirement id="ir_investor">
+      <requiredDecision href="#decision_investor"/>
+    </informationRequirement>
+    <literalExpression id="decision_eligible_lit">
+      <text>investor.grade = "A"</text>
+    </literalExpression>
+  </decision>
+</definitions>

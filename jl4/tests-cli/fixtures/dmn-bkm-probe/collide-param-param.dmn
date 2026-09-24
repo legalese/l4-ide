@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE E2. Two different BKMs whose formalParameters share names, and share
+  them with a THIRD BKM that is called from inside one of them.
+
+      alpha(v, w) = v - w
+      beta (v, w) = w - v          same spellings, opposite body
+      gamma(v)    = alpha(v, 1) + beta(v, 1)   calls both, with its OWN `v`
+
+  What this asks: is each encapsulatedLogic its own parameter scope, so that
+  uniquifying parameter names is per-BKM rather than per-document? gamma is the
+  case that matters: an engine that kept one global parameter frame would let
+  gamma's `v` leak into alpha's and beta's, and the subtraction is written
+  non-commutatively so that leaking would move the answer.
+
+  If this passes on both engines, Lower.hs's "each is its own uniquifyIn scope"
+  is confirmed on its second axis (E1 confirms it against the top level), and
+  the emitter never needs to rename a parameter because some other BKM used the
+  spelling.
+
+  MEASURED 2026-07-31: 6/6 values on BOTH engines, KIE clean, Camunda clean.
+  Each encapsulatedLogic is its own parameter scope, including for a BKM that
+  calls two others which reuse its own parameter spellings. The emitter never
+  needs to rename a parameter because a different BKM used the same name.
+
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_collide_param_param" name="collide_param_param" namespace="https://legalese.com/l4/dmn/collide_param_param" exporter="hand">
+  <businessKnowledgeModel id="bkm_alpha" name="alpha">
+    <variable id="bkm_alpha_var" name="alpha" typeRef="number"/>
+    <encapsulatedLogic id="bkm_alpha_logic">
+      <formalParameter id="bkm_alpha_p1" name="v" typeRef="number"/>
+      <formalParameter id="bkm_alpha_p2" name="w" typeRef="number"/>
+      <literalExpression id="bkm_alpha_lit">
+        <text>v - w</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <businessKnowledgeModel id="bkm_beta" name="beta">
+    <variable id="bkm_beta_var" name="beta" typeRef="number"/>
+    <encapsulatedLogic id="bkm_beta_logic">
+      <formalParameter id="bkm_beta_p1" name="v" typeRef="number"/>
+      <formalParameter id="bkm_beta_p2" name="w" typeRef="number"/>
+      <literalExpression id="bkm_beta_lit">
+        <text>w - v</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <businessKnowledgeModel id="bkm_gamma" name="gamma">
+    <variable id="bkm_gamma_var" name="gamma" typeRef="number"/>
+    <encapsulatedLogic id="bkm_gamma_logic">
+      <formalParameter id="bkm_gamma_p1" name="v" typeRef="number"/>
+      <literalExpression id="bkm_gamma_lit">
+        <text>alpha(v, 1) + beta(v, 1) * 100</text>
+      </literalExpression>
+    </encapsulatedLogic>
+    <knowledgeRequirement id="kr_gamma_alpha">
+      <requiredKnowledge href="#bkm_alpha"/>
+    </knowledgeRequirement>
+    <knowledgeRequirement id="kr_gamma_beta">
+      <requiredKnowledge href="#bkm_beta"/>
+    </knowledgeRequirement>
+  </businessKnowledgeModel>
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_a" name="a">
+    <variable id="decision_a_var" name="a" typeRef="number"/>
+    <informationRequirement id="ir_a_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_a">
+      <requiredKnowledge href="#bkm_alpha"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_a_lit">
+      <text>alpha(n, 3)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_b" name="b">
+    <variable id="decision_b_var" name="b" typeRef="number"/>
+    <informationRequirement id="ir_b_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_b">
+      <requiredKnowledge href="#bkm_beta"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_b_lit">
+      <text>beta(n, 3)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_g" name="g">
+    <variable id="decision_g_var" name="g" typeRef="number"/>
+    <informationRequirement id="ir_g_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_g">
+      <requiredKnowledge href="#bkm_gamma"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_g_lit">
+      <text>gamma(n)</text>
+    </literalExpression>
+  </decision>
+</definitions>

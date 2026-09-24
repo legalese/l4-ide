@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  What this pins: what FEEL `null` DOES on each engine. Nothing in this repo had
+  ever measured that before 2026-07-31 — there was not one `null` in any
+  committed .dmn golden — and R8-d' (MAYBE lowers to FEEL null) rests entirely
+  on the answers below.
+
+      present_is_not_null   q != null, q supplied or supplied AS null
+      number_eq_null        n = null, n a number
+      guarded_if            if q != null then .. else ..   <- the COMPOSED form
+                                                              the exporter emits
+                                                              for CONSIDER over a
+                                                              MAYBE
+      whole_value_null      the literal `null` as a whole decision value
+      table_default_null    one row `<= 10`, defaultOutputEntry `null`
+                            <- exactly the shape `capped at ten` emits, and
+                               exactly R8-d's own stated overturn condition
+
+  The dangerous question was `number_eq_null`, and it is why this file was
+  written BEFORE any of the lowering. If `=` against null answered null rather
+  than false on either engine, then `if x != null then a else b` would take the
+  ELSE branch on a non-boolean condition and the absence-test half of R8-d'
+  would have been an ANSWER CHANGE rather than a rendering change. The fallback
+  was pre-declared: ship the value channel only, keep refusing the scrutinee.
+
+  MEASURED 2026-07-31 on KIE 8.44.0.Final and zeebe-dmn 8.7.6. Both answer 15/15
+  and they AGREE on every question here: comparison against null is a proper
+  boolean, a decision may be null outright, and a table's defaultOutputEntry may
+  be null. So the fallback was not needed.
+
+  The `<output>` carries neither @name nor @typeRef, because a single-output
+  table that carries them draws two ILLEGAL_USE_OF_* warnings from KIE — and
+  because that is what jl4-core/src/L4/Dmn/Emit.hs emits. A probe that pins the
+  emitter's idiom has to be written in the emitter's shape.
+
+  N2 — what an engine does with a name that was never supplied at all — is NOT
+  asked here. The engines DISAGREE about it, and its companion fixture
+  null-absent.dmn measures the disagreement in both directions.
+
+  No negative control, for the same reason the hydration probe has none: this
+  asks what an expression EVALUATES to, which a positive answers completely.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_null_semantics" name="null_semantics" namespace="https://legalese.com/l4/dmn/null_semantics" exporter="hand">
+  <inputData id="input_q" name="q">
+    <variable id="input_q_var" name="q" typeRef="string"/>
+  </inputData>
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_present_is_not_null" name="present_is_not_null">
+    <variable id="decision_present_is_not_null_var" name="present_is_not_null" typeRef="boolean"/>
+    <informationRequirement id="ir_pinn_q">
+      <requiredInput href="#input_q"/>
+    </informationRequirement>
+    <literalExpression id="decision_present_is_not_null_lit">
+      <text>q != null</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_number_eq_null" name="number_eq_null">
+    <variable id="decision_number_eq_null_var" name="number_eq_null" typeRef="boolean"/>
+    <informationRequirement id="ir_nen_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <literalExpression id="decision_number_eq_null_lit">
+      <text>n = null</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_guarded_if" name="guarded_if">
+    <variable id="decision_guarded_if_var" name="guarded_if" typeRef="string"/>
+    <informationRequirement id="ir_gi_q">
+      <requiredInput href="#input_q"/>
+    </informationRequirement>
+    <literalExpression id="decision_guarded_if_lit">
+      <text>if q != null then "present" else "absent"</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_whole_value_null" name="whole_value_null">
+    <variable id="decision_whole_value_null_var" name="whole_value_null" typeRef="string"/>
+    <literalExpression id="decision_whole_value_null_lit">
+      <text>null</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_table_default_null" name="table_default_null">
+    <variable id="decision_table_default_null_var" name="table_default_null" typeRef="number"/>
+    <informationRequirement id="ir_tdn_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <decisionTable id="decision_table_default_null_dt" hitPolicy="UNIQUE">
+      <input id="decision_table_default_null_i1" label="n">
+        <inputExpression id="decision_table_default_null_i1_expr" typeRef="number">
+          <text>n</text>
+        </inputExpression>
+      </input>
+      <output id="decision_table_default_null_o1">
+        <defaultOutputEntry id="decision_table_default_null_o1_default">
+          <text>null</text>
+        </defaultOutputEntry>
+      </output>
+      <rule id="decision_table_default_null_r1">
+        <inputEntry id="decision_table_default_null_r1_i1">
+          <text>&lt;= 10</text>
+        </inputEntry>
+        <outputEntry id="decision_table_default_null_r1_o1">
+          <text>n</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

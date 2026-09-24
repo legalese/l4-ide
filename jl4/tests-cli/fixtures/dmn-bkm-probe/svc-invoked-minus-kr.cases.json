@@ -1,0 +1,13 @@
+{
+  "note": [
+    "Cases for svc-invoked-minus-kr.dmn (probe D3, the isolation for D2). 2",
+    "cases x 3 decisions = 6 value checks. The expected values are D2's, i.e.",
+    "what the model answers WITH the edge, so a pass means the edge was not",
+    "needed and a fail means it was. via_bundle is the only decision that can",
+    "move."
+  ],
+  "cases": [
+    { "name": "A. n = 4", "context": { "n": 4 }, "expect": { "step": 8, "total": 9, "via_bundle": 209 } },
+    { "name": "B. n = 0", "context": { "n": 0 }, "expect": { "step": 0, "total": 1, "via_bundle": 201 } }
+  ]
+}

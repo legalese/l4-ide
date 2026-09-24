@@ -1,0 +1,184 @@
+{
+  "note": [
+    "Engine cases for the DATE-LITERAL exhibit (ymd-dates.l4, spec §15.4).",
+    "",
+    "WHAT THESE COVER: that a date written the way `daydate.l4` recommends --",
+    "`YMD y m d`, ISO order, bounds-checked -- reaches a real engine as a real",
+    "FEEL date, in all three positions the exhibit puts one: a boxed literal",
+    "body (`commencement`, `the appointed day`, `the transition day`), a",
+    "decision-table CELL endpoint (`the regime that applies`), and a law-time",
+    "interval endpoint (`the filing fee`). Before the fold, every one of those",
+    "was raw L4 that neither engine would parse.",
+    "",
+    "TWO INDEPENDENT DATE AXES, and the cases separate them: `the_application",
+    "_date` is the date the CASE is about, `RULES_EFFECTIVE_DATE` is the date",
+    "the LAW is about. Cases A-G move them together because that is the cheap",
+    "way to straddle both tables' seams at once; case H moves them apart, so a",
+    "lowering that confused the two would fail there and only there.",
+    "",
+    "EVERY SEAM IS STRADDLED BY A DAY-OF / DAY-BEFORE PAIR, which is what pins",
+    "the closed-low / open-high convention:",
+    "  * 2026-01-01 (both tables)       A + B",
+    "  * 2024-02-29 (the regime table)  C + D",
+    "  * 1983-01-01 (both tables)       E + F",
+    "Delete a pair and an off-by-one on that interval passes green.",
+    "",
+    "2024-02-29 IS THE POINT OF CASE C. A leap day is the cheapest proof the",
+    "fold consults a calendar rather than range-checking three numbers, and it",
+    "is also the argument-order guard: read little-endian, `YMD 2024 2 29`",
+    "would be nonsense (day 2024) and would not fold at all, so a transposed",
+    "implementation cannot reach this expectation by accident. Its refusing",
+    "sibling `YMD 2023 2 29` -- 2023 was not a leap year -- is pinned in",
+    "not-ok/ymd-unfoldable-date.l4 and in jl4/tests/DmnExport.hs.",
+    "",
+    "`{\"$date\": \"YYYY-MM-DD\"}` is the fixture vocabulary's only way to say",
+    "\"this is a FEEL date\"; both harnesses convert by declared type, never by",
+    "appearance (see KieDmnCheck.jsonToFeel's BigDecimal note).",
+    "",
+    "ACTIVATION CONTRACT: every expected value below was derived from the L4",
+    "SOURCE, not from a DMN engine's own output -- a pin regenerated from the",
+    "thing it pins is vacuous. Measured 2026-08-02 with the built `l4` binary",
+    "on eight copies of ymd-dates.l4 whose two ASSUMEs were replaced by the",
+    "case's own values, each carrying",
+    "`#EVAL \\`EVAL UNDER RULES EFFECTIVE AT\\` (YMD y m d) <decision>` for all",
+    "six decisions. L4 answered `DATE OF 1, 1, 1983` / `DATE OF 29, 2, 2024` /",
+    "`DATE OF 1, 1, 2026` for the three constants in every case, which is the",
+    "same argument-order check from the evaluator's side.",
+    "",
+    "WHAT THEY DO NOT COVER, so a green run is not read as more than it is:",
+    "the floor row's answer is an ASSUME bottom, which L4 refuses to evaluate.",
+    "Here it is an ordinary DMN input, and -1 is a sentinel chosen because no",
+    "real fee could be negative, so a floor-row hit is unmistakable in the",
+    "harness output (same device as gst-rate.cases.json)."
+  ],
+  "cases": [
+    {
+      "name": "A. on the transition day (both axes)",
+      "context": {
+        "the_application_date": { "$date": "2026-01-01" },
+        "RULES_EFFECTIVE_DATE": { "$date": "2026-01-01" },
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+      },
+      "expect": {
+        "commencement": { "$date": "1983-01-01" },
+        "the_appointed_day": { "$date": "2024-02-29" },
+        "the_transition_day": { "$date": "2026-01-01" },
+        "the_regime_that_applies": "transitional",
+        "the_filing_fee": 1000,
+        "the_fee_with_surcharge": 2000
+      }
+    },
+    {
+      "name": "B. the day before the transition day",
+      "context": {
+        "the_application_date": { "$date": "2025-12-31" },
+        "RULES_EFFECTIVE_DATE": { "$date": "2025-12-31" },
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+      },
+      "expect": {
+        "commencement": { "$date": "1983-01-01" },
+        "the_appointed_day": { "$date": "2024-02-29" },
+        "the_transition_day": { "$date": "2026-01-01" },
+        "the_regime_that_applies": "appointed",
+        "the_filing_fee": 250,
+        "the_fee_with_surcharge": 500
+      }
+    },
+    {
+      "name": "C. on the appointed day, which is a leap day",
+      "context": {
+        "the_application_date": { "$date": "2024-02-29" },
+        "RULES_EFFECTIVE_DATE": { "$date": "2024-02-29" },
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+      },
+      "expect": {
+        "commencement": { "$date": "1983-01-01" },
+        "the_appointed_day": { "$date": "2024-02-29" },
+        "the_transition_day": { "$date": "2026-01-01" },
+        "the_regime_that_applies": "appointed",
+        "the_filing_fee": 250,
+        "the_fee_with_surcharge": 500
+      }
+    },
+    {
+      "name": "D. the day before the appointed day",
+      "context": {
+        "the_application_date": { "$date": "2024-02-28" },
+        "RULES_EFFECTIVE_DATE": { "$date": "2024-02-28" },
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+      },
+      "expect": {
+        "commencement": { "$date": "1983-01-01" },
+        "the_appointed_day": { "$date": "2024-02-29" },
+        "the_transition_day": { "$date": "2026-01-01" },
+        "the_regime_that_applies": "original",
+        "the_filing_fee": 250,
+        "the_fee_with_surcharge": 500
+      }
+    },
+    {
+      "name": "E. on commencement",
+      "context": {
+        "the_application_date": { "$date": "1983-01-01" },
+        "RULES_EFFECTIVE_DATE": { "$date": "1983-01-01" },
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+      },
+      "expect": {
+        "commencement": { "$date": "1983-01-01" },
+        "the_appointed_day": { "$date": "2024-02-29" },
+        "the_transition_day": { "$date": "2026-01-01" },
+        "the_regime_that_applies": "original",
+        "the_filing_fee": 250,
+        "the_fee_with_surcharge": 500
+      }
+    },
+    {
+      "name": "F. the day before commencement (both floor rows)",
+      "context": {
+        "the_application_date": { "$date": "1982-12-31" },
+        "RULES_EFFECTIVE_DATE": { "$date": "1982-12-31" },
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+      },
+      "expect": {
+        "commencement": { "$date": "1983-01-01" },
+        "the_appointed_day": { "$date": "2024-02-29" },
+        "the_transition_day": { "$date": "2026-01-01" },
+        "the_regime_that_applies": "pre-commencement",
+        "the_filing_fee": -1,
+        "the_fee_with_surcharge": -2
+      }
+    },
+    {
+      "name": "G. long before commencement",
+      "context": {
+        "the_application_date": { "$date": "1900-01-01" },
+        "RULES_EFFECTIVE_DATE": { "$date": "1900-01-01" },
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+      },
+      "expect": {
+        "commencement": { "$date": "1983-01-01" },
+        "the_appointed_day": { "$date": "2024-02-29" },
+        "the_transition_day": { "$date": "2026-01-01" },
+        "the_regime_that_applies": "pre-commencement",
+        "the_filing_fee": -1,
+        "the_fee_with_surcharge": -2
+      }
+    },
+    {
+      "name": "H. the two date axes pulled apart",
+      "context": {
+        "the_application_date": { "$date": "2024-06-15" },
+        "RULES_EFFECTIVE_DATE": { "$date": "1982-12-31" },
+        "no_fee_is_prescribed_before_commencement_on_1983_01_01": -1
+      },
+      "expect": {
+        "commencement": { "$date": "1983-01-01" },
+        "the_appointed_day": { "$date": "2024-02-29" },
+        "the_transition_day": { "$date": "2026-01-01" },
+        "the_regime_that_applies": "appointed",
+        "the_filing_fee": -1,
+        "the_fee_with_surcharge": -2
+      }
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "note": [
+    "Engine cases for the Phase 5 BKM exhibit (bkm.l4, spec §6.2). What these",
+    "pin that the hand-written dmn-bkm-probe fixtures do not: that",
+    "jl4-core/src/L4/Dmn/Lower.hs EMITS the shapes — a red run on a probe",
+    "isolates the engine, a red run here isolates the lowering.",
+    "",
+    "The BKMs (weighted_sum, boosted, adjusted) are not named in `expect`:",
+    "a businessKnowledgeModel is a function, not a decision, and the cases",
+    "schema keys expectations on decision names only — a RECORDED LIMITATION",
+    "of both harnesses (spec §13.6; a BKM's value is asserted through its",
+    "callers, which is what every expectation below does).",
+    "",
+    "What each value attests: case_one/case_two exercise the BKM→BKM chain",
+    "(boosted -> weighted_sum, the knowledgeRequirement on the CALLING BKM,",
+    "probe C1's shape, emitted); pay_hydrated + pay_check exercise a BKM",
+    "invocation INSIDE a boxed-context entry over earlier sibling entries",
+    "(probes B1/B2, emitted); adj_one/adj_two exercise the λ-LIFTED CLOSURE —",
+    "their rendered call sites read `adjusted(y: 1, baseline: baseline)`, so",
+    "a wrong value here means the lift bound the wrong environment."
+  ],
+  "cases": [
+    {
+      "name": "A. small pay packet",
+      "context": {
+        "pay": { "base": 5, "bonus": 3 }
+      },
+      "expect": {
+        "case_one": 22,
+        "case_two": 42,
+        "pay_hydrated": { "base": 5, "bonus": 3, "total": 13 },
+        "pay_check": 16,
+        "baseline": 7,
+        "adj_one": 8,
+        "adj_two": 9
+      }
+    },
+    {
+      "name": "B. larger pay packet",
+      "context": {
+        "pay": { "base": 100, "bonus": 50 }
+      },
+      "expect": {
+        "case_one": 22,
+        "case_two": 42,
+        "pay_hydrated": { "base": 100, "bonus": 50, "total": 250 },
+        "pay_check": 253,
+        "baseline": 7,
+        "adj_one": 8,
+        "adj_two": 9
+      }
+    }
+  ]
+}

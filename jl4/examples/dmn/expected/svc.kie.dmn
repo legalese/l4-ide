@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_service_exhibit" name="Service exhibit" namespace="https://legalese.com/l4/dmn/service_exhibit" exporter="jl4">
+  <inputData id="input_p" name="p">
+    <variable id="input_p_var" name="p" typeRef="number"/>
+  </inputData>
+  <inputData id="input_q" name="q">
+    <variable id="input_q_var" name="q" typeRef="number"/>
+  </inputData>
+  <decision id="decision_base_charge" name="base_charge" label="base charge">
+    <variable id="decision_base_charge_var" name="base_charge" label="base charge" typeRef="number"/>
+    <literalExpression id="decision_base_charge_literal">
+      <text>40</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_special_case" name="special_case" label="special case">
+    <variable id="decision_special_case_var" name="special_case" label="special case" typeRef="number"/>
+    <informationRequirement id="decision_special_case_ir1">
+      <requiredDecision href="#decision_base_charge"/>
+    </informationRequirement>
+    <knowledgeRequirement id="decision_special_case_kr1">
+      <requiredKnowledge href="#service_special_assessment"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_special_case_literal">
+      <text>special_assessment(p: 150, q: 5) + base_charge</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_assessment_floor" name="assessment_floor" label="assessment floor">
+    <variable id="decision_assessment_floor_var" name="assessment_floor" label="assessment floor" typeRef="number"/>
+    <literalExpression id="decision_assessment_floor_literal">
+      <text>100</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_special_rate" name="special_rate" label="special rate">
+    <variable id="decision_special_rate_var" name="special_rate" label="special rate" typeRef="number"/>
+    <informationRequirement id="decision_special_rate_ir1">
+      <requiredDecision href="#decision_assessment_floor"/>
+    </informationRequirement>
+    <informationRequirement id="decision_special_rate_ir2">
+      <requiredInput href="#input_p"/>
+    </informationRequirement>
+    <informationRequirement id="decision_special_rate_ir3">
+      <requiredInput href="#input_q"/>
+    </informationRequirement>
+    <decisionTable id="decision_special_rate_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="special rate">
+      <input id="decision_special_rate_i1" label="p GREATER THAN `assessment floor`">
+        <inputExpression id="decision_special_rate_i1_expr" typeRef="boolean">
+          <text>p &gt; assessment_floor</text>
+        </inputExpression>
+      </input>
+      <output id="decision_special_rate_o1">
+        <defaultOutputEntry id="decision_special_rate_o1_default">
+          <text>p - q</text>
+        </defaultOutputEntry>
+      </output>
+      <rule id="decision_special_rate_r1">
+        <description>p GREATER THAN `assessment floor`</description>
+        <inputEntry id="decision_special_rate_r1_i1">
+          <text>true</text>
+        </inputEntry>
+        <outputEntry id="decision_special_rate_r1_o1">
+          <text>p + q</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decisionService id="service_service_exhibit" name="Service_exhibit" label="Service exhibit">
+    <variable id="service_service_exhibit_var" name="Service_exhibit" label="Service exhibit" typeRef="number"/>
+    <outputDecision href="#decision_special_case"/>
+    <encapsulatedDecision href="#decision_base_charge"/>
+  </decisionService>
+  <decisionService id="service_special_assessment" name="special_assessment" label="special assessment">
+    <variable id="service_special_assessment_var" name="special_assessment" label="special assessment" typeRef="number"/>
+    <outputDecision href="#decision_special_rate"/>
+    <encapsulatedDecision href="#decision_assessment_floor"/>
+    <inputData href="#input_p"/>
+    <inputData href="#input_q"/>
+  </decisionService>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="definitions_service_exhibit_diagram" name="Service exhibit">
+      <dmndi:DMNShape id="input_p_shape" dmnElementRef="input_p">
+        <dc:Bounds x="60" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_q_shape" dmnElementRef="input_q">
+        <dc:Bounds x="280" y="380" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_base_charge_shape" dmnElementRef="decision_base_charge">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_assessment_floor_shape" dmnElementRef="decision_assessment_floor">
+        <dc:Bounds x="280" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_special_case_shape" dmnElementRef="decision_special_case">
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_special_rate_shape" dmnElementRef="decision_special_rate">
+        <dc:Bounds x="280" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_service_exhibit_shape" dmnElementRef="service_service_exhibit">
+        <dc:Bounds x="40" y="40" width="220" height="280"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="service_special_assessment_shape" dmnElementRef="service_special_assessment">
+        <dc:Bounds x="260" y="40" width="220" height="280"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="decision_special_case_ir1_edge" dmnElementRef="decision_special_case_ir1">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_special_rate_ir1_edge" dmnElementRef="decision_special_rate_ir1">
+        <di:waypoint x="370" y="220"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_special_rate_ir2_edge" dmnElementRef="decision_special_rate_ir2">
+        <di:waypoint x="150" y="380"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_special_rate_ir3_edge" dmnElementRef="decision_special_rate_ir3">
+        <di:waypoint x="370" y="380"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_special_case_kr1_edge" dmnElementRef="decision_special_case_kr1">
+        <di:waypoint x="370" y="320"/>
+        <di:waypoint x="150" y="60"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

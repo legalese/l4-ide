@@ -1,0 +1,45 @@
+-- NEGATIVE fixture for the future D-RECURSIVE check (spec §6.4.2, §6.3.9).
+--
+-- p2, PARAMETERISED arm. Two top-level DECIDEs that call each other:
+--
+--     `even step` n  reads  `odd step`
+--     `odd step`  n  reads  `even step`
+--
+-- Under Phase 5 both become BUSINESS KNOWLEDGE MODELS, so the cycle lives on
+-- the knowledgeRequirement graph and is §6.3.9's arm. The nullary arm of the
+-- same shape is a DIFFERENT graph and a different check, which is why it has
+-- its own file: cycle-p2-mutual-nullary.l4. Writing p2 once would have merged
+-- two findings into one fixture.
+--
+-- WHY AN OWN-NAME-MENTION DETECTOR MISSES IT: neither body mentions its own
+-- name. Each mentions the OTHER's. Only an SCC over the requirement graph sees
+-- this, which is §6.4.2's conclusion and the reason both p2 files exist.
+--
+-- On today's tree the emitted DRG IS cyclic here and the fidelity report never
+-- says so.
+--
+-- Expected after Phase 5: one D-RECURSIVE over an SCC of size 2, listing the
+-- name AND id of both members, range = Nothing.
+--
+--
+-- PROVENANCE OF THIS HEADER. The .l4 source was typechecked (`l4 check`, clean)
+-- when it was written on 2026-07-31, with a prebuilt CLI. The statements above
+-- about what TODAY'S EXPORTER emits and reports are taken from spec
+-- §6.4.2/§6.4.5's table and were NOT re-measured here: that session had no
+-- build. Whoever wires these fixtures into jl4/tests/DmnExport.hs must MEASURE
+-- the expectation rather than transcribe it.
+-- NEVER added to `goldenSubjects`.
+
+IMPORT prelude
+
+§ `mutual recursion, parameterised`
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`even step` n MEANS
+    IF n EQUALS 0 THEN TRUE ELSE `odd step` (n MINUS 1)
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`odd step` n MEANS
+    IF n EQUALS 0 THEN FALSE ELSE `even step` (n MINUS 1)

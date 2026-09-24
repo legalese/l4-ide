@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE A3. What this asks: can a BKM's encapsulatedLogic be a decisionTable
+  over MORE THAN ONE formalParameter, and does it evaluate on both engines?
+
+  Spec section 6.2 rules that "a parameterised guarded chain stays a table; no
+  degradation to a literal expression". Section 13.3 row 4 recorded that as
+  QUOTED, not executed, and only at single arity. This upgrades it to EXECUTED
+  at arity 2.
+
+  The table is UNIQUE over (a: number, b: boolean) and is deliberately NOT
+  symmetric in its two inputs, so a swapped binding lands on a different rule
+  and changes the answer rather than agreeing by accident. `other` is a second
+  BKM with the SAME parameter names invoked from the same file, which also
+  incidentally exercises probe E2's question in passing.
+
+  WHAT A FLIP MEANS. If an engine rejects a multi-parameter table inside
+  encapsulatedLogic, the emitter must degrade parameterised guarded chains to
+  nested if-then-else literal expressions for that flavor, losing hit-policy
+  metadata and every downstream table-shaped affordance (gap/overlap analysis,
+  modeler rendering). That is a real product loss, not a spelling change.
+
+  Note the shape difference from PR #176's spouse-context-table.dmn: there, the
+  table sat INSIDE a boxed contextEntry and Camunda 8 refused at parse. Here the
+  table is the encapsulatedLogic body itself, which is the XSD-blessed position
+  for it (tFunctionDefinition takes any tExpression child).
+
+  MEASURED IN PASSING: the single <output> here carries NO typeRef. With one,
+  KIE 8.44 raises WARN [ILLEGAL_USE_OF_TYPEREF] "Decision table with single
+  output ... should not have an output type reference"; Camunda 8 says nothing
+  and the values are identical on both. So the typeRef is not load bearing for
+  evaluation, but it is not free either: it costs a validator warning.
+
+  MEASURED 2026-07-31: 12/12 values on both engines, KIE validator and build
+  clean, Camunda parse clean. Section 13.3 row 4 moves from QUOTED to EXECUTED,
+  at arity 2, with the positional and the named call sites agreeing in every
+  case.
+
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_bkm_table_multiparam" name="bkm_table_multiparam" namespace="https://legalese.com/l4/dmn/bkm_table_multiparam" exporter="hand">
+  <businessKnowledgeModel id="bkm_band" name="band">
+    <variable id="bkm_band_var" name="band" typeRef="string"/>
+    <encapsulatedLogic id="bkm_band_logic">
+      <formalParameter id="bkm_band_p1" name="a" typeRef="number"/>
+      <formalParameter id="bkm_band_p2" name="b" typeRef="boolean"/>
+      <decisionTable id="bkm_band_dt" hitPolicy="UNIQUE" outputLabel="band">
+        <input id="bkm_band_in_a">
+          <inputExpression id="bkm_band_in_a_e" typeRef="number">
+            <text>a</text>
+          </inputExpression>
+        </input>
+        <input id="bkm_band_in_b">
+          <inputExpression id="bkm_band_in_b_e" typeRef="boolean">
+            <text>b</text>
+          </inputExpression>
+        </input>
+        <output id="bkm_band_out"/>
+        <rule id="bkm_band_r1">
+          <inputEntry id="bkm_band_r1_i1"><text>&lt; 10</text></inputEntry>
+          <inputEntry id="bkm_band_r1_i2"><text>true</text></inputEntry>
+          <outputEntry id="bkm_band_r1_o"><text>"low-flagged"</text></outputEntry>
+        </rule>
+        <rule id="bkm_band_r2">
+          <inputEntry id="bkm_band_r2_i1"><text>&lt; 10</text></inputEntry>
+          <inputEntry id="bkm_band_r2_i2"><text>false</text></inputEntry>
+          <outputEntry id="bkm_band_r2_o"><text>"low-plain"</text></outputEntry>
+        </rule>
+        <rule id="bkm_band_r3">
+          <inputEntry id="bkm_band_r3_i1"><text>&gt;= 10</text></inputEntry>
+          <inputEntry id="bkm_band_r3_i2"><text>true</text></inputEntry>
+          <outputEntry id="bkm_band_r3_o"><text>"high-flagged"</text></outputEntry>
+        </rule>
+        <rule id="bkm_band_r4">
+          <inputEntry id="bkm_band_r4_i1"><text>&gt;= 10</text></inputEntry>
+          <inputEntry id="bkm_band_r4_i2"><text>false</text></inputEntry>
+          <outputEntry id="bkm_band_r4_o"><text>"high-plain"</text></outputEntry>
+        </rule>
+      </decisionTable>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <businessKnowledgeModel id="bkm_scale" name="scale">
+    <variable id="bkm_scale_var" name="scale" typeRef="number"/>
+    <encapsulatedLogic id="bkm_scale_logic">
+      <formalParameter id="bkm_scale_p1" name="a" typeRef="number"/>
+      <formalParameter id="bkm_scale_p2" name="b" typeRef="boolean"/>
+      <literalExpression id="bkm_scale_lit">
+        <text>if b then a * 2 else a * 3</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <inputData id="input_flag" name="flag">
+    <variable id="input_flag_var" name="flag" typeRef="boolean"/>
+  </inputData>
+  <decision id="decision_band_of" name="band_of">
+    <variable id="decision_band_of_var" name="band_of" typeRef="string"/>
+    <informationRequirement id="ir_band_of_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <informationRequirement id="ir_band_of_flag">
+      <requiredInput href="#input_flag"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_band_of">
+      <requiredKnowledge href="#bkm_band"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_band_of_lit">
+      <text>band(n, flag)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_band_named" name="band_named">
+    <variable id="decision_band_named_var" name="band_named" typeRef="string"/>
+    <informationRequirement id="ir_band_named_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <informationRequirement id="ir_band_named_flag">
+      <requiredInput href="#input_flag"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_band_named">
+      <requiredKnowledge href="#bkm_band"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_band_named_lit">
+      <text>band(b: flag, a: n)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_scaled" name="scaled">
+    <variable id="decision_scaled_var" name="scaled" typeRef="number"/>
+    <informationRequirement id="ir_scaled_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <informationRequirement id="ir_scaled_flag">
+      <requiredInput href="#input_flag"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_scaled">
+      <requiredKnowledge href="#bkm_scale"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_scaled_lit">
+      <text>scale(n, flag)</text>
+    </literalExpression>
+  </decision>
+</definitions>

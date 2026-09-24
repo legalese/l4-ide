@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE E5. E4's SERVICE-SIDE TWIN: a <decisionService> whose @name equals a
+  <decision>'s @name.
+
+  tDecisionService is a tInvocable, and on KIE its name lives in the same FEEL
+  scope that makes probe D2's `bundle(n: ...)` resolve. So a service name can
+  collide with a decision name in exactly the way a BKM name can, and section 5.2's
+  scope list does not yet mention either.
+
+      decision        bundle  = n + 5
+      decisionService bundle  = { output: total, encapsulated: step, input: n }
+      decision        read_bundle = bundle + 1
+
+  The service is GROUPING-ONLY: nothing carries a knowledgeRequirement to it.
+  That is deliberate, so that the Camunda leg can run at all; a KR to a service
+  is a whole-file ClassCastException there (probe D2), which would mask this
+  question behind that one.
+
+  On Camunda a service is unaddressable, so the only question its leg answers is
+  whether the colliding name perturbs the parse or the decisions. On KIE the
+  question is sharper: does `bundle` in read_bundle resolve to the decision's
+  value or to the invocable, and does anything say so.
+
+  MEASURED 2026-07-31:
+    KIE 8.44  : validator raises DUPLICATE_NAME twice (decision node and service
+                node). Build clean. RUNTIME IS ENTIRELY UNAFFECTED: all four
+                decisions answer correctly, `bundle` in read_bundle resolves to
+                the DECISION, and evaluateDecisionService("bundle") still reaches
+                the service and prints `SVC bundle -> {n=4, total=9}`. So on the
+                service side the collision is a VALIDATOR-ONLY event.
+    Camunda 8 : silent; all four decisions correct.
+
+  Contrast probe E4 sharply. A BKM name colliding with a decision name DELETES
+  the decision on KIE; a SERVICE name colliding with a decision name costs a
+  validator message and nothing else. Same diagnostic code, different severity in
+  fact. That is why the two probes are separate files.
+
+  Wired HarnessMustFail on the KIE leg (the validator errors alone fail the
+  banner) and HarnessMustPass on the Camunda leg.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_collide_svc_decision" name="collide_svc_decision" namespace="https://legalese.com/l4/dmn/collide_svc_decision" exporter="hand">
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_step" name="step">
+    <variable id="decision_step_var" name="step" typeRef="number"/>
+    <informationRequirement id="ir_step_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <literalExpression id="decision_step_lit">
+      <text>n * 2</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_total" name="total">
+    <variable id="decision_total_var" name="total" typeRef="number"/>
+    <informationRequirement id="ir_total_step">
+      <requiredDecision href="#decision_step"/>
+    </informationRequirement>
+    <literalExpression id="decision_total_lit">
+      <text>step + 1</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_bundle" name="bundle">
+    <variable id="decision_bundle_var" name="bundle" typeRef="number"/>
+    <informationRequirement id="ir_bundle_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <literalExpression id="decision_bundle_lit">
+      <text>n + 5</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_read_bundle" name="read_bundle">
+    <variable id="decision_read_bundle_var" name="read_bundle" typeRef="number"/>
+    <informationRequirement id="ir_read_bundle">
+      <requiredDecision href="#decision_bundle"/>
+    </informationRequirement>
+    <literalExpression id="decision_read_bundle_lit">
+      <text>bundle + 1</text>
+    </literalExpression>
+  </decision>
+  <decisionService id="svc_bundle" name="bundle">
+    <variable id="svc_bundle_var" name="bundle" typeRef="number"/>
+    <outputDecision href="#decision_total"/>
+    <encapsulatedDecision href="#decision_step"/>
+    <inputData href="#input_n"/>
+  </decisionService>
+</definitions>
