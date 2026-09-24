@@ -1164,10 +1164,10 @@ verifyWhereRecursiveFixture    = fixtureDir </> "verify-where-recursive.l4"
 -- can carry a `differential` oracle instead of reporting NOT-REGENERATED.
 -- If this pair ever diverges, p7-tnr silently stops measuring what it says.
 nlgRegcfSource, nlgRegcfGolden, nlgWizardSource, nlgWizardGolden :: FilePath
-nlgRegcfSource  = "examples/legal/regcf/regcf.l4"
-nlgRegcfGolden  = "examples/legal/regcf/tests/regcf.nlg.golden"
-nlgWizardSource = "examples/legal/regcf/regcf-wizard.l4"
-nlgWizardGolden = "examples/legal/regcf/tests/regcf-wizard.nlg.golden"
+nlgRegcfSource  = "examples/canon/us/regcf/regcf.l4"
+nlgRegcfGolden  = "examples/canon/us/regcf/tests/regcf.nlg.golden"
+nlgWizardSource = "examples/canon/us/regcf/regcf-wizard.l4"
+nlgWizardGolden = "examples/canon/us/regcf/tests/regcf-wizard.nlg.golden"
 
 -- The eleven-plus-two placement rows for an @nlg on a rule's head. Its
 -- `.nlg.golden` pins the `l4 nlg` columns; `l4 render` has no golden anywhere in
@@ -5310,7 +5310,7 @@ spec bin = do
       -- `any \`the purpose is a charitable purpose\` (entity's purposes)`, a
       -- one-parameter decision passed by name rather than a lambda written out
       -- at the call site. No example under examples/docassemble/ does that.
-      out <- daEmit bin "examples/legal/charities-cleanroom/charity-test.l4"
+      out <- daEmit bin "examples/canon/je/charities-2014/charity-test.l4"
       shouldContain' "the charities interview" out "DAList"
       shouldContain' "the charities interview" out "object_type"
       shouldContain' "the charities interview" out "for _purpose in entity.purposes"
