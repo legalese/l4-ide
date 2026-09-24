@@ -28,16 +28,28 @@
     };
     bundles = lib.mkOption {
       type = lib.types.attrsOf lib.types.path;
-      default = {
-        classic = ../../jl4/experiments/classic;
-        thailand-cosmetics = ../../jl4/experiments/thailand-cosmetics;
-      };
+      default = { };
       description = ''
         Bundles to pre-seed into the store on startup.
         Keys are deployment IDs, values are directories containing .l4 files.
         Pre-seeded bundles are compiled on first boot; subsequent restarts use CBOR cache.
+
+        The base set is DEFINED below rather than carried in this `default`, so
+        that a feature module can contribute its own corpus additively — an
+        `attrsOf` option merges its definitions, whereas a `default` is discarded
+        the moment anyone defines the option at all. Carrying the base set in the
+        default meant a module adding one bundle would silently drop the others.
+        A corpus contributed by a feature module must be contributed INSIDE that
+        module's `mkIf`, so that a host which has not enabled the feature serves
+        exactly what it served before.
       '';
     };
+  };
+
+  # The base bundles, served by every host.
+  config.services.jl4-service.bundles = {
+    classic = ../../jl4/experiments/classic;
+    thailand-cosmetics = ../../jl4/experiments/thailand-cosmetics;
   };
 
   config.services.nginx.virtualHosts.${config.networking.domain}.locations = {
@@ -54,7 +66,12 @@
     enable = true;
     description = "jl4-service (multi-tenant L4 deployment service)";
     after = [ "network.target" "nginx.service" ];
-    requires = [ "nginx.service" ];
+    # jl4-service is the backend that nginx reverse-proxies to; it does not
+    # depend on nginx to run. Using `wants` (a weak dep) rather than `requires`
+    # (a hard dep) keeps startup ordering via `after` without cascading an
+    # nginx restart into a jl4-service restart. That cascade is what triggered
+    # a stale-bundle recompile on `nixos-rebuild switch` (smucclaw/l4-ide#850).
+    wants = [ "nginx.service" ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       ExecStartPre = pkgs.writeShellScript "jl4-service-preseed" ''
