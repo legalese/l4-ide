@@ -1,0 +1,705 @@
+IMPORT prelude
+IMPORT `charities-common`
+
+§ `Charities (Jersey) Law 2014 — Part 9 — Miscellaneous and Final Provisions (Articles 37-43)`
+
+-- ===========================================================================
+-- PART 9 — MISCELLANEOUS AND FINAL PROVISIONS. Articles 37 to 43.
+--
+-- Source: Charities (Jersey) Law 2014 (L.41/2014), Official Consolidated
+-- Version, showing the law from 16 October 2025 to Current.
+-- https://www.jerseylaw.je/laws/current/l_41_2014
+--
+-- THE SHAPE OF PART 9 — two provisions with real logic, and five stubs:
+--
+--   Art 37    OFFENCES BY CORPORATE AND OTHER BODIES. The only substantive rule in
+--             the Part, and the only one with teeth.
+--             37(1) is an ATTRIBUTION RULE: a four-fold CONJUNCTION —
+--                 (i)   an offence under this Law has been committed;
+--                 (ii)  the offender is an LLP, a separate limited partnership, or
+--                       a body corporate  [a DISJUNCTION of three];
+--                 (iii) the offence is PROVED to have been committed with the
+--                       CONSENT OR CONNIVANCE of the person; and
+--                 (iv)  the person is within limb (a) or limb (b)
+--                       [a DISJUNCTION];
+--             feeding a LIABILITY: "the person is ALSO guilty of the offence and
+--             liable IN THE SAME MANNER as the partnership or body corporate to the
+--             penalty provided for that offence."
+--             37(2) is a DEEMING RULE that feeds limb (a): in a member-managed body
+--             corporate, a member acting in connection with the member's functions
+--             of management is treated AS IF a director.
+--             The attribution is modelled as BOOLEANs; the liability, and the
+--             prohibition it implies, are modelled in the regulative layer.
+--
+--   Art 38    SERVICE OF NOTICES. A pure Order-making power. INERT-PROSE STUB.
+--
+--   Art 39    REGULATIONS AND ORDERS. Pure ancillary-provision powers. STUB.
+--
+--   Art 40    SAVINGS AND TRANSITIONAL.
+--             40(1) IS operative: a NON-DEROGATION rule with a three-fold
+--                   CONJUNCTION (whose power / independent of this Law / in respect
+--                   of charities). Encoded properly.
+--             40(2), 40(3) are pure Regulation-making powers. STUB.
+--
+--   Art 41    AMENDMENTS OF LAWS RELATING TO SHARING OF INFORMATION.
+--             41(1) IS operative: a DEFINITION of "relevant enactment" — a
+--                   three-limb DISJUNCTION, (a), (b), (c). Encoded properly.
+--             41(2) is a pure Regulation-making power. STUB.
+--
+--   Art 42    CONSEQUENTIAL AMENDMENTS OF OTHER ENACTMENTS. Pure Regulation power. STUB.
+--
+--   Art 43    CITATION. STUB.
+--
+-- ENCODING STYLE — INERT: verbatim statute inline as bare strings (identity of
+-- their context — TRUE under AND, FALSE under OR), `...` = AND-sugar, `..` =
+-- OR-sugar, layout IS the bracketing. Only the operative atoms are lifted to
+-- BOOLEANs. Read the left margin and you are reading Part 9.
+--
+-- Part 9 regulates acts that are NOT in `charities-common`'s Action enum, so a
+-- LOCAL enum `Part9Action` is declared here (as instructed: do not extend the
+-- shared enum), and the deontics are typed `GIVETH A DEONTIC Actor Part9Action`.
+--
+-- -------------------------------------------------------------------------
+-- INTERPRETATION CALLS — every one of them, flagged.
+--
+-- >>> (1) ARTICLE 37 IS NOT DRAFTED AS A PROHIBITION. It is drafted as an
+--     ATTRIBUTION rule: "the person is ALSO guilty of the offence". It never says
+--     "a person shall not consent to or connive in an offence". But an attribution
+--     of GUILT is, in substance, a prohibition on the conduct attributed — and
+--     since the offence is the thing the Law actually wants to deter, we SURFACE
+--     the prohibition as an explicit `SHANT` in the regulative layer, so that the
+--     trace can exhibit the breach. The constitutive attribution rule
+--     (`Article 37(1) — the officer is also guilty of the offence`) is the ground
+--     truth; the `SHANT` and the consequent liability are derived from it. We flag
+--     the derivation rather than pretend the statute spelled it out.
+--
+-- >>> (2) THE UN-GATED OFFICER LIMB. The Article 37(1) chapeau names THREE possible
+--     offenders (an LLP, a separate limited partnership, a body corporate). Limb (a)
+--     then lists officers with DEFINITE ARTICLES tied to particular offenders: "a
+--     partner of THE PARTNERSHIP, or director, governor, secretary or other similar
+--     officer of THE BODY CORPORATE". A cross-gated reading is available (a
+--     "director" claim counts only where the offender IS a body corporate). We
+--     encode the FLAT DISJUNCTION the statute actually writes, and do NOT invent
+--     the cross-gate — because the definite articles already do the work in the
+--     FACTS: a well-formed record cannot truthfully assert `is a director of the
+--     body corporate` where the offender is a limited liability partnership. The
+--     cross-gate would therefore be redundant on honest facts and, on dishonest
+--     ones, would be the model second-guessing the pleadings. FLAGGED, not patched.
+--     (Art 37(2)'s deeming IS gated on `the offender is a body corporate`, because
+--     the statute expressly says "Where the affairs of A BODY CORPORATE ...".)
+--
+-- >>> (3) "CONSENT OR CONNIVANCE" IS A SINGLE PROVED FACT. The statute requires the
+--     offence to be "PROVED to have been committed with the consent or connivance
+--     of" the person. We lift this as ONE boolean rather than splitting consent from
+--     connivance: the disjunction is internal to the standard of proof, both routes
+--     have the identical legal consequence, and no provision of this Law
+--     distinguishes them. Note also that the model does NOT reach neglect: unlike
+--     many corporate-liability provisions, Article 37 has NO "or is attributable to
+--     any neglect on the part of" limb. That is the drafter's choice, and we do not
+--     supply it.
+--
+-- >>> (4) DEADLINES. Part 9 gives NO deadline for anything. The Article 37
+--     prohibition is perpetual and the liability is whatever the sentencing court
+--     imposes. `WITHIN 365` (the prohibition) and `WITHIN 30` (the penalty) are
+--     REVIEWABLE PLACEHOLDERS for open-textured standards, present only to make the
+--     trace executable. Read no precision into them.
+--
+-- >>> (5) ARTICLES 41(1) AND 40(1) ARE NOT STUBBED. Article 41 and Article 40 are
+--     mostly Regulation-making powers, and those parts ARE stubbed. But Art 41(1)
+--     is a genuine DEFINITION ("a relevant enactment is - (a) ... (b) ... (c) ...")
+--     and Art 40(1) is a genuine NON-DEROGATION rule; both have computable logic, so
+--     both are encoded. Stubbing them would have been a silent gap of a different
+--     kind: pretending there is no logic where there is.
+-- ===========================================================================
+
+§§ `Article 37(1) — the offence by the body, and the officer accused`
+
+-- The offence committed BY the corporate body. This is the "primary" offence: the
+-- one Article 37 attributes onward.
+DECLARE CorporateOffence HAS
+    description                                                     IS A STRING
+
+    -- The chapeau: "If an offence under this Law, committed by ..."
+    `an offence under this Law has been committed`                   IS A BOOLEAN
+    `the offender is a limited liability partnership`                IS A BOOLEAN
+    `the offender is a separate limited partnership`                 IS A BOOLEAN
+    `the offender is a body corporate`                               IS A BOOLEAN
+
+    -- Article 37(2) — the fact about the BODY that opens the deeming rule.
+    `the affairs of the body corporate are managed by its members`   IS A BOOLEAN
+
+-- The person against whom the offence is to be attributed. Independent CHECKBOX
+-- flags, not an enum: one person can be several of these at once (a director who is
+-- also the company secretary; a member of a member-managed body who is ALSO a
+-- purported director), and Article 37 does not make them exclusive.
+DECLARE AccusedOfficer HAS
+    name                                                            IS A STRING
+
+    -- The proof requirement in the chapeau. It is a fact about the PAIR (this
+    -- offence, this person), so it lives with the person. See INTERPRETATION CALL (3).
+    `the offence is proved to have been committed with that person's consent or connivance`  IS A BOOLEAN
+
+    -- Article 37(1)(a). See INTERPRETATION CALL (2) on the definite articles.
+    `is a partner of the partnership`                                IS A BOOLEAN
+    `is a director of the body corporate`                            IS A BOOLEAN
+    `is a governor of the body corporate`                            IS A BOOLEAN
+    `is a secretary of the body corporate`                           IS A BOOLEAN
+    `is another similar officer of the body corporate`               IS A BOOLEAN
+
+    -- Article 37(1)(b)
+    `purports to act in any such capacity`                           IS A BOOLEAN
+
+    -- Article 37(2) — the two facts about the PERSON that complete the deeming.
+    `is a member of the body corporate`                              IS A BOOLEAN
+    `the act or default was in connection with the member's functions of management`  IS A BOOLEAN
+
+§§ `Article 37(2) — the member-manager, deemed a director`
+
+-- 37(2) is not a free-standing rule: it is a DEEMING rule whose whole effect is to
+-- feed limb (1)(a). So we name it here and DISJOIN it into (1)(a) below, exactly
+-- where the statute puts it ("paragraph (1) applies ... as if the member were a
+-- director of the body corporate").
+GIVEN o IS AN AccusedOfficer
+      a IS A CorporateOffence
+GIVETH A BOOLEAN
+`Article 37(2) — a member of a member-managed body corporate, deemed a director` o a MEANS
+        "(2) Where the affairs of a body corporate are managed by its members,"
+    ... a's `the offender is a body corporate`
+    AND a's `the affairs of the body corporate are managed by its members`
+    AND "paragraph (1) applies in relation to acts and defaults of a member in connection with the member's functions of management"
+    ... o's `is a member of the body corporate`
+    AND o's `the act or default was in connection with the member's functions of management`
+    AND "as if the member were a director of the body corporate."
+
+§§ `Article 37(1)(a) and (b) — the persons to whom the offence is attributed`
+
+GIVEN o IS AN AccusedOfficer
+      a IS A CorporateOffence
+GIVETH A BOOLEAN
+`Article 37(1)(a) — a partner, director, governor, secretary or other similar officer` o a MEANS
+        "(a) a person who is a partner of the partnership, or director, governor, secretary or other similar officer of the body corporate; or"
+    ..  o's `is a partner of the partnership`
+    ..  o's `is a director of the body corporate`
+    ..  o's `is a governor of the body corporate`
+    ..  o's `is a secretary of the body corporate`
+    ..  o's `is another similar officer of the body corporate`
+    ..  `Article 37(2) — a member of a member-managed body corporate, deemed a director` o a
+    -- The last disjunct IS Article 37(2): the deemed director enters limb (a) here,
+    -- and nowhere else.
+
+GIVEN o IS AN AccusedOfficer
+GIVETH A BOOLEAN
+`Article 37(1)(b) — a person purporting to act in any such capacity` o MEANS
+        "(b) any person purporting to act in any such capacity,"
+    ... o's `purports to act in any such capacity`
+
+§§ `Article 37(1) — the offender must be a partnership or a body corporate`
+
+GIVEN a IS A CorporateOffence
+GIVETH A BOOLEAN
+`Article 37(1) — the offender is a partnership or a body corporate` a MEANS
+        "committed by a limited liability partnership, a separate limited partnership or a body corporate"
+    ..  a's `the offender is a limited liability partnership`
+    ..  a's `the offender is a separate limited partnership`
+    ..  a's `the offender is a body corporate`
+    -- The offence of a natural person, or of an unincorporated association, is NOT
+    -- attributed onward by Article 37. That is a real limit on the section, and the
+    -- disjunction is where it lives.
+
+§§ `Article 37(1) — THE ATTRIBUTION RULE`
+
+-- The whole of Article 37 in one conjunction: an offence, by a body of the right
+-- kind, PROVED to have been committed with the person's consent or connivance, and
+-- the person is within limb (a) or limb (b). Note the layout: the (a)/(b) OR is
+-- indented INSIDE the final AND, which is what makes it bind tighter. That is a
+-- deliberate, visible bracketing choice, not an accident of punctuation.
+GIVEN o IS AN AccusedOfficer
+      a IS A CorporateOffence
+GIVETH A BOOLEAN
+`Article 37(1) — the officer is also guilty of the offence` o a MEANS
+        "(1) If an offence under this Law,"
+    ... a's `an offence under this Law has been committed`
+    AND `Article 37(1) — the offender is a partnership or a body corporate` a
+    AND "is proved to have been committed with the consent or connivance of -"
+    ... o's `the offence is proved to have been committed with that person's consent or connivance`
+    AND     `Article 37(1)(a) — a partner, director, governor, secretary or other similar officer` o a
+        ..  `Article 37(1)(b) — a person purporting to act in any such capacity` o
+    AND "the person is also guilty of the offence and liable in the same manner as the partnership or body corporate to the penalty provided for that offence."
+
+§§ `Article 40(1) — the savings rule (non-derogation)`
+
+-- Article 40(1) is a genuine operative rule, not a stub: it SAVES a power from the
+-- effect of this Law. Three conjuncts — whose power, its provenance, its subject
+-- matter — all of which must hold for the saving to apply.
+DECLARE SavedPower HAS
+    description                                                     IS A STRING
+    `the power or function is that of the Attorney General`          IS A BOOLEAN
+    `the power or function is that of the Bailiff`                   IS A BOOLEAN
+    `the power or function is that of the court`                     IS A BOOLEAN
+    `the power or function exists independently of this Law (under customary law or otherwise)`  IS A BOOLEAN
+    `the power or function is in respect of charities or of acts for charitable purposes (whether as defined in this Law or otherwise)`  IS A BOOLEAN
+
+GIVEN p IS A SavedPower
+GIVETH A BOOLEAN
+`Article 40(1) — the power is saved from derogation by this Law` p MEANS
+        "(1) Nothing in this Law is to be read as derogating from any power or function of the Attorney General, the Bailiff, or the court,"
+    ...     p's `the power or function is that of the Attorney General`
+        ..  p's `the power or function is that of the Bailiff`
+        ..  p's `the power or function is that of the court`
+    AND "being a power or function that exists independently of this Law (under customary law or otherwise),"
+    ... p's `the power or function exists independently of this Law (under customary law or otherwise)`
+    AND "in respect of charities or of acts for charitable purposes (whether as defined in this Law or otherwise)."
+    ... p's `the power or function is in respect of charities or of acts for charitable purposes (whether as defined in this Law or otherwise)`
+    -- Note who is NOT on the list: the Commissioner, the Comptroller and the JFSC.
+    -- Their powers over charities are the CREATURES of this Law, and Article 40(1)
+    -- does not purport to save anything for them.
+
+§§ `Article 41(1) — "relevant enactment"`
+
+-- A definition, and so a disjunction. It exists only "for the purpose of paragraph
+-- (2)" — the Regulation-making power that is stubbed below — but the definition
+-- itself is perfectly computable, so we compute it.
+DECLARE RelevantEnactment HAS
+    name                                                            IS A STRING
+    `(a) is the Proceeds of Crime (Supervisory Bodies) (Jersey) Law 2008`  IS A BOOLEAN
+    `(b) is any other enactment under which the JFSC has functions`  IS A BOOLEAN
+    `(c) is any enactment relating to taxation`                      IS A BOOLEAN
+
+GIVEN e IS A RelevantEnactment
+GIVETH A BOOLEAN
+`Article 41(1) — is a relevant enactment` e MEANS
+        "(1) For the purpose of paragraph (2) a relevant enactment is -"
+    ..  "(a) the Proceeds of Crime (Supervisory Bodies) (Jersey) Law 2008;"
+    ..  e's `(a) is the Proceeds of Crime (Supervisory Bodies) (Jersey) Law 2008`
+    ..  "(b) any other enactment under which the JFSC has functions;"
+    ..  e's `(b) is any other enactment under which the JFSC has functions`
+    ..  "(c) any enactment relating to taxation."
+    ..  e's `(c) is any enactment relating to taxation`
+
+§§ `Articles 38, 39, 40(2)-(3), 41(2), 42 and 43 — INERT-PROSE STUBS`
+
+-- The Order- and Regulation-making powers, and the citation. These confer a power on
+-- the Minister or the States to make DELEGATED LEGISLATION. There is nothing here to
+-- decide: no condition, no test, no addressee under a duty. The operative content
+-- would be in the Order or the Regulations, if and when made — and those are not
+-- this Law. Deliberate STUBS, carrying the verbatim text, so that the in-order
+-- corpus has NO SILENT GAP. NO operative logic, NO outcome, NO invented deontic.
+
+GIVETH A BOOLEAN
+`Article 38 — service of notices (STUB)` MEANS
+        "38 Service of notices"
+    ... "The Minister may by Order make further provision as to the service of any notice under this Law."
+
+#EVAL `Article 38 — service of notices (STUB)`
+
+GIVETH A BOOLEAN
+`Article 39 — Regulations and Orders (STUB)` MEANS
+        "39 Regulations and Orders"
+    ... "(1) An Order or Regulations under this Law may contain such transitional, consequential, incidental, supplementary or savings provisions, other than an amendment of this Law, as appear to the Minister or the States (as the case may be) to be necessary or expedient for the purposes of the Order or Regulations."
+    ... "(2) A power under this Law to amend, by Regulations, any provision of this Law includes the power to make such transitional, consequential, incidental or supplementary amendments to any other provision of this Law as appears to the States to be necessary or expedient."
+
+#EVAL `Article 39 — Regulations and Orders (STUB)`
+
+-- Article 40(1) is encoded above. Only the two Regulation-making paragraphs are stubbed.
+GIVETH A BOOLEAN
+`Article 40(2) and 40(3) — the savings and transitional Regulation powers (STUB)` MEANS
+        "40 Savings and transitional provisions"
+    ... "(2) The States may by Regulations make such other saving provision as appears to the States to be necessary or expedient for the purposes of this Law."
+    ... "(3) The States may by Regulations make such transitional provision as appears to the States to be necessary or expedient for the purposes of the bringing into force of this Law."
+
+#EVAL `Article 40(2) and 40(3) — the savings and transitional Regulation powers (STUB)`
+
+-- Article 41(1) is encoded above. Only the Regulation-making paragraph is stubbed.
+GIVETH A BOOLEAN
+`Article 41(2) — the information-sharing amendment power (STUB)` MEANS
+        "41 Amendments of Laws relating to sharing of information"
+    ... "(2) The States may by Regulations amend any relevant enactment, to make such provision as the States consider necessary or expedient to enable any supervisory body, the JFSC and the Comptroller to disclose information to the Commissioner for the purposes of this Law."
+
+#EVAL `Article 41(2) — the information-sharing amendment power (STUB)`
+
+GIVETH A BOOLEAN
+`Article 42 — consequential amendments of other enactments (STUB)` MEANS
+        "42 Consequential amendments of other enactments"
+    ... "The States may by Regulations -"
+    ... "(a) amend the Trusts (Jersey) Law 1984 and the Foundations (Jersey) Law 2009, to make provision for the application under those Laws of the charity test under this Law (by reference the test itself, or to whether a trust or foundation is registered under this Law, or otherwise), or of the definition of charitable purposes under this Law, and for related purposes;"
+    ... "(b) amend any other enactment (not including this Law) to make such consequential provision as the States consider necessary or expedient, in relation to a reference (direct or indirect) in that other enactment to charities or charitable purposes or related terms."
+    -- (sic: "by reference the test itself" — the word "to" is missing in the
+    --  official consolidation. Carried verbatim.)
+
+#EVAL `Article 42 — consequential amendments of other enactments (STUB)`
+
+GIVETH A BOOLEAN
+`Article 43 — citation (STUB)` MEANS
+        "43 Citation"
+    ... "This Law may be cited as the Charities (Jersey) Law 2014."
+
+#EVAL `Article 43 — citation (STUB)`
+
+§§ `Part 9 — the regulative layer`
+
+-- The acts Part 9 regulates. NOT in `charities-common`'s Action enum, so declared
+-- locally with a Part-unique name, per the corpus convention. Only ARTICLE 37 has a
+-- regulative layer at all: Articles 38-43 are stubs, and we do NOT invent deontics
+-- for delegated-legislation powers.
+DECLARE Part9Action IS ONE OF
+  `consent to or connive in an offence under this Law committed by the partnership or body corporate`
+  `submit to the penalty provided for that offence, in the same manner as the partnership or body corporate`
+
+-- Article 37, surfaced as the PROHIBITION it implies. See INTERPRETATION CALL (1):
+-- the statute attributes GUILT rather than forbidding the conduct, but guilt
+-- attributed is conduct forbidden. SHANT is exactly right: performing the act IS the
+-- breach; refraining discharges it. Unconditional — it binds every partner, officer
+-- and purported officer, all the time. WITHIN 365 is the placeholder of CALL (4).
+GIVETH A DEONTIC Actor Part9Action
+`Article 37 — the prohibition implied by the attribution of guilt` MEANS
+    PARTY Person SHANT `consent to or connive in an offence under this Law committed by the partnership or body corporate` WITHIN 365
+
+-- The LIABILITY, gated on the attribution rule. "liable IN THE SAME MANNER as the
+-- partnership or body corporate to the penalty provided for that offence" — so the
+-- duty arises if and only if the four-fold conjunction of Article 37(1) is made out.
+GIVEN o IS AN AccusedOfficer
+      a IS A CorporateOffence
+GIVETH A DEONTIC Actor Part9Action
+`Article 37(1) — the officer's liability to the penalty` o a MEANS
+    IF   `Article 37(1) — the officer is also guilty of the offence` o a
+    THEN PARTY Person MUST `submit to the penalty provided for that offence, in the same manner as the partnership or body corporate` WITHIN 30
+    ELSE FULFILLED
+
+§ `Tests — Part 9`
+
+§§ `Article 37 — the offences`
+
+-- The primary offence: a registered charity, incorporated as a company, breaches
+-- Article 21 by holding itself out as registered when it is not.
+`the company's Article 21 offence` MEANS CorporateOffence WITH
+    description                                                     IS "a company falsely refers to itself as a registered charity"
+    `an offence under this Law has been committed`                   IS TRUE
+    `the offender is a limited liability partnership`                IS FALSE
+    `the offender is a separate limited partnership`                 IS FALSE
+    `the offender is a body corporate`                               IS TRUE
+    `the affairs of the body corporate are managed by its members`   IS FALSE
+
+-- The same offence, but by a limited liability partnership.
+`the LLP's Article 21 offence` MEANS CorporateOffence WITH
+    description                                                     IS "an LLP falsely refers to itself as a registered charity"
+    `an offence under this Law has been committed`                   IS TRUE
+    `the offender is a limited liability partnership`                IS TRUE
+    `the offender is a separate limited partnership`                 IS FALSE
+    `the offender is a body corporate`                               IS FALSE
+    `the affairs of the body corporate are managed by its members`   IS FALSE
+
+-- A body corporate whose affairs are managed by its members: the Article 37(2) case.
+`the member-managed body's Article 21 offence` MEANS CorporateOffence WITH
+    description                                                     IS "a member-managed body corporate falsely refers to itself as a registered charity"
+    `an offence under this Law has been committed`                   IS TRUE
+    `the offender is a limited liability partnership`                IS FALSE
+    `the offender is a separate limited partnership`                 IS FALSE
+    `the offender is a body corporate`                               IS TRUE
+    `the affairs of the body corporate are managed by its members`   IS TRUE
+
+-- >>> THE LIMIT OF ARTICLE 37. A sole trader commits exactly the same offence with
+--     exactly the same state of mind. Article 37 does not reach it: the offender is
+--     not an LLP, not a separate limited partnership, and not a body corporate. There
+--     is no one to attribute the offence ONWARD to, because the offender IS the
+--     natural person. The disjunction in the chapeau is what stops the rule.
+`the sole trader's Article 21 offence` MEANS CorporateOffence WITH
+    description                                                     IS "a natural person trading alone falsely refers to himself as a registered charity"
+    `an offence under this Law has been committed`                   IS TRUE
+    `the offender is a limited liability partnership`                IS FALSE
+    `the offender is a separate limited partnership`                 IS FALSE
+    `the offender is a body corporate`                               IS FALSE
+    `the affairs of the body corporate are managed by its members`   IS FALSE
+
+#ASSERT `Article 37(1) — the offender is a partnership or a body corporate` `the company's Article 21 offence`
+#ASSERT `Article 37(1) — the offender is a partnership or a body corporate` `the LLP's Article 21 offence`
+#ASSERT NOT `Article 37(1) — the offender is a partnership or a body corporate` `the sole trader's Article 21 offence`
+
+§§ `Article 37(1)(a) — the consenting director`
+
+`Mr de Gruchy, a consenting director` MEANS AccusedOfficer WITH
+    name                                                            IS "Mr de Gruchy"
+    `the offence is proved to have been committed with that person's consent or connivance`  IS TRUE
+    `is a partner of the partnership`                                IS FALSE
+    `is a director of the body corporate`                            IS TRUE
+    `is a governor of the body corporate`                            IS FALSE
+    `is a secretary of the body corporate`                           IS FALSE
+    `is another similar officer of the body corporate`               IS FALSE
+    `purports to act in any such capacity`                           IS FALSE
+    `is a member of the body corporate`                              IS FALSE
+    `the act or default was in connection with the member's functions of management`  IS FALSE
+
+#ASSERT `Article 37(1)(a) — a partner, director, governor, secretary or other similar officer` `Mr de Gruchy, a consenting director` `the company's Article 21 offence`
+#ASSERT `Article 37(1) — the officer is also guilty of the offence` `Mr de Gruchy, a consenting director` `the company's Article 21 offence`
+
+-- >>> THE PROOF REQUIREMENT, MADE EXECUTABLE. The SAME director, on the SAME
+--     offence, but the consent or connivance is NOT PROVED. He is not guilty. Being
+--     a director of an offending company is not, by itself, an offence — Article 37
+--     is not a strict-liability rule, and this is the conjunct that says so.
+`Ms Bisson, a director, no consent proved` MEANS AccusedOfficer WITH
+    name                                                            IS "Ms Bisson"
+    `the offence is proved to have been committed with that person's consent or connivance`  IS FALSE
+    `is a partner of the partnership`                                IS FALSE
+    `is a director of the body corporate`                            IS TRUE
+    `is a governor of the body corporate`                            IS FALSE
+    `is a secretary of the body corporate`                           IS FALSE
+    `is another similar officer of the body corporate`               IS FALSE
+    `purports to act in any such capacity`                           IS FALSE
+    `is a member of the body corporate`                              IS FALSE
+    `the act or default was in connection with the member's functions of management`  IS FALSE
+
+#ASSERT `Article 37(1)(a) — a partner, director, governor, secretary or other similar officer` `Ms Bisson, a director, no consent proved` `the company's Article 21 offence`
+#ASSERT NOT `Article 37(1) — the officer is also guilty of the offence` `Ms Bisson, a director, no consent proved` `the company's Article 21 offence`
+
+§§ `Article 37(1)(a) — the consenting partner of an LLP`
+
+`Mr Machon, a consenting partner` MEANS AccusedOfficer WITH
+    name                                                            IS "Mr Machon"
+    `the offence is proved to have been committed with that person's consent or connivance`  IS TRUE
+    `is a partner of the partnership`                                IS TRUE
+    `is a director of the body corporate`                            IS FALSE
+    `is a governor of the body corporate`                            IS FALSE
+    `is a secretary of the body corporate`                           IS FALSE
+    `is another similar officer of the body corporate`               IS FALSE
+    `purports to act in any such capacity`                           IS FALSE
+    `is a member of the body corporate`                              IS FALSE
+    `the act or default was in connection with the member's functions of management`  IS FALSE
+
+#ASSERT `Article 37(1) — the officer is also guilty of the offence` `Mr Machon, a consenting partner` `the LLP's Article 21 offence`
+-- The same consenting partner, but the SOLE TRADER's offence: Article 37 does not
+-- bite, because the chapeau's disjunction of offenders is not satisfied.
+#ASSERT NOT `Article 37(1) — the officer is also guilty of the offence` `Mr Machon, a consenting partner` `the sole trader's Article 21 offence`
+
+§§ `Article 37(1)(b) — the purported director who was never appointed`
+
+-- >>> LIMB (b) IS THE ANTI-EVASION LIMB. A shadow director, never validly appointed,
+--     who nonetheless holds himself out as one. He is not within limb (a) — he is not
+--     in truth a director of anything — but limb (b) catches him: "any person
+--     purporting to act in any such capacity". Without limb (b), the officer's own
+--     defective appointment would be his defence.
+`Mr Le Cornu, a purported director` MEANS AccusedOfficer WITH
+    name                                                            IS "Mr Le Cornu"
+    `the offence is proved to have been committed with that person's consent or connivance`  IS TRUE
+    `is a partner of the partnership`                                IS FALSE
+    `is a director of the body corporate`                            IS FALSE
+    `is a governor of the body corporate`                            IS FALSE
+    `is a secretary of the body corporate`                           IS FALSE
+    `is another similar officer of the body corporate`               IS FALSE
+    `purports to act in any such capacity`                           IS TRUE
+    `is a member of the body corporate`                              IS FALSE
+    `the act or default was in connection with the member's functions of management`  IS FALSE
+
+#ASSERT NOT `Article 37(1)(a) — a partner, director, governor, secretary or other similar officer` `Mr Le Cornu, a purported director` `the company's Article 21 offence`
+#ASSERT `Article 37(1)(b) — a person purporting to act in any such capacity` `Mr Le Cornu, a purported director`
+#ASSERT `Article 37(1) — the officer is also guilty of the offence` `Mr Le Cornu, a purported director` `the company's Article 21 offence`
+
+§§ `Article 37(2) — the member-manager, deemed a director`
+
+-- The member of a MEMBER-MANAGED body corporate, whose act or default was in
+-- connection with his functions of management. He is none of the limb-(a) officers,
+-- and he does not purport to be one — but Article 37(2) deems him a director, and he
+-- enters limb (a) that way.
+`Mr Pallot, a managing member` MEANS AccusedOfficer WITH
+    name                                                            IS "Mr Pallot"
+    `the offence is proved to have been committed with that person's consent or connivance`  IS TRUE
+    `is a partner of the partnership`                                IS FALSE
+    `is a director of the body corporate`                            IS FALSE
+    `is a governor of the body corporate`                            IS FALSE
+    `is a secretary of the body corporate`                           IS FALSE
+    `is another similar officer of the body corporate`               IS FALSE
+    `purports to act in any such capacity`                           IS FALSE
+    `is a member of the body corporate`                              IS TRUE
+    `the act or default was in connection with the member's functions of management`  IS TRUE
+
+#ASSERT `Article 37(2) — a member of a member-managed body corporate, deemed a director` `Mr Pallot, a managing member` `the member-managed body's Article 21 offence`
+#ASSERT `Article 37(1)(a) — a partner, director, governor, secretary or other similar officer` `Mr Pallot, a managing member` `the member-managed body's Article 21 offence`
+#ASSERT `Article 37(1) — the officer is also guilty of the offence` `Mr Pallot, a managing member` `the member-managed body's Article 21 offence`
+
+-- >>> THE TWO EDGES OF THE 37(2) DEEMING, MADE EXECUTABLE.
+-- EDGE 1 — the SAME managing member, but the body corporate is NOT member-managed.
+--          The deeming needs the fact about the BODY as well as the fact about the
+--          PERSON. On the ordinary company's offence, he is deemed nothing, and he is
+--          not guilty.
+#ASSERT NOT `Article 37(2) — a member of a member-managed body corporate, deemed a director` `Mr Pallot, a managing member` `the company's Article 21 offence`
+#ASSERT NOT `Article 37(1) — the officer is also guilty of the offence` `Mr Pallot, a managing member` `the company's Article 21 offence`
+
+-- EDGE 2 — a member of the SAME member-managed body, who consented, but whose act or
+--          default was NOT in connection with his functions of management (say, a
+--          purely personal capacity). Article 37(2) applies "in relation to ACTS AND
+--          DEFAULTS OF A MEMBER IN CONNECTION WITH the member's functions of
+--          management" — and no further. He is a mere member, and mere members are
+--          not in limb (a).
+`Mrs Vibert, a member acting in a personal capacity` MEANS AccusedOfficer WITH
+    name                                                            IS "Mrs Vibert"
+    `the offence is proved to have been committed with that person's consent or connivance`  IS TRUE
+    `is a partner of the partnership`                                IS FALSE
+    `is a director of the body corporate`                            IS FALSE
+    `is a governor of the body corporate`                            IS FALSE
+    `is a secretary of the body corporate`                           IS FALSE
+    `is another similar officer of the body corporate`               IS FALSE
+    `purports to act in any such capacity`                           IS FALSE
+    `is a member of the body corporate`                              IS TRUE
+    `the act or default was in connection with the member's functions of management`  IS FALSE
+
+#ASSERT NOT `Article 37(2) — a member of a member-managed body corporate, deemed a director` `Mrs Vibert, a member acting in a personal capacity` `the member-managed body's Article 21 offence`
+#ASSERT NOT `Article 37(1)(a) — a partner, director, governor, secretary or other similar officer` `Mrs Vibert, a member acting in a personal capacity` `the member-managed body's Article 21 offence`
+#ASSERT NOT `Article 37(1) — the officer is also guilty of the offence` `Mrs Vibert, a member acting in a personal capacity` `the member-managed body's Article 21 offence`
+
+§§ `Article 37 — the no-primary-offence case`
+
+-- No offence by the body at all. The whole rule is parasitic on a primary offence:
+-- there is nothing to attribute. Even a director who "consented" to a lawful act is
+-- guilty of nothing.
+`no offence at all` MEANS CorporateOffence WITH
+    description                                                     IS "the company did nothing wrong"
+    `an offence under this Law has been committed`                   IS FALSE
+    `the offender is a limited liability partnership`                IS FALSE
+    `the offender is a separate limited partnership`                 IS FALSE
+    `the offender is a body corporate`                               IS TRUE
+    `the affairs of the body corporate are managed by its members`   IS FALSE
+
+#ASSERT NOT `Article 37(1) — the officer is also guilty of the offence` `Mr de Gruchy, a consenting director` `no offence at all`
+
+§§ `Article 40(1) — the savings rule`
+
+-- The Attorney General's ancient customary-law standing as protector of charities.
+-- Exactly what Article 40(1) is for: this Law does not touch it.
+`the Attorney General's customary-law protective jurisdiction over charities` MEANS SavedPower WITH
+    description                                                     IS "the AG's customary law role as protector of charities"
+    `the power or function is that of the Attorney General`          IS TRUE
+    `the power or function is that of the Bailiff`                   IS FALSE
+    `the power or function is that of the court`                     IS FALSE
+    `the power or function exists independently of this Law (under customary law or otherwise)`  IS TRUE
+    `the power or function is in respect of charities or of acts for charitable purposes (whether as defined in this Law or otherwise)`  IS TRUE
+
+#ASSERT `Article 40(1) — the power is saved from derogation by this Law` `the Attorney General's customary-law protective jurisdiction over charities`
+
+-- The court's supervisory jurisdiction over trusts, under the Trusts (Jersey) Law
+-- 1984: the court IS on the list, the power IS independent of this Law, and it IS in
+-- respect of acts for charitable purposes (a charitable trust). Saved.
+`the court's supervisory jurisdiction over charitable trusts` MEANS SavedPower WITH
+    description                                                     IS "the Royal Court's supervision of a charitable trust under the Trusts (Jersey) Law 1984"
+    `the power or function is that of the Attorney General`          IS FALSE
+    `the power or function is that of the Bailiff`                   IS FALSE
+    `the power or function is that of the court`                     IS TRUE
+    `the power or function exists independently of this Law (under customary law or otherwise)`  IS TRUE
+    `the power or function is in respect of charities or of acts for charitable purposes (whether as defined in this Law or otherwise)`  IS TRUE
+
+#ASSERT `Article 40(1) — the power is saved from derogation by this Law` `the court's supervisory jurisdiction over charitable trusts`
+
+-- >>> WHO IS NOT SAVED (1). The Commissioner is not on the Article 40(1) list, and
+--     could not be: his powers are the CREATURES of this Law. He has nothing that
+--     exists independently of it, so nothing to save. Both the first conjunct AND the
+--     second fail.
+`the Commissioner's power to deregister` MEANS SavedPower WITH
+    description                                                     IS "the Commissioner's Article 16 deregistration power"
+    `the power or function is that of the Attorney General`          IS FALSE
+    `the power or function is that of the Bailiff`                   IS FALSE
+    `the power or function is that of the court`                     IS FALSE
+    `the power or function exists independently of this Law (under customary law or otherwise)`  IS FALSE
+    `the power or function is in respect of charities or of acts for charitable purposes (whether as defined in this Law or otherwise)`  IS TRUE
+
+#ASSERT NOT `Article 40(1) — the power is saved from derogation by this Law` `the Commissioner's power to deregister`
+
+-- >>> WHO IS NOT SAVED (2). The edge case that isolates the SECOND conjunct: a power
+--     of the COURT (so the first conjunct passes) which this Law itself created —
+--     the Article 20 disqualification order. It is NOT a power that "exists
+--     independently of this Law", so Article 40(1) does not save it. It does not need
+--     saving; it needs only this Law.
+`the court's Article 20 disqualification power` MEANS SavedPower WITH
+    description                                                     IS "the Royal Court's power to disqualify a governor under Article 20 of THIS Law"
+    `the power or function is that of the Attorney General`          IS FALSE
+    `the power or function is that of the Bailiff`                   IS FALSE
+    `the power or function is that of the court`                     IS TRUE
+    `the power or function exists independently of this Law (under customary law or otherwise)`  IS FALSE
+    `the power or function is in respect of charities or of acts for charitable purposes (whether as defined in this Law or otherwise)`  IS TRUE
+
+#ASSERT NOT `Article 40(1) — the power is saved from derogation by this Law` `the court's Article 20 disqualification power`
+
+-- The edge case that isolates the THIRD conjunct: the Attorney General's power to
+-- prosecute motoring offences. His power, plainly independent of this Law — but not
+-- in respect of charities. Article 40(1) has nothing to say about it.
+`the Attorney General's power to prosecute motoring offences` MEANS SavedPower WITH
+    description                                                     IS "nothing to do with charities"
+    `the power or function is that of the Attorney General`          IS TRUE
+    `the power or function is that of the Bailiff`                   IS FALSE
+    `the power or function is that of the court`                     IS FALSE
+    `the power or function exists independently of this Law (under customary law or otherwise)`  IS TRUE
+    `the power or function is in respect of charities or of acts for charitable purposes (whether as defined in this Law or otherwise)`  IS FALSE
+
+#ASSERT NOT `Article 40(1) — the power is saved from derogation by this Law` `the Attorney General's power to prosecute motoring offences`
+
+§§ `Article 41(1) — relevant enactments`
+
+`the Proceeds of Crime (Supervisory Bodies) (Jersey) Law 2008` MEANS RelevantEnactment WITH
+    name                                                            IS "Proceeds of Crime (Supervisory Bodies) (Jersey) Law 2008"
+    `(a) is the Proceeds of Crime (Supervisory Bodies) (Jersey) Law 2008`  IS TRUE
+    `(b) is any other enactment under which the JFSC has functions`  IS FALSE
+    `(c) is any enactment relating to taxation`                      IS FALSE
+
+#ASSERT `Article 41(1) — is a relevant enactment` `the Proceeds of Crime (Supervisory Bodies) (Jersey) Law 2008`
+
+`the Income Tax (Jersey) Law 1961` MEANS RelevantEnactment WITH
+    name                                                            IS "Income Tax (Jersey) Law 1961"
+    `(a) is the Proceeds of Crime (Supervisory Bodies) (Jersey) Law 2008`  IS FALSE
+    `(b) is any other enactment under which the JFSC has functions`  IS FALSE
+    `(c) is any enactment relating to taxation`                      IS TRUE
+
+#ASSERT `Article 41(1) — is a relevant enactment` `the Income Tax (Jersey) Law 1961`
+
+`the Financial Services (Jersey) Law 1998` MEANS RelevantEnactment WITH
+    name                                                            IS "Financial Services (Jersey) Law 1998"
+    `(a) is the Proceeds of Crime (Supervisory Bodies) (Jersey) Law 2008`  IS FALSE
+    `(b) is any other enactment under which the JFSC has functions`  IS TRUE
+    `(c) is any enactment relating to taxation`                      IS FALSE
+
+#ASSERT `Article 41(1) — is a relevant enactment` `the Financial Services (Jersey) Law 1998`
+
+-- The negative: an enactment on none of the three limbs. The Road Traffic Law is not
+-- a relevant enactment, and the States may not use Article 41(2) to amend it.
+`the Road Traffic (Jersey) Law 1956` MEANS RelevantEnactment WITH
+    name                                                            IS "Road Traffic (Jersey) Law 1956"
+    `(a) is the Proceeds of Crime (Supervisory Bodies) (Jersey) Law 2008`  IS FALSE
+    `(b) is any other enactment under which the JFSC has functions`  IS FALSE
+    `(c) is any enactment relating to taxation`                      IS FALSE
+
+#ASSERT NOT `Article 41(1) — is a relevant enactment` `the Road Traffic (Jersey) Law 1956`
+
+§§ `Article 37 — the prohibition and the liability, exercised`
+
+-- The consenting director does the forbidden thing. SHANT: doing the act IS the
+-- breach. This is the trace the prosecution would put before the court.
+#TRACE `Article 37 — the prohibition implied by the attribution of guilt` AT 0 WITH
+    PARTY Person DOES `consent to or connive in an offence under this Law committed by the partnership or body corporate` AT 100
+
+-- The prohibition obeyed: the person never consents or connives, and the window runs
+-- out (the day-400 act carries the clock past it). SHANT refrained -> FULFILLED.
+#TRACE `Article 37 — the prohibition implied by the attribution of guilt` AT 0 WITH
+    PARTY Person DOES `submit to the penalty provided for that offence, in the same manner as the partnership or body corporate` AT 400
+
+-- The liability, on facts where the attribution rule IS made out: Mr de Gruchy pays,
+-- inside the (placeholder) 30-day window. FULFILLED.
+#TRACE `Article 37(1) — the officer's liability to the penalty` `Mr de Gruchy, a consenting director` `the company's Article 21 offence` AT 0 WITH
+    PARTY Person DOES `submit to the penalty provided for that offence, in the same manner as the partnership or body corporate` AT 20
+
+-- The liability, made out but NOT discharged. The day-40 act carries the clock past
+-- the 30-day deadline without the penalty being submitted to: MUST -> BREACH.
+#TRACE `Article 37(1) — the officer's liability to the penalty` `Mr de Gruchy, a consenting director` `the company's Article 21 offence` AT 0 WITH
+    PARTY Person DOES `consent to or connive in an offence under this Law committed by the partnership or body corporate` AT 40
+
+-- >>> The attribution rule NOT made out (no consent proved). The duty never arises:
+--     FULFILLED, and Ms Bisson owes nothing — on an IDENTICAL event stream to the
+--     BREACH immediately above. The only difference in the world is whether consent
+--     or connivance was PROVED.
+#TRACE `Article 37(1) — the officer's liability to the penalty` `Ms Bisson, a director, no consent proved` `the company's Article 21 offence` AT 0 WITH
+    PARTY Person DOES `consent to or connive in an offence under this Law committed by the partnership or body corporate` AT 40
+
+-- The member-manager, deemed a director by Article 37(2), is liable in the same
+-- manner as the body corporate. He pays.
+#TRACE `Article 37(1) — the officer's liability to the penalty` `Mr Pallot, a managing member` `the member-managed body's Article 21 offence` AT 0 WITH
+    PARTY Person DOES `submit to the penalty provided for that offence, in the same manner as the partnership or body corporate` AT 25
+
+-- >>> The SAME man, the SAME consent, but the body corporate is NOT member-managed,
+--     so the Article 37(2) deeming never fires and he is within neither limb (a) nor
+--     limb (b). No liability: FULFILLED, even though the clock runs past the deadline.
+#TRACE `Article 37(1) — the officer's liability to the penalty` `Mr Pallot, a managing member` `the company's Article 21 offence` AT 0 WITH
+    PARTY Person DOES `consent to or connive in an offence under this Law committed by the partnership or body corporate` AT 40
