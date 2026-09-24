@@ -58,16 +58,6 @@ Available commands:
                            GraphViz DOT
   render                   Render an L4 file to a formatted document
                            (html|text|json|plan)
-  export                   Export an L4 file to a foreign interchange notation
-                           (dmn|dmn-md|bpmn) with a fidelity report
-  openfisca                Compile the decision-rule subset of an L4 file to a
-                           runnable OpenFisca Python module
-  blawx                    Compile the decision-rule subset of an L4 file to a
-                           Blawx project (.blawx YAML + s(CASP) dump)
-  catala                   Compile the constitutive subset of an L4 file to a
-                           literate Catala module
-  docassemble              Compile the decision-rule subset of an L4 file to a
-                           docassemble interview (YAML), with a fidelity report
   nlg                      Linearize a module's directives to natural-language
                            prose (the .nlg golden payload)
   lts                      List, for every #TRACE, what is owed now, what would
@@ -76,9 +66,16 @@ Available commands:
   verify                   Look for unsatisfiable rules, dead branches, vacuous
                            guards and unreachable outcomes in the boolean
                            decision skeleton
+  export                   Write an L4 module out in another notation: an
+                           interchange document, a runnable program, or an
+                           interview. Run `l4 export --help` for the formats,
+                           `l4 export FORMAT --help` for each one's options
+  import                   Read another notation into L4 source. Run `l4 import
+                           --help` for the formats
 ```
 
-Run `l4 <command> --help` for the options of any subcommand.
+Run `l4 <command> --help` for the options of any subcommand. The notations L4 can export to are
+listed by `l4 export --help`, and each format has its own options: `l4 export dmn --help`.
 
 ---
 

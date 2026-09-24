@@ -1,6 +1,6 @@
 -- R5 shape probe: TWO independent, unrelated @export entries, each with its
 -- own defect (a NOT, and a non-boolean ASSUME reached as a bare atom).
--- `l4 yscript` must report BOTH in a single run (batched, not
+-- `l4 export yscript` must report BOTH in a single run (batched, not
 -- first-error-wins) rather than stopping at whichever is found first.
 
 ASSUME `the widget is registered` IS A BOOLEAN

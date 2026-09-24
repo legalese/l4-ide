@@ -652,7 +652,7 @@ regulativeRulesInOrder (MkSection _ _ _ _ decls) = concatMap ofDecl decls
 --
 -- Peeling only @Where@ and @LetIn@ (which is what this did until 2026-07-27)
 -- meant every such rule was invisible: @extractStateGraphs@ returned @[]@ and
--- @l4 export --to=bpmn@ refused with "No regulative rules found in module" on
+-- @l4 export bpmn@ refused with "No regulative rules found in module" on
 -- a module full of obligations. All three regulative rules in
 -- @jl4\/examples\/legal\/regcf\/regcf.l4@ were in that position.
 --

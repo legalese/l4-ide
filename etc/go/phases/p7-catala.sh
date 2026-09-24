@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # P7 — the Catala leg.
 #
-# `l4 catala FILE` lowers an L4 module to Catala, the French/EU tax-and-benefit
+# `l4 export catala FILE` lowers an L4 module to Catala, the French/EU tax-and-benefit
 # language whose whole design is the default-logic structure that statutes
 # actually have (a general rule plus exceptions that defeat it). The emitter is
 # specified in specs/todo/CATALA-EXPORT-SPEC.md.
 #
-# WHY THIS LEG EXISTS, AND WHY `l4 catala`'s OWN EXIT CODE IS NOT THE GATE.
-# `l4 catala` exits 0 on emissions that Catala then REJECTS. The measured shape
+# WHY THIS LEG EXISTS, AND WHY `l4 export catala`'s OWN EXIT CODE IS NOT THE GATE.
+# `l4 export catala` exits 0 on emissions that Catala then REJECTS. The measured shape
 # is smucclaw/l4-ide#958: a non-`@export` helper routed between two `@export`
 # rules lowers to a toplevel definition with a scope call inside it, which the
 # emitter is happy to write and `catala typecheck` refuses. So an emitter that
@@ -67,7 +67,7 @@ fi
 
 if [[ "${1:-}" == "--inputs" ]]; then
   # THE PINNED CLOCK IS A VERDICT INPUT, so it is a digest contributor.
-  # `--fixed-now` is what this stage passes to `l4 catala` below, and it is the
+  # `--fixed-now` is what this stage passes to `l4 export catala` below, and it is the
   # answer to "as at what date does the law say this". Two runs of the same
   # subject, same tree, same binary and DIFFERENT --fixed-now must not digest
   # alike, or the second borrows the first's answer about a different point in
@@ -103,7 +103,7 @@ fi
 # --- does this binary have the subcommand at all? ---------------------------
 #
 # A BROKEN, not a finding: the leg is declared, so the repo believes `l4
-# catala` exists. If it does not, nothing this stage could report would be a
+# export catala` exists. If it does not, nothing this stage could report would be a
 # statement about the encoding. Probed once, before any emission, so the
 # diagnostic names the cause rather than arriving as N identical failures.
 #
@@ -113,11 +113,11 @@ fi
 # TOP-LEVEL help and exits 0. A missing subcommand would therefore pass an
 # exit-code check silently, which is the one thing this probe exists to catch.
 # What distinguishes them is the Usage line: the subcommand's own help opens
-# `… catala FILE …`, the top-level help opens `… (COMMAND | FILE …)`.
+# `… export catala FILE …`, the top-level help opens `… (COMMAND | FILE …)`.
 #
 # THE PROGRAM NAME IS NOT PART OF THE PATTERN, and anchoring on it was a defect
 # here. optparse-applicative prints `Usage: <argv0> catala …` from the
-# binary's own basename, so a probe matching the literal `Usage: l4 catala `
+# binary's own basename, so a probe matching the literal `Usage: l4 export catala `
 # reports BROKEN — which STOPS THE WHOLE RUN — for any `l4` that is not named
 # exactly `l4`. That is not an exotic configuration: CLAUDE.md §3.2.1 tells you
 # to copy the binary somewhere unique before probing with it, and §3.1 has
@@ -125,11 +125,11 @@ fi
 # snapshot named `l4-milescard-snapshot`, which printed
 # `Usage: l4-milescard-snapshot catala ` and was called broken.
 set +e
-"$L4" catala --help >"$GO_OUT/p7-catala.help.txt" 2>&1
+"$L4" export catala --help >"$GO_OUT/p7-catala.help.txt" 2>&1
 HELP_RC=$?
 set -e
-if [[ $HELP_RC -ne 0 ]] || ! grep -qE '^Usage: [^ ]+ catala ' "$GO_OUT/p7-catala.help.txt"; then
-  go_broken "the l4 binary at $L4 has no usable 'catala' subcommand: \`l4 catala --help\` exited $HELP_RC and did not print a 'Usage: <program> catala …' line — it printed \"$(head -1 "$GO_OUT/p7-catala.help.txt" 2>/dev/null)\". An unknown first word is parsed as a FILENAME by this CLI, so the exit code alone would not have shown this. Leg legs['p7-catala'] is declared for subject '$GO_S_ID', so either the binary predates the emitter or the subcommand was renamed; rebuild, or undeclare the leg."
+if [[ $HELP_RC -ne 0 ]] || ! grep -qE '^Usage: [^ ]+ export catala ' "$GO_OUT/p7-catala.help.txt"; then
+  go_broken "the l4 binary at $L4 has no usable 'catala' subcommand: \`l4 export catala --help\` exited $HELP_RC and did not print a 'Usage: <program> export catala …' line — it printed \"$(head -1 "$GO_OUT/p7-catala.help.txt" 2>/dev/null)\". An unknown first word is parsed as a FILENAME by this CLI, so the exit code alone would not have shown this. Leg legs['p7-catala'] is declared for subject '$GO_S_ID', so either the binary predates the emitter or the subcommand was renamed; rebuild, or undeclare the leg."
 fi
 
 # --- emit, one module at a time ---------------------------------------------
@@ -154,7 +154,7 @@ for m in "${MODULES[@]}"; do
   STEM="$(basename "$m" .l4)"
   # THE OUTPUT BASENAME IS NOT FREE: IT BECOMES THE CATALA MODULE NAME.
   #
-  # `l4 catala -o FILE` derives the emitted `> Module X` from FILE's basename,
+  # `l4 export catala -o FILE` derives the emitted `> Module X` from FILE's basename,
   # and Catala identifiers admit only letters, digits and `_`, starting with a
   # letter. So `-o dbs-yuu.catala_en` is REFUSED outright — "`dbs-yuu` cannot be
   # a Catala module name … e.g. `dbsyuu.catala_en`" — and the emitter exits 1
@@ -215,27 +215,27 @@ for m in "${MODULES[@]}"; do
   # disambiguated.
   MOUT="$GO_OUT/p7-catala.emit-$(basename "$OUT" .catala_en).txt"
   set +e
-  "$L4" catala "$m" -o "$OUT" --fixed-now "$GO_FIXED_NOW" >"$MOUT" 2>&1
+  "$L4" export catala "$m" -o "$OUT" --fixed-now "$GO_FIXED_NOW" >"$MOUT" 2>&1
   RC=$?
   set -e
   cat "$MOUT" >>"$LOG"
   if [[ $RC -ne 0 ]]; then
     [[ -f "$OUT" ]] && ARTS+=(--artifact "$OUT")
     ARTS+=(--artifact "$MOUT")
-    # THE REFUSAL, NOT A TAIL OF THE LOG. `l4 catala` prints one header line
+    # THE REFUSAL, NOT A TAIL OF THE LOG. `l4 export catala` prints one header line
     # and then one `  - in <decision>: <why>` bullet per decision it cannot
     # compile. Slicing the last N lines instead — which this script did until
     # its own first live run — quotes an arbitrary SUFFIX of that list and
     # reports fewer findings than there are, with nothing saying so. Measured
     # 2026-09-21 on chubb: five bullets, of which a `tail -3` showed three.
-    REFUSAL="$(sed -n '/^l4 catala: /,$p' "$MOUT")"
+    REFUSAL="$(sed -n '/^l4 export catala: /,$p' "$MOUT")"
     [[ -z "$REFUSAL" ]] && REFUSAL="$(grep -v '^  ' "$MOUT" | tail -5)"
     NBULLETS="$(printf '%s\n' "$REFUSAL" | grep -c '^  - ' || true)"
     QUOTED="$(printf '%s\n' "$REFUSAL" | head -6 | tr '\n' ' ' | tr -s ' ')"
     ELIDED=""
     [[ "${NBULLETS:-0}" -gt 5 ]] && ELIDED=" (showing 5 of $NBULLETS; all of them are in $(basename "$MOUT"))"
     go_receipt --status DEGRADED \
-      --reason "l4 catala exited $RC on $REL, so no Catala was emitted for it and the toolchain gate never ran. The emitter refusing is a finding about the ENCODING, not about this machine: it names each decision it cannot lower and why. Emitter said: ${QUOTED}${ELIDED}" \
+      --reason "l4 export catala exited $RC on $REL, so no Catala was emitted for it and the toolchain gate never ran. The emitter refusing is a finding about the ENCODING, not about this machine: it names each decision it cannot lower and why. Emitter said: ${QUOTED}${ELIDED}" \
       "${ARTS[@]}" --artifact "$LOG" \
       --metric "modules_total=$MODULES_TOTAL" \
       --metric "modules_emitted=${#EMITTED[@]}" \
@@ -345,7 +345,7 @@ if [[ $VRC -ne 0 ]]; then
   # reader a year from now needs to know which. The validator stops at the
   # first layer that fails and says so in its own trailer line.
   if grep -q '(catala typecheck)' "$VOUT"; then
-    WHICH="layer 1, \`catala typecheck\`: Catala REJECTED what the emitter wrote. This is the #958 class of finding — \`l4 catala\` exited 0 on every module and the emission is still not Catala. Do not read the emitter's 0 as evidence"
+    WHICH="layer 1, \`catala typecheck\`: Catala REJECTED what the emitter wrote. This is the #958 class of finding — \`l4 export catala\` exited 0 on every module and the emission is still not Catala. Do not read the emitter's 0 as evidence"
   elif grep -q '(catala proof' "$VOUT"; then
     WHICH="layer 2, \`catala proof\`: the emitted exception ladder has sibling rungs that can both fire, which is a Conflict at run time. The Mode B ladders are emitted linear precisely so that cannot happen, so this says the ladder builder or the encoding it read has changed shape"
   elif grep -q 'clerk test ran' "$VOUT"; then
@@ -378,7 +378,7 @@ if [[ -z "${T_TOTAL:-}" || "${T_TOTAL:-0}" -eq 0 ]]; then
 fi
 
 go_receipt --status PASS \
-  --oracle-cmd "l4 catala <module> -o <run>/<stem>.catala_en --fixed-now $GO_FIXED_NOW  (x${#EMITTED[@]}) && node etc/validate-catala.mjs <emitted…>" \
+  --oracle-cmd "l4 export catala <module> -o <run>/<stem>.catala_en --fixed-now $GO_FIXED_NOW  (x${#EMITTED[@]}) && node etc/validate-catala.mjs <emitted…>" \
   --oracle-exit 0 \
   --oracle-class execution \
   --oracle-because "Catala's own interpreter RAN the emitted modules and agreed. \`clerk test\` re-executed all $T_TOTAL \`\`\`catala-test-cli block(s) across ${#EMITTED[@]} emission(s) with $T_FAILED failures, and every expected value in those blocks was computed by L4's evaluator (R7), so this is two independently written evaluators returning the same answers over the same rules — the artifact ran on its target engine, on cases, and agreed. Layers 1 and 2 ran first and are structural rather than executional: \`catala typecheck\` accepted all $TYPECHECK_OK, and \`catala proof\` reported no overlapping exceptions on all $PROOF_OK, which is the only check anywhere that would notice a Mode B ladder whose rungs stopped being linear. The class is claimed on layer 3 alone; layers 1 and 2 would only license \`structural\`." \

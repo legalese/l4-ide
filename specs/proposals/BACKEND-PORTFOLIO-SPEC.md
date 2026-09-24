@@ -231,8 +231,9 @@ Per-target specs cite these henceforth instead of restating them. Each was previ
 independently in at least two of: the OpenFisca doc §6, CATALA-EXPORT-SPEC §7/R7/R9, PR #258
 §3.1/§6, VERIFICATION-BACKEND-LOWERING-SPEC's harness section, and the Blawx spec.
 
-- **I1 — Architecture pattern.** A forward bridge is `L4.<Target>.{IR,Lower,Emit}` plus a CLI verb
-  (or an `l4 export --to=` format for interchange XML), keyed on `@export` via
+- **I1 — Architecture pattern.** A forward bridge is `L4.<Target>.{IR,Lower,Emit}` plus an
+  `l4 export FORMAT` subcommand (CLI-SURFACE-SPEC C1, 2026-09-24; this read "a CLI verb (or an
+  `l4 export --to=` format for interchange XML)" until then), keyed on `@export` via
   `L4.Export.getExportedFunctions`, with `lowerModule :: Module Resolved -> Either [LowerError] …`
   reporting **all** rejections in one batch, each naming the construct and source range.
 - **I2 — Oracle direction.** `L4.EvaluateLazy` is the reference semantics for every backend.
@@ -324,7 +325,7 @@ bug when they don't.
 | defeasibility           | owned by `SUBJECT-TO-NOTWITHSTANDING-SPEC.md`; evidence: Catala §5.2, Blawx §1.1/§5.2 (see §3.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | exhaustiveness severity | L4's oracle WARNS (`PatternMatchesMissing` via `addWarning`, `TypeCheck.hs:1934` at `8af7d332`) where Catala and DMN-UNIQUE ERROR — export lowerings close the gap (warning-as-error inside the fragment, or explicit arms). `@nonexhaustive` IS on `unstable` since the #256 main-merge (`Lexer.hs:83,444-445` at `8af7d332`; checkouts at `fe8d37d3`-or-earlier lack it): it silences only the missing-branch warning, i.e. author-declared partiality — which lowerings can honour by emitting explicit `impossible` arms (Catala `0dfce71c`).      |
 | tests/oracle            | I2/I3 here; instances: OpenFisca `roundtrip_check.py`, Catala R7, #258 §6, Blawx (PR #261).                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| CLI verb surface        | #258's ruling on LP verbs; Blawx defers to it; execution bridges use one verb each (I1).                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| CLI verb surface        | Owned by `CLI-SURFACE-SPEC.md` since 2026-09-24: every target is `l4 export FORMAT`, every importer `l4 import FORMAT` (C1), which answers #258's LP-R11. Until then execution bridges used one verb each.                                                                                                                                                                                                                                                                                                                                             |
 
 ## 7. Double-covered seams (P4)
 

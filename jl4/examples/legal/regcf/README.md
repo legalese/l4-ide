@@ -477,7 +477,7 @@ from this file's own outermost `§` heading.
 ### 6.1 DMN: 70 decisions, 12 tables, and a model both engines evaluate
 
 **Measured 2026-08-09 on the shipped goldens (R12 + R13,
-`specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12/§16).** `l4 export --to=dmn` on
+`specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md` §15.12/§16).** `l4 export dmn` on
 this file succeeds, the XML parses under `dmn-moddle` with **zero warnings**, and —
 since R12 dropped the law-time-rebinding scenarios and R13 lowered the deontic
 reporting spine to a verdict decision table — **both engines evaluate it end to end**,
@@ -544,7 +544,7 @@ this corpus and must not be read as it.
 ### 6.2 BPMN: three rules, three processes, cut from this file
 
 ```
-$ l4 export jl4/examples/legal/regcf/regcf.l4 --to bpmn --rule "ongoing reporting obligation"
+$ l4 export bpmn jl4/examples/legal/regcf/regcf.l4 --rule "ongoing reporting obligation"
 ```
 
 All three regulative rules here are `IF`-headed — `advertising restriction` (:494),

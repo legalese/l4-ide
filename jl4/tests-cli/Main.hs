@@ -165,7 +165,7 @@ runL4In mCwd mEnv bin args = do
   -- stdout to EOF and only then reading stderr deadlocks the moment the child
   -- writes more to stderr than the pipe buffer holds (~16 KB on macOS): the
   -- child blocks on the stderr write, so it never closes stdout, so the parent
-  -- never returns. That is not hypothetical — `l4 blawx` on a seed whose
+  -- never returns. That is not hypothetical — `l4 export blawx` on a seed whose
   -- assumed predicates are refused for publication emits ~22 KB of diagnostics
   -- on a run that exits 0, and it hung this suite until it was killed, with no
   -- output and no failure to point at.
@@ -400,7 +400,7 @@ readUtf8 fp = T.unpack . TE.decodeUtf8Lenient <$> BS.readFile fp
 -- absence of the emitter's own stderr diagnostic for it.
 noBlankedBlawxRow :: FilePath -> String -> IO ()
 noBlankedBlawxRow bin stem = do
-  Output code sout serr <- runL4 bin ["blawx", "examples/blawx/" ++ stem ++ ".l4"]
+  Output code sout serr <- runL4 bin ["export", "blawx", "examples/blawx/" ++ stem ++ ".l4"]
   code `shouldBe` ExitSuccess
   (stem, "no Blockly image" `isInfixOf` serr) `shouldBe` (stem, False)
   let fields = [f | l <- lines sout, Just f <- [blawxStoredField l]]
@@ -427,8 +427,8 @@ noBlankedBlawxRow bin stem = do
 -- a drifting field name a red test rather than a quietly weaker harness.
 twinsAgree :: FilePath -> (String, String) -> IO ()
 twinsAgree bin (seed, twin) = do
-  Output codeA soutA _ <- runL4 bin ["blawx", "examples/blawx/" ++ seed ++ ".l4", "--scasp"]
-  Output codeB soutB _ <- runL4 bin ["blawx", "examples/blawx/" ++ twin ++ ".l4", "--scasp"]
+  Output codeA soutA _ <- runL4 bin ["export", "blawx", "examples/blawx/" ++ seed ++ ".l4", "--scasp"]
+  Output codeB soutB _ <- runL4 bin ["export", "blawx", "examples/blawx/" ++ twin ++ ".l4", "--scasp"]
   codeA `shouldBe` ExitSuccess
   codeB `shouldBe` ExitSuccess
   let body = drop 1 . lines
@@ -580,12 +580,12 @@ batchEscapeInput   = fixtureDir </> "batch-escape-input.json"
 evalTraceFixture   = fixtureDir </> "evaltrace.l4"
 
 ----------------------------------------------------------------------------
--- `l4 docassemble` (M2): the package tree, citations and the glossary
+-- `l4 export docassemble` (M2): the package tree, citations and the glossary
 --
 -- Everything in this section pins DOCASSEMBLE-EXPORT-SPEC.md §10 (M2) and the
 -- two rulings it leans on, R11 (§8.11, artifact shape) and R9 (§8.9, emission
 -- hygiene). The M1 surface — six byte-golden examples plus the not-ok/
--- refusals — is pinned separately, in `describe "l4 docassemble"`, and must
+-- refusals — is pinned separately, in `describe "l4 export docassemble"`, and must
 -- stay green through M2: packaging is an ADDITIONAL artifact shape, not a
 -- change to the bare one.
 ----------------------------------------------------------------------------
@@ -665,12 +665,12 @@ daM4Refused =
 -- verbatim stderr is what makes a REGRESSION legible rather than merely red.
 daEmit :: FilePath -> FilePath -> IO String
 daEmit bin src = do
-  Output code sout serr <- runL4 bin ["docassemble", src]
+  Output code sout serr <- runL4 bin ["export", "docassemble", src]
   case code of
     ExitSuccess   -> pure sout
     ExitFailure n -> do
       expectationFailure $
-        "`l4 docassemble " ++ src ++ "` exited " ++ show n
+        "`l4 export docassemble " ++ src ++ "` exited " ++ show n
         ++ ": the M4 construct this example exists for is still refused."
         ++ "\n--- stderr ---\n" ++ serr
       pure ""
@@ -754,7 +754,7 @@ emptyTreeDirs root = sort <$> go ""
     isDir <- doesDirectoryExist (root </> r)
     if isDir then go r else pure []
 
--- | Run @l4 docassemble FILE --package DIR@ into a FRESH directory and return
+-- | Run @l4 export docassemble FILE --package DIR@ into a FRESH directory and return
 -- the written tree's sorted file list.
 --
 -- The failure message names the milestone deliberately: until M2 lands the
@@ -763,10 +763,10 @@ emptyTreeDirs root = sort <$> go ""
 expectPackage :: FilePath -> FilePath -> FilePath -> IO [FilePath]
 expectPackage bin src outDir = do
   removePathForcibly outDir
-  Output code sout serr <- runL4 bin ["docassemble", src, "--package", outDir]
+  Output code sout serr <- runL4 bin ["export", "docassemble", src, "--package", outDir]
   unless (code == ExitSuccess) $
     expectationFailure $
-      "`l4 docassemble " ++ src ++ " --package " ++ outDir ++ "` did not succeed: exited "
+      "`l4 export docassemble " ++ src ++ " --package " ++ outDir ++ "` did not succeed: exited "
       ++ show code
       ++ "\n(M2/R11: --package DIR must write an installable PEP 420 package tree)"
       ++ "\n--- stdout ---\n" ++ sout
@@ -1253,10 +1253,33 @@ spec bin = do
       sout `shouldSatisfy` ("trace" `isInfixOf`)
       sout `shouldSatisfy` ("state-graph" `isInfixOf`)
       sout `shouldSatisfy` ("export" `isInfixOf`)
-      sout `shouldSatisfy` ("openfisca" `isInfixOf`)
-      sout `shouldSatisfy` ("blawx" `isInfixOf`)
+      sout `shouldSatisfy` ("import" `isInfixOf`)
       sout `shouldSatisfy` ("nlg" `isInfixOf`)
       sout `shouldSatisfy` ("verify" `isInfixOf`)
+
+  -- CLI-SURFACE-SPEC C1: every foreign notation is a subcommand of `export`
+  -- or `import`, and those two help screens are the catalogue. The old
+  -- top-level verbs are gone, not aliased: an unknown first word is read as a
+  -- FILENAME by the bare `l4 FILE` form, so the assertion is that each one
+  -- fails, not what it says.
+  describe "l4 export / l4 import" $ do
+    it "`l4 export --help` lists every format" $ do
+      Output code sout _ <- runL4 bin ["export", "--help"]
+      code `shouldBe` ExitSuccess
+      for_ ["dmn", "dmn-md", "bpmn", "openfisca", "blawx", "catala", "docassemble", "yscript"] \fmt ->
+        sout `shouldSatisfy` (("\n  " <> fmt <> " ") `isInfixOf`)
+
+    it "`l4 import --help` lists blawx" $ do
+      Output code sout _ <- runL4 bin ["import", "--help"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("\n  blawx " `isInfixOf`)
+
+    it "requires a format" $
+      expectFail bin ["export"]
+
+    it "no longer has a top-level verb per backend" $
+      for_ ["openfisca", "blawx", "catala", "docassemble", "yscript"] \verb ->
+        expectFail bin [verb, "x.l4"]
 
   describe "l4 run" $ do
     it "succeeds on a clean file" $
@@ -1692,7 +1715,7 @@ spec bin = do
       -- top-level declaration claims it" is the behaviour this replaced, not a
       -- hypothetical — and the fixture's next declaration deliberately carries
       -- no @desc of its own, so a mis-attachment would show up as its key.
-      Output code sout serr <- runL4 bin ["docassemble", descAttachmentFixture]
+      Output code sout serr <- runL4 bin ["export", "docassemble", descAttachmentFixture]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       case [ b | b <- yamlBlocks sout, "auto terms:" `isInfixOf` b ] of
@@ -2487,7 +2510,7 @@ spec bin = do
           -- ...and no location is listed twice.
           nub (map asFile paths) `shouldBe` map asFile paths
 
-  -- Track S0: `l4 export --to=dmn|dmn-md|bpmn [--fidelity-report]`.
+  -- Track S0: `l4 export dmn|dmn-md|bpmn [--fidelity-report]`.
   --
   -- The interesting property of these goldens is that they are not new files.
   -- `jl4/tests/BpmnExport.hs` and `jl4/tests/DmnExport.hs` build the same
@@ -2496,14 +2519,14 @@ spec bin = do
   -- pipeline). Byte equality across those two paths is the actual claim.
   describe "l4 export" $ do
     it "reproduces the BPMN golden byte-for-byte on stdout" $
-      expectGolden bin ["export", "--to=bpmn", bpmnOfferingSource] bpmnOfferingGolden
+      expectGolden bin ["export", "bpmn", bpmnOfferingSource] bpmnOfferingGolden
 
     it "reproduces the DMN 1.3 XML golden byte-for-byte on stdout" $
-      expectGolden bin ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName]
+      expectGolden bin ["export", "dmn", dmnSource, "--model-name", dmnModelName]
                        dmnGolden
 
     it "reproduces the dmnmd markdown golden byte-for-byte on stdout" $
-      expectGolden bin ["export", "--to=dmn-md", dmnSource, "--model-name", dmnModelName]
+      expectGolden bin ["export", "dmn-md", dmnSource, "--model-name", dmnModelName]
                        dmnMarkdownGolden
 
     it "writes the fidelity report as a sibling file, not into the document" $ do
@@ -2516,7 +2539,7 @@ spec bin = do
       removePathForcibly outDir
       createDirectoryIfMissing True outDir
       Output code sout serr <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "-o", outFile, "--fidelity-report"]
+        ["export", "bpmn", bpmnOfferingSource, "-o", outFile, "--fidelity-report"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` null                       -- the document went to the file
       serr `shouldSatisfy` ("fidelity report written to" `isInfixOf`)
@@ -2531,10 +2554,10 @@ spec bin = do
       removePathForcibly outDir
 
     it "keeps stdout a pure document when --fidelity-report goes to stderr" $ do
-      -- `l4 export --to=bpmn f.l4 --fidelity-report > f.bpmn` must still
+      -- `l4 export bpmn f.l4 --fidelity-report > f.bpmn` must still
       -- produce an importable file.
       Output code sout serr <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "--fidelity-report"]
+        ["export", "bpmn", bpmnOfferingSource, "--fidelity-report"]
       code `shouldBe` ExitSuccess
       goldenXml <- readUtf8 bpmnOfferingGolden
       sout `shouldBe` goldenXml
@@ -2544,7 +2567,7 @@ spec bin = do
     it "tallies what was lost on stderr even without --fidelity-report" $ do
       -- The report is not optional in spirit: an export never silently drops
       -- what the source said just because the caller did not know to ask.
-      Output code _ serr <- runL4 bin ["export", "--to=bpmn", bpmnOfferingSource]
+      Output code _ serr <- runL4 bin ["export", "bpmn", bpmnOfferingSource]
       code `shouldBe` ExitSuccess
       serr `shouldSatisfy` ("could not carry everything" `isInfixOf`)
       serr `shouldSatisfy` ("blocking" `isInfixOf`)
@@ -2556,11 +2579,11 @@ spec bin = do
       -- Blocking means "the target notation has no form for this", which is
       -- true of every realistic export (F1 fires for every task in every BPMN
       -- file). A gate that always fires would be no gate at all.
-      Output code _ _ <- runL4 bin ["export", "--to=bpmn", bpmnOfferingSource]
+      Output code _ _ <- runL4 bin ["export", "bpmn", bpmnOfferingSource]
       code `shouldBe` ExitSuccess
 
     it "exits non-zero on a Blocking note under --fail-on=blocking" $
-      expectFail bin ["export", "--to=bpmn", bpmnOfferingSource, "--fail-on=blocking"]
+      expectFail bin ["export", "bpmn", bpmnOfferingSource, "--fail-on=blocking"]
 
     -- --fail-on is a THRESHOLD ("a note this severe or worse"), over a lattice
     -- ordered Blocking < Lossy < Advisory. `expectFail ... --fail-on=blocking`
@@ -2575,7 +2598,7 @@ spec bin = do
     -- any note regardless of severity and the advisory-only
     -- `--fail-on=blocking`/`=lossy` rows do.
     describe "--fail-on thresholds" $ do
-      let dmnGate fixture gate = runL4 bin (["export", "--to=dmn", fixture] <> gate)
+      let dmnGate fixture gate = runL4 bin (["export", "dmn", fixture] <> gate)
           exitsNonZero fixture gate = do
             Output code _ _ <- dmnGate fixture gate
             code `shouldSatisfy` (/= ExitSuccess)
@@ -2584,7 +2607,7 @@ spec bin = do
             code `shouldBe` ExitSuccess
 
       it "a blocking-only report is caught by every threshold" $ do
-        -- `l4 export --to=dmn export-blocking-only.l4` reports 2 blocking,
+        -- `l4 export dmn export-blocking-only.l4` reports 2 blocking,
         -- 0 lossy, 0 advisory: the pure-Blocking end of the lattice. Assert
         -- that first, so the rows below cannot go green for the wrong reason
         -- if the fixture's notes ever change severity.
@@ -2597,7 +2620,7 @@ spec bin = do
           ["blocking", "lossy", "advisory"]
 
       it "an advisory-only report is caught by --fail-on=advisory and nothing stricter" $ do
-        -- `l4 export --to=dmn export-advisory-only.l4` reports 1 advisory and
+        -- `l4 export dmn export-advisory-only.l4` reports 1 advisory and
         -- nothing else. Notes ARE present throughout, so "exit 0" here means
         -- "no note reached the threshold", not "no notes".
         Output tally _ serr <- dmnGate exportAdvisoryOnlyFixture []
@@ -2620,7 +2643,7 @@ spec bin = do
       -- writing a decision-free document. This is the behaviour change that
       -- retired export-two-rules.l4 from the blocking-only role above.
       it "refuses an all-regulative module as DMN (empty model after the population filter)" $
-        expectFail bin ["export", "--to=dmn", exportTwoRulesFixture]
+        expectFail bin ["export", "dmn", exportTwoRulesFixture]
 
     -- FIXTURE(d)'s importer view must see a BACKTICKED import. A hyphenated
     -- module name can only be imported as IMPORT `interp-common`, and the
@@ -2633,54 +2656,53 @@ spec bin = do
     -- shape, unreferenced by the importer, so it must still drop — proving
     -- the scan discriminates by name rather than failing open.
     it "keeps a fixture-shaped decision whose importer spells the IMPORT with backticks" $ do
-      Output code sout _ <- runL4 bin ["export", "--to=dmn", importViewFixture]
+      Output code sout _ <- runL4 bin ["export", "dmn", importViewFixture]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("decision_statute" `isInfixOf`)
       sout `shouldSatisfy` (not . ("local sample" `isInfixOf`))
 
     it "still writes the document when --fail-on trips" $ do
       Output code sout _ <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "--fail-on=blocking"]
+        ["export", "bpmn", bpmnOfferingSource, "--fail-on=blocking"]
       code `shouldSatisfy` (/= ExitSuccess)
       goldenXml <- readUtf8 bpmnOfferingGolden
       sout `shouldBe` goldenXml
 
     it "honours --deadline-unit=refuse (no invented ISO duration)" $ do
       Output code _ serr <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "--deadline-unit=refuse"]
+        ["export", "bpmn", bpmnOfferingSource, "--deadline-unit=refuse"]
       code `shouldBe` ExitSuccess
       -- Under the default the unitless WITHINs are read as days and reported as
       -- P-DEADLINE-UNIT advisories; under `refuse` they become P-DEADLINE.
       serr `shouldSatisfy` ("P-DEADLINE" `isInfixOf`)
-      Output _ soutDefault _ <- runL4 bin ["export", "--to=bpmn", bpmnOfferingSource]
+      Output _ soutDefault _ <- runL4 bin ["export", "bpmn", bpmnOfferingSource]
       Output _ soutRefuse  _ <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "--deadline-unit=refuse"]
+        ["export", "bpmn", bpmnOfferingSource, "--deadline-unit=refuse"]
       soutDefault `shouldSatisfy` ("timerEventDefinition" `isInfixOf`)
       soutRefuse `shouldSatisfy` (not . ("timerEventDefinition" `isInfixOf`))
 
-    it "rejects an unknown --to with a message naming the accepted targets" $ do
-      Output code _ serr <- runL4 bin ["export", "--to=xml", dmnSource]
+    it "rejects an unknown format" $ do
+      Output code _ serr <- runL4 bin ["export", "xml", dmnSource]
       code `shouldSatisfy` (/= ExitSuccess)
-      serr `shouldSatisfy` ("Invalid export target" `isInfixOf`)
-      serr `shouldSatisfy` ("dmn|dmn-md|bpmn" `isInfixOf`)
+      serr `shouldSatisfy` ("Invalid argument `xml'" `isInfixOf`)
 
-    it "requires --to" $
+    it "requires a format before the file" $
       expectFail bin ["export", dmnSource]
 
     it "refuses BPMN when the module has no regulative rules" $ do
-      Output code _ serr <- runL4 bin ["export", "--to=bpmn", exportNothingFixture]
+      Output code _ serr <- runL4 bin ["export", "bpmn", exportNothingFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("regulative" `isInfixOf`)
 
     it "refuses DMN when the module has no decisions" $ do
-      Output code _ serr <- runL4 bin ["export", "--to=dmn", exportNothingFixture]
+      Output code _ serr <- runL4 bin ["export", "dmn", exportNothingFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("No decisions found" `isInfixOf`)
 
     it "refuses to guess which process to draw, and names the candidates" $ do
       -- renderBpmn writes its own XML prolog, so two processes concatenated is
       -- not a document. Refusing beats emitting something no tool can read.
-      Output code _ serr <- runL4 bin ["export", "--to=bpmn", exportTwoRulesFixture]
+      Output code _ serr <- runL4 bin ["export", "bpmn", exportTwoRulesFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("--rule" `isInfixOf`)
       serr `shouldSatisfy` ("the filing" `isInfixOf`)
@@ -2688,7 +2710,7 @@ spec bin = do
 
     it "selects one process with --rule" $ do
       Output code sout _ <- runL4 bin
-        ["export", "--to=bpmn", exportTwoRulesFixture, "--rule", "the fee"]
+        ["export", "bpmn", exportTwoRulesFixture, "--rule", "the fee"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("<?xml" `isInfixOf`)
       sout `shouldSatisfy` ("the fee" `isInfixOf`)
@@ -2696,25 +2718,24 @@ spec bin = do
 
     it "fails on an unknown --rule and lists what is available" $ do
       Output code _ serr <- runL4 bin
-        ["export", "--to=bpmn", exportTwoRulesFixture, "--rule", "no such rule"]
+        ["export", "bpmn", exportTwoRulesFixture, "--rule", "no such rule"]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("no such rule" `isInfixOf`)
       serr `shouldSatisfy` ("the filing" `isInfixOf`)
 
     it "rejects --rule on a DMN export instead of ignoring it" $ do
-      Output code _ serr <- runL4 bin ["export", "--to=dmn", dmnSource, "--rule", "x"]
+      Output code _ serr <- runL4 bin ["export", "dmn", dmnSource, "--rule", "x"]
       code `shouldSatisfy` (/= ExitSuccess)
-      serr `shouldSatisfy` ("--rule" `isInfixOf`)
-      serr `shouldSatisfy` ("--to=bpmn" `isInfixOf`)
+      serr `shouldSatisfy` ("Invalid option `--rule'" `isInfixOf`)
 
     it "rejects --model-name on a BPMN export instead of ignoring it" $ do
       Output code _ serr <- runL4 bin
-        ["export", "--to=bpmn", bpmnOfferingSource, "--model-name", "X"]
+        ["export", "bpmn", bpmnOfferingSource, "--model-name", "X"]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("--model-name" `isInfixOf`)
 
     it "fails on a file that does not typecheck" $
-      expectFail bin ["export", "--to=dmn", errorFixture]
+      expectFail bin ["export", "dmn", errorFixture]
 
     -- --flavor (R7). The two flavors differ on exactly one construct, and that
     -- construct is not emitted until Phase 5, so today the flag is observable
@@ -2724,14 +2745,14 @@ spec bin = do
     describe "--flavor" $ do
       it "defaults to camunda, and says so in the report rather than just 'DMN'" $ do
         Output code _ serr <- runL4 bin
-          ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName, "--fidelity-report"]
+          ["export", "dmn", dmnSource, "--model-name", dmnModelName, "--fidelity-report"]
         code `shouldBe` ExitSuccess
         serr `shouldSatisfy` ("DMN 1.3 (XML), camunda flavor" `isInfixOf`)
 
       it "accepts kie, and drools as a synonym for it" $
         for_ ["kie", "drools"] \flavor -> do
           Output code _ serr <- runL4 bin
-            [ "export", "--to=dmn", dmnSource, "--model-name", dmnModelName
+            [ "export", "dmn", dmnSource, "--model-name", dmnModelName
             , "--flavor=" ++ flavor, "--fidelity-report" ]
           code `shouldBe` ExitSuccess
           serr `shouldSatisfy` ("DMN 1.3 (XML), kie flavor" `isInfixOf`)
@@ -2746,8 +2767,8 @@ spec bin = do
         -- a requiredKnowledge onto a decisionService; the camunda bytes do
         -- not (that one edge is fatal to Camunda 8's parse(), spec §13.4),
         -- and each equals its committed golden.
-        Output _ svcCam _ <- runL4 bin ["export", "--to=dmn", svcSource]
-        Output _ svcKie _ <- runL4 bin ["export", "--to=dmn", svcSource, "--flavor=kie"]
+        Output _ svcCam _ <- runL4 bin ["export", "dmn", svcSource]
+        Output _ svcKie _ <- runL4 bin ["export", "dmn", svcSource, "--flavor=kie"]
         svcKie `shouldSatisfy`
           ("<requiredKnowledge href=\"#service_special_assessment\"/>" `isInfixOf`)
         svcCam `shouldSatisfy` (not . ("requiredKnowledge href=\"#service_" `isInfixOf`))
@@ -2760,44 +2781,41 @@ spec bin = do
         -- both equal the one unsuffixed golden. A drift here means the flavor
         -- bit grew a second observable, which wants its own golden split.
         Output _ camunda _ <- runL4 bin
-          ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName, "--flavor=camunda"]
+          ["export", "dmn", dmnSource, "--model-name", dmnModelName, "--flavor=camunda"]
         Output _ kie _ <- runL4 bin
-          ["export", "--to=dmn", dmnSource, "--model-name", dmnModelName, "--flavor=kie"]
+          ["export", "dmn", dmnSource, "--model-name", dmnModelName, "--flavor=kie"]
         kie `shouldBe` camunda
         golden <- readUtf8 dmnGolden
         camunda `shouldBe` golden
 
-      it "rejects --flavor on --to=dmn-md, because nothing on that path reads it" $ do
+      it "rejects --flavor on dmn-md, because nothing on that path reads it" $ do
         -- It was admitted here at first, on the theory that "the flavor lives
         -- in the Drg, which both emitters read". It does not: emitMarkdown
         -- mentions no field of it and markdownReport hard-codes the target
         -- "dmnmd", so --flavor=kie produced a byte-identical document AND a
-        -- byte-identical fidelity report. That is the silent ignore
-        -- checkTargetFlags exists to refuse.
+        -- byte-identical fidelity report. That is the silent ignore the
+        -- per-format parsers now refuse by not offering the flag at all.
         Output code _ serr <- runL4 bin
-          ["export", "--to=dmn-md", dmnSource, "--model-name", dmnModelName, "--flavor=kie"]
+          ["export", "dmn-md", dmnSource, "--model-name", dmnModelName, "--flavor=kie"]
         code `shouldSatisfy` (/= ExitSuccess)
-        serr `shouldSatisfy` ("--flavor" `isInfixOf`)
-        serr `shouldSatisfy` ("--to=dmn-md" `isInfixOf`)
-        serr `shouldSatisfy` ("--to=dmn" `isInfixOf`)
+        serr `shouldSatisfy` ("Invalid option `--flavor=kie'" `isInfixOf`)
 
-      it "still accepts --model-name on --to=dmn-md, which does belong to both" $ do
+      it "still accepts --model-name on dmn-md, which does belong to both" $ do
         Output code sout _ <- runL4 bin
-          ["export", "--to=dmn-md", dmnSource, "--model-name", dmnModelName]
+          ["export", "dmn-md", dmnSource, "--model-name", dmnModelName]
         code `shouldBe` ExitSuccess
         golden <- readUtf8 dmnMarkdownGolden
         sout `shouldBe` golden
 
       it "rejects --flavor on a BPMN export instead of ignoring it" $ do
         Output code _ serr <- runL4 bin
-          ["export", "--to=bpmn", bpmnOfferingSource, "--flavor=kie"]
+          ["export", "bpmn", bpmnOfferingSource, "--flavor=kie"]
         code `shouldSatisfy` (/= ExitSuccess)
-        serr `shouldSatisfy` ("--flavor" `isInfixOf`)
-        serr `shouldSatisfy` ("--to=bpmn" `isInfixOf`)
+        serr `shouldSatisfy` ("Invalid option `--flavor=kie'" `isInfixOf`)
 
       it "rejects an unknown flavor, naming the accepted ones" $ do
         Output code _ serr <- runL4 bin
-          ["export", "--to=dmn", dmnSource, "--flavor=camunda7"]
+          ["export", "dmn", dmnSource, "--flavor=camunda7"]
         code `shouldSatisfy` (/= ExitSuccess)
         serr `shouldSatisfy` ("Invalid --flavor" `isInfixOf`)
         serr `shouldSatisfy` ("camunda|kie" `isInfixOf`)
@@ -3612,179 +3630,179 @@ spec bin = do
     it "fails on a module that does not typecheck" $
       expectFail bin ["verify", errorFixture]
 
-  describe "l4 openfisca" $ do
+  describe "l4 export openfisca" $ do
     it "compiles the flat-tax example to its golden OpenFisca module" $
-      expectGolden bin ["openfisca", "examples/openfisca/flat-tax.l4"]
+      expectGolden bin ["export", "openfisca", "examples/openfisca/flat-tax.l4"]
                        "examples/openfisca/expected/flat-tax.py"
 
     it "compiles the means-tested benefit example to its golden module" $
-      expectGolden bin ["openfisca", "examples/openfisca/benefit.l4"]
+      expectGolden bin ["export", "openfisca", "examples/openfisca/benefit.l4"]
                        "examples/openfisca/expected/benefit.py"
 
     it "compiles a group entity with LIST OF aggregation (household)" $
-      expectGolden bin ["openfisca", "examples/openfisca/household.l4"]
+      expectGolden bin ["export", "openfisca", "examples/openfisca/household.l4"]
                        "examples/openfisca/expected/household.py"
 
     it "compiles a time-varying marginal-rate scale + parameter store (scale)" $
-      expectGolden bin ["openfisca", "examples/openfisca/scale.l4"]
+      expectGolden bin ["export", "openfisca", "examples/openfisca/scale.l4"]
                        "examples/openfisca/expected/scale.py"
 
     it "compiles roles + count/any/all aggregation (roles)" $
-      expectGolden bin ["openfisca", "examples/openfisca/roles.l4"]
+      expectGolden bin ["export", "openfisca", "examples/openfisca/roles.l4"]
                        "examples/openfisca/expected/roles.py"
 
     it "compiles an enum + CONSIDER (housing)" $
-      expectGolden bin ["openfisca", "examples/openfisca/housing.l4"]
+      expectGolden bin ["export", "openfisca", "examples/openfisca/housing.l4"]
                        "examples/openfisca/expected/housing.py"
 
     it "compiles dated formulas (BRANCH IF period reaches → formula_YYYY_MM)" $
-      expectGolden bin ["openfisca", "examples/openfisca/dated.l4"]
+      expectGolden bin ["export", "openfisca", "examples/openfisca/dated.l4"]
                        "examples/openfisca/expected/dated.py"
 
     it "compiles a member decision-call inside an aggregation (agecheck)" $
-      expectGolden bin ["openfisca", "examples/openfisca/agecheck.l4"]
+      expectGolden bin ["export", "openfisca", "examples/openfisca/agecheck.l4"]
                        "examples/openfisca/expected/agecheck.py"
 
     it "compiles a scalar legislation-parameter store (incometax)" $
-      expectGolden bin ["openfisca", "examples/openfisca/incometax.l4"]
+      expectGolden bin ["export", "openfisca", "examples/openfisca/incometax.l4"]
                        "examples/openfisca/expected/incometax.py"
 
     it "compiles the country-template basic_income (dated formulas + scalar params)" $
-      expectGolden bin ["openfisca", "examples/openfisca/basic-income.l4"]
+      expectGolden bin ["export", "openfisca", "examples/openfisca/basic-income.l4"]
                        "examples/openfisca/expected/basic-income.py"
 
     it "rejects a name collision (distinct L4 names → same Python identifier)" $
-      expectFail bin ["openfisca", "examples/openfisca/not-ok/name-collision.l4"]
+      expectFail bin ["export", "openfisca", "examples/openfisca/not-ok/name-collision.l4"]
 
     it "rejects a mis-ordered dated BRANCH (ascending arms)" $
-      expectFail bin ["openfisca", "examples/openfisca/not-ok/branch-misordered.l4"]
+      expectFail bin ["export", "openfisca", "examples/openfisca/not-ok/branch-misordered.l4"]
 
     it "emits a Variable subclass and a TaxBenefitSystem" $ do
-      Output code sout _ <- runL4 bin ["openfisca", "examples/openfisca/flat-tax.l4"]
+      Output code sout _ <- runL4 bin ["export", "openfisca", "examples/openfisca/flat-tax.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("class flat_tax_on_salary(Variable):" `isInfixOf`)
       sout `shouldSatisfy` ("class L4TaxBenefitSystem(TaxBenefitSystem):" `isInfixOf`)
 
     it "fails on a file that does not typecheck" $
-      expectFail bin ["openfisca", errorFixture]
+      expectFail bin ["export", "openfisca", errorFixture]
 
-  describe "l4 yscript" $ do
+  describe "l4 export yscript" $ do
     it "compiles the Foreign Relations Act s10 example to its golden yscript" $
-      expectGolden bin ["yscript", "examples/yscript/foreign-relations-s10.l4"]
+      expectGolden bin ["export", "yscript", "examples/yscript/foreign-relations-s10.l4"]
                        "examples/yscript/expected/foreign-relations-s10.ys"
 
     it "compiles the Hairdressers Act s4(1) example to its golden yscript" $
-      expectGolden bin ["yscript", "examples/yscript/hairdressers-s4-1.l4"]
+      expectGolden bin ["export", "yscript", "examples/yscript/hairdressers-s4-1.l4"]
                        "examples/yscript/expected/hairdressers-s4-1.ys"
 
     it "emits one RULE per in-fragment Decide, PROVIDES text verbatim" $ do
-      Output code sout _ <- runL4 bin ["yscript", "examples/yscript/foreign-relations-s10.l4"]
+      Output code sout _ <- runL4 bin ["export", "yscript", "examples/yscript/foreign-relations-s10.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("RULE Section 10 - Core foreign arrangements PROVIDES" `isInfixOf`)
       sout `shouldSatisfy` ("RULE Section 10(3) PROVIDES" `isInfixOf`)
       sout `shouldSatisfy` ("ONLY IF" `isInfixOf`)
 
     it "fails on a file that does not typecheck" $
-      expectFail bin ["yscript", errorFixture]
+      expectFail bin ["export", "yscript", errorFixture]
 
     it "rejects a call (with arguments) to a parameterised Decide reached from the \
        \@export closure (R1)" $ do
-      Output code _ serr <- runL4 bin ["yscript", fixtureDir </> "yscript-parameterized-decide.l4"]
+      Output code _ serr <- runL4 bin ["export", "yscript", fixtureDir </> "yscript-parameterized-decide.l4"]
       code `shouldNotBe` ExitSuccess
       shouldContain' "stderr" serr "argument"
 
     it "rejects a parameterised @export entry point itself (R1)" $ do
-      Output code _ serr <- runL4 bin ["yscript", fixtureDir </> "yscript-parameterized-export.l4"]
+      Output code _ serr <- runL4 bin ["export", "yscript", fixtureDir </> "yscript-parameterized-export.l4"]
       code `shouldNotBe` ExitSuccess
       shouldContain' "stderr" serr "has parameters"
 
     it "rejects NOT (R2: yscript's negation spelling is unverified)" $ do
-      Output code _ serr <- runL4 bin ["yscript", fixtureDir </> "yscript-not.l4"]
+      Output code _ serr <- runL4 bin ["export", "yscript", fixtureDir </> "yscript-not.l4"]
       code `shouldNotBe` ExitSuccess
       shouldContain' "stderr" serr "NOT"
 
     it "rejects a non-boolean ASSUME reached from the @export closure (R1/R3)" $ do
-      Output code _ serr <- runL4 bin ["yscript", fixtureDir </> "yscript-non-boolean-assume.l4"]
+      Output code _ serr <- runL4 bin ["export", "yscript", fixtureDir </> "yscript-non-boolean-assume.l4"]
       code `shouldNotBe` ExitSuccess
       shouldContain' "stderr" serr "not BOOLEAN"
 
     it "batches every offender into one refusal (R5), not first-error-wins" $ do
-      Output code _ serr <- runL4 bin ["yscript", fixtureDir </> "yscript-multiple-offenders.l4"]
+      Output code _ serr <- runL4 bin ["export", "yscript", fixtureDir </> "yscript-multiple-offenders.l4"]
       code `shouldNotBe` ExitSuccess
       shouldContain' "stderr" serr "NOT"
       shouldContain' "stderr" serr "not BOOLEAN"
 
-  describe "l4 blawx" $ do
+  describe "l4 export blawx" $ do
     it "compiles the Appendix-A benefit example to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/benefit.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/benefit.l4"]
                        "examples/blawx/expected/benefit.blawx"
 
     it "dumps benefit's concatenated s(CASP) (--scasp) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/benefit.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/benefit.l4", "--scasp"]
                        "examples/blawx/expected/benefit.pl"
 
     it "compiles the minimal mortality example to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/mortality.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/mortality.l4"]
                        "examples/blawx/expected/mortality.blawx"
 
     it "dumps mortality's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/mortality.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/mortality.l4", "--scasp"]
                        "examples/blawx/expected/mortality.pl"
 
     it "compiles the aggregates example (findall + *_blawx_list) to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/scores.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/scores.l4"]
                        "examples/blawx/expected/scores.blawx"
 
     it "dumps scores' s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/scores.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/scores.l4", "--scasp"]
                        "examples/blawx/expected/scores.pl"
 
     it "compiles the structural-recursion example to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/sumlist.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/sumlist.l4"]
                        "examples/blawx/expected/sumlist.blawx"
 
     it "dumps sumlist's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/sumlist.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/sumlist.l4", "--scasp"]
                        "examples/blawx/expected/sumlist.pl"
 
     it "compiles the rodents-and-vermin exclusion to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/rodents.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/rodents.l4"]
                        "examples/blawx/expected/rodents.blawx"
 
     it "dumps rodents' s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/rodents.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/rodents.l4", "--scasp"]
                        "examples/blawx/expected/rodents.pl"
 
     it "compiles the ASSUME-shaped anti-social example to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/antisocial.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/antisocial.l4"]
                        "examples/blawx/expected/antisocial.blawx"
 
     it "dumps antisocial's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/antisocial.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/antisocial.l4", "--scasp"]
                        "examples/blawx/expected/antisocial.pl"
 
     it "compiles antisocial's record-spelled semantic twin to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/antisocial-twin.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/antisocial-twin.l4"]
                        "examples/blawx/expected/antisocial-twin.blawx"
 
     it "dumps the antisocial twin's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/antisocial-twin.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/antisocial-twin.l4", "--scasp"]
                        "examples/blawx/expected/antisocial-twin.pl"
 
     it "compiles the ASSUME-shaped alcohol act to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/alcohol.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/alcohol.l4"]
                        "examples/blawx/expected/alcohol.blawx"
 
     it "dumps alcohol's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/alcohol.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/alcohol.l4", "--scasp"]
                        "examples/blawx/expected/alcohol.pl"
 
     it "compiles alcohol's record-spelled semantic twin to its golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/alcohol-twin.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/alcohol-twin.l4"]
                        "examples/blawx/expected/alcohol-twin.blawx"
 
     it "dumps the alcohol twin's s(CASP) to its golden .pl" $
-      expectGolden bin ["blawx", "examples/blawx/alcohol-twin.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/alcohol-twin.l4", "--scasp"]
                        "examples/blawx/expected/alcohol-twin.pl"
 
     -- P4c, the statute showcase: Housing Act 1988 Sch 2 grounds 8, 13, 15 and
@@ -3793,11 +3811,11 @@ spec bin = do
     -- exist). Four records in one Blawx namespace, 49 oracle-anchored
     -- directives, and the corpus's only arity-2 computed predicate.
     it "compiles the four Housing Act grounds to their golden .blawx stream" $
-      expectGolden bin ["blawx", "examples/blawx/housing-grounds.l4"]
+      expectGolden bin ["export", "blawx", "examples/blawx/housing-grounds.l4"]
                        "examples/blawx/expected/housing-grounds.blawx"
 
     it "compiles the four Housing Act grounds to their golden s(CASP) dump" $
-      expectGolden bin ["blawx", "examples/blawx/housing-grounds.l4", "--scasp"]
+      expectGolden bin ["export", "blawx", "examples/blawx/housing-grounds.l4", "--scasp"]
                        "examples/blawx/expected/housing-grounds.pl"
 
     -- The arity-2 gap, pinned rather than assumed. `per-period threshold met`
@@ -3812,7 +3830,7 @@ spec bin = do
     -- harness re-saves every one of them. If a later change starts declaring
     -- arity-2 predicates, this test is the one to delete.
     it "emits an undeclared but imaged arity-2 predicate (the recorded gap)" $ do
-      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/housing-grounds.l4"]
+      Output code sout _ <- runL4 bin ["export", "blawx", "examples/blawx/housing-grounds.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("per_period_threshold_met(Claim,Arrears)" `isInfixOf`)
       sout `shouldSatisfy` ("?- per_period_threshold_met(g1,1300)." `isInfixOf`)
@@ -3849,7 +3867,7 @@ spec bin = do
         , "housing-grounds" ]
 
     it "carries the @export prose into rule_text, and falls back to @ref (structural)" $ do
-      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/antisocial.l4"]
+      Output code sout _ <- runL4 bin ["export", "blawx", "examples/blawx/antisocial.l4"]
       code `shouldBe` ExitSuccess
       -- arm A: a decision carrying BOTH @export prose and @ref shows the prose
       sout `shouldSatisfy`
@@ -3868,13 +3886,13 @@ spec bin = do
       sout `shouldSatisfy` (not . ("effect_target" `isInfixOf`))
 
     it "gives NOT over an ASSUMEd input classical negation, not NAF (R5)" $ do
-      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/alcohol.l4", "--scasp"]
+      Output code sout _ <- runL4 bin ["export", "blawx", "examples/blawx/alcohol.l4", "--scasp"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("-the_proprietor_corrects_the_price_list(Pr)." `isInfixOf`)
       sout `shouldSatisfy` (not . ("not the_proprietor_corrects_the_price_list" `isInfixOf`))
 
     it "rejects a subjectless ASSUMEd input rather than blanking its row" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/zero-arity.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/zero-arity.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("no category subject" `isInfixOf`)
       -- the refused band is an ARITY band; the message must say so, because
@@ -3887,7 +3905,7 @@ spec bin = do
       -- The other half of the refused band. `classifyPred` places an input as
       -- an attribute only at (category) or (category) -> value; relationship
       -- blocks start at total arity 3; a two-place input falls between them.
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/arity-two.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/arity-two.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("no category subject" `isInfixOf`)
       serr `shouldSatisfy` ("`severity exceeds` is an input of total arity 2" `isInfixOf`)
@@ -3896,7 +3914,7 @@ spec bin = do
       serr `shouldSatisfy` (not . ("first parameter is not a category" `isInfixOf`))
 
     it "emits the ruledoc first, then workspaces with the dedup-marked triple (structural smoke)" $ do
-      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/benefit.l4"]
+      Output code sout _ <- runL4 bin ["export", "blawx", "examples/blawx/benefit.l4"]
       code `shouldBe` ExitSuccess
       -- R1: exactly one ruledoc row, FIRST — before any workspace row
       firstLineWith "- model: blawx.ruledoc" sout
@@ -3916,18 +3934,18 @@ spec bin = do
       sout `shouldSatisfy` ("?- eligible_for_benefit(X)." `isInfixOf`)
 
     it "refuses -o FILE.pl without --scasp (the dump would clobber its own YAML)" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/benefit.l4",
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/benefit.l4",
                                        "-o", "examples/blawx/refused.pl"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("--scasp" `isInfixOf`)
 
     it "rejects a DATE-sorted field by name (Blawx v1)" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/dates.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/dates.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("dates (Blawx v1)" `isInfixOf`)
 
     it "rejects an unstratified module (the middle-end records, this leg refuses)" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/unstratified.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/unstratified.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("unstratified negation (Blawx v1)" `isInfixOf`)
 
@@ -3938,7 +3956,7 @@ spec bin = do
       -- value. A wrong answer with a green exit code is the worst outcome a
       -- transpiler has, so the refusal is loud and both operand positions of
       -- the IF/ELSE (the REq and its complement RNeq) are covered.
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/record-identity.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/record-identity.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("record identity (Blawx)" `isInfixOf`)
       serr `shouldSatisfy` ("EQUALS on operands of record type `Player`" `isInfixOf`)
@@ -3952,7 +3970,7 @@ spec bin = do
       -- rules in this fixture are refused now, and each diagnostic names the
       -- operand's OWN sort, because "of record type `Player`" would be a false
       -- description of a list.
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/record-identity-list.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/record-identity-list.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("type `LIST OF Player`, which contains the record type `Player`" `isInfixOf`)
       serr `shouldSatisfy` ("type `LIST OF MAYBE Player`, which contains the record type `Player`" `isInfixOf`)
@@ -3966,14 +3984,14 @@ spec bin = do
     -- lowered at exit 0, emitting the `A = B` identity W1 exists to refuse.
     it "rejects EQUALS on an IMPORTed record, whose sort reaches us opaque" $ do
       Output code _ serr <- runL4 bin
-        ["blawx", "tests-cli/fixtures/blawx-opaque/imported-record-identity.l4"]
+        ["export", "blawx", "tests-cli/fixtures/blawx-opaque/imported-record-identity.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("record identity (Blawx)" `isInfixOf`)
       serr `shouldSatisfy` ("opaque type `Shared Ontology.Player`" `isInfixOf`)
       serr `shouldSatisfy` ("no name to look up" `isInfixOf`)
 
     it "rejects a relationship above the arity-10 block ceiling" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/arity.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/arity.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("above the block ceiling of 10" `isInfixOf`)
 
@@ -3982,7 +4000,7 @@ spec bin = do
     -- -- eId sec_4_5 against the workspace sec_4_section we wrote, i.e. an
     -- orphaned canvas in a document that imports and stores without complaint.
     it "rejects a pinned section whose text opens with another index" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/sub-provision-index.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/sub-provision-index.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("sub-provision index (Blawx v1)" `isInfixOf`)
       serr `shouldSatisfy` ("orphaning" `isInfixOf`)
@@ -3993,7 +4011,7 @@ spec bin = do
     -- parse there and orphans every later canvas. `asciiFold` folds what
     -- legislation actually contains; the residue is refused.
     it "rejects a section text carrying a character clean-law cannot lex" $ do
-      Output code _ serr <- runL4 bin ["blawx", "examples/blawx/not-ok/section-text-non-ascii.l4"]
+      Output code _ serr <- runL4 bin ["export", "blawx", "examples/blawx/not-ok/section-text-non-ascii.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("non-ASCII section text (Blawx v1)" `isInfixOf`)
       serr `shouldSatisfy` ("U+00A3" `isInfixOf`)
@@ -4004,24 +4022,24 @@ spec bin = do
     -- unemittable. The fixture above pins the refusal; this pins the fold, on
     -- the seed corpus, which carries ten U+2014 em dashes across five files.
     it "folds the punctuation legislation carries rather than refusing it" $ do
-      Output code sout _ <- runL4 bin ["blawx", "examples/blawx/antisocial.l4"]
+      Output code sout _ <- runL4 bin ["export", "blawx", "examples/blawx/antisocial.l4"]
       code `shouldBe` ExitSuccess
       -- the ten U+2014 em dashes across the seed corpus become hyphens, and
       -- none of them reaches the emitted rule_text
       sout `shouldSatisfy` (not . ("\x2014" `isInfixOf`))
 
     it "fails on a file that does not typecheck" $
-      expectFail bin ["blawx", errorFixture]
+      expectFail bin ["export", "blawx", errorFixture]
 
   -- The import direction (R14, spec §10 P5). `lift . emit = id` has two
   -- halves; this is the parse half, and it is checked in the only way that
   -- needs no foreign toolchain and no external corpus: emit a real document,
   -- read it back through every layer, and compare both the IR and the bytes.
-  describe "l4 blawx --import" $ do
+  describe "l4 import blawx" $ do
     it "round-trips each P1/P3 seed: emit -> parse -> the same block IR and the same bytes" $
       mapM_
         (\stem -> do
-            Output code sout serr <- runL4 bin ["blawx", "examples/blawx/" ++ stem ++ ".l4", "--roundtrip"]
+            Output code sout serr <- runL4 bin ["export", "blawx", "examples/blawx/" ++ stem ++ ".l4", "--roundtrip"]
             unless (code == ExitSuccess) $
               expectationFailure (stem ++ ": --roundtrip failed\n--- stderr ---\n" ++ serr)
             sout `shouldSatisfy` ("IR and bytes unchanged" `isInfixOf`))
@@ -4029,7 +4047,7 @@ spec bin = do
 
     it "parses an emitted .blawx back and reports a clean census" $ do
       Output code sout serr <- runL4 bin
-        ["blawx", "--import", "--parse-only", "examples/blawx/expected/mortality.blawx"]
+        ["import", "blawx", "--parse-only", "examples/blawx/expected/mortality.blawx"]
       unless (code == ExitSuccess) $
         expectationFailure ("--import --parse-only failed\n--- stderr ---\n" ++ serr)
       -- One machine-readable line, so the census harness need not scrape prose.
@@ -4040,7 +4058,7 @@ spec bin = do
 
     it "names the row and the block when a document is outside the liftable fragment" $ do
       Output code _ serr <- runL4 bin
-        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/unsupported.blawx"]
+        ["import", "blawx", "--parse-only", "tests-cli/fixtures/blawx-import/unsupported.blawx"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("blawx-parse/unsupported-block" `isInfixOf`)
       serr `shouldSatisfy` ("sec_1_section" `isInfixOf`)
@@ -4048,41 +4066,44 @@ spec bin = do
 
     it "warns per skipped disabled block rather than silently dropping it (P5-3)" $ do
       Output code _ serr <- runL4 bin
-        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/disabled.blawx"]
+        ["import", "blawx", "--parse-only", "tests-cli/fixtures/blawx-import/disabled.blawx"]
       code `shouldBe` ExitSuccess
       serr `shouldSatisfy` ("blawx-parse/disabled-block-skipped" `isInfixOf`)
       serr `shouldSatisfy` ("skipped disabled <query>" `isInfixOf`)
 
     it "refuses a stream whose first row is not the ruledoc" $ do
       Output code _ serr <- runL4 bin
-        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/no-ruledoc.blawx"]
+        ["import", "blawx", "--parse-only", "tests-cli/fixtures/blawx-import/no-ruledoc.blawx"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("blawx-parse/row-order" `isInfixOf`)
 
     it "refuses XML outside the Blockly subset by name and offset" $ do
       Output code _ serr <- runL4 bin
-        ["blawx", "--import", "--parse-only", "tests-cli/fixtures/blawx-import/bad-xml.blawx"]
+        ["import", "blawx", "--parse-only", "tests-cli/fixtures/blawx-import/bad-xml.blawx"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("blawx-parse/xml-malformed" `isInfixOf`)
       serr `shouldSatisfy` ("mismatched close tag" `isInfixOf`)
 
-    -- `l4 blawx` has no --help of its own (the subcommand parsers carry no
-    -- helper), so the usage banner optparse prints on a bad option is where
-    -- the surface is documented. Asserting on it keeps the new flags from
-    -- being added to the parser and forgotten in the spec.
-    it "documents the new flags in the usage banner" $ do
-      Output code _ serr <- runL4 bin ["blawx", "--help"]
-      code `shouldBe` ExitFailure 1
-      serr `shouldSatisfy` ("--import" `isInfixOf`)
-      serr `shouldSatisfy` ("--parse-only" `isInfixOf`)
-      serr `shouldSatisfy` ("--reemit" `isInfixOf`)
+    -- Each direction's --help lists that direction's flags and nothing else:
+    -- the import-only flags are not offered on an export, and vice versa.
+    it "documents each direction's flags in its own --help" $ do
+      Output ecode esout _ <- runL4 bin ["export", "blawx", "--help"]
+      ecode `shouldBe` ExitSuccess
+      esout `shouldSatisfy` ("--scasp" `isInfixOf`)
+      esout `shouldSatisfy` ("--roundtrip" `isInfixOf`)
+      esout `shouldSatisfy` (not . ("--parse-only" `isInfixOf`))
+      Output icode isout _ <- runL4 bin ["import", "blawx", "--help"]
+      icode `shouldBe` ExitSuccess
+      isout `shouldSatisfy` ("--parse-only" `isInfixOf`)
+      isout `shouldSatisfy` ("--reemit" `isInfixOf`)
+      isout `shouldSatisfy` (not . ("--scasp" `isInfixOf`))
 
   -- The lift (R14's other half). Its evidence is `jl4/examples/blawx/imported/`,
   -- both halves of which the pipeline produced: `bird.l4` is what the lift
   -- emitted from upstream's own bird.yaml, and `bird.blawx` is what the
   -- renderers re-emitted from the same parsed blocks. The reference checkout
   -- is NOT a test dependency -- these tests read only what is committed.
-  describe "l4 blawx --import (the lift)" $ do
+  describe "l4 import blawx (the lift)" $ do
     it "the committed bird artifact evaluates to the oracles recorded in it" $ do
       Output code sout serr <- runL4 bin ["run", "--trace", "none", "examples/blawx/imported/bird.l4"]
       unless (code == ExitSuccess) $
@@ -4096,7 +4117,7 @@ spec bin = do
       results `shouldBe` ["LIST \"pingu\"", "TRUE", "TRUE", "TRUE"]
 
     it "re-lifting the re-emitted .blawx reproduces the same rules and the same oracles" $ do
-      Output code sout serr <- runL4 bin ["blawx", "--import", "examples/blawx/imported/bird.blawx"]
+      Output code sout serr <- runL4 bin ["import", "blawx", "examples/blawx/imported/bird.blawx"]
       unless (code == ExitSuccess) $
         expectationFailure ("--import on the re-emitted bird failed\n--- stderr ---\n" ++ serr)
       -- The applies-idiom, the unfolded defeat layer, and the recorded answers.
@@ -4107,7 +4128,7 @@ spec bin = do
       length (filter ("-- L4 oracle ==> " `isPrefixOf`) (lines sout)) `shouldBe` 4
 
     it "refuses a document outside the liftable fragment, naming every construct" $ do
-      Output code _ serr <- runL4 bin ["blawx", "--import", "examples/blawx/expected/sumlist.blawx"]
+      Output code _ serr <- runL4 bin ["import", "blawx", "examples/blawx/expected/sumlist.blawx"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("cannot lift this document to L4" `isInfixOf`)
       -- an n-ary relation is not a unary predicate over the object universe
@@ -4124,7 +4145,7 @@ spec bin = do
     -- (benefit.blawx concludes `benefit_amount(A, Tmp)` from `Tmp is
     -- 1000 + Bonus`), and it is refused by its own name.
     it "refuses a value-typed attribute a rule CONCLUDES, by name" $ do
-      Output code _ serr <- runL4 bin ["blawx", "--import", "examples/blawx/expected/benefit.blawx"]
+      Output code _ serr <- runL4 bin ["import", "blawx", "examples/blawx/expected/benefit.blawx"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("blawx-lift/value-attribute-concluded" `isInfixOf`)
       serr `shouldSatisfy` ("blawx-lift/conclusion-shape" `isInfixOf`)
@@ -4136,7 +4157,7 @@ spec bin = do
     -- workspaces, and the free-variable test query.
     it "lifts Blawx's own beard_tax, comparisons and paragraphs included" $ do
       Output code sout serr <- runL4 bin
-        ["blawx", "--import", "examples/blawx/imported/beard_tax.blawx"]
+        ["import", "blawx", "examples/blawx/imported/beard_tax.blawx"]
       unless (code == ExitSuccess) $
         expectationFailure ("beard_tax did not lift\n--- stderr ---\n" ++ serr)
       -- the number attribute: one MAYBE NUMBER field, one definedness
@@ -4174,7 +4195,7 @@ spec bin = do
     -- the lift exited 0 with warnings only.
     it "keeps a defeat whose sections are paragraphs (§11 W5)" $ do
       Output code sout serr <- runL4 bin
-        ["blawx", "--import", "tests-cli/fixtures/blawx-import/paragraph-defeat-ok.blawx"]
+        ["import", "blawx", "tests-cli/fixtures/blawx-import/paragraph-defeat-ok.blawx"]
       unless (code == ExitSuccess) $
         expectationFailure ("paragraph-defeat-ok did not lift\n--- stderr ---\n" ++ serr)
       sout `shouldSatisfy`
@@ -4195,7 +4216,7 @@ spec bin = do
     -- by name instead.
     it "refuses an `overrules` the fold would activate, by name (§11 W5)" $ do
       Output code _ serr <- runL4 bin
-        ["blawx", "--import", "tests-cli/fixtures/blawx-import/paragraph-defeat.blawx"]
+        ["import", "blawx", "tests-cli/fixtures/blawx-import/paragraph-defeat.blawx"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("blawx-lift/defeat-target" `isInfixOf`)
       serr `shouldSatisfy` ("holds(sec_1_section,qualifies_s1b,X)" `isInfixOf`)
@@ -4215,14 +4236,14 @@ spec bin = do
     -- flipping it back. Refused by name now, exactly as `defeat-target` is.
     it "refuses an `inapplicable` rule the fold would re-gate, by name" $ do
       Output code _ serr <- runL4 bin
-        ["blawx", "--import", "tests-cli/fixtures/blawx-import/paragraph-applies.blawx"]
+        ["import", "blawx", "tests-cli/fixtures/blawx-import/paragraph-applies.blawx"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("blawx-lift/applies-target" `isInfixOf`)
       serr `shouldSatisfy` ("blawx_applies(sec_5__para_a_section,X)" `isInfixOf`)
 
     it "--reemit writes the .blawx regenerated from the parsed blocks" $ do
       Output code sout serr <- runL4 bin
-        ["blawx", "--import", "--reemit", "examples/blawx/expected/mortality.blawx"]
+        ["import", "blawx", "--reemit", "examples/blawx/expected/mortality.blawx"]
       unless (code == ExitSuccess) $
         expectationFailure ("--reemit failed\n--- stderr ---\n" ++ serr)
       -- Our own emission parsed and re-emitted is byte-identical to itself;
@@ -4231,39 +4252,39 @@ spec bin = do
       original <- readFile "examples/blawx/expected/mortality.blawx"
       sout `shouldBe` original
 
-  describe "l4 docassemble" $ do
+  describe "l4 export docassemble" $ do
     it "compiles the WHERE-heavy rodents example to its golden interview (R3 survival)" $
-      expectGolden bin ["docassemble", "examples/docassemble/rodents-and-vermin.l4"]
+      expectGolden bin ["export", "docassemble", "examples/docassemble/rodents-and-vermin.l4"]
                        "examples/docassemble/expected/rodents-and-vermin.yml"
 
     it "compiles the top-level IMPLIES seam example (R4 verdict driver)" $
-      expectGolden bin ["docassemble", "examples/docassemble/seam.l4"]
+      expectGolden bin ["export", "docassemble", "examples/docassemble/seam.l4"]
                        "examples/docassemble/expected/seam.yml"
 
     it "compiles a 3-way enum CONSIDER to a radio question + elif chain (R6)" $
-      expectGolden bin ["docassemble", "examples/docassemble/enum-triage.l4"]
+      expectGolden bin ["export", "docassemble", "examples/docassemble/enum-triage.l4"]
                        "examples/docassemble/expected/enum-triage.yml"
 
     it "compiles TYPICALLY prefills + MAYBE optionality with Mako-hostile @desc (R7/R8/R9)" $
-      expectGolden bin ["docassemble", "examples/docassemble/defaults.l4"]
+      expectGolden bin ["export", "docassemble", "examples/docassemble/defaults.l4"]
                        "examples/docassemble/expected/defaults.yml"
 
     it "keeps attributes out of the DAObject namespace + inlines a computed field (R2)" $
-      expectGolden bin ["docassemble", "examples/docassemble/computed-and-shadow.l4"]
+      expectGolden bin ["export", "docassemble", "examples/docassemble/computed-and-shadow.l4"]
                        "examples/docassemble/expected/computed-and-shadow.yml"
 
     it "emits a question for an ASSUME referenced only through an inlined function (R3)" $
-      expectGolden bin ["docassemble", "examples/docassemble/assume-via-fn.l4"]
+      expectGolden bin ["export", "docassemble", "examples/docassemble/assume-via-fn.l4"]
                        "examples/docassemble/expected/assume-via-fn.yml"
 
     it "drives the seam scope-first, never as the classical short-circuit (R4)" $ do
-      Output code sout _ <- runL4 bin ["docassemble", "examples/docassemble/seam.l4"]
+      Output code sout _ <- runL4 bin ["export", "docassemble", "examples/docassemble/seam.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("if notice_rule_satisfied_scope:" `isInfixOf`)
       sout `shouldSatisfy` (not . ("not notice_rule_satisfied_scope or" `isInfixOf`))
 
     it "refuses a deontic body by name (Regulative, Blocking)" $ do
-      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/deontic-body.l4"]
+      Output code _ serr <- runL4 bin ["export", "docassemble", "examples/docassemble/not-ok/deontic-body.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("deontic/regulative rule (PARTY MUST/MAY/SHANT) has no docassemble form" `isInfixOf`)
 
@@ -4275,30 +4296,30 @@ spec bin = do
     -- against the false claim M4 would otherwise leave behind.
 
     it "refuses a post-sanitisation name collision, naming both originals" $ do
-      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/name-collision.l4"]
+      Output code _ serr <- runL4 bin ["export", "docassemble", "examples/docassemble/not-ok/name-collision.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("name collision: `t.notice_period`" `isInfixOf`)
       serr `shouldSatisfy` ("L4 `notice period`" `isInfixOf`)
       serr `shouldSatisfy` ("L4 `notice_period`" `isInfixOf`)
 
     it "refuses a function value passed as data, by the function's own name (R3)" $ do
-      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/higher-order.l4"]
+      Output code _ serr <- runL4 bin ["export", "docassemble", "examples/docassemble/not-ok/higher-order.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("higher-order use of function `is positive`" `isInfixOf`)
 
     it "refuses a seam-goal reference that travels through an inlined function (R4 guard)" $ do
-      Output code _ serr <- runL4 bin ["docassemble", "examples/docassemble/not-ok/seam-ref-via-fn.l4"]
+      Output code _ serr <- runL4 bin ["export", "docassemble", "examples/docassemble/not-ok/seam-ref-via-fn.l4"]
       code `shouldBe` ExitFailure 1
       serr `shouldSatisfy` ("seam-shaped export (top-level IMPLIES) is referenced by another decision" `isInfixOf`)
 
     it "gates on advisory fidelity notes with --fail-on=advisory" $
-      expectFail bin ["docassemble", "examples/docassemble/defaults.l4", "--fail-on=advisory"]
+      expectFail bin ["export", "docassemble", "examples/docassemble/defaults.l4", "--fail-on=advisory"]
 
     it "emits only block keys docassemble 1.10.7 recognises (R9.5 vocabulary)" $
       DAEmit.emitterVocabularyViolations `shouldBe` []
 
     it "fails on a file that does not typecheck" $
-      expectFail bin ["docassemble", errorFixture]
+      expectFail bin ["export", "docassemble", errorFixture]
 
     -- M1 regression, tightened for M2: the six goldens above pin STDOUT.
     -- `-o` is a different code path (it also drops the fidelity report into a
@@ -4313,7 +4334,7 @@ spec bin = do
         removePathForcibly outFile
         removePathForcibly sidecar
         Output code sout serr <-
-          runL4 bin ["docassemble", daExampleDir </> (stem ++ ".l4"), "-o", outFile]
+          runL4 bin ["export", "docassemble", daExampleDir </> (stem ++ ".l4"), "-o", outFile]
         unless (code == ExitSuccess) $
           expectationFailure (stem ++ ": -o run failed\n--- stderr ---\n" ++ serr)
         sout `shouldBe` ""
@@ -4340,7 +4361,7 @@ spec bin = do
   -- so every assertion below is about the SHAPE of the written tree: which
   -- files exist, which must NOT exist, what they say, and that two runs agree.
   ----------------------------------------------------------------------------
-  describe "l4 docassemble --package (M2/R11: the installable package tree)" $ do
+  describe "l4 export docassemble --package (M2/R11: the installable package tree)" $ do
     it "writes the PEP 420 shape, including the namespace __init__.py that must be ABSENT" $ do
       tmp <- getTemporaryDirectory
       let dir = tmp </> "l4-da-pkg-shape"
@@ -4480,7 +4501,7 @@ spec bin = do
       copyFile daCitationsSource beta
       _ <- expectPackage bin alpha dir
       -- expectPackage clears the directory first, so regenerate by hand.
-      Output code _ serr <- runL4 bin ["docassemble", beta, "--package", dir]
+      Output code _ serr <- runL4 bin ["export", "docassemble", beta, "--package", dir]
       unless (code == ExitSuccess) $
         expectationFailure ("regeneration failed\n--- stderr ---\n" ++ serr)
       files <- treeFiles dir
@@ -4509,7 +4530,7 @@ spec bin = do
       let dir = tmp </> "l4-da-regen-keep"
       _ <- expectPackage bin daCitationsSource dir
       writeFile (dir </> "NOTES.md") "hand-written, not ours\n"
-      Output code _ serr <- runL4 bin ["docassemble", daCitationsSource, "--package", dir]
+      Output code _ serr <- runL4 bin ["export", "docassemble", daCitationsSource, "--package", dir]
       unless (code == ExitSuccess) $
         expectationFailure ("regeneration failed\n--- stderr ---\n" ++ serr)
       kept <- readUtf8 (dir </> "NOTES.md")
@@ -4588,7 +4609,7 @@ spec bin = do
       removePathForcibly dir
       removePathForcibly file
       Output code _ serr <-
-        runL4 bin ["docassemble", daCitationsSource, "-o", file, "--package", dir]
+        runL4 bin ["export", "docassemble", daCitationsSource, "-o", file, "--package", dir]
       code `shouldBe` ExitFailure 1
       shouldContain' "stderr" serr "--package cannot be combined with --output"
       wroteFile <- doesFileExist file
@@ -4649,9 +4670,9 @@ spec bin = do
   -- law that ACTUALLY decided the case. Short-circuited rules did not decide
   -- anything, so citing them would be citing law that never fired.
   ----------------------------------------------------------------------------
-  describe "l4 docassemble citations (M2: @ref citations and the glossary)" $ do
+  describe "l4 export docassemble citations (M2: @ref citations and the glossary)" $ do
     it "attaches each rule's own @ref to that rule's own code block, via explain()" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daCitationsSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
 
@@ -4711,7 +4732,7 @@ spec bin = do
         shouldContain' ("the " ++ bid ++ " code block") blk cite
 
     it "renders logic_explanation() on every verdict screen" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daCitationsSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       for_ ["ev_offering_exempt_screen_holds", "ev_offering_exempt_screen_fails"] \sid -> do
@@ -4719,7 +4740,7 @@ spec bin = do
         shouldContain' ("the " ++ sid ++ " screen") blk "logic_explanation()"
 
     it "emits one `auto terms:` glossary block, keyed on the L4 defined terms" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daCitationsSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       case [ b | b <- yamlBlocks sout, "auto terms:" `isInfixOf` b ] of
@@ -4746,7 +4767,7 @@ spec bin = do
           ++ "\n--- emitted interview ---\n" ++ sout
 
     it "strips L4's own `@ref ` herald and the inline `<< >>` delimiters" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daCitationsSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       -- The inline form's text must ARRIVE …
@@ -4759,7 +4780,7 @@ spec bin = do
       shouldNotContain' "the emitted interview" sout "intermediary only>>"
 
     it "escapes Mako-hostile citation text (R9.1, the `defaults` discipline applied to @ref)" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daCitationsSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daCitationsSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       -- carried at all
@@ -4786,7 +4807,7 @@ spec bin = do
     -- rendering has to be deliberate. It is the same `expectGolden` contract
     -- the six M1 examples ride on.
     it "compiles the @ref citations + glossary example to its golden interview" $
-      expectGolden bin ["docassemble", daCitationsSource]
+      expectGolden bin ["export", "docassemble", daCitationsSource]
                        "examples/docassemble/expected/citations.yml"
 
     it "declares the M2 block keys in its own emitter vocabulary (R9.5)" $ do
@@ -4819,9 +4840,9 @@ spec bin = do
   -- M2 repair cases: losses that used to be silent, and one that used to
   -- change the answer.
   ----------------------------------------------------------------------------
-  describe "l4 docassemble (M2 repairs: declared losses and reserved names)" $ do
+  describe "l4 export docassemble (M2 repairs: declared losses and reserved names)" $ do
     it "declares both ways an `auto terms:` entry cannot survive, and drops them" $ do
-      Output code sout serr <- runL4 bin ["docassemble", daGlossLossSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daGlossLossSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
 
@@ -4831,7 +4852,7 @@ spec bin = do
       -- group whose pattern no longer matches its own term, and an unbalanced
       -- one raises re.error while the Interview is constructed, so the emitted
       -- interview cannot be LOADED at all — while `l4 check` and
-      -- `l4 docassemble` both report success and the report said
+      -- `l4 export docassemble` both report success and the report said
       -- "(nothing lost)".
       shouldContain'    "stderr" serr "DA-GLOSS-REGEX"
       shouldContain'    "stderr" serr "s 12(1)"
@@ -4861,7 +4882,7 @@ spec bin = do
       -- the opposite verdict to the bare one (R11 decision 6 says the two
       -- shapes must mean the same thing). The bare artifact reserves the name
       -- too, so the shapes cannot disagree about a variable's NAME either.
-      Output code sout serr <- runL4 bin ["docassemble", daRuntimeCollisionSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daRuntimeCollisionSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       shouldContain' "the emitted interview" sout "l4_source_text_ = d.filed_on_time"
@@ -4889,7 +4910,7 @@ spec bin = do
   --
   -- Every test in this block was RED at the commit that introduced it, and each
   -- was red for a reason the tool stated in words: M1 refused each of these
-  -- constructs BY NAME, so the failure was `l4 docassemble` exiting 1 with
+  -- constructs BY NAME, so the failure was `l4 export docassemble` exiting 1 with
   -- prose naming the milestone that owed the answer — not a missing symbol,
   -- not a typo, not a compile error. `daEmit` still prints that stderr verbatim,
   -- which is what makes a regression legible. The block is GREEN as of
@@ -4915,7 +4936,7 @@ spec bin = do
   --
   -- No M4 example carries a byte golden here. See `daListSource` for why.
   ----------------------------------------------------------------------------
-  describe "l4 docassemble (M4: breadth — acceptance)" $ do
+  describe "l4 export docassemble (M4: breadth — acceptance)" $ do
 
     ------------------------------------------------------------------------
     -- A. `LIST OF` via DAList gathering
@@ -5081,7 +5102,7 @@ spec bin = do
       -- and DATE land, which is precisely the drift CLAUDE.md warns about. So
       -- the diagnostic is required to name what it is refusing.
       Output code _ serr <-
-        runL4 bin ["docassemble", "examples/docassemble/not-ok/maybe-enum.l4"]
+        runL4 bin ["export", "docassemble", "examples/docassemble/not-ok/maybe-enum.l4"]
       code `shouldBe` ExitFailure 1
       shouldContain' "the refusal" serr "MAYBE"
       shouldContain' "the refusal" serr "Severity"
@@ -5324,13 +5345,13 @@ spec bin = do
       for_ [ daListSource, daPayloadSource, daMaybeSource, daDateSource
            , daReviewSource, daLetterSource ] \src -> do
         let stem = takeWhile (/= '.') (drop (length daExampleDir + 1) src)
-        expectGolden bin ["docassemble", src]
+        expectGolden bin ["export", "docassemble", src]
           (daExampleDir </> "expected" </> (stem ++ ".yml"))
 
     it "leaves the four refusals M4 does not own refusing, by their own names (G)" $
       for_ daStillRefused \(fixture, diagnostic) -> do
         Output code _ serr <-
-          runL4 bin ["docassemble", "examples/docassemble/not-ok" </> fixture]
+          runL4 bin ["export", "docassemble", "examples/docassemble/not-ok" </> fixture]
         unless (code == ExitFailure 1) $
           expectationFailure $
             fixture ++ " no longer refuses (exit " ++ show code
@@ -5353,7 +5374,7 @@ spec bin = do
       -- template prose where an `attachment:` sub-key must be. Measured against
       -- real docassemble 1.10.7: `parse.Interview` raises `DASourceError` from
       -- parse.py:8352-8360, so the whole interview is unloadable — every
-      -- question, in BOTH artifact shapes — while `l4 docassemble` exits 0.
+      -- question, in BOTH artifact shapes — while `l4 export docassemble` exits 0.
       --
       -- `|2`, not `|4`: the indicator is an offset from the PARENT node's
       -- indentation and the `attachment:` mapping sits at two.
@@ -5439,7 +5460,7 @@ spec bin = do
       -- user_dict for real, via `from docassemble.base.util import *`
       -- (parse.py:131, exec'd at :8523-8524), which the emitter deliberately
       -- does not suppress.
-      Output code sout serr <- runL4 bin ["docassemble", daGlobalShadowSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daGlobalShadowSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       shouldContain' "the emitted interview" sout "all_ = f.the_box_was_ticked"
@@ -5458,7 +5479,7 @@ spec bin = do
       -- `<list>[i].<attr>` spelling would reach `undefine()` with the iterator
       -- unresolved. The emitter therefore emits none there — and says so, which
       -- is the difference between a bounded repair and a silent one.
-      Output code sout serr <- runL4 bin ["docassemble", daGatheredMaybeSource]
+      Output code sout serr <- runL4 bin ["export", "docassemble", daGatheredMaybeSource]
       unless (code == ExitSuccess) $
         expectationFailure ("emit failed\n--- stderr ---\n" ++ serr)
       -- the guard IS emitted on the element's value question …
@@ -5471,7 +5492,7 @@ spec bin = do
       let ymlPath = tmp </> "l4-da-gathered-maybe.yml"
           repPath = tmp </> "l4-da-gathered-maybe.fidelity.txt"
       Output code2 _ serr2 <-
-        runL4 bin ["docassemble", daGatheredMaybeSource, "-o", ymlPath]
+        runL4 bin ["export", "docassemble", daGatheredMaybeSource, "-o", ymlPath]
       unless (code2 == ExitSuccess) $
         expectationFailure ("emit -o failed\n--- stderr ---\n" ++ serr2)
       report <- readUtf8 repPath
@@ -5483,7 +5504,7 @@ spec bin = do
     it "refuses M4's own two new collisions, by their own names (I)" $
       for_ daM4Refused \(fixture, diagnostic) -> do
         Output code _ serr <-
-          runL4 bin ["docassemble", "examples/docassemble/not-ok" </> fixture]
+          runL4 bin ["export", "docassemble", "examples/docassemble/not-ok" </> fixture]
         unless (code == ExitFailure 1) $
           expectationFailure $
             fixture ++ " no longer refuses (exit " ++ show code ++ ")"
@@ -5491,21 +5512,21 @@ spec bin = do
         -- Not the internal-error message: a user-authored condition must be
         -- reported in L4 terms, naming what to rename.
         shouldNotContain' (fixture ++ " refusal") serr "internal id collision"
-  -- `l4 catala` (specs/todo/CATALA-EXPORT-SPEC.md). Each golden below has been
+  -- `l4 export catala` (specs/todo/CATALA-EXPORT-SPEC.md). Each golden below has been
   -- run through the real toolchain — `catala typecheck` and `clerk test`
   -- against catala 1.2.1 — so the goldens are not merely "what the emitter
   -- currently prints"; see examples/catala/README.md.
-  describe "l4 catala" $ do
+  describe "l4 export catala" $ do
     it "compiles the spec's Appendix A example to its golden Catala module" $
-      expectGolden bin ["catala", "examples/catala/benefit.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/benefit.l4"]
                        "examples/catala/expected/benefit.catala_en"
 
     it "compiles a nested-guard rate table (the ladder-direction exhibit)" $
-      expectGolden bin ["catala", "examples/catala/bands.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/bands.l4"]
                        "examples/catala/expected/bands.catala_en"
 
     it "compiles the literate weave: § headings, inert law text, @ref, enums" $
-      expectGolden bin ["catala", "examples/catala/statute.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/statute.l4"]
                        "examples/catala/expected/statute.catala_en"
 
     -- The two OpenFisca seed-corpus ports named in the spec's P1 exit
@@ -5513,15 +5534,15 @@ spec bin = do
     -- what makes them Catala-clean is R11's elision of the `period` plumbing
     -- string (and, in household, of `Person.name`).
     it "compiles the flat-tax port, eliding the OpenFisca period string (R11)" $
-      expectGolden bin ["catala", "examples/catala/flat-tax.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/flat-tax.l4"]
                        "examples/catala/expected/flat-tax.catala_en"
 
     it "compiles the household port: group entity, LIST OF, absorbed sum (R5)" $
-      expectGolden bin ["catala", "examples/catala/household.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/household.l4"]
                        "examples/catala/expected/household.catala_en"
 
     it "compiles CONSIDER-on-enum plus TYPICALLY → context (R10)" $
-      expectGolden bin ["catala", "examples/catala/tariff.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/tariff.l4"]
                        "examples/catala/expected/tariff.catala_en"
 
     -- The coverage exhibit. An adversarial review found the other six goldens
@@ -5530,7 +5551,7 @@ spec bin = do
     -- `contains`, `impossible`, a private toplevel or the R3 date helper would
     -- have been caught by nothing in the tree.
     it "compiles the coverage exhibit: dates, MAYBE, folds, a private toplevel" $
-      expectGolden bin ["catala", "examples/catala/registry.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/registry.l4"]
                        "examples/catala/expected/registry.catala_en"
 
     -- The @export-everything hatch, and the only file in this corpus carrying a
@@ -5541,7 +5562,7 @@ spec bin = do
     -- fixpoint carries it TRANSITIVELY (`the top` never names the binder, reaches
     -- it only through `the middle`, and must still declare and forward it).
     it "compiles the @export chain, threading a section GIVEN as a scope input" $
-      expectGolden bin ["catala", "examples/catala/export-chain.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/export-chain.l4"]
                        "examples/catala/expected/export-chain.catala_en"
 
     -- The lowering scans the whole IMPORT closure, not just the entry module.
@@ -5549,7 +5570,7 @@ spec bin = do
     -- door was reported as "outside the v1 Catala fragment (§6)" — a message
     -- about the language, for a defect in the scan.
     it "compiles a decision built out of imported declarations and an imported helper" $
-      expectGolden bin ["catala", "examples/catala/imports.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/imports.l4"]
                        "examples/catala/expected/imports.catala_en"
 
     -- Reading the closure means the prelude's own declarations are visible too.
@@ -5557,7 +5578,7 @@ spec bin = do
     -- only when the emitted code reaches it. Assert on what is absent, because
     -- the golden above can only show what is present.
     it "emits no stdlib declaration for a module that merely imports the prelude" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/imports.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/imports.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("declaration structure Assessment:" `isInfixOf`)
       sout `shouldSatisfy` ("declaration enumeration Band:" `isInfixOf`)
@@ -5572,11 +5593,11 @@ spec bin = do
     -- it was not collected and the directive was dropped, so only directives
     -- with literal arguments became tests.
     it "collects a fixture reached only from a directive and tests against it" $
-      expectGolden bin ["catala", "examples/catala/fixtures.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/fixtures.l4"]
                        "examples/catala/expected/fixtures.catala_en"
 
     it "emits every directive as a test scope when its arguments name fixtures" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/fixtures.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/fixtures.l4"]
       code `shouldBe` ExitSuccess
       -- The three fixture-argument directives convert. The file's last two are
       -- skipped on purpose, so this asserts the absence of the CAUSE rather
@@ -5598,7 +5619,7 @@ spec bin = do
     -- vanished rather than appearing under the wrong number. The last two
     -- directives of `fixtures.l4` are both skipped, so this catches either half.
     it "numbers a skipped directive by its own position, and reports every one" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/fixtures.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/fixtures.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("- directive 4 did not become a Catala" `isInfixOf`)
       sout `shouldSatisfy` ("- directive 5 did not become a Catala" `isInfixOf`)
@@ -5612,11 +5633,11 @@ spec bin = do
     -- structure and the fields carrying it are both gone, and the test below it
     -- pins that both disappearances are disclosed rather than silent.
     it "elides a record whose every field is a STRING, and the fields that carry it" $
-      expectGolden bin ["catala", "examples/catala/all-string-record.l4"]
+      expectGolden bin ["export", "catala", "examples/catala/all-string-record.l4"]
                        "examples/catala/expected/all-string-record.catala_en"
 
     it "discloses an elided structure and the fields that vanish with it" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/all-string-record.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/all-string-record.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("structure `Provenance` is not emitted at all" `isInfixOf`)
       sout `shouldSatisfy`
@@ -5636,7 +5657,7 @@ spec bin = do
     -- reader must be told about, so it goes in the notes block, not just on
     -- stderr.
     it "discloses every R11 elision in the emitted document's notes block" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/household.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/household.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("field `name` of `Person` is a STRING" `isInfixOf`)
       sout `shouldSatisfy` ("parameter `period` of `household income` is a STRING" `isInfixOf`)
@@ -5645,7 +5666,7 @@ spec bin = do
     -- source, because Catala lets a caller omit a `context` variable and L4
     -- does not let a caller omit anything.
     it "emits TYPICALLY as `context` + an in-scope default, and says so" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/tariff.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/tariff.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("context cap content decimal" `isInfixOf`)
       sout `shouldSatisfy` ("A Catala caller may omit it; an L4 caller may not." `isInfixOf`)
@@ -5657,7 +5678,7 @@ spec bin = do
     -- and nothing fails. The twin scope omits it, over a directive whose cap
     -- actually binds, which is what makes the default observable.
     it "pins the R10 default with a twin test scope that omits the argument" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/tariff.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/tariff.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("#[test] declaration scope Test3Default:" `isInfixOf`)
       sout `shouldSatisfy`
@@ -5667,7 +5688,7 @@ spec bin = do
     -- R2 (§8.2) promised a lowering note at each coercion; R7 (§8.7) promised a
     -- human-legible companion to the exact-rational JSON block.
     it "emits R2's per-coercion note and R7's human-format companion line" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/registry.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/registry.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("# R2 coercion: `decimal of` was inserted" `isInfixOf`)
       sout `shouldSatisfy` ("is ROUNDED here rather than refused" `isInfixOf`)
@@ -5678,7 +5699,7 @@ spec bin = do
     -- the emitter writes the conditional form. `benefit.l4`'s disjunction is
     -- the one the spec's Appendix A example turns on.
     it "emits AND/OR as short-circuiting conditionals, never Catala `and`/`or`" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/benefit.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/benefit.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy`
         ("(if (a.age >= 65.0) then true else a.is_veteran)" `isInfixOf`)
@@ -5687,7 +5708,7 @@ spec bin = do
     -- R4: the exception ladder is the PRIMARY emission, and it never ships
     -- without the apparatus that re-checks it.
     it "emits Mode B ladders together with their equivalence grid" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/bands.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/bands.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("label rate_band_r1 exception rate_band_r2" `isInfixOf`)
       sout `shouldSatisfy` ("#[test] declaration scope RateBandEqvGrid:" `isInfixOf`)
@@ -5697,14 +5718,14 @@ spec bin = do
     -- `clerk test --reset`. 0.25 is L4's answer for a 60000 income, and Catala
     -- prints exact rationals in JSON, so it has to appear as 1/4.
     it "fills test blocks with values L4 computed, as exact rationals" $ do
-      Output code sout _ <- runL4 bin ["catala", "examples/catala/bands.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "examples/catala/bands.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` ("$ catala test-scope Test1 --disable-warnings -F json" `isInfixOf`)
       sout `shouldSatisfy` ("{\"result\":\"1/4\"}" `isInfixOf`)
       sout `shouldSatisfy` ("{\"result\":\"2/5\"}" `isInfixOf`)
 
     it "--boolean-only drops the ladders and the grids that check them" $ do
-      Output code sout _ <- runL4 bin ["catala", "--boolean-only", "examples/catala/bands.l4"]
+      Output code sout _ <- runL4 bin ["export", "catala", "--boolean-only", "examples/catala/bands.l4"]
       code `shouldBe` ExitSuccess
       sout `shouldNotSatisfy` ("EqvGrid" `isInfixOf`)
       sout `shouldNotSatisfy` ("label rate_band_r1" `isInfixOf`)
@@ -5715,7 +5736,7 @@ spec bin = do
     -- etc/validate-catala.mjs walks `expected/`, so the flag's output is under
     -- `catala typecheck`, `catala proof` and `clerk test` like everything else.
     it "pins the --boolean-only rendering as a golden the R9 harness checks" $
-      expectGolden bin ["catala", "--boolean-only", "examples/catala/bands.l4"]
+      expectGolden bin ["export", "catala", "--boolean-only", "examples/catala/bands.l4"]
                        "examples/catala/expected/bands-boolean-only.catala_en"
 
     -- Catala wants the module name to be the file's basename with its first
@@ -5723,7 +5744,7 @@ spec bin = do
     -- than by the toolchain after the file has been written.
     it "rejects an -o basename that cannot be a Catala module name" $ do
       Output code _ serr <- runL4 bin
-        ["catala", "examples/catala/flat-tax.l4", "-o", "ft-out.catala_en"]
+        ["export", "catala", "examples/catala/flat-tax.l4", "-o", "ft-out.catala_en"]
       code `shouldNotBe` ExitSuccess
       serr `shouldSatisfy` ("cannot be a Catala module name" `isInfixOf`)
 
@@ -5731,11 +5752,11 @@ spec bin = do
     -- conflate in Catala's flat per-structure namespace; the OpenFisca fixture
     -- has the same shape and serves both backends.
     it "rejects a name collision (distinct L4 names → same Catala identifier)" $
-      expectFail bin ["catala", "examples/openfisca/not-ok/name-collision.l4"]
+      expectFail bin ["export", "catala", "examples/openfisca/not-ok/name-collision.l4"]
 
     -- Six shapes that used to compile to Catala saying something other than
     -- what the L4 says. Each fixture's header names the divergence; the point
-    -- of the group is that `l4 catala` refuses rather than emitting quietly.
+    -- of the group is that `l4 export catala` refuses rather than emitting quietly.
     -- `duplicate-type-name` became possible only once the lowering read the
     -- import closure (§8.1.2): two imported modules each declaring a `Thing`,
     -- which `l4 check` accepts and one flat Catala namespace cannot hold.
@@ -5747,12 +5768,12 @@ spec bin = do
          , "duplicate-type-name"
          ] $ \name ->
       it ("rejects " ++ name ++ " rather than changing its denotation") $
-        expectFail bin ["catala", "examples/catala/not-ok/" ++ name ++ ".l4"]
+        expectFail bin ["export", "catala", "examples/catala/not-ok/" ++ name ++ ".l4"]
 
     -- smucclaw/l4-ide#958. R1 emits an @export'd decision as a Catala SCOPE and
     -- every other reachable decision as a TOPLEVEL, and Catala allows a scope
     -- call only inside a scope — so a non-exported caller of an exported callee
-    -- cannot be expressed. Until this refusal, `l4 catala` emitted that module,
+    -- cannot be expressed. Until this refusal, `l4 export catala` emitted that module,
     -- printed nothing at all, and exited 0; the invalid output was found only by
     -- running `catala typecheck` over it by hand, which reports "Scope calls are
     -- not allowed outside of a scope" (catala 1.2.1, exit 123).
@@ -5771,7 +5792,7 @@ spec bin = do
          ] $ \(name, caller, callee) ->
       it ("refuses " ++ name ++ ": a scope call would land outside a scope") $ do
         Output code _ serr <- runL4 bin
-          ["catala", "examples/catala/not-ok/" ++ name ++ ".l4"]
+          ["export", "catala", "examples/catala/not-ok/" ++ name ++ ".l4"]
         code `shouldNotBe` ExitSuccess
         -- names the caller, the callee, the rule, and the way out
         serr `shouldSatisfy` (("`" ++ caller ++ "`") `isInfixOf`)
@@ -5781,7 +5802,7 @@ spec bin = do
         serr `shouldSatisfy` ("Mark this caller @export too" `isInfixOf`)
 
     it "fails on a file that does not typecheck" $
-      expectFail bin ["catala", errorFixture]
+      expectFail bin ["export", "catala", errorFixture]
   where
     for_ xs f = mapM_ f xs
 

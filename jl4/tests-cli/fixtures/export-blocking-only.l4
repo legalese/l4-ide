@@ -1,4 +1,4 @@
--- Fixture for the `l4 export --to=dmn --fail-on` threshold tests: a DMN
+-- Fixture for the `l4 export dmn --fail-on` threshold tests: a DMN
 -- report that is blocking-ONLY (2 blocking, 0 lossy, 0 advisory).
 --
 -- Two decisions whose bodies are BOOLEAN ORDERINGS: FEEL's comparison

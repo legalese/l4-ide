@@ -350,12 +350,17 @@ gap as a dropped directive.
   `#EVALTRACE` evaluation traces as GraphViz (PNG (Portable Network Graphics) and SVG (Scalable Vector Graphics) output needs `-o`).
 - `l4 state-graph FILE` — extract regulative-rule state transition
   graphs as GraphViz DOT (its graph-description language).
-- `l4 export --to=dmn|dmn-md|bpmn FILE [--fidelity-report]` — write the
+- `l4 export dmn|dmn-md|bpmn FILE [--fidelity-report]` — write the
   module out as DMN (Decision Model and Notation) 1.3 in XML (Extensible Markup Language), dmnmd markdown, or BPMN (Business Process Model and Notation) 2.0 XML. The
   document goes to stdout (or `-o FILE`); `--fidelity-report` adds the
   list of what the target notation could not carry, to `FILE.fidelity.txt`
   beside `-o` or to stderr otherwise. A one-line tally of the losses is
   printed to stderr either way.
+- `l4 export FORMAT FILE` — the other notations: `openfisca`, `catala`,
+  `blawx`, `docassemble`, `yscript`. `l4 export --help` lists every format and
+  `l4 export FORMAT --help` its options. `l4 import blawx FILE` reads a Blawx
+  project back into L4. There is no top-level `l4 openfisca`, `l4 blawx` and
+  so on: each notation is a subcommand of `export` (or `import`).
 
 ### 7. Test with `#EVAL`, `#ASSERT`, `#TRACE`
 
@@ -494,7 +499,7 @@ which is assumed and takes 1 input of its own`. This one used to pass
 
 An `ASSUME` of **no** inputs is a value and stays publishable. The check follows
 every rule the export reaches, so hiding one behind a helper does not help. The
-typechecker and the `jl4-service` deploy both reject such bundles; `l4 blawx` is
+typechecker and the `jl4-service` deploy both reject such bundles; `l4 export blawx` is
 the exception and compiles them, because a Blawx interview asks a person for the
 answer rather than receiving it in a request.
 

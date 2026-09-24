@@ -1,6 +1,6 @@
 -- REFUSAL FIXTURE (BLAWX-EXPORT-SPEC §8.4, §11 W3; integrated 2026-09-02).
 --
--- `l4 blawx` refuses this module; `l4 check` succeeds on it. The refusal is
+-- `l4 export blawx` refuses this module; `l4 check` succeeds on it. The refusal is
 -- the Blawx leg's, not L4's — the module is perfectly good L4.
 --
 -- clean-law 0.0.4 (the version Blawx pins) builds its `legal_text` from

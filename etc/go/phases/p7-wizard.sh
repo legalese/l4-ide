@@ -69,4 +69,4 @@ go_receipt --status DEGRADED \
   --reason "l4 render --format plan produced a well-formed plan over $UNITS units, and it is NOT the interview query plan the wizard leg needs: it is a disposition/reachability plan (which units inline, which are reachable), with $ASKS populated 'asks' arrays. The interview plan is served by a running jl4-service, which no l4 subcommand reaches. The strongest oracle available here is well-formedness, which etc/go/lib/verdict.mjs bars from PASS on purpose: 'the plan parses' is not 'the wizard asks the right questions'." \
   --artifact "$PLAN" --artifact "$LOG" \
   --metric "units=$UNITS" --metric "populated_asks=$ASKS" \
-  --note "SPEC.md §P7 names a query-planner interview; no CLI entry point for it exists (there is no l4 wizard and no --to wizard)"
+  --note "SPEC.md §P7 names a query-planner interview; no CLI entry point for it exists (there is no l4 wizard and no l4 export wizard)"
