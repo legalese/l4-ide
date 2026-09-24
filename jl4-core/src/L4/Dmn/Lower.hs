@@ -6386,7 +6386,7 @@ lowerModule opts modul@(MkModule _ uri _) =
             ("`" <> decideName d <> "` has a deontic body; it is lowered to a VERDICT \
              \decision table over its guards, each rule's output a string naming the \
              \arm. The obligation semantics (PARTY/MUST/WITHIN/HENCE/LEST) are the \
-             \BPMN exporter's job (`l4 export --to=bpmn`): WITHIN deadlines are the \
+             \BPMN exporter's job (`l4 export bpmn`): WITHIN deadlines are the \
              \exported deadline decisions, the HENCE loop is the BPMN loop-back edge, \
              \and a BPMN gateway consumes this verdict to choose the process path")
             "the obligation as a state: PARTY/WITHIN/HENCE/LEST do not survive into \
