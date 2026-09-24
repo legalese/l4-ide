@@ -36,10 +36,12 @@ if [ ${#missing[@]} -gt 0 ]; then
 fi
 
 if [ ! -x "$GHCUP_BIN/ghcup" ]; then
+  # BOOTSTRAP_HASKELL_ADJUST_BASHRC is deliberately left unset: the bootstrap
+  # tests it with `-n`, so even "=0" means "edit ~/.bashrc". PATH is handed to
+  # the session through CLAUDE_ENV_FILE below instead.
   curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org |
     BOOTSTRAP_HASKELL_NONINTERACTIVE=1 \
       BOOTSTRAP_HASKELL_MINIMAL=1 \
-      BOOTSTRAP_HASKELL_ADJUST_BASHRC=0 \
       sh >/dev/null
 fi
 
