@@ -378,7 +378,7 @@ async function regenerate(xmlContent, siblings) {
 
 // ---- inputs ----------------------------------------------------------------
 // TWO directories, not one. `expected/` holds the P1/P3 export goldens;
-// `imported/` holds what `l4 blawx --import --reemit` regenerated from parsed
+// `imported/` holds what `l4 import blawx --reemit` regenerated from parsed
 // blocks (P5). Both are `.blawx` this repo produced and both owe the re-save
 // fixpoint, and leaving the import half off the default list meant a plain run
 // reported "35 checked, 0 failed" while never touching bird -- a green that
