@@ -222,6 +222,16 @@ The same check was run over every build-90 corpus file that renders: 7 `legal/` 
 
 So the whole schema gap is two metadata lines plus an empty-document guard.
 
+**Re-measured on `unstable`, same day** **[E]**. A fresh `l4` built from `unstable` @ `7df7a3ca`,
+run over the 7 top-level `legal/*.l4` files and all 336 `ok/**` files (343 documents, every one of
+which renders):
+
+- **0 of 343 valid as emitted.**
+- **310 of 343 valid after the same two FRBR additions**, including all 7 `legal/` files.
+- **The other 33 fail only on an empty `<body>`**, the same single error in every case.
+
+So the finding does not depend on the build-90 binary.
+
 **Anchor stability, measured** **[E]**. TNR §2.3 item 6 leaves this "to be measured". Inserting a
 single ``ASSUME `the person is a sole trader` IS BOOLEAN`` above the alcohol act's first `ASSUME`
 (file copied to `act.l4` for the probe) shifts every later anchor:
