@@ -4,7 +4,7 @@
 -- them would merge two different docassemble questions into one variable
 -- and answer both with one input; checkCollisions must reject the module
 -- with a diagnostic naming both originals and the shared sanitised name.
--- The file itself typechecks: the refusal belongs to `l4 docassemble`.
+-- The file itself typechecks: the refusal belongs to `l4 export docassemble`.
 
 DECLARE Tenancy HAS `notice period` IS A NUMBER, notice_period IS A NUMBER
 
