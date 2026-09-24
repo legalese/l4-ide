@@ -204,7 +204,7 @@ loadBlawxDoc file = do
       exitFailure
     Just tc -> do
       -- Surface non-fatal diagnostics, but proceed: a clean type-check is the
-      -- precondition that matters for lowering (the `l4 openfisca` posture).
+      -- precondition that matters for lowering (the `l4 export openfisca` posture).
       putDiagnostics errs
       case lowerModule defaultLowerOptions tc.entityInfo tc.module'
              >>= lowerBlawx of
