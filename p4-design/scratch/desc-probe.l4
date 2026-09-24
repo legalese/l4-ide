@@ -1,0 +1,18 @@
+DECLARE T HAS f IS A BOOLEAN
+
+@export
+@desc FORM1 export-then-desc
+GIVEN t IS A T
+GIVETH A BOOLEAN
+DECIDE `form one` t IF t's f
+
+@desc FORM2 desc-then-export
+@export
+GIVEN t IS A T
+GIVETH A BOOLEAN
+DECIDE `form two` t IF t's f
+
+@export FORM3 export-with-prose
+GIVEN t IS A T
+GIVETH A BOOLEAN
+DECIDE `form three` t IF t's f

@@ -1,0 +1,13 @@
+ASSUME Person IS A TYPE
+ASSUME Conduct IS A TYPE
+
+GIVEN r IS A Person
+ASSUME conduct r IS A Conduct
+
+GIVEN c IS A Conduct
+ASSUME `is unreasonable` c IS A BOOLEAN
+
+@export test
+GIVEN p IS A Person
+GIVETH A BOOLEAN
+DECIDE `bad` p IF `is unreasonable` (conduct p)
