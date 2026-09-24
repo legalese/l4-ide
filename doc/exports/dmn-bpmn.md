@@ -43,8 +43,8 @@ This is the export for handing your rules to an organisation rather than an indi
 ## The command
 
 ```
-l4 export --to dmn FILE
-l4 export --to bpmn FILE
+l4 export dmn FILE
+l4 export bpmn FILE
 ```
 
 | Flag                     | Effect                                                                                 |
@@ -366,12 +366,12 @@ domain is left exactly as L4 wrote it: only the table that can decline says that
   in the artifact for a person to read, not in the result for a program to branch on.
 - Refusal is order-dependent under lazy `AND`/`OR` in L4 (`FALSE AND x` answers, `x AND FALSE`
   refuses) and FEEL's logic is not, so a refusal buried inside a boolean can move.
-- The **markdown carrier** (`--to dmn-md`) cannot carry a refusal at all. dmnmd's cell grammar is a
+- The **markdown carrier** (`export dmn-md`) cannot carry a refusal at all. dmnmd's cell grammar is a
   number, an integer range, or a bare token, with no `null`, so a refusing table is **omitted**. A
   bare `null` cell would be read back as the _string_ `"null"`, which is the one outcome worse than
   omitting the table. The omission is not silent: the markdown itself carries an
   `<!-- OMITTED: … -->` marker naming each dropped decision and why, and the fidelity report
-  carries the located list with codes. Note that `--to dmn-md` still **exits 0** — read the marker,
+  carries the located list with codes. Note that `export dmn-md` still **exits 0** — read the marker,
   or pass `--fail-on blocking`.
 - `l4 verify` does not model refusals; see [REFUSE](../reference/control-flow/REFUSE.md).
 

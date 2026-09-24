@@ -47,7 +47,7 @@ what makes the logic-programming abilities above available to rules you wrote in
 ## The command
 
 ```
-l4 blawx FILE
+l4 export blawx FILE
 ```
 
 Compiles the decision-rule subset of `FILE` to a Blawx project and prints the `.blawx` project
@@ -57,17 +57,23 @@ file — written in YAML (a plain-text data format) — to standard output. The 
 | --------------- | ---------------------------------------------------------------------------- |
 | `--output FILE` | write the `.blawx` project file to `FILE`, and the s(CASP) dump alongside it |
 | `--scasp`       | emit the concatenated s(CASP) program instead of the `.blawx` project file   |
-| `--import`      | **read** a `.blawx` project and lift it back to L4 — the reverse direction   |
-| `--parse-only`  | with `--import`: parse and report without lifting                            |
-| `--reemit`      | with `--import`: re-emit the `.blawx` from what was parsed                   |
 | `--roundtrip`   | self-check: emit, parse back, and assert the two agree                       |
+
+The reverse direction is its own command, `l4 import blawx FILE`, which **reads** a `.blawx`
+project and lifts it back to L4:
+
+| Flag            | Effect                                                   |
+| --------------- | -------------------------------------------------------- |
+| `--output FILE` | write the lifted L4 to `FILE` instead of standard output |
+| `--parse-only`  | parse and report without lifting                         |
+| `--reemit`      | re-emit the `.blawx` from what was parsed, instead of L4 |
 
 `--scasp` is the one to reach for when debugging: it hands you the logic program itself, which you
 can run against an s(CASP) system directly without going through the Blawx user interface.
 
 ## The only two-way export
 
-Blawx is the **one** backend that reads its own format back. `l4 blawx --import` parses a `.blawx`
+Blawx is the **one** backend that reads its own format back. `l4 import blawx` parses a `.blawx`
 project and lifts it to L4, and `--roundtrip` checks that emitting and re-importing round-trips
 faithfully.
 
@@ -167,7 +173,7 @@ BOOLEAN`` — is a rule with an input of its own, and someone has to answer it. 
 put that question: the predicate becomes an `#abducible` the interview asks about. A web request
 does not, because it carries JavaScript Object Notation (**"JSON"**), which sends values and not
 rules. So since 2026-09-08 an `@export`ed rule that reads one is refused at check time, while
-`l4 blawx` compiles the same file unchanged. If you run `l4 check` on one of the shipped seeds and
+`l4 export blawx` compiles the same file unchanged. If you run `l4 check` on one of the shipped seeds and
 see a page of `… is assumed and takes 1 input of its own`, nothing is wrong: that file is a Blawx
 encoding, not a web API. To publish it as an API, write its inputs as record fields — every shipped
 seed has a record-spelled twin that emits byte-identical s(CASP). See

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # P7 — the ladder-diagram leg.
 #
-# There is no `l4 ladder` and no `--to ladder`. The generator is a TypeScript
+# There is no `l4 ladder` and no `l4 export ladder`. The generator is a TypeScript
 # entry point — the subject's ladder npm script (subject.json, legs
 # ['p7-ladder']) — which drives a live jl4-lsp. Set JL4_LSP_CMD to a prebuilt
 # jl4-lsp; this orchestrator never builds.

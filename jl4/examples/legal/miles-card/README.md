@@ -43,7 +43,7 @@ The UOB cl.34 block was generated the same way but its script was not preserved,
 ```
 l4 check miles-card.l4
 l4 run   miles-card.l4
-l4 catala miles-card.l4 -o /tmp/miles-card.catala_en && node etc/validate-catala.mjs /tmp/miles-card.catala_en
+l4 export catala miles-card.l4 -o /tmp/miles-card.catala_en && node etc/validate-catala.mjs /tmp/miles-card.catala_en
 ```
 
 The third line is the gate the spec requires and the L4 exit code is not it (smucclaw/l4-ide#958).

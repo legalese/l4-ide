@@ -26,12 +26,12 @@ None of this is separately authored — it is generated automatically from the r
 ## Why compile to it
 
 Hand a consultation to AustLII's decades-old Rules-as-Code explanation engine, for its `Why?`/`How?`/`What if?` apparatus — for free, over whatever propositional logic your L4 module already expresses.
-You are not writing a second copy of the rules to get that apparatus; `l4 yscript` derives the `RULE`/`PROVIDES`/`ONLY IF` blocks from the same `DECIDE`/`MEANS` definitions and `@ref` citations you already wrote.
+You are not writing a second copy of the rules to get that apparatus; `l4 export yscript` derives the `RULE`/`PROVIDES`/`ONLY IF` blocks from the same `DECIDE`/`MEANS` definitions and `@ref` citations you already wrote.
 
 ## The command
 
 ```
-l4 yscript FILE
+l4 export yscript FILE
 ```
 
 Compiles the pure-propositional-logic subset of `FILE` to yscript source, printed to standard output.
@@ -41,7 +41,7 @@ Compiles the pure-propositional-logic subset of `FILE` to yscript source, printe
 | `--output FILE` | write the generated yscript source to `FILE` instead of stdout |
 
 There is no `--package` (yscript has no installable-package concept to mirror docassemble's) and no `--fail-on` (there is no fidelity-severity ladder to gate on — see below).
-On success it exits `0`; on refusal it prints every reason, prefixed `l4 yscript: cannot compile this module to yscript`, and exits non-zero.
+On success it exits `0`; on refusal it prints every reason, prefixed `l4 export yscript: cannot compile this module to yscript`, and exits non-zero.
 
 ## What it consumes
 
@@ -84,7 +84,7 @@ Refused outright, by construction:
 
 **No import path back.**
 This backend is one-way: L4 → yscript only.
-There is no `l4 yscript --import`, and nothing reads generated yscript source back into L4.
+There is no `l4 import yscript`, and nothing reads generated yscript source back into L4.
 
 **AGPL note.**
 The yscript _interpreter_ itself is distributed under the GNU Affero GPL.

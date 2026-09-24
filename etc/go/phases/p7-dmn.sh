@@ -85,7 +85,7 @@ GOLDEN="${GO_S_DMN_GOLDEN:-}"
 # ACQUIRED a golden would ride the arm below untouched. Two further things would
 # have to move first — subject.mjs's ALT_LEG_KEYS/ALT_LEG_ENV, which today
 # REFUSE a `golden` key on an additional encoding (etc/go/selftest.mjs asserts
-# exactly that refusal), and the arm's `$L4 export "$GO_S_ENCODING"`, which
+# exactly that refusal), and the arm's `$L4 export dmn "$GO_S_ENCODING"`, which
 # names the committed entry module rather than the selected encoding's. What
 # this test buys today is that the leg no longer decides on a label, and that
 # whichever of those lands, the decision here needs no re-derivation.
@@ -156,7 +156,7 @@ if [[ -z "$GOLDEN" ]]; then
     STEM="$(basename "$m" .l4)"
     OUT="$GO_OUT/$STEM.dmn"
     set +e
-    "$L4" export "$m" --to dmn -o "$OUT" --fidelity-report 2>"$GO_OUT/$STEM.dmn.emit.stderr"
+    "$L4" export dmn "$m" -o "$OUT" --fidelity-report 2>"$GO_OUT/$STEM.dmn.emit.stderr"
     EXPORT_RC=$?
     set -e
     cat "$GO_OUT/$STEM.dmn.emit.stderr"
@@ -176,7 +176,7 @@ if [[ -z "$GOLDEN" ]]; then
         CERT="a deposited module that typechecks (p3-encode certified it this run)"
       fi
       go_receipt --status DEGRADED \
-        --reason "l4 export --to dmn exited $EXPORT_RC on $STEM.l4, $CERT. That is an exporter gap over this encoding's constructs, not a defect in the deposit; see $GO_OUT/$STEM.dmn.emit.stderr. This is the §8.1 exhibit: the de novo encoding cannot yet ride run 1's projection suite." \
+        --reason "l4 export dmn exited $EXPORT_RC on $STEM.l4, $CERT. That is an exporter gap over this encoding's constructs, not a defect in the deposit; see $GO_OUT/$STEM.dmn.emit.stderr. This is the §8.1 exhibit: the de novo encoding cannot yet ride run 1's projection suite." \
         --artifact "$GO_OUT/$STEM.dmn.emit.stderr" \
         --metric "encoding_id=${GO_S_ENCODING_ID:-primary}" --metric "export_exit=$EXPORT_RC"
       exit "$GO_EXIT_FINDING"
@@ -311,7 +311,7 @@ DIFFLOG="$GO_OUT/p7-dmn.canon-diff.txt"
 # and is reported at step 4b, while an export that produced nothing is a defect
 # in the harness and stays `go_broken`.
 set +e
-"$L4" export "$GO_S_ENCODING" --to dmn -o "$OUT" --fidelity-report --fail-on=blocking \
+"$L4" export dmn "$GO_S_ENCODING" -o "$OUT" --fidelity-report --fail-on=blocking \
   2>"$GO_OUT/p7-dmn.fidelity.stderr"
 EXPORT_RC=$?
 set -e
@@ -321,7 +321,7 @@ cat "$GO_OUT/p7-dmn.fidelity.stderr"
 FID="${OUT%.dmn}.fidelity.txt"
 
 [[ $EXPORT_RC -eq 0 || -s "$FID" ]] || \
-  go_broken "l4 export --to dmn exited $EXPORT_RC on a module that typechecks, and wrote no fidelity report — so this is not the --fail-on gate tripping"
+  go_broken "l4 export dmn exited $EXPORT_RC on a module that typechecks, and wrote no fidelity report — so this is not the --fail-on gate tripping"
 
 # --- 2. differential oracle against the committed golden --------------------
 # NOT a bare byte-diff: that is red on day one and the cause is a defect in the
@@ -354,7 +354,7 @@ read -r BLOCKING LOSSY ADVISORY < <(node "$GO_LIB/fidelity-counts.mjs" "$FID")
 # first, so a stale-golden message can never stand in for it.
 if [[ $EXPORT_RC -ne 0 ]]; then
   go_receipt --status DEGRADED \
-    --reason "l4 export --to dmn --fail-on=blocking exited $EXPORT_RC: the emitted DMN carries $BLOCKING blocking fidelity note(s). Blocking means the target notation has no form for something this encoding says and a fallback was emitted — for D-REFUSE that is a decision which can DECLINE to answer, lowered to FEEL null, with no consumer positioned to fence it. Read $FID, then either repair the encoding or record why the note is accepted; do not drop the flag." \
+    --reason "l4 export dmn --fail-on=blocking exited $EXPORT_RC: the emitted DMN carries $BLOCKING blocking fidelity note(s). Blocking means the target notation has no form for something this encoding says and a fallback was emitted — for D-REFUSE that is a decision which can DECLINE to answer, lowered to FEEL null, with no consumer positioned to fence it. Read $FID, then either repair the encoding or record why the note is accepted; do not drop the flag." \
     --artifact "$OUT" --artifact "$FID" \
     --metric "blocking=$BLOCKING" --metric "lossy=$LOSSY" --metric "advisory=$ADVISORY"
   exit "$GO_EXIT_FINDING"

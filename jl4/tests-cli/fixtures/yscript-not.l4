@@ -1,6 +1,6 @@
 -- R2 shape probe: a NOT in a reached Decide's body. yscript's own negation
 -- keyword could not be confirmed against a primary source (spec R2), so
--- `l4 yscript` refuses rather than guess a spelling.
+-- `l4 export yscript` refuses rather than guess a spelling.
 
 ASSUME `the tenant has paid rent` IS A BOOLEAN
 

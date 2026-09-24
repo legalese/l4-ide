@@ -367,7 +367,7 @@ const KEEP = [
   ],
   [
     /(^|\/)jl4\/examples\/blawx\/(alcohol|antisocial|not-ok\/arity-two)\.l4$/,
-    "a Blawx seed: its input predicates are signature-style ASSUMEs, and that shape is the exhibit. Since R-X4 (built 2026-09-08) an @export reading EITHER spelling is refused, so migrating would not restore the export either; `l4 blawx` compiles these files regardless (specs/todo/IMPLICIT-PROPS-DESIGN.md §11.21)",
+    "a Blawx seed: its input predicates are signature-style ASSUMEs, and that shape is the exhibit. Since R-X4 (built 2026-09-08) an @export reading EITHER spelling is refused, so migrating would not restore the export either; `l4 export blawx` compiles these files regardless (specs/todo/IMPLICIT-PROPS-DESIGN.md §11.21)",
   ],
   [
     /(^|\/)jl4\/examples\/ok\/(signatures|tbd)\.l4$/,
