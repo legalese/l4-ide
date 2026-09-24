@@ -787,7 +787,10 @@ decision?`)? OPEN.
   an existing command with emission arriving later. natural4's ~30
   independently-registered transpiler modes (§8.3, "surface sprawl") are the
   cautionary precedent for the per-target option. Whoever owns the `l4`
-  subcommand surface rules this before R0 lands. OPEN.
+  subcommand surface rules this before R0 lands. **ANSWERED 2026-09-24** by
+  `CLI-SURFACE-SPEC.md` C1: one format per target under `l4 export` (`l4 export swipl`,
+  `l4 export scasp`, `l4 export proleg`, …), not an `l4 relational --target` verb. The census,
+  being a report rather than a notation, has no ruled spelling yet.
 
 - **LP-R12 (Ergo reference engine).** Added 2026-09-02. Is the R5 reference
   the XSB-based `ErgoEngine` (open source, the only implementation whose
