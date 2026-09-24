@@ -1,0 +1,1136 @@
+================================================================================
+SOURCE TEXT — 17 CFR Part 227, Regulation Crowdfunding
+Securities and Exchange Commission (17 CFR ch. II, subch. A)
+================================================================================
+
+PROVENANCE
+----------
+Source URL   : https://www.ecfr.gov/api/versioner/v1/full/2026-08-03/title-17.xml?chapter=II&part=227
+               (eCFR versioner API — the machine-readable rendering of
+               https://www.ecfr.gov/current/title-17/chapter-II/part-227)
+Fetched      : 2026-08-05
+Fetch route  : DIRECT, over the eCFR versioner API. The eCFR *website* is not
+               reachable from this environment — https://www.ecfr.gov/current/...
+               answers HTTP 302 to https://unblock.federalregister.gov/ for both
+               curl and WebFetch — but api.ecfr.gov's versioner endpoints answer
+               200 without challenge, so the text below is the publisher's own
+               bytes and no archive fallback was needed.
+Currency     : The eCFR versioner's own currency record for title 17, verbatim
+               (https://www.ecfr.gov/api/versioner/v1/titles.json, fetched
+               2026-08-05):
+                 {"number":17,"name":"Commodity and Securities Exchanges",
+                  "latest_amended_on":"2026-07-26","latest_issue_date":"2026-07-27",
+                  "up_to_date_as_of":"2026-08-03","reserved":false}
+               For part 227 specifically the versioner reports
+               latest_amendment_date 2023-03-01, latest_issue_date 2023-03-30
+               over 85 section-version rows
+               (https://www.ecfr.gov/api/versioner/v1/versions/title-17.json?part=227).
+               So: the title is current to 3 Aug 2026; the part itself has not
+               been amended since 1 Mar 2023. What happened on that date was an
+               expiry, not an enactment — established by diffing the versioner's
+               own renderings at 2023-02-28 and 2023-03-02, not inferred: three
+               COVID-era provisions added by 86 FR 3590/3591/3592 with a built-in
+               sunset lapsed together. § 227.201(bb) and § 227.301(e) were
+               removed outright and § 227.100(b)(7) reverted to "[Reserved]",
+               which is why a reserved paragraph survives below and why no
+               "Effective Date Note:" annotations appear anywhere in the text.
+               The window 14 Jan 2021 – 1 Mar 2023 is therefore a real dated arm
+               for anyone encoding a rule-version axis over this part.
+Corroboration: The GPO annual edition (CFR-2025-title17-vol3-part227.xml,
+               revised as of 1 April 2025, https://www.govinfo.gov/content/pkg/
+               CFR-2025-title17-vol3/xml/CFR-2025-title17-vol3-part227.xml)
+               carries the same 22 sections. Word-level comparison of the
+               section bodies (citation notes excluded, punctuation and
+               whitespace normalised): 101,803 vs 101,802 characters,
+               SequenceMatcher ratio 0.999907, ONE differing block — govinfo
+               prints "offeringstatement" for "offering statement" in
+               § 227.503(a)(1), a GPO typesetting artifact across a page break.
+               No substantive divergence.
+Amendments   : The part's own citation apparatus (the bracketed "[80 FR 71537,
+               Nov. 16, 2015, as amended at ...]" notes printed under each
+               amended section, reproduced verbatim below) names ten Federal
+               Register documents. Each was resolved to a govinfo granule and
+               then VERIFIED BY CONTENT — issuing agency, SEC release number,
+               and a printed page range containing the cited page. That check
+               was not ceremonial: govinfo's link service
+               (https://www.govinfo.gov/link/fr/<vol>/<page>) resolves a page to
+               the granule that BEGINS on it, not the one that contains it, and
+               four of the ten cites point at a document's last page. Trusting
+               it would have recorded 87 FR 57398 as a Coast Guard safety-zone
+               rule instead of SEC Release 33-11098. The verified table is in
+               ../source-bundle.json under this document's annotation inventory.
+               The amendments' effects are already integrated into the text
+               below; the FR granules themselves are not reproduced here,
+               their preambles running to 225 FR pages for the 2015 release
+               alone.
+Rendering    : Plain-text rendering of the eCFR XML. Words are verbatim;
+               whitespace is normalised and each <P> is one block paragraph.
+               eCFR italics (<I>) are written _like this_, so that the
+               "Instruction to paragraph (x)" headings and the defined terms the
+               eCFR italicises survive the flattening. Nothing is elided: all
+               22 sections of the part appear, in order, each followed by its
+               citation note where the eCFR prints one.
+Scope        : The subject is 17 CFR Part 227 (see etc/go/subjects/regcf/
+               subject.json). Two provisions OUTSIDE the part are reproduced as
+               an annex because the part's operative text depends on them for
+               meaning: § 230.501 (the accredited-investor definition and the
+               annual-income/net-worth calculation that § 227.100(a)(2) and its
+               Instruction 1 incorporate) and § 270.3a-9 (the crowdfunding
+               vehicle that § 227.100(d) excludes from "investor"). Other
+               outward references — § 239.900 (Form C), § 249.2000 (Form Funding
+               Portal), § 240.10b-10, § 240.17a-4(f), § 240.17f-2, § 230.152,
+               § 230.241 — are named but NOT reproduced: they prescribe forms or
+               procedures rather than supplying terms the part's rules turn on.
+================================================================================
+
+PART 227—REGULATION CROWDFUNDING, GENERAL RULES AND REGULATIONS
+
+Authority: 15 U.S.C. 77d, 77d-1, 77s, 77z-3, 78c, 78o, 78q, 78w, 78mm, and Pub. L. 112-106, secs. 301-305, 126 Stat. 306 (2012).
+
+Source: 80 FR 71537, Nov. 16, 2015, unless otherwise noted.
+
+==============================================================================
+Subpart A—General
+==============================================================================
+
+------------------------------------------------------------------------------
+§ 227.100 Crowdfunding exemption and requirements.
+------------------------------------------------------------------------------
+
+(a) _Exemption._ An issuer may offer or sell securities in reliance on section 4(a)(6) of the Securities Act of 1933 (the “Securities Act”) (15 U.S.C. 77d(a)(6)), provided that:
+
+(1) The aggregate amount of securities sold to all investors by the issuer in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) during the 12-month period preceding the date of such offer or sale, including the securities offered in such transaction, shall not exceed $5,000,000;
+
+(2) Where the purchaser is not an accredited investor (as defined in Rule 501 (§ 230.501 of this chapter)), the aggregate amount of securities sold to such an investor across all issuers in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) during the 12-month period preceding the date of such transaction, including the securities sold to such investor in such transaction, shall not exceed:
+
+(i) The greater of $2,500, or 5 percent of the greater of the investor's annual income or net worth, if either the investor's annual income or net worth is less than $124,000; or
+
+(ii) Ten percent of the greater of the investor's annual income or net worth, not to exceed an amount sold of $124,000, if both the investor's annual income and net worth are equal to or more than $124,000;
+
+_Instruction 1 to paragraph (a)(2)._ To determine the investment limit for a natural person, the person's annual income and net worth shall be calculated as those values are calculated for purposes of determining accredited investor status in accordance with § 230.501 of this chapter.
+
+_Instruction 2 to paragraph (a)(2)._ A person's annual income and net worth may be calculated jointly with that person's spouse; however, when such a joint calculation is used, the aggregate investment of the investor spouses may not exceed the limit that would apply to an individual investor at that income or net worth level.
+
+_Instruction 3 to paragraph (a)(2)._ An issuer offering and selling securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) may rely on the efforts of an intermediary required by § 227.303(b) to ensure that the aggregate amount of securities purchased by an investor in offerings pursuant to section 4(a)(6) of the Securities Act will not cause the investor to exceed the limit set forth in section 4(a)(6) of the Securities Act and § 227.100(a)(2), _provided that_ the issuer does not know that the investor has exceeded the investor limits or would exceed the investor limits as a result of purchasing securities in the issuer's offering.
+
+(3) The transaction is conducted through an intermediary that complies with the requirements in section 4A(a) of the Securities Act (15 U.S.C. 77d-1(a)) and the related requirements in this part, and the transaction is conducted exclusively through the intermediary's platform; and
+
+_Instruction to paragraph (a)(3)._ An issuer shall not conduct an offering or concurrent offerings in reliance on section 4(a)(6) of the Securities Act of 1933 (15 U.S.C. 77d(a)(6)) using more than one intermediary.
+
+(4) The issuer complies with the requirements in section 4A(b) of the Securities Act (15 U.S.C. 77d-1(b)) and the related requirements in this part; _provided, however,_ that the failure to comply with §§ 227.202, 227.203(a)(3) and 227.203(b) shall not prevent an issuer from relying on the exemption provided by section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)).
+
+(b) _Applicability._ The crowdfunding exemption shall not apply to transactions involving the offer or sale of securities by any issuer that:
+
+(1) Is not organized under, and subject to, the laws of a State or territory of the United States or the District of Columbia;
+
+(2) Is subject to the requirement to file reports pursuant to section 13 or section 15(d) of the Securities Exchange Act of 1934 (the “Exchange Act”) (15 U.S.C. 78m or 78o(d));
+
+(3) Is an investment company, as defined in section 3 of the Investment Company Act of 1940 (15 U.S.C. 80a-3), or is excluded from the definition of investment company by section 3(b) or section 3(c) of that Act (15 U.S.C. 80a-3(b) or 80a-3(c));
+
+(4) Is not eligible to offer or sell securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) as a result of a disqualification as specified in § 227.503(a);
+
+(5) Has sold securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) and has not filed with the Commission and provided to investors, to the extent required, the ongoing annual reports required by this part during the two years immediately preceding the filing of the required offering statement; or
+
+_Instruction to paragraph (b)(5)._ An issuer delinquent in its ongoing reports can again rely on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) once it has filed with the Commission and provided to investors both of the annual reports required during the two years immediately preceding the filing of the required offering statement.
+
+(6) Has no specific business plan or has indicated that its business plan is to engage in a merger or acquisition with an unidentified company or companies.
+
+(7) [Reserved]
+
+(c) _Issuer._ For purposes of § 227.201(r), calculating aggregate amounts offered and sold in § 227.100(a) and § 227.201(t), and determining whether an issuer has previously sold securities in § 227.201(t)(3), _issuer_ includes all entities controlled by or under common control with the issuer and any predecessors of the issuer.
+
+_Instruction to paragraph (c)._ The term _control_ means the possession, direct or indirect, of the power to direct or cause the direction of the management and policies of the entity, whether through the ownership of voting securities, by contract or otherwise.
+
+(d) _Investor._ For purposes of this part, investor means any investor or any potential investor, as the context requires. A crowdfunding vehicle (as defined in § 270.3a-9 of this chapter) is not considered an investor for the purposes of this part.
+
+(e) _Integration with other offerings._ To determine whether offers and sales should be integrated, see § 230.152 of this chapter.
+
+[80 FR 71537, Nov. 16, 2015, as amended at 82 FR 17552, Apr. 12, 2017; 85 FR 27131, May 7, 2020; 85 FR 54490, Sept. 2, 2020; 86 FR 3590, Jan. 14, 2021; 87 FR 57398, Sept. 20, 2022]
+
+==============================================================================
+Subpart B—Requirements for Issuers
+==============================================================================
+
+------------------------------------------------------------------------------
+§ 227.201 Disclosure requirements.
+------------------------------------------------------------------------------
+
+An issuer offering or selling securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) and in accordance with section 4A of the Securities Act (15 U.S.C. 77d-1) and this part, and any co-issuer jointly offering or selling securities with such an issuer in reliance on the same, must file with the Commission and provide to investors and the relevant intermediary the following information:
+
+(a) The name, legal status (including its form of organization, jurisdiction in which it is organized and date of organization), physical address and Web site of the issuer;
+
+(b) The names of the directors and officers (and any persons occupying a similar status or performing a similar function) of the issuer, all positions and offices with the issuer held by such persons, the period of time in which such persons served in the position or office and their business experience during the past three years, including:
+
+(1) Each person's principal occupation and employment, including whether any officer is employed by another employer; and
+
+(2) The name and principal business of any corporation or other organization in which such occupation and employment took place.
+
+_Instruction to paragraph (b)._ For purposes of this paragraph (b), the term _officer_ means a president, vice president, secretary, treasurer or principal financial officer, comptroller or principal accounting officer, and any person routinely performing similar functions.
+
+(c) The name of each person, as of the most recent practicable date but no earlier than 120 days prior to the date the offering statement or report is filed, who is a beneficial owner of 20 percent or more of the issuer's outstanding voting equity securities, calculated on the basis of voting power;
+
+(d) A description of the business of the issuer and the anticipated business plan of the issuer;
+
+(e) The current number of employees of the issuer;
+
+(f) A discussion of the material factors that make an investment in the issuer speculative or risky;
+
+(g) The target offering amount and the deadline to reach the target offering amount, including a statement that if the sum of the investment commitments does not equal or exceed the target offering amount at the offering deadline, no securities will be sold in the offering, investment commitments will be cancelled and committed funds will be returned;
+
+(h) Whether the issuer will accept investments in excess of the target offering amount and, if so, the maximum amount that the issuer will accept and how oversubscriptions will be allocated, such as on a pro-rata, first come-first served, or other basis;
+
+(i) A description of the purpose and intended use of the offering proceeds;
+
+_Instruction to paragraph (i)._ An issuer must provide a reasonably detailed description of any intended use of proceeds, such that investors are provided with enough information to understand how the offering proceeds will be used. If an issuer has identified a range of possible uses, the issuer should identify and describe each probable use and the factors the issuer may consider in allocating proceeds among the potential uses. If the issuer will accept proceeds in excess of the target offering amount, the issuer must describe the purpose, method for allocating oversubscriptions, and intended use of the excess proceeds with similar specificity.
+
+(j) A description of the process to complete the transaction or cancel an investment commitment, including a statement that:
+
+(1) Investors may cancel an investment commitment until 48 hours prior to the deadline identified in the issuer's offering materials;
+
+(2) The intermediary will notify investors when the target offering amount has been met;
+
+(3) If an issuer reaches the target offering amount prior to the deadline identified in its offering materials, it may close the offering early if it provides notice about the new offering deadline at least five business days prior to such new offering deadline (absent a material change that would require an extension of the offering and reconfirmation of the investment commitment); and
+
+(4) If an investor does not cancel an investment commitment before the 48-hour period prior to the offering deadline, the funds will be released to the issuer upon closing of the offering and the investor will receive securities in exchange for his or her investment;
+
+(k) A statement that if an investor does not reconfirm his or her investment commitment after a material change is made to the offering, the investor's investment commitment will be cancelled and the committed funds will be returned;
+
+(l) The price to the public of the securities or the method for determining the price, provided that, prior to any sale of securities, each investor shall be provided in writing the final price and all required disclosures;
+
+(m) A description of the ownership and capital structure of the issuer, including:
+
+(1) The terms of the securities being offered and each other class of security of the issuer, including the number of securities being offered and/or outstanding, whether or not such securities have voting rights, any limitations on such voting rights, how the terms of the securities being offered may be modified and a summary of the differences between such securities and each other class of security of the issuer, and how the rights of the securities being offered may be materially limited, diluted or qualified by the rights of any other class of security of the issuer;
+
+(2) A description of how the exercise of rights held by the principal shareholders of the issuer could affect the purchasers of the securities being offered;
+
+(3) The name and ownership level of each person, as of the most recent practicable date but no earlier than 120 days prior to the date the offering statement or report is filed, who is the beneficial owner of 20 percent or more of the issuer's outstanding voting equity securities, calculated on the basis of voting power;
+
+(4) How the securities being offered are being valued, and examples of methods for how such securities may be valued by the issuer in the future, including during subsequent corporate actions;
+
+(5) The risks to purchasers of the securities relating to minority ownership in the issuer and the risks associated with corporate actions including additional issuances of securities, issuer repurchases of securities, a sale of the issuer or of assets of the issuer or transactions with related parties; and
+
+(6) A description of the restrictions on transfer of the securities, as set forth in § 227.501;
+
+(n) The name, SEC file number and Central Registration Depository (CRD) number (as applicable) of the intermediary through which the offering is being conducted;
+
+(o) A description of the intermediary's financial interests in the issuer's transaction and in the issuer, including:
+
+(1) The amount of compensation to be paid to the intermediary, whether as a dollar amount or a percentage of the offering amount, or a good faith estimate if the exact amount is not available at the time of the filing, for conducting the offering, including the amount of referral and any other fees associated with the offering, and
+
+(2) Any other direct or indirect interest in the issuer held by the intermediary, or any arrangement for the intermediary to acquire such an interest;
+
+(p) A description of the material terms of any indebtedness of the issuer, including the amount, interest rate, maturity date and any other material terms;
+
+(q) A description of exempt offerings conducted within the past three years;
+
+_Instruction to paragraph (q)._ In providing a description of any prior exempt offerings, disclose:
+
+(1) The date of the offering;
+
+(2) The offering exemption relied upon;
+
+(3) The type of securities offered; and
+
+(4) The amount of securities sold and the use of proceeds;
+
+(r) A description of any transaction since the beginning of the issuer's last fiscal year, or any currently proposed transaction, to which the issuer was or is to be a party and the amount involved exceeds five percent of the aggregate amount of capital raised by the issuer in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) during the preceding 12-month period, inclusive of the amount the issuer seeks to raise in the current offering under section 4(a)(6) of the Securities Act, in which any of the following persons had or is to have a direct or indirect material interest:
+
+(1) Any director or officer of the issuer;
+
+(2) Any person who is, as of the most recent practicable date but no earlier than 120 days prior to the date the offering statement or report is filed, the beneficial owner of 20 percent or more of the issuer's outstanding voting equity securities, calculated on the basis of voting power;
+
+(3) If the issuer was incorporated or organized within the past three years, any promoter of the issuer; or
+
+(4) Any member of the family of any of the foregoing persons, which includes a child, stepchild, grandchild, parent, stepparent, grandparent, spouse or spousal equivalent, sibling, mother-in-law, father-in-law, son-in-law, daughter-in-law, brother-in-law, or sister-in-law, and shall include adoptive relationships. The term _spousal equivalent_ means a cohabitant occupying a relationship generally equivalent to that of a spouse.
+
+_Instruction 1 to paragraph (r)._ For each transaction identified, disclose the name of the specified person and state his or her relationship to the issuer, and the nature and, where practicable, the approximate amount of his or her interest in the transaction. The amount of such interest shall be computed without regard to the amount of the profit or loss involved in the transaction. Where it is not practicable to state the approximate amount of the interest, the approximate amount involved in the transaction shall be disclosed.
+
+_Instruction 2 to paragraph (r)._ For purposes of paragraph (r), a transaction includes, but is not limited to, any financial transaction, arrangement or relationship (including any indebtedness or guarantee of indebtedness) or any series of similar transactions, arrangements or relationships.
+
+(s) A discussion of the issuer's financial condition, including, to the extent material, liquidity, capital resources and historical results of operations;
+
+_Instruction 1 to paragraph (s)._ The discussion must cover each period for which financial statements of the issuer are provided. An issuer also must include a discussion of any material changes or trends known to management in the financial condition and results of operations of the issuer subsequent to the period for which financial statements are provided.
+
+_Instruction 2 to paragraph (s)._ For issuers with no prior operating history, the discussion should focus on financial milestones and operational, liquidity and other challenges. For issuers with an operating history, the discussion should focus on whether historical results and cash flows are representative of what investors should expect in the future. Issuers should take into account the proceeds of the offering and any other known or pending sources of capital. Issuers also should discuss how the proceeds from the offering will affect the issuer's liquidity, whether receiving these funds and any other additional funds is necessary to the viability of the business, and how quickly the issuer anticipates using its available cash. In addition, issuers should describe the other available sources of capital to the business, such as lines of credit or required contributions by shareholders.
+
+_Instruction 3 to paragraph (s)._ References to the issuer in this paragraph and its instructions refer to the issuer and its predecessors, if any.
+
+(t) For offerings that, together with all other amounts sold under section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) within the preceding 12-month period, have, in the aggregate, the following target offering amounts:
+
+(1) $124,000 or less, the amount of total income, taxable income and total tax, or the equivalent line items, as reported on the federal income tax returns filed by the issuer for the most recently completed year (if any), which shall be certified by the principal executive officer of the issuer to reflect accurately the information reported on the issuer's federal income tax returns, and financial statements of the issuer, which shall be certified by the principal executive officer of the issuer to be true and complete in all material respects. If financial statements of the issuer are available that have either been reviewed or audited by a public accountant that is independent of the issuer, the issuer must provide those financial statements instead and need not include the information reported on the federal income tax returns or the certifications of the principal executive officer;
+
+(2) More than $124,000, but not more than $618,000, financial statements of the issuer reviewed by a public accountant that is independent of the issuer. If financial statements of the issuer are available that have been audited by a public accountant that is independent of the issuer, the issuer must provide those financial statements instead and need not include the reviewed financial statements; and
+
+(3) More than $618,000, financial statements of the issuer audited by a public accountant that is independent of the issuer; _provided, however,_ that for issuers that have not previously sold securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)), offerings that have a target offering amount of more than $618,000, but not more than $1,235,000, financial statements of the issuer reviewed by a public accountant that is independent of the issuer. If financial statements of the issuer are available that have been audited by a public accountant that is independent of the issuer, the issuer must provide those financial statements instead and need not include the reviewed financial statements.
+
+_Instruction 1 to paragraph (t)._ To determine the financial statements required under this paragraph (t), an issuer must aggregate amounts sold in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) within the preceding 12-month period and the offering amount in the offering for which disclosure is being provided. If the issuer will accept proceeds in excess of the target offering amount, the issuer must include the maximum offering amount that the issuer will accept in the calculation to determine the financial statements required under this paragraph (t).
+
+_Instruction 2 to paragraph (t)._ An issuer may voluntarily meet the requirements of this paragraph (t) for a higher aggregate target offering amount.
+
+_Instruction 3 to paragraph (t)._ The financial statements must be prepared in accordance with U.S. generally accepted accounting principles and include balance sheets, statements of comprehensive income, statements of cash flows, statements of changes in stockholders' equity and notes to the financial statements. If the financial statements are not audited, they must be labeled as “unaudited.” The financial statements must cover the two most recently completed fiscal years or the period(s) since inception, if shorter.
+
+_Instruction 4 to paragraph (t)._ For an offering conducted in the first 120 days of a fiscal year, the financial statements provided may be for the two fiscal years prior to the issuer's most recently completed fiscal year; however, financial statements for the two most recently completed fiscal years must be provided if they are otherwise available. If more than 120 days have passed since the end of the issuer's most recently completed fiscal year, the financial statements provided must be for the issuer's two most recently completed fiscal years. If the 120th day falls on a Saturday, Sunday, or holiday, the next business day shall be considered the 120th day for purposes of determining the age of the financial statements.
+
+_Instruction 5 to paragraph (t)._ An issuer may elect to delay complying with any new or revised financial accounting standard that applies to companies that are not issuers (as defined under section 2(a) of the Sarbanes-Oxley Act of 2002 (15 U.S.C. 7201(a)) until the date that such companies are required to comply with such new or revised accounting standard. Issuers electing this accommodation must disclose it at the time the issuer files its offering statement and apply the election to all standards. Issuers electing not to use this accommodation must forgo this accommodation for all financial accounting standards and may not elect to rely on this accommodation in any future filings.
+
+_Instruction 6 to paragraph (t)._ An issuer required to provide information from a tax return under paragraph (t)(1) of this section before filing a tax return with the U.S. Internal Revenue Service for the most recently completed fiscal year may provide information from its tax return for the prior year (if any), provided that the issuer provides information from the tax return for the most recently completed fiscal year when it is filed with the U.S. Internal Revenue Service (if the tax return is filed during the offering period). An issuer that requested an extension from the U.S. Internal Revenue Service would not be required to provide information from the tax return until the date the return is filed, if filed during the offering period. If an issuer has not yet filed a tax return and is not required to file a tax return before the end of the offering period, then the tax return information does not need to be provided.
+
+_Instruction 7 to paragraph (t)._ An issuer providing financial statements that are not audited or reviewed and tax information as specified under paragraph (t)(1) of this section must have its principal executive officer provide the following certification:
+
+I, [identify the certifying individual], certify that:
+
+(1) the financial statements of [identify the issuer] included in this Form are true and complete in all material respects; and
+
+(2) the tax return information of [identify the issuer] included in this Form reflects accurately the information reported on the tax return for [identify the issuer] filed for the fiscal year ended [date of most recent tax return].
+
+[Signature and title].
+
+_Instruction 8 to paragraph (t)._ Financial statement reviews shall be conducted in accordance with the Statements on Standards for Accounting and Review Services issued by the Accounting and Review Services Committee of the American Institute of Certified Public Accountants. A signed review report must accompany the reviewed financial statements, and an issuer must notify the public accountant of the issuer's intended use of the review report in the offering. An issuer will not be in compliance with the requirement to provide reviewed financial statements if the review report includes modifications.
+
+_Instruction 9 to paragraph (t)._ Financial statement audits shall be conducted in accordance with either auditing standards issued by the American Institute of Certified Public Accountants (referred to as U.S. Generally Accepted Auditing Standards) or the standards of the Public Company Accounting Oversight Board. A signed audit report must accompany audited financial statements, and an issuer must notify the public accountant of the issuer's intended use of the audit report in the offering. An issuer will not be in compliance with the requirement to provide audited financial statements if the audit report includes a qualified opinion, an adverse opinion, or a disclaimer of opinion.
+
+_Instruction 10 to paragraph (t)._ To qualify as a public accountant that is independent of the issuer for purposes of this part, the accountant must satisfy the independence standards of either:
+
+(i) 17 CFR 210.2-01 of this chapter, or
+
+(ii) The American Institute of Certified Public Accountants. The public accountant that audits or reviews the financial statements provided by an issuer must be:
+
+(A) Duly registered and in good standing as a certified public accountant under the laws of the place of his or her residence or principal office; or
+
+(B) In good standing and entitled to practice as a public accountant under the laws of his or her place of residence or principal office.
+
+_Instruction 11 to paragraph (t)._ Except as set forth in § 227.100(c), references to the issuer in this paragraph (t) and its instructions (2) through (10) refer to the issuer and its predecessors, if any.
+
+(u) Any matters that would have triggered disqualification under § 227.503(a) but occurred before May 16, 2016. The failure to provide such disclosure shall not prevent an issuer from continuing to rely on the exemption provided by section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) if the issuer establishes that it did not know and, in the exercise of reasonable care, could not have known of the existence of the undisclosed matter or matters;
+
+_Instruction to paragraph (u)._ An issuer will not be able to establish that it could not have known of a disqualification unless it has made factual inquiry into whether any disqualifications exist. The nature and scope of the factual inquiry will vary based on the facts and circumstances concerning, among other things, the issuer and the other offering participants.
+
+(v) Updates regarding the progress of the issuer in meeting the target offering amount, to be provided in accordance with § 227.203;
+
+(w) Where on the issuer's Web site investors will be able to find the issuer's annual report, and the date by which such report will be available on the issuer's Web site;
+
+(x) Whether the issuer or any of its predecessors previously failed to comply with the ongoing reporting requirements of § 227.202;
+
+(y) Any material information necessary in order to make the statements made, in light of the circumstances under which they were made, not misleading; and
+
+(z) Any written communication or broadcast script provided in accordance with § 227.206 or, if within 30 days of the initial filing of the offering statement, § 230.241 of this chapter.
+
+(aa) [Reserved]
+
+_Instruction to § 227.201._ If disclosure provided pursuant to any paragraph of this section also satisfies the requirements of one or more other paragraphs of this section, it is not necessary to repeat the disclosure. Instead of repeating information, an issuer may include a cross-reference to disclosure contained elsewhere in the offering statement or report, including to information in the financial statements.
+
+[80 FR 71537, Nov. 16, 2015, as amended at 82 FR 17552, Apr. 12, 2017; 85 FR 27131, May 7, 2020; 85 FR 54490, Sept. 2, 2020; 86 FR 3590, 3591, Jan. 14, 2021; 87 FR 57398, Sept. 20, 2022]
+
+------------------------------------------------------------------------------
+§ 227.202 Ongoing reporting requirements.
+------------------------------------------------------------------------------
+
+(a) An issuer that has offered and sold securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) and in accordance with section 4A of the Securities Act (15 U.S.C. 77d-1) and this part must file with the Commission and post on the issuer's Web site an annual report along with the financial statements of the issuer certified by the principal executive officer of the issuer to be true and complete in all material respects and a description of the financial condition of the issuer as described in § 227.201(s). If, however, an issuer has available financial statements that have either been reviewed or audited by a public accountant that is independent of the issuer, those financial statements must be provided and the certification by the principal executive officer will not be required. The annual report also must include the disclosure required by paragraphs (a), (b), (c), (d), (e), (f), (m), (p), (q), (r), and (x) of § 227.201. The report must be filed in accordance with the requirements of § 227.203 and Form C (§ 239.900 of this chapter) and no later than 120 days after the end of the fiscal year covered by the report.
+
+_Instruction 1 to paragraph (a)._ Instructions (3), (8), (9), (10), and (11) to paragraph (t) of § 227.201 shall apply for purposes of this section.
+
+_Instruction 2 to paragraph (a)._ An issuer providing financial statements that are not audited or reviewed must have its principal executive officer provide the following certification:
+
+I, [identify the certifying individual], certify that the financial statements of [identify the issuer] included in this Form are true and complete in all material respects.
+
+[Signature and title].
+
+(b) An issuer must continue to comply with the ongoing reporting requirements until one of the following occurs:
+
+(1) The issuer is required to file reports under section 13(a) or section 15(d) of the Exchange Act (15 U.S.C. 78m(a) or 78o(d));
+
+(2) The issuer has filed, since its most recent sale of securities pursuant to this part, at least one annual report pursuant to this section and has fewer than 300 holders of record;
+
+(3) The issuer has filed, since its most recent sale of securities pursuant to this part, the annual reports required pursuant to this section for at least the three most recent years and has total assets that do not exceed $10,000,000;
+
+(4) The issuer or another party repurchases all of the securities issued in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)), including any payment in full of debt securities or any complete redemption of redeemable securities; or
+
+(5) The issuer liquidates or dissolves its business in accordance with state law.
+
+[80 FR 71537, Nov. 16, 2015, as amended at 82 FR 45725, Oct. 2, 2017; 83 FR 47836, Sept. 21, 2018; 83 FR 52964, Oct. 19, 2018; 85 FR 17751, Mar. 31, 2020]
+
+------------------------------------------------------------------------------
+§ 227.203 Filing requirements and form.
+------------------------------------------------------------------------------
+
+(a) _Form C—Offering statement and amendments_ (§ 239.900 of this chapter).
+
+(1) _Offering statement._ Except as allowed by § 227.206, an issuer offering or selling securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) and in accordance with section 4A of the Securities Act (15 U.S.C. 77d-1) and this part, and any co-issuer jointly offering or selling securities with such an issuer in reliance on the same, must file with the Commission and provide to investors and the relevant intermediary a Form C: Offering Statement (Form C) (§ 239.900 of this chapter) prior to the commencement of the offering of securities. An issuer that is both offering or selling securities with a co-issuer and separately offering or selling securities on its own must file with the Commission and provide to investors and the relevant intermediary a separate Form C for such offering. Every Form C must include the information required by § 227.201.
+
+(2) _Amendments to offering statement._ An issuer must file with the Commission and provide to investors and the relevant intermediary an amendment to the offering statement filed on Form C (§ 239.900 of this chapter) to disclose any material changes, additions or updates to information that it provides to investors through the intermediary's platform, for any offering that has not yet been completed or terminated. The amendment must be filed on Form C: Amendment (Form C/A) (§ 239.900 of this chapter), and if the amendment reflects material changes, additions or updates, the issuer shall check the box indicating that investors must reconfirm an investment commitment within five business days or the investor's commitment will be considered cancelled.
+
+(3) _Progress updates._ (i) An issuer must file with the Commission and provide to investors and the relevant intermediary a Form C: Progress Update (Form C-U) (§ 239.900 of this chapter) to disclose its progress in meeting the target offering amount no later than five business days after each of the dates when the issuer reaches 50 percent and 100 percent of the target offering amount.
+
+(ii) If the issuer will accept proceeds in excess of the target offering amount, the issuer must file with the Commission and provide to investors and the relevant intermediary, no later than five business days after the offering deadline, a final Form C-U (§ 239.900 of this chapter) to disclose the total amount of securities sold in the offering.
+
+(iii) The requirements of paragraphs (a)(3)(i) and (ii) of this section shall not apply to an issuer if the relevant intermediary makes publicly available on the intermediary's platform frequent updates regarding the progress of the issuer in meeting the target offering amount; however, the issuer must still file a Form C-U (§ 239.900 of this chapter) to disclose the total amount of securities sold in the offering no later than five business days after the offering deadline.
+
+_Instruction to paragraph (a)(3)._ If multiple Forms C-U (§ 239.900 of this chapter) are triggered within the same five business day period, the issuer may consolidate such progress updates into one Form C-U, so long as the Form C-U discloses the most recent threshold that was met and the Form C-U is filed with the Commission and provided to investors and the relevant intermediary by the day on which the first progress update is due.
+
+_Instruction 1 to paragraph (a)._ An issuer would satisfy the requirement to provide to the relevant intermediary the information required by this paragraph (a) if it provides to the relevant intermediary a copy of the disclosures filed with the Commission.
+
+_Instruction 2 to paragraph (a)._ An issuer would satisfy the requirement to provide to investors the information required by this paragraph (a) if the issuer refers investors to the information on the intermediary's platform by means of a posting on the issuer's Web site or by email.
+
+(b) _Form C: Annual report and termination of reporting_ (§ 239.900 of this chapter). (1) _Annual reports._ An issuer that has sold securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) and in accordance with section 4A of the Securities Act (15 U.S.C. 77d-1) and this part must file an annual report on Form C: Annual Report (Form C-AR) (§ 239.900 of this chapter) with the Commission no later than 120 days after the end of the fiscal year covered by the report. The annual report shall include the information required by § 227.202(a).
+
+(2) _Amendments to annual report._ An issuer must file with the Commission an amendment to the annual report filed on Form C: Annual Report (Form C-AR) (§ 239.900 of this chapter) to make a material change to the previously filed annual report as soon as practicable after discovery of the need for the material change. The amendment must be filed on Form C: Amendment to Annual Report (Form C-AR/A) (§ 239.900 of this chapter).
+
+(3) _Termination of reporting._ An issuer eligible to terminate its obligation to file annual reports with the Commission pursuant to § 227.202(b) must file with the Commission, within five business days from the date on which the issuer becomes eligible to terminate its reporting obligation, Form C: Termination of Reporting (Form C-TR) (§ 239.900 of this chapter) to advise investors that the issuer will cease reporting pursuant to this part.
+
+[80 FR 71537, Nov. 16, 2015, as amended at 86 FR 3591, Jan. 14, 2021]
+
+------------------------------------------------------------------------------
+§ 227.204 Advertising.
+------------------------------------------------------------------------------
+
+(a)(1) An issuer may not, directly or indirectly, advertise the terms of an offering made in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)), except for oral or written communications that meet the requirements of paragraph (b) of this section or of § 227.206.
+
+(2) _Instruction to paragraph (a)._ For purposes of this paragraph (a), issuer includes persons acting on behalf of the issuer.
+
+(b) A notice may advertise any of the terms of an issuer's offering made in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) if it directs investors to the intermediary's platform and includes no more than the following information:
+
+(1) A statement that the issuer is conducting an offering pursuant to section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)), the name of the intermediary through which the offering is being conducted, and information (including a link in any written communications) directing the potential investor to the intermediary's platform;
+
+(2) The terms of the offering; and
+
+(3) Factual information about the legal identity and business location of the issuer, limited to the name of the issuer of the security, the address, phone number and Web site of the issuer, the email address of a representative of the issuer and a brief description of the business of the issuer.
+
+(c) Notwithstanding the prohibition on advertising any of the terms of the offering, an issuer, and persons acting on behalf of the issuer, may communicate with investors and potential investors about the terms of the offering through communication channels provided by the intermediary on the intermediary's platform, provided that an issuer identifies itself as the issuer in all communications. Persons acting on behalf of the issuer must identify their affiliation with the issuer in all communications on the intermediary's platform.
+
+(d) Notwithstanding the requirement that a notice advertising any of the terms of an issuer's offering made in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) include no more than the information specified in paragraph (b) of this section, an issuer conducting an offering in reliance on Regulation Crowdfunding concurrently with another offering that discloses the terms of the Regulation Crowdfunding offering in the disclosure document for the other offering will not be deemed to have exceeded these disclosure limitations if the disclosure document for the other offering satisfies all the other requirements of this section. If the disclosure document for the other offering is filed on the Commission's Electronic Data Gathering and Retrieval System (EDGAR), the link required by paragraph (b)(1) may not be a live hyperlink.
+
+(e) _Instruction to § 227.204._ For purposes of this section, terms of the offering means the amount of securities offered, the nature of the securities, the price of the securities, the closing date of the offering period, the planned use of proceeds and the issuer's progress toward meeting its funding target.
+
+[80 FR 71537, Nov. 16, 2015, as amended at 86 FR 3592, Jan. 14, 2021]
+
+------------------------------------------------------------------------------
+§ 227.205 Promoter compensation.
+------------------------------------------------------------------------------
+
+(a) An issuer, or person acting on behalf of the issuer, shall be permitted to compensate or commit to compensate, directly or indirectly, any person to promote the issuer's offerings made in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) through communication channels provided by an intermediary on the intermediary's platform, but only if the issuer or person acting on behalf of the issuer, takes reasonable steps to ensure that the person promoting the offering clearly discloses the receipt, past or prospective, of such compensation with any such communication.
+
+_Instruction to paragraph (a)._ The disclosure required by this paragraph is required, with each communication, for persons engaging in promotional activities on behalf of the issuer through the communication channels provided by the intermediary, regardless of whether or not the compensation they receive is specifically for the promotional activities. This includes persons hired specifically to promote the offering as well as to persons who are otherwise employed by the issuer or who undertake promotional activities on behalf of the issuer.
+
+(b) Other than as set forth in paragraph (a) of this section, an issuer or person acting on behalf of the issuer shall not compensate or commit to compensate, directly or indirectly, any person to promote the issuer's offerings made in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)), unless such promotion is limited to notices permitted by, and in compliance with, § 227.204.
+
+------------------------------------------------------------------------------
+§ 227.206 Solicitations of interest and other communications.
+------------------------------------------------------------------------------
+
+(a) _Solicitation of interest._ At any time before the filing of an offering statement, an issuer may communicate orally or in writing to determine whether there is any interest in a contemplated securities offering. Such communications are deemed to be an offer of a security for sale for purposes of the antifraud provisions of the Federal securities laws. No solicitation or acceptance of money or other consideration, nor of any commitment, binding or otherwise, from any person is permitted until the offering statement is filed.
+
+(b) _Conditions._ The communications must:
+
+(1) State that no money or other consideration is being solicited, and if sent in response, will not be accepted;
+
+(2) State that no offer to buy the securities can be accepted and no part of the purchase price can be received until the offering statement is filed and only through an intermediary's platform; and
+
+(3) State that a person's indication of interest involves no obligation or commitment of any kind.
+
+(c) _Indications of interest._ Any written communication under this section may include a means by which a person may indicate to the issuer that such person is interested in a potential offering. This issuer may require the name, address, telephone number, and/or email address in any response form included pursuant to this paragraph (c).
+
+[86 FR 3592, Jan. 14, 2021]
+
+==============================================================================
+Subpart C—Requirements for Intermediaries
+==============================================================================
+
+------------------------------------------------------------------------------
+§ 227.300 Intermediaries.
+------------------------------------------------------------------------------
+
+(a) _Requirements._ A person acting as an intermediary in a transaction involving the offer or sale of securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) must:
+
+(1) Be registered with the Commission as a broker under section 15(b) of the Exchange Act (15 U.S.C. 78_o_(b)) or as a funding portal in accordance with the requirements of § 227.400; and
+
+(2) Be a member a national securities association registered under section 15A of the Exchange Act (15 U.S.C. 78_o_-3).
+
+(b) _Financial interests._ Any director, officer or partner of an intermediary, or any person occupying a similar status or performing a similar function, may not have a financial interest in an issuer that is offering or selling securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) through the intermediary's platform, or receive a financial interest in an issuer as compensation for the services provided to or for the benefit of the issuer in connection with the offer or sale of such securities. An intermediary may not have a financial interest in an issuer that is offering or selling securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) through the intermediary's platform unless:
+
+(1) The intermediary receives the financial interest from the issuer as compensation for the services provided to, or for the benefit of, the issuer in connection with the offer or sale of the securities being offered or sold in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) through the intermediary's platform; and
+
+(2) the financial interest consists of securities of the same class and having the same terms, conditions and rights as the securities being offered or sold in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) through the intermediary's platform. For purposes of this paragraph, a _financial interest in an issuer_ means a direct or indirect ownership of, or economic interest in, any class of the issuer's securities.
+
+(c) _Definitions._ For purposes of this part:
+
+(1) _Associated person of a funding portal_ or _person associated with a funding portal_ means any partner, officer, director or manager of a funding portal (or any person occupying a similar status or performing similar functions), any person directly or indirectly controlling or controlled by such funding portal, or any employee of a funding portal, except that any person associated with a funding portal whose functions are solely clerical or ministerial shall not be included in the meaning of such term for purposes of section 15(b) of the Exchange Act (15 U.S.C. 78_o_(b)) (other than paragraphs (4) and (6) of section 15(b) of the Exchange Act).
+
+(2) _Funding portal_ means a broker acting as an intermediary in a transaction involving the offer or sale of securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)), that does not:
+
+(i) Offer investment advice or recommendations;
+
+(ii) Solicit purchases, sales or offers to buy the securities displayed on its platform;
+
+(iii) Compensate employees, agents, or other persons for such solicitation or based on the sale of securities displayed or referenced on its platform; or
+
+(iv) Hold, manage, possess, or otherwise handle investor funds or securities.
+
+(3) _Intermediary_ means a broker registered under section 15(b) of the Exchange Act (15 U.S.C. 78_o_(b)) or a funding portal registered under § 227.400 and includes, where relevant, an associated person of the registered broker or registered funding portal.
+
+(4) _Platform_ means a program or application accessible via the Internet or other similar electronic communication medium through which a registered broker or a registered funding portal acts as an intermediary in a transaction involving the offer or sale of securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)).
+
+_Instruction to paragraph (c)(4)._ An intermediary through which a crowdfunding transaction is conducted may engage in back office or other administrative functions other than on the intermediary's platform.
+
+------------------------------------------------------------------------------
+§ 227.301 Measures to reduce risk of fraud.
+------------------------------------------------------------------------------
+
+An intermediary in a transaction involving the offer or sale of securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) must:
+
+(a) Have a reasonable basis for believing that an issuer seeking to offer and sell securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) through the intermediary's platform complies with the requirements in section 4A(b) of the Act (15 U.S.C. 77d-1(b)) and the related requirements in this part. In satisfying this requirement, an intermediary may rely on the representations of the issuer concerning compliance with these requirements unless the intermediary has reason to question the reliability of those representations;
+
+(b) Have a reasonable basis for believing that the issuer has established means to keep accurate records of the holders of the securities it would offer and sell through the intermediary's platform, provided that an intermediary may rely on the representations of the issuer concerning its means of recordkeeping unless the intermediary has reason to question the reliability of those representations. An intermediary will be deemed to have satisfied this requirement if the issuer has engaged the services of a transfer agent that is registered under Section 17A of the Exchange Act (15 U.S.C. 78q-1(c)).
+
+(c) Deny access to its platform to an issuer if the intermediary:
+
+(1) Has a reasonable basis for believing that the issuer or any of its officers, directors (or any person occupying a similar status or performing a similar function) or beneficial owners of 20 percent or more of the issuer's outstanding voting equity securities, calculated on the basis of voting power, is subject to a disqualification under § 227.503. In satisfying this requirement, an intermediary must, at a minimum, conduct a background and securities enforcement regulatory history check on each issuer whose securities are to be offered by the intermediary and on each officer, director or beneficial owner of 20 percent or more of the issuer's outstanding voting equity securities, calculated on the basis of voting power.
+
+(2) Has a reasonable basis for believing that the issuer or the offering presents the potential for fraud or otherwise raises concerns about investor protection. In satisfying this requirement, an intermediary must deny access if it reasonably believes that it is unable to adequately or effectively assess the risk of fraud of the issuer or its potential offering. In addition, if an intermediary becomes aware of information after it has granted access that causes it to reasonably believe that the issuer or the offering presents the potential for fraud or otherwise raises concerns about investor protection, the intermediary must promptly remove the offering from its platform, cancel the offering, and return (or, for funding portals, direct the return of) any funds that have been committed by investors in the offering.
+
+[80 FR 71537, Nov. 16, 2015, as amended at 85 FR 27132, May 7, 2020; 85 FR 54490, Sept. 2, 2020; 86 FR 3592, Jan. 14, 2021]
+
+------------------------------------------------------------------------------
+§ 227.302 Account opening.
+------------------------------------------------------------------------------
+
+(a) _Accounts and electronic delivery._ (1) No intermediary or associated person of an intermediary may accept an investment commitment in a transaction involving the offer or sale of securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) until the investor has opened an account with the intermediary and the intermediary has obtained from the investor consent to electronic delivery of materials.
+
+(2) An intermediary must provide all information that is required to be provided by the intermediary under subpart C of this part (§§ 227.300 through 227.305), including, but not limited to, educational materials, notices and confirmations, through electronic means. Unless otherwise indicated in the relevant rule of subpart C of this part, in satisfying this requirement, an intermediary must provide the information through an electronic message that contains the information, through an electronic message that includes a specific link to the information as posted on intermediary's platform, or through an electronic message that provides notice of what the information is and that it is located on the intermediary's platform or on the issuer's Web site. Electronic messages include, but are not limited to, email, social media messages, instant messages or other electronic media messages.
+
+(b) _Educational materials._ (1) In connection with establishing an account for an investor, an intermediary must deliver educational materials to such investor that explain in plain language and are otherwise designed to communicate effectively and accurately:
+
+(i) The process for the offer, purchase and issuance of securities through the intermediary and the risks associated with purchasing securities offered and sold in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6));
+
+(ii) The types of securities offered and sold in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) available for purchase on the intermediary's platform and the risks associated with each type of security, including the risk of having limited voting power as a result of dilution;
+
+(iii) The restrictions on the resale of a security offered and sold in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6));
+
+(iv) The types of information that an issuer is required to provide under § 227.202, the frequency of the delivery of that information and the possibility that those obligations may terminate in the future;
+
+(v) The limitations on the amounts an investor may invest pursuant to § 227.100(a)(2);
+
+(vi) The limitations on an investor's right to cancel an investment commitment and the circumstances in which an investment commitment may be cancelled by the issuer;
+
+(vii) The need for the investor to consider whether investing in a security offered and sold in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) is appropriate for that investor;
+
+(viii) That following completion of an offering conducted through the intermediary, there may or may not be any ongoing relationship between the issuer and intermediary; and
+
+(ix) That under certain circumstances an issuer may cease to publish annual reports and, therefore, an investor may not continually have current financial information about the issuer.
+
+(2) An intermediary must make the most current version of its educational material available on its platform at all times and, if at any time, the intermediary makes a material revision to its educational materials, it must make the revised educational materials available to all investors before accepting any additional investment commitments or effecting any further transactions in securities offered and sold in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)).
+
+(c) _Promoters._ In connection with establishing an account for an investor, an intermediary must inform the investor that any person who promotes an issuer's offering for compensation, whether past or prospective, or who is a founder or an employee of an issuer that engages in promotional activities on behalf of the issuer on the intermediary's platform, must clearly disclose in all communications on the intermediary's platform, respectively, the receipt of the compensation and that he or she is engaging in promotional activities on behalf of the issuer.
+
+(d) _Compensation disclosure._ When establishing an account for an investor, an intermediary must clearly disclose the manner in which the intermediary is compensated in connection with offerings and sales of securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)).
+
+------------------------------------------------------------------------------
+§ 227.303 Requirements with respect to transactions.
+------------------------------------------------------------------------------
+
+(a) _Issuer information._ An intermediary in a transaction involving the offer or sale of securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) must make available to the Commission and to investors any information required to be provided by the issuer of the securities under §§ 227.201 and 227.203(a).
+
+(1) This information must be made publicly available on the intermediary's platform, in a manner that reasonably permits a person accessing the platform to save, download, or otherwise store the information;
+
+(2) This information must be made publicly available on the intermediary's platform for a minimum of 21 days before any securities are sold in the offering, during which time the intermediary may accept investment commitments;
+
+(3) This information, including any additional information provided by the issuer, must remain publicly available on the intermediary's platform until the offer and sale of securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) is completed or cancelled; and
+
+(4) An intermediary may not require any person to establish an account with the intermediary to access this information.
+
+(b) _Investor qualification._ Each time before accepting any investment commitment (including any additional investment commitment from the same person), an intermediary must:
+
+(1) Have a reasonable basis for believing that the investor satisfies the investment limitations established by section 4(a)(6)(B) of the Act (15 U.S.C. 77d(a)(6)(B)) and this part. An intermediary may rely on an investor's representations concerning compliance with the investment limitation requirements concerning the investor's annual income, net worth, and the amount of the investor's other investments made pursuant to section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) unless the intermediary has reason to question the reliability of the representation.
+
+(2) Obtain from the investor:
+
+(i) A representation that the investor has reviewed the intermediary's educational materials delivered pursuant to § 227.302(b), understands that the entire amount of his or her investment may be lost, and is in a financial condition to bear the loss of the investment; and
+
+(ii) A questionnaire completed by the investor demonstrating the investor's understanding that:
+
+(A) There are restrictions on the investor's ability to cancel an investment commitment and obtain a return of his or her investment;
+
+(B) It may be difficult for the investor to resell securities acquired in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)); and
+
+(C) Investing in securities offered and sold in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) involves risk, and the investor should not invest any funds in an offering made in reliance on section 4(a)(6) of the Securities Act unless he or she can afford to lose the entire amount of his or her investment.
+
+(c) _Communication channels._ An intermediary must provide on its platform communication channels by which persons can communicate with one another and with representatives of the issuer about offerings made available on the intermediary's platform, provided:
+
+(1) If the intermediary is a funding portal, it does not participate in these communications other than to establish guidelines for communication and remove abusive or potentially fraudulent communications;
+
+(2) The intermediary permits public access to view the discussions made in the communication channels;
+
+(3) The intermediary restricts posting of comments in the communication channels to those persons who have opened an account with the intermediary on its platform; and
+
+(4) The intermediary requires that any person posting a comment in the communication channels clearly and prominently disclose with each posting whether he or she is a founder or an employee of an issuer engaging in promotional activities on behalf of the issuer, or is otherwise compensated, whether in the past or prospectively, to promote the issuer's offering.
+
+(d) _Notice of investment commitment._ An intermediary must promptly, upon receipt of an investment commitment from an investor, give or send to the investor a notification disclosing:
+
+(1) The dollar amount of the investment commitment;
+
+(2) The price of the securities, if known;
+
+(3) The name of the issuer; and
+
+(4) The date and time by which the investor may cancel the investment commitment.
+
+(e) _Maintenance and transmission of funds._ (1) An intermediary that is a registered broker must comply with the requirements of 17 CFR 240.15c2-4.
+
+(2) An intermediary that is a funding portal must direct investors to transmit the money or other consideration directly to a qualified third party that has agreed in writing to hold the funds for the benefit of, and to promptly transmit or return the funds to, the persons entitled thereto in accordance with paragraph (e)(3) of this section. For purposes of this subpart C (§§ 227.300 through 227.305), a qualified third party means a:
+
+(i) Registered broker or dealer that carries customer or broker or dealer accounts and holds funds or securities for those persons; or
+
+(ii) Bank or credit union (where such credit union is insured by National Credit Union Administration) that has agreed in writing either to hold the funds in escrow for the persons who have the beneficial interests therein and to transmit or return such funds directly to the persons entitled thereto when so directed by the funding portal as described in paragraph (e)(3) of this section, or to maintain a bank or credit union account (or accounts) for the exclusive benefit of investors and the issuer.
+
+(3) A funding portal that is an intermediary in a transaction involving the offer or sale of securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) shall promptly direct the qualified third party to:
+
+(i) Transmit funds from the qualified third party to the issuer when the aggregate amount of investment commitments from all investors is equal to or greater than the target amount of the offering and the cancellation period as set forth in § 227.304 has elapsed, _provided that_ in no event may the funding portal direct this transmission of funds earlier than 21 days after the date on which the intermediary makes publicly available on its platform the information required to be provided by the issuer under §§ 227.201 and 227.203(a);
+
+(ii) Return funds to an investor when an investment commitment has been cancelled in accordance with § 227.304 (including for failure to obtain effective reconfirmation as required under § 227.304(c)); and
+
+(iii) Return funds to investors when an issuer does not complete the offering.
+
+(f) _Confirmation of transaction._ (1) An intermediary must, at or before the completion of a transaction in a security in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)), give or send to each investor a notification disclosing:
+
+(i) The date of the transaction;
+
+(ii) The type of security that the investor is purchasing;
+
+(iii) The identity, price, and number of securities purchased by the investor, as well as the number of securities sold by the issuer in the transaction and the price(s) at which the securities were sold;
+
+(iv) If a debt security, the interest rate and the yield to maturity calculated from the price paid and the maturity date;
+
+(v) If a callable security, the first date that the security can be called by the issuer; and
+
+(vi) The source, form and amount of any remuneration received or to be received by the intermediary in connection with the transaction, including any remuneration received or to be received by the intermediary from persons other than the issuer.
+
+(2) An intermediary satisfying the requirements of paragraph (f)(1) of this section is exempt from the requirements of § 240.10b-10 of this chapter with respect to a transaction in a security offered and sold in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)).
+
+[80 FR 71537, Nov. 16, 2015, as amended at 85 FR 27132, May 7, 2020; 85 FR 54490, Sept. 2, 2020; 86 FR 3592, Jan. 14, 2021]
+
+------------------------------------------------------------------------------
+§ 227.304 Completion of offerings, cancellations and reconfirmations.
+------------------------------------------------------------------------------
+
+(a) _Generally._ An investor may cancel an investment commitment for any reason until 48 hours prior to the deadline identified in the issuer's offering materials. During the 48 hours prior to such deadline, an investment commitment may not be cancelled except as provided in paragraph (c) of this section.
+
+(b) _Early completion of offering._ If an issuer reaches the target offering amount prior to the deadline identified in its offering materials pursuant to § 227.201(g), the issuer may close the offering on a date earlier than the deadline identified in its offering materials pursuant to § 227.201(g), _provided that:_
+
+(1) The offering remains open for a minimum of 21 days pursuant to § 227.303(a);
+
+(2) The intermediary provides notice to any potential investors, and gives or sends notice to investors that have made investment commitments in the offering, of:
+
+(i) The new, anticipated deadline of the offering;
+
+(ii) The right of investors to cancel investment commitments for any reason until 48 hours prior to the new offering deadline; and
+
+(iii) Whether the issuer will continue to accept investment commitments during the 48-hour period prior to the new offering deadline.
+
+(3) The new offering deadline is scheduled for and occurs at least five business days after the notice required in paragraph (b)(2) of this section is provided; and
+
+(4) At the time of the new offering deadline, the issuer continues to meet or exceed the target offering amount.
+
+(c) _Cancellations and reconfirmations based on material changes._ (1) If there is a material change to the terms of an offering or to the information provided by the issuer, the intermediary must give or send to any investor who has made an investment commitment notice of the material change and that the investor's investment commitment will be cancelled unless the investor reconfirms his or her investment commitment within five business days of receipt of the notice. If the investor fails to reconfirm his or her investment within those five business days, the intermediary within five business days thereafter must:
+
+(i) Give or send the investor a notification disclosing that the commitment was cancelled, the reason for the cancellation and the refund amount that the investor is expected to receive; and
+
+(ii) Direct the refund of investor funds.
+
+(2) If material changes to the offering or to the information provided by the issuer regarding the offering occur within five business days of the maximum number of days that an offering is to remain open, the offering must be extended to allow for a period of five business days for the investor to reconfirm his or her investment.
+
+(d) _Return of funds if offering is not completed._ If an issuer does not complete an offering, an intermediary must within five business days:
+
+(1) Give or send each investor a notification of the cancellation, disclosing the reason for the cancellation, and the refund amount that the investor is expected to receive;
+
+(2) Direct the refund of investor funds; and
+
+(3) Prevent investors from making investment commitments with respect to that offering on its platform.
+
+[80 FR 71537, Nov. 16, 2015, as amended at 85 FR 27132, May 7, 2020; 85 FR 54490, Sept. 2, 2020; 86 FR 3592, Jan. 14, 2021]
+
+------------------------------------------------------------------------------
+§ 227.305 Payments to third parties.
+------------------------------------------------------------------------------
+
+(a) _Prohibition on payments for personally identifiable information._ An intermediary may not compensate any person for providing the intermediary with the personally identifiable information of any investor or potential investor in securities offered and sold in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)).
+
+(b) For purposes of this rule, personally identifiable information means information that can be used to distinguish or trace an individual's identity, either alone or when combined with other personal or identifying information that is linked or linkable to a specific individual.
+
+==============================================================================
+Subpart D—Funding Portal Regulation
+==============================================================================
+
+------------------------------------------------------------------------------
+§ 227.400 Registration of funding portals.
+------------------------------------------------------------------------------
+
+(a) _Registration._ A funding portal must register with the Commission, by filing a complete Form Funding Portal (§ 249.2000 of this chapter) in accordance with the instructions on the form, and become a member of a national securities association registered under section 15A of the Exchange Act (15 U.S.C. 78_o_-3). The registration will be effective the later of:
+
+(1) Thirty calendar days after the date that the registration is received by the Commission; or
+
+(2) The date the funding portal is approved for membership by a national securities association registered under section 15A of the Exchange Act (15 U.S.C. 78_o_-3).
+
+(b) _Amendments to registration._ A funding portal must file an amendment to Form Funding Portal (§ 249.2000 of this chapter) within 30 days of any of the information previously submitted on Form Funding Portal becoming inaccurate for any reason.
+
+(c) _Successor registration._ (1) If a funding portal succeeds to and continues the business of a registered funding portal, the registration of the predecessor will remain effective as the registration of the successor if the successor, within 30 days after such succession, files a registration on Form Funding Portal (§ 249.2000 of this chapter) and the predecessor files a withdrawal on Form Funding Portal; _provided, however,_ that the registration of the predecessor funding portal will be deemed withdrawn 45 days after registration on Form Funding Portal is filed by the successor.
+
+(2) Notwithstanding paragraph (c)(1) of this section, if a funding portal succeeds to and continues the business of a registered funding portal and the succession is based solely on a change of the predecessor's date or state of incorporation, form of organization, or composition of a partnership, the successor may, within 30 days after the succession, amend the registration of the predecessor on Form Funding Portal (§ 249.2000 of this chapter) to reflect these changes.
+
+(d) _Withdrawal._ A funding portal must promptly file a withdrawal of registration on Form Funding Portal (§ 249.2000 of this chapter) in accordance with the instructions on the form upon ceasing to operate as a funding portal. Withdrawal will be effective on the later of 30 days after receipt by the Commission (after the funding portal is no longer operational), or within such longer period of time as to which the funding portal consents or which the Commission by order may determine as necessary or appropriate in the public interest or for the protection of investors.
+
+(e) _Applications and reports._ The applications and reports provided for in this section shall be considered filed when a complete Form Funding Portal (§ 249.2000 of this chapter) is submitted with the Commission. Duplicate originals of the applications and reports provided for in this section must be filed with surveillance personnel designated by any registered national securities association of which the funding portal is a member.
+
+(f) _Nonresident funding portals._ Registration pursuant to this section by a nonresident funding portal shall be conditioned upon there being an information sharing arrangement in place between the Commission and the competent regulator in the jurisdiction under the laws of which the nonresident funding portal is organized or where it has its principal place of business, that is applicable to the nonresident funding portal.
+
+(1) _Definition._ For purposes of this section, the term _nonresident funding portal_ shall mean a funding portal incorporated in or organized under the laws of a jurisdiction outside of the United States or its territories, or having its principal place of business in any place not in the United States or its territories.
+
+(2) _Power of attorney._ (i) Each nonresident funding portal registered or applying for registration pursuant to this section shall obtain a written consent and power of attorney appointing an agent in the United States, other than the Commission or a Commission member, official or employee, upon whom may be served any process, pleadings or other papers in any action under the federal securities laws. This consent and power of attorney must be signed by the nonresident funding portal and the named agent(s) for service of process.
+
+(ii) Each nonresident funding portal registered or applying for registration pursuant to this section shall, at the time of filing its application on Form Funding Portal (§ 249.2000 of this chapter), furnish to the Commission the name and address of its United States agent for service of process on Schedule C to the Form.
+
+(iii) Any change of a nonresident funding portal's agent for service of process and any change of name or address of a nonresident funding portal's existing agent for service of process shall be communicated promptly to the Commission through amendment of the Schedule C to Form Funding Portal (§ 249.2000 of this chapter).
+
+(iv) Each nonresident funding portal must promptly appoint a successor agent for service of process if the nonresident funding portal discharges its identified agent for service of process or if its agent for service of process is unwilling or unable to accept service on behalf of the nonresident funding portal.
+
+(v) Each nonresident funding portal must maintain, as part of its books and records, the written consent and power of attorney identified in paragraph (f)(2)(i) of this section for at least three years after the agreement is terminated.
+
+(3) _Access to books and records; inspections and examinations_—(i) _Certification and opinion of counsel._ Any nonresident funding portal applying for registration pursuant to this section shall:
+
+(A) Certify on Schedule C to Form Funding Portal (§ 249.2000 of this chapter) that the nonresident funding portal can, as a matter of law, and will provide the Commission and any registered national securities association of which it becomes a member with prompt access to the books and records of such nonresident funding portal and can, as a matter of law, and will submit to onsite inspection and examination by the Commission and any registered national securities association of which it becomes a member; and
+
+(B) Provide an opinion of counsel that the nonresident funding portal can, as a matter of law, provide the Commission and any registered national securities association of which it becomes a member with prompt access to the books and records of such nonresident funding portal and can, as a matter of law, submit to onsite inspection and examination by the Commission and any registered national securities association of which it becomes a member.
+
+(ii) _Amendments._ The nonresident funding portal shall re-certify, on Schedule C to Form Funding Portal (§ 249.2000 of this chapter), within 90 days after any changes in the legal or regulatory framework that would impact the nonresident funding portal's ability to provide, or the manner in which it provides, the Commission, or any registered national securities association of which it is a member, with prompt access to its books and records or that would impact the Commission's or such registered national securities association's ability to inspect and examine the nonresident funding portal. The re-certification shall be accompanied by a revised opinion of counsel describing how, as a matter of law, the nonresident funding portal can continue to meet its obligations under paragraphs (f)(3)(i)(A) and (B) of this section.
+
+------------------------------------------------------------------------------
+§ 227.401 Exemption.
+------------------------------------------------------------------------------
+
+A funding portal that is registered with the Commission pursuant to § 227.400 is exempt from the broker registration requirements of section 15(a)(1) of the Exchange Act (15 U.S.C. 78_o_(a)(1)) in connection with its activities as a funding portal.
+
+------------------------------------------------------------------------------
+§ 227.402 Conditional safe harbor.
+------------------------------------------------------------------------------
+
+(a) _General._ Under section 3(a)(80) of the Exchange Act (15 U.S.C. 78c(a)(80)), a funding portal acting as an intermediary in a transaction involving the offer or sale of securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) may not: offer investment advice or recommendations; solicit purchases, sales, or offers to buy the securities offered or displayed on its platform or portal; compensate employees, agents, or other persons for such solicitation or based on the sale of securities displayed or referenced on its platform or portal; hold, manage, possess, or otherwise handle investor funds or securities; or engage in such other activities as the Commission, by rule, determines appropriate. This section is intended to provide clarity with respect to the ability of a funding portal to engage in certain activities, consistent with the prohibitions under section 3(a)(80) of the Exchange Act. No presumption shall arise that a funding portal has violated the prohibitions under section 3(a)(80) of the Exchange Act or this part by reason of the funding portal or its associated persons engaging in activities in connection with the offer or sale of securities in reliance on section 4(a)(6) of the Securities Act that do not meet the conditions specified in paragraph (b) of this section. The antifraud provisions and all other applicable provisions of the federal securities laws continue to apply to the activities described in paragraph (b) of this section.
+
+(b) _Permitted activities._ A funding portal may, consistent with the prohibitions under section 3(a)(80) of the Exchange Act (15 U.S.C. 78c(a)(80)) and this part:
+
+(1) Determine whether and under what terms to allow an issuer to offer and sell securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) through its platform; provided that a funding portal otherwise complies with this part;
+
+(2) Apply objective criteria to highlight offerings on the funding portal's platform where:
+
+(i) The criteria are reasonably designed to highlight a broad selection of issuers offering securities through the funding portal's platform, are applied consistently to all issuers and offerings and are clearly displayed on the funding portal's platform;
+
+(ii) The criteria may include, among other things, the type of securities being offered (for example, common stock, preferred stock or debt securities); the geographic location of the issuer; the industry or business segment of the issuer; the number or amount of investment commitments made, progress in meeting the issuer's target offering amount or, if applicable, the maximum offering amount; and the minimum or maximum investment amount; provided that the funding portal may not highlight an issuer or offering based on the advisability of investing in the issuer or its offering; and
+
+(iii) The funding portal does not receive special or additional compensations for highlighting one or more issuers or offerings on its platform;
+
+(3) Provide search functions or other tools that investors can use to search, sort, or categorize the offerings available through the funding portal's platform according to objective criteria where;
+
+(i) The criteria may include, among other things, the type of securities being offered (for example, common stock, preferred stock or debt securities); the geographic location of the issuer; the industry or business segment of the issuer; the number or amount of investment commitments made, progress in meeting the issuer's target offering amount or, if applicable, the maximum offering amount; and the minimum or maximum investment amount; and
+
+(ii) The criteria may not include, among other things, the advisability of investing in the issuer or its offering, or an assessment of any characteristic of the issuer, its business plan, its key management or risks associated with an investment.
+
+(4) Provide communication channels by which investors can communicate with one another and with representatives of the issuer through the funding portal's platform about offerings through the platform, so long as the funding portal (and its associated persons):
+
+(i) Does not participate in these communications, other than to establish guidelines for communication and remove abusive or potentially fraudulent communications;
+
+(ii) Permits public access to view the discussions made in the communication channels;
+
+(iii) Restricts posting of comments in the communication channels to those persons who have opened an account on its platform; and
+
+(iv) Requires that any person posting a comment in the communication channels clearly disclose with each posting whether he or she is a founder or an employee of an issuer engaging in promotional activities on behalf of the issuer, or is otherwise compensated, whether in the past or prospectively, to promote an issuer's offering;
+
+(5) Advise an issuer about the structure or content of the issuer's offering, including assisting the issuer in preparing offering documentation;
+
+(6) Compensate a third party for referring a person to the funding portal, so long as the third party does not provide the funding portal with personally identifiable information of any potential investor, and the compensation, other than that paid to a registered broker or dealer, is not based, directly or indirectly, on the purchase or sale of a security in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) offered on or through the funding portal's platform;
+
+(7) Pay or offer to pay any compensation to a registered broker or dealer for services, including referrals pursuant to paragraph (b)(6) of this section, in connection with the offer or sale of securities by the funding portal in reliance on section 4(a)(6) of the Act(15 U.S.C. 77d(a)(6)), provided that:
+
+(i) Such services are provided pursuant to a written agreement between the funding portal and the registered broker or dealer;
+
+(ii) Such services and compensation are permitted under this part; and
+
+(iii) Such services and compensation comply with the rules of any registered national securities association of which the funding portal is a member;
+
+(8) Receive any compensation from a registered broker or dealer for services provided by the funding portal in connection with the offer or sale of securities by the funding portal in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)), provided that:
+
+(i) Such services are provided pursuant to a written agreement between the funding portal and the registered broker or dealer;
+
+(ii) Such compensation is permitted under this part; and
+
+(iii) Such compensation complies with the rules of any registered national securities association of which the funding portal is a member;
+
+(9) Advertise the existence of the funding portal and identify one or more issuers or offerings available on the portal on the basis of objective criteria, as long as:
+
+(i) The criteria are reasonably designed to identify a broad selection of issuers offering securities through the funding portal's platform, and are applied consistently to all potential issuers and offerings;
+
+(ii) The criteria may include, among other things, the type of securities being offered (for example, common stock, preferred stock or debt securities); the geographic location of the issuer; the industry or business segment of the issuer; the expressed interest by investors, as measured by number or amount of investment commitments made, progress in meeting the issuer's target offering amount or, if applicable, the maximum offering amount; and the minimum or maximum investment amount; and
+
+(iii) The funding portal does not receive special or additional compensation for identifying the issuer or offering in this manner;
+
+(10) Deny access to its platform to, or cancel an offering of an issuer, pursuant to § 227.301(c)(2), if the funding portal has a reasonable basis for believing that the issuer or the offering presents the potential for fraud or otherwise raises concerns about investor protection;
+
+(11) Accept, on behalf of an issuer, an investment commitment for securities offered in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) by that issuer on the funding portal's platform;
+
+(12) Direct investors where to transmit funds or remit payment in connection with the purchase of securities offered and sold in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)); and
+
+(13) Direct a qualified third party, as required by § 227.303(e), to release proceeds to an issuer upon completion of a crowdfunding offering or to return proceeds to investors in the event an investment commitment or an offering is cancelled.
+
+------------------------------------------------------------------------------
+§ 227.403 Compliance.
+------------------------------------------------------------------------------
+
+(a) _Policies and procedures._ A funding portal must implement written policies and procedures reasonably designed to achieve compliance with the federal securities laws and the rules and regulations thereunder relating to its business as a funding portal.
+
+(b) _Privacy._ A funding portal must comply with the requirements of part 248 of this chapter as they apply to brokers.
+
+(c) _Inspections and examinations._ A funding portal shall permit the examination and inspection of all of its business and business operations that relate to its activities as a funding portal, such as its premises, systems, platforms, and records by representatives of the Commission and of the registered national securities association of which it is a member.
+
+------------------------------------------------------------------------------
+§ 227.404 Records to be made and kept by funding portals.
+------------------------------------------------------------------------------
+
+(a) _Generally._ A funding portal shall make and preserve the following records for five years, the first two years in an easily accessible place:
+
+(1) All records related to an investor who purchases or attempts to purchase securities through the funding portal;
+
+(2) All records related to issuers who offer and sell or attempt to offer and sell securities through the funding portal and the control persons of such issuers;
+
+(3) Records of all communications that occur on or through its platform;
+
+(4) All records related to persons that use communication channels provided by a funding portal to promote an issuer's securities or communicate with potential investors;
+
+(5) All records required to demonstrate compliance with the requirements of subparts C (§§ 227.300 through 227.305) and D (§§ 227.400 through 227.404) of this part;
+
+(6) All notices provided by such funding portal to issuers and investors generally through the funding portal's platform or otherwise, including, but not limited to, notices addressing hours of funding portal operations (if any), funding portal malfunctions, changes to funding portal procedures, maintenance of hardware and software, instructions pertaining to access to the funding portal and denials of, or limitations on, access to the funding portal;
+
+(7) All written agreements (or copies thereof) entered into by such funding portal relating to its business as such;
+
+(8) All daily, monthly and quarterly summaries of transactions effected through the funding portal, including:
+
+(i) Issuers for which the target offering amount has been reached and funds distributed; and
+
+(ii) Transaction volume, expressed in:
+
+(A) Number of transactions;
+
+(B) Number of securities involved in a transaction;
+
+(C) Total amounts raised by, and distributed to, issuers; and
+
+(D) Total dollar amounts raised across all issuers, expressed in U.S. dollars; and
+
+(9) A log reflecting the progress of each issuer who offers or sells securities through the funding portal toward meeting the target offering amount.
+
+(b) _Organizational documents._ A funding portal shall make and preserve during the operation of the funding portal and of any successor funding portal, all organizational documents relating to the funding portal, including but not limited to, partnership agreements, articles of incorporation or charter, minute books and stock certificate books (or other similar type documents).
+
+(c) _Format._ The records required to be maintained and preserved pursuant to paragraph (a) of this section must be produced, reproduced, and maintained in the original, non-alterable format in which they were created or as permitted under § 240.17a-4(f) of this chapter.
+
+(d) _Third parties._ The records required to be made and preserved pursuant to this section may be prepared or maintained by a third party on behalf of a funding portal. An agreement with a third party shall not relieve a funding portal from the responsibility to prepare and maintain records as specified in this rule. A funding portal must file with the registered national securities association of which it is a member, a written undertaking in a form acceptable to the registered national securities association, signed by a duly authorized person of the third party, stating in effect that such records are the property of the funding portal and will be surrendered promptly on request of the funding portal. The undertaking shall include the following provision:
+
+    With respect to any books and records maintained or preserved on behalf of [name of funding portal], the undersigned hereby acknowledges that the books and records are the property of [name of funding portal], and hereby undertakes to permit examination of such books and records at any time, or from time to time, during business hours by representatives of the Securities and Exchange Commission and the registered national securities association of which the funding portal is a member, and to promptly furnish to the Commission, its representatives, and the registered national securities association of which the funding portal is a member, a true, correct, complete and current hard copy of any, all, or any part of, such books and records.
+
+(e) _Review of records._ All records of a funding portal are subject at any time, or from time to time, to reasonable periodic, special, or other examination by the representatives of the Commission and the registered national securities association of which a funding portal is a member. Every funding portal shall furnish promptly to the Commission, its representatives, and the registered national securities association of which the funding portal is a member true, correct, complete and current copies of such records of the funding portal that are requested by the representatives of the Commission and the registered national securities association.
+
+(f) _Financial recordkeeping and reporting of currency and foreign transactions._ A funding portal that is subject to the requirements of the Currency and Foreign Transactions Reporting Act of 1970 (15 U.S.C. 5311 _et seq._) shall comply with the reporting, recordkeeping and record retention requirements of 31 CFR chapter X. Where 31 CFR chapter X and § 227.404(a) and (b) require the same records or reports to be preserved for different periods of time, such records or reports shall be preserved for the longer period of time.
+
+==============================================================================
+Subpart E—Miscellaneous Provisions
+==============================================================================
+
+------------------------------------------------------------------------------
+§ 227.501 Restrictions on resales.
+------------------------------------------------------------------------------
+
+(a) Securities issued in a transaction exempt from registration pursuant to section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) and in accordance with section 4A of the Securities Act (15 U.S.C. 77d-1) and this part may not be transferred by any purchaser of such securities during the one-year period beginning when the securities were issued in a transaction exempt from registration pursuant to section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)), unless such securities are transferred:
+
+(1) To the issuer of the securities;
+
+(2) To an accredited investor;
+
+(3) As part of an offering registered with the Commission; or
+
+(4) To a member of the family of the purchaser or the equivalent, to a trust controlled by the purchaser, to a trust created for the benefit of a member of the family of the purchaser or the equivalent, or in connection with the death or divorce of the purchaser or other similar circumstance.
+
+(b) For purposes of this § 227.501, the term _accredited investor_ shall mean any person who comes within any of the categories set forth in § 230.501(a) of this chapter, or who the seller reasonably believes comes within any of such categories, at the time of the sale of the securities to that person.
+
+(c) For purposes of this section, the term _member of the family of the purchaser or the equivalent_ includes a child, stepchild, grandchild, parent, stepparent, grandparent, spouse or spousal equivalent, sibling, mother-in-law, father-in-law, son-in-law, daughter-in-law, brother-in-law, or sister-in-law of the purchaser, and shall include adoptive relationships. For purposes of this paragraph (c), the term _spousal equivalent_ means a cohabitant occupying a relationship generally equivalent to that of a spouse.
+
+------------------------------------------------------------------------------
+§ 227.502 Insignificant deviations from a term, condition or requirement of this part (Regulation Crowdfunding).
+------------------------------------------------------------------------------
+
+(a) A failure to comply with a term, condition, or requirement of this part will not result in the loss of the exemption from the requirements of Section 5 of the Securities Act (15 U.S.C. 77e) for any offer or sale to a particular individual or entity, if the issuer relying on the exemption shows:
+
+(1) The failure to comply was insignificant with respect to the offering as a whole;
+
+(2) The issuer made a good faith and reasonable attempt to comply with all applicable terms, conditions and requirements of this part; and
+
+(3) The issuer did not know of such failure where the failure to comply with a term, condition or requirement of this part was the result of the failure of the intermediary to comply with the requirements of section 4A(a) of the Securities Act (15 U.S.C. 77d-1(a)) and the related rules, or such failure by the intermediary occurred solely in offerings other than the issuer's offering.
+
+(b) Paragraph (a) of this section shall not preclude the Commission from bringing an enforcement action seeking any appropriate relief for an issuer's failure to comply with all applicable terms, conditions and requirements of this part.
+
+------------------------------------------------------------------------------
+§ 227.503 Disqualification provisions.
+------------------------------------------------------------------------------
+
+(a) _Disqualification events._ No exemption under section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) shall be available for a sale of securities if the issuer; any predecessor of the issuer; any affiliated issuer; any director, officer, general partner or managing member of the issuer; any beneficial owner of 20 percent or more of the issuer's outstanding voting equity securities, calculated on the basis of voting power; any promoter connected with the issuer in any capacity at the time of filing, any offer after filing, or such sale; any person that has been or will be paid (directly or indirectly) remuneration for solicitation of purchasers in connection with such sale of securities; or any general partner, director, officer or managing member of any such solicitor:
+
+(1) Has been convicted, within 10 years before the filing of the offering statement or such sale (or five years, in the case of issuers, their predecessors and affiliated issuers), of any felony or misdemeanor:
+
+(i) In connection with the purchase or sale of any security;
+
+(ii) Involving the making of any false filing with the Commission; or
+
+(iii) Arising out of the conduct of the business of an underwriter, broker, dealer, municipal securities dealer, investment adviser, funding portal or paid solicitor of purchasers of securities;
+
+(2) Is subject to any order, judgment or decree of any court of competent jurisdiction, entered within five years before the filing of the information required by section 4A(b) of the Securities Act (15 U.S.C. 77d-1(b)) or such sale that, at the time of such filing or sale, restrains or enjoins such person from engaging or continuing to engage in any conduct or practice:
+
+(i) In connection with the purchase or sale of any security;
+
+(ii) Involving the making of any false filing with the Commission; or
+
+(iii) Arising out of the conduct of the business of an underwriter, broker, dealer, municipal securities dealer, investment adviser, funding portal or paid solicitor of purchasers of securities;
+
+(3) Is subject to a final order of a State securities commission (or an agency or officer of a State performing like functions); a State authority that supervises or examines banks, savings associations or credit unions; a State insurance commission (or an agency or officer of a state performing like functions); an appropriate Federal banking agency; the U.S. Commodity Futures Trading Commission; or the National Credit Union Administration that:
+
+(i) At the time of the filing of the information required by section 4A(b) of the Securities Act (15 U.S.C. 77d-1(b)) or such sale, bars the person from:
+
+(A) Association with an entity regulated by such commission, authority, agency or officer;
+
+(B) Engaging in the business of securities, insurance or banking; or
+
+(C) Engaging in savings association or credit union activities; or
+
+(ii) Constitutes a final order based on a violation of any law or regulation that prohibits fraudulent, manipulative or deceptive conduct entered within ten years before such filing of the offering statement or such sale;
+
+(iii) _Instruction to paragraph (a)(3). Final order_ shall mean a written directive or declaratory statement issued by a Federal or State agency, described in this paragraph (a)(3), under applicable statutory authority that provides for notice and an opportunity for hearing, which constitutes a final disposition or action by that Federal or State agency.
+
+(4) Is subject to an order of the Commission entered pursuant to section 15(b) or 15B(c) of the Exchange Act (15 U.S.C. 78_o_(b) or 78_o_-4(c)) or section 203(e) or (f) of the Investment Advisers Act of 1940 (15 U.S.C. 80b-3(e) or (f)) that, at the time of the filing of the information required by section 4A(b) of the Securities Act (15 U.S.C. 77d-1(b)) or such sale:
+
+(i) Suspends or revokes such person's registration as a broker, dealer, municipal securities dealer, investment adviser or funding portal;
+
+(ii) Places limitations on the activities, functions or operations of such person; or
+
+(iii) Bars such person from being associated with any entity or from participating in the offering of any penny stock;
+
+(5) Is subject to any order of the Commission entered within five years before the filing of the information required by section 4A(b) of the Securities Act (15 U.S.C. 77d-1(b)) or such sale that, at the time of such filing or sale, orders the person to cease and desist from committing or causing a violation or future violation of:
+
+(i) Any scienter-based anti-fraud provision of the Federal securities laws, including without limitation section 17(a)(1) of the Securities Act (15 U.S.C. 77q(a)(1)), section 10(b) of the Exchange Act (15 U.S.C. 78j(b)) and 17 CFR 240.10b-5, section 15(c)(1) of the Exchange Act (15 U.S.C. 78_o_(c)(1)) and section 206(1) of the Investment Advisers Act of 1940 (15 U.S.C. 80b-6(1)) or any other rule or regulation thereunder; or
+
+(ii) Section 5 of the Securities Act (15 U.S.C. 77e);
+
+(6) Is suspended or expelled from membership in, or suspended or barred from association with a member of, a registered national securities exchange or a registered national or affiliated securities association for any act or omission to act constituting conduct inconsistent with just and equitable principles of trade;
+
+(7) Has filed (as a registrant or issuer), or was or was named as an underwriter in, any registration statement or Regulation A (17 CFR 230.251 through 230.263) offering statement filed with the Commission that, within five years before the filing of the information required by section 4A(b) of the Securities Act (15 U.S.C. 77d-1(b)) or such sale, was the subject of a refusal order, stop order, or order suspending the Regulation A exemption, or is, at the time of such filing or sale, the subject of an investigation or proceeding to determine whether a stop order or suspension order should be issued; or
+
+(8) Is subject to a United States Postal Service false representation order entered within five years before the filing of the information required by section 4A(b) of the Securities Act (15 U.S.C. 77d-1(b)) or such sale, or is, at the time of such filing or sale, subject to a temporary restraining order or preliminary injunction with respect to conduct alleged by the United States Postal Service to constitute a scheme or device for obtaining money or property through the mail by means of false representations.
+
+_Instruction to paragraph (a):_ With respect to any beneficial owner of 20 percent or more of the issuer's outstanding voting equity securities, calculated on the basis of voting power, the issuer is required to determine whether a disqualifying event has occurred only as of the time of filing of the offering statement and not from the time of such sale.
+
+(b) _Transition, waivers, reasonable care exception._ Paragraph (a) of this section shall not apply:
+
+(1) With respect to any conviction, order, judgment, decree, suspension, expulsion or bar that occurred or was issued before May 16, 2016;
+
+(2) Upon a showing of good cause and without prejudice to any other action by the Commission, if the Commission determines that it is not necessary under the circumstances that an exemption be denied;
+
+(3) If, before the filing of the information required by section 4A(b) of the Securities Act (15 U.S.C. 77d-1(b)) or such sale, the court or regulatory authority that entered the relevant order, judgment or decree advises in writing (whether contained in the relevant judgment, order or decree or separately to the Commission or its staff) that disqualification under paragraph (a) of this section should not arise as a consequence of such order, judgment or decree; or
+
+(4) If the issuer establishes that it did not know and, in the exercise of reasonable care, could not have known that a disqualification existed under paragraph (a) of this section.
+
+_Instruction to paragraph (b)(4)._ An issuer will not be able to establish that it has exercised reasonable care unless it has made, in light of the circumstances, factual inquiry into whether any disqualifications exist. The nature and scope of the factual inquiry will vary based on the facts and circumstances concerning, among other things, the issuer and the other offering participants.
+
+(c) _Affiliated issuers._ For purposes of paragraph (a) of this section, events relating to any affiliated issuer that occurred before the affiliation arose will be not considered disqualifying if the affiliated entity is not:
+
+(1) In control of the issuer; or
+
+(2) Under common control with the issuer by a third party that was in control of the affiliated entity at the time of such events.
+
+(d) _Intermediaries._ A person that is subject to a statutory disqualification as defined in section 3(a)(39) of the Exchange Act (15 U.S.C. 78c(a)(39)) may not act as, or be an associated person of, an intermediary in a transaction involving the offer or sale of securities in reliance on section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) unless so permitted pursuant to Commission rule or order.
+
+_Instruction to paragraph (d)._ § 240.17f-2 of this chapter generally requires the fingerprinting of every person who is a partner, director, officer or employee of a broker, subject to certain exceptions.
+
+[80 FR 71537, Nov. 16, 2015, as amended at 86 FR 3592, Jan. 14, 2021]
+
+------------------------------------------------------------------------------
+§ 227.504 Definition of “qualified purchaser”.
+------------------------------------------------------------------------------
+
+For purposes of section 18(b)(3) of the Securities Act [15 U.S.C. 77r(b)(3)], a “qualified purchaser” means any person to whom securities are offered or sold pursuant to an offering under §§ 227.100 through 227.504 (Regulation Crowdfunding).
+
+[86 FR 3593, Jan. 14, 2021]
+
+
+================================================================================
+ANNEX — provisions outside 17 CFR Part 227 relied on by its text
+Fetched 2026-08-05 from the eCFR versioner API, same route as above:
+  https://www.ecfr.gov/api/versioner/v1/full/2026-08-03/title-17.xml?part=230&section=230.501
+  https://www.ecfr.gov/api/versioner/v1/full/2026-08-03/title-17.xml?part=270&section=270.3a-9
+================================================================================
+
+------------------------------------------------------------------------------
+§ 230.501 Definitions and terms used in Regulation D.
+------------------------------------------------------------------------------
+
+As used in Regulation D (§ 230.500 _et seq._ of this chapter), the following terms shall have the meaning indicated:
+
+(a) _Accredited investor. Accredited investor_ shall mean any person who comes within any of the following categories, or who the issuer reasonably believes comes within any of the following categories, at the time of the sale of the securities to that person:
+
+(1) Any bank as defined in section 3(a)(2) of the Act, or any savings and loan association or other institution as defined in section 3(a)(5)(A) of the Act whether acting in its individual or fiduciary capacity; any broker or dealer registered pursuant to section 15 of the Securities Exchange Act of 1934; any investment adviser registered pursuant to section 203 of the Investment Advisers Act of 1940 or registered pursuant to the laws of a state; any investment adviser relying on the exemption from registering with the Commission under section 203(l) or (m) of the Investment Advisers Act of 1940; any insurance company as defined in section 2(a)(13) of the Act; any investment company registered under the Investment Company Act of 1940 or a business development company as defined in section 2(a)(48) of that act; any Small Business Investment Company licensed by the U.S. Small Business Administration under section 301(c) or (d) of the Small Business Investment Act of 1958; any Rural Business Investment Company as defined in section 384A of the Consolidated Farm and Rural Development Act; any plan established and maintained by a state, its political subdivisions, or any agency or instrumentality of a state or its political subdivisions, for the benefit of its employees, if such plan has total assets in excess of $5,000,000; any employee benefit plan within the meaning of the Employee Retirement Income Security Act of 1974 if the investment decision is made by a plan fiduciary, as defined in section 3(21) of such act, which is either a bank, savings and loan association, insurance company, or registered investment adviser, or if the employee benefit plan has total assets in excess of $5,000,000 or, if a self-directed plan, with investment decisions made solely by persons that are accredited investors;
+
+(2) Any private business development company as defined in section 202(a)(22) of the Investment Advisers Act of 1940;
+
+(3) Any organization described in section 501(c)(3) of the Internal Revenue Code, corporation, Massachusetts or similar business trust, partnership, or limited liability company, not formed for the specific purpose of acquiring the securities offered, with total assets in excess of $5,000,000;
+
+(4) Any director, executive officer, or general partner of the issuer of the securities being offered or sold, or any director, executive officer, or general partner of a general partner of that issuer;
+
+(5) Any natural person whose individual net worth, or joint net worth with that person's spouse or spousal equivalent, exceeds $1,000,000;
+
+(i) Except as provided in paragraph (a)(5)(ii) of this section, for purposes of calculating net worth under this paragraph (a)(5):
+
+(A) The person's primary residence shall not be included as an asset;
+
+(B) Indebtedness that is secured by the person's primary residence, up to the estimated fair market value of the primary residence at the time of the sale of securities, shall not be included as a liability (except that if the amount of such indebtedness outstanding at the time of sale of securities exceeds the amount outstanding 60 days before such time, other than as a result of the acquisition of the primary residence, the amount of such excess shall be included as a liability); and
+
+(C) Indebtedness that is secured by the person's primary residence in excess of the estimated fair market value of the primary residence at the time of the sale of securities shall be included as a liability;
+
+(ii) Paragraph (a)(5)(i) of this section will not apply to any calculation of a person's net worth made in connection with a purchase of securities in accordance with a right to purchase such securities, provided that:
+
+(A) Such right was held by the person on July 20, 2010;
+
+(B) The person qualified as an accredited investor on the basis of net worth at the time the person acquired such right; and
+
+(C) The person held securities of the same issuer, other than such right, on July 20, 2010.
+
+For the purposes of calculating joint net worth in this paragraph (a)(5): Joint net worth can be the aggregate net worth of the investor and spouse or spousal equivalent; assets need not be held jointly to be included in the calculation. Reliance on the joint net worth standard of this paragraph (a)(5) does not require that the securities be purchased jointly.
+
+(6) Any natural person who had an individual income in excess of $200,000 in each of the two most recent years or joint income with that person's spouse or spousal equivalent in excess of $300,000 in each of those years and has a reasonable expectation of reaching the same income level in the current year;
+
+(7) Any trust, with total assets in excess of $5,000,000, not formed for the specific purpose of acquiring the securities offered, whose purchase is directed by a sophisticated person as described in § 230.506(b)(2)(ii);
+
+(8) Any entity in which all of the equity owners are accredited investors;
+
+It is permissible to look through various forms of equity ownership to natural persons in determining the accredited investor status of entities under this paragraph (a)(8). If those natural persons are themselves accredited investors, and if all other equity owners of the entity seeking accredited investor status are accredited investors, then this paragraph (a)(8) may be available.
+
+(9) Any entity, of a type not listed in paragraph (a)(1), (2), (3), (7), or (8), not formed for the specific purpose of acquiring the securities offered, owning investments in excess of $5,000,000;
+
+For the purposes this paragraph (a)(9), “investments” is defined in rule 2a51-1(b) under the Investment Company Act of 1940 (17 CFR 270.2a51-1(b)).
+
+(10) Any natural person holding in good standing one or more professional certifications or designations or credentials from an accredited educational institution that the Commission has designated as qualifying an individual for accredited investor status. In determining whether to designate a professional certification or designation or credential from an accredited educational institution for purposes of this paragraph (a)(10), the Commission will consider, among others, the following attributes:
+
+(i) The certification, designation, or credential arises out of an examination or series of examinations administered by a self-regulatory organization or other industry body or is issued by an accredited educational institution;
+
+(ii) The examination or series of examinations is designed to reliably and validly demonstrate an individual's comprehension and sophistication in the areas of securities and investing;
+
+(iii) Persons obtaining such certification, designation, or credential can reasonably be expected to have sufficient knowledge and experience in financial and business matters to evaluate the merits and risks of a prospective investment; and
+
+(iv) An indication that an individual holds the certification or designation is either made publicly available by the relevant self-regulatory organization or other industry body or is otherwise independently verifiable;
+
+The Commission will designate professional certifications or designations or credentials for purposes of this paragraph (a)(10), by order, after notice and an opportunity for public comment. The professional certifications or designations or credentials currently recognized by the Commission as satisfying the above criteria will be posted on the Commission's website.
+
+(11) Any natural person who is a “knowledgeable employee,” as defined in rule 3c-5(a)(4) under the Investment Company Act of 1940 (17 CFR 270.3c-5(a)(4)), of the issuer of the securities being offered or sold where the issuer would be an investment company, as defined in section 3 of such act, but for the exclusion provided by either section 3(c)(1) or section 3(c)(7) of such act;
+
+(12) Any “family office,” as defined in rule 202(a)(11)(G)-1 under the Investment Advisers Act of 1940 (17 CFR 275.202(a)(11)(G)-1):
+
+(i) With assets under management in excess of $5,000,000,
+
+(ii) That is not formed for the specific purpose of acquiring the securities offered, and
+
+(iii) Whose prospective investment is directed by a person who has such knowledge and experience in financial and business matters that such family office is capable of evaluating the merits and risks of the prospective investment; and
+
+(13) Any “family client,” as defined in rule 202(a)(11)(G)-1 under the Investment Advisers Act of 1940 (17 CFR 275.202(a)(11)(G)-1)), of a family office meeting the requirements in paragraph (a)(12) of this section and whose prospective investment in the issuer is directed by such family office pursuant to paragraph (a)(12)(iii).
+
+(b) _Affiliate._ An _affiliate_ of, or person _affiliated_ with, a specified person shall mean a person that directly, or indirectly through one or more intermediaries, controls or is controlled by, or is under common control with, the person specified.
+
+(c) _Aggregate offering price. Aggregate offering price_ shall mean the sum of all cash, services, property, notes, cancellation of debt, or other consideration to be received by an issuer for issuance of its securities. Where securities are being offered for both cash and non-cash consideration, the aggregate offering price shall be based on the price at which the securities are offered for cash. Any portion of the aggregate offering price attributable to cash received in a foreign currency shall be translated into United States currency at the currency exchange rate in effect at a reasonable time prior to or on the date of the sale of the securities. If securities are not offered for cash, the aggregate offering price shall be based on the value of the consideration as established by bona fide sales of that consideration made within a reasonable time, or, in the absence of sales, on the fair value as determined by an accepted standard. Such valuations of non-cash consideration must be reasonable at the time made.
+
+(d) _Business combination. Business combination_ shall mean any transaction of the type specified in paragraph (a) of Rule 145 under the Act (17 CFR 230.145) and any transaction involving the acquisition by one issuer, in exchange for all or a part of its own or its parent's stock, of stock of another issuer if, immediately after the acquisition, the acquiring issuer has control of the other issuer (whether or not it had control before the acquisition).
+
+(e) _Calculation of number of purchasers._ For purposes of calculating the number of purchasers under § 230.506(b) only, the following shall apply:
+
+(1) The following purchasers shall be excluded:
+
+(i) Any relative, spouse or relative of the spouse of a purchaser who has the same primary residence as the purchaser;
+
+(ii) Any trust or estate in which a purchaser and any of the persons related to him as specified in paragraph (e)(1)(i) or (e)(1)(iii) of this section collectively have more than 50 percent of the beneficial interest (excluding contingent interests);
+
+(iii) Any corporation or other organization of which a purchaser and any of the persons related to him as specified in paragraph (e)(1)(i) or (e)(1)(ii) of this section collectively are beneficial owners of more than 50 percent of the equity securities (excluding directors' qualifying shares) or equity interests; and
+
+(iv) Any accredited investor.
+
+(2) A corporation, partnership or other entity shall be counted as one purchaser. If, however, that entity is organized for the specific purpose of acquiring the securities offered and is not an accredited investor under paragraph (a)(8) of this section, then each beneficial owner of equity securities or equity interests in the entity shall count as a separate purchaser for all provisions of Regulation D (§§ 230.501-230.508), except to the extent provided in paragraph (e)(1) of this section.
+
+(3) A non-contributory employee benefit plan within the meaning of Title I of the Employee Retirement Income Security Act of 1974 shall be counted as one purchaser where the trustee makes all investment decisions for the plan.
+
+The issuer must satisfy all the other provisions of Regulation D for all purchasers whether or not they are included in calculating the number of purchasers. Clients of an investment adviser or customers of a broker or dealer shall be considered the “purchasers” under Regulation D regardless of the amount of discretion given to the investment adviser or broker or dealer to act on behalf of the client or customer.
+
+(f) _Executive officer. Executive officer_ shall mean the president, any vice president in charge of a principal business unit, division or function (such as sales, administration or finance), any other officer who performs a policy making function, or any other person who performs similar policy making functions for the issuer. Executive officers of subsidiaries may be deemed executive officers of the issuer if they perform such policy making functions for the issuer.
+
+(g) _Final order. Final order_ shall mean a written directive or declaratory statement issued by a federal or state agency described in § 230.506(d)(1)(iii) under applicable statutory authority that provides for notice and an opportunity for hearing, which constitutes a final disposition or action by that federal or state agency.
+
+(h) _Issuer._ The definition of the term _issuer_ in section 2(a)(4) of the Act shall apply, except that in the case of a proceeding under the Federal Bankruptcy Code (11 U.S.C. 101 _et seq._), the trustee or debtor in possession shall be considered the issuer in an offering under a plan or reorganization, if the securities are to be issued under the plan.
+
+(i) _Purchaser representative. Purchaser representative_ shall mean any person who satisfies all of the following conditions or who the issuer reasonably believes satisfies all of the following conditions:
+
+(1) Is not an affiliate, director, officer or other employee of the issuer, or beneficial owner of 10 percent or more of any class of the equity securities or 10 percent or more of the equity interest in the issuer, except where the purchaser is:
+
+(i) A relative of the purchaser representative by blood, marriage or adoption and not more remote than a first cousin;
+
+(ii) A trust or estate in which the purchaser representative and any persons related to him as specified in paragraph (i)(1)(i) or (iii) of this section collectively have more than 50 percent of the beneficial interest (excluding contingent interest) or of which the purchaser representative serves as trustee, executor, or in any similar capacity; or
+
+(iii) A corporation or other organization of which the purchaser representative and any persons related to him as specified in paragraph (i)(1)(i) or (ii) of this section collectively are the beneficial owners of more than 50 percent of the equity securities (excluding directors' qualifying shares) or equity interests;
+
+(2) Has such knowledge and experience in financial and business matters that he is capable of evaluating, alone, or together with other purchaser representatives of the purchaser, or together with the purchaser, the merits and risks of the prospective investment;
+
+(3) Is acknowledged by the purchaser in writing, during the course of the transaction, to be his purchaser representative in connection with evaluating the merits and risks of the prospective investment; and
+
+(4) Discloses to the purchaser in writing a reasonable time prior to the sale of securities to that purchaser any material relationship between himself or his affiliates and the issuer or its affiliates that then exists, that is mutually understood to be contemplated, or that has existed at any time during the previous two years, and any compensation received or to be received as a result of such relationship.
+
+(j) _Spousal equivalent._ The term _spousal equivalent_ shall mean a cohabitant occupying a relationship generally equivalent to that of a spouse.
+
+A person acting as a purchaser representative should consider the applicability of the registration and antifraud provisions relating to brokers and dealers under the Securities Exchange Act of 1934 (_Exchange Act_) (15 U.S.C. 78a _et seq.,_ as amended) and relating to investment advisers under the Investment Advisers Act of 1940.
+
+The acknowledgment required by paragraph (h)(3) and the disclosure required by paragraph (h)(4) of this section must be made with specific reference to each prospective investment. Advance blanket acknowledgment, such as for _all securities transactions_ or _all private placements,_ is not sufficient.
+
+Disclosure of any material relationships between the purchaser representative or his affiliates and the issuer or its affiliates does not relieve the purchaser representative of his obligation to act in the interest of the purchaser.
+
+[47 FR 11262, Mar. 16, 1982, as amended at 53 FR 7868, Mar. 10, 1988; 54 FR 11372, Mar. 20, 1989; 76 FR 81806, Dec. 29, 2011; 77 FR 18685, Mar. 28, 2012; 78 FR 44770, 44804, July 24, 2013; 81 FR 83553, Nov. 21, 2016; 85 FR 64277, Oct. 9, 2020; 90 FR 9687, Feb. 18, 2025]
+
+------------------------------------------------------------------------------
+§ 270.3a-9 Crowdfunding vehicle.
+------------------------------------------------------------------------------
+
+(a) Notwithstanding section 3(a) of the Act, a crowdfunding vehicle will be deemed not to be an investment company if the vehicle:
+
+(1) Is organized and operated for the sole purpose of directly acquiring, holding, and disposing of securities issued by a single crowdfunding issuer and raising capital in one or more offerings made in compliance with §§ 227.100 through 227.504 (Regulation Crowdfunding);
+
+(2) Does not borrow money and uses the proceeds from the sale of its securities solely to purchase a single class of securities of a single crowdfunding issuer;
+
+(3) Issues only one class of securities in one or more offerings under Regulation Crowdfunding in which the crowdfunding vehicle and the crowdfunding issuer are deemed to be co-issuers under the Securities Act (15 U.S.C. 77a _et seq._);
+
+(4) Receives a written undertaking from the crowdfunding issuer to fund or reimburse the expenses associated with its formation, operation, or winding up, receives no other compensation, and any compensation paid to any person operating the vehicle is paid solely by the crowdfunding issuer;
+
+(5) Maintains the same fiscal year-end as the crowdfunding issuer;
+
+(6) Maintains a one-to-one relationship between the number, denomination, type and rights of crowdfunding issuer securities it owns and the number, denomination, type and rights of its securities outstanding;
+
+(7) Seeks instructions from the holders of its securities with regard to:
+
+(i) The voting of the crowdfunding issuer securities it holds and votes the crowdfunding issuer securities only in accordance with such instructions; and
+
+(ii) Participating in tender or exchange offers or similar transactions conducted by the crowdfunding issuer and participates in such transactions only in accordance with such instructions;
+
+(8) Receives, from the crowdfunding issuer, all disclosures and other information required under Regulation Crowdfunding and the crowdfunding vehicle promptly provides such disclosures and other information to the investors and potential investors in the crowdfunding vehicle's securities and to the relevant intermediary; and
+
+(9) Provides to each investor the right to direct the crowdfunding vehicle to assert the rights under State and Federal law that the investor would have if he or she had invested directly in the crowdfunding issuer and provides to each investor any information that it receives from the crowdfunding issuer as a shareholder of record of the crowdfunding issuer.
+
+(b) For purposes of this section:
+
+(1) _Crowdfunding issuer_ means a company that seeks to raise capital as a co-issuer with a crowdfunding vehicle in an offering that complies with all of the requirements under section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) and Regulation Crowdfunding.
+
+(2) _Crowdfunding vehicle_ means an issuer formed by or on behalf of a crowdfunding issuer for the purpose of conducting an offering under section 4(a)(6) of the Securities Act (15 U.S.C. 77d(a)(6)) as a co-issuer with the crowdfunding issuer, which offering is controlled by the crowdfunding issuer.
+
+(3) _Regulation Crowdfunding_ means the regulations set forth in §§ 227.100 through 227.504 of this chapter.
+
+[86 FR 3602, Jan. 14, 2021]
