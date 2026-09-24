@@ -41,3 +41,14 @@ DECIDE `is eligible for benefit` IS
   AND NOT `has criminal record`
 
 #CHECK `is eligible for benefit`
+
+-- Binding Assumed Values
+
+-- No directive binds an ASSUME inside a file; values arrive at deployment.
+-- To test in the file, make the input a GIVEN parameter and supply it by name.
+
+GIVEN `applicant age for test` IS A NUMBER
+DECIDE `is adult` IF `applicant age for test` >= 18
+
+#EVAL `is adult` WITH `applicant age for test` IS 25
+#ASSERT `is adult` WITH `applicant age for test` IS 25

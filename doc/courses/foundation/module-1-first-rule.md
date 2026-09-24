@@ -188,6 +188,11 @@ When a function returns an obligation (not just a value), we use `GIVETH A DEONT
 
 Don't worry about mastering `DEONTIC` yet—copy the pattern for now; it is taught fully in Module 6.
 
+> **Looking ahead.** When actions carry an actor field (the value-actor encoding), L4
+> enforces that the party obligated in `PARTY p MUST a` matches `a`'s performer. This
+> is covered fully in Module 6 and in
+> [Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md).
+
 ---
 
 ## Testing with #EVAL

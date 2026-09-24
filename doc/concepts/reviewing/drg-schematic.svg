@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 150" role="img" aria-label="Schematic decision requirements graph">
+<style>
+svg{--ink:#191511;--soft:#5d5648;--line:#ddd5c6;--wax:#b03d29;--jade:#2e7d5b;--gold:#9a7b2d;--card:#ffffff;--paper:#faf7f1}
+@media (prefers-color-scheme:dark){svg{--ink:#eae4d8;--soft:#a49a88;--line:#332e26;--wax:#e06a52;--jade:#5fbd93;--gold:#d4af52;--card:#1d1a16;--paper:#141210}}
+.lane{fill:none;stroke:var(--line)}
+.lbl2{font-family:"SF Mono",Menlo,monospace;font-size:12px;fill:var(--soft)}
+.nm{font-family:"SF Mono",Menlo,monospace;font-size:13px;fill:var(--ink)}
+.cond{font-family:"SF Mono",Menlo,monospace;font-size:11px;fill:var(--soft)}
+.flow{fill:none;stroke:var(--soft);stroke-width:2}
+.node{fill:var(--card);stroke:var(--soft);stroke-width:2}
+</style>
+  <g font-family="SF Mono,Menlo,monospace" font-size="12">
+    <ellipse cx="90" cy="115" rx="78" ry="20" fill="none" stroke="var(--soft)" stroke-width="1.6"/>
+    <text x="90" y="119" text-anchor="middle" fill="var(--soft)">offering amount</text>
+    <ellipse cx="285" cy="115" rx="82" ry="20" fill="none" stroke="var(--soft)" stroke-width="1.6"/>
+    <text x="285" y="119" text-anchor="middle" fill="var(--soft)">first-time issuer</text>
+    <rect x="105" y="20" width="230" height="34" rx="4" fill="none" stroke="var(--jade)" stroke-width="2"/>
+    <text x="220" y="42" text-anchor="middle" fill="var(--ink)">financial statements required</text>
+    <rect x="420" y="20" width="180" height="34" rx="4" fill="none" stroke="var(--jade)" stroke-width="2"/>
+    <text x="510" y="42" text-anchor="middle" fill="var(--ink)">disclosure obligations</text>
+    <path d="M110,96 L180,58" stroke="var(--soft)" stroke-width="1.6" fill="none"/>
+    <path d="M280,96 L245,58" stroke="var(--soft)" stroke-width="1.6" fill="none"/>
+    <path d="M338,37 L417,37" stroke="var(--soft)" stroke-width="1.6" fill="none" stroke-dasharray="1 3"/>
+  </g>
+</svg>

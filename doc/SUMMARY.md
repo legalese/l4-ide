@@ -17,6 +17,15 @@
 - [Patterns](reference/patterns/README.md)
 - [Errors and Troubleshooting](reference/errors/README.md)
 
+## Exports
+
+- [Overview](exports/README.md)
+- [docassemble](exports/docassemble.md)
+- [OpenFisca](exports/openfisca.md)
+- [Catala](exports/catala.md)
+- [Blawx](exports/blawx.md)
+- [DMN and BPMN](exports/dmn-bpmn.md)
+
 ## Courses
 
 - [Overview](courses/README.md)

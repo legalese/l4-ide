@@ -57,8 +57,12 @@ DECIDE isEligible IS
 ## Behavior
 
 - Assumed values can be used in expressions but have no defined value
-- When evaluated directly, assumed values remain symbolic
-- Assumed values are typically bound via `#CHECK ... WITH` or `#TRACE ... WITH`
+- Evaluating an expression that needs one stops: "I could not continue evaluating, because I
+  needed to know the value of ... but it is an assumed term"
+- No directive binds an assumed value inside a file. `WITH` supplies named arguments to a
+  _function_, so `#CHECK isAdult WITH age IS 25` is a type error when `isAdult` takes no
+  parameters. Values are supplied at deployment (next section); for in-file tests, declare
+  the input as a `GIVEN` parameter instead (see [Binding Assumed Values](#binding-assumed-values))
 
 ## ASSUME and `@export`
 
@@ -96,13 +100,29 @@ refuses to deploy such bundles.
 
 ## Binding Assumed Values
 
+There is no in-file binding form. The following is a type error, because `WITH` passes
+named arguments to a function and `isAdult` is not one:
+
 ```l4
 ASSUME age IS A NUMBER
 
 DECIDE isAdult IS age >= 18
 
--- Bind the assumed value for checking
+-- ✘ You are trying to apply isAdult ... of type BOOLEAN (which is not a function)
+--   to (named) arguments
 #CHECK isAdult WITH age IS 25
+```
+
+At deployment, `jl4-service` binds `age` from the request (see
+[ASSUME and `@export`](#assume-and-export)). To exercise the rule in the file, make `age`
+a `GIVEN` parameter; `WITH` then supplies it by name:
+
+```l4
+GIVEN age IS A NUMBER
+DECIDE isAdult IF age >= 18
+
+#EVAL isAdult WITH age IS 25     -- TRUE
+#ASSERT isAdult WITH age IS 25
 ```
 
 ## Related Keywords
