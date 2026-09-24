@@ -1,0 +1,283 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Singapore succession — the shared domain`
+
+-- ===========================================================================
+-- THE SHARED ONTOLOGY for Singapore's succession trio:
+--
+--   Wills Act 1838                      (WA1838)   -- is there a valid will?
+--   Intestate Succession Act 1967       (ISA1967)  -- who takes, in what shares?
+--   Probate and Administration Act 1934 (PAA1934)  -- who administers, and when?
+--
+-- WHY ONE ONTOLOGY AND NOT THREE ENCODINGS. The three Acts are not three
+-- subjects. They are three views of ONE event -- a death -- and they share
+-- their nouns: the same person is the PAA's "deceased", the Wills Act's
+-- "testator" and the ISA's "intestate"; the same human being is a beneficiary
+-- under a will, a next-of-kin under ISA rule 3, and a person "interested in
+-- the estate" with standing to apply for a grant under PAA s 18(2). Encoding
+-- each Act against its own private notion of a person would triplicate the
+-- family tree and let the three copies disagree -- and the questions users
+-- actually ask ("my father died without a will, who gets the flat, and how
+-- long does it take?") cross all three Acts in a single breath.
+--
+-- So this module owns the nouns. Each Act module owns its own verbs, imports
+-- these types, and never redeclares them.
+--
+-- INERT STYLE. Nothing here is exported. The types carry the statutes' own
+-- words in their FIELD NAMES so a domain expert can read a record declaration
+-- against the section it comes from. Citations ride on `@ref`.
+--
+-- WHAT THIS MODULE DELIBERATELY DOES NOT DO. It states no rule. A field here
+-- records a FACT about the world ("the will was signed at the foot or end");
+-- whether that fact makes the will valid is the Wills Act module's business.
+-- The split is what lets the fork register point at one reading of one rule
+-- without the ontology moving underneath it.
+-- ===========================================================================
+
+
+§§ `Persons, and the recursion the ISA needs`
+
+-- ISA s 7 rule 3 distributes "by equal portions per stirpes ... amongst the
+-- children ... and such persons as legally represent those children, in case
+-- any of those children be then dead", and Proviso No. (2) pushes that to
+-- "the remotest degree". A person is therefore a TREE, not a row: to divide
+-- per stirpes you must be able to ask, of a predeceased child, who stands in
+-- their place -- and of those, the same question again.
+--
+-- `issue` holds that person's own descendants. It is populated only where the
+-- distribution needs it: a surviving child's issue never take (their parent
+-- takes), so a surviving child may carry EMPTY issue without affecting any
+-- answer.
+DECLARE Person
+    HAS `name`                    IS A STRING
+        `survived the deceased`   IS A BOOLEAN
+        `issue`                   IS A LIST OF Person
+
+-- ISA s 6(a): a person "only conceived in the womb" at the date of death who
+-- is "subsequently born alive" is treated as surviving. That is a fact about
+-- the person, so it is recorded by setting `survived the deceased` TRUE --
+-- the Act tells you how to classify, and classification happens at data-entry
+-- time, not at rule time. Recorded here because a reader looking for s 6(a)
+-- in the ISA module will not find a rule for it.
+
+
+§§ `The deceased`
+
+-- ISA s 2 excludes Muslims ENTIRELY from the Act; their estates are governed
+-- by the Administration of Muslim Law Act 1966 and by Muslim law. This is not
+-- a rounding error in an end-user tool -- it changes the answer completely --
+-- so the flag is a required field rather than an optional one, and every
+-- entry point is obliged to branch on it.
+--
+-- ISA s 4 and s 5 make DOMICILE and the MOVABLE/IMMOVABLE split jointly
+-- decisive: movables follow the law of the domicile, Singapore immovables
+-- follow this Act whatever the domicile.
+DECLARE Deceased
+    HAS `name`                        IS A STRING
+        `date of death`               IS A DATE
+        `domiciled in Singapore`      IS A BOOLEAN
+        `Muslim`                      IS A BOOLEAN
+
+
+§§ `The family`
+
+-- The classes ISA s 7 rules 1-8 draw on, in the Act's own order. Each list
+-- holds only persons in that class; whether they take is the ISA module's
+-- question.
+--
+-- `surviving spouses` is a LIST and not a single person because ISA s 8
+-- contemplates an intestate who "leaves surviving him more than one wife",
+-- who then "share among them equally the share that the wife ... would have
+-- been entitled to". A monogamous estate is the one-element case, not a
+-- different shape.
+DECLARE Family
+    HAS `surviving spouses`   IS A LIST OF Person
+        `children`            IS A LIST OF Person
+        `parents`             IS A LIST OF Person
+        `siblings`            IS A LIST OF Person
+        `grandparents`        IS A LIST OF Person
+        `uncles and aunts`    IS A LIST OF Person
+
+-- NOT MODELLED, AND WHY. ISA s 3 defines "child" as "a legitimate child and
+-- includes any child adopted by virtue of an order of court". An illegitimate
+-- child is therefore NOT a "child" for ISA purposes and does not take on
+-- intestacy. That is a live and consequential feature of the law, but it is a
+-- CLASSIFICATION rule, not a distribution rule: it decides whether a human
+-- being belongs in the `children` list at all. It is recorded in the fork
+-- register rather than encoded as a predicate, because the tool cannot
+-- observe legitimacy -- it can only be told.
+--
+-- ISA s 6(b) ranks half-blood relations "immediately after those of the whole
+-- blood related to him in the same degree". Within rules 6 and 8 that matters
+-- only where whole-blood relations in the same degree exist; see the ISA
+-- module's note.
+
+
+§§ `The estate`
+
+-- ISA s 5 distributes "that property or the proceeds thereof, AFTER PAYMENT
+-- THEREOUT of the expenses of due administration as prescribed by the
+-- Probate and Administration Act 1934" -- so the ISA never divides the gross
+-- estate. What it divides is what the PAA module computes.
+--
+-- The movable/immovable split is not presentational. Under ISA s 4(1)
+-- movables are regulated by the law of the domicile; under s 4(2) immovables
+-- are regulated by this Act "wherever he may have been domiciled". A
+-- foreign-domiciled deceased with a Singapore flat is therefore the ordinary
+-- case in which this Act governs PART of the estate and foreign law the rest.
+DECLARE Estate
+    HAS `immovable property in Singapore`  IS A NUMBER
+        `movable property in Singapore`    IS A NUMBER
+        `funeral, testamentary and administration expenses` IS A NUMBER
+        `debts and liabilities`            IS A NUMBER
+
+
+§§ `The will`
+
+-- The facts the Wills Act tests. Every field is an OBSERVATION about the
+-- document and its execution; the Wills Act module decides what they add up
+-- to. Field names quote s 4, s 6(2), s 13 and s 27 so a reviewer can lay the
+-- declaration beside the section.
+DECLARE Will
+    HAS `in writing`                                  IS A BOOLEAN
+        `signed at the foot or end by the testator`   IS A BOOLEAN
+        `number of attesting witnesses`               IS A NUMBER
+        `witnesses present at the same time`          IS A BOOLEAN
+        `witnesses subscribed in the testator's presence` IS A BOOLEAN
+        `testator's age at execution`                 IS A NUMBER
+        `soldier in actual military service or mariner at sea` IS A BOOLEAN
+        `married after execution`                     IS A BOOLEAN
+        `expressed to be made in contemplation of that marriage` IS A BOOLEAN
+        `revoked by a later will, writing or destruction` IS A BOOLEAN
+        `proportion of the estate beneficially disposed of` IS A NUMBER
+        `an executor is appointed, and able and willing to act` IS A BOOLEAN
+
+-- `proportion of the estate beneficially disposed of` is a SIMPLIFICATION,
+-- and the only one in this ontology. ISA s 10 applies the intestacy rules to
+-- "the part of his property not so disposed of", which in general requires
+-- identifying WHICH property a will fails to dispose of -- a construction
+-- question over the will's own text. This tool cannot read the will, so it
+-- takes the undisposed part as a proportion of value: 1 means a will that
+-- disposes of nothing, 0 a will that exhausts the estate. It is exact where
+-- the gap is a residuary share and approximate where the gap is a specific
+-- asset. Recorded in the fork register.
+
+
+§§ `The case`
+
+-- One record threaded as a single GIVEN parameter, per house style: an
+-- ASSUME-shaped module typechecks but will not evaluate, and every question
+-- this corpus answers is a question about one death.
+DECLARE Case
+    HAS `deceased`  IS A Deceased
+        `family`    IS A Family
+        `estate`    IS A Estate
+        `will`      IS A MAYBE Will
+
+
+§§ `Interpretation — the materialised forks`
+
+-- R4 (fork representation): a fork that is MATERIALISED is one field of an
+-- `Interpretation` record threaded as an ordinary GIVEN, so that both
+-- readings are executable and the test suite can show what turns on the
+-- difference. Forks resolved at encode time, or delegated to whoever supplies
+-- the facts, are recorded in the fork register and do NOT appear here.
+--
+-- Each field is documented at the rule it bears on; see the ISA module.
+-- `TYPICALLY` carries the orthodox reading as the field's default, which is the
+-- slot a settling authority would be cited at if one ever settles the fork.
+-- Both defaults are TRUE: both take the stirpital reading, which is the one the
+-- fork register records as `live`.
+DECLARE Interpretation
+    HAS `stirpital division starts at the child generation` IS A BOOLEAN TYPICALLY TRUE
+        `a sibling's children take per stirpes`             IS A BOOLEAN TYPICALLY TRUE
+
+-- The reading this corpus takes unless a caller says otherwise. Fork-register
+-- entries F1 and F3 carry the argument for each arm.
+GIVETH AN Interpretation
+`the orthodox reading` MEANS
+    Interpretation WITH `stirpital division starts at the child generation` IS TRUE
+                      , `a sibling's children take per stirpes`             IS TRUE
+
+-- The competing reading of F1: where no child survives, division restarts per
+-- capita at the nearest generation in which anyone did.
+GIVETH AN Interpretation
+`the per capita reading` MEANS
+    Interpretation WITH `stirpital division starts at the child generation` IS FALSE
+                      , `a sibling's children take per stirpes`             IS TRUE
+
+
+§§ `Outcomes`
+
+-- What every entry point in this corpus ultimately produces: who takes, how
+-- much, and under which rule. `basis` carries the citation as inert text so
+-- that a projection -- a ladder diagram, a DMN table, the wizard -- can show
+-- the user WHY without re-deriving it.
+--
+-- `fraction` is a share OF THE DISTRIBUTABLE ESTATE, not a money amount.
+-- L4 numbers are exact rationals, so a half really is 1/2 and the shares of
+-- a complete distribution sum to exactly 1 -- a property the test suite
+-- asserts rather than assumes.
+DECLARE Share
+    HAS `taker`     IS A STRING
+        `fraction`  IS A NUMBER
+        `basis`     IS A STRING
+
+-- The shape of an answer. `governed by this Act` is FALSE where ISA s 2
+-- (Muslim estates) or ISA s 4(1) (foreign-domiciled movables) puts the
+-- question outside the Act; in that case `shares` is EMPTY and `basis`
+-- names the regime that does govern, so the tool says "not my question"
+-- rather than answering a question it was not asked.
+DECLARE Distribution
+    HAS `governed by this Act`  IS A BOOLEAN
+        `shares`                IS A LIST OF Share
+        `note`                  IS A STRING
+
+
+§§ `Helpers over the ontology`
+
+GIVEN c IS A Case
+GIVETH A NUMBER
+`gross estate of` c MEANS
+    c's `estate`'s `immovable property in Singapore`
+    PLUS c's `estate`'s `movable property in Singapore`
+
+-- ISA s 5: what is distributed is what remains "after payment thereout of the
+-- expenses of due administration as prescribed by the Probate and
+-- Administration Act 1934". The PAA module owns the ORDER in which those
+-- payments are applied (s 57 and the Second Schedule); the arithmetic of what
+-- is left is common to every caller, so it lives here.
+GIVEN c IS A Case
+GIVETH A NUMBER
+`distributable estate of` c MEANS
+    `gross estate of` c
+    MINUS c's `estate`'s `funeral, testamentary and administration expenses`
+    MINUS c's `estate`'s `debts and liabilities`
+
+-- PAA s 57(1) routes an INSOLVENT estate to the First Schedule (bankruptcy
+-- priorities) and s 57(4) routes a solvent one to the Second Schedule. Which
+-- applies is decided by this comparison and nothing else.
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`the estate is solvent` c MEANS
+    `gross estate of` c
+    AT LEAST
+      (c's `estate`'s `funeral, testamentary and administration expenses`
+       PLUS c's `estate`'s `debts and liabilities`)
+
+GIVEN people IS A LIST OF Person
+GIVETH A LIST OF Person
+`the survivors among` people MEANS
+    filter (GIVEN p YIELD p's `survived the deceased`) people
+
+-- NAMING NOTE. This reads `someone survived among` xs rather than the more
+-- natural `any of` xs `survived`, because a mixfix pattern whose LAST token is
+-- a keyword is accepted where it is DEFINED and then cannot be applied
+-- anywhere: every call site reports "expects 1 argument, but you are applying
+-- it to 2". Reduced to a three-line repro and reported upstream. Until that is
+-- fixed, every mixfix in this corpus ends with an argument.
+GIVEN people IS A LIST OF Person
+GIVETH A BOOLEAN
+`someone survived among` people MEANS
+    any (GIVEN p YIELD p's `survived the deceased`) people

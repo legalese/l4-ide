@@ -1,0 +1,1354 @@
+IMPORT prelude
+IMPORT daydate
+IMPORT `sg-succession-domain`
+
+§ `Wills Act 1838`
+
+-- ===========================================================================
+-- THE WILLS ACT 1838 (WA1838), Singapore, 2020 Rev Ed, informal consolidation
+-- in force from 28 October 2022.
+--
+-- Source: https://sso.agc.gov.sg/Act/WA1838 (official PDF; see
+-- source/fetch-sso.py and source/WA1838.txt for the fetched text this
+-- encoding quotes). Every quotation in this module was cut mechanically from
+-- that file; none was retyped from memory.
+--
+-- SCOPE. This corpus answers "what happens after somebody dies?", and within
+-- that question the Wills Act has exactly one job: IS THERE A VALID WILL, AND
+-- WHAT DOES IT DO? So the sections encoded here are the ones that decide that
+-- and no others:
+--
+--   s 4        Will of infant invalid
+--   s 6        Mode of execution (and s 6(3)-(4) on where the signature sits)
+--   s 10       Gifts to attesting witness or to wife or husband to be void
+--   s 13       Will to be revoked by marriage except in certain cases
+--   s 14       No will to be revoked by presumption from altered circumstances
+--   s 15       Revocation of will or codicil
+--   s 17       Revival of revoked will
+--   s 27       Saving as to wills of soldiers and mariners
+--
+-- STRUCTURE. The module runs in the Act's own order -- 4, 6, 10, 13, 14, 15,
+-- 17, 27 -- and only then composes the three entry points, because a reviewer
+-- reading with the statute open should never have to hunt. The composition is
+-- deliberately last: it is this module's only editorial act, and it is easier
+-- to argue with when it is not scattered through the sections it draws on.
+--
+-- WHAT IS DELIBERATELY NOT HERE. s 3 (property disposable), s 5 (formal
+-- validity by reference to a foreign law -- note that s 5 is NOT confined to
+-- wills executed abroad; see the note at s 6), s 7-9, s 11-12, s 16, s 18-26 and s 28 are read but not
+-- encoded; each is recorded at the point where a reader would expect it, with
+-- the reason. The recurring reason is that this tool cannot read the will's
+-- TEXT -- it is told facts about the will's execution -- so every section that
+-- construes words on the page (s 19-26) is outside what the ontology can feed.
+--
+-- INERT STYLE. Nothing here is exported. The wizard module carries the export
+-- surface; this module is the law, and the law does not have an API.
+-- ===========================================================================
+
+
+§§ `The house rule, restated because it bites hardest here`
+
+-- PARENTHESISE EVERY `NOT`. `NOT` takes a WHOLE expression, not an atom, so
+--
+--     A AND NOT B AND NOT C        parses as     A AND NOT (B AND NOT C)
+--
+-- The ISA module's note records the case where that silently produced a wrong
+-- legal answer. It bites hardest in THIS Act because s 6(2) is a four-limb
+-- conjunction and s 13(1) is "revoked ... except", i.e. a conjunction with a
+-- negated second limb -- exactly the shape above. Every `NOT` below is
+-- parenthesised, including where it is unambiguous.
+
+
+§§ `1. Section 4 -- Will of infant invalid`
+
+@ref WA 1838 s 4 -- Will of infant invalid
+-- "No will made by any person under 21 years of age shall be valid."
+--
+-- Stated as the FACT the section turns on. The consequence -- invalidity --
+-- is applied where the sections are composed, because s 27(1) opens
+-- "Notwithstanding anything in this Act" and lets a soldier or mariner make a
+-- will under 21; folding that exception in here would hide it from a reader
+-- looking up s 4.
+--
+-- 21, not 18, and the reason is the plain one: s 4 says 21, and nothing has
+-- amended it. The tempting explanation -- that the Civil Law (Amendment) Act
+-- 2009 lowered the general age of majority to 18 and expressly carved the
+-- Wills Act out of it -- is wrong on both halves. It is written out here
+-- because it is the error a reader is most likely to arrive with, and because
+-- an earlier version of this comment asserted it.
+--
+-- What Act 7 of 2009 actually did, checked against the Civil Law Act 1909 as it
+-- now stands. Six of its sections carry the [7/2009] marker -- ss 4, 20, 21,
+-- 22, 35 and 36 -- and only the last two are about the age of a minor at all;
+-- the other four are about injunctions and about damages for a wrongful death.
+-- s 35 is headed "Contracts of minors who have attained 18 years of age" and
+-- provides that "a contract entered into by a minor who has attained the age of
+-- 18 years shall have effect as if he were of full age"; s 36 is headed "Legal
+-- proceedings and actions by minors who have attained 18 years of age". Each is
+-- confined to its own subject matter -- contracts, and litigating in one's own
+-- name -- and neither declares a general age of majority. No section of the
+-- Civil Law Act does; there is no age-of-majority provision in it to lower.
+--
+-- Nor is there a Wills Act carve-out. s 35(3) provides that subsection (1)
+-- "shall not affect or alter -- ... (b) the application of any provision in any
+-- other written law stipulating a requirement as to the attainment of a
+-- particular age for the purposes of that written law". That is a generic
+-- saving: it leaves s 4 standing without naming it, along with every other age
+-- requirement in the statute book. s 35(4) then withholds even the contractual
+-- relaxation from dealings in land and in trust interests.
+--
+-- The number in the encoding is the number in the section.
+GIVEN w IS A Will
+GIVETH A BOOLEAN
+`the will is made by a person under 21 years of age` w MEANS
+    w's `testator's age at execution` LESS THAN 21
+
+
+§§ `2. Section 6 -- Mode of execution`
+
+@ref WA 1838 s 6(1) -- Mode of execution
+-- "No will shall be valid unless it is in writing and executed in the manner
+-- mentioned in subsection (2)."
+GIVEN w IS A Will
+GIVETH A BOOLEAN
+`the will is in writing and executed in the manner mentioned in subsection (2)` w MEANS
+    w's `in writing`
+    AND `the will is executed in the manner mentioned in subsection (2)` w
+
+@ref WA 1838 s 6(2) -- first limb: signature
+-- "Every will shall be signed at the foot or end thereof by the testator, or
+-- by some other person in his presence and by his direction, ..."
+--
+-- ONTOLOGY GAP, RECORDED. The Will record carries one boolean,
+-- `signed at the foot or end by the testator`, which cannot distinguish the
+-- testator's own hand from "some other person in his presence and by his
+-- direction". The section treats the two alike, so the ANSWER is unaffected;
+-- what is lost is the tool's ability to ask the amanuensis question, which is
+-- where the litigated failures live (was the direction given? was the
+-- testator present?). Requested as a separate field.
+GIVEN w IS A Will
+GIVETH A BOOLEAN
+`the will is signed at the foot or end thereof by the testator` w MEANS
+    w's `signed at the foot or end by the testator`
+
+@ref WA 1838 s 6(2) -- second limb: acknowledgment before two witnesses at once
+-- "... and the signature shall be made or acknowledged by the testator as the
+-- signature to his will or codicil in the presence of 2 or more witnesses
+-- present at the same time, ..."
+--
+-- Two conditions, and the second is the one that fails in practice: it is not
+-- enough that two people witnessed, they must have been present TOGETHER when
+-- the testator signed or acknowledged. A will taken round to one neighbour on
+-- Monday and another on Tuesday fails this limb with two witnesses on its
+-- face.
+--
+-- MADE OR ACKNOWLEDGED is folded into the same field. The ontology's
+-- `witnesses present at the same time` records that the signature was made or
+-- acknowledged before witnesses so present; it cannot say which. The section
+-- treats them alike.
+GIVEN w IS A Will
+GIVETH A BOOLEAN
+`the signature was made or acknowledged in the presence of 2 or more witnesses present at the same time` w MEANS
+    w's `number of attesting witnesses` AT LEAST 2
+    AND w's `witnesses present at the same time`
+
+@ref WA 1838 s 6(2) -- third limb: subscription
+-- "... and those witnesses shall subscribe the will in the presence of the
+-- testator, but no form of attestation shall be necessary."
+--
+-- "no form of attestation shall be necessary" is why there is no attestation
+-- clause field anywhere in this encoding: a will with no attestation clause
+-- at all is validly executed. The clause is evidential, not constitutive.
+GIVEN w IS A Will
+GIVETH A BOOLEAN
+`those witnesses subscribed the will in the presence of the testator` w MEANS
+    w's `witnesses subscribed in the testator's presence`
+
+-- The three limbs of s 6(2), conjoined in the section's own order. Split out
+-- from s 6(1) so that s 10(3) -- which asks whether the will "is duly executed
+-- without his attestation" -- can re-ask the same question over a smaller
+-- witness count without restating the test.
+GIVEN w IS A Will
+GIVETH A BOOLEAN
+`the will is executed in the manner mentioned in subsection (2)` w MEANS
+    `the will` w `is executed in the manner mentioned in subsection (2) counting` witnesses
+    WHERE
+      witnesses MEANS w's `number of attesting witnesses`
+
+GIVEN w         IS A Will
+      witnesses IS A NUMBER
+GIVETH A BOOLEAN
+`the will` w `is executed in the manner mentioned in subsection (2) counting` witnesses MEANS
+    `the will is signed at the foot or end thereof by the testator` w
+    AND (witnesses AT LEAST 2)
+    AND w's `witnesses present at the same time`
+    AND `those witnesses subscribed the will in the presence of the testator` w
+
+@ref WA 1838 s 6(3) -- position of the signature
+-- "Every will shall, as far only as regards the position of the signature of
+-- the testator, or of the person signing for him as mentioned in
+-- subsection (2), be deemed to be valid under this section if the signature
+-- shall be so placed at or after, or following, or under, or beside, or
+-- opposite to the end of the will, that it shall be apparent on the face of
+-- the will that the testator intended to give effect by such his signature to
+-- the writing signed as his will; and no such will shall be affected by the
+-- circumstance -- (a) that the signature shall not follow or be immediately
+-- after the foot or end of the will; (b) that a blank space shall intervene
+-- between the concluding word of the will and the signature; ..."
+--
+-- Constant TRUE, and that is the encoding, not a shortcut. s 6(3) is a
+-- deeming provision that RELAXES s 6(2)'s "at the foot or end": the five
+-- enumerated circumstances in (a)-(e) cannot defeat a will. So the ontology's
+-- `signed at the foot or end by the testator` is to be answered TRUE for any
+-- signature placed as s 6(3) describes, and this definition records that the
+-- classification has already happened by the time the fact reaches the rule.
+-- The one thing s 6(3) still requires -- that the testator's animus be
+-- "apparent on the face of the will" -- is a judgement on the document, which
+-- is exactly what this tool cannot make.
+GIVEN w IS A Will
+GIVETH A BOOLEAN
+`the position of the signature does not affect the validity of the will` w MEANS TRUE
+
+-- NOT MODELLED: s 6(4). "The enumeration of the circumstances under
+-- subsection (3) shall not restrict the generality of that subsection; but no
+-- signature under this Act shall be operative to give effect to any
+-- disposition or direction which is underneath or which follows it, nor shall
+-- it give effect to any disposition or direction inserted after the signature
+-- shall be made." The first half is a canon of construction about s 6(3) and
+-- needs no encoding. The second half decides WHICH DISPOSITIONS a valid
+-- signature reaches -- a question about the text below the signature line.
+-- This tool is told facts about execution, never the text, so s 6(4) cannot
+-- fire here. It bears on `proportion of the estate beneficially disposed of`,
+-- which is supplied from outside.
+
+-- NOT MODELLED: s 5 (Rules as to formal validity). s 5(1) -- "This section
+-- shall take effect notwithstanding any other provisions of this Act" -- so it
+-- overrides everything above. s 5(2): "A will shall be treated as properly
+-- executed if its execution conformed to the internal law in force -- (a) in
+-- the territory where it was executed; (b) in the territory where the testator
+-- was domiciled at the time -- (i) when the will was executed; or (ii) of his
+-- death; (c) in the territory where the testator habitually resided at either
+-- of the times referred to in paragraph (b); or (d) in the state of which the
+-- testator was a national at either of the times referred to in paragraph (b)."
+--
+-- READ THE LIMBS, NOT THE HEADLINE. It is natural to summarise s 5 as the
+-- section that rescues a will EXECUTED ABROAD, and this comment used to say
+-- exactly that. The section does not say it. Only limb (a) is about the place
+-- of execution; (b), (c) and (d) turn on domicile, habitual residence and
+-- nationality, and none of them requires the will to have been executed
+-- outside Singapore. A will signed in an Orchard Road office by a testator
+-- domiciled in England, or habitually resident in Malaysia, or holding only
+-- Indonesian nationality, is squarely inside (b), (c) and (d). So is a
+-- Singapore-executed will whose testator acquires a foreign domicile before he
+-- dies, because (b)(ii) looks at the domicile at DEATH.
+--
+-- That correction changes what the tool must ask. A refusal keyed to "the will
+-- was executed outside Singapore" would stay silent in precisely the cases
+-- s 5 exists for. The connecting factor that has to be captured is a
+-- disjunction over seven facts, not one: the territory of execution; the
+-- testator's domicile when the will was executed and his domicile at death;
+-- his habitual residence at each of those two times; and his nationality at
+-- each of those two times. Requested as fields, and the refusal should fire
+-- when any of them points outside Singapore.
+--
+-- s 5(3) IS A SEPARATE LIST and is not covered by that disjunction at all.
+-- "Without prejudice to subsection (2), the following shall be treated as
+-- properly executed": (a) a will executed on board a vessel or aircraft,
+-- conforming to the internal law of the territory with which the vessel or
+-- aircraft is most closely connected; (b) a will so far as it disposes of
+-- immovable property, conforming to the internal law where the property is
+-- situated; (c) a will so far as it REVOKES a will or provision, conforming to
+-- any law by reference to which the revoked will would be treated as properly
+-- executed -- which reaches s 15(b) above, not just s 6; and (d) a will so far
+-- as it exercises a power of appointment, conforming to the law governing the
+-- essential validity of the power. s 5(4) adds that a will exercising a power
+-- is not improperly executed by reason only of failing formal requirements in
+-- the instrument creating the power.
+--
+-- s 5(9) BOUNDS THE GAP IN TIME: "This section shall not apply to a will of a
+-- testator who died before 26 June 1992 and shall apply to a will of a testator
+-- who dies after that date whether the will was executed before or after that
+-- date." Like s 10(4), the date attaches to the DEATH. For a death before
+-- 26 June 1992 this module's s 6 answer is the whole answer and nothing is
+-- missing; for a death after that date the gap is live. (A death ON 26 June
+-- 1992 falls within neither limb on the literal words. Nothing here turns on
+-- the point, and it is noted only so that a reader who spots it knows it was
+-- read and not smoothed over.)
+--
+-- WHICH WAY THE OMISSION ERRS. s 5 only ever ADDS ways of being properly
+-- executed -- "shall be treated as properly executed if" -- so leaving it out
+-- can only make `the will is formally valid` too STRICT. This module will
+-- never call a will good that s 5 would condemn; it may call a will bad that
+-- s 5 would save, and then route the estate to intestacy that should have
+-- passed under the will.
+--
+-- Why it is out of scope rather than encoded: answering it means executing a
+-- FOREIGN law's formality rules, and a tool that silently assumes Singapore
+-- formalities for a will signed in Johor, or for a Singapore-signed will of an
+-- English-domiciled testator, would give a confidently wrong answer. The honest
+-- output is a refusal, and the refusal belongs at the wizard's front door, not
+-- buried in a conjunction. Also not encoded, and not needed for the refusal:
+-- s 5(5) (formal requirements taken at the time of execution, with later
+-- relieving changes counted), s 5(6) (special formalities of a foreign law
+-- treated as formal only), s 5(7) (construction unaffected by a change of
+-- domicile) and s 5(8) (choosing between two or more systems of internal law
+-- within one state).
+
+-- NOT MODELLED: s 7 (execution of a power of appointment by will), s 8
+-- (publication not necessary -- a nullity to encode), s 9 (incompetency of an
+-- attesting witness does not invalidate), s 11 (creditor attesting), s 12
+-- (executor attesting). s 9, s 11 and s 12 are all rules of EVIDENCE about who
+-- may be admitted to prove the will; none of them changes whether the will is
+-- valid or who takes, which is the only thing this module computes. They are
+-- listed here so that a reader who looks for them knows they were read.
+
+
+§§ `3. Section 10 -- Gifts to an attesting witness, or to that witness's spouse`
+
+-- WHY THIS SECTION IS IN AN OTHERWISE VALIDITY-ONLY MODULE. Everything else
+-- here answers "is the will good?". s 10 answers "the will is good, but this
+-- person does not take" -- and for the tool that is a bigger difference than
+-- it looks. A wizard that reports a valid will and then hands the estate to
+-- the witness who signed it has given a wrong answer without ever making a
+-- wrong validity finding. So s 10 gets its own outcome record.
+
+DECLARE `Gift to an attesting witness`
+    HAS `the gift is utterly null and void`   IS A BOOLEAN
+        `the will remains valid`              IS A BOOLEAN
+        `explanation`                         IS A STRING
+
+@ref WA 1838 s 10(4) -- the date subsection (3) runs from
+-- "Subsection (3) shall apply to the will of any person dying after
+-- 29 May 1992, whether executed before or after 29 May 1992."
+--
+-- Note what the date attaches to: the DEATH, not the execution. A will
+-- attested in 1970 by a legatee is saved by s 10(3) if the testator lived
+-- past 29 May 1992, and is not if he did not.
+GIVETH A DATE
+`the date subsection (3) runs from` MEANS YMD 1992 5 29
+
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`the testator died after 29 May 1992 in` c MEANS
+    c's `deceased`'s `date of death` GREATER THAN `the date subsection (3) runs from`
+
+@ref WA 1838 s 10(3) -- the saving: disregard the interested attestation
+-- "The attestation of a will by a person to whom or to whose spouse there is
+-- given or made any disposition as is described in subsection (1) shall be
+-- disregarded for the purposes of that subsection if the will is duly
+-- executed without his attestation and without that of any other such person."
+--
+-- "without that of any other such person" is why the parameter is a COUNT and
+-- not a flag: you strike out EVERY interested attestation at once and ask
+-- whether what remains still satisfies s 6(2). Two interested witnesses out of
+-- three leaves one, which is not enough, and both gifts fall.
+--
+-- SIMPLIFICATION, RECORDED. Striking out attestations is modelled by
+-- subtracting from the witness count while holding
+-- `witnesses present at the same time` and the subscription fact constant.
+-- That is exact where the whole attesting group was present together -- the
+-- ordinary case, and the only case in which the count mattered -- and it is
+-- optimistic in the contrived case where the disinterested witnesses were
+-- present together only because the interested one was in the room.
+GIVEN w IS A Will
+      `interested attestors` IS A NUMBER
+GIVETH A BOOLEAN
+`the will` w `is duly executed without the attestation of` `interested attestors` MEANS
+    w's `in writing`
+    AND `the will` w `is executed in the manner mentioned in subsection (2) counting` remaining
+    WHERE
+      remaining MEANS w's `number of attesting witnesses` MINUS `interested attestors`
+
+@ref WA 1838 s 10(1) -- the gift is utterly null and void
+-- "If any person attests the execution of any will to whom or to whose wife or
+-- husband any beneficial devise, legacy, estate, interest, gift or appointment
+-- of or affecting any real or personal estate, other than and except charges
+-- and directions for the payment of any debt, shall be thereby given or made,
+-- the devise, legacy, estate, interest, gift or appointment shall, so far only
+-- as concerns the person attesting the execution of the will, or the wife or
+-- husband of that person, or any person claiming under that person or wife or
+-- husband, be utterly null and void."
+--
+-- @ref WA 1838 s 10(2) -- "The attesting witness referred to in subsection (1)
+-- shall be admitted as a witness to prove the execution of the will or to
+-- prove the validity or invalidity thereof, notwithstanding the devise,
+-- legacy, estate, interest, gift or appointment mentioned in the will."
+--
+-- s 10(2) is the reason `the will remains valid` is answered from s 4, s 6 and
+-- s 27 alone and never from this section: the interested witness still counts
+-- as a witness. The section voids the GIFT and leaves the WILL standing. It is
+-- also, read with the exception for "charges and directions for the payment of
+-- any debt", why a creditor-witness is untouched -- see s 11.
+--
+-- ONTOLOGY GAP, RECORDED. The count of attesting witnesses who (or whose
+-- spouse) take a beneficial gift is supplied as a parameter, because the Will
+-- record has no list of beneficiaries and no link from a beneficiary to an
+-- attesting witness. Requested as a field.
+GIVEN `interested attestors` IS A NUMBER
+      w IS A Will
+      c IS A Case
+GIVETH A `Gift to an attesting witness`
+`the gift to` `interested attestors` `attesting witnesses under the will` w `in` c MEANS
+  BRANCH
+    IF `interested attestors` AT MOST 0
+    THEN `Gift to an attesting witness` WITH
+             `the gift is utterly null and void` IS FALSE
+           , `the will remains valid`             IS `the will is formally valid` w
+           , `explanation`                        IS "WA 1838 s 10 does not arise: no attesting witness of this will, and no spouse of one, takes a beneficial gift under it."
+
+    IF `the testator died after 29 May 1992 in` c
+       AND `the will` w `is duly executed without the attestation of` `interested attestors`
+    THEN `Gift to an attesting witness` WITH
+             `the gift is utterly null and void` IS FALSE
+           , `the will remains valid`             IS `the will is formally valid` w
+           , `explanation`                        IS "WA 1838 s 10(3): the gift stands. The will is duly executed without the attestation of the witnesses who take under it, so their attestation is disregarded and s 10(1) does not bite. s 10(4) applies s 10(3) to the will of any person dying after 29 May 1992."
+
+    OTHERWISE `Gift to an attesting witness` WITH
+                  `the gift is utterly null and void` IS TRUE
+                , `the will remains valid`             IS `the will is formally valid` w
+                , `explanation`                        IS "WA 1838 s 10(1): the gift to the attesting witness, or to that witness's spouse, is utterly null and void so far as concerns that person. The will itself is unaffected -- s 10(2) still admits the witness to prove it -- so everything else in the will takes effect and the failed gift falls into residue or intestacy."
+
+-- The same question from the outside, where the caller has a Case and may not
+-- have a will at all.
+GIVEN c IS A Case
+      `interested attestors` IS A NUMBER
+GIVETH A `Gift to an attesting witness`
+`the position on gifts to attesting witnesses in` c `where the interested attestors number` `interested attestors` MEANS
+    CONSIDER c's `will`
+    WHEN NOTHING THEN `there being no will, no gift to an attesting witness arises`
+    WHEN JUST w  THEN `the gift to` `interested attestors` `attesting witnesses under the will` w `in` c
+
+GIVETH A `Gift to an attesting witness`
+`there being no will, no gift to an attesting witness arises` MEANS `Gift to an attesting witness` WITH
+      `the gift is utterly null and void` IS FALSE
+    , `the will remains valid`             IS FALSE
+    , `explanation`                        IS "There is no will, so WA 1838 s 10 has nothing to bite on. The estate passes on intestacy under the Intestate Succession Act 1967."
+
+
+§§ `4. Section 13 -- Will to be revoked by marriage except in certain cases`
+
+@ref WA 1838 s 13(2) -- the contemplation-of-marriage exception
+-- "Notwithstanding subsection (1), where a will made on or after 29 August
+-- 1938 is expressed to be made in contemplation of a marriage, the will shall
+-- not be revoked by the solemnisation of the marriage contemplated; and this
+-- subsection shall apply notwithstanding that the marriage contemplated may be
+-- the first, second or subsequent marriage of a person lawfully practising
+-- polygamy."
+--
+-- Read the exception narrowly, because the section does: the will survives the
+-- solemnisation of THE MARRIAGE CONTEMPLATED, not of any later marriage to
+-- somebody else. The ontology's
+-- `expressed to be made in contemplation of that marriage` carries the word
+-- "that" for exactly this reason -- it is answered against the marriage
+-- recorded in `married after execution`, not against contemplation at large.
+--
+-- MODELLING ASSUMPTION, RECORDED. s 13(2) is confined to "a will made on or
+-- after 29 August 1938". The Will record has no date of execution, so this
+-- encoding assumes every will before it was made on or after that date. The
+-- assumption is safe for the tool's purpose -- a will executed before
+-- 29 August 1938 would be at least 88 years old and its testator long dead --
+-- but it is an assumption, not a finding, and the date of execution is
+-- requested as a field.
+GIVEN w IS A Will
+GIVETH A BOOLEAN
+`the will is expressed to be made in contemplation of that marriage` w MEANS
+    w's `expressed to be made in contemplation of that marriage`
+
+@ref WA 1838 s 13(1) -- Will to be revoked by marriage
+-- "Every will made by a man or woman shall be revoked by his or her marriage,
+-- except a will made in exercise of a power of appointment, when the real or
+-- personal estate thereby appointed would not in default of such appointment
+-- pass to his or her heir, executor or administrator or the person entitled
+-- under the Intestate Succession Act 1967."
+--
+-- This is the single most consequential rule in the Act for an end-user tool,
+-- because it is the one nobody knows. A perfectly executed will, safe in a
+-- drawer, is destroyed by the testator's later marriage -- and no document
+-- records the destruction. A wizard that checks execution and stops has told
+-- a newly married testator that a dead will is alive.
+--
+-- NOT MODELLED: the power-of-appointment exception in s 13(1). It spares a
+-- will made in exercise of a power where the appointed property would not, in
+-- default of appointment, pass to the heir, executor, administrator or the
+-- ISA taker. Encoding it needs two facts the ontology does not carry -- that
+-- the will exercises a power, and where the property would go in default --
+-- and the second is a question about the INSTRUMENT CREATING THE POWER, which
+-- this tool never sees. Requested as a field. (Not in the fork register:
+-- denovo/fork-register.json carries no Wills Act entry -- F1 to F7 are ISA and
+-- PAA -- so this is an unencoded exception, not a materialised fork.)
+GIVEN w IS A Will
+GIVETH A BOOLEAN
+`the will is revoked by the marriage of the testator` w MEANS
+    w's `married after execution`
+    AND (NOT `the will is expressed to be made in contemplation of that marriage` w)
+
+
+§§ `5. Section 14 -- No will to be revoked by presumption from altered circumstances`
+
+@ref WA 1838 s 14 -- No will to be revoked by presumption from altered circumstances
+-- "No will shall be revoked by any presumption of an intention on the ground
+-- of an alteration in circumstances."
+--
+-- Constant FALSE, and it earns its place. s 14 abolishes a doctrine, and the
+-- only way to encode an abolition is to carry the abolished ground as a
+-- disjunct that can never fire. It appears in the s 15 list below so that a
+-- reader can see the closed list is closed: divorce, estrangement, the birth
+-- of a child, the sale of the devised house -- none of them revokes anything,
+-- and the encoding says so out loud rather than by silence.
+GIVETH A BOOLEAN
+`revocation by presumption of an intention on the ground of an alteration in circumstances` MEANS FALSE
+
+
+§§ `6. Section 15 -- Revocation of will or codicil`
+
+@ref WA 1838 s 15 -- Revocation of will or codicil
+-- "No will or codicil, or any part thereof, shall be revoked otherwise than --
+--     (a) as provided in section 13;
+--     (b) by another will or codicil executed in the manner by this Act
+--         required;
+--     (c) by some writing declaring an intention to revoke it, and executed in
+--         the manner in which a will is by this Act required to be executed; or
+--     (d) by the burning, tearing, or otherwise destroying the will by the
+--         testator, or by some person in his presence and by his direction,
+--         with the intention of revoking it."
+--
+-- "otherwise than" makes this a CLOSED LIST, which is the whole content of the
+-- section: it is not a list of ways to revoke, it is a prohibition on every
+-- other way. The encoding is therefore a disjunction with nothing outside it,
+-- and s 14's dead disjunct is carried along to make the closure visible.
+--
+-- SIMPLIFICATION, RECORDED. Limbs (b), (c) and (d) collapse into the single
+-- ontology field `revoked by a later will, writing or destruction`. The three
+-- limbs differ in what must be proved -- (b) and (c) require the later
+-- instrument to be executed as this Act requires, (d) requires both the
+-- physical act AND the animus revocandi -- and the flag records the CONCLUSION
+-- of those enquiries rather than their inputs. A tool that wanted to test the
+-- later instrument's own execution would recur into s 6 on a second Will
+-- record; the ontology carries only one.
+GIVEN w IS A Will
+GIVETH A BOOLEAN
+`the will has been revoked` w MEANS
+    `the will is revoked by the marriage of the testator` w
+    OR w's `revoked by a later will, writing or destruction`
+    OR `revocation by presumption of an intention on the ground of an alteration in circumstances`
+
+-- NOT MODELLED: s 16 (Effect of obliteration, interlineation or alteration).
+-- s 16(1) makes an alteration made after execution ineffective "except so far
+-- as the words or effect of the will before such alteration shall not be
+-- apparent", unless the alteration is itself executed as a will; s 16(2) says
+-- how it may be. Both turn on reading the FACE of the document -- what is
+-- apparent through the obliteration, where the initials sit relative to the
+-- interlineation -- and the ontology carries no marks-on-the-page. Note the
+-- direction of the answer, which matters for a user: a botched alteration does
+-- not destroy the will, it is simply ignored, and the will takes effect in its
+-- original words wherever those remain apparent.
+
+
+§§ `7. Section 17 -- Revival of revoked will`
+
+@ref WA 1838 s 17(1) -- Revival of revoked will
+-- "No will or codicil, or any part thereof, which shall be in any manner
+-- revoked, shall be revived otherwise than by the re-execution thereof, or by
+-- a codicil executed in the manner required by this Act and showing an
+-- intention to revive the will or codicil."
+--
+-- Another closed list -- "otherwise than" again -- and it closes the loop s 15
+-- opened. The point most users take from it is the negative one: tearing up
+-- the LATER will does not bring the earlier one back to life. Only
+-- re-execution, or a codicil that says so, does.
+--
+-- But the POSITIVE point is the one that has to reach an answer. Where one of
+-- those two things has happened, the revoked will is alive again: it is
+-- operative, it disposes of the estate on its own terms, and the estate does
+-- NOT pass on intestacy. An encoding that computes revival and then never
+-- consults it reports a revived will as dead, which is the same wrong answer as
+-- not encoding s 17 at all, with the additional vice of looking encoded. So
+-- `the will` w `is revoked, revival being` r below is the predicate the
+-- composition in part 9 actually calls, and it is defined through this one.
+--
+-- ONTOLOGY GAP, RECORDED. The revival fact is a parameter rather than a field,
+-- because the Will record has none. It records the CONCLUSION of s 17(1)'s
+-- enquiry rather than its inputs: TRUE means the will was re-executed, or that
+-- a codicil executed in the manner this Act requires and showing an intention
+-- to revive it was made. Both limbs carry their own execution requirement --
+-- "the re-execution thereof", "a codicil executed in the manner required by
+-- this Act" -- which is a second pass over s 6 on a second instrument, and the
+-- ontology carries only one Will record. Requested as a field.
+GIVEN w IS A Will
+      `re-executed, or revived by a codicil showing an intention to revive` IS A BOOLEAN
+GIVETH A BOOLEAN
+`the revoked will` w `is revived by` `re-executed, or revived by a codicil showing an intention to revive` MEANS
+    `the will has been revoked` w
+    AND `re-executed, or revived by a codicil showing an intention to revive`
+
+-- s 15 and s 17 read together: a will is out of action only if it has been
+-- revoked AND has not been revived. This is what part 9 consults.
+--
+-- `the will has been revoked` w above is deliberately left answering its own
+-- question -- WAS it revoked -- and is still reported in its own field, because
+-- a user holding a torn-up will and a fresh codicil needs to see both facts,
+-- not a single netted verdict that hides one of them.
+GIVEN w IS A Will
+      `revived` IS A BOOLEAN
+GIVETH A BOOLEAN
+`the will` w `is revoked, revival being` `revived` MEANS
+    `the will has been revoked` w
+    AND (NOT `the revoked will` w `is revived by` `revived`)
+
+-- NOT MODELLED: s 17(2). "When any will or codicil which shall be partly
+-- revoked, and afterwards wholly revoked, shall be revived, the revival shall
+-- not extend to so much thereof as shall have been revoked before the
+-- revocation of the whole thereof, unless an intention to the contrary be
+-- shown." This is a rule about PARTIAL revocation, and the ontology's
+-- revocation flags are whole-will. Encoding it needs a revocation history per
+-- clause, which is a different shape of record from the one this corpus has.
+
+
+§§ `8. Section 27 -- Saving as to wills of soldiers and mariners`
+
+@ref WA 1838 s 27(5) -- who counts as a soldier
+-- "For the purposes of this section, “soldier” includes a member of an air
+-- force and a serviceman serving in the digital and intelligence service of
+-- the Singapore Armed Forces."
+--                                                  [Act 24 of 2022 wef 28/10/2022]
+--
+-- @ref WA 1838 s 27(4) -- "This section shall extend to any member of any
+-- naval or marine forces not only when he is at sea but also when he is so
+-- circumstanced that if he were a soldier he would be in actual military
+-- service within the meaning of this section."
+--
+-- s 27(4) and s 27(5) are DEFINITIONS, not rules: they widen who falls inside
+-- "soldier being in actual military service, or any mariner or seaman being at
+-- sea". The ontology carries a single boolean answering that widened question,
+-- so the classification happens at data-entry time and there is no predicate
+-- to write -- the same treatment the domain module gives ISA s 6(a). Recorded
+-- here so that a reader looking for the 2022 amendment finds it: the addition
+-- of the digital and intelligence service is a live extension of the
+-- privilege, and a DIS serviceman on operations is within it.
+GIVEN w IS A Will
+GIVETH A BOOLEAN
+`the testator is a soldier in actual military service, or a mariner or seaman at sea` w MEANS
+    w's `soldier in actual military service or mariner at sea`
+
+@ref WA 1838 s 27(1) -- Saving as to wills of soldiers and mariners
+-- "Notwithstanding anything in this Act, any soldier being in actual military
+-- service, or any mariner or seaman being at sea, may dispose of his personal
+-- estate as he might have done before the making of this Act and may do so
+-- even though under 21 years of age."
+--
+-- Two savings in one sentence, and they are separate:
+--   (i)  the FORMALITIES fall away entirely -- "as he might have done before
+--        the making of this Act" means the pre-1838 law, under which a
+--        nuncupative (spoken) will of personal estate was good. So s 6 does
+--        not apply: no writing, no signature, no witnesses.
+--   (ii) the AGE BAR in s 4 falls away -- "even though under 21 years of age".
+--
+-- "Notwithstanding anything in this Act" is why this predicate is consulted
+-- FIRST when the sections are composed below, ahead of s 4 and s 6.
+--
+-- AMBIGUITY, RECORDED. "as he might have done before the making of this Act"
+-- imports the pre-1838 law rather than abolishing form altogether, and the
+-- pre-1838 law was not formless: the Statute of Frauds 1677 s 19 hedged a
+-- nuncupative will of personalty above £30 with its own conditions, from which
+-- s 23 then exempted "any soldier being in actual military service, or any
+-- mariner or seaman being at sea" -- the very words s 27(1) reuses. The
+-- narrower reading would make a privileged will subject to those residual
+-- conditions; the settled reading, and the one taken here, is that the
+-- exemption is complete and the privileged testator is dispensed from form.
+-- This encoding therefore returns TRUE for a privileged will on the strength
+-- of the privilege alone. What it still cannot test is that the testator meant
+-- the words as his will -- animus testandi survives s 27 and is not a fact the
+-- ontology carries.
+GIVEN w IS A Will
+GIVETH A BOOLEAN
+`the saving in section 27 applies to` w MEANS
+    `the testator is a soldier in actual military service, or a mariner or seaman at sea` w
+
+@ref WA 1838 s 27(2) -- Validity of testamentary dispositions of real property
+-- "A testamentary disposition of any real estate made by a person to whom this
+-- section applies, and who dies after 29 August 1938 shall, notwithstanding
+-- that the person making the disposition was at the time of making it under 21
+-- years of age or that the disposition has not been made in such manner or
+-- form as was on 29 August 1938 required by law, be valid in any case where
+-- the person making the disposition was of such age and the disposition has
+-- been made in such manner and form that if the disposition had been a
+-- disposition of personal estate made by that person it would have been valid."
+--
+-- s 27(1) alone saves only PERSONAL estate; a privileged will of the family
+-- flat would have failed. s 27(2) closes that gap for deaths after 29 August
+-- 1938 by making the real-estate disposition as good as the personal-estate
+-- one. Since every death this tool will ever see is after 1938 the condition
+-- is all but always satisfied -- but it is encoded rather than assumed,
+-- because "all but always" is not a thing a legal encoding gets to say.
+GIVETH A DATE
+`the date subsection 27(2) runs from` MEANS YMD 1938 8 29
+
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`the privileged will extends to real estate in` c MEANS
+    c's `deceased`'s `date of death` GREATER THAN `the date subsection 27(2) runs from`
+
+-- NOT MODELLED: s 27(3) (power to appoint testamentary guardians). "Where any
+-- person dies after 29 August 1938 having made a will which is, or which, if
+-- it had been a disposition of property, would have been rendered valid by
+-- this section, any appointment contained in that will of any person as
+-- guardian of the infant children of the testator shall be of full force and
+-- effect." It is encodable on the same date test as s 27(2), and it is left
+-- out because guardianship of children is not succession to property: it
+-- belongs to the Guardianship of Infants Act 1934, and answering it here would
+-- put a family-law answer inside an estate-distribution tool. Recorded so that
+-- a reader knows the omission is a scope decision and not an oversight.
+
+
+§§ `9. The Act's answer -- is there an operative will?`
+
+-- Everything above is one section per provision. This part is the only place
+-- where sections are put together, and the only place where this encoding
+-- exercises judgement about how they interact. It is kept separate and last so
+-- that a domain expert can accept the sections and argue with the composition,
+-- which is a much easier conversation than arguing with both at once.
+
+@ref WA 1838 s 4, s 6, s 27 -- formal validity
+-- The order of the arms is the Act's own. s 27(1) opens "Notwithstanding
+-- anything in this Act", so it is asked FIRST: a soldier in actual military
+-- service or a mariner at sea may make a will with no writing, no signature,
+-- no witnesses and no majority, and none of the questions below him arise.
+-- Then s 4, because an infant's will fails whatever its execution. Then s 6.
+GIVEN w IS A Will
+GIVETH A BOOLEAN
+`the will is formally valid` w MEANS
+  BRANCH
+    IF `the saving in section 27 applies to` w
+    THEN TRUE
+
+    IF `the will is made by a person under 21 years of age` w
+    THEN FALSE
+
+    OTHERWISE `the will is in writing and executed in the manner mentioned in subsection (2)` w
+
+-- Why it failed, in the words of the section that failed it, so that a wizard
+-- can tell a user which single fact to go and check. The arms are in the Act's
+-- order and are reached only once validity has failed, so the last arm is
+-- unreachable in practice -- it is written out rather than left to a
+-- catch-all, because a legal answer with no citation is not an answer.
+GIVEN w IS A Will
+GIVETH A STRING
+`why the will is not formally valid` w MEANS
+  BRANCH
+    IF `the will is made by a person under 21 years of age` w
+    THEN "WA 1838 s 4: no will made by any person under 21 years of age is valid. The testator was under 21 when the will was made, and was not a soldier in actual military service or a mariner at sea, so the saving in s 27 does not apply."
+
+    IF (NOT w's `in writing`)
+    THEN "WA 1838 s 6(1): no will is valid unless it is in writing. This will was not in writing, and the testator was not a soldier in actual military service or a mariner at sea, so the saving in s 27 does not apply."
+
+    IF (NOT `the will is signed at the foot or end thereof by the testator` w)
+    THEN "WA 1838 s 6(2): every will must be signed at the foot or end by the testator, or by some other person in his presence and by his direction. This will was not."
+
+    IF w's `number of attesting witnesses` LESS THAN 2
+    THEN "WA 1838 s 6(2): the testator's signature must be made or acknowledged in the presence of 2 or more witnesses. This will has fewer than 2 attesting witnesses."
+
+    IF (NOT w's `witnesses present at the same time`)
+    THEN "WA 1838 s 6(2): the 2 or more witnesses must be present AT THE SAME TIME when the testator signs or acknowledges his signature. These witnesses were not, so the will fails however many of them there were."
+
+    IF (NOT `those witnesses subscribed the will in the presence of the testator` w)
+    THEN "WA 1838 s 6(2): the witnesses must subscribe the will in the presence of the testator. These witnesses did not."
+
+    OTHERWISE "WA 1838 s 4 and s 6: the will does not satisfy the Act's requirements as to capacity and execution."
+
+@ref WA 1838 s 4, s 6, s 27 -- formal validity, from the outside
+-- The Case-level form, for a caller who has a death and may or may not have a
+-- will. NOTHING is FALSE: an absent will is not a valid one. Note that this is
+-- the opposite convention from the revocation predicate below, and for the
+-- same reason -- each answers its own question about a will that is not there,
+-- and each answers it in the direction that cannot mislead.
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`the will is formally valid in` c MEANS
+    CONSIDER c's `will`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST w  THEN `the will is formally valid` w
+
+@ref WA 1838 s 13, s 15 -- revocation, from the outside
+-- The Case-level form of s 15, for a caller who has a death and may or may not
+-- have a will. NOTHING is not "revoked": a testator who never made a will has
+-- nothing to revoke, and saying otherwise would let a wizard print "your will
+-- was revoked" to somebody who never had one.
+GIVEN c IS A Case
+GIVETH A BOOLEAN
+`the will has been revoked in` c MEANS
+    CONSIDER c's `will`
+    WHEN NOTHING THEN FALSE
+    WHEN JUST w  THEN `the will has been revoked` w
+
+-- The shape of this Act's answer. It is not the ISA's `Distribution`, because
+-- this Act distributes nothing: it decides whether there is an instrument to
+-- distribute UNDER, and hands the ISA the part of the estate the instrument
+-- leaves alone.
+--
+-- `the proportion of the estate the will disposes of` is the hinge between the
+-- two Acts. It is 0 whenever there is no operative will -- invalid, revoked or
+-- absent -- so that ISA s 10 sees a total intestacy, and it is the will's own
+-- figure otherwise.
+--
+-- `valid under sections 4, 6 and 27`, `revoked under sections 13 to 15` and
+-- `revived under section 17` are each reported as the answer to their OWN
+-- question, not as a ranked verdict. So an invalid will that was also followed
+-- by a marriage reports both, and reports `there is an operative will` FALSE
+-- once. That is deliberate: a user who fixes one defect needs to know the other
+-- is still there, and a wizard that surfaced only the first would send them
+-- away to re-execute a will the marriage had already killed.
+--
+-- It also means the combination TRUE/TRUE/TRUE is not a contradiction but the
+-- ordinary s 17 case: a will that was validly made, was revoked, and has been
+-- revived is operative AND was revoked -- both are true of it, and both are
+-- reported. `there is an operative will` is the netted answer; the three
+-- section fields are the workings.
+DECLARE `Testamentary position`
+    HAS `there is an operative will`                    IS A BOOLEAN
+        `valid under sections 4, 6 and 27`              IS A BOOLEAN
+        `revoked under sections 13 to 15`               IS A BOOLEAN
+        `revived under section 17`                      IS A BOOLEAN
+        `the proportion of the estate the will disposes of` IS A NUMBER
+        `explanation`                                   IS A STRING
+
+GIVETH A `Testamentary position`
+`the position where there is no will` MEANS `Testamentary position` WITH
+      `there is an operative will`                    IS FALSE
+    , `valid under sections 4, 6 and 27`              IS FALSE
+    , `revoked under sections 13 to 15`               IS FALSE
+    , `revived under section 17`                      IS FALSE
+    , `the proportion of the estate the will disposes of` IS 0
+    , `explanation`                                   IS "There is no will. The Wills Act 1838 has no application, and the whole estate passes on intestacy under the Intestate Succession Act 1967."
+
+-- The arms are s 4/6/27, then s 15-with-s-17, then s 17's positive case, then
+-- the ordinary one.
+--
+-- WHY THE INVALIDITY ARM REPORTS NO REVIVAL. s 17(1) revives a will "which
+-- shall be in any manner revoked". A will that never satisfied s 4, s 6 or the
+-- s 27 saving was never operative, so there is nothing for s 15 to have revoked
+-- and nothing for s 17 to revive; re-executing it would be a fresh execution
+-- governed by s 6 on facts this record does not carry. So that arm reports
+-- `revived under section 17` FALSE whatever revival fact it is handed, and the
+-- user is sent back to the execution defect, which is the thing they can act
+-- on.
+GIVEN w         IS A Will
+      c         IS A Case
+      `revived` IS A BOOLEAN
+GIVETH A `Testamentary position`
+`the position on the will` w `in` c `revival being` `revived` MEANS
+  BRANCH
+    IF (NOT `the will is formally valid` w)
+    THEN `Testamentary position` WITH
+             `there is an operative will`                    IS FALSE
+           , `valid under sections 4, 6 and 27`              IS FALSE
+           , `revoked under sections 13 to 15`               IS `the will has been revoked` w
+           , `revived under section 17`                      IS FALSE
+           , `the proportion of the estate the will disposes of` IS 0
+           , `explanation`                                   IS `why the will is not formally valid` w
+
+    IF `the will` w `is revoked, revival being` `revived`
+    THEN `Testamentary position` WITH
+             `there is an operative will`                    IS FALSE
+           , `valid under sections 4, 6 and 27`              IS TRUE
+           , `revoked under sections 13 to 15`               IS TRUE
+           , `revived under section 17`                      IS FALSE
+           , `the proportion of the estate the will disposes of` IS 0
+           , `explanation`                                   IS `why the will has been revoked` w
+
+    IF `the will has been revoked` w
+    THEN `Testamentary position` WITH
+             `there is an operative will`                    IS TRUE
+           , `valid under sections 4, 6 and 27`              IS TRUE
+           , `revoked under sections 13 to 15`               IS TRUE
+           , `revived under section 17`                      IS TRUE
+           , `the proportion of the estate the will disposes of` IS w's `proportion of the estate beneficially disposed of`
+           , `explanation`                                   IS `why the revived will is operative` w
+
+    OTHERWISE `Testamentary position` WITH
+                  `there is an operative will`                    IS TRUE
+                , `valid under sections 4, 6 and 27`              IS TRUE
+                , `revoked under sections 13 to 15`               IS FALSE
+                , `revived under section 17`                      IS FALSE
+                , `the proportion of the estate the will disposes of` IS w's `proportion of the estate beneficially disposed of`
+                , `explanation`                                   IS `why the will is operative` w `in` c
+
+-- The ordinary case, where nobody has re-executed anything and no codicil was
+-- made: revival is FALSE, and the answer is what it was before s 17 was wired
+-- in. Written as a delegation rather than a copy so that the two can never
+-- drift apart.
+GIVEN w IS A Will
+      c IS A Case
+GIVETH A `Testamentary position`
+`the position on the will` w `in` c MEANS
+    `the position on the will` w `in` c `revival being` FALSE
+
+GIVEN w IS A Will
+GIVETH A STRING
+`why the will has been revoked` w MEANS
+  BRANCH
+    IF `the will is revoked by the marriage of the testator` w
+    THEN "WA 1838 s 13(1): every will is revoked by the testator's marriage. This will was made before a marriage and was not expressed to be made in contemplation of that marriage, so the marriage revoked it and the estate passes on intestacy. Nothing had to be done to the document: it was revoked by operation of law on the day of the wedding."
+
+    IF w's `revoked by a later will, writing or destruction`
+    THEN "WA 1838 s 15(b)-(d): the will was revoked by a later will or codicil duly executed, by a writing declaring an intention to revoke it and executed as a will, or by the testator burning, tearing or otherwise destroying it with the intention of revoking it."
+
+    OTHERWISE "WA 1838 s 15: the will has been revoked."
+
+-- The mirror image, for the will s 17 has brought back. It names the ground of
+-- revocation as well as the revival, because a user whose will was revoked by
+-- marriage and revived by codicil is holding two documents and needs to know
+-- which one is doing the work.
+GIVEN w IS A Will
+GIVETH A STRING
+`why the revived will is operative` w MEANS
+  BRANCH
+    IF `the will is revoked by the marriage of the testator` w
+    THEN "WA 1838 s 13(1) and s 17(1): the testator's marriage revoked this will, but it has since been revived -- by its re-execution, or by a codicil executed in the manner this Act requires and showing an intention to revive it. Those are the only two ways: s 17(1) says no revoked will shall be revived 'otherwise than' by one of them. The will is operative again and disposes of the estate on its own terms; the estate does not pass on intestacy."
+
+    IF w's `revoked by a later will, writing or destruction`
+    THEN "WA 1838 s 15(b)-(d) and s 17(1): the will was revoked -- by a later will or codicil, by a writing declaring an intention to revoke it, or by being burnt, torn or otherwise destroyed with the intention of revoking it -- but it has since been revived, by its re-execution or by a codicil executed in the manner this Act requires and showing an intention to revive it. Note what would NOT have revived it: destroying the later revoking instrument does nothing, because s 17(1) closes the list at those two ways. The will is operative again."
+
+    OTHERWISE "WA 1838 s 17(1): the will was revoked and has since been revived, by its re-execution or by a codicil executed in the manner this Act requires and showing an intention to revive it. It is operative again."
+
+GIVEN w IS A Will
+      c IS A Case
+GIVETH A STRING
+`why the will is operative` w `in` c MEANS
+  BRANCH
+    IF `the saving in section 27 applies to` w
+       AND `the privileged will extends to real estate in` c
+    THEN "WA 1838 s 27: the testator was a soldier in actual military service, or a mariner or seaman at sea, so he could dispose of his personal estate as he might have done before this Act -- without writing, signature or witnesses -- and even though under 21. Because he died after 29 August 1938, s 27(2) makes the disposition good for real estate as well. The will has not been revoked under s 13 or s 15 and is operative."
+
+    IF `the saving in section 27 applies to` w
+    THEN "WA 1838 s 27(1): the testator was a soldier in actual military service, or a mariner or seaman at sea, so he could dispose of his PERSONAL estate as he might have done before this Act, and even though under 21. He died on or before 29 August 1938, so s 27(2) does not extend the saving to real estate. The will has not been revoked under s 13 or s 15."
+
+    OTHERWISE "WA 1838 s 4 and s 6: the testator was 21 or over, the will is in writing and signed at the foot or end, the signature was made or acknowledged before 2 or more witnesses present at the same time, and those witnesses subscribed in the testator's presence. The will has not been revoked under s 13 or s 15, so it is operative."
+
+-- THE ENTRY POINT. One question in, one answer out: is there an operative
+-- will, and if not, why not.
+--
+-- Two arities, and the two-argument one is the real definition. The s 17
+-- revival fact has nowhere to live in a Case -- the ontology has no field for
+-- it -- so a caller who knows the will was re-executed, or that a codicil
+-- showing an intention to revive it was made, supplies that here. The
+-- one-argument form is the same question with revival FALSE, which is the
+-- ordinary case and the one every fixture below but the revival fixtures uses.
+GIVEN c         IS A Case
+      `revived` IS A BOOLEAN
+GIVETH A `Testamentary position`
+`the testamentary position in` c `revival being` `revived` MEANS
+    CONSIDER c's `will`
+    WHEN NOTHING THEN `the position where there is no will`
+    WHEN JUST w  THEN `the position on the will` w `in` c `revival being` `revived`
+
+GIVEN c IS A Case
+GIVETH A `Testamentary position`
+`the testamentary position in` c MEANS
+    `the testamentary position in` c `revival being` FALSE
+
+
+§§ `10. Fixtures for the assertions`
+
+-- One constructor, ten facts, in the order the sections ask for them:
+--
+--   age            the testator's age at execution         (s 4)
+--   witnesses      how many attested                       (s 6(2))
+--   writing        was it in writing                       (s 6(1))
+--   signed         signed at the foot or end               (s 6(2))
+--   together       the witnesses present at the same time  (s 6(2))
+--   subscribed     they subscribed in his presence         (s 6(2))
+--   privileged     soldier in actual military service, or mariner at sea (s 27)
+--   married        the testator married after execution    (s 13(1))
+--   contemplation  expressed to be made in contemplation of that marriage (s 13(2))
+--   revoked        revoked by a later will, writing or destruction (s 15(b)-(d))
+--
+-- Each fixture below is then named for the one fact it changes, so an
+-- assertion reads as a sentence about a will and not as a row of booleans.
+GIVEN `age`           IS A NUMBER
+      `witnesses`     IS A NUMBER
+      `writing`       IS A BOOLEAN
+      `signed`        IS A BOOLEAN
+      `together`      IS A BOOLEAN
+      `subscribed`    IS A BOOLEAN
+      `privileged`    IS A BOOLEAN
+      `married`       IS A BOOLEAN
+      `contemplation` IS A BOOLEAN
+      `revoked`       IS A BOOLEAN
+GIVETH A Will
+`a will with` `age` `witnesses` `writing` `signed` `together` `subscribed` `privileged` `married` `contemplation` `revoked` MEANS Will WITH
+      `in writing`                                  IS `writing`
+    , `signed at the foot or end by the testator`   IS `signed`
+    , `number of attesting witnesses`               IS `witnesses`
+    , `witnesses present at the same time`          IS `together`
+    , `witnesses subscribed in the testator's presence` IS `subscribed`
+    , `testator's age at execution`                 IS `age`
+    , `soldier in actual military service or mariner at sea` IS `privileged`
+    , `married after execution`                     IS `married`
+    , `expressed to be made in contemplation of that marriage` IS `contemplation`
+    , `revoked by a later will, writing or destruction` IS `revoked`
+    , `proportion of the estate beneficially disposed of` IS 1
+    , `an executor is appointed, and able and willing to act` IS TRUE
+
+GIVETH A Will
+`a properly executed will` MEANS
+    `a will with` 40 2 TRUE TRUE TRUE TRUE FALSE FALSE FALSE FALSE
+
+GIVETH A Will
+`a will made by a person under 21` MEANS
+    `a will with` 20 2 TRUE TRUE TRUE TRUE FALSE FALSE FALSE FALSE
+
+-- The privileged testator of s 27(1): a 20-year-old soldier on operations who
+-- says what he wants done and dies. No writing, no signature, no witnesses --
+-- and, by the saving, a good will of his personal estate.
+GIVETH A Will
+`a soldier's nuncupative will made under 21` MEANS
+    `a will with` 20 0 FALSE FALSE FALSE FALSE TRUE FALSE FALSE FALSE
+
+GIVETH A Will
+`a will attested by only one witness` MEANS
+    `a will with` 40 1 TRUE TRUE TRUE TRUE FALSE FALSE FALSE FALSE
+
+GIVETH A Will
+`a will whose two witnesses were not present at the same time` MEANS
+    `a will with` 40 2 TRUE TRUE FALSE TRUE FALSE FALSE FALSE FALSE
+
+GIVETH A Will
+`a will not in writing` MEANS
+    `a will with` 40 2 FALSE TRUE TRUE TRUE FALSE FALSE FALSE FALSE
+
+GIVETH A Will
+`a will the testator never signed` MEANS
+    `a will with` 40 2 TRUE FALSE TRUE TRUE FALSE FALSE FALSE FALSE
+
+GIVETH A Will
+`a will whose witnesses subscribed out of the testator's presence` MEANS
+    `a will with` 40 2 TRUE TRUE TRUE FALSE FALSE FALSE FALSE FALSE
+
+GIVETH A Will
+`a will followed by the testator's marriage` MEANS
+    `a will with` 40 2 TRUE TRUE TRUE TRUE FALSE TRUE FALSE FALSE
+
+GIVETH A Will
+`a will expressed to be made in contemplation of that marriage` MEANS
+    `a will with` 40 2 TRUE TRUE TRUE TRUE FALSE TRUE TRUE FALSE
+
+GIVETH A Will
+`a will the testator tore up` MEANS
+    `a will with` 40 2 TRUE TRUE TRUE TRUE FALSE FALSE FALSE TRUE
+
+-- For s 10(3): three attesting witnesses, so that striking out one interested
+-- attestation still leaves the two s 6(2) requires.
+GIVETH A Will
+`a will attested by three witnesses` MEANS
+    `a will with` 40 3 TRUE TRUE TRUE TRUE FALSE FALSE FALSE FALSE
+
+GIVETH A Family
+`a family that need not be filled in` MEANS Family WITH
+      `surviving spouses` IS EMPTY
+    , `children`          IS EMPTY
+    , `parents`           IS EMPTY
+    , `siblings`          IS EMPTY
+    , `grandparents`      IS EMPTY
+    , `uncles and aunts`  IS EMPTY
+
+GIVETH AN Estate
+`an estate that need not be filled in` MEANS Estate WITH
+      `immovable property in Singapore` IS 500000
+    , `movable property in Singapore`   IS 100000
+    , `funeral, testamentary and administration expenses` IS 20000
+    , `debts and liabilities`           IS 30000
+
+GIVETH A DATE
+`a modern date of death` MEANS YMD 2026 3 1
+
+-- Before 29 August 1938 and before 29 May 1992, so that s 27(2) and s 10(4)
+-- can be shown to bite rather than assumed to.
+GIVETH A DATE
+`a date of death before the 1938 amendment` MEANS YMD 1930 1 1
+
+GIVEN `died on` IS A DATE
+GIVETH A Deceased
+`a testator dying on` `died on` MEANS Deceased WITH
+      `name`                   IS "the testator"
+    , `date of death`          IS `died on`
+    , `domiciled in Singapore` IS TRUE
+    , `Muslim`                 IS FALSE
+
+GIVEN `died on` IS A DATE
+      w IS A Will
+GIVETH A Case
+`a death on` `died on` `leaving the will` w MEANS Case WITH
+      `deceased` IS `a testator dying on` `died on`
+    , `family`   IS `a family that need not be filled in`
+    , `estate`   IS `an estate that need not be filled in`
+    , `will`     IS JUST w
+
+GIVEN w IS A Will
+GIVETH A Case
+`a modern death leaving the will` w MEANS
+    `a death on` `a modern date of death` `leaving the will` w
+
+GIVETH A Case
+`a modern death leaving no will at all` MEANS Case WITH
+      `deceased` IS `a testator dying on` `a modern date of death`
+    , `family`   IS `a family that need not be filled in`
+    , `estate`   IS `an estate that need not be filled in`
+    , `will`     IS NOTHING
+
+-- Named cases, so that no assertion has to nest one call inside another.
+GIVETH A Case
+`a modern death leaving a properly executed will` MEANS
+    `a modern death leaving the will` `a properly executed will`
+
+GIVETH A Case
+`a modern death leaving a soldier's nuncupative will` MEANS
+    `a modern death leaving the will` `a soldier's nuncupative will made under 21`
+
+GIVETH A Case
+`a 1930 death leaving a soldier's nuncupative will` MEANS
+    `a death on` `a date of death before the 1938 amendment` `leaving the will` `a soldier's nuncupative will made under 21`
+
+GIVETH A Case
+`a modern death leaving a will attested by three witnesses` MEANS
+    `a modern death leaving the will` `a will attested by three witnesses`
+
+GIVETH A Case
+`a 1930 death leaving a will attested by three witnesses` MEANS
+    `a death on` `a date of death before the 1938 amendment` `leaving the will` `a will attested by three witnesses`
+
+GIVETH A Case
+`a modern death leaving a will revoked by marriage` MEANS
+    `a modern death leaving the will` `a will followed by the testator's marriage`
+
+GIVETH A Case
+`a modern death leaving an under-21 will` MEANS
+    `a modern death leaving the will` `a will made by a person under 21`
+
+GIVETH A Case
+`a modern death leaving a will the testator tore up` MEANS
+    `a modern death leaving the will` `a will the testator tore up`
+
+-- Results named once and asserted several times, so that no assertion has to
+-- nest a call inside a projection.
+GIVETH A `Testamentary position`
+`the position on an ordinary will` MEANS
+    `the testamentary position in` `a modern death leaving a properly executed will`
+
+GIVETH A `Testamentary position`
+`the position where there was no will` MEANS
+    `the testamentary position in` `a modern death leaving no will at all`
+
+GIVETH A `Testamentary position`
+`the position on a will revoked by marriage` MEANS
+    `the testamentary position in` `a modern death leaving a will revoked by marriage`
+
+GIVETH A `Testamentary position`
+`the position on an under-21 will` MEANS
+    `the testamentary position in` `a modern death leaving an under-21 will`
+
+GIVETH A `Testamentary position`
+`the position on a soldier's will` MEANS
+    `the testamentary position in` `a modern death leaving a soldier's nuncupative will`
+
+-- The same three deaths again, this time with the s 17 revival fact TRUE: the
+-- will was re-executed, or a codicil executed as this Act requires and showing
+-- an intention to revive it was made. Each is paired above with its revival-
+-- FALSE twin, so the assertions can show the fact CHANGING the answer rather
+-- than merely being accepted.
+GIVETH A `Testamentary position`
+`the position on a will revoked by marriage and afterwards revived` MEANS
+    `the testamentary position in` `a modern death leaving a will revoked by marriage` `revival being` TRUE
+
+GIVETH A `Testamentary position`
+`the position on a torn-up will afterwards revived` MEANS
+    `the testamentary position in` `a modern death leaving a will the testator tore up` `revival being` TRUE
+
+-- s 17 has nothing to revive where the will was never valid: the under-21 will
+-- fails s 4, and no amount of re-execution recorded in this fact can cure a
+-- defect in the execution facts themselves.
+GIVETH A `Testamentary position`
+`the position on an under-21 will said to have been revived` MEANS
+    `the testamentary position in` `a modern death leaving an under-21 will` `revival being` TRUE
+
+-- The unrevoked will, handed a revival fact it has no use for: s 17 speaks only
+-- to a will "which shall be in any manner revoked", so the answer must not move.
+GIVETH A `Testamentary position`
+`the position on an ordinary will said to have been revived` MEANS
+    `the testamentary position in` `a modern death leaving a properly executed will` `revival being` TRUE
+
+GIVETH A `Gift to an attesting witness`
+`the gift where no attesting witness takes` MEANS
+    `the gift to` 0 `attesting witnesses under the will` `a will attested by three witnesses` `in` `a modern death leaving a will attested by three witnesses`
+
+GIVETH A `Gift to an attesting witness`
+`the gift where one of three witnesses takes` MEANS
+    `the gift to` 1 `attesting witnesses under the will` `a will attested by three witnesses` `in` `a modern death leaving a will attested by three witnesses`
+
+GIVETH A `Gift to an attesting witness`
+`the gift where two of three witnesses take` MEANS
+    `the gift to` 2 `attesting witnesses under the will` `a will attested by three witnesses` `in` `a modern death leaving a will attested by three witnesses`
+
+GIVETH A `Gift to an attesting witness`
+`the gift where one of two witnesses takes` MEANS
+    `the gift to` 1 `attesting witnesses under the will` `a properly executed will` `in` `a modern death leaving a properly executed will`
+
+GIVETH A `Gift to an attesting witness`
+`the gift where one of three witnesses takes, the testator dying in 1930` MEANS
+    `the gift to` 1 `attesting witnesses under the will` `a will attested by three witnesses` `in` `a 1930 death leaving a will attested by three witnesses`
+
+
+§§ `11. Assertions`
+
+-- Section 4, section 6 and the section 27 saving.
+
+#ASSERT     `the will is formally valid` `a properly executed will`
+
+-- s 4: no will made by any person under 21 years of age shall be valid --
+-- whatever else is right about it.
+#ASSERT NOT `the will is formally valid` `a will made by a person under 21`
+
+-- s 6(2): "2 or more witnesses". One is not two, and this is the single most
+-- common way a homemade Singapore will dies.
+#ASSERT NOT `the will is formally valid` `a will attested by only one witness`
+
+-- s 6(2) again, and the limb people miss: two witnesses are not enough unless
+-- they were present AT THE SAME TIME.
+#ASSERT NOT `the will is formally valid` `a will whose two witnesses were not present at the same time`
+
+#ASSERT NOT `the will is formally valid` `a will not in writing`
+#ASSERT NOT `the will is formally valid` `a will the testator never signed`
+#ASSERT NOT `the will is formally valid` `a will whose witnesses subscribed out of the testator's presence`
+
+-- s 27(1). The soldier's will is under 21 AND fails every limb of s 6 -- no
+-- writing, no signature, no witnesses -- and is good anyway. The first
+-- assertion is what makes the second one interesting: without it the fixture
+-- could have quietly been of age.
+#ASSERT     `the will is made by a person under 21 years of age` `a soldier's nuncupative will made under 21`
+#ASSERT     `the will is formally valid` `a soldier's nuncupative will made under 21`
+
+-- s 27(2). The privilege reaches real estate only for a death after
+-- 29 August 1938.
+#ASSERT     `the privileged will extends to real estate in` `a modern death leaving a soldier's nuncupative will`
+#ASSERT NOT `the privileged will extends to real estate in` `a 1930 death leaving a soldier's nuncupative will`
+
+-- Sections 13, 14 and 15.
+
+-- s 13(1): marriage revokes, and the will was faultless when it was made --
+-- which is the whole point. Validity and revocation are different questions
+-- and the encoding keeps them apart.
+#ASSERT     `the will is formally valid` `a will followed by the testator's marriage`
+#ASSERT     `the will has been revoked` `a will followed by the testator's marriage`
+
+-- s 13(2): expressed to be made in contemplation of that marriage, so the
+-- solemnisation does not revoke it.
+#ASSERT NOT `the will has been revoked` `a will expressed to be made in contemplation of that marriage`
+
+-- s 15(d): burning, tearing or otherwise destroying, with the intention of
+-- revoking.
+#ASSERT     `the will has been revoked` `a will the testator tore up`
+
+#ASSERT NOT `the will has been revoked` `a properly executed will`
+
+-- s 14: the abolished ground can never fire, which is what makes the s 15 list
+-- closed.
+#ASSERT NOT `revocation by presumption of an intention on the ground of an alteration in circumstances`
+
+-- No will is not a revoked will.
+#ASSERT NOT `the will has been revoked in` `a modern death leaving no will at all`
+
+-- Section 17.
+
+#ASSERT     `the revoked will` `a will followed by the testator's marriage` `is revived by` TRUE
+#ASSERT NOT `the revoked will` `a will followed by the testator's marriage` `is revived by` FALSE
+#ASSERT NOT `the revoked will` `a properly executed will` `is revived by` TRUE
+
+-- s 15 and s 17 read together. The revived will is no longer revoked-and-out;
+-- the unrevived one still is; and the will that was never revoked is unmoved by
+-- a revival fact either way, because s 17 speaks only to a revoked will.
+#ASSERT     `the will` `a will followed by the testator's marriage` `is revoked, revival being` FALSE
+#ASSERT NOT `the will` `a will followed by the testator's marriage` `is revoked, revival being` TRUE
+#ASSERT     `the will` `a will the testator tore up` `is revoked, revival being` FALSE
+#ASSERT NOT `the will` `a will the testator tore up` `is revoked, revival being` TRUE
+#ASSERT NOT `the will` `a properly executed will` `is revoked, revival being` FALSE
+#ASSERT NOT `the will` `a properly executed will` `is revoked, revival being` TRUE
+
+-- Section 10.
+
+#ASSERT NOT `the gift where no attesting witness takes`'s `the gift is utterly null and void`
+
+-- s 10(3): strike out the one interested attestation and two witnesses remain,
+-- so the will is duly executed without it and the gift stands.
+#ASSERT NOT `the gift where one of three witnesses takes`'s `the gift is utterly null and void`
+
+-- "and without that of any other such person": strike out BOTH and only one
+-- witness remains, so neither gift is saved.
+#ASSERT     `the gift where two of three witnesses take`'s `the gift is utterly null and void`
+
+-- Two witnesses, one of whom takes: the attestation is needed, so it cannot be
+-- disregarded, and s 10(1) bites.
+#ASSERT     `the gift where one of two witnesses takes`'s `the gift is utterly null and void`
+
+-- ... and the will is still a good will. That is the distinction this section
+-- exists to draw, and the one an end-user tool most needs to get right.
+#ASSERT     `the gift where one of two witnesses takes`'s `the will remains valid`
+
+-- s 10(4): the saving in s 10(3) reaches only the will of a person dying after
+-- 29 May 1992. Same will, same witnesses, earlier death, opposite answer.
+#ASSERT     `the gift where one of three witnesses takes, the testator dying in 1930`'s `the gift is utterly null and void`
+
+-- The Act's answer.
+
+#ASSERT     `the position on an ordinary will`'s `there is an operative will`
+#ASSERT NOT `the position where there was no will`'s `there is an operative will`
+#ASSERT NOT `the position on an under-21 will`'s `there is an operative will`
+#ASSERT     `the position on a soldier's will`'s `there is an operative will`
+
+-- Valid AND revoked: the answer a wizard must be able to give, because the
+-- user is holding a document that looks perfect.
+#ASSERT NOT `the position on a will revoked by marriage`'s `there is an operative will`
+#ASSERT     `the position on a will revoked by marriage`'s `valid under sections 4, 6 and 27`
+#ASSERT     `the position on a will revoked by marriage`'s `revoked under sections 13 to 15`
+
+-- s 17 REACHING THE COMPOSED ANSWER. This is the point of the section: the
+-- revival fact must be able to change what the entry point says, and here it
+-- does. Same death, same will, same execution facts -- only the s 17 fact
+-- differs, and the estate stops passing on intestacy.
+#ASSERT     `the position on a will revoked by marriage and afterwards revived`'s `there is an operative will`
+#ASSERT     `the position on a will revoked by marriage and afterwards revived`'s `valid under sections 4, 6 and 27`
+#ASSERT     `the position on a will revoked by marriage and afterwards revived`'s `revoked under sections 13 to 15`
+#ASSERT     `the position on a will revoked by marriage and afterwards revived`'s `revived under section 17`
+#ASSERT     `the position on a will revoked by marriage and afterwards revived`'s `the proportion of the estate the will disposes of` EQUALS 1
+
+-- ... and the revival-FALSE twin, unchanged, so the pair is a differential and
+-- not just an assertion that happens to hold.
+#ASSERT NOT `the position on a will revoked by marriage`'s `revived under section 17`
+
+-- s 15(d) then s 17(1): tearing it up revoked it, re-executing it revived it.
+#ASSERT     `the position on a torn-up will afterwards revived`'s `there is an operative will`
+#ASSERT     `the position on a torn-up will afterwards revived`'s `revoked under sections 13 to 15`
+#ASSERT     `the position on a torn-up will afterwards revived`'s `revived under section 17`
+
+-- s 17 cannot cure an execution defect: the under-21 will stays dead, and the
+-- answer says so through s 4 rather than through s 17.
+#ASSERT NOT `the position on an under-21 will said to have been revived`'s `there is an operative will`
+#ASSERT NOT `the position on an under-21 will said to have been revived`'s `revived under section 17`
+#ASSERT NOT `the position on an under-21 will said to have been revived`'s `valid under sections 4, 6 and 27`
+
+-- ... and it does not disturb a will that was never revoked. Nothing in the
+-- ordinary answer moves when the revival fact is flipped.
+#ASSERT     `the position on an ordinary will said to have been revived`'s `there is an operative will`
+#ASSERT NOT `the position on an ordinary will said to have been revived`'s `revoked under sections 13 to 15`
+#ASSERT NOT `the position on an ordinary will said to have been revived`'s `revived under section 17`
+#ASSERT     `the position on an ordinary will said to have been revived`'s `the proportion of the estate the will disposes of` EQUALS 1
+
+-- The hinge into ISA s 10: no operative will means nothing is disposed of by
+-- will, so the whole estate falls to intestacy.
+#ASSERT `the position on an ordinary will`'s `the proportion of the estate the will disposes of` EQUALS 1
+#ASSERT `the position on a will revoked by marriage`'s `the proportion of the estate the will disposes of` EQUALS 0
+#ASSERT `the position where there was no will`'s `the proportion of the estate the will disposes of` EQUALS 0
+#ASSERT `the position on a torn-up will afterwards revived`'s `the proportion of the estate the will disposes of` EQUALS 1
+
+-- The Case-level predicates, on a death with no will at all: not valid, and
+-- not revoked either.
+#ASSERT NOT `the will is formally valid in` `a modern death leaving no will at all`
+#ASSERT     `the will is formally valid in` `a modern death leaving a properly executed will`
