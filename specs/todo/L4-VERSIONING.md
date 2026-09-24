@@ -1,3 +1,8 @@
+> **Status (audited 2026-07-03):** OPEN — the L4 _compiler_ versioning proposed here (MAJOR.MINOR.BUILD, `l4 release-check`, interface manifest, content hash, pin resolver) is unbuilt; there is no `l4 release-check` subcommand.
+>
+> - What DID ship is a separate, service-side scheme this spec explicitly warns against coupling to (§8 anti-patterns): `jl4-service` bakes deployment `MAJOR.BREAKING.RUNNING` from the CI run number (`Version.hs`; `ControlPlane.hs:521-529`), comparing deploy interfaces at PUT time (`Compatibility.hs`), not a `.l4` corpus across compiler builds.
+> - Nothing from this spec's corpus/manifest/pinning design has landed.
+
 # L4 Versioning
 
 A lightweight versioning scheme for the L4 language and compiler. Designed to add semantic meaning to the existing monotonic build numbers without disrupting the release process or introducing constraint-solver machinery.

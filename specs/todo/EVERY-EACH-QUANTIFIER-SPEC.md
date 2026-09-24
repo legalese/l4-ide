@@ -1,3 +1,8 @@
+> **Status (audited 2026-07-03):** OPEN — no `EVERY`/`EACH` quantifiers; regulative rules bind a single `PARTY` only.
+>
+> - `EVERY`/`EACH`/`NO` are not lexer keywords (`jl4-core/src/L4/Lexer.hs`); `ALL` exists only for `FOR ALL`.
+> - `obligation` parser takes exactly one party expr (`Parser.hs:1774-1775`); no barrier/fork semantics, `WHO`-filter, or `BarrierObligation` runtime. Syntax appears only in non-compiling aspirational examples (`jl4/experiments/regulative-powers.l4:4`).
+
 # EVERY/EACH Quantifier Specification
 
 **Status:** Draft

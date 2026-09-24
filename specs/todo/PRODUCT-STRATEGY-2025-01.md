@@ -1,3 +1,9 @@
+> **Status (audited 2026-07-03):** PARTIAL / SUPERSEDED — a Jan-2026 sprint roadmap now ~6 months stale; strategy has since shifted to the skills/plugin marketplace.
+>
+> - Done since writing: `dev-healthcheck.sh`, `dev-stop.sh`, `docker-compose.yml`; deployment + version automation (MAJOR.BREAKING.RUNNING baking, marketplace skill/plugin distribution) well beyond the roadmap's Week-3 asks.
+> - Not evidenced: one-click `setup.sh`, demo video, l4-wizard landing page, template gallery; `#313` hover fix unverifiable (no `jl4-lsp/src/LSP/L4/Hover.hs`).
+> - Treat as a historical planning record; live priorities now tracked elsewhere.
+
 # Product Strategy & Prioritization - January 2025
 
 **Date:** January 9, 2026  
@@ -797,6 +803,33 @@ _Priority:_ **P2 - Post-Sprint Week 3-4**
 - Triaged 48 open issues
 - Created 4-week post-sprint roadmap
 - Defined success metrics and risk mitigation
+
+---
+
+## The Adoption Thesis (Why-Now / Why-Us)
+
+_Added 2026-07-25. Condensed, product-facing version; the full long-form treatment lives in the pitch knowledge base (`l4-pitch` repo → `PITCH.md` → "Deep Dive: The Adoption Thesis"). Captured here so the roadmap is disciplined by it._
+
+Computational law has been attempted since Allen (1957) and the 1986 British Nationality Act formalization, and never achieved adoption. Before we claim "this time is different," we owe a _mechanism_, not a mood — and the mechanism should discipline what we build.
+
+**The failures were not logic failures.** The blockers were: (1) **incentive misalignment** — the party who did the encoding wasn't the party who captured the value; (2) **no consuming downstream** — the formal artifact was a demo, nothing ran on it; (3) **maintenance rot** — nobody funded keeping encodings current; (4) **deliberate ambiguity** — vagueness as a negotiated asset a powerful party won't give up; (5) **skill scarcity with no gradual on-ramp**. A better prover or type system fixes none of these, so **we don't lead with "better logic."**
+
+**What changed (W. Brian Arthur's enabling-technology test).** Two complements crossed a threshold. (a) **LLMs collapse the two historically fatal costs** — formalizing at scale, and explaining a formal result to a layperson. (b) **A consuming runtime now exists** — citizen wizard, decision-service API, anti-hallucination oracle — so the formal artifact produces value without a human in the loop (Claude Code is already a consumer). Production cost collapsed; a paying downstream appeared.
+
+**The honest limit.** LLMs do _not_ fix the incentives for **incumbent personas** (practicing lawyers, legislatures). That's why the nonconsumer-first wedge is load-bearing, not optional — it's the only terrain where the 50-year blocker is genuinely absent (there was no prior solution, so "good enough" can't be true there).
+
+**Where demand is real.** Not one-off contracts — that pain is diffuse and probabilistic, as hard to sell against as insurance. Demand is real where a legal defect **repeats at scale**: per-claim insurance payout logic, regulator compliance throughput, high-frequency contract operations. Every hard pilot finding (the legislative race condition; the million-dollar payout ambiguity) landed there, by selection rather than luck.
+
+**The real risk is repeatability, not adoption in the abstract.** The pilots already prove the tech works and the value is monetizable; the open question is whether each win _productizes_ or stays artisanal consulting. **The open-core corpus is the mechanism that converts bespoke engagements into a compounding, recurring-revenue library — and de-risking that conversion is the single most important thing this roadmap must do.**
+
+**The four-question qualifier** — say "different" only when all four are yes; decline the opportunity if any is no:
+
+1. Same party does the work and reaps the benefit (incentives aligned).
+2. Concentrated, recurring pain (a defect repeated at scale).
+3. A nonconsumer buyer with no "good enough" incumbent to displace.
+4. A consuming runtime that turns the artifact into value without a human in the loop.
+
+Public claim we defend: **not** "a System of Record for all of law" — that's a decades-long social project we name as the _direction_ — but the two or three niches where the complement has already crossed the threshold, proven by our pilots.
 
 ---
 
