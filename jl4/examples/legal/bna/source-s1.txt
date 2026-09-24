@@ -1,0 +1,257 @@
+================================================================================
+SOURCE TEXT — British Nationality Act 1981 (c. 61), section 1
+"Acquisition by birth or adoption"
+================================================================================
+
+PROVENANCE
+----------
+Source URL   : https://www.legislation.gov.uk/ukpga/1981/61/section/1
+               (legislation.gov.uk revised/"latest available" version)
+Fetched      : 2026-08-02
+Fetch route  : Direct fetch of legislation.gov.uk was blocked by an AWS WAF
+               JavaScript challenge (HTTP 202, x-amzn-waf-action: challenge),
+               for both curl and WebFetch; Chrome automation was not permitted.
+               Text was therefore retrieved from the Internet Archive Wayback
+               Machine's captures of the SAME legislation.gov.uk URLs:
+                 s. 1  : snapshot 20260705112453 (5 July 2026)
+                   https://web.archive.org/web/20260705112453/https://www.legislation.gov.uk/ukpga/1981/61/section/1
+                 s. 50 : snapshot 20260719130201 (19 July 2026)
+                   https://web.archive.org/web/20260719130201/https://www.legislation.gov.uk/ukpga/1981/61/section/50
+               Corroboration: the Wayback capture of the CLML XML
+               (/section/1/data.xml, snapshot 20241009092719, version valid
+               2023-12-15) carries the identical s. 1 text — consistent with
+               the section last being textually amended on 1.7.2021.
+Version note : The page's own banner states: "British Nationality Act 1981,
+               Section 1 is up to date with all changes known to be in force
+               on or before 04 July 2026. There are changes that may be
+               brought into force at a future date."
+               Version points listed for s. 1: 01/02/1991, 21/05/2002,
+               01/06/2003, 30/12/2005, 13/01/2010, 06/04/2010, 21/12/2018,
+               01/07/2021 (latest).
+               Amendments visible in the text include: qualifying-territory
+               words (British Overseas Territories Act 2002, in force
+               21.5.2002); s. 1(1A)/(3A)/(9) armed-forces provisions
+               (Borders, Citizenship and Immigration Act 2009 s. 42, in force
+               13.1.2010); s. 1(5)/(5A) adoption substitution (Adoption
+               (Intercountry Aspects) Act 1999, in force 1.6.2003, amended by
+               Adoption and Children Act 2002, in force 30.12.2005);
+               "or section 10A" (S.I. 2021/743, in force 1.7.2021).
+               Outstanding ("yet to be applied") changes listed on the page
+               all target OTHER provisions (s. 6(3)(4), s. 41, Sch. 1 —
+               BCIA 2009 ss. 39-41, themselves prospectively repealed by
+               Nationality and Borders Act 2022 (c. 36) s. 9(3)(a)); NONE
+               amend the s. 1 text itself.
+Rendering    : Plain-text rendering of the legislation.gov.uk HTML. Square
+               brackets with F-numbers ([F1 ...]) are legislation.gov.uk's
+               inline markers for amended/inserted text, resolved in the
+               "Textual Amendments" list below the section. "F18 ...." in
+               s. 1(8) marks words repealed. Whitespace is normalised; the
+               words are verbatim.
+================================================================================
+
+1 Acquisition by birth or adoption. U.K.
+
+
+(1) A person born in the United Kingdom after commencement [F1, or in a qualifying territory on or after the appointed day,] shall be a British citizen if at the time of the birth his father or mother is—
+    (a) a British citizen; or
+    (b) settled in the United Kingdom [F2 or that territory].
+
+[F3 (1A) A person born in the United Kingdom or a qualifying territory on or after the relevant day shall be a British citizen if at the time of the birth his father or mother is a member of the armed forces.]
+
+(2) A new-born infant who, after commencement, is found abandoned in the United Kingdom [F4, or on or after the appointed day is found abandoned in a qualifying territory,] shall, unless the contrary is shown, be deemed for the purposes of subsection (1)—
+    (a) to have been born in the United Kingdom after commencement [F5 or in that territory on or after the appointed day]; and
+    (b) to have been born to a parent who at the time of the birth was a British citizen or settled in the United Kingdom [F6 or that territory].
+
+(3) A person born in the United Kingdom after commencement who is not a British citizen by virtue of subsection (1) [F7, (1A)] or (2) [F8 or section 10A] shall be entitled to be registered as a British citizen if, while he is a minor—
+    (a) his father or mother becomes a British citizen or becomes settled in the United Kingdom; and
+    (b) an application is made for his registration as a British citizen.
+
+[F9 (3A) A person born in the United Kingdom on or after the relevant day who is not a British citizen by virtue of subsection (1), (1A) or (2) [F10 or section 10A] shall be entitled to be registered as a British citizen if, while he is a minor—
+    (a) his father or mother becomes a member of the armed forces; and
+    (b) an application is made for his registration as a British citizen]
+
+(4) A person born in the United Kingdom after commencement who is not a British citizen by virtue of subsection (1) [F11, (1A)] or (2) [F12 or section 10A] shall be entitled, on an application for his registration as a British citizen made at any time after he has attained the age of ten years, to be registered as such a citizen if, as regards each of the first ten years of that person’s life, the number of days on which he was absent from the United Kingdom in that year does not exceed 90.
+
+[F13 (5) Where—
+    (a) any court in the United Kingdom [F14 or, on or after the appointed day, any court in a qualifying territory] makes an order authorising the adoption of a minor who is not a British citizen; or
+    (b) a minor who is not a British citizen is adopted under a Convention adoption [F15 effected under the law of a country or territory outside the United Kingdom],
+  that minor shall, if the requirements of subsection (5A) are met, be a British citizen as from the date on which the order is made or the Convention adoption is effected, as the case may be.
+
+(5A) Those requirements are that on the date on which the order is made or the Convention adoption is effected (as the case may be)—
+    (a) the adopter or, in the case of a joint adoption, one of the adopters is a British citizen; and
+    (b) in a case within subsection (5)(b), the adopter or, in the case of a joint adoption, both of the adopters are habitually resident in the United Kingdom [F16 or in a designated territory].]
+
+(6) Where an order [F17 or a Convention adoption] in consequence of which any person became a British citizen by virtue of subsection (5) ceases to have effect, whether on annulment or otherwise, the cesser shall not affect the status of that person as a British citizen.
+
+(7) If in the special circumstances of any particular case the Secretary of State thinks fit, he may for the purposes of subsection (4) treat the person to whom the application relates as fulfilling the requirement specified in that subsection although, as regards any one or more of the first ten years of that person’s life, the number of days on which he was absent from the United Kingdom in that year or each of the years in question exceeds 90.
+
+(8) In this section and elsewhere in this Act “settled” has the meaning given by section 50 F18....
+
+[F19 (9) The relevant day for the purposes of subsection (1A) or (3A) is the day appointed for the commencement of section 42 of the Borders, Citizenship and Immigration Act 2009 (which inserted those subsections).]
+
+==============================================================================
+
+Textual Amendments
+----------------------------------------
+F1 Words in s. 1(1) inserted (21.5.2002) by British Overseas Territories Act 2002 (c. 8), Sch. 1 para. 1(2)(a); S.I. 2002/1252, art. 2
+F2 Words in s. 1(1)(b) inserted (21.5.2002) by British Overseas Territories Act 2002 (c. 8), Sch. 1 para. 1(2)(b); S. I. 2002/1252, art. 2
+F3 S. 1(1A) inserted (13.1.2010) by Borders, Citizenship and Immigration Act 2009 (c. 11), ss. 42(2), 58; S.I. 2009/2731, art. 4(a)
+F4 Words in s. 1(2) inserted (21.5.2002) by by British Overseas Territories Act 2002 (c. 8), Sch. 1 para. 1(3)(a); S.I. 2002/1252, art. 2
+F5 Words in s. 1(2)(a) inserted (21.5.2002) by by British Overseas Territories Act 2002 (c. 8), Sch. 1 para. 1(3)(b); S.I. 2002/1252, art. 2
+F6 Words in s. 1(2)(b) inserted (21.5.2002) by by British Overseas Territories Act 2002 (c. 8), Sch. 1 para. 1(3)(c); S.I. 2002/1252, art. 2
+F7 Word in s. 1(3) inserted (13.1.2010) by Borders, Citizenship and Immigration Act 2009 (c. 11), ss. 42(3), 58; S.I. 2009/2731, art. 4(a)
+F8 Words in s. 1(3) inserted (1.7.2021) by The British Nationality Act 1981 (Immigration Rules Appendix EU) (Amendment) Regulations 2021 (S.I. 2021/743), regs. 1(1), 2(2)
+F9 S. 1(3A) inserted (13.1.2010) by Borders, Citizenship and Immigration Act 2009 (c. 11), ss. 42(4), 58; S.I. 2009/2731, art. 4(a)
+F10 Words in s. 1(3A) inserted (1.7.2021) by The British Nationality Act 1981 (Immigration Rules Appendix EU) (Amendment) Regulations 2021 (S.I. 2021/743), regs. 1(1), 2(2)
+F11 Words in s. 1(4) inserted (13.1.2010) by Borders, Citizenship and Immigration Act 2009 (c. 11), ss. 42(5), 58; S.I. 2009/2731, art. 4(a)
+F12 Words in s. 1(4) inserted (1.7.2021) by The British Nationality Act 1981 (Immigration Rules Appendix EU) (Amendment) Regulations 2021 (S.I. 2021/743), regs. 1(1), 2(2)
+F13 S. 1(5)(5A) substituted (1.6.2003) for s. 1(5) by 1999 c. 18, ss. 7(1), 18(3); S.I. 2003/362, art. 2(a)
+F14 Words in s. 1(5) inserted (21.5.2002) by British Overseas Territories Act 2002 (c. 8), Sch. 1 para. 1(4); S.I. 2002/1252, art. 2
+F15 Words in s. 1(5)(b) inserted (30.12.2005) by Adoption and Children Act 2002 (c. 38), ss. 137(4)(a), 148 (with Sch. 4 paras. 6-8); S.I. 2005/2213, art. 2(m)
+F16 Words in s. 1(5A)(b) inserted (30.12.2005) by Adoption and Children Act 2002 (c. 38), ss. 137(4)(b), 148 (with Sch. 4 paras. 6-8); S.I. 2005/2213, art. 2(m)
+F17 Words in s. 1(6) inserted (1.6.2003) by 1999 c. 18, ss. 7(2), 18(3); S.I. 2003/362, art. 2(a)
+F18 Words in s. 1(8) repealed (30.12.2005) by Adoption and Children Act 2002 (c. 38), ss. 137(4)(c), 139(3), 148, Sch. 5 (with Sch. 4 paras. 2, 6-8); S.I. 2005/2213, art. 2(m); S.I. 2005/2897, art. 2(b)
+F19 S. 1(9) inserted (13.1.2010) by Borders, Citizenship and Immigration Act 2009 (c. 11), ss. 42(6), 58; S.I. 2009/2731, art. 4(a)
+
+Modifications etc. (not altering text)
+----------------------------------------
+C1 S. 1 modified (21.12.2018) by The Human Fertilisation and Embryology (Parental Orders) Regulations 2018 (S.I. 2018/1412), reg. 1(2), Sch. 4 para. 10
+C2 S. 1(1) explained by S.I. 1972/1613, art. 6 (as inserted by S.I. 1982/1649, art. 3)
+C3 S. 1(3)(4) restricted (4.12.2006) by Immigration, Asylum and Nationality Act 2006 (c. 13), ss. 58, 62; S.I. 2006/2838, art. 4(1) (subject to art. 4(2))
+C4 S. 1(5)(a) modified (6.4.2010) by The Human Fertilisation and Embryology (Parental Orders) Regulations 2010 (S.I. 2010/985), regs. 1(1), 5, Sch. 4
+C5 S. 1(5A)(a) modified (6.4.2010) by The Human Fertilisation and Embryology (Parental Orders) Regulations 2010 (S.I. 2010/985), regs. 1(1), 5, Sch. 4
+
+================================================================================
+ANNEX A — Definitions from s. 50 (Interpretation) that s. 1 leans on
+(verbatim extracts; same provenance as above, s. 50 snapshot of 19 July 2026;
+banner: "Section 50 is up to date with all changes known to be in force on or
+before 19 July 2026")
+================================================================================
+
+From s. 50(1) — "In this Act, unless the context otherwise requires—":
+
+  "appointed day" means the day appointed by the Secretary of State under
+      section 8 of the British Overseas Territories Act 2002 for the
+      commencement of Schedule 1 to that Act;
+      [in force note: that day was 21 May 2002 — S.I. 2002/1252, art. 2]
+
+  "commencement", without more, means the commencement of this Act;
+      [the Act commenced 1 January 1983]
+
+  "Convention adoption" means an adoption effected under the law of a country
+      or territory in which the Convention is in force, and certified in
+      pursuance of Article 23(1) of the Convention
+      [inserted by F4-annotation in s. 50; "the Convention" is the 1993 Hague
+      Convention on Intercountry Adoption, defined elsewhere in s. 50(1)]
+
+  "designated territory" means a qualifying territory, or the Sovereign Base
+      Areas of Akrotiri and Dhekelia, which is designated by Her Majesty by
+      Order in Council under subsection (14)
+
+  "the Islands" means the Channel Islands and the Isle of Man;
+
+  "minor" means a person who has not attained the age of eighteen years;
+
+  "qualifying territory" means a British overseas territory other than the
+      Sovereign Base Areas of Akrotiri and Dhekelia;
+
+  "settled" shall be construed in accordance with subsections (2) to (4);
+
+  "the United Kingdom" means Great Britain, Northern Ireland and the Islands,
+      taken together;
+
+From s. 50(1A)-(1B) (armed forces; used by s. 1(1A)/(3A)):
+
+  (1A) Subject to subsection (1B), references in this Act to being a member of
+       the armed forces are references to being—
+       (a) a member of the regular forces within the meaning of the Armed
+           Forces Act 2006, or
+       (b) a member of the reserve forces within the meaning of that Act
+           subject to service law by virtue of paragraph (a), (b) or (c) of
+           section 367(2) of that Act.
+  (1B) A person is not to be regarded as a member of the armed forces by
+       virtue of subsection (1A) if the person is treated as a member of a
+       regular or reserve force by virtue of—
+       (a) section 369 of the Armed Forces Act 2006, or
+       (b) section 4(3) of the Visiting Forces (British Commonwealth) Act 1933.
+
+From s. 50(2)-(5) (the "settled" construction; bracketed [F9 British overseas
+territory] is a textual amendment marker as in the main text):
+
+  (2) Subject to subsection (3), references in this Act to a person being
+      settled in the United Kingdom or in a [F9 British overseas territory]
+      are references to his being ordinarily resident in the United Kingdom
+      or, as the case may be, in that territory without being subject under
+      the immigration laws to any restriction on the period for which he may
+      remain.
+  (3) Subject to subsection (4), a person is not to be regarded for the
+      purposes of this Act—
+      (a) as having been settled in the United Kingdom at any time when he was
+          entitled to an exemption under section 8(3) or (4)(b) or (c) of the
+          Immigration Act 1971 or, unless the order under section 8(2) of
+          that Act conferring the exemption in question provides otherwise,
+          to an exemption under the said section 8(2), or to any
+          corresponding exemption under the former immigration laws; or
+      (b) as having been settled in a [F9 British overseas territory] at any
+          time when he was under the immigration laws entitled to any
+          exemption corresponding to any such exemption as is mentioned in
+          paragraph (a) (that paragraph being for the purposes of this
+          paragraph read as if the words from "unless" to "otherwise" were
+          omitted).
+  (4) A person to whom a child is born in the United Kingdom after
+      commencement is to be regarded for the purposes of section 1(1) as
+      being settled in the United Kingdom at the time of the birth if—
+      (a) he would fall to be so regarded but for his being at that time
+          entitled to an exemption under section 8(3) of the Immigration Act
+          1971; and
+      (b) immediately before he became entitled to that exemption he was
+          settled in the United Kingdom; and
+      (c) he was ordinarily resident in the United Kingdom from the time when
+          he became entitled to that exemption to the time of the birth;
+      but this subsection shall not apply if at the time of the birth the
+      child's father or mother is a person on whom any immunity from
+      jurisdiction is conferred by or under the Diplomatic Privileges Act
+      1964.
+  (5) It is hereby declared that a person is not to be treated for the
+      purpose of any provision of this Act as ordinarily resident in the
+      United Kingdom or in a [F9 British overseas territory] at a time when
+      he is in the United Kingdom or, as the case may be, in that territory
+      in breach of the immigration laws.
+
+================================================================================
+ANNEX B — Cross-references from s. 1 (noted, not fetched)
+================================================================================
+
+Textually referenced by the current s. 1:
+  - s. 50            (s. 1(8): "settled"; also supplies "commencement",
+                      "qualifying territory", "appointed day", "minor",
+                      "the United Kingdom", "Convention adoption",
+                      "designated territory", "member of the armed forces")
+  - s. 10A           (s. 1(3), (3A), (4): "or section 10A" — registration of
+                      persons under the EU withdrawal agreement route,
+                      inserted by S.I. 2021/743; a person who is a British
+                      citizen under s. 10A is excluded from the s. 1(3)/(3A)/
+                      (4) registration entitlements)
+  - BCIA 2009 s. 42  (s. 1(9): fixes the "relevant day" for (1A)/(3A) as the
+                      commencement day of that section — 13 January 2010 per
+                      S.I. 2009/2731, art. 4(a))
+  - (via s. 50(3)-(4)) Immigration Act 1971 s. 8; Diplomatic Privileges Act
+                      1964
+
+Conceptual neighbours the current s. 1 does NOT textually cite, but which the
+classic Sergot et al. (CACM 1986) formalization and any faithful encoding
+should note:
+  - s. 14            defines "British citizen by descent"; citizenship
+                      acquired under s. 1 is relevantly "otherwise than by
+                      descent" (that classification lives in s. 14, not s. 1)
+  - s. 3             registration of minors generally (discretionary route
+                      complementing the s. 1(3)/(3A)/(4) entitlements)
+  - Sch. 2           reduction of statelessness (alternative acquisition
+                      routes for some persons born in the UK who get nothing
+                      under s. 1)
+  - s. 41A           good character requirement: per modification note C3,
+                      s. 1(3)/(4) registration is restricted (4.12.2006) by
+                      Immigration, Asylum and Nationality Act 2006 s. 58 —
+                      the good-character requirement now embodied in s. 41A
+                      applies to applications under s. 1(3)/(3A)/(4) by
+                      persons aged 10 or over.

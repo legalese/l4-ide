@@ -1,0 +1,1140 @@
+
+=== probe-feel-quantifier.dmn ===
+XSD    valid
+VALID  clean
+BUILD  clean
+MODEL  Charities (Jersey) Law 2014 — the charity test  ns=https://legalese.com/l4/dmn/charities_jersey_law_2014_the_charity_test
+       inputData     [purpose:Purpose, entity:Entity]
+       decisions     [Article_1_the_definitions_on_which_the_charity_test_depends, Article_2_4_constitution, Article_2_6_purpose, Article_2_7_governor, a_the_prevention_or_relief_of_poverty, b_the_advancement_of_education, c_the_advancement_of_religion, d_the_advancement_of_health, e_the_saving_of_lives, f_the_advancement_of_citizenship_or_community_development, g_the_advancement_of_the_arts_heritage_culture_or_science, h_the_advancement_of_public_participation_in_sport, _2_d_the_recreational_facilities_restriction_is_satisfied, i_the_provision_of_recreational_facilities_or_activities, j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation, k_the_promotion_of_religious_or_racial_harmony, l_the_promotion_of_equality_and_diversity, m_the_advancement_of_environmental_protection_or_improvement, n_the_relief_of_those_in_need, o_the_advancement_of_animal_welfare, p_any_other_analogous_purpose, the_purpose_falls_within_paragraph_1, _5_the_purpose_is_excluded_as_political, _7_3_b_the_entity_benefits_only_identified_natural_persons, _7_2_the_mandatory_considerations_were_had_regard_to, _7_2_b_the_section_of_the_public_question_was_reached, _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit, the_public_benefit_determination_was_properly_made, the_entity_has_at_least_one_charitable_purpose, ii_the_purpose_is_purely_ancillary_or_incidental, the_purpose_is_charitable_or_purely_ancillary_or_incidental, _5_1_a_all_of_its_purposes_are_charitable_or_ancillary, the_entity_provides_or_intends_to_provide_public_benefit, the_applicant_s_intention_limb, _5_1_b_public_benefit, _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted, _5_2_governorship_by_a_listed_person_is_expressly_permitted, _5_2_a_listed_person_is_expressly_permitted_under_either_mode, _5_2_the_government_control_disqualification_applies, the_entity_meets_the_charity_test]
+       BKMs          [the_purpose_is_a_charitable_purpose]
+       decisionSvcs  [Article_6_Charitable_purposes, Article_7_Public_benefit, Article_5_The_charity_test]
+CASE   the St Helier poverty trust + a poverty-relief purpose - the clean base case: one charitable purpose, a sound finding, a clean constitution
+EVAL   context {entity={name=the St Helier poverty trust, purposes=[{description=the preve …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = true
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = true
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the St Helier poverty trust, purpose …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the St Helier poverty trust, purposes=[{d …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the St Helier poverty trust, purposes=[ …  [context echo elided]
+CASE   the poverty trust with a charity shop + an ancillary fundraising purpose - A9 satisfied - an ancillary purpose WITH a charitable purpose behind it
+EVAL   context {entity={name=the poverty trust with a charity shop, purposes=[{description …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = false
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = false
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = false   <<< EXPECTED true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = false   <<< EXPECTED true
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = false   <<< EXPECTED true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = false   <<< EXPECTED true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false   <<< EXPECTED true
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the poverty trust with a charity sho …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the poverty trust with a charity shop, pu …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the poverty trust with a charity shop,  …  [context echo elided]
+       svc out the_entity_meets_the_charity_test = false   <<< EXPECTED true
+CASE   the charity shop with nothing behind it + an ancillary fundraising purpose - A9 refused - the same ancillary purpose with nothing to be ancillary TO
+EVAL   context {entity={name=the charity shop with nothing behind it, purposes=[{descripti …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = false
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = false
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = false
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = false
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = false
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = false
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the charity shop with nothing behind …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the charity shop with nothing behind it,  …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the charity shop with nothing behind it …  [context echo elided]
+CASE   the poverty trust with a party-political object + a party-political purpose - 6(5) purpose-level carve-out: a political purpose defeats 5(1)(a)
+EVAL   context {entity={name=the poverty trust with a party-political object, purposes=[{d …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = false
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = true
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = false
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = false
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = false
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = false   <<< EXPECTED true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = true
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the poverty trust with a party-polit …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the poverty trust with a party-political  …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the poverty trust with a party-politica …  [context echo elided]
+CASE   the poverty trust with incidental campaigning + an ancillary party-political purpose - 6(5) double reach: a political purpose cannot be rescued by calling it ancillary
+EVAL   context {entity={name=the poverty trust with incidental campaigning, purposes=[{des …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = false
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = true
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = false
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = false
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = false
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = false
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = false   <<< EXPECTED true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the poverty trust with incidental ca …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the poverty trust with incidental campaig …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the poverty trust with incidental campa …  [context echo elided]
+CASE   the grocery company + a purely commercial purpose - no Article 6(1) head reached at all
+EVAL   context {entity={name=the grocery company, purposes=[{description=the carrying on o …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = false
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = false
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = false
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = false
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = false
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = false
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the grocery company, purposes=[{desc …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the grocery company, purposes=[{descripti …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the grocery company, purposes=[{descrip …  [context echo elided]
+CASE   the entity with no purposes + a poverty-relief purpose - A10 vacuous truth: no purposes, so 5(1)(a) passes and 5(1)(b) decides
+EVAL   context {entity={name=the entity with no purposes, purposes=[], constitution={descr …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = true
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = true
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = false
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the entity with no purposes, purpose …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the entity with no purposes, purposes=[], …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the entity with no purposes, purposes=[ …  [context echo elided]
+CASE   the entity with no purposes and no benefit + a poverty-relief purpose - A10 with the benefit limb also failing - why 5(1)(a)'s vacuity is nearly harmless
+EVAL   context {entity={name=the entity with no purposes and no benefit, purposes=[], cons …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = false
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = true
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = false
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = false
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = false
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the entity with no purposes and no b …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the entity with no purposes and no benefi …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the entity with no purposes and no bene …  [context echo elided]
+CASE   the disease-prevention trust + a sickness-prevention purpose - 6(2)(a) WIDENS head (d): sickness prevention without advancing health
+EVAL   context {entity={name=the disease-prevention trust, purposes=[{description=the prev …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = false
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = true
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = true
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the disease-prevention trust, purpos …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the disease-prevention trust, purposes=[{ …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the disease-prevention trust, purposes= …  [context echo elided]
+CASE   the pigeon fanciers' association + a spectator-pastime purpose - 6(2)(c) GATE fails: a pastime that is not sport involving physical skill and exertion
+EVAL   context {entity={name=the pigeon fanciers' association, purposes=[{description=the  …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = false
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = false
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = false
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = false
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = false
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = false
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the pigeon fanciers' association, pu …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the pigeon fanciers' association, purpose …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the pigeon fanciers' association, purpo …  [context echo elided]
+CASE   the island swimming association + a physical-sport purpose - 6(2)(c) GATE passes
+EVAL   context {entity={name=the island swimming association, purposes=[{description=the a …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = false
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = true
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = true
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the island swimming association, pur …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the island swimming association, purposes …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the island swimming association, purpos …  [context echo elided]
+CASE   the members-only tennis club + a members-only recreation purpose - 6(2)(d) GATE fails: recreation neither need-directed nor open to the public
+EVAL   context {entity={name=the members-only tennis club, purposes=[{description=the prov …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = false
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = false
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = false
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = false
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = false
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = false
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the members-only tennis club, purpos …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the members-only tennis club, purposes=[{ …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the members-only tennis club, purposes= …  [context echo elided]
+CASE   the public recreation ground trust + an open recreation purpose - 6(2)(d) GATE passes on its second limb
+EVAL   context {entity={name=the public recreation ground trust, purposes=[{description=th …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = false
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = true
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = true
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = true
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the public recreation ground trust,  …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the public recreation ground trust, purpo …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the public recreation ground trust, pur …  [context echo elided]
+CASE   the humanist society + a philosophical-belief purpose - 6(2)(f) DEEMS philosophical belief into head (p) with no separate analogy judgement
+EVAL   context {entity={name=the humanist society, purposes=[{description=the advancement  …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = false
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = true
+       the_entity_meets_the_charity_test  SUCCEEDED              = true
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the humanist society, purposes=[{des …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the humanist society, purposes=[{descript …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the humanist society, purposes=[{descri …  [context echo elided]
+CASE   the Ministerially directed trust + a poverty-relief purpose - 5(2) direction mode
+EVAL   context {entity={name=the Ministerially directed trust, purposes=[{description=the  …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = true
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = true
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = true
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = false
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = true
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the Ministerially directed trust, pu …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the Ministerially directed trust, purpose …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the Ministerially directed trust, purpo …  [context echo elided]
+CASE   the Ministerially directed trust exempted by Order + a poverty-relief purpose - 5(3): a Ministerial Order disapplies 5(2)
+EVAL   context {entity={name=the Ministerially directed trust exempted by Order, purposes= …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = true
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = true
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = true
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = true
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the Ministerially directed trust exe …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the Ministerially directed trust exempted …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the Ministerially directed trust exempt …  [context echo elided]
+CASE   the States-governed foundation + a poverty-relief purpose - 5(2) governor mode, limb (b)
+EVAL   context {entity={name=the States-governed foundation, purposes=[{description=the pr …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = true
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = true
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = true
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = true
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = false
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the States-governed foundation, purp …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the States-governed foundation, purposes= …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the States-governed foundation, purpose …  [context echo elided]
+CASE   the Guernsey-governed foundation + a poverty-relief purpose - 5(2) governor mode, limb (c) - the foreign equivalent
+EVAL   context {entity={name=the Guernsey-governed foundation, purposes=[{description=the  …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = true
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = true
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = true
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = true
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = false
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the Guernsey-governed foundation, pu …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the Guernsey-governed foundation, purpose …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the Guernsey-governed foundation, purpo …  [context echo elided]
+CASE   the trust with a Minister in a private capacity + a poverty-relief purpose - 5(2) 'acting in that capacity' not extended, so no disqualification
+EVAL   context {entity={name=the trust with a Minister in a private capacity, purposes=[{d …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = true
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = true
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = true
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = true
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the trust with a Minister in a priva …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the trust with a Minister in a private ca …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the trust with a Minister in a private  …  [context echo elided]
+CASE   the dormant registered charity + a poverty-relief purpose - A11 negative: a registered charity that only INTENDS to provide benefit
+EVAL   context {entity={name=the dormant registered charity, purposes=[{description=the pr …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = false
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = true
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = false
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = false
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the dormant registered charity, purp …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the dormant registered charity, purposes= …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the dormant registered charity, purpose …  [context echo elided]
+CASE   the applicant not yet operating + a poverty-relief purpose - A11 positive: the same finding, but the entity is an applicant
+EVAL   context {entity={name=the applicant not yet operating, purposes=[{description=the p …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = true
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = true
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = true
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the applicant not yet operating, pur …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the applicant not yet operating, purposes …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the applicant not yet operating, purpos …  [context echo elided]
+CASE   the grandchildren's trust + a poverty-relief purpose - 7(3)(b) hard bar defeats an affirmative 5(1)(b) finding
+EVAL   context {entity={name=the grandchildren's trust, purposes=[{description=the prevent …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = false
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = true
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = false
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = true
+SVC    Article_6_Charitable_purposes -> {entity={name=the grandchildren's trust, purposes= …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the grandchildren's trust, purposes=[{des …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the grandchildren's trust, purposes=[{d …  [context echo elided]
+CASE   the school with an unduly restrictive fee + a poverty-relief purpose - A7: 'unduly restrictive' is a consideration, not a defeater - the test still passes
+EVAL   context {entity={name=the school with an unduly restrictive fee, purposes=[{descrip …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = true
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = true
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = true
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the school with an unduly restrictiv …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the school with an unduly restrictive fee …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the school with an unduly restrictive f …  [context echo elided]
+CASE   the church whose benefit was presumed + a poverty-relief purpose - A8: a presumption-tainted determination is improperly made, yet the test passes on the merits
+EVAL   context {entity={name=the church whose benefit was presumed, purposes=[{description …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = false
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = true
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = true
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = true
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = true
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = false
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the church whose benefit was presume …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the church whose benefit was presumed, pu …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the church whose benefit was presumed,  …  [context echo elided]
+CASE   the entity whose determiner skipped 7(2)(b) + a poverty-relief purpose - A8/7(2)(b): the determiner skipped the question, so the determination is improperly made
+EVAL   context {entity={name=the entity whose determiner skipped 7(2)(b), purposes=[{descr …  [context echo elided]
+       Article_2_7_governor               SUCCEEDED              = true
+       c_the_advancement_of_religion      SUCCEEDED              = false
+       the_public_benefit_determination_was_properly_made SUCCEEDED              = false
+       Article_1_the_definitions_on_which_the_charity_test_depends SUCCEEDED              = true
+       _5_1_b_public_benefit              SUCCEEDED              = true
+       the_applicant_s_intention_limb     SUCCEEDED              = false
+       _5_2_the_government_control_disqualification_applies SUCCEEDED              = false
+       g_the_advancement_of_the_arts_heritage_culture_or_science SUCCEEDED              = false
+       k_the_promotion_of_religious_or_racial_harmony SUCCEEDED              = false
+       a_the_prevention_or_relief_of_poverty SUCCEEDED              = true
+       _5_the_purpose_is_excluded_as_political SUCCEEDED              = false
+       j_the_advancement_of_human_rights_conflict_resolution_or_reconciliation SUCCEEDED              = false
+       _5_2_governorship_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       h_the_advancement_of_public_participation_in_sport SUCCEEDED              = false
+       _2_d_the_recreational_facilities_restriction_is_satisfied SUCCEEDED              = false
+       the_entity_provides_or_intends_to_provide_public_benefit SUCCEEDED              = true
+       o_the_advancement_of_animal_welfare SUCCEEDED              = false
+       d_the_advancement_of_health        SUCCEEDED              = false
+       n_the_relief_of_those_in_need      SUCCEEDED              = false
+       the_purpose_falls_within_paragraph_1 SUCCEEDED              = true
+       _5_1_a_all_of_its_purposes_are_charitable_or_ancillary SUCCEEDED              = true
+       b_the_advancement_of_education     SUCCEEDED              = false
+       _5_2_a_listed_person_is_expressly_permitted_under_either_mode SUCCEEDED              = false
+       p_any_other_analogous_purpose      SUCCEEDED              = false
+       the_entity_meets_the_charity_test  SUCCEEDED              = true
+       _7_2_the_mandatory_considerations_were_had_regard_to SUCCEEDED              = false
+       f_the_advancement_of_citizenship_or_community_development SUCCEEDED              = false
+       Article_2_4_constitution           SUCCEEDED              = true
+       the_purpose_is_charitable_or_purely_ancillary_or_incidental SUCCEEDED              = true
+       m_the_advancement_of_environmental_protection_or_improvement SUCCEEDED              = false
+       e_the_saving_of_lives              SUCCEEDED              = false
+       i_the_provision_of_recreational_facilities_or_activities SUCCEEDED              = false
+       the_entity_has_at_least_one_charitable_purpose SUCCEEDED              = true
+       _5_2_direction_or_control_by_a_listed_person_is_expressly_permitted SUCCEEDED              = false
+       l_the_promotion_of_equality_and_diversity SUCCEEDED              = false
+       ii_the_purpose_is_purely_ancillary_or_incidental SUCCEEDED              = false
+       Article_2_6_purpose                SUCCEEDED              = true
+       _7_2_b_the_section_of_the_public_question_was_reached SUCCEEDED              = false
+       _7_3_a_no_charitable_purpose_was_presumed_to_be_for_the_public_benefit SUCCEEDED              = true
+       _7_3_b_the_entity_benefits_only_identified_natural_persons SUCCEEDED              = false
+SVC    Article_6_Charitable_purposes -> {entity={name=the entity whose determiner skipped  …  [context echo elided]
+SVC    Article_7_Public_benefit -> {entity={name=the entity whose determiner skipped 7(2)( …  [context echo elided]
+SVC    Article_5_The_charity_test -> {entity={name=the entity whose determiner skipped 7(2 …  [context echo elided]
+
+KIE 8.44.0.Final VERDICT: 1 file(s), 25 case(s), 0 error(s), 0 warning(s), 1000/1000 decision(s) SUCCEEDED, 993/1000 value(s) as expected, 124/125 service output value(s) as expected   <<< FAILED
+
+[100 oversized context-echo lines truncated to their first 90 characters. They repeat the case context verbatim from charity-test.cases.json; no engine ANSWER was removed.]
