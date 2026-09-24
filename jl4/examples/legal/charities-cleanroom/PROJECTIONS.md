@@ -37,9 +37,9 @@ Commands (from the repo root, with `JL4_LIBRARY_PATH=$PWD/jl4-core/libraries`):
 
 ```sh
 D=jl4/examples/legal/charities-cleanroom
-l4 export $D/charity-test.l4 --to dmn    --fidelity-report -o $D/projections/charity-test.dmn
-l4 export $D/charity-test.l4 --to dmn-md --fidelity-report -o $D/projections/charity-test.dmn.md
-l4 export $D/charity-test.l4 --to bpmn   --fidelity-report -o /dev/null   # exits 1, see §5
+l4 export dmn $D/charity-test.l4    --fidelity-report -o $D/projections/charity-test.dmn
+l4 export dmn-md $D/charity-test.l4 --fidelity-report -o $D/projections/charity-test.dmn.md
+l4 export bpmn $D/charity-test.l4   --fidelity-report -o /dev/null   # exits 1, see §5
 
 npx --yes --package=dmn-moddle node etc/validate-dmn.mjs $D/projections/*.dmn
 
@@ -269,7 +269,7 @@ separate the two readings. A case file built from one-purpose entities would hav
 Both refuse, and both refusals are correct:
 
 ```
-$ l4 export …/charity-test.l4 --to bpmn --fidelity-report
+$ l4 export bpmn …/charity-test.l4 --fidelity-report
 No regulative rules found in module — nothing to export as BPMN          (exit 1)
 
 $ l4 state-graph …/charity-test.l4
