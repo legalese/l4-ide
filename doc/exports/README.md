@@ -10,13 +10,17 @@ So L4 compiles **out**. Each export takes the rules you have written and re-expr
 system that already has users, semantics, tooling and an install base — and each one is a genuine
 piece of software with its own community, not a format we invented.
 
-| Neighbour                         | What it is                                                          | What you get from L4                                         | Command          |
-| --------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------- |
-| **[docassemble](docassemble.md)** | open-source guided interviews used across access-to-justice work    | a working interview that asks the citizen only what it needs | `l4 docassemble` |
-| **[OpenFisca](openfisca.md)**     | the microsimulation engine behind several countries' benefit models | a runnable Python module of tax/benefit variables            | `l4 openfisca`   |
-| **[Catala](catala.md)**           | a literate language for law, with a proof assistant behind it       | a literate module pairing statute text with its logic        | `l4 catala`      |
-| **[Blawx](blawx.md)**             | a visual, blocks-based rules tool over the s(CASP) reasoner         | a Blawx project you can open, run and explain                | `l4 blawx`       |
-| **[DMN and BPMN](dmn-bpmn.md)**   | the OMG standards for decision tables and process diagrams          | decision tables and process models for standard engines      | `l4 export`      |
+Every export is spelled the same way: `l4 export FORMAT FILE`. `l4 export --help` lists the
+formats, and `l4 export FORMAT --help` lists one format's options. The one backend that also reads
+its notation back does so with `l4 import FORMAT FILE`.
+
+| Neighbour                         | What it is                                                          | What you get from L4                                         | Command                              |
+| --------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------ |
+| **[docassemble](docassemble.md)** | open-source guided interviews used across access-to-justice work    | a working interview that asks the citizen only what it needs | `l4 export docassemble`              |
+| **[OpenFisca](openfisca.md)**     | the microsimulation engine behind several countries' benefit models | a runnable Python module of tax/benefit variables            | `l4 export openfisca`                |
+| **[Catala](catala.md)**           | a literate language for law, with a proof assistant behind it       | a literate module pairing statute text with its logic        | `l4 export catala`                   |
+| **[Blawx](blawx.md)**             | a visual, blocks-based rules tool over the s(CASP) reasoner         | a Blawx project you can open, run and explain                | `l4 export blawx`, `l4 import blawx` |
+| **[DMN and BPMN](dmn-bpmn.md)**   | the OMG standards for decision tables and process diagrams          | decision tables and process models for standard engines      | `l4 export dmn`, `dmn-md`, `bpmn`    |
 
 ## Which one do I want?
 
@@ -70,7 +74,7 @@ machine-checked equivalence argument — see those pages.
 ## What these exports are not
 
 **They are one-way.** With one exception these compile L4 _out_, not back in. Blawx alone can read
-its own format back with `l4 blawx --import` (see [Blawx](blawx.md)). Do not plan a workflow in
+its own format back with `l4 import blawx` (see [Blawx](blawx.md)). Do not plan a workflow in
 which someone edits the generated artifact and expects the L4 to follow.
 
 **They do not replace the source.** The generated artifact is a projection. When the law changes,

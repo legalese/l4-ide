@@ -45,27 +45,33 @@ what makes the logic-programming abilities above available to rules you wrote in
 ## The command
 
 ```
-l4 blawx FILE
+l4 export blawx FILE
 ```
 
 Compiles the decision-rule subset of `FILE` to a Blawx project and prints the `.blawx` YAML to
 standard output. The s(CASP) program is written alongside it only when you pass `--output`.
 
-| Flag            | Effect                                                                     |
-| --------------- | -------------------------------------------------------------------------- |
-| `--output FILE` | write the `.blawx` YAML to `FILE`, and the s(CASP) dump alongside it       |
-| `--scasp`       | emit the concatenated s(CASP) program instead of the `.blawx` YAML         |
-| `--import`      | **read** a `.blawx` project and lift it back to L4 — the reverse direction |
-| `--parse-only`  | with `--import`: parse and report without lifting                          |
-| `--reemit`      | with `--import`: re-emit the `.blawx` from what was parsed                 |
-| `--roundtrip`   | self-check: emit, parse back, and assert the two agree                     |
+| Flag            | Effect                                                               |
+| --------------- | -------------------------------------------------------------------- |
+| `--output FILE` | write the `.blawx` YAML to `FILE`, and the s(CASP) dump alongside it |
+| `--scasp`       | emit the concatenated s(CASP) program instead of the `.blawx` YAML   |
+| `--roundtrip`   | self-check: emit, parse back, and assert the two agree               |
+
+The reverse direction is its own command, `l4 import blawx FILE`, which **reads** a `.blawx`
+project and lifts it back to L4:
+
+| Flag            | Effect                                                   |
+| --------------- | -------------------------------------------------------- |
+| `--output FILE` | write the lifted L4 to `FILE` instead of standard output |
+| `--parse-only`  | parse and report without lifting                         |
+| `--reemit`      | re-emit the `.blawx` from what was parsed, instead of L4 |
 
 `--scasp` is the one to reach for when debugging: it hands you the logic program itself, which you
 can run against an s(CASP) system directly without going through the Blawx UI.
 
 ## The only two-way export
 
-Blawx is the **one** backend that reads its own format back. `l4 blawx --import` parses a `.blawx`
+Blawx is the **one** backend that reads its own format back. `l4 import blawx` parses a `.blawx`
 project and lifts it to L4, and `--roundtrip` checks that emitting and re-importing round-trips
 faithfully.
 

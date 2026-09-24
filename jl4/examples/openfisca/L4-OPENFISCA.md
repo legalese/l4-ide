@@ -16,7 +16,7 @@ end-to-end.
 ## 1. The toolchain
 
 ```
-   ┌──────────────┐   isomorphic    ┌──────────────┐   l4 openfisca   ┌──────────────┐
+   ┌──────────────┐   isomorphic    ┌──────────────┐   l4 export openfisca   ┌──────────────┐
    │ legislation  │  formalisation  │      L4      │  (this bridge)   │  OpenFisca   │
    │ / regulation │ ──────────────▶ │  .l4 source │ ───────────────▶ │   Python     │
    └──────────────┘                 └──────────────┘                  └──────────────┘
@@ -118,7 +118,7 @@ the human-facing, type-checked, statute-aligned source that feeds it.
 
 ## 4. Worked examples (with validating outputs)
 
-Each example is a real `.l4` file in this directory. `l4 openfisca FILE` emits
+Each example is a real `.l4` file in this directory. `l4 export openfisca FILE` emits
 the OpenFisca module; the numbers below are produced by **running that emitted
 module in OpenFisca** and confirming they match the L4 `#EVAL` values.
 
@@ -174,7 +174,7 @@ Round-trip: members earning 1000 and 1500 → `household_income = 2500.0` ✓
 
 ```sh
 # emit
-cabal run l4 -- openfisca jl4/examples/openfisca/household.l4 -o /tmp/household.py
+cabal run l4 -- export openfisca jl4/examples/openfisca/household.l4 -o /tmp/household.py
 
 # run it in real OpenFisca and check the numbers match the L4 #EVALs
 uv venv --python 3.12 /tmp/of && uv pip install --python /tmp/of/bin/python openfisca-core "numpy==2.1.3"
@@ -182,7 +182,7 @@ uv venv --python 3.12 /tmp/of && uv pip install --python /tmp/of/bin/python open
 ```
 
 The golden output of every example is pinned in `expected/` and checked by the
-`l4 openfisca` cases in `jl4/tests-cli/Main.hs`.
+`l4 export openfisca` cases in `jl4/tests-cli/Main.hs`.
 
 ---
 
@@ -213,7 +213,7 @@ OpenFisca output as float32-approximate, not exact.
 The verification has two tiers, and a green check means different things:
 
 - **Golden tests** (`tests-cli`, run in CI) are **regression-only** — they pin
-  that `l4 openfisca` keeps emitting the same `.py`. They prove nothing about
+  that `l4 export openfisca` keeps emitting the same `.py`. They prove nothing about
   semantics.
 - **Round-trips** (`roundtrip_check.py`) genuinely execute the emitted module in
   real OpenFisca, but the expected numbers come from L4's own `#EVAL`/`#ASSERT`.
