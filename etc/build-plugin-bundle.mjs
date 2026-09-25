@@ -3,7 +3,7 @@
 // every file the skill cites, and nothing else.
 //
 // WHY THIS IS COMPUTED RATHER THAN A LIST. The skill teaches by example: it
-// names ~46 files it does not carry (`jl4/examples/legal/regcf/regcf.l4` alone
+// names ~46 files it does not carry (`jl4/examples/canon/us/regcf/regcf.l4` alone
 // is cited 20 times) and almost all of those citations are prose, not markdown
 // links -- so shipping the skill alone does not produce broken links, it
 // produces an agent told "see how regcf.l4 handles this" with no regcf.l4 on
@@ -489,7 +489,7 @@ Generated from l4-ide \`${headSha.slice(0, 12)}\`.
 
 \`skills/writing-l4-rules/\` is the skill. Everything else is the material the
 skill **cites**: it teaches by worked example, naming files like
-\`jl4/examples/legal/regcf/regcf.l4\` in its prose rather than restating them.
+\`jl4/examples/canon/us/regcf/regcf.l4\` in its prose rather than restating them.
 Those citations are carried at their original repo-relative paths, so each one
 resolves against this bundle root exactly as it resolves against the l4-ide
 root. Nothing in the skill text was rewritten.

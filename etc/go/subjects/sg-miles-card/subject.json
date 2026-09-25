@@ -42,8 +42,9 @@
     "            typechecks; well-formedness only, cannot raise the verdict.",
     "  p7-mcp    declared: the composer carries one @export; deployable surface.",
     "  p7-tnr    declared: the NLG golden exists at",
-    "            jl4/examples/legal/miles-card/tests/miles-card.nlg.golden and `l4 nlg`",
-    "            regenerates it, so the leg is a real differential oracle.",
+    "            jl4/examples/canon/contracts/payments/sg-miles-card/tests/miles-card.nlg.golden",
+    "            and `l4 nlg` regenerates it, so the leg is a real differential",
+    "            oracle.",
     "  p7-bpmn and p7-lts NOT declared: every module is constitutive (no",
     "            MUST/MAY/SHANT anywhere; pins.json regulative_rules is []).",
     "  p7-wizard NOT declared: no wizard module. p7-dmn, p7-dmn-md, p7-ladder NOT",
@@ -55,21 +56,21 @@
   "source_url": "https://www.dbs.com.sg/iwov-resources/media/pdf/cards/promotions/dbs-yuu-cards/dbs-yuu-card-promotion-tncs.pdf",
   "encoding": {
     "state": "written",
-    "main": "jl4/examples/legal/miles-card/miles-card.l4",
+    "main": "jl4/examples/canon/contracts/payments/sg-miles-card/miles-card.l4",
     "modules": [
-      "jl4/examples/legal/miles-card/miles-card-domain.l4",
-      "jl4/examples/legal/miles-card/classify.l4",
-      "jl4/examples/legal/miles-card/categorize.l4",
-      "jl4/examples/legal/miles-card/dbs-yuu.l4",
-      "jl4/examples/legal/miles-card/dbs-womans-world.l4",
-      "jl4/examples/legal/miles-card/citi-rewards.l4",
-      "jl4/examples/legal/miles-card/hsbc-revolution.l4",
-      "jl4/examples/legal/miles-card/uob-ladys-solitaire.l4",
-      "jl4/examples/legal/miles-card/posb-passion.l4",
-      "jl4/examples/legal/miles-card/flat-cards.l4",
-      "jl4/examples/legal/miles-card/miles-card.l4",
-      "jl4/examples/legal/miles-card/miles-card-cases.l4",
-      "jl4/examples/legal/miles-card/miles-card-disputed.l4"
+      "jl4/examples/canon/contracts/payments/sg-miles-card/miles-card-domain.l4",
+      "jl4/examples/canon/contracts/payments/sg-miles-card/classify.l4",
+      "jl4/examples/canon/contracts/payments/sg-miles-card/categorize.l4",
+      "jl4/examples/canon/contracts/payments/sg-miles-card/dbs-yuu.l4",
+      "jl4/examples/canon/contracts/payments/sg-miles-card/dbs-womans-world.l4",
+      "jl4/examples/canon/contracts/payments/sg-miles-card/citi-rewards.l4",
+      "jl4/examples/canon/contracts/payments/sg-miles-card/hsbc-revolution.l4",
+      "jl4/examples/canon/contracts/payments/sg-miles-card/uob-ladys-solitaire.l4",
+      "jl4/examples/canon/contracts/payments/sg-miles-card/posb-passion.l4",
+      "jl4/examples/canon/contracts/payments/sg-miles-card/flat-cards.l4",
+      "jl4/examples/canon/contracts/payments/sg-miles-card/miles-card.l4",
+      "jl4/examples/canon/contracts/payments/sg-miles-card/miles-card-cases.l4",
+      "jl4/examples/canon/contracts/payments/sg-miles-card/miles-card-disputed.l4"
     ]
   },
   "checks": {
@@ -81,24 +82,30 @@
     "p7-akn": {},
     "p7-mcp": {},
     "p7-tnr": {
-      "golden": "jl4/examples/legal/miles-card/tests/miles-card.nlg.golden"
+      "golden": "jl4/examples/canon/contracts/payments/sg-miles-card/tests/miles-card.nlg.golden"
     }
   },
   "natlang_sources": {
-    "bundle": "jl4/examples/legal/miles-card/source/source-bundle.json",
-    "register": "jl4/examples/legal/miles-card/source/external-modifications.json"
+    "bundle": "jl4/examples/canon/contracts/payments/sg-miles-card/registers/source-bundle.json",
+    "register": "jl4/examples/canon/contracts/payments/sg-miles-card/registers/external-modifications.json"
   },
   "comparison": {
-    "fork_register": "jl4/examples/legal/miles-card/source/fork-register.json",
-    "surface_map": "jl4/examples/legal/miles-card/source/surface-map.json"
+    "fork_register": "jl4/examples/canon/contracts/payments/sg-miles-card/registers/fork-register.json",
+    "surface_map": "jl4/examples/canon/contracts/payments/sg-miles-card/registers/surface-map.json"
   },
   "encodings": {
     "cheatsheet-2026-06": {
-      "modules": ["jl4/examples/legal/miles-card/cheatsheet-claims.l4"],
+      "modules": [
+        "jl4/examples/canon/contracts/payments/sg-miles-card/cheatsheet-claims.l4"
+      ],
       "checks": {
         "min_dated_arms": 0,
         "min_assertions": 184
       }
     }
+  },
+  "canon": {
+    "subject_path": "contracts/payments/sg-miles-card",
+    "primary_row": "legalese"
   }
 }

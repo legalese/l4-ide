@@ -20,7 +20,8 @@
 //             mirror. This is the claim likeliest to rot, because a number that
 //             was measured once reads exactly like a number that is still true.
 //   notes     "`NOTES.md` §9" — NOT mirrored: the pin's allowlist carries *.l4,
-//             tests/*.golden, encoding.json and SOURCE-LICENSE.md, and no prose.
+//             tests/*.golden, encoding.json, SOURCE-LICENSE.md and
+//             registers/*.json, and no prose.
 //             Needs a canon checkout, so it SKIPS with a PRINTED note by default
 //             (a silent skip would read as a pass) and is fatal under --require.
 //

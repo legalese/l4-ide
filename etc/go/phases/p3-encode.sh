@@ -19,7 +19,7 @@
 # all: SPEC.md §7.3 carries it as HG1, and this stage records it as
 # unverified rather than omitting it.
 #
-# Requirements source: jl4/examples/legal/bna/SMOKE-REPORT.md §2 (p3-encode) —
+# Requirements source: legalese/canon subjects/uk/bna-1981/encodings/legalese/report/SMOKE-REPORT.md §2 (p3-encode) —
 # "the real stage needs: the l4 skill's inert-style guidance as the prompt
 # substrate; JL4_LIBRARY_PATH pinned; and its green gate must parse the run log
 # for `assertion failed` rather than trust exit 0 (§3.2)." The first is the

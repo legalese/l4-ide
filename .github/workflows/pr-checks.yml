@@ -215,7 +215,7 @@ jobs:
               # broaden to `jl4/examples/legal/**` — that would run both Java
               # engines on every corpus edit in the repo, including subjects
               # with no DMN leg at all.
-              - 'jl4/examples/legal/regcf/**'
+              - 'jl4/examples/canon/us/regcf/**'
               - 'etc/kie-dmn-check/**'
               - 'etc/camunda-dmn-check/**'
               - 'etc/validate-dmn.mjs'

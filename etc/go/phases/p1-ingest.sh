@@ -21,7 +21,7 @@
 # `integrity-digest-or-immutable-capture` refuses a document that is neither
 # hashed nor pinned to an archive URL.
 #
-# Requirements source: jl4/examples/legal/bna/SMOKE-REPORT.md §2 ("the real
+# Requirements source: legalese/canon subjects/uk/bna-1981/encodings/legalese/report/SMOKE-REPORT.md §2 ("the real
 # stage needs: input = an act/section citation; output = exactly such a
 # provenance-headed source artifact; requirements = an archive-fallback fetch
 # strategy, capture of the in-force banner, and preservation of the F/C

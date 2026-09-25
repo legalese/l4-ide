@@ -14,7 +14,7 @@ did not. Predicates are a different matter, and belong to the ladder; see
 | `offering.l4`     | Three parties, a four-way `RAND` (concurrent obligations with different bearers), two `SHANT`s, timer boundary events, a breach terminal      |
 | `handover.l4`     | A deadline that is a _name_ (no timer, no invented duration), a `RAND` and a `ROR`, and four permissions whose deadlines are drawn as lapse arms |
 | `consultation.l4` | The only one that draws a converging parallel gateway: a `RAND` of deadline-free permissions, one branch of which is a chain                  |
-| `../legal/regcf/regcf.l4` | The real 992-line Reg CF corpus — **three** rules, so three golden pairs (`regcf-reporting`, `regcf-advertising`, `regcf-resale`): a renewing obligation drawn as a loop, `IF`-headed duties with guarded gateway arms, named deadlines, two prohibitions. Read from `examples/legal/`, not copied here — see below |
+| `../canon/us/regcf/regcf.l4` | The real 992-line Reg CF corpus — **three** rules, so three golden pairs (`regcf-reporting`, `regcf-advertising`, `regcf-resale`): a renewing obligation drawn as a loop, `IF`-headed duties with guarded gateway arms, named deadlines, two prohibitions. Read from `examples/legal/`, not copied here — see below |
 | `tenancy.l4`      | A quantified obligation (`EVERY`) under each join — **three** rules, so three golden pairs (`tenancy-barrier`, `tenancy-fork`, `tenancy-fork-beside-party`): a multi-instance **task** for the barrier and a multi-instance **sub-process** for the fork, `P-CAST` on both. The witness that a barrier and a fork export differently, and since 2026-09-19 that they are not the same graph with a different label. The third rule is a fork beside a `PARTY` obligation in a `RAND`, both `LEST BREACH`, which is the case where the shared breach terminal must stay an error end for the party while the fork gets a plain one of its own; see below |
 | `option.l4`       | A single `PARTY … MAY` whose `HENCE` is another party's obligation: the one shape in which a permission's lapse and its `HENCE` have different destinations. The witness that the lapse arm ends the rule fulfilled instead of creating the seller's duty; see below |
 | `modals.l4`       | The other modal × join cells — **six** rules, six golden pairs (`modals-*`): a `SHANT` barrier completing on the first act, a `MAY` barrier whose lapse goes to fulfilled, their fork twins, and the two-deadline shapes. Cut after the 2026-09-15 review found the marker inverted two of these and nothing exercised them |
@@ -22,11 +22,11 @@ did not. Predicates are a different matter, and belong to the ladder; see
 ## The Reg CF goldens are cut from the corpus itself
 
 The three `regcf-*` golden pairs are exported from
-`jl4/examples/legal/regcf/regcf.l4` — the real 992-line formalisation of 17 CFR
+`jl4/examples/canon/us/regcf/regcf.l4` — the real 992-line formalisation of 17 CFR
 Part 227 — not from a fixture beside it:
 
 ```
-$ l4 export bpmn jl4/examples/legal/regcf/regcf.l4 \
+$ l4 export bpmn jl4/examples/canon/us/regcf/regcf.l4 \
      --rule "ongoing reporting obligation" --fidelity-report
 ```
 
@@ -244,7 +244,7 @@ diff /tmp/offering.bpmn          expected/offering.bpmn
 diff /tmp/offering.fidelity.txt  expected/offering.fidelity.txt
 
 # the Reg CF trio, from the corpus in examples/legal/ rather than from here
-l4 export bpmn ../legal/regcf/regcf.l4 --rule "ongoing reporting obligation" \
+l4 export bpmn ../canon/us/regcf/regcf.l4 --rule "ongoing reporting obligation" \
    -o /tmp/regcf-reporting.bpmn --fidelity-report
 diff /tmp/regcf-reporting.bpmn         expected/regcf-reporting.bpmn
 diff /tmp/regcf-reporting.fidelity.txt expected/regcf-reporting.fidelity.txt

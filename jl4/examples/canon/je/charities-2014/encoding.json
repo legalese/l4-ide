@@ -1,0 +1,24 @@
+{
+  "id": "cleanroom-2026-08",
+  "encoder": "legalese",
+  "display_name": "The charity test — Articles 5 to 7 of the Charities (Jersey) Law 2014, encoded de novo",
+  "status": "draft",
+  "status_checked": "2026-09-23",
+  "version": "0.1.0",
+  "versions_encoded": "The Official Consolidated Version showing the law from 16 October 2025 to current, as retrieved 2026-08-02. Articles 5, 6 and 7 carry no endnote marker in that version (SOURCE-EXTRACT.md:25), so they stand as enacted in 2014; no rule-version axis.",
+  "license": "Apache-2.0",
+  "maintainer": {
+    "name": "Legalese Pte. Ltd.",
+    "github": "legalese"
+  },
+  "modules": [
+    "charity-test.l4"
+  ],
+  "scope": "The charity test of the Charities (Jersey) Law 2014: Article 5 (the test and its government-control carve-out), Article 6 (charitable purposes) and Article 7 (public benefit), with the Article 1 and Article 2(4), (6) and (7) definitions they rest on. Inert house style, with every interpretive choice registered in README.md §3. Encoded DE NOVO from the primary source: README.md §7 is the cleanroom integrity declaration, including one disclosed contamination. The emitted DMN does not execute on either engine, because two list quantifiers have no FEEL lowering; that finding is the smoke test's product and is set out in PROJECTIONS.md §4. COMPARISON.md and comparison/ compare this encoding with the independent paper case study in l4-ide and with a third-party wiki's process model. 102 assertions, none failing, with four goldens.",
+  "assertions": 102,
+  "not_reviewed": {
+    "gate": "HG1",
+    "state": "none recorded",
+    "note": "No HG1 grant or waiver was found for this encoding in legalese/l4-ide, where it was written."
+  }
+}

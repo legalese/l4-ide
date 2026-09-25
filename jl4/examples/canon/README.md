@@ -73,9 +73,13 @@ rather than silently keeping one file.
 
 ## What is here, and what is not
 
-Carried: `*.l4`, `tests/*.golden`, `encoding.json`, `SOURCE-LICENSE.md`.
+Carried: `*.l4`, `tests/*.golden`, `encoding.json`, `SOURCE-LICENSE.md`, and `registers/*.json`
+(one level deep). The registers joined on 2026-09-23 (LODGER): they are the deposits `etc/go`
+reads, so without them a subject whose encoding lives in canon cannot run the pipeline's ingest,
+sweep, fork and differential stages.
 
-Not carried: `source/`, `report/`, `app/`, `registers/`, `projections/`, `NOTES.md`, `README.md`.
+Not carried: `source/`, `report/`, `app/`, `projections/`, `NOTES.md`, `README.md`, and anything
+below `registers/` that is not a top-level `.json`.
 The list is an **allowlist** — a new kind of file in canon needs an edit to `included()` in
 `sync-canon.mjs` before it appears here, rather than arriving by default.
 

@@ -6,7 +6,7 @@ the rest was oversold.
 mirrors one external summary of the regulation, which presents it as eight
 requirement groups, and encodes those eight to the depth that summary reaches.
 Left out, in the corpus's own words:
-[Subpart C's funding-portal registration regime (Rules 400-404), the bad-actor disqualification detail (Rule 503), and the Rule 201 disclosure itemisation beyond the financial statement tiers](src:jl4/examples/legal/regcf/regcf.l4#L28-L31 "verbatim"),
+[Subpart C's funding-portal registration regime (Rules 400-404), the bad-actor disqualification detail (Rule 503), and the Rule 201 disclosure itemisation beyond the financial statement tiers](src:jl4/examples/canon/us/regcf/regcf.l4#L28-L31 "verbatim"),
 along with Rules 205 and 206.
 
 **And a scope note about this document rather than the encoding.** The sections
@@ -56,10 +56,10 @@ not a computation.
 
 **Dead limbs.** Three of the acts the corpus declares are performed by no rule
 at all — they occur exactly once each, in the declaration:
-[file a Form C offering statement](src:jl4/examples/legal/regcf/regcf.l4#L96 "verbatim"),
-[file a Form C-U progress update](src:jl4/examples/legal/regcf/regcf.l4#L97 "verbatim")
+[file a Form C offering statement](src:jl4/examples/canon/us/regcf/regcf.l4#L96 "verbatim"),
+[file a Form C-U progress update](src:jl4/examples/canon/us/regcf/regcf.l4#L97 "verbatim")
 and
-[transmit funds to the issuer](src:jl4/examples/legal/regcf/regcf.l4#L101 "verbatim").
+[transmit funds to the issuer](src:jl4/examples/canon/us/regcf/regcf.l4#L101 "verbatim").
 There is also one period that only the citizen-facing wizard's prose reads; the
 decision-table exporter flags it as an inert decision —
 [advisory — decision_business_days_to_file_a_progress_update](src:jl4/examples/dmn/expected/regcf-corpus.fidelity.txt#L299 "verbatim")

@@ -7,6 +7,8 @@ a test harness or a file under `jl4/examples/` yet.~~ Both sentences were true w
 now false: §3B added a CI job, a golden glob and 85 files under `jl4/examples/canon/`; the pin bump
 carried the mirror to 90; and §4 deleted 45 files from `jl4/examples/legal/`. The measurements are
 from `unstable` `388f8605` and canon `mengwong/drafts` `299dd490`, taken the evening of 2026-09-15.
+**§4.2 (LODGER) BUILT 2026-09-23:** the remaining canon-bound subjects moved, the mirror carries
+`registers/*.json`, and the pin is canon drafts `9ef88a7a` with twelve blessed rows.
 
 ## 1. The ruling, verbatim
 
@@ -302,6 +304,8 @@ carries.**
 the mirror allowlist — which is really the question of how `etc/go` addresses a
 canon-hosted subject — and re-blessing canon's `cleanroom-2026-08` from l4-ide's
 healthy copy, which is "moved, not lost" running in the other direction.
+**Both ANSWERED 2026-09-23, see §4.2:** registers join (M1), and canon's cleanroom copy was
+replaced with l4-ide's and blessed.
 
 ### 4.1 The plan as written before any of it was measured
 
@@ -321,8 +325,89 @@ healthy copy, which is "moved, not lost" running in the other direction.
 - `jl4/examples/legal/README.md` states the split: what is here and why, what is in canon and
   where the pin is. `CLAUDE.md` §3.1's "which globs, exactly" gains the canon block. The memory
   note `canon-is-the-home-for-encodings` gains the same sentence.
-- Nothing else moves. `regcf`, `bna`, `charities-cleanroom` and the single-file subjects stay in
-  l4-ide until they are in canon, and that is fine — the ruling says so.
+- ~~Nothing else moves. `regcf`, `bna`, `charities-cleanroom` and the single-file subjects stay in
+  l4-ide until they are in canon, and that is fine — the ruling says so.~~ **Superseded
+  2026-09-23 by LODGER (§4.2):** all but the single-file subjects moved.
+
+### 4.2 LODGER — the rest of the canon-bound corpus moves, DONE 2026-09-23
+
+**The ruling.**
+Meng ruled LODGER on 2026-09-23, and the action as ruled was:
+
+> Do the move on `unstable` as its own PR, the way succession moved: the subjects go to canon, `unstable` vendors them back under `jl4/examples/canon/`, and the readers are re-pointed there.
+
+The subjects were `regcf`, `bna`, `charities-cleanroom`, whatever was left of `sg-succession` (`app/`, `cleanroom-2026-08/`, `denovo/`, `source/`), and `miles-card`.
+SUITCASE, also 2026-09-23, fired it with rulings on the plan's open points:
+
+- **M1: the mirror carries `registers/*.json`.** This answers §4's boarded question.
+- **M2: source texts stay in l4-ide.** That covers the Singapore Acts, the card issuers' terms, and `miles-card/source/`.
+- **M3: Reg CF keeps `README.md`, `PROJECTIONS.md` and `figures/` in l4-ide.** Canon gets its own `NOTES.md`.
+- **M4: the explainer's README citations stay on the l4-ide copy.** This follows from M3.
+- **M5: deposit Jersey's `SOURCE-EXTRACT.md`.** Meng: "you can find the jersey charities act online, it's public law."
+- **M6: SUITCASE is the HG2 go** to publish these subjects in public canon.
+- **M7: the pin stays on a `mengwong/drafts` SHA.**
+
+**What was done — canon** (drafts `7a87b244` → `9ef88a7a`, merge of `claude/lodger-deposit`):
+
+| canon commit | what                                                                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `08608fb`    | `us/regcf`, new. Rows `legalese` and `cleanroom-2026-08`, with `source/` at the subject level (US federal text, public domain, 17 U.S.C. § 105). |
+| `728c04b`    | `uk/bna-1981`, new, OGL v3.0.                                                                                                                    |
+| `224d618`    | `je/charities-2014`, new, OSAL-J v1.0, kept in its original layout.                                                                              |
+| `8c720aa`    | `sg/succession` `cleanroom-2026-08` refreshed from l4-ide's copy.                                                                                |
+| `99cb764`    | `contracts/payments/sg-miles-card`: 3 NLG goldens refreshed, the source bundle merged, 3 files added.                                            |
+| `ea72ecb`    | three surface-map module paths re-pointed at this repository's mirror                                                                            |
+
+Every moved file went into canon **byte-identical** to l4-ide `7df7a3ca6`, checked by git blob id per file.
+There are two exceptions, both named in their commits: the miles-card source bundle is a merge of two diverged copies, and `ea72ecb` changes three surface-map paths.
+The Jersey terms turned out to be **determined**, which the plan had said they were not.
+jerseylaw.je's Copyright page offers the legislation under the Open States Assembly Licence – Jersey v1.0.
+That page, and the licence itself (read from an Internet Archive capture, because statesassembly.je answered 403), are quoted and dated in the row's `SOURCE-LICENSE.md`.
+
+**What was done — here:**
+
+1. `sync-canon.mjs`'s `included()` admits `registers/<name>.json`, one level deep, with a selftest case.
+   A positive control showed the new case fails when the line is disabled.
+   `--pull` at the old pin vendored the 9 registers of rows that were already blessed.
+2. The pin moved to `9ef88a7a`, and six rows were blessed: `sg/succession/cleanroom`, `us/regcf/cleanroom`, `us/regcf`, `uk/bna-1981`, `je/charities-2014` and `contracts/payments/sg-miles-card`.
+   Each subject's primary row is listed **last**, because `check-canon-citations.mjs` maps a subject to its last blessed row.
+3. 198 files were deleted from `legal/`, and every functional reader was re-pointed in the same commit: the DMN and BPMN tests, the CI `dmn:` filter, three go sidecars, the Reg CF explainer, the go selftest and a fixture, `ladder-svg`'s test and demo, the `regcf-wizard` nix bundle, and `m3-baseline-check.py`.
+4. Prose locators were re-pointed: the skill's `source-patterns/`, `doc/`, READMEs and comments. Records were left alone, per `b7eb2ecce`'s rule.
+
+**What stayed in `legal/`, and why:** `jl4/examples/legal/README.md` lists each item and the reason for it.
+
+**Measured after:**
+
+- The 25 modules and 100 goldens under `canon/` are the same bytes that `legal/**` had defended.
+- `sync-canon --check`: the mirror matches `9ef88a7a`.
+- `check-corpus-goldens`: 533 files, the same total as before.
+- The narrative citation step: 96 checked, 0 unresolved.
+- `node etc/go/selftest.mjs` with a worktree `l4`: all checks pass, with 1 skip (`--with-driver` only).
+- `go.sh plan` passes for every subject and encoding.
+- Every sidecar path exists except `sg-miles-card`'s `comparison.surface_map`, which was declared before it existed on `unstable` too.
+
+**What review changed:**
+
+- **Canon's cleanroom was not failing for the reason the pin said.**
+  The pin blamed an Info diagnostic at `daydate.l4:104`.
+  Canon's copy failed `l4 check` on a NOT-precedence **error** at `probate-administration-act.l4:1915:23`, which l4-ide had fixed in `106114777` and never carried over.
+  The pin's comment now says so.
+- **A reader the plan called silent was loud.**
+  `fixtures/source-bundle.valid.json` names `bna/source-s1.txt` as its assembled artifact.
+  With that file gone, four go-selftest assertions failed.
+  The fixture now carries its own byte-identical copy, and its `sha256` matches the recorded digest.
+
+**Not done here, deliberately:**
+
+- **`jl4/tests-cli/Main.hs:1167-1170` and `:5313` still name the old `legal/` paths.**
+  FILLET (#478) is moving those lines into per-backend modules.
+  Whichever lands second re-points the five string literals.
+  Until then, the `l4-cli-test` cases that read them fail on this branch.
+- **`ofek`'s sidecar still declares no `natlang_sources` or `comparison`.**
+  Its registers are vendored now, but declaring them changes what a run of that subject measures, which is its own change.
+- **Reg CF's `source/` is not vendored.**
+  So `register-validate`'s digest checks over the Reg CF cleanroom bundle report _skip_ in this repository.
+  They pass in canon, where the bytes are.
 
 ## 5. The CI challenge the cross-repo shape has, stated plainly (why §3B was chosen)
 

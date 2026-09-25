@@ -21,7 +21,7 @@
 // dies on `incorrect indentation (got 75, should be greater than 180)` at a line
 // of the module it was handed. (`l4 format` on the same file DOES round-trip, so
 // the defect is batch's pretty-layout path, not the formatter.) Batch also
-// requires @export, and `jl4/examples/legal/regcf/regcf.l4` declares none.
+// requires @export, and `jl4/examples/canon/us/regcf/regcf.l4` declares none.
 //
 // So the oracle borrows batch's *wrapper* idea and drops its re-emission: it
 // writes a probe module that IMPORTs the module under test, declares one

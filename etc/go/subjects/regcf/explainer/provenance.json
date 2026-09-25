@@ -23,7 +23,7 @@
           "anchor": "the join key measurement: ranked atoms carry `unique`, and atomIds are numbered per response"
         },
         {
-          "path": "jl4/examples/legal/regcf/regcf-wizard.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf-wizard.l4",
           "sha256": "sha256:4c4a4d664561b8bb2f7458cc8d7ea1863a6c8190cd51662570980f688a749a37",
           "anchor": "§ The exported entry points, L540-L622 — the authoritative export set"
         }
@@ -54,7 +54,7 @@
           "anchor": "the ELSE IF tolerance and the dated-arm floor"
         },
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "scope note, L28-L31"
         },
@@ -80,7 +80,7 @@
       "drafted_on": "2026-08-05",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§ scope note and § Parties and acts, L11-L93"
         },
@@ -132,7 +132,7 @@
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§ Top-level, L755-L777; modelling note, L69-L85"
         },
@@ -158,7 +158,7 @@
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§ Top-level, L755-L777; § Thresholds, L104-L250"
         }
@@ -179,7 +179,7 @@
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§1 Issuer eligibility, L252-L322"
         },
@@ -210,7 +210,7 @@
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§1 Issuer eligibility, L252-L322"
         }
@@ -231,7 +231,7 @@
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§3 shape change L373-L404; rule-version tests L1176-L1182"
         },
@@ -241,7 +241,7 @@
           "anchor": "§3.1 the greater-of change"
         },
         {
-          "path": "jl4/examples/legal/regcf/regcf-wizard.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf-wizard.l4",
           "sha256": "sha256:4c4a4d664561b8bb2f7458cc8d7ea1863a6c8190cd51662570980f688a749a37",
           "anchor": "cited from this section; see the citation coordinates in the text"
         }
@@ -262,12 +262,12 @@
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§2 and §3, L325-L457; group 3 assertions, L900-L920"
         },
         {
-          "path": "jl4/examples/legal/regcf/regcf-wizard.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf-wizard.l4",
           "sha256": "sha256:4c4a4d664561b8bb2f7458cc8d7ea1863a6c8190cd51662570980f688a749a37",
           "anchor": "cited from this section; see the citation coordinates in the text"
         }
@@ -288,7 +288,7 @@
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§4 COVID refusal L465-L503; assurance ordering L505-L524"
         },
@@ -314,7 +314,7 @@
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§4 Disclosure requirements, L458-L545"
         }
@@ -335,7 +335,7 @@
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§6 Advertising restrictions, L586-L636; modelling note L69-L85"
         }
@@ -356,7 +356,7 @@
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§6 Advertising restrictions, L586-L636"
         }
@@ -377,7 +377,7 @@
       "drafted_on": "2026-08-05",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§7 Ongoing reporting, L638-L706"
         },
@@ -403,7 +403,7 @@
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§7 Ongoing reporting, L638-L706"
         }
@@ -424,7 +424,7 @@
       "drafted_on": "2026-08-05",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§8 endpoint note L718-L723; resale period L250"
         },
@@ -450,7 +450,7 @@
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§8 Resale restrictions, L708-L753"
         }
@@ -492,7 +492,7 @@
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§ Thresholds L104-L225; TIMEZONE L9"
         },
@@ -523,7 +523,7 @@
       "drafted_on": "2026-08-03",
       "drafted_from": [
         {
-          "path": "jl4/examples/legal/regcf/regcf.l4",
+          "path": "jl4/examples/canon/us/regcf/regcf.l4",
           "sha256": "sha256:64ac59ca4d830ec3c8fa05f21553f248a87a1e9566f62243e82fb4b9a12c2c20",
           "anchor": "§ Thresholds L104-L225; rule-version tests L1111-L1200"
         }

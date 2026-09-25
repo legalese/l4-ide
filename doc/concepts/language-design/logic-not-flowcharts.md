@@ -446,7 +446,7 @@ includes "legal engineers building automated systems," and it took formalising t
 regulation to see it.
 
 The contrast is not that we are more careful. It is that the question does not arise.
-In the Reg CF mirror corpus (`jl4/examples/legal/regcf/regcf.l4`)
+In the Reg CF mirror corpus (`jl4/examples/canon/us/regcf/regcf.l4`)
 the figure is **bound once**, as `income or net worth cut point`, and read by both the
 investor-limit rule and the financial-statement tier. Name resolution — not editorial
 diligence — is what guarantees the two agree; a divergence is not a thing you can write

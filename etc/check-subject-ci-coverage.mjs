@@ -143,7 +143,14 @@ if (!dmnFilter) {
     subjects.flatMap((s) => (s.legs?.["p7-dmn"] ? s.encoding_dirs : [])),
   );
   for (const g of globs) {
-    if (!g.startsWith("jl4/examples/legal/")) continue;
+    // Corpus globs live under legal/ or, since the corpus moved to canon
+    // (LODGER, 2026-09-23), under the vendored mirror. Checking legal/ alone
+    // would let a stale canon/ entry over-trigger forever without a note.
+    if (
+      !g.startsWith("jl4/examples/legal/") &&
+      !g.startsWith("jl4/examples/canon/")
+    )
+      continue;
     const base = g.replace(/\/?\*\*$/, "");
     if (![...dmnDirs].some((d) => d === base || d.startsWith(base + "/")))
       notes.push(

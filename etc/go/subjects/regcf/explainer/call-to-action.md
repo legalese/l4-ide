@@ -23,7 +23,7 @@ carries no exported entry points of its own, and the façade module supplies
 them.
 
 ```
-cd jl4/examples/legal/regcf
+cd jl4/examples/canon/us/regcf
 zip -r /tmp/regcf.zip regcf.l4 regcf-wizard.l4
 curl --fail -X POST http://localhost:8080/deployments -F id=regcf -F sources=@/tmp/regcf.zip
 ```
@@ -63,7 +63,7 @@ enumerates them by hand.
 
 The one worth calling first is the law-time control. The corpus exports the
 investment-limit calculation twice — once as it stands today, and once
-[under the rules in force on a chosen date — for checking a past investment against the rules that actually applied to it](src:jl4/examples/legal/regcf/regcf-wizard.l4#L625 "verbatim").
+[under the rules in force on a chosen date — for checking a past investment against the rules that actually applied to it](src:jl4/examples/canon/us/regcf/regcf-wizard.l4#L625 "verbatim").
 Call the second with a `rule date` from before the substantive amendment and
 again with one from today, on the same income and net worth, and you get the two
 figures the **How much** section describes, out of the same code, with nothing

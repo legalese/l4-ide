@@ -4,7 +4,7 @@ The exhibit and golden for the DMN exporter — Track **D1** of the Lexipedia-su
 programme (`specs/todo/lexipedia-superset/SPEC.md`).
 
 There are **four** subjects here — `reg-cf.l4` (shape), `gst-rate.l4` (dated regime),
-`../legal/regcf/regcf.l4` (the real corpus) and `sumtype.l4` (data model) — and the
+`../canon/us/regcf/regcf.l4` (the real corpus) and `sumtype.l4` (data model) — and the
 difference between them is the deliverable.
 
 | File                              | What it is                                                                                   |
@@ -19,7 +19,7 @@ difference between them is the deliverable.
 | `gst-rate.cases.json`             | ten **rule dates** + every decision's answer under each; the dates are fed as `{"$date": …}`  |
 | `expected/gst-rate.*`             | its four artifacts — two `UNIQUE` date-interval tables, one `D-RULEDATE`, zero blocking on them |
 | `not-ok/dated-chain-*.l4`         | six negative fixtures: mis-ordered arms, duplicate dates, a rolling `Date 32 1 2024`, a mixed chain (all `D-DATEDCHAIN`), a law-time-guarded obligation, and a nested `OTHERWISE` (the last two must stay off the dated path entirely) |
-| `expected/regcf-corpus.*`         | the same four artifacts cut from the **real** 1,241-line corpus at `../legal/regcf/regcf.l4`  |
+| `expected/regcf-corpus.*`         | the same four artifacts cut from the **real** 1,241-line corpus at `../canon/us/regcf/regcf.l4`  |
 
 All four sets are produced by `jl4/tests/DmnExport.hs` (`goldenSubjects`); regenerate by
 deleting a golden and re-running `cabal test jl4:jl4-test` twice.
@@ -210,8 +210,8 @@ Before that ruling this exhibit could not exist. The exporter wrote the L4 text
 `REFUSE "…"` into a `<literalExpression>`, and KIE 8.44.0.Final failed to compile the
 **whole file** (`ERROR [ERR_COMPILING_FEEL] … syntax error`, verdict `FAILED`), which is
 why every legal-corpus refusal site was still spelled `ASSUME`. On 2026-09-06 the two dated
-exhibits beside this file (`gst-rate.l4`, `ymd-dates.l4`) and `legal/regcf/denovo/` moved to
-`REFUSE` on the strength of it; `legal/regcf/regcf.l4`'s floor did not, because a refusal
+exhibits beside this file (`gst-rate.l4`, `ymd-dates.l4`) and `canon/us/regcf/cleanroom/` moved to
+`REFUSE` on the strength of it; `canon/us/regcf/regcf.l4`'s floor did not, because a refusal
 reachable from a tier-2 businessKnowledgeModel un-BKMs it (measured: 5 BKMs become decisions,
 29 inputs become 58) — see `doc/reference/control-flow/REFUSE.md`, limits.
 
@@ -555,8 +555,8 @@ l4 export dmn    reg-cf.l4 | diff - expected/reg-cf.dmn
 l4 export dmn-md reg-cf.l4 | diff - expected/reg-cf.dmn.md
 
 # the corpus, likewise with no flags
-l4 export dmn    ../legal/regcf/regcf.l4 | diff - expected/regcf-corpus.dmn
-l4 export dmn-md ../legal/regcf/regcf.l4 | diff - expected/regcf-corpus.dmn.md
+l4 export dmn    ../canon/us/regcf/regcf.l4 | diff - expected/regcf-corpus.dmn
+l4 export dmn-md ../canon/us/regcf/regcf.l4 | diff - expected/regcf-corpus.dmn.md
 ```
 
 **The corpus `.dmn` (and `gst-rate.dmn`) do NOT reproduce byte-for-byte, and the

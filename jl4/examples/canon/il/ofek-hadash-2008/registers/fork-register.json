@@ -1,0 +1,109 @@
+{
+ "note": "Open questions, construction choices and measured findings for this encoding. A fork is a place where the instruments do not settle the answer and the encoding had to choose, or where it declines to.",
+ "forks": [
+  {
+   "id": "F1",
+   "kind": "construction",
+   "title": "the merged cells in the salary table",
+   "question": "The 2022 shekel printing renders the cells beyond the frontier as MERGED cells spanning several ranks; the corrected agorot printing and the 1.1.2015 tables leave those same positions BLANK. This encoding reads a merged cell as the printed value REPEATED at each rank it spans, which is what a payroll office plainly does with it. The alternative reading — that those ranks are simply undefined at that seniority, and that a teacher cannot hold them — is not obviously wrong, and no instrument in the corpus says which is right.",
+   "where": "ofek-salary-table.l4, §§ `The merged cells are repeats, not steps`. The difference is observable and asserted: on the repeat reading `BA cell 3 2` equals `BA cell 3 9`; on the rank-step reading they would differ by 7.5% per rank.",
+   "status": "open"
+  },
+  {
+   "id": "F2",
+   "kind": "construction",
+   "title": "seniority beyond 36 years",
+   "question": "The tables stop at seniority 36. A teacher with 40 years' recognised seniority is not addressed by any instrument in the corpus. This encoding reads the last row as continuing.",
+   "where": "ofek-salary-table.l4, `the combined salary for a full post`; asserted at `BA cell 40 9 EQUALS BA cell 36 9`.",
+   "status": "open"
+  },
+  {
+   "id": "F3",
+   "kind": "conflict",
+   "title": "section 38(g) quota against section 38(i) waiting limit",
+   "question": "Section 38(g) rations ranks 7-9 to 10%/5%/3% of all teaching posts. Section 38(i) says a teacher who has met the section 38(e) conditions may not be kept waiting more than 3/4/5 years for those ranks — but adds 'subject to the existence of a free quota place'. If the quota never frees a place, the two provisions never resolve: the teacher is simultaneously entitled not to be kept waiting and unable to be promoted. The agreement does not say what happens.",
+   "where": "ofek-placement.l4 reports BOTH facts rather than choosing: `the teacher meets the conditions for promotion` is TRUE, `the quota admits the promotion` is FALSE, and `the teacher has waited as long as section 38(i) allows` is TRUE. Exercised on the fixture `a promotion into rank 7 with the quota full`.",
+   "status": "open"
+  },
+  {
+   "id": "F4",
+   "kind": "gap",
+   "title": "recognised seniority is an input, not a computation",
+   "question": "Section 37 defines recognised seniority by reference to the Teachers' Service Regulations (takanon sherut ovdei hora'a) 'as they are today and as they may be from time to time'. Those regulations are in the corpus — one document of about 770,000 characters — and their recognition rules are NOT encoded. Seniority is therefore supplied as a number. This is the largest single gap in the encoding: a teacher cannot ask this encoding what their seniority IS, only what follows from it.",
+   "where": "ofek-domain.l4, `a teacher`'s `seniority in years`. What section 37 itself says on the face of the agreement IS encoded, in ofek-placement.l4 `the period counts as recognised seniority`.",
+   "status": "open"
+  },
+  {
+   "id": "F5",
+   "kind": "gap",
+   "title": "rank is an input, not a computation",
+   "question": "Section 38 makes promotion depend on ministry criteria (section 38(a)(2), (e)(2)), on evaluations conducted under professional guidance (section 38(e)(3)), and on a system-wide quota measured against the whole national establishment. None of those is a function of one teacher's record, so rank is supplied. The section 38 machinery IS encoded and can be asked whether a given application succeeds.",
+   "where": "ofek-domain.l4, `a teacher`'s `rank`; ofek-placement.l4 `the teacher may be promoted`.",
+   "status": "open"
+  },
+  {
+   "id": "F6",
+   "kind": "scope",
+   "title": "non-academic teachers have their own tables, which are not in the corpus",
+   "question": "Sections 51-53 give teachers who are not academic their own combined-salary tables, and sections 54-61 their own conversion rules. Those tables are not among the corpus's table documents. A non-academic teacher is therefore placed in the BA table by this encoding, which is WRONG for pay purposes and is flagged here rather than silently.",
+   "where": "ofek-domain.l4, `the table the teacher is placed in`, OTHERWISE arm.",
+   "status": "open"
+  },
+  {
+   "id": "F7",
+   "kind": "scope",
+   "title": "the conversion chapters are not encoded",
+   "question": "Sections 43-50 (academic) and 54-61 (non-academic) convert an existing teacher's pre-reform salary into a place in the new table, by a formula with named variables. The encoding records WHETHER a teacher entered by conversion — it changes the section 26 age reduction — but does not perform the conversion. An existing teacher's rank and seniority are supplied as inputs like anyone else's.",
+   "where": "ofek-domain.l4, `how the teacher entered the reform`; used in ofek-worktime.l4 `the week after the age reduction for`.",
+   "status": "open"
+  },
+  {
+   "id": "F8",
+   "kind": "scope",
+   "title": "only two stages of education",
+   "question": "Sections 15 and 17 set out the working week for a primary school and a junior high school in full. Sections 18-23 do the same for special education, integration teachers, paramedical roles and mixed-stage schools, and sections 62-138 cover principals, deputies, counsellors and kindergarten teachers. None of those is encoded. The corpus also carries the whole Oz LeTmura reform for upper secondary, which is a different agreement and out of scope entirely.",
+   "where": "ofek-domain.l4, `a stage of education`.",
+   "status": "open"
+  },
+  {
+   "id": "F9",
+   "kind": "interpretation",
+   "title": "which Tosefet Ofek enters the section 39(b) base",
+   "question": "Section 39(b) makes the base for a percentage role supplement the combined salary FOR A FULL POST. Section 5.4 of the 2022 agreement says Tosefet Ofek 2022 'shall be taken into account for the purpose of computing percentage supplements computed on the basis of the combined salary'. Neither says in terms whether the FULL-POST Tosefet or the teacher's own pro-rated Tosefet enters that base. This encoding uses the full-post figure, because mixing a full-post salary with a pro-rated supplement in one sum has no warrant in either text.",
+   "where": "ofek-pay.l4, `the full-post percentage base for`. On a half post the two readings differ by half the Tosefet times the supplement rate — for the Yael fixture, about 42 shekels a month.",
+   "status": "open"
+  },
+  {
+   "id": "F10",
+   "kind": "observation",
+   "title": "the 2026 agreement prices an extra hour BELOW the value of that hour",
+   "question": "Section 25 of the approved agreement of 29.6.2026 pays 25% of the value of an hour for the additional substitution hour section 24 requires. Every other hour worked on top of a post in this scheme is 125% (2008 sections 29, 30) or 100% (2008 section 33(c)(3)). The corpus's own editorial note records that this figure was checked against the signed scan precisely because it reads like a typo, and confirms 25%. Encoded as printed.",
+   "where": "ofek-fiscal-2025.l4, `the rate for the section 25 additional hour`.",
+   "status": "recorded"
+  },
+  {
+   "id": "F11",
+   "kind": "finding",
+   "title": "the salary table is generated by the two percentages it prints in its own margins",
+   "question": "Not a fork but a measured finding, recorded because it is what the encoding is for. Taking the base cell and applying only the step percentages printed in the table's margins — 2% for seniority rows 2-7, 1% from row 8, 7.5% across the ranks — reproduces all 224 separately-printed cells of both the BA and MA tables. On the corrected agorot printing the worst deviation over the whole grid is 0.005, i.e. the rounding of a two-decimal figure. On the shekel printing the same claim needs a tolerance of 1.00, which is itself evidence that the shekel figures are roundings of the agorot ones rather than a separately computed table. The 1.1.2015 tables, which also print agorot, agree to 0.01.",
+   "where": "ofek-salary-table.l4, §§ `The table agrees with the steps it prints` — 20 assertions.",
+   "status": "measured"
+  },
+  {
+   "id": "F12",
+   "kind": "tooling",
+   "title": "l4 catala does not lower this module's #ASSERT directives to #[test] scopes",
+   "question": "Every #ASSERT in ofek-catala.l4 is reported as 'did not become a Catala #[test] scope … that is a lowering bug, please report it'. Minimal reproductions are in NOTES.md section 7. Consequence for this row: the emitted Catala module is typechecked but not self-testing, so catala/ofek_hadash_cases.catala_en supplies the six case scopes BY HAND, and they must be updated by hand if the encoding changes.",
+   "where": "catala/ofek_hadash_cases.catala_en; source/run-catala.sh runs them and compares against the L4 figures.",
+   "status": "upstream-candidate"
+  },
+  {
+   "id": "F13",
+   "kind": "tooling",
+   "title": "l4 catala emits a module catala typecheck rejects, without saying so",
+   "question": "An @export'd function lowers to a Catala SCOPE, and catala allows a scope call only from inside another scope. Exporting a helper is therefore fine provided every caller of it is exported too; what fails is a scope called from a NON-exported toplevel definition, and l4 catala exits 0 while emitting it. Here `the full-post percentage base for` has such a caller, `the supplement for one slot of` at ofek-catala.l4:492, so annotating it produced a module catala 1.2.1 rejected with 'Scope calls are not allowed outside of a scope.' CORRECTED 2026-09-07: the earlier reading of this entry -- that @export is not composable -- was false. Putting @export on all 28 definitions that take a GIVEN emits 43 scopes, typechecks, and returns the same six case figures digit for digit. The single @export is a choice, not a limitation. The upstream candidate is the silence: l4 catala should refuse, or not lower a helper whose callers are not all exported. FILED UPSTREAM 2026-09-07 as smucclaw/l4-ide#958, against the missing check rather than the composition: https://github.com/smucclaw/l4-ide/issues/958",
+   "where": "NOTES.md section 7.3(b), with the eleven-line reproduction.",
+   "status": "filed-upstream"
+  }
+ ]
+}

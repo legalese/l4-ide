@@ -1342,7 +1342,7 @@ spec bin = do
       -- `any \`the purpose is a charitable purpose\` (entity's purposes)`, a
       -- one-parameter decision passed by name rather than a lambda written out
       -- at the call site. No example under examples/docassemble/ does that.
-      out <- daEmit bin "examples/legal/charities-cleanroom/charity-test.l4"
+      out <- daEmit bin "examples/canon/je/charities-2014/charity-test.l4"
       shouldContain' "the charities interview" out "DAList"
       shouldContain' "the charities interview" out "object_type"
       shouldContain' "the charities interview" out "for _purpose in entity.purposes"

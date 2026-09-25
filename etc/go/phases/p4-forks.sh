@@ -17,7 +17,7 @@
 # procedure establishes that every ambiguity was found, so the register is
 # checked for internal and cross-file consistency and never for exhaustiveness.
 #
-# Requirements source: jl4/examples/legal/bna/SMOKE-REPORT.md §2 (p4-forks) —
+# Requirements source: legalese/canon subjects/uk/bna-1981/encodings/legalese/report/SMOKE-REPORT.md §2 (p4-forks) —
 # "the real stage therefore needs: R4 to specify a machine-checkable fork syntax
 # (the prose-convention marker is an interface, and it already broke once — one
 # of the 12 drifted from the exact marker syntax so a convention scan found 11),
