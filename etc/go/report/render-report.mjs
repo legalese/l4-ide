@@ -1,0 +1,897 @@
+#!/usr/bin/env node
+// Render the conversion report from journal.ndjson AND NOTHING ELSE.
+//
+// Four rules, all enforced here rather than by convention:
+//
+//   1. The template carries no measured numbers. Every figure is a placeholder
+//      resolved from a journal row. A digit-run in the template that is not on
+//      the small allowlist below is a template defect (exit 4).
+//   2. An unresolved placeholder is a hard error (exit 4). A claim with no
+//      journal row cannot be printed.
+//   3. A required section with no rows renders as "ABSENT", never omitted, and
+//      says which stage would have supplied it.
+//   4. Every CLAIM comes from the journal — but the artifacts table also asks
+//      the disk whether the files those claims name are still there, and prints
+//      GONE or CHANGED when they are not. Rule 1 forbids typing a number;
+//      it does not license printing a recorded byte count and sha256 under the
+//      heading "Every artifact this run put on disk" for a file that is not on
+//      disk. That is what this renderer used to do, on every resumed run whose
+//      artifacts had been cleaned up: `go.sh verify` found them GONE while the
+//      report tabulated their sizes as fact.
+//
+// And one property that makes the whole honesty stance self-defending: this
+// renderer verifies the journal's hash chain, and prints the failure IN THE
+// REPORT when it does not verify. Hand-editing the journal produces a report
+// that says the journal was hand-edited.
+//
+// Usage: node etc/go/report/render-report.mjs RUNDIR [--format md,html]
+// Exit:  0 rendered · 2 usage · 4 template defect or unresolved placeholder
+
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { sha256File, verify } from "../lib/ledger.mjs";
+import { runVerdict } from "../lib/verdict.mjs";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const TEMPLATE = resolve(HERE, "template.md");
+
+// Tokens that may legitimately carry digits in the template: spec coordinates
+// and standard version numbers. Everything else with two or more digits is a
+// transcribed measurement and is refused.
+const ALLOWED_DIGIT_TOKENS = [
+  /\b17 CFR Part 227\b/g,
+  /\bG[0-4]\b/g,
+  /\bP(?:10|[1-9])\b/g,
+  /\bR[0-7]\b/g,
+  /\bHG[12]\b/g,
+  /\bDMN 1\.3\b/g,
+  /\bAKN 3\.0\b/g,
+  /\bBPMN 2\.0\b/g,
+  /§ ?\d+(\.\d+)*/g,
+  /\bv0\b/g,
+];
+
+const args = process.argv.slice(2);
+const positional = args.filter((a, i) => {
+  if (a.startsWith("--")) return false;
+  const prev = args[i - 1];
+  return !(prev === "--format" || prev === "--out");
+});
+const rundir = positional[0];
+const fmtIdx = args.indexOf("--format");
+const formats = (fmtIdx >= 0 ? args[fmtIdx + 1] : "md").split(",");
+const outIdx = args.indexOf("--out");
+if (!rundir) {
+  process.stderr.write("usage: render-report.mjs RUNDIR [--format md,html]\n");
+  process.exit(2);
+}
+
+const journalPath = resolve(rundir, "journal.ndjson");
+if (!existsSync(journalPath)) {
+  process.stderr.write(`render-report.mjs: no journal at ${journalPath}\n`);
+  process.exit(2);
+}
+
+// --- template hygiene, checked before anything is rendered -------------------
+const template = readFileSync(TEMPLATE, "utf8");
+{
+  let scrubbed = template
+    .replace(/<!--[\s\S]*?-->/g, "") // the header comment explains the rule; it may cite it
+    .replace(/```[\s\S]*?```/g, "") // fenced blocks are commands, not claims
+    .replace(/\{\{[^}]*\}\}/g, ""); // placeholders resolve to measured values
+  for (const re of ALLOWED_DIGIT_TOKENS) scrubbed = scrubbed.replace(re, "");
+  const stray = scrubbed.match(/\d{2,}/g);
+  if (stray) {
+    process.stderr.write(
+      `render-report.mjs: TEMPLATE DEFECT — literal numbers in ${TEMPLATE}: ${[...new Set(stray)].join(", ")}\n` +
+        `Every measured figure must be a {{placeholder}} resolved from a journal row. A number typed\n` +
+        `into the template is a claim with no evidence behind it, and it is how PROJECTIONS.md came to\n` +
+        `state a fidelity heading, a per-code table and two line counts that its own artifacts\n` +
+        `contradicted. (This sentence gives no COUNT on purpose: three sites once gave three\n` +
+        `different ones, and the count changes every time the document is repaired.)\n`,
+    );
+    process.exit(4);
+  }
+}
+
+// --- the journal -------------------------------------------------------------
+const chain = verify(journalPath);
+const records = chain.records;
+const begin = records.find((r) => r.kind === "run_begin");
+const end = records.filter((r) => r.kind === "run_end").pop();
+const allStageEnds = records.filter((r) => r.kind === "stage_end");
+// Latest row per stage wins; earlier rows remain on the journal as history. A
+// Map built in journal order does exactly that.
+const stageEnds = [...new Map(allStageEnds.map((r) => [r.stage, r])).values()];
+const gateRecs = records.filter((r) => r.kind === "gate");
+const byStage = new Map(stageEnds.map((r) => [r.stage, r]));
+
+// A journal with no run_begin describes no run, and a report over it would be
+// a page of "(none)" carrying a verdict nothing earned. Refuse rather than
+// render: an empty report that looks complete is worse than no report.
+if (!begin) {
+  process.stderr.write(
+    `render-report.mjs: ${journalPath} has no run_begin record, so there is no run to report on. ` +
+      `Refusing to render a report whose every field would be a placeholder.\n`,
+  );
+  process.exit(4);
+}
+
+const declared = begin?.declared_stages ?? [];
+const gateStates = [...new Map(gateRecs.map((g) => [g.gate, g])).values()].map(
+  (g) => ({
+    gate: g.gate,
+    state: g.state,
+    reason: g.reason,
+    signature_file: g.signature_file,
+    seq: g.seq,
+  }),
+);
+const mv = runVerdict({
+  declared,
+  receipts: stageEnds,
+  gates: gateStates,
+});
+
+/**
+ * The cost ledger, IF this run left one on disk beside its journal.
+ *
+ * `p9-report`'s rule is that the report is a function of `journal.ndjson` and
+ * nothing else, and that rule is why the report can be re-derived by anyone
+ * holding the run directory. This does not break it: the ledger is an artifact
+ * of THIS run, named and hashed on `p9-cost`'s own receipt, and it is read only
+ * for the per-segment breakdown — a table whose absence costs the report
+ * nothing and whose numbers are checked against the journal-derived metrics by
+ * the stage that wrote it. Every headline figure still comes from a receipt.
+ *
+ * Fail-open by construction: a run whose artifacts have been swept renders the
+ * rest of this section exactly as before.
+ */
+let _ledger;
+function costLedger() {
+  if (_ledger !== undefined) return _ledger;
+  _ledger = null;
+  const rec = byStage.get("p9-cost");
+  for (const a of rec?.artifacts ?? []) {
+    if (!String(a.path ?? "").endsWith("cost-ledger.json")) continue;
+    try {
+      _ledger = JSON.parse(readFileSync(a.path, "utf8"));
+    } catch {
+      _ledger = null;
+    }
+  }
+  return _ledger;
+}
+
+const esc = (s) =>
+  String(s ?? "")
+    .replace(/\|/g, "\\|")
+    .replace(/\n/g, " ");
+const absent = (what, who) =>
+  `**ABSENT.** ${what} No stage in this run wrote it; ${who}`;
+
+// --- section builders --------------------------------------------------------
+function gatesTable() {
+  if (!gateStates.length)
+    return absent(
+      "SPEC.md §7.3 defines two human gates, HG1 and HG2.",
+      "no gate record exists, which means no gated stage was reached.",
+    );
+  const rows = gateStates.map((g) => {
+    let how;
+    if (g.state === "satisfied")
+      how = `satisfied by \`${g.signature_file ?? "(no signature file recorded)"}\``;
+    else if (g.state === "waived") how = `**waived**: ${esc(g.reason)}`;
+    else how = `**refused**: ${esc(g.reason)}`;
+    return `| ${g.gate} | ${g.state} | ${how} |`;
+  });
+  return ["| gate | state | how |", "| --- | --- | --- |", ...rows].join("\n");
+}
+
+function projectionsTable() {
+  const legs = declared.filter((s) => s.startsWith("p7-"));
+  if (!legs.length)
+    return absent(
+      "SPEC.md §P7 lists seven projection legs.",
+      "no p7 stage is declared for this run.",
+    );
+  const rows = legs.map((s) => {
+    const r = byStage.get(s);
+    if (!r) return `| \`${s}\` | — | **no receipt** | the stage did not run |`;
+    // A replayed receipt deliberately carries no oracle of its own: the oracle
+    // ran, on inputs whose digest is byte-identical, and its row is in this
+    // same journal. Say that, rather than printing a bare "none" against a
+    // PASS — which reads as a PASS the lattice would have refused.
+    const oracle = r.oracle
+      ? `${r.oracle.class}`
+      : r.replayed_from
+        ? "replayed"
+        : "none";
+    const label = r.label ? ` (${r.label})` : "";
+    // A PASS carries no `reason` — the lattice requires a reason only where the
+    // status is not green. What it does carry is the oracle's `because`, which
+    // is the equivalent sentence: why this evidence licenses this status.
+    const says =
+      r.reason ??
+      r.oracle?.because ??
+      (r.replayed_from
+        ? // `replayed_from_run` is null for the ordinary resume — the borrowed
+          // receipt is a few lines up in THIS journal. When it is set, the
+          // evidence was earned in another run, and saying "on this journal"
+          // would send a reader looking for a record that is not there.
+          `inputs unchanged; the verdict and its evidence are the receipt ${r.replayed_from.slice(0, 23)}… ${
+            r.replayed_from_run
+              ? `earned in run ${r.replayed_from_run}, whose artifacts were copied into this one`
+              : "on this journal"
+          }`
+        : "");
+    return `| \`${s}\` | ${r.status}${label} | ${oracle} | ${esc(says)} |`;
+  });
+  return [
+    "| leg | status | oracle class | what it says |",
+    "| --- | --- | --- | --- |",
+    ...rows,
+  ].join("\n");
+}
+
+function projectionsDetail() {
+  const legs = declared.filter((s) => s.startsWith("p7-"));
+  const out = [];
+  for (const s of legs) {
+    const r = byStage.get(s);
+    if (!r) continue;
+    out.push(`### \`${s}\` — ${r.status}${r.label ? ` (${r.label})` : ""}`);
+    out.push("");
+    if (r.reason) out.push(r.reason);
+    if (r.blocker) {
+      out.push("");
+      out.push(`**Blocker.** ${r.blocker}`);
+    }
+    if (r.oracle) {
+      out.push("");
+      out.push(
+        `**Oracle** (\`${r.oracle.class}\`, exit ${r.oracle.exit}): \`${r.oracle.cmd}\``,
+      );
+      if (r.oracle.because) out.push(`${r.oracle.because}`);
+    } else if (r.replayed_from) {
+      out.push("");
+      out.push(
+        "**Oracle:** none in this receipt — see the replay note below, which names the receipt whose oracle did run.",
+      );
+    } else {
+      out.push("");
+      out.push("**Oracle:** none ran.");
+    }
+    const m = Object.entries(r.metrics || {});
+    if (m.length) {
+      out.push("");
+      out.push(m.map(([k, v]) => `\`${k}=${esc(v)}\``).join(" · "));
+    }
+    for (const n of r.notes || [])
+      out.push(`\n> *claimed, not verified* (${n.author}): ${n.text}`);
+    if (r.replayed_from)
+      out.push(
+        r.replayed_from_run
+          ? `\n*Replayed across runs* from receipt \`${r.replayed_from}\`, earned in run \`${r.replayed_from_run}\` — the declared inputs were byte-identical, so the oracle did not run again. That run's artifacts were COPIED into this one, so every hash below is checkable from this run directory alone.`
+          : `\n*Replayed* from receipt \`${r.replayed_from}\` — the inputs were unchanged and the oracle did not run again.`,
+      );
+    out.push("");
+  }
+  return out.join("\n") || absent("Per-leg detail.", "no p7 receipt exists.");
+}
+
+/**
+ * One receipt, rendered whole: status, reason, oracle, metrics, notes.
+ *
+ * `label` prefixes the status line when a section carries more than one
+ * receipt, so a reader can tell which stage is speaking.
+ *
+ * A PASS receipt has `reason: null` BY DESIGN — the reason field exists to
+ * explain a non-PASS, and verdict.mjs's rule 3 requires it only there. So the
+ * status line drops the dash entirely rather than printing the JS literal
+ * `null`, which is what the de novo sections did before this helper existed:
+ * a measured `**PASS** — null` in a report whose whole job is to say why.
+ *
+ * The oracle's `because` and the notes are not decoration. A de novo stage's
+ * PASS is a narrow structural claim, and everything it does NOT establish
+ * rides on those two fields — p1-ingest's "whether the bundle is the RIGHT
+ * text is unverified", p5-gate's two `CARRIED BY HG1` halves. Rendering the
+ * status without them turns a hedged claim into a bare green.
+ */
+function receiptBlock(r, label) {
+  const head = label ? `**${label}:** ${r.status}` : `**${r.status}**`;
+  const lines = [r.reason ? `${head} — ${r.reason}` : head];
+  if (r.oracle) {
+    lines.push("");
+    lines.push(`Oracle (\`${r.oracle.class}\`): \`${r.oracle.cmd}\``);
+    lines.push("");
+    lines.push(r.oracle.because ?? "");
+  }
+  const m = Object.entries(r.metrics || {});
+  if (m.length)
+    lines.push("", m.map(([k, v]) => `\`${k}=${esc(v)}\``).join(" · "));
+  for (const n of r.notes || [])
+    lines.push(`\n> *claimed, not verified* (${n.author}): ${n.text}`);
+  return lines.join("\n");
+}
+
+function testsSection() {
+  const r = byStage.get("p6-tests");
+  if (!r)
+    return absent(
+      "SPEC.md §P6 requires the test results.",
+      "`p6-tests` has no receipt in this run.",
+    );
+  return receiptBlock(r);
+}
+
+function sourceSection() {
+  const r = byStage.get("p1-ingest");
+  if (r) return receiptBlock(r);
+  const p0 = byStage.get("p0-preflight");
+  const shas = Object.entries(p0?.metrics ?? {})
+    .filter(([k]) => k.startsWith("corpus_sha_"))
+    .map(([k, v]) => `| \`${k.replace(/^corpus_sha_/, "")}\` | \`${v}\` |`);
+  return [
+    absent(
+      // Subject-GENERIC. This sentence used to name "the SEC entry point, the
+      // eCFR retrieval, and the FR citations", which is Reg CF's apparatus and
+      // nobody else's: the sg-succession report told a reader that a Singapore
+      // succession corpus owed an eCFR retrieval. The requirement is the same
+      // for every subject; only the sources differ, and those are the
+      // subject's own business, not this renderer's.
+      "SPEC.md §P1 requires the source bundle with provenance — the retrieval of each source document, its integrity digest or immutable capture, the publisher's in-force statement, and the citation of the instrument and of each amendment.",
+      // NOT-DECLARED AND DECLARED-BUT-MISSING ARE OPPOSITE CLAIMS, and only
+      // one of them is an excuse. "Not declared" says the run never owed this
+      // section; "declared, no receipt" says it owed it and did not deliver —
+      // which is what makes the verdict INCOMPLETE. Printing the first for the
+      // second converts an owed gap into a settled one, the exact inversion
+      // this file's header rule exists to refuse. `p6-tests` and `p8-diff`
+      // below already say it the right way round.
+      declared.includes("p1-ingest")
+        ? "`p1-ingest` is declared for this run and has no receipt, so no ingest is accounted for. The run owed this section and did not deliver it."
+        : "`p1-ingest` is not declared for this run: the corpus is REPLAYED, not re-derived from source, so no ingest happened and none is claimed. (The stage itself no longer refuses — on the deposit path it validates a deposited source bundle — but a bundle is not what this run read.)",
+    ),
+    "",
+    "What this run did read, and its exact content:",
+    "",
+    "| file | sha256 |",
+    "| --- | --- |",
+    ...(shas.length ? shas : ["| (none recorded) | |"]),
+  ].join("\n");
+}
+
+function sweepSection() {
+  const r = byStage.get("p2-sweep");
+  if (r) return receiptBlock(r);
+  return absent(
+    'SPEC.md §P2 requires the external-modification register, and requires this report to state what was SEARCHED, not only what was found — "no modification found" is a checked claim, not a default.',
+    // Also subject-generic: "C&DIs, no-action letters" is the SEC's guidance
+    // apparatus. Courts, regulator guidance and instruments in flight are the
+    // three classes every jurisdiction has; what they are CALLED is the
+    // subject's business.
+    declared.includes("p2-sweep")
+      ? "`p2-sweep` is declared for this run and has no receipt, so no sweep is accounted for. Nothing was searched, so nothing may be reported as searched, and the run owed this section and did not deliver it."
+      : "`p2-sweep` is not declared for this run. Nothing was searched, so nothing may be reported as searched, and this report makes no claim that the encoding is current with respect to courts striking or reading down a provision, the regulator's interpretive guidance, or instruments in flight. (On the deposit path the stage validates a deposited register — but note that validating a register is not performing a sweep: no procedure enumerates the searches that should have run.)",
+  );
+}
+
+/**
+ * SPEC.md §P3/§P4 want "what the encoding decided, including every ambiguity
+ * fork and every externally-settled resolution", and P5 is the gate over that
+ * same material. Three receipts answer to this heading, so all three are
+ * rendered — labelled, whole, and each with its own notes.
+ *
+ * This section used to render `p3-encode` alone and name `p4-forks` only in
+ * the ABSENT prose, which was measurable as a silence: a `g2` run whose fork
+ * register had been deposited and validated produced a `p4-forks` receipt that
+ * appeared NOWHERE in the report, and a `p5-gate` receipt whose two
+ * `CARRIED BY HG1` notes — the halves of the gate no script holds — likewise
+ * reached no reader. ORCHESTRATOR.md §5.2 asserted that every de novo receipt's
+ * reason "appears in the report"; measured, three of the five did.
+ */
+function encodingSection() {
+  const r = byStage.get("p3-check");
+  const enc = byStage.get("p3-encode");
+  const forks = byStage.get("p4-forks");
+  const gate = byStage.get("p5-gate");
+  const out = [];
+  const denovo = [
+    [enc, "Encoding (de novo)"],
+    [forks, "Ambiguity forks"],
+    [gate, "Adversarial gate (mechanisable half)"],
+  ].filter(([rec]) => rec);
+  for (const [rec, label] of denovo) {
+    if (out.length) out.push("");
+    out.push(receiptBlock(rec, label));
+  }
+  if (!denovo.length)
+    out.push(
+      absent(
+        "SPEC.md §P3/§P4 require what the encoding decided, including every ambiguity fork and every externally-settled resolution.",
+        ["p3-encode", "p4-forks", "p5-gate"].some((x) => declared.includes(x))
+          ? "`p3-encode`, `p4-forks` and `p5-gate` are declared for this run and left no receipt, so no encoding decision and no fork is accounted for. The run owed this section and did not deliver it."
+          : "`p3-encode`, `p4-forks` and `p5-gate` are not declared for this run — they validate de novo deposits, and this run replayed the committed encoding — so this run made no encoding decisions and opened no forks. The encoding it exercised is the committed corpus.",
+      ),
+    );
+  if (r) {
+    out.push("");
+    out.push(
+      `**What was checked about the committed encoding:** ${r.status} — ${r.reason ?? ""}`,
+    );
+    if (r.oracle)
+      out.push(
+        "",
+        `Oracle (\`${r.oracle.class}\`): \`${r.oracle.cmd}\``,
+        "",
+        r.oracle.because ?? "",
+      );
+    for (const n of r.notes || [])
+      out.push(`\n> *claimed, not verified* (${n.author}): ${n.text}`);
+  }
+  return out.join("\n");
+}
+
+/**
+ * Every stage this report does not otherwise narrate.
+ *
+ * WHY THIS EXISTS. The verdict gloss above claims, of a COMPLETE run, that
+ * "every non-PASS receipt carries a reason that appears below". That was a
+ * standing falsehood the moment a non-PASS receipt existed outside the sites
+ * named in this file: `projectionsTable`/`projectionsDetail` narrate exactly
+ * `p7-*`, and every other block is hard-wired to a stage name. `p9-report`
+ * escaped the hole only because it can emit nothing but PASS or a hard failure.
+ * `p9-explain` cannot — it is DEGRADED whenever a narrative section is
+ * unreviewed, which is its normal state — so a real, reasoned, non-PASS receipt
+ * reached the journal and no reader. MEASURED on run 2026-08-03-3f45e62b-004:
+ * five of six non-PASS reasons reached the report and `p9-explain`'s did not.
+ *
+ * The set is computed by SUBTRACTION rather than listed, so the next stage
+ * added anywhere in the pipeline lands here by default instead of vanishing.
+ * A stage that gets its own narrated site later simply stops appearing here.
+ */
+const NARRATED_ELSEWHERE = new Set([
+  "p0-preflight",
+  "p1-ingest",
+  "p2-sweep",
+  "p3-check",
+  "p3-encode",
+  "p4-forks",
+  "p5-gate",
+  "p6-tests",
+  "p8-diff", // narrated whole in triageSection()
+  "p9-cost", // narrated whole in costSection()
+]);
+function otherStagesSection() {
+  const rows = stageEnds.filter(
+    (r) => !NARRATED_ELSEWHERE.has(r.stage) && !r.stage.startsWith("p7-"),
+  );
+  if (!rows.length)
+    return absent(
+      "Every receipt on this journal must reach a reader, whatever stage wrote it — the verdict gloss above promises exactly that.",
+      "every stage of this run is accounted for under one of the headings above, so there is nothing left over.",
+    );
+  const out = [
+    "The stages above are narrated under the heading they belong to. These are the rest — reporting stages, and anything added to the pipeline that has no heading of its own yet. They are here because the verdict gloss at the top of this report promises that every non-PASS receipt's reason appears below, and a stage with no site is how that promise quietly stops being true.",
+    "",
+  ];
+  for (const r of rows.sort((a, b) => a.stage.localeCompare(b.stage))) {
+    out.push(receiptBlock(r, `\`${r.stage}\``));
+    out.push("");
+  }
+  return out.join("\n");
+}
+
+/** ms as something a person reads. Deterministic; no locale in the units. */
+function dur(ms) {
+  if (ms == null || !Number.isFinite(Number(ms))) return "—";
+  let n = Math.round(Number(ms));
+  if (n < 1000) return `${n} ms`;
+  const s = Math.floor(n / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h) return `${h}h ${String(m).padStart(2, "0")}m`;
+  if (m) return `${m}m ${String(sec).padStart(2, "0")}s`;
+  return `${sec}s`;
+}
+const num = (v) =>
+  v == null || v === "" ? "—" : Number(v).toLocaleString("en-US");
+
+/**
+ * WHAT THIS RUN COST — and, more to the point, HOW EACH FIGURE WAS COME BY.
+ *
+ * Two tables and they are not interchangeable. The per-stage timings are the
+ * driver's own: it started the clock, it stopped it, and `ledger.verify` refuses
+ * any row claiming more time than the bracket it sits in. The token and tool
+ * figures are read out of the agent harness's transcripts — nobody typed them,
+ * but the transcript is an ordinary file, so they are labelled `attributed` and
+ * the ledger names every file it read with its sha256.
+ *
+ * The per-stage table is built HERE, from the journal, rather than read out of
+ * p9-cost's metrics. That is not duplication: p9-cost runs before p9-report, so
+ * its own totals stop short of the last two stages, while this render happens
+ * after run_end and can see all of them. Two figures that differ by exactly the
+ * stages between them, each correct about its own boundary.
+ */
+function costSection() {
+  const timed = stageEnds.filter((r) => typeof r.elapsed_ms === "number");
+  // The run's span, taken from THIS journal at render time — after `run_end`,
+  // so it covers the reporting stages that `p9-cost` ran too early to see.
+  const stamps = records
+    .map((r) => r.ts)
+    .filter(Boolean)
+    .sort();
+  // Replayed rows behave differently in three places below — the table, the
+  // totals, and the wall-clock floor — so they are identified once.
+  const replayed = stageEnds.filter(
+    (r) => r.replayed_from && typeof r.elapsed_ms === "number",
+  );
+  const runSpanMs = stamps.length
+    ? Date.parse(stamps[stamps.length - 1]) - Date.parse(stamps[0])
+    : null;
+  const cost = byStage.get("p9-cost");
+  if (!timed.length && !cost)
+    return absent(
+      "A run that cannot say what it cost cannot be compared to the next one, and the pipeline's own overheads stay invisible.",
+      "no stage on this journal carries a timing, and `p9-cost` has no receipt. A journal written before schema 6 records no durations at all.",
+    );
+
+  const out = [];
+
+  if (timed.length) {
+    const totalStage = timed.reduce((a, r) => a + r.elapsed_ms, 0);
+    const totalDisp = stageEnds.reduce((a, r) => a + (r.dispatch_ms ?? 0), 0);
+    const untimed = stageEnds.length - timed.length;
+    out.push(
+      "**Attested — measured by the driver.** It started each clock and stopped it; `go.sh verify` refuses any row claiming more than a second more time than the interval between its own `stage_begin` and `stage_end` — a second of slack, because the clock falls back to whole seconds on a shell without `EPOCHREALTIME`.",
+      "",
+      "| stage | status | ran for | dispatch | |",
+      "| ----- | ------ | ------: | -------: | - |",
+    );
+    for (const r of stageEnds) {
+      out.push(
+        `| \`${esc(r.stage)}\` | ${esc(r.status)} | ${dur(r.elapsed_ms)} | ${dur(r.dispatch_ms)} | ${r.replayed_from ? "replayed" : ""} |`,
+      );
+    }
+    out.push(
+      `| **total** | | **${dur(totalStage)}** | **${dur(totalDisp)}** | |`,
+      "",
+      "`dispatch` is the driver's own time before each stage started — asking the stage for its inputs, digesting and itemising them, and searching for a replayable receipt. It is spent on every stage, including the ones that then replay in milliseconds, and on an EXECUTED stage it is listed separately rather than folded in, because it is the harness's cost and not the stage's work.",
+    );
+    // A REPLAYED ROW'S NUMBER IS NOT WHAT THE STAGE COSTS. It is what finding
+    // and materialising the earlier receipt cost, which is the right thing to
+    // record and the wrong thing to read as execution — so it is named rather
+    // than left to the `replayed` marker in the last column.
+    // (hoisted above; the wall-clock paragraph needs it too)
+    if (replayed.length)
+      out.push(
+        "",
+        `**A replayed row's number is not the same measurement as the rest of the column.** ${replayed.length} stage(s) replayed an earlier receipt rather than executing, costing ${dur(replayed.reduce((a, r) => a + r.elapsed_ms, 0))} between them. Two things follow, and neither is visible from the table alone. First, that figure is what the REPLAY cost — declaring inputs, digesting them, finding the receipt and materialising its artifacts — not what the work costs; the work was done, and timed, in the run the receipt came from. Second, the driver has nowhere to put a separate dispatch figure for a row it writes itself, so on these rows dispatch is INSIDE the "ran for" number and the dispatch cell is blank. The dispatch total below therefore omits their dispatch and the "ran for" total contains it — which matters most in the replay-heavy runs where harness overhead dominates. A replay also writes no \`stage_begin\`, so it has no interval and contributes nothing to any wall-clock union.`,
+      );
+    if (untimed)
+      out.push(
+        "",
+        `${untimed} receipt(s) on this journal carry no timing, so the total above is short by an unmeasured amount. A stage that ended without going through \`go_receipt\`, or a row written before journal schema 6.`,
+      );
+    out.push("");
+  }
+
+  const m = cost?.metrics || {};
+  // A RECEIPT WITH NO FIGURES IS NOT A TABLE OF DASHES. `p9-cost` reports
+  // SKIPPED when no agent session drove the run — a pipeline driven by hand,
+  // which is a legitimate way to drive it — and rendering its empty metric set
+  // through the table below would print a grid of em-dashes that reads as a
+  // measurement returning nothing rather than as a measurement not taken.
+  if (!cost || m.cost_requests === undefined) {
+    out.push(
+      cost
+        ? `**Attributed — what the agent sessions spent.** \`p9-cost\` reported **${esc(cost.status)}**${cost.reason ? ` — ${esc(cost.reason)}` : ""}, so this run has no token or tool figures. That is what a run driven by hand looks like, and it is not a zero.`
+        : "**Attributed — what the agent sessions spent.** `p9-cost` has no receipt in this run, so there is none.",
+      "",
+      "The stage timings above are unaffected either way: the driver writes them on every `stage_end`, whoever invoked it.",
+    );
+    for (const n of cost?.notes || [])
+      out.push(`\n> *claimed, not verified* (${n.author}): ${n.text}`);
+    return out.join("\n");
+  }
+
+  const g = (k) => (m[k] === undefined || m[k] === "" ? null : m[k]);
+  out.push(
+    "",
+    `**Attributed — what the agent sessions spent.** Read out of the harness's own JSONL transcripts, ${num(g("cost_transcripts"))} of them, each named in \`cost-ledger.json\` with its sha256 so a second party can repeat the derivation. Nobody typed these numbers; the transcript is nonetheless an ordinary file, which is why they are attributed rather than attested.`,
+    "",
+    "| | in this run's window | across the whole session |",
+    "| --- | ---: | ---: |",
+    `| API requests | ${num(g("cost_requests"))} | ${num(g("cost_requests_session_total"))} |`,
+    `| output tokens | ${num(g("cost_output_tokens"))} | ${num(g("cost_output_tokens_session_total"))} |`,
+    `| of which reasoning | ${num(g("cost_thinking_tokens"))} | |`,
+    `| input tokens | ${num(g("cost_input_tokens"))} | |`,
+    `| cache writes | ${num(g("cost_cache_creation_tokens"))} | |`,
+    `| cache reads | ${num(g("cost_cache_read_tokens"))} | |`,
+    `| tool calls | ${num(g("cost_tool_calls"))} | ${num(g("cost_tool_calls_session_total"))} |`,
+    "",
+    `The right-hand column is an upper bound, not a second measurement: it is everything the session did, including whatever else it was asked to do. The left column clips to this run's own window, from its first journal record to its last.`,
+    "",
+    // THE LIMIT OF CLOCK ATTRIBUTION, stated where the numbers are rather than
+    // left for a reader to infer. Demonstrated on this pipeline's own runs: a
+    // session that resumed a day-old run to re-run one stage had a full day of
+    // unrelated work fall inside the window and be reported as this run's cost.
+    "Both columns are attributions **by clock**, and a clock cannot tell work on this run apart from work that merely happened at the same time. So the left column misses what came before the driver was first invoked — reading the source, deciding what to encode — and includes anything else the session did between the first record and the last, which on a human-gated pipeline can be days. It understates at one end and overstates at the other; the honest reading is that the true figure lies between the two columns, nearer the left.",
+    "",
+    // THE SUBAGENT FIGURES ARE SESSION TOTALS, and the sentence has to say so.
+    // It said "of the requests above" while quoting a whole-session number
+    // beside a window-clipped table — the same conflation the ledger's own
+    // arithmetic check was added to catch, reappearing in prose, where no
+    // check reaches it.
+    `Model(s): \`${esc(g("cost_models") ?? "—")}\`. Across the whole session — the right-hand column, not the left — ${num(g("cost_subagent_requests_session_total"))} requests were made by subagents, spending ${num(g("cost_subagent_output_tokens_session_total"))} output tokens across ${num(g("cost_workflows_session_total"))} workflow fan-out(s). Those are measured from the subagents' own transcripts, which the session file does not contain at all: a ledger that read only the session file would report a fraction and look complete.`,
+    "",
+    "**Network, model-initiated.** " +
+      `In this run's window — the left-hand column above, not the right — ${num(g("cost_web_search"))} web search(es), ${num(g("cost_web_fetch"))} fetch(es) and ${num(g("cost_mcp_calls"))} external-service call(s), taking ${dur(g("cost_network_ms"))} between them. Across the whole session: ${num(g("cost_web_search_session_total"))} web search(es).`,
+    "",
+    "That counts calls the MODEL made, by tool name. A stage that runs `curl` reaches the network inside a shell call and is invisible to it, so the pipeline's own retrievals are counted separately, by the stage that makes them:",
+    "",
+    (() => {
+      // THE SECOND POPULATION, AND IT IS NEVER ADDED TO THE FIRST. One is
+      // model-initiated and counted by tool name; the other is the fetch that
+      // produced the source bundle, counted by the script that made the
+      // requests. A single total over both would be a number about nothing.
+      const p1 = byStage.get("p1-ingest");
+      const ing = p1?.metrics ?? {};
+      if (!p1)
+        return "> This run declared no `p1-ingest` stage, so there is no source-side figure. On the committed-encoding path the sources were fetched in an earlier run; on the deposit path `p1-ingest` validates the bundle that records them.";
+      if (ing.documents_retrieved === undefined)
+        return `> \`p1-ingest\` reported **${esc(p1.status)}**${p1.reason ? ` — ${esc(p1.reason)}` : ""}, so no bundle was read and there is no source-side figure.`;
+      if (ing.retrieval_requests === undefined)
+        return `> The source bundle records ${num(ing.documents_retrieved)} document(s) retrieved. It states no \`retrieval_cost\`, so how many requests that took, and how long, is not recorded — a bundle assembled by hand cannot know it, and a zero would read as a source that cost nothing to fetch.`;
+      // STANDING, said plainly. Unlike everything else in this section, these
+      // figures are not read from anything this pipeline controls: the bundle
+      // is an agent DEPOSIT, and its retrieval_cost is whatever the depositing
+      // fetch recorded. The schema constrains it — a total may not be smaller
+      // than the sum of its own documents — and that is the whole of the
+      // guarantee. Calling it "measured" without saying whose measurement it is
+      // would give it the standing of the driver's own clock.
+      return `> Source side, **as deposited** — a claim by the fetch that produced the bundle, not a measurement by this run: ${num(ing.retrieval_requests)} HTTP request(s) over ${num(ing.documents_retrieved)} document(s), taking ${dur(ing.retrieval_ms)}${ing.retrieval_bytes ? ` for ${num(ing.retrieval_bytes)} bytes` : ""}. What the schema guarantees is internal consistency and nothing more: a stated total may not be smaller than the sum of the documents it totals.`;
+    })(),
+    "",
+    "**Wall clock.** " +
+      // THE SPAN IS DERIVED HERE, from the journal, not read from the metric.
+      // `cost_span_ms` was frozen when p9-cost ran, so it stops before the
+      // reporting stages while the per-stage table above does not — and the
+      // frozen figure can therefore be SMALLER than the stage total printed a
+      // few lines up, which reads as a broken report rather than as two
+      // boundaries.
+      `The run spans ${dur(runSpanMs)} from its first journal record to its last. Of that, ${dur(g("cost_pipeline_busy_ms"))} is attested stage execution${replayed.length ? ` (over the stages that actually EXECUTED, which is why it can sit far below the "ran for" total above when most stages replayed)` : ""}, and at least ${dur(g("cost_agent_tool_ms"))} is measured tool-call time, giving a floor of ${dur(g("cost_busy_lower_bound_ms"))} during which something was demonstrably running. Both component figures stop where the attributed ones do; the span does not.`,
+    "",
+    "The gap between the span and that floor is mostly not idleness in the ordinary sense: this pipeline stops at a human gate and waits. The floor is a floor and not an estimate — it unions attested stage brackets with measured tool intervals, and counts nothing at all for the time a model spends reasoning between two tool calls, which is real work that leaves no interval to measure.",
+    "",
+    "**No money.** Token counts are facts about this run; prices are facts about a contract and change without notice. A stale rate table would put a confident wrong figure in a report whose whole premise is that every number has a row behind it. A reader with a rate card can multiply.",
+    "",
+    `The attributed figures stop at \`${esc(g("cost_measured_through") ?? "—")}\` — the last stage that had written a receipt when \`p9-cost\` read the journal. \`p9-cost\` runs before the reporting stages so that this section can exist, so it cannot count itself, \`p9-report\` or \`p9-explain\`. The per-stage table above is rendered after \`run_end\` and does see them, which is why the two totals differ by exactly the stages between them.`,
+  );
+  // --- WHERE THE COST WENT ---------------------------------------------------
+  const seg = costLedger()?.by_segment ?? [];
+  if (seg.length) {
+    out.push(
+      "",
+      "**Where it went.** The journal's stage brackets cut the run into segments, and every counted request and tool call falls in exactly one — an invariant `p9-cost` checks rather than assumes.",
+      "",
+      "| segment | requests | output tokens | tool calls | tool time (summed) |",
+      "| ------- | -------: | ------------: | ---------: | -----------------: |",
+    );
+    for (const x of seg)
+      out.push(
+        `| ${esc(x.title)} | ${num(x.requests)} | ${num(x.output_tokens)} | ${num(x.tool_calls)} | ${dur(x.tool_ms)} |`,
+      );
+    out.push(
+      "",
+      // THE FINDING THIS TABLE MAKES VISIBLE, and it is a finding about the
+      // method rather than a hedge about the numbers.
+      "The tool column here is a **sum**, while the wall-clock floor above is a **union**: calls made in parallel are counted once each here and once in total there, so these figures are larger and the two must not be compared as though they answered the same question.",
+      "",
+      "A `during <stage>` row is **not what that stage cost**. A phase script calls no model, so by construction it spends no tokens; anything attributed to a stage's own bracket is work the session was doing at the same time on something else. Attribution here is by clock, and a clock cannot tell concurrent work apart from the work it overlaps. The `between` rows are the ones that answer \"what did this pipeline cost\": they are the agent's own working time — reading the source, writing the encoding, deciding whether to grant the gate.",
+    );
+  }
+
+  const selves = Number(g("cost_transcripts_measuring_self") ?? 0);
+  if (selves)
+    out.push(
+      "",
+      `One further boundary: ${num(selves)} of the transcripts read is the session that did the reading, so its own figures stop at the moment it measured itself. Two reads of a live transcript minutes apart differ by exactly the calls that did the reading.`,
+    );
+
+  if (cost.status !== "PASS")
+    out.push(
+      "",
+      `\`p9-cost\` reported **${esc(cost.status)}**${cost.reason ? ` — ${esc(cost.reason)}` : ""}.`,
+    );
+  for (const n of cost.notes || [])
+    out.push(`\n> *claimed, not verified* (${n.author}): ${n.text}`);
+  return out.join("\n");
+}
+
+function comparisonSection() {
+  return absent(
+    "SPEC.md §P9 requires a factual note of disagreement wherever another system has published its own representation of the same rule.",
+    "no stage in this run reads another system's representation. Making that comparison is R2's read-only probe, and any contact is HG2's subject.",
+  );
+}
+
+function triageSection() {
+  // p8-diff (2026-08-09) is this section's stage: it runs SPEC.md §8's diff
+  // oracle over the declared surface map and emits the triage table with every
+  // row UNTRIAGED — the three dispositions are judgements, owned by the skill
+  // and then HG1, never by a script. Its receipt renders here, whole, and this
+  // is its narrated site (it is in NARRATED_ELSEWHERE below).
+  const r = byStage.get("p8-diff");
+  if (!r)
+    return absent(
+      "SPEC.md §8's triage table classifies each disagreement between the de novo encoding and the committed corpus as encoding error / genuine ambiguity / improvement over the hand corpus.",
+      "`p8-diff` — the stage that runs the diff oracle (`etc/go/lib/denovo-diff.mjs`) over the subject's declared surface map — has no receipt in this run. It is declared on the deposit path; a run about the committed encoding replays one encoding and compares nothing.",
+    );
+  const m = r.metrics || {};
+  const head =
+    r.status === "SKIPPED" || r.status === "DEGRADED"
+      ? []
+      : [
+          `The comparator evaluated **${esc(m.evaluations ?? "?")}** (pair, row) cells over ${esc(m.pairs ?? "?")} declared pair(s): ${esc(m.agreed ?? "?")} agreed, **${esc(m.diverged ?? "?")} diverged**, ${esc(m.untriaged ?? "?")} untriaged. Every divergence witness is emitted \`UNTRIAGED\` in the \`denovo-diff.md\` artifact; triaging them (encoding error / genuine ambiguity / improvement) is the reviewer's act, and a run that finds a divergence is §8's *better* pass.`,
+          "",
+        ];
+  return [...head, receiptBlock(r, "`p8-diff`")].join("\n");
+}
+
+// The one place this renderer looks at anything other than the journal, and it
+// looks only to CONTRADICT the journal where the journal has gone stale. It
+// prints no figure taken from disk: the bytes and sha256 columns are still the
+// recorded ones, and the state column says whether they are still true.
+function artifactState(a) {
+  if (a.absent) return "ABSENT";
+  const p = isAbsolute(a.path) ? a.path : resolve(rundir, a.path);
+  if (!existsSync(p)) return "GONE";
+  try {
+    return sha256File(p) === a.sha256 ? "on disk" : "CHANGED";
+  } catch {
+    return "UNREADABLE";
+  }
+}
+
+function artifactsTable() {
+  const rows = [];
+  let notOnDisk = 0;
+  for (const r of stageEnds) {
+    for (const a of r.artifacts || []) {
+      const state = artifactState(a);
+      if (state !== "on disk") notOnDisk++;
+      rows.push(
+        `| \`${r.stage}\` | \`${basename(a.path)}\` | ${a.absent ? "—" : a.bytes} | \`${a.absent ? "—" : a.sha256.slice(0, 23)}…\` | ${state === "on disk" ? state : `**${state}**`} |`,
+      );
+    }
+  }
+  if (!rows.length)
+    return absent(
+      "Every status must point at an artifact.",
+      "no receipt names one, which should be impossible.",
+    );
+  const table = [
+    "| stage | artifact | bytes (recorded) | sha256 (recorded) | state now |",
+    "| --- | --- | --- | --- | --- |",
+    ...rows,
+  ].join("\n");
+  if (!notOnDisk) return table;
+  return [
+    `**${notOnDisk} of the ${rows.length} artifacts this run recorded no longer hash as recorded.** The bytes and sha256 ` +
+      `columns below are what the receipts said at the time; the last column is what the disk says now. A ` +
+      `\`GONE\` or \`CHANGED\` row means this report's evidence for that stage's status cannot be re-checked ` +
+      `from this run directory. Re-derive with \`etc/go/go.sh verify\`, which reports the same rows and exits 1.`,
+    "",
+    table,
+  ].join("\n");
+}
+
+// WHAT THE RUN WAS ABOUT, glossed. Keyed on the three encoding cases and not on
+// a capability label (R9, §3.9): `g1`/`g2` said which of this tooling's
+// milestones was being exercised, which is a fact about this repository, while
+// the reader of a report about a body of law needs to know which ENCODING of
+// that law the run measured.
+const ENCODING_GLOSS = (id) => {
+  if (id === "primary")
+    return "the committed encoding, replayed. It is driven through every reachable projection; nothing is encoded from source.";
+  if (id === "undeclared")
+    return "the deposit path over a subject that declares no additional encoding, so every deposit stage reports SKIPPED naming what is missing.";
+  // A schema-4 journal records a capability label, and `g2` named an ordinal
+  // from which the encoding cannot be recovered. Say so rather than inventing
+  // an id: verify-run.mjs reports the same value the same way.
+  if (typeof id === "string" && id.startsWith("legacy:"))
+    return "(a journal written before journal schema 5, which recorded a capability milestone rather than an encoding)";
+  return "an additional encoding, deposited. This run validates and measures what was deposited and compares it against the committed encoding.";
+};
+const VERDICT_GLOSS = {
+  COMPLETE:
+    "COMPLETE means every declared stage has a receipt, no receipt is BROKEN, every non-PASS receipt carries a reason that appears below, and every gate is signed or explicitly waived. It is completeness of accounting, NOT greenness: legs below may report NOT-EXECUTABLE, DEGRADED or NOT-REGENERATED, and each says why.",
+  INCOMPLETE:
+    "INCOMPLETE means a declared stage has no receipt, or a non-PASS receipt gave no reason. The gaps are listed below.",
+  GATE: "GATE means a human gate was not satisfied and the run refused to continue past it.",
+  BROKEN:
+    "BROKEN means a harness defect, not a finding about the corpus. Nothing below should be read as a statement about the encoding.",
+};
+
+const values = {
+  "run.id": begin?.run_id ?? "(none)",
+  "run.encoding":
+    begin?.encoding ?? (begin?.milestone ? `legacy:${begin.milestone}` : "?"),
+  "run.encoding_gloss": ENCODING_GLOSS(
+    begin?.encoding ?? (begin?.milestone ? `legacy:${begin.milestone}` : null),
+  ),
+  "run.subject": begin?.subject ?? "(none)",
+  "run.repo_head": begin?.repo_head ?? "(none)",
+  "run.tree_state": begin?.tree_state ?? "(unknown)",
+  "run.fixed_now": begin?.fixed_now ?? "(unpinned)",
+  "run.l4_binary": begin?.l4_binary ?? "(none)",
+  "run.journal_path": journalPath,
+  "run.record_count": String(records.length),
+  "run.chain_state": chain.ok
+    ? "verifies"
+    : `**DOES NOT VERIFY** — ${chain.problems.join("; ")}`,
+  "run.verdict": end?.verdict ?? mv.verdict,
+  "run.verdict_gloss":
+    VERDICT_GLOSS[end?.verdict ?? mv.verdict] ?? "(no gloss recorded)",
+  "gates.table": gatesTable(),
+  "sections.source": sourceSection(),
+  "sections.sweep": sweepSection(),
+  "sections.encoding": encodingSection(),
+  "projections.table": projectionsTable(),
+  "projections.detail": projectionsDetail(),
+  "sections.tests": testsSection(),
+  "sections.comparison": comparisonSection(),
+  "sections.other_stages": otherStagesSection(),
+  "sections.triage": triageSection(),
+  "sections.cost": costSection(),
+  "artifacts.table": artifactsTable(),
+  "footer.generated": `*Generated by \`etc/go/report/render-report.mjs\` from \`${journalPath}\`. Nothing in this report was typed; every figure resolves from a journal row.*`,
+};
+
+let md = template.replace(/<!--[\s\S]*?-->\n?/, "");
+md = md.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
+  const k = key.trim();
+  if (!(k in values)) {
+    process.stderr.write(
+      `render-report.mjs: UNRESOLVED PLACEHOLDER {{${k}}} — a claim with no journal row cannot be printed.\n`,
+    );
+    process.exit(4);
+  }
+  return values[k];
+});
+
+const leftover = md.match(/\{\{[^}]*\}\}/g);
+if (leftover) {
+  process.stderr.write(
+    `render-report.mjs: unresolved placeholders remain: ${leftover.join(", ")}\n`,
+  );
+  process.exit(4);
+}
+
+const written = [];
+const outDir = outIdx >= 0 ? resolve(args[outIdx + 1]) : resolve(rundir);
+if (formats.includes("md")) {
+  const p = resolve(outDir, "report.md");
+  writeFileSync(p, md);
+  written.push(p);
+}
+if (formats.includes("html")) {
+  // Deliberately minimal: a <pre> wrapper, no markdown engine, no dependency.
+  // The markdown IS the report; the HTML is a convenience and says so.
+  const p = resolve(outDir, "report.html");
+  const escapeHtml = (s) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  writeFileSync(
+    p,
+    `<!doctype html><meta charset="utf-8"><title>Conversion report — ${escapeHtml(values["run.subject"])} (${escapeHtml(values["run.encoding"])})</title>` +
+      `<style>body{font:14px/1.55 ui-monospace,Menlo,monospace;max-width:60rem;margin:2rem auto;padding:0 1rem}pre{white-space:pre-wrap}</style>` +
+      `<p><em>This HTML is a convenience wrapper. <code>report.md</code> is the report.</em></p><pre>${escapeHtml(md)}</pre>\n`,
+  );
+  written.push(p);
+}
+
+for (const p of written) process.stdout.write(`render-report: wrote ${p}\n`);
+process.exit(0);

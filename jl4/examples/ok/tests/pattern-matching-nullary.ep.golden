@@ -1,0 +1,45 @@
+-- =============================================================================
+-- Pattern Matching: clause groups discriminated only by nullary constructors
+--
+-- Groups whose clauses differ only in nullary-constructor columns -- booleans
+-- (TRUE / FALSE) and enum constants (Water / Fire / Cosmetic) -- are recognised
+-- as pattern-matching clauses and desugared to CONSIDER/WHEN, so long as they
+-- share a single GIVEN/GIVETH signature. (Overloaded, same-name, different-type
+-- definitions each carry their own signature and are never grouped.)
+-- See specs/todo/PATTERN-MATCHING-SPEC.md, Examples 4 and 5.
+-- =============================================================================
+
+IMPORT prelude
+
+-- Boolean discrimination: TRUE / FALSE are nullary constructors.
+GIVEN b IS A BOOLEAN
+GIVETH A NUMBER
+DECIDE `to bit` TRUE  IS 1
+DECIDE `to bit` FALSE IS 0
+
+#EVAL `to bit` TRUE    -- 1
+#EVAL `to bit` FALSE   -- 0
+
+-- Enum discrimination: an insurance-perils style coverage table.
+DECLARE Peril IS ONE OF Water, Fire, Cosmetic
+
+GIVEN p IS A Peril
+GIVETH A BOOLEAN
+DECIDE covered Water    IS TRUE
+DECIDE covered Fire     IS TRUE
+DECIDE covered Cosmetic IS FALSE
+
+#EVAL covered Water     -- TRUE
+#EVAL covered Fire      -- TRUE
+#EVAL covered Cosmetic  -- FALSE
+
+-- Nullary discrimination combined with a trailing catch-all variable clause.
+GIVEN p IS A Peril
+GIVETH A NUMBER
+DECIDE premium Water IS 100
+DECIDE premium Fire  IS 200
+DECIDE premium other IS 0
+
+#EVAL premium Water     -- 100
+#EVAL premium Fire      -- 200
+#EVAL premium Cosmetic  -- 0 (catch-all: `other` binds the argument)

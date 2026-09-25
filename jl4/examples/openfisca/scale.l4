@@ -1,0 +1,57 @@
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+DECLARE Bracket HAS
+    threshold IS A NUMBER
+    rate      IS A NUMBER
+
+GIVEN t IS A NUMBER
+      r IS A NUMBER
+GIVETH A Bracket
+`band` MEANS Bracket WITH threshold IS t, rate IS r
+
+GIVEN income   IS A NUMBER
+      brackets IS A LIST OF Bracket
+GIVETH A NUMBER
+`scale tax` MEANS
+    CONSIDER brackets
+    WHEN EMPTY THEN 0
+    WHEN b FOLLOWED BY rest THEN
+        CONSIDER rest
+        WHEN EMPTY THEN
+            b's rate TIMES (max 0 (income MINUS b's threshold))
+        WHEN nextB FOLLOWED BY anything THEN
+              (b's rate TIMES (max 0 ((min income (nextB's threshold)) MINUS b's threshold)))
+            PLUS (`scale tax` OF income, rest)
+
+@desc scale taxes.social_security_contribution
+GIVEN y IS A NUMBER
+GIVETH A LIST OF Bracket
+`ss brackets` MEANS
+    BRANCH
+        IF y AT LEAST 2017 THEN LIST (`band` OF 0, 0.02), (`band` OF 6000, 0.06), (`band` OF 12400, 0.12)
+        IF y AT LEAST 2015 THEN LIST (`band` OF 0, 0.04), (`band` OF 12200, 0.12)
+        IF y AT LEAST 2013 THEN LIST (`band` OF 0, 0.03), (`band` OF 12000, 0.10)
+        OTHERWISE EMPTY
+
+@export Social security contribution payable by a person for a period
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`social security contribution` p period MEANS
+    `scale tax` OF (p's salary), (`ss brackets` OF period's year)
+
+`p2000`  MEANS Person WITH salary IS 2000
+`p15000` MEANS Person WITH salary IS 15000
+`y2013` MEANS Period WITH year IS 2013, month IS 1
+`y2015` MEANS Period WITH year IS 2015, month IS 1
+`y2017` MEANS Period WITH year IS 2017, month IS 1
+
+#ASSERT (`social security contribution` OF `p2000`,  `y2013`) EQUALS 60
+#ASSERT (`social security contribution` OF `p15000`, `y2013`) EQUALS 660
+#ASSERT (`social security contribution` OF `p2000`,  `y2015`) EQUALS 80
+#ASSERT (`social security contribution` OF `p15000`, `y2015`) EQUALS 824
+#ASSERT (`social security contribution` OF `p2000`,  `y2017`) EQUALS 40
+#ASSERT (`social security contribution` OF `p15000`, `y2017`) EQUALS 816

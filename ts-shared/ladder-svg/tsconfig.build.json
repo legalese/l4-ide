@@ -1,0 +1,12 @@
+/* Build config: emit ONLY src/, so the package entry lands at dist/index.js — which is
+ * what package.json `exports` promises, and what a cross-package importer resolves.
+ * (`tsconfig.json` keeps rootDir "./" so `check` still typechecks demo/, standalone/
+ * and test/.) */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src"
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

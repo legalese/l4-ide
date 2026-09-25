@@ -1,11 +1,19 @@
 # Specification: TYPICALLY Keyword for Default Values
 
-**Status:** ⚠️ BACKED OUT (December 2025)
+**Status:** PARTIALLY LANDED (audited 2026-08-16) — `TYPICALLY` is back in the language as
+**metadata-only** default values: lexed, parsed, and type-checked (literal constants only, explicit
+type required, rejected on `TYPICALLY`-on-TYPE binders), but **not operational** — no presumptive
+evaluation, no PEVAL/PASSERT. Reintroduced by commit `27cd4770`
+(`feat(l4): reintroduce TYPICALLY as metadata-only default values`), hardened by `d6aca898`; see
+`jl4-core/src/L4/TypeCheck.hs:1268-1306` and `jl4/examples/ok/typically-basic.l4`. The presumptive
+evaluation this spec proposes below remains **not implemented**; the December 2025 revert history
+is retained beneath for the record. `CATALA-EXPORT-SPEC.md` R10 proposes operationalising the
+metadata externally (as Catala `context` variables).
 **Related:** `doc/default-values.md` (conceptual background), `BOOLEAN-MINIMIZATION-SPEC.md`
 
-> **⚠️ IMPLEMENTATION STATUS: REVERTED**
+> **⚠️ HISTORY: FIRST IMPLEMENTATION REVERTED (December 2025)**
 >
-> An initial implementation of TYPICALLY was attempted on branch `mengwong/635` but was
+> An initial full implementation of TYPICALLY was attempted on branch `mengwong/635` but was
 > reverted due to a critical heisenbug in the type checker's name disambiguation logic.
 >
 > **What was implemented:**

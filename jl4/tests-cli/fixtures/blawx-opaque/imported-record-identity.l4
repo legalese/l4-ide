@@ -1,0 +1,21 @@
+-- REFUSAL FIXTURE, BLAWX-EXPORT-SPEC §11 W1 (integrated 2026-09-02).
+--
+-- W1's own note said the `RSOpaque` escape was "not known to be reachable in
+-- the M1 fragment, and none was constructed". It is reachable, and this is the
+-- construction: a record `DECLARE`d in an IMPORTed module reaches the Blawx
+-- emitter as `RSOpaque "Shared Ontology.Player"` — a printed name with no
+-- `RName` behind it — so `recordInSort` has nothing to look up in
+-- `envDeclRecords` and the EQUALS below lowered at exit 0, emitting exactly
+-- the `A = B` identity comparison the W1 refusal exists to stop.
+--
+-- `l4 check` succeeds on this module. The refusal is the Blawx leg's.
+
+IMPORT `shared-ontology`
+
+§ `Section`
+
+@export Two players are the same player if they are equal.
+GIVEN a IS A Player
+      b IS A Player
+GIVETH A BOOLEAN
+DECIDE `same player` a b IF a EQUALS b

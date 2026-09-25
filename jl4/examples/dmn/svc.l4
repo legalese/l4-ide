@@ -1,0 +1,53 @@
+-- The §-INVOCATION exhibit (DMN-EXPORT-PROGRAM-MODEL-SPEC.md §2.3, §13.5):
+-- the ONE construct on which the two flavors emit different bytes, isolated
+-- in its own module so every other golden can stay unsuffixed.
+--
+-- `special rate` is deliberately NOT a BKM: @nonexhaustive puts it in the
+-- safety-refused set (§6.2's boundary — an uncertified body is never emitted
+-- as a BKM). It IS §-invocable: the sole output of its § `special assessment`,
+-- whose service encapsulates `assessment floor` and whose inputs are exactly
+-- the decide's own GIVEN parameters. So the call in `special case`:
+--
+--   * on the `kie` flavor renders as the decisionService invocation
+--     `special_assessment(p: 150, q: 5)`, with a knowledgeRequirement →
+--     decisionService edge on the caller — REQUIRED by KIE (compile error
+--     without it, probe D3);
+--   * on the `camunda` flavor stays raw L4 with a Blocking
+--     D-FLAVOR-NOSERVICE note, because that same edge is FATAL to Camunda 8's
+--     parse() (§13.4, probe D2). The camunda golden of this exhibit is
+--     therefore UNLOADABLE on its own flavor's engine — that is the exhibit:
+--     the flavor REFUSES the construct, and the refusal is loud in the
+--     fidelity report rather than silent in the artifact.
+--
+-- Goldens: svc.dmn (camunda, unsuffixed) + svc.kie.dmn — the first
+-- flavor-SPLIT golden pair (§13.6). The flavor-divergence tests in
+-- jl4/tests/DmnExport.hs and jl4/tests-cli/Main.hs assert the split
+-- positively on this subject: the kie bytes contain a requiredKnowledge
+-- pointing at a decisionService and the camunda bytes do not.
+
+IMPORT prelude
+
+§ `Service exhibit`
+
+GIVETH A NUMBER
+`base charge` MEANS 40
+
+GIVETH A NUMBER
+`special case` MEANS `special rate` 150 5 PLUS `base charge`
+
+§§ `special assessment`
+
+GIVETH A NUMBER
+`assessment floor` MEANS 100
+
+-- @nonexhaustive is the REFUSAL LEVER, not a fact about the chain (it has an
+-- OTHERWISE): the decorator puts the decide in the L2 safety set, which keeps
+-- it out of the emitted-BKM population and in the §-invocable one. Both
+-- engines still evaluate it standalone.
+@nonexhaustive
+GIVEN p IS A NUMBER
+      q IS A NUMBER
+GIVETH A NUMBER
+`special rate` p q MEANS
+    BRANCH IF p GREATER THAN `assessment floor` THEN p PLUS q
+           OTHERWISE p MINUS q

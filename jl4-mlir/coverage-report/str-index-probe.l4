@@ -1,0 +1,42 @@
+§ `String index probe`
+-- Exercises the index-carrying string builtins STRINGLENGTH / INDEXOF /
+-- CHARAT / SUBSTRING. The curated cases are branch-crossing on
+-- code-UNIT vs code-POINT semantics: jl4-service (Data.Text) counts by
+-- Unicode code point, while naive JS string ops count by UTF-16 code
+-- unit — any astral-plane char (e.g. 😀 U+1F600, a surrogate pair in
+-- JS) makes the two disagree. SUBSTRING cases additionally cross on the
+-- third argument being a LENGTH (Text.take len . Text.drop start), not
+-- an end index as JS .substring would read it.
+--
+-- NOTE: the first @export in a §-sectioned file is emitted as a helper
+-- (frontend/schema quirk), so the first DECIDE below is a SACRIFICIAL
+-- throwaway; everything we actually curate cases for comes after it.
+
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+@export
+DECIDE probePrime IF x
+
+@export
+GIVEN s IS A STRING
+GIVETH A NUMBER
+DECIDE strLen IS STRINGLENGTH s
+
+@export
+GIVEN h IS A STRING
+      n IS A STRING
+GIVETH A NUMBER
+DECIDE idxOf IS INDEXOF h n
+
+@export
+GIVEN s IS A STRING
+      i IS A NUMBER
+GIVETH A STRING
+DECIDE chAt IS CHARAT s i
+
+@export
+GIVEN s IS A STRING
+      i IS A NUMBER
+      j IS A NUMBER
+GIVETH A STRING
+DECIDE subStr IS SUBSTRING s i j

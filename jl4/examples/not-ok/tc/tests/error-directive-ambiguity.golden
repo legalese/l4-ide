@@ -24,7 +24,7 @@ File: error-directive-ambiguity.l4
   Source: check
   Severity: DiagnosticSeverity_Information
   Code: <none>
-  Message: res12
+  Message: a
 File: error-directive-ambiguity.l4
   Hidden: no
   Range: 10:8-10:16

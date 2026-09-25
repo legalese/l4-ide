@@ -1,0 +1,49 @@
+`the investment limit for the investor` with `the staff reading` and `a modest investor` is equal to 2500
+`the investment limit for the investor` with `the staff reading` and `an investor with income only` is equal to 7500
+`the investment limit for the investor` with `the staff reading` and `a comfortable investor` is equal to 15000
+`the investment limit for the investor` with `the staff reading` and `a wealthy investor` is equal to `the investor ceiling`
+`the investment limit for the investor` with `the staff reading` and `an entity investor` is equal to 100000
+`the investment limit for the investor` with `the text alone` and `an entity investor` is equal to 2500
+`the investment limit for the investor` with `the staff reading` and `an entity investor`
+`the investment limit for the investor` with `the text alone` and `an entity investor`
+`amount sold in the twelve months running from each closing` with `an issuer that has closed twice` and `YMD` with 2026, 6 and 16 is equal to 4500000
+`the issuer's headroom under the twelve month cap` with `the staff reading`, `an issuer that has closed twice`, `the offering on the anniversary` and `YMD` with 2026, 6 and 16 is equal to 500000
+`the issuer's headroom under the twelve month cap` with `the staff reading`, `an issuer that has closed twice`, `the offering on the anniversary` and `YMD` with 2026, 6 and 15 is equal to 0
+`the financial statements required` with `the staff reading`, `a first-time issuer` and `a small offering` is equal to `tax return information with financial statements certified by the principal executive officer`
+`the financial statements required` with `the staff reading`, `a first-time issuer` and `a medium offering` is equal to `financial statements reviewed by a public accountant that is independent of the issuer`
+`the financial statements required` with `the staff reading`, `a first-time issuer` and `a large offering` is equal to `financial statements reviewed by a public accountant that is independent of the issuer`
+`the financial statements required` with `the staff reading`, `a repeat issuer` and `a large offering` is equal to `financial statements audited by a public accountant that is independent of the issuer`
+`the financial statements required` with `the staff reading`, `a first-time issuer` and `a huge offering` is equal to `financial statements audited by a public accountant that is independent of the issuer`
+not `the transfer is permitted` with `a transfer` with `YMD` with 2026, 1 and 1, `YMD` with 2026, 6 and 1 and `FALSE`
+`the transfer is permitted` with `a transfer` with `YMD` with 2026, 1 and 1, `YMD` with 2026, 6 and 1 and `TRUE`
+`the transfer is permitted` with `a transfer` with `YMD` with 2025, 1 and 1, `YMD` with 2026, 6 and 1 and `FALSE`
+`the transfer is permitted` with `a transfer` with `YMD` with 2025, 6 and 1, `YMD` with 2026, 6 and 1 and `FALSE`
+not `the transfer is permitted` with `a transfer` with `YMD` with 2025, 6 and 1, `YMD` with 2026, 5 and 31 and `FALSE`
+`the covered person is disqualified` with `a director convicted in 2023` and `YMD` with 2026, 1 and 2
+not `the covered person is disqualified` with `an issuer convicted in 2019` and `YMD` with 2026, 1 and 2
+`the covered person is disqualified` with `an issuer convicted in 2019` and `YMD` with 2023, 1 and 2
+not `the covered person is disqualified` with `a director convicted in 2015` and `YMD` with 2020, 1 and 2
+`the issuer may cease its ongoing reporting` with `the text alone` and `an issuer behind a crowdfunding vehicle`
+not `the issuer may cease its ongoing reporting` with `the staff reading` and `an issuer behind a crowdfunding vehicle`
+`the date the funding portal's registration becomes effective` with `a portal` with `YMD` with 2026, 1 and 1 and `YMD` with 2026, 3 and 1 is equal to `YMD` with 2026, 3 and 1
+`the date the funding portal's registration becomes effective` with `a portal` with `YMD` with 2026, 1 and 1 and `YMD` with 2026, 1 and 5 is equal to `YMD` with 2026, 1 and 31
+`the governing retention period in years` with `a portal` with `YMD` with 2026, 1 and 1 and `YMD` with 2026, 1 and 5 is equal to 5
+`the governing retention period in years` with `a portal` with `YMD` with 2026, 1 and 1 and `YMD` with 2026, 1 and 5
+`the issuer may close the offering early` with `an offering closing early`
+not `the issuer may close the offering early` with `an offering closing too fast`
+not `the issuer may close the offering early` with `an offering closing too soon`
+`the crowdfunding exemption is available` with `the staff reading`, `a first-time issuer`, `a small offering`, `a modest investor`, 2000 and `YMD` with 2026, 3 and 1
+not `100(a)(2) — the investor's limit is not exceeded` with `the staff reading`, `a modest investor` and 3000
+`the crowdfunding exemption is available` with `the staff reading`, `a first-time issuer`, `a small offering`, `a modest investor`, 3000 and `YMD` with 2026, 3 and 1
+`no exemption is available because of a disqualification` with `an issuer with a disqualified director`
+`the crowdfunding exemption does not apply to the issuer` with `the staff reading` and `an issuer with a disqualified director`
+not `the crowdfunding exemption does not apply to the issuer` with `the staff reading` and `a first-time issuer`
+`the investor's net worth` with `a homeowner` is equal to 900000
+not `the investor is an accredited investor` with `a homeowner`
+`the investor's net worth` with `a homeowner`
+executing contract `the material change reconfirmation chain` with `an offering with a material change` and `a reconfirmed commitment` at 0 with the following events:  party `the intermediary` did `give or send the investor notice of the material change` at 1 party `the investor` did `reconfirm the investment commitment` at 3
+executing contract `the material change reconfirmation chain` with `an offering with a material change` and `an abandoned commitment` at 0 with the following events:  party `the intermediary` did `give or send the investor notice of the material change` at 1
+`the issuer may close the offering early` with `an offering closing early`
+`the financial statements required` with `the staff reading`, `a first-time issuer` and `a large offering`
+`the financial statements required` with `the staff reading`, `a repeat issuer` and `a large offering`
+`the issuer's headroom under the twelve month cap` with `the staff reading`, `an issuer that has closed twice`, `the offering on the anniversary` and `YMD` with 2026, 6 and 16

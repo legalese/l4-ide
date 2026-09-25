@@ -1,0 +1,35 @@
+{
+  "note": [
+    "Cases for bkm-in-context-sibling.dmn (probe B2). 3 cases x 2 decisions = 6",
+    "value checks per engine. Case C is the discriminating one: subtotal (150)",
+    "and raw.a (140) are both >= 100 but differ, and raw.b (10) is not, so a",
+    "call that read the wrong sibling or the wrong projection would answer",
+    "graded = 0 while the right one answers 1."
+  ],
+  "cases": [
+    {
+      "name": "A. subtotal 30, below the classify line",
+      "context": { "raw": { "a": 20, "b": 10 } },
+      "expect": {
+        "bundle": { "subtotal": 30, "graded": 0, "doubled": 0, "note": "g=0" },
+        "total": 30
+      }
+    },
+    {
+      "name": "B. subtotal exactly 100, the boundary",
+      "context": { "raw": { "a": 60, "b": 40 } },
+      "expect": {
+        "bundle": { "subtotal": 100, "graded": 1, "doubled": 2, "note": "g=1" },
+        "total": 102
+      }
+    },
+    {
+      "name": "C. subtotal 150 vs raw.a 140 vs raw.b 10, all distinct",
+      "context": { "raw": { "a": 140, "b": 10 } },
+      "expect": {
+        "bundle": { "subtotal": 150, "graded": 1, "doubled": 2, "note": "g=1" },
+        "total": 152
+      }
+    }
+  ]
+}

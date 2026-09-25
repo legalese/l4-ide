@@ -4,7 +4,7 @@ IMPORT timezone
 IMPORT jurisdiction
 IMPORT `legal-persons`
 
-"Etc/UTC"
+TIMEZONE IS "Etc/UTC"
 
 § `Legal Persons Library Tests`
 
@@ -35,7 +35,7 @@ IMPORT `legal-persons`
 -- Test address formatting
 #EVAL `format address` "123 Main St" "New York" "NY" "10001" "US"
 #EVAL `format address` "456 High St" "London" "England" "SW1A 1AA" "GB"
-#EVAL `format address` "789 Rue de la Paix" "Paris" "\206le-de-France" "75001" "FR"
+#EVAL `format address` "789 Rue de la Paix" "Paris" "Île-de-France" "75001" "FR"
 
 -- Test postal code validation
 #EVAL `is valid US zip code` "12345"

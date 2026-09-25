@@ -1,0 +1,25 @@
+-- Named rejection: the MAYBE-valued overload of a recognised aggregate.
+--
+-- `minimum` and `maximum` are overloaded in the prelude — once over
+-- `LIST OF NUMBER` (prelude.l4:336,345) and again over `LIST OF MAYBE NUMBER`
+-- (:353,385) — and the middle-end recognises aggregates BY NAME, which matches
+-- both. The overloads are separated by SORT, using the resolved callee's own
+-- result type, and the MAYBE one is refused: lowering it to a plain
+-- `RAggregate` would silently drop the NOTHINGs, and a bridge that quietly
+-- changes the answer is worse than one that declines.
+--
+-- The MAYBE is deliberately INTERIOR here — a list-of-MAYBE record field, not a
+-- MAYBE-valued parameter or result. A MAYBE in the signature is caught earlier
+-- and by a different check (`checkFragmentSorts`, on the way in), so a fixture
+-- written that way would witness that check and leave this one untested, which
+-- is the state this file was added to end.
+
+IMPORT prelude
+
+DECLARE Readings HAS
+    samples IS A LIST OF MAYBE NUMBER
+
+@export
+GIVEN r IS A Readings
+GIVETH A BOOLEAN
+DECIDE `has no floor` IF minimum (r's samples) EQUALS NOTHING

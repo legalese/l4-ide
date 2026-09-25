@@ -1,0 +1,43 @@
+-- NEGATIVE fixture, and the file that KEEPS A CONCESSION HONEST (spec §6.4.5,
+-- and §2.4.1's L12).
+--
+-- p4, second variant: the WHERE-local recurses ON ITSELF, and no top-level name
+-- participates.
+--
+--     `the settled value` MEANS `fixpoint`
+--                         WHERE `fixpoint` MEANS `fixpoint`
+--
+-- §6.4.5 concedes that this is INVISIBLE to any graph whose nodes are
+-- decisions: the only cycle is inside one node, so no SCC over the DRG can
+-- report it however correct the SCC is. Today it is caught incidentally, by
+-- D-LITERALEXPR, because the body does not render -- which is luck, not a
+-- check.
+--
+-- The fixture exists so that the concession has a witness. If a future change
+-- makes the body render, D-LITERALEXPR stops firing, and this file becomes a
+-- SILENT non-terminating decision unless something else is added. That is a
+-- regression the concession predicted and this file is how it gets noticed.
+--
+-- Expected: NO D-CYCLE and NO D-RECURSIVE, deliberately, plus whatever note the
+-- unrenderable body draws. If a cycle finding ever DOES appear here, the graph
+-- grew nodes it did not have, and §6.4.5 needs rereading rather than the
+-- fixture needing fixing.
+--
+--
+-- PROVENANCE OF THIS HEADER. The .l4 source was typechecked (`l4 check`, clean)
+-- when it was written on 2026-07-31, with a prebuilt CLI. The statements above
+-- about what TODAY'S EXPORTER emits and reports are taken from spec
+-- §6.4.2/§6.4.5's table and were NOT re-measured here: that session had no
+-- build. Whoever wires these fixtures into jl4/tests/DmnExport.hs must MEASURE
+-- the expectation rather than transcribe it.
+-- NEVER added to `goldenSubjects`.
+
+IMPORT prelude
+
+§ `self recursive where local`
+
+GIVETH A NUMBER
+`the settled value` MEANS
+    `fixpoint`
+      WHERE
+        `fixpoint` MEANS `fixpoint` PLUS 0

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE C4. NEGATIVE CONTROL. What this asks: what happens when a BKM's @name
+  and its <variable>/@name DISAGREE?
+
+      businessKnowledgeModel @name = "f"
+      its variable           @name = "g"
+      the caller decision invokes  f(n)
+
+  Section 6.2 states the invariant "BKM @name = variable/@name" and section 13.3
+  row 6 measured the KIE side: validator ERROR, build clean, runtime FAILS. The
+  Camunda side is one of the two gaps section 13.8 names by hand. This file
+  measures both in one place and pins them.
+
+  The cases assert the answer the file WOULD give if the names agreed (n * 3),
+  so the probe distinguishes three outcomes rather than two: an engine may (a)
+  refuse, (b) answer correctly anyway by preferring @name, or (c) answer null /
+  wrongly. Only (a) and (c) make the invariant engine-checked; (b) means the
+  emitter is on its own and checkDrg must carry it.
+
+  Wired HarnessMustFail on the KIE leg. If it ever starts passing, KIE has
+  changed its mind about the invariant and section 6.2 must be re-read.
+
+  MEASURED 2026-07-31, and the engines DISAGREE, which is the point:
+
+    KIE 8.44  : validator ERROR [VARIABLE_NAME_MISMATCH] "Variable name 'g' does
+                not match the Business Knowledge Model node name 'f'"; BUILD
+                CLEAN; and then at runtime, per case,
+                    msg ERROR FEEL ERROR while evaluating literal expression
+                    'f(n)': Not an invocable: 'null'
+                with `result` reported FAILED and null. Section 13.3 row 6
+                reproduced exactly.
+    Camunda 8 : outcome (b). It PARSES, says nothing, and ANSWERS CORRECTLY
+                (12 and 0). zeebe-dmn binds the invocable by the BKM's @name and
+                does not consult variable/@name at all.
+
+  CONSEQUENCE. Section 6.2's "@name = variable/@name" invariant is engine-checked
+  on `kie` and completely unchecked on the DEFAULT flavor, where a mismatch is
+  not merely tolerated but invisible. checkDrg must carry it. Wired
+  HarnessMustFail on the KIE leg and HarnessMustPass on the Camunda leg.
+
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_bkm_name_mismatch" name="bkm_name_mismatch" namespace="https://legalese.com/l4/dmn/bkm_name_mismatch" exporter="hand">
+  <businessKnowledgeModel id="bkm_f" name="f">
+    <variable id="bkm_f_var" name="g" typeRef="number"/>
+    <encapsulatedLogic id="bkm_f_logic">
+      <formalParameter id="bkm_f_p1" name="v" typeRef="number"/>
+      <literalExpression id="bkm_f_lit">
+        <text>v * 3</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_result" name="result">
+    <variable id="decision_result_var" name="result" typeRef="number"/>
+    <informationRequirement id="ir_result_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_result_f">
+      <requiredKnowledge href="#bkm_f"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_result_lit">
+      <text>f(n)</text>
+    </literalExpression>
+  </decision>
+</definitions>

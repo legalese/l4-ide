@@ -1,0 +1,31 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+set-operators.l4:18:1-61:
+  TRUE
+set-operators.l4:19:1-66:
+  3
+set-operators.l4:26:1-52:
+  3
+set-operators.l4:27:1-56:
+  0
+set-operators.l4:33:1-102:
+  TRUE
+set-operators.l4:39:1-68:
+  1
+set-operators.l4:47:1-54:
+  3
+set-operators.l4:49:1-55:
+  3
+set-operators.l4:58:1-35:
+  TRUE
+set-operators.l4:59:1-35:
+  FALSE
+set-operators.l4:61:1-69:
+  LIST CT
+set-operators.l4:65:1-49:
+  0
+set-operators.l4:66:1-52:
+  3
+set-operators.l4:67:1-38:
+  LIST 5, 6

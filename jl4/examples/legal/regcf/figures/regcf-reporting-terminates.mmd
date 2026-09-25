@@ -1,0 +1,16 @@
+---
+config:
+  railroad:
+    nonTerminalFill: "#ffffff"
+    nonTerminalStroke: "#222222"
+    nonTerminalTextColor: "#111111"
+    terminalFill: "transparent"
+    terminalStroke: "transparent"
+    terminalTextColor: "#888888"
+    lineColor: "#8a8a8a"
+    markerFill: "#222222"
+    strokeWidth: 1.5
+    fontSize: 15
+---
+railroad-beta
+ongoing_reporting_obligation_may_terminate = sequence(terminal("(b) An issuer must continue to comply with the ongoing reporting requirements until one of the following occurs:"), choice(nonterminal("(b)(1) — became an Exchange Act reporting company OF status"), nonterminal("(b)(2) — one annual report filed and fewer than 300 holders of record OF status"), nonterminal("(b)(3) — three annual reports filed and total assets not exceeding $10,000,000 OF status"), nonterminal("(b)(4) — all securities repurchased OF status"), nonterminal("(b)(5) — liquidated or dissolved OF status")));

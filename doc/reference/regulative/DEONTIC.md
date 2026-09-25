@@ -29,6 +29,35 @@ The DEONTIC type is parameterized by two type arguments:
 - **ActorType**: The type of parties who can act (e.g., `Buyer`, `Seller`)
 - **ActionType**: The type of actions that can be performed (e.g., `deliver`, `pay`)
 
+### Actors, actions, and the performer rule
+
+The recommended encoding makes **actors ordinary values** of one type and
+**actions records that carry their actor(s)**. The contract head is then
+monomorphic (`DEONTIC Actor Action`), which drives mixed-actor events natively.
+
+```l4
+DECLARE Actor IS ONE OF Eater, Drinker
+DECLARE Action HAS actor IS AN Actor, verb IS A STRING
+eat   MEANS Action OF Eater,   "eat"
+drink MEANS Action OF Drinker, "drink"
+```
+
+With this encoding L4 enforces that a `PARTY p MUST a` obligation (and a
+`PARTY p DOES a` event) has `p` as the action `a`'s **performer** — so a Drinker
+may not be obligated to, or do, an Eater action:
+
+```l4
+GIVETH DEONTIC Actor Action
+bad MEANS PARTY Drinker MUST eat WITHIN 30
+-- ❌ `eat` is performed by `Eater`, not by `Drinker`.
+```
+
+The performer is the first actor in positional order (the subject-first canon),
+which makes actions **duplex** and supports parameterised actions and
+higher-order **procurement**. See
+**[Actors, Actions, and Agreement](../../concepts/legal-modeling/actors-and-actions.md)**
+for the full rules with worked ✅/❌ examples.
+
 ## Examples
 
 **Example file:** [deontic-example.l4](deontic-example.l4)

@@ -1,0 +1,19 @@
+-- Test: @ref annotations attach to arbitrary AST nodes, not only declarations.
+-- Here @ref is placed in front of expression-level nodes (the bodies of the
+-- DECIDEs and a sub-expression), which the addRefCommentsToAst pass attaches to
+-- the immediately following AST node.
+
+@ref https://example.com/rules/section-1
+GIVEN x IS A NUMBER
+DECIDE doubled x IS
+  @ref https://example.com/rules/section-1a
+  x * 2
+
+@ref https://example.com/rules/section-2
+GIVEN n IS A NUMBER
+DECIDE isPositive IF
+  @ref https://example.com/rules/section-2a
+  n > 0
+
+#EVAL doubled 21
+#EVAL isPositive 3

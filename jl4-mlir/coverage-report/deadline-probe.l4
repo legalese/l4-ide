@@ -1,0 +1,15 @@
+IMPORT prelude
+
+DECLARE Party IS ONE OF `the borrower`
+DECLARE `Repay Action` IS ONE OF `repay loan`
+
+`Deadline Days` MEANS 7 PLUS 7
+
+@export computed deadline demo
+GIVETH A DEONTIC Party `Repay Action`
+`repayment` MEANS
+    PARTY `the borrower`
+    MUST `repay loan`
+    WITHIN `Deadline Days`
+    HENCE FULFILLED
+    LEST BREACH BY `the borrower` BECAUSE "late"

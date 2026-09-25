@@ -36,7 +36,7 @@ import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
 
 import Backend.Api
 import Backend.CodeGen (generateEvalWrapper, generateDeonticEvalWrapper, GeneratedCode(..))
-import L4.Export (extractAssumeParamTypes, extractAssumeParamResolveds)
+import L4.Export (AssumeRewrite(..), extractAssumeParamTypes, extractAssumeParamResolveds, rewriteModuleAssumes)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson
 import qualified Data.Scientific as Scientific
@@ -157,20 +157,26 @@ typecheckAndEvalBundle moduleContext evalFiles = do
   -- Core libraries (prelude, …) to register as stable virtual files, unless the
   -- deployment ships its own copy of the same name (which then shadows the
   -- embedded one). Registering them up front means `IMPORT prelude` resolves via
-  -- the VFS, instead of the resolver's on-demand `addVirtualFile` embedded
-  -- fallback (LSP.L4.Rules). That fallback mutates the VFS mid-rule and — under
-  -- -O, in the multi-pass compileBundle/eval path — yields an unstable/duplicate
-  -- prelude module and spurious overload ambiguity (e.g. `count xs >= n` →
-  -- "ambiguous __GEQ__"). Verified: the same source is rejected via the embedded
-  -- fallback and accepted when the library is a real virtual file. The libraries
-  -- stay *dependencies* (NOT added to `allUris`), so they are never serialized or
-  -- surfaced as deployment files — only resolved when imported.
+  -- the VFS, instead of the resolver's on-demand embedded fallback
+  -- (LSP.L4.Rules). That fallback used to mutate the VFS mid-rule and — under
+  -- -O, in the multi-pass compileBundle/eval path — yielded an
+  -- unstable/duplicate prelude module and spurious overload ambiguity (e.g.
+  -- `count xs >= n` → "ambiguous __GEQ__"). Verified: the same source is
+  -- rejected via the embedded fallback and accepted when the library is a real
+  -- virtual file. The libraries stay *dependencies* (NOT added to `allUris`),
+  -- so they are never serialized or surfaced as deployment files — only
+  -- resolved when imported.
+  --
+  -- They are registered at `Shake.embeddedLibraryUri`, the one URI the resolver
+  -- hands back for an embedded winner. Registering them anywhere else would
+  -- give a bundle two `prelude` modules whenever some importer resolves via the
+  -- VFS tier and another falls through to the embedded tier — which is how the
+  -- duplicate-module ambiguity above arises.
   let bundleBasenames = Set.fromList (map takeFileName (StrictMap.keys moduleContext))
       embeddedLibFiles =
-        [ (libName, content)
+        [ (name, content)
         | (name, content) <- StrictMap.toList EmbeddedLibraries.embeddedLibraries
-        , let libName = Text.unpack name <.> "l4"
-        , not (libName `Set.member` bundleBasenames)
+        , not ((Text.unpack name <.> "l4") `Set.member` bundleBasenames)
         ]
 
   -- Use the first file's directory as the session root (arbitrary but required)
@@ -190,7 +196,7 @@ typecheckAndEvalBundle moduleContext evalFiles = do
         -- Register embedded core libraries as stable virtual files (dependencies
         -- only — deliberately NOT added to allUris, see note above).
         forM_ embeddedLibFiles $ \(libName, content) ->
-          void $ Shake.addVirtualFile (toNormalizedFilePath ("./" <> libName)) content
+          void $ Shake.addVirtualFileUri (Shake.embeddedLibraryUri libName) content
 
         -- Typecheck ALL bundle files in one batch — Shake shares import resolution
         let allUris = [uri | (_, _, uri) <- fileNfps]
@@ -384,7 +390,7 @@ buildModuleInfo decls = ModuleInfo
     recordFor (MkDeclare _ _ (MkAppForm _ tyName _ _) (RecordDecl _ (Just ctor) fields)) =
       Just (getUnique tyName, (ctor, map fieldOf fields))
       where
-        fieldOf (MkTypedName _ fn fty _) = (rawNameToText (rawName (getActual fn)), fty)
+        fieldOf (MkTypedName _ fn fty _ _) = (rawNameToText (rawName (getActual fn)), fty)
     recordFor _ = Nothing
 
     enumFor :: Declare Resolved -> Maybe (Unique, [(Text, Resolved)])
@@ -600,15 +606,17 @@ evaluateWithCompiledDeontic filepath fnDecl compiled sourceText modContext param
     Just _xs -> throwError $ InterpreterError "L4: More than ONE #EVAL found in the program."
 
 -- | Direct AST evaluation (fast path) - for simple types without FnObject.
--- Referenced ASSUMEs are bound via a LET expression /around the inlined body/
--- (not around the call). A closure-based call captures its defining env, so
--- a LetIn wrapping @App fn [...]@ wouldn't reach the body — instead we
--- bind both GIVEN parameters and referenced ASSUMEs as local decls and
--- evaluate the body expression directly.
+-- Each supplied ASSUME is bound by installing a nullary DECIDE at the
+-- ASSUME's own address in the module ('rewriteModuleAssumes'): the
+-- exported body and every helper it reaches resolve the ASSUME by its
+-- 'Unique', and the module's own definitions are evaluated fresh per
+-- call, so all of them see the supplied value. A LET around the call (or
+-- around the inlined body) would not: a helper's closure captures the
+-- module environment, where the ASSUME is still 'ValAssumed'.
 evaluateDirectAST
   :: CompiledModule
   -> [(Text, Maybe FnLiteral)]            -- ^ GIVEN params (positional for the call)
-  -> [(Resolved, Type' Resolved)]         -- ^ ASSUMEs referenced by the body
+  -> [(Resolved, Type' Resolved)]         -- ^ ASSUMEs read by the export (transitively)
   -> [(Text, Maybe FnLiteral)]            -- ^ ASSUME values (keyed by name)
   -> TraceLevel
   -> Bool
@@ -621,7 +629,6 @@ evaluateDirectAST compiled params assumeRefs assumeValues traceLevel includeGrap
       paramTypes = extractParamTypes compiled.compiledDecide
       paramMap   = Map.fromList [(name, val) | (name, Just val) <- params]
       assumeMap  = Map.fromList [(name, val) | (name, Just val) <- assumeValues]
-      MkDecide _ _ (MkAppForm _ _ givenResolveds _) body = compiled.compiledDecide
 
   argExprs <- forM paramTypes $ \(name, ty) ->
     case fnLiteralToExprTyped moduleInfo ty (Map.lookup name paramMap) of
@@ -629,34 +636,22 @@ evaluateDirectAST compiled params assumeRefs assumeValues traceLevel includeGrap
         throwError $ InterpreterError ("Parameter '" <> name <> "': " <> err)
       Right e -> pure e
 
-  -- Emit a LocalDecide binding `name = valueExpr` — used for both GIVEN
-  -- parameters (from call args) and referenced ASSUMEs. The LocalDecide
-  -- reuses the parameter's/ASSUME's own Resolved so the body's refs
-  -- (which share the same Unique) resolve to this local binding.
-  let mkLocalBinding :: Resolved -> Expr Resolved -> LocalDecl Resolved
-      mkLocalBinding r valueExpr = LocalDecide emptyAnno $
-        MkDecide emptyAnno
-          (MkTypeSig emptyAnno (MkGivenSig emptyAnno []) Nothing)
-          (MkAppForm emptyAnno r [] Nothing)
-          valueExpr
-
-  assumeBindings <- forM assumeRefs $ \(assumeRes, assumeTy) -> do
+  assumeExprs <- fmap Map.fromList $ forM assumeRefs $ \(assumeRes, assumeTy) -> do
     let nm = rawNameToText (rawName (getActual assumeRes))
     case fnLiteralToExprTyped moduleInfo assumeTy (Map.lookup nm assumeMap) of
       Left err ->
         throwError $ InterpreterError ("ASSUME '" <> nm <> "': " <> err)
-      Right valueExpr -> pure (mkLocalBinding assumeRes valueExpr)
+      Right valueExpr -> pure (getUnique assumeRes, valueExpr)
 
-  -- If there are no ASSUME refs, use the closure-based call — it's the
-  -- well-trodden path and semantically equivalent to inlining. When ASSUMEs
-  -- are involved, inline the body with LET bindings for both GIVENs and
-  -- ASSUMEs so the body sees our local bindings instead of the closure's
-  -- captured module-level env (where ASSUMEs are still ValAssumed).
-  let funResolved = getFunctionResolved compiled.compiledDecide
-      callExpr = case assumeBindings of
-        [] -> buildFunctionCallExpr funResolved argExprs
-        _  -> let givenBindings = zipWith mkLocalBinding givenResolveds argExprs
-              in LetIn emptyAnno (assumeBindings <> givenBindings) body
+  -- The replacement DECIDE keeps the ASSUME's own type signature and app
+  -- form (hence its Resolved and Unique), so every reference in the
+  -- module — in the export or in a helper — now finds a value there.
+  let bindAssume (MkAssume _ tySig appForm@(MkAppForm _ r _ _) _ _) =
+        case Map.lookup (getUnique r) assumeExprs of
+          Nothing        -> KeepAssume
+          Just valueExpr -> ReplaceAssume (Decide emptyAnno (MkDecide emptyAnno tySig appForm valueExpr))
+      boundModule = rewriteModuleAssumes bindAssume compiled.compiledModule
+      callExpr = buildFunctionCallExpr (getFunctionResolved compiled.compiledDecide) argExprs
 
   -- Configure evaluation with tracing based on trace level
   let evalTracePolicy = case traceLevel of
@@ -677,7 +672,7 @@ evaluateDirectAST compiled params assumeRefs assumeValues traceLevel includeGrap
     evalConfig
     compiled.compiledEntityInfo
     callExpr
-    (compiled.compiledImportEnv, compiled.compiledModule)
+    (compiled.compiledImportEnv, boundModule)
 
   -- Handle result
   case mResult of
@@ -982,9 +977,9 @@ extractParamTypes :: Decide Resolved -> [(Text, Type' Resolved)]
 extractParamTypes (MkDecide _ (MkTypeSig _ (MkGivenSig _ typedNames) _) _ _) =
   mapMaybe extractTypedName typedNames
   where
-    extractTypedName (MkOptionallyTypedName _ resolved (Just ty)) =
+    extractTypedName (MkOptionallyTypedName _ resolved (Just ty) _) =
       Just (rawNameToText (rawName $ getActual resolved), ty)
-    extractTypedName (MkOptionallyTypedName _ resolved Nothing) =
+    extractTypedName (MkOptionallyTypedName _ resolved Nothing _) =
       -- Try to get type from resolved info
       case getAnno (getName resolved) ^. #extra % #resolvedInfo of
         Just (TypeInfo ty _) -> Just (rawNameToText (rawName $ getActual resolved), ty)
@@ -1114,15 +1109,27 @@ valueToFnLiteral ei = \case
     pure $ FnLitString $ prettyLayout name
   Eval.ValConstructor resolved [] ->
     -- Special case boolean constructors (preserve original casing for others)
-    let name = prettyLayout $ getActual resolved
+    let name = constructorText resolved
      in case Text.toUpper name of
           "TRUE" -> pure $ FnLitBool True
           "FALSE" -> pure $ FnLitBool False
+          -- NOTHING is the absence of a value, and JSON spells that null.
+          -- Emitting the string "NOTHING" made an optional field's empty case
+          -- indistinguishable from a genuine string answer, and made
+          -- `MAYBE NUMBER` unusable for exactly the job it is for: saying that
+          -- a limit does not apply without naming a number that could be
+          -- mistaken for one.
+          "NOTHING" -> pure FnUnknown
           -- Other nullary constructors become strings (original casing preserved)
           _ -> pure $ FnLitString name
+  -- JUST x is x. The Maybe wrapper is L4's, not the caller's, and wrapping it
+  -- in an object would make every optional field a tagged union the client has
+  -- to unwrap. This matches 'L4.Evaluate.ValueLazyJSON', which the LSP uses.
+  Eval.ValConstructor resolved [v]
+    | Text.toUpper (constructorText resolved) == "JUST" -> nfToFnLiteral ei v
   Eval.ValConstructor resolved vals -> do
     lits <- traverse (nfToFnLiteral ei) vals
-    let name = prettyLayout $ getActual resolved
+    let name = constructorText resolved
         fieldNames = lookupFieldNames ei resolved
     pure $ case fieldNames of
       Just names | length names == length lits ->
@@ -1137,6 +1144,23 @@ valueToFnLiteral ei = \case
           ]
   Eval.ValAssumed var ->
     throwError $ InterpreterError $ "#EVAL produced ASSUME: " <> prettyLayout var
+
+-- | A constructor's name, as a JSON payload should carry it.
+--
+-- NOT 'prettyLayout': that renders a 'Name' as L4 /source/, so an identifier
+-- with spaces in it comes back backtick-quoted — and this value is compared by
+-- clients against the @enum@ the service itself declared in its
+-- @returnSchema@, which is built by 'L4.FunctionSchema.resolvedNameText' and
+-- carries no backticks. So the service was handing out a schema and then
+-- returning values that fail it: declared
+-- @\"financial statements reviewed by an independent public accountant\"@,
+-- returned
+-- @\"\`financial statements reviewed by an independent public accountant\`\"@.
+--
+-- 'getActual' rather than 'getOriginal', matching 'L4.FunctionSchema', so that
+-- the two agree by construction rather than by coincidence.
+constructorText :: Resolved -> Text
+constructorText = rawNameToText . rawName . getActual
 
 -- | Look up field names for a constructor from the EntityInfo.
 -- Returns 'Just' field names if the constructor has named fields, 'Nothing' otherwise.

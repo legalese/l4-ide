@@ -1,0 +1,207 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+charity-test.l4:1263:1-83:
+  assertion satisfied
+charity-test.l4:1264:1-86:
+  assertion satisfied
+charity-test.l4:1265:1-76:
+  assertion satisfied
+charity-test.l4:1266:1-81:
+  assertion satisfied
+charity-test.l4:1267:1-67:
+  assertion satisfied
+charity-test.l4:1268:1-105:
+  assertion satisfied
+charity-test.l4:1269:1-118:
+  assertion satisfied
+charity-test.l4:1270:1-92:
+  assertion satisfied
+charity-test.l4:1271:1-88:
+  assertion satisfied
+charity-test.l4:1272:1-87:
+  assertion satisfied
+charity-test.l4:1273:1-106:
+  assertion satisfied
+charity-test.l4:1274:1-75:
+  assertion satisfied
+charity-test.l4:1275:1-81:
+  assertion satisfied
+charity-test.l4:1281:1-78:
+  assertion satisfied
+charity-test.l4:1282:1-73:
+  assertion satisfied
+charity-test.l4:1286:1-99:
+  assertion satisfied
+charity-test.l4:1287:1-96:
+  assertion satisfied
+charity-test.l4:1289:1-91:
+  assertion satisfied
+charity-test.l4:1290:1-90:
+  assertion satisfied
+charity-test.l4:1294:1-112:
+  assertion satisfied
+charity-test.l4:1295:1-105:
+  assertion satisfied
+charity-test.l4:1296:1-111:
+  assertion satisfied
+charity-test.l4:1297:1-104:
+  assertion satisfied
+charity-test.l4:1302:1-141:
+  assertion satisfied
+charity-test.l4:1303:1-81:
+  assertion satisfied
+charity-test.l4:1304:1-75:
+  assertion satisfied
+charity-test.l4:1308:1-85:
+  assertion satisfied
+charity-test.l4:1309:1-84:
+  assertion satisfied
+charity-test.l4:1312:1-81:
+  assertion satisfied
+charity-test.l4:1313:1-80:
+  assertion satisfied
+charity-test.l4:1314:1-79:
+  assertion satisfied
+charity-test.l4:1315:1-82:
+  assertion satisfied
+charity-test.l4:1316:1-87:
+  assertion satisfied
+charity-test.l4:1320:1-142:
+  assertion satisfied
+charity-test.l4:1322:1-144:
+  assertion satisfied
+charity-test.l4:1325:1-154:
+  assertion satisfied
+charity-test.l4:1326:1-129:
+  assertion satisfied
+charity-test.l4:1330:1-102:
+  assertion satisfied
+charity-test.l4:1331:1-112:
+  assertion satisfied
+charity-test.l4:1332:1-114:
+  assertion satisfied
+charity-test.l4:1333:1-122:
+  assertion satisfied
+charity-test.l4:1334:1-120:
+  assertion satisfied
+charity-test.l4:1335:1-94:
+  assertion satisfied
+charity-test.l4:1337:1-102:
+  assertion satisfied
+charity-test.l4:1341:1-69:
+  assertion satisfied
+charity-test.l4:1342:1-84:
+  assertion satisfied
+charity-test.l4:1344:1-79:
+  assertion satisfied
+charity-test.l4:1345:1-78:
+  assertion satisfied
+charity-test.l4:1346:1-73:
+  assertion satisfied
+charity-test.l4:1347:1-72:
+  assertion satisfied
+charity-test.l4:1349:1-182:
+  assertion satisfied
+charity-test.l4:1350:1-104:
+  assertion satisfied
+charity-test.l4:1351:1-67:
+  assertion satisfied
+charity-test.l4:1352:1-106:
+  assertion satisfied
+charity-test.l4:1355:1-180:
+  assertion satisfied
+charity-test.l4:1356:1-83:
+  assertion satisfied
+charity-test.l4:1360:1-95:
+  assertion satisfied
+charity-test.l4:1363:1-132:
+  assertion satisfied
+charity-test.l4:1364:1-101:
+  assertion satisfied
+charity-test.l4:1366:1-117:
+  assertion satisfied
+charity-test.l4:1367:1-111:
+  assertion satisfied
+charity-test.l4:1368:1-115:
+  assertion satisfied
+charity-test.l4:1370:1-128:
+  assertion satisfied
+charity-test.l4:1371:1-105:
+  assertion satisfied
+charity-test.l4:1373:1-88:
+  assertion satisfied
+charity-test.l4:1378:1-119:
+  assertion satisfied
+charity-test.l4:1379:1-111:
+  assertion satisfied
+charity-test.l4:1380:1-104:
+  assertion satisfied
+charity-test.l4:1382:1-117:
+  assertion satisfied
+charity-test.l4:1383:1-109:
+  assertion satisfied
+charity-test.l4:1384:1-102:
+  assertion satisfied
+charity-test.l4:1385:1-111:
+  assertion satisfied
+charity-test.l4:1386:1-104:
+  assertion satisfied
+charity-test.l4:1388:1-108:
+  assertion satisfied
+charity-test.l4:1389:1-99:
+  assertion satisfied
+charity-test.l4:1392:1-126:
+  assertion satisfied
+charity-test.l4:1393:1-119:
+  assertion satisfied
+charity-test.l4:1395:1-131:
+  assertion satisfied
+charity-test.l4:1396:1-122:
+  assertion satisfied
+charity-test.l4:1400:1-78:
+  assertion satisfied
+charity-test.l4:1401:1-88:
+  assertion satisfied
+charity-test.l4:1402:1-79:
+  assertion satisfied
+charity-test.l4:1403:1-82:
+  assertion satisfied
+charity-test.l4:1404:1-85:
+  assertion satisfied
+charity-test.l4:1405:1-71:
+  assertion satisfied
+charity-test.l4:1406:1-82:
+  assertion satisfied
+charity-test.l4:1407:1-92:
+  assertion satisfied
+charity-test.l4:1408:1-101:
+  assertion satisfied
+charity-test.l4:1409:1-98:
+  assertion satisfied
+charity-test.l4:1411:1-90:
+  assertion satisfied
+charity-test.l4:1412:1-98:
+  assertion satisfied
+charity-test.l4:1413:1-96:
+  assertion satisfied
+charity-test.l4:1414:1-70:
+  assertion satisfied
+charity-test.l4:1415:1-83:
+  assertion satisfied
+charity-test.l4:1416:1-79:
+  assertion satisfied
+charity-test.l4:1417:1-81:
+  assertion satisfied
+charity-test.l4:1418:1-76:
+  assertion satisfied
+charity-test.l4:1419:1-83:
+  assertion satisfied
+charity-test.l4:1420:1-81:
+  assertion satisfied
+charity-test.l4:1421:1-83:
+  assertion satisfied
+charity-test.l4:1422:1-93:
+  assertion satisfied
+charity-test.l4:1428:1-78:
+  assertion satisfied

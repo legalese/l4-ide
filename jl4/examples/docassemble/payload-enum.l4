@@ -1,0 +1,79 @@
+-- M4 (spec §10): constructor payloads via docassemble `show if`.
+--
+-- `enum-triage.l4` is the nullary case, shipped at M1: an `IS ONE OF` whose
+-- constructors carry nothing rides as one `datatype: radio` question and the
+-- `CONSIDER` arms compile to `==` comparisons. This file is the case M1
+-- refused by name: constructors that CARRY something.
+--
+-- The idiom here is the one the corpus actually uses — the escape hatch
+-- (`refused HAS the stated reason IS A STRING`) and the qualified grant
+-- (`granted subject to conditions HAS the number of conditions IS A NUMBER`).
+-- Each payload becomes a FOLLOW-UP question gated on the radio answer, and
+-- the gate must be docassemble's `show if:` in its `{code: …}` spelling:
+--
+--   * the `{variable:, is:}` spelling is browser-side JavaScript only
+--     (parse.py:3998-4002 at 1b6678384 sets show_if_var/show_if_val and no
+--     showif_code), so the engine shows every field and an API/headless drive
+--     DEFINES them all — it cannot encode a constructor payload at all;
+--   * the `{code: …}` spelling is evaluated server-side (parse.py:6316-6325
+--     evals showif_code and sets extras['ok'][n] = False at 6320/6324), and a
+--     field it hides is left genuinely UNDEFINED — not '', not 0, not None.
+--
+-- Hence the two claims this file exists to test:
+--
+--   * the follow-up for the constructor that was NOT chosen is never asked;
+--   * and it never leaks a default into the computation — on the `granted`
+--     path a zero `number of conditions` must not be able to decide the
+--     `GREATER THAN 3` test, because on that path the test is not reached at
+--     all.
+--
+-- One hazard is baked into the shape: a `show if: {code: …}` that reads a
+-- variable set by a field in the SAME question is fatal (`DASourceError:
+-- Infinite loop: <var> already looked for`). The radio must therefore be its
+-- own, earlier question — probed against 1.10.7.
+
+DECLARE `Licensing Outcome` IS ONE OF
+    granted
+    `granted subject to conditions`
+        HAS `the number of conditions` IS A NUMBER
+    refused
+        HAS `the stated ground of refusal` IS A STRING
+
+DECLARE Decision
+    HAS
+      @desc What the licensing authority decided
+      `the outcome` IS A `Licensing Outcome`
+
+@export Whether an appeal lies against the licensing decision
+GIVEN d IS A Decision @desc The licensing decision under challenge
+GIVETH A BOOLEAN
+DECIDE `an appeal lies` d IF
+    CONSIDER d's `the outcome`
+    WHEN granted                        THEN FALSE
+    WHEN `granted subject to conditions` n THEN n GREATER THAN 3
+    WHEN refused                       g THEN NOT (g EQUALS "non-payment of the fee")
+
+-- An unconditional grant: nothing to appeal. Neither payload question may be
+-- asked on this path.
+#EVAL `an appeal lies` (Decision WITH `the outcome` IS granted)
+-- FALSE
+
+-- A grant on two conditions: within the tolerance, so no appeal. The NUMBER
+-- payload is asked; the STRING payload is not.
+#EVAL `an appeal lies` (Decision WITH `the outcome` IS `granted subject to conditions` OF 2)
+-- FALSE
+
+-- A grant on nine conditions: appealable.
+#EVAL `an appeal lies` (Decision WITH `the outcome` IS `granted subject to conditions` OF 9)
+-- TRUE
+
+-- Refused for non-payment: pay and re-apply, no appeal. The STRING payload is
+-- asked; the NUMBER payload is not — and must not arrive as 0, because a 0
+-- that reached `GREATER THAN 3` would be answering a question the law never
+-- put.
+#EVAL `an appeal lies` (Decision WITH `the outcome` IS refused OF "non-payment of the fee")
+-- FALSE
+
+-- Refused on the merits: appealable.
+#EVAL `an appeal lies` (Decision WITH `the outcome` IS refused OF "the premises are unsuitable")
+-- TRUE

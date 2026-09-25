@@ -1,0 +1,40 @@
+-- ADVERSARIAL PROBE for guard 2 of the M3 gate measurement. NOT corpus:
+-- it lives under etc/ precisely so it is not swept up by jl4-test's
+-- `examples/**` globs and does not need goldens.
+--
+-- The shape is the one that broke the first run of the measurement:
+--
+--     ((A AND C) OR B) AND D
+--
+-- an AND nested inside an OR nested inside an AND. `LSP.L4.Viz.Ladder` with
+-- shouldSimplify=True distributes that into CNF, `(A OR B) AND (C OR B) AND D`,
+-- which a lazy left-to-right walk costs at 3.125 questions -- while the emitted
+-- docassemble interview keeps the SOURCE shape and really costs 2.875. The
+-- error is one-directional (distribution can only ADD demands), so it inflated
+-- the declaration-order baseline and flattered the planner.
+--
+-- § 227.503(a)(7) and § 227.503(a)(8) of jl4/examples/legal/regcf/denovo have
+-- exactly this shape and are two of the eleven decisions the planner won on, so
+-- the bug lived where the result lived. The first run's guard 2 could not catch
+-- it: every interview it covered was a decision on which the two askers TIE.
+--
+-- Keep this probe in guard 2's case list. If a future change reintroduces a
+-- normalising step between the source and the measured baseline, this is the
+-- fixture that says so.
+DECLARE Probe
+    HAS
+      @desc A
+      `a` IS A BOOLEAN
+      @desc B
+      `b` IS A BOOLEAN
+      @desc C
+      `c` IS A BOOLEAN
+      @desc D
+      `d` IS A BOOLEAN
+
+@export Whether the probe holds
+GIVEN p IS A Probe @desc The probe subject
+GIVETH A BOOLEAN
+DECIDE `probe holds` p IF
+        ((p's `a` AND p's `c`) OR p's `b`)
+    AND p's `d`

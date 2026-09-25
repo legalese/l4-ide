@@ -1,0 +1,33 @@
+{
+  "note": [
+    "The context for the M1 XSD sequence-order pair. Both files in that pair are",
+    "the SAME model, so one cases file serves both: the positive control must",
+    "evaluate it cleanly, and the negative golden must never get that far because",
+    "Xerces rejects it on leg 1 (see the comment at the top of either .dmn).",
+    "",
+    "Supplying a context at all is what makes the positive control a real green:",
+    "with no context KIE reports the decision SKIPPED, and etc/kie-dmn-check",
+    "counts a SKIPPED decision as a failure -- so a contextless 'pass' here would",
+    "be indistinguishable from a harness that did nothing."
+  ],
+  "cases": [
+    {
+      "name": "A. a gold-tier subject",
+      "context": {
+        "tier": "gold"
+      },
+      "expect": {
+        "is_gold": true
+      }
+    },
+    {
+      "name": "B. a subject in another allowed tier",
+      "context": {
+        "tier": "bronze"
+      },
+      "expect": {
+        "is_gold": false
+      }
+    }
+  ]
+}

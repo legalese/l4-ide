@@ -33,7 +33,7 @@ import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as LspQueryPlan
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 
-import L4.EvaluateLazy (EvalConfig, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), prettyEvalException)
+import L4.EvaluateLazy (EvalConfig, resolveEvalConfig, EvalDirectiveResult(..), EvalDirectiveValue(..), prettyEvalException, prettyAssertionOutcome)
 import qualified L4.EvaluateLazy.GraphViz2 as GraphViz
 import L4.EvaluateLazy.GraphVizOptions (defaultGraphVizOptions)
 import L4.TracePolicy (replDefaultPolicy)
@@ -584,7 +584,7 @@ evalExpression st contextFile exprText = do
   let contextUri = normalizedFilePathToUri (toNormalizedFilePath contextFile)
   [mTc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck contextUri]
   originalContent <- case mTc of
-    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives tc.module')
+    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives (Print.restoreMixfixPatterns tc.mixfixRegistry tc.module'))
     Nothing -> do
       -- Fallback to raw text if typecheck failed
       mContent <- Shake.getVirtualFileText st.ideState contextUri
@@ -643,9 +643,10 @@ formatResults :: [EvalDirectiveResult] -> Text
 formatResults results = Text.unlines $ map formatResult results
 
 formatResult :: EvalDirectiveResult -> Text
-formatResult (MkEvalDirectiveResult _range res _trace) = case res of
-  Assertion True  -> "True (assertion passed)"
-  Assertion False -> "False (assertion failed)"
+formatResult (MkEvalDirectiveResult _range res _trace _ledger) = case res of
+  Assertion (Right True)  -> "True (assertion passed)"
+  Assertion (Right False) -> "False (assertion failed)"
+  Assertion (Left err)    -> "Error: " <> prettyAssertionOutcome (Left err)
   Reduction (Right nf) -> Print.prettyLayout nf
   Reduction (Left err) -> "Error: " <> Text.unlines (prettyEvalException err)
 
@@ -667,7 +668,7 @@ evalWithTrace st contextFile exprText = do
   let contextUri = normalizedFilePathToUri (toNormalizedFilePath contextFile)
   [mTc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck contextUri]
   originalContent <- case mTc of
-    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives tc.module')
+    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives (Print.restoreMixfixPatterns tc.mixfixRegistry tc.module'))
     Nothing -> do
       mContent <- Shake.getVirtualFileText st.ideState contextUri
       case mContent of
@@ -716,7 +717,7 @@ evalWithTraceAscii st contextFile exprText = do
   let contextUri = normalizedFilePathToUri (toNormalizedFilePath contextFile)
   [mTc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck contextUri]
   originalContent <- case mTc of
-    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives tc.module')
+    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives (Print.restoreMixfixPatterns tc.mixfixRegistry tc.module'))
     Nothing -> do
       mContent <- Shake.getVirtualFileText st.ideState contextUri
       case mContent of
@@ -752,10 +753,11 @@ formatAsciiTraceResults :: [EvalDirectiveResult] -> Text
 formatAsciiTraceResults results = Text.unlines $ map formatAsciiTraceResult results
 
 formatAsciiTraceResult :: EvalDirectiveResult -> Text
-formatAsciiTraceResult (MkEvalDirectiveResult _range res mtrace) =
+formatAsciiTraceResult (MkEvalDirectiveResult _range res mtrace _ledger) =
   let resultText = case res of
-        Assertion True  -> "Result: True (assertion passed)"
-        Assertion False -> "Result: False (assertion failed)"
+        Assertion (Right True)  -> "Result: True (assertion passed)"
+        Assertion (Right False) -> "Result: False (assertion failed)"
+        Assertion (Left err)    -> "Error: " <> prettyAssertionOutcome (Left err)
         Reduction (Right nf) -> "Result: " <> Print.prettyLayout nf
         Reduction (Left err) -> "Error: " <> Text.unlines (prettyEvalException err)
   in case mtrace of
@@ -773,12 +775,12 @@ formatTraceResults st exprText actualExpr mModule results = do
       pure $ Text.unlines messages
 
 formatTraceResult :: Module Resolved -> EvalDirectiveResult -> Text
-formatTraceResult mModule (MkEvalDirectiveResult _range _res mtrace) = case mtrace of
+formatTraceResult mModule (MkEvalDirectiveResult _range _res mtrace _ledger) = case mtrace of
   Nothing -> "(no trace available)"
   Just tr -> GraphViz.traceToGraphViz GraphViz.defaultGraphVizOptions (Just mModule) tr
 
 saveTraceResult :: ReplState -> Text -> Text -> Module Resolved -> TraceSink -> EvalDirectiveResult -> IO Text
-saveTraceResult st exprText actualExpr mModule sink result@(MkEvalDirectiveResult _ _ mtrace) =
+saveTraceResult st exprText actualExpr mModule sink result@(MkEvalDirectiveResult _ _ mtrace _ledger) =
   case mtrace of
     Nothing -> pure "(no trace available)"
     Just tr -> do
@@ -828,9 +830,11 @@ inlineSingleLine txt =
        else Text.intercalate " " nonEmpty
 
 summarizeEvalResult :: EvalDirectiveResult -> Text
-summarizeEvalResult (MkEvalDirectiveResult _range res _trace) = case res of
-  Assertion True  -> "True (assertion passed)"
-  Assertion False -> "False (assertion failed)"
+summarizeEvalResult (MkEvalDirectiveResult _range res _trace _ledger) = case res of
+  Assertion (Right True)  -> "True (assertion passed)"
+  Assertion (Right False) -> "False (assertion failed)"
+  Assertion (Left err)    ->
+    Text.intercalate "; " ("Error" : "assertion could not be evaluated" : prettyEvalException err)
   Reduction (Right nf) -> Print.prettyLayout nf
   Reduction (Left err)  ->
     Text.intercalate "; " ("Error" : prettyEvalException err)
@@ -936,7 +940,7 @@ getExpressionType st contextFile exprText = do
   let contextUri = normalizedFilePathToUri (toNormalizedFilePath contextFile)
   [mTc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck contextUri]
   originalContent <- case mTc of
-    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives tc.module')
+    Just tc -> pure $ Print.prettyLayout (filterIdeDirectives (Print.restoreMixfixPatterns tc.mixfixRegistry tc.module'))
     Nothing -> do
       -- Fallback to raw text if typecheck failed
       mContent <- Shake.getVirtualFileText st.ideState contextUri
@@ -962,7 +966,10 @@ getExpressionType st contextFile exprText = do
       -- Look for CheckInfo in the infos list - #CHECK adds the type as a CheckInfo
       let checkInfoTypes = [ty | MkCheckErrorWithContext (CheckInfo ty _) _ <- tc.infos]
       case checkInfoTypes of
-        (ty:_) -> pure $ Print.prettyLayout ty
+        -- Residual inference variables carry an edit-order-dependent gensym
+        -- (@res184@); render them as stable type-variable names (@a@, @b@, …)
+        -- exactly as #CHECK and hover do.
+        (ty:_) -> pure $ Print.prettyTypeForDisplay ty
         [] | not tc.success -> do
           -- Type error - report the first few errors
           let errors = tc.infos

@@ -126,6 +126,41 @@ export const Evaluator: LadderEvaluator = {
             shortCircuitedRoots: child.shortCircuitedRoots,
           }
         })
+        .with({ $type: 'Implies' }, async (expr) => {
+          // The seam (ladder DESIGN §25). The VALUE is the classical one — three-valued
+          // `¬scope ∨ requirement` — and this evaluator returns a value, so that is all
+          // it can say. It is the PICTURE that must not stop there: a vacuous TRUE means
+          // "the rule never bit", not "complies", and telling those apart is what
+          // ladder-core's two lamps are for. Nothing here can recover the distinction,
+          // which is exactly why the seam had to become a node rather than sugar.
+          const [scope, requirement] = await Promise.all([
+            eval_(expr.scope, intermediate),
+            eval_(expr.requirement, intermediate),
+          ])
+          const { result, shortCircuitedRoots } = evalOrChain(
+            [negate(scope.result), requirement.result],
+            [expr.scope.id, expr.requirement.id]
+          )
+
+          const finalIntermediate = combineIntermediates([
+            scope.intermediate,
+            requirement.intermediate,
+          ]).set(expr.id, result)
+
+          return {
+            result,
+            intermediate: finalIntermediate,
+            consultedUniques: unionSets([
+              scope.consultedUniques,
+              requirement.consultedUniques,
+            ]),
+            shortCircuitedRoots: unionSets([
+              shortCircuitedRoots,
+              scope.shortCircuitedRoots,
+              requirement.shortCircuitedRoots,
+            ]),
+          }
+        })
         .with({ $type: 'And' }, async (expr: And) => {
           const andResults = await Promise.all(
             expr.args.map((arg) => eval_(arg, intermediate))
@@ -253,6 +288,15 @@ export const Evaluator: LadderEvaluator = {
 /***************************
       AndChain, OrChain
 ****************************/
+
+/** Three-valued negation: unknown stays unknown. (The `Not` arm's rule, reusable.) */
+function negate(val: UBoolVal): UBoolVal {
+  return match(val)
+    .with(P.when(isTrueVal), () => new FalseVal())
+    .with(P.when(isFalseVal), () => new TrueVal())
+    .with(P.when(isUnknownVal), () => new UnknownVal())
+    .exhaustive()
+}
 
 function evalAndChain(bools: UBoolVal[], ids: IRId[]) {
   const firstFalse = bools.findIndex(isFalseVal)

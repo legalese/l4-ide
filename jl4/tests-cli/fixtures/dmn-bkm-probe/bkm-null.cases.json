@@ -1,0 +1,25 @@
+{
+  "note": [
+    "Cases for bkm-null.dmn (probe B3). 3 cases x 3 decisions = 9 value checks",
+    "per engine. Case C carries an EXPLICIT JSON null for `capped`, which is",
+    "what licenses a null answer in both harnesses; the two guarded decisions",
+    "must then answer -1 rather than null or an error."
+  ],
+  "cases": [
+    {
+      "name": "A. n = 3, under the cap",
+      "context": { "n": 3 },
+      "expect": { "capped": 30, "guarded": 31, "guarded_inline": 31 }
+    },
+    {
+      "name": "B. n = 10, the boundary; > 10 is false so still a value",
+      "context": { "n": 10 },
+      "expect": { "capped": 100, "guarded": 101, "guarded_inline": 101 }
+    },
+    {
+      "name": "C. n = 11, the BKM returns null",
+      "context": { "n": 11 },
+      "expect": { "capped": null, "guarded": -1, "guarded_inline": -1 }
+    }
+  ]
+}

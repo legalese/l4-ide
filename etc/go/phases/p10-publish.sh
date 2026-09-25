@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# P10 — publish.
+#
+# THIS STAGE IS SCAFFOLDED AND CANNOT RUN.
+#
+# It exists as an entry point so the pipeline's shape is visible and so that
+# asking for it yields a named blocker rather than a missing file. It is NOT a
+# member of either declared stage list, so its absence cannot make a run
+# INCOMPLETE, and it writes no receipt: a stage that did not run has
+# nothing to record.
+
+if [[ "${1:-}" == "--inputs" ]]; then
+  printf '%s\n' "${BASH_SOURCE[0]}"
+  exit 0
+fi
+
+cat >&2 <<'MSG'
+p10-publish: SCAFFOLDED AND CANNOT RUN.
+
+WHAT IT WOULD DO
+  Create the corpus-of-law repository, populate it with the encoding, the
+  projections and the conversion report, and either contribute to lexipedia
+  or publish the comparison note in its place.
+
+BLOCKER
+  Ruling R1 was RULED IN FULL on 2026-08-02: the repository is
+  legalese/canon — public from day one with inspectable gates and encoding
+  version numbers, sidecar class/instance layout, Apache-2.0 + carried
+  source-terms + optional CC-BY on prose. SPEC.md is explicit that
+  jl4/examples/ and experiments/ are NOT its long-term home. Ruling R2 was
+  ruled the same day (probe done; comparison note at G4; contact only with
+  a live page).
+
+  The repository now EXISTS — scaffolded 2026-08-02, public, holding
+  subjects/README.md and ZERO subjects. (An earlier version of this text
+  said "it does not exist yet"; that was written ten minutes before it was
+  created and stayed wrong afterwards. Creating it was the HG2 act; the
+  ruling named the repo, it did not create it.)
+
+  What remains blocked is DEPOSITING a subject into it. That is an
+  outward-facing write, so it is HG2's, and it opens on a signature or not
+  at all. This orchestrator therefore contains no code that can publish
+  anything, and this stage is where that absence is stated rather than
+  assumed.
+
+Nothing was written and no receipt was recorded.
+MSG
+exit 3

@@ -1,0 +1,100 @@
+{
+  "$type": "FunDecl",
+  "body": {
+    "$type": "And",
+    "args": [
+      {
+        "$type": "UBoolVar",
+        "atomId": "a5cd464e-b7c1-5e50-9afd-6965842b9386",
+        "canInline": false,
+        "id": {
+          "id": 3
+        },
+        "name": {
+          "label": "`person has capacity`",
+          "unique": 23
+        },
+        "typically": true,
+        "value": "UnknownV"
+      },
+      {
+        "$type": "Or",
+        "args": [
+          {
+            "$type": "UBoolVar",
+            "atomId": "e5ac8240-0124-50f5-a0be-b3fdd4cee33b",
+            "canInline": false,
+            "id": {
+              "id": 5
+            },
+            "name": {
+              "label": "b's `of age`",
+              "unique": 6
+            },
+            "typically": null,
+            "value": "UnknownV"
+          },
+          {
+            "$type": "UBoolVar",
+            "atomId": "f94522fa-cdea-5274-944d-99fdb5ba24c8",
+            "canInline": false,
+            "id": {
+              "id": 7
+            },
+            "name": {
+              "label": "`has parental approval`",
+              "unique": 29
+            },
+            "typically": false,
+            "value": "UnknownV"
+          },
+          {
+            "$type": "UBoolVar",
+            "atomId": "6326bf0e-555f-51cc-8c60-8f958d7825c5",
+            "canInline": false,
+            "id": {
+              "id": 8
+            },
+            "name": {
+              "label": "`has spousal approval`",
+              "unique": 27
+            },
+            "typically": false,
+            "value": "UnknownV"
+          }
+        ],
+        "id": {
+          "id": 4
+        }
+      }
+    ],
+    "id": {
+      "id": 2
+    }
+  },
+  "id": {
+    "id": 1
+  },
+  "name": {
+    "label": "`may purchase alcohol`",
+    "unique": 25
+  },
+  "params": [
+    {
+      "label": "b",
+      "unique": 26
+    },
+    {
+      "label": "`has spousal approval`",
+      "unique": 27
+    },
+    {
+      "label": "`beer only`",
+      "unique": 28
+    },
+    {
+      "label": "`has parental approval`",
+      "unique": 29
+    }
+  ]
+}

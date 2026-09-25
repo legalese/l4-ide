@@ -1,0 +1,41 @@
+-- REFUSED (M4): two constructors of one enum carrying a payload field of the
+-- same name.
+--
+-- M4 hoists a constructor payload to a SIBLING attribute of the record that
+-- holds the enum: `d.the outcome`'s payload lands at `d.the reason`, because a
+-- payload qualifies the enum ANSWER and so rides beside it. That makes an
+-- idiomatic ADT — two constructors that each carry a `reason` — two questions
+-- writing one docassemble variable.
+--
+-- It has always been a hard error; what this fixture pins is that it is
+-- reported as a NAME COLLISION and not as an `internal id collision`. The two
+-- blocks carry an identical ("question", L4 label) pair, so the collision check
+-- used to fold them to one entry and say nothing, and the block-id dedup fired
+-- instead — with a message this module's own source calls misleading, which
+-- names a block id and neither of the two definitions to rename.
+--
+-- The same shape covers a payload field colliding with a REAL record field of
+-- the same name; both are one L4 name used twice, not two names sanitising
+-- together.
+
+DECLARE Outcome IS ONE OF
+    granted
+    refused  HAS `the reason` IS A STRING
+    deferred HAS `the reason` IS A STRING
+
+DECLARE Decision
+    HAS
+      @desc The outcome of the application
+      `the outcome` IS AN Outcome
+
+@export whether the decision is final
+GIVEN d IS A Decision @desc The decision under assessment
+GIVETH A BOOLEAN
+`final` d MEANS
+    CONSIDER d's `the outcome`
+    WHEN granted     THEN TRUE
+    WHEN refused  OF r THEN FALSE
+    WHEN deferred OF r THEN FALSE
+
+#EVAL `final` OF Decision WITH `the outcome` IS granted
+-- TRUE

@@ -209,6 +209,18 @@ So the rule above renders as _"The greater of means the greater of x and y"_ in
 its own definition, and a call `` `the greater of` `start date` `end date` ``
 renders as _"the greater of the start date and the end date"_.
 
+A slot is **tight**: `%amount%`, with no spaces inside the delimiters. That is
+what keeps a written-out percentage from being mistaken for one. In
+
+```l4
+@nlg a 5% levy on %amount%
+```
+
+the `%` after `5` is ordinary text, because `% levy on %` has spaces inside it
+and so is not a slot; `%amount%` still is one. Where a percent sign would end up
+flush against a word — `5%levy` — wrap it in backticks (`` `5%` ``) or spell it
+out ("5 percent"), either of which puts it beyond doubt.
+
 ### It replaces the implementation
 
 A function with an `@nlg` renders **as its sentence**, not as its body. This is
@@ -240,6 +252,99 @@ which is eligible holds"_ instead of exposing the recursion.
   cost (it can drift from the logic), so reserve it for where it earns its keep.
 - One sentence per definition. If you need branching prose, let the structure
   (`CONSIDER`/`IF`) render and annotate the leaves.
+
+---
+
+## Literal recitals — carrying prose that isn't computed
+
+The levers above get _computed_ logic to read as prose. But parts of a legal
+document aren't logic at all — recitals, the preamble, the WHEREAS clauses.
+Their job is to be carried verbatim and numbered, not evaluated. For these,
+reach for the `hierarchy` library: a recital outline is a tree of **strings**
+(`item "…"`), authored as a bullet list and rendered with automatic numbering.
+
+Each item is just text — never evaluated — so a recital may say anything,
+including wording that would not be valid L4 logic. Mark each item with a **`•`**
+bullet and nest by indenting deeper (see [Bullet lists](#bullet-lists) below).
+
+```l4
+IMPORT hierarchy
+
+`recital scheme` MEANS LIST UpperAlpha, Decimal, LowerRoman
+
+`recitals` MEANS
+  item "RECITALS"
+    • item "the Company is engaged in the business of software development;"
+    • item "the Consultant has expertise in legal engineering; and"
+    • item "the parties wish to record the terms of their engagement, namely"
+      • item "the scope of services;"
+      • item "the fees payable; and"
+      • item "the term and termination."
+
+#EVAL `render outline` `recital scheme` `recitals`
+```
+
+renders the heading verbatim and numbers the rest by depth — `A`, `B`,
+`C`, then `C.1`, `C.2`, …:
+
+```
+RECITALS
+A      the Company is engaged in the business of software development;
+B      the Consultant has expertise in legal engineering; and
+C      the parties wish to record the terms of their engagement, namely
+C.1    the scope of services;
+C.2    the fees payable; and
+C.3    the term and termination.
+```
+
+You pick the numbering _style_ per depth (`recital scheme` above is upper-alpha,
+then decimal, then lower-roman); the renderer assigns the actual markers. When
+drafting needs an irregular sequence — an inserted "2A", a restart — `labeled`,
+`numbered`, and `restartAt` pin or reset a marker without disturbing its
+neighbours.
+
+The contrast with the rest of this guide is the point: `@nlg` renders prose
+_from_ logic; recitals are prose that simply _is_. Use names + shape + `@nlg`
+for the operative clauses, and `hierarchy` outlines for the narrative scaffolding
+around them.
+
+### Bullet lists
+
+A `•` followed by a space and a same-line body opens a list element; a block
+of `•` items aligned at a common column desugars to an ordinary `LIST`
+(conventionally written at the start of a line, though that's a style
+convention, not an enforced rule):
+
+```l4
+DECIDE xs IS
+  • 1
+  • 2
+  • 3          -- == LIST 1, 2, 3
+```
+
+`•` was chosen deliberately: it has no other meaning in L4 (unlike `-`, which is
+subtraction), so it is unambiguous everywhere — including in **argument
+position**. That is what lets bullet children nest under a constructor with no
+`LIST` and no parentheses: `• item "a"` under `item "Parent"` makes `"a"` a
+_child_ of the parent (feeding the arity-overloaded `item txt kids`
+constructor), to any depth. The element itself is any expression, so every
+outline constructor — `item`, `labeled`, `numbered`, `restartAt` — works per
+line.
+
+**Indentation.** A child bullet lines up directly under its parent's content —
+the `item` word, which the `• ` marker sits two columns to the left of:
+
+```l4
+item "Parent"
+  • item "Sub"
+    • item "child"     -- the child '•' sits under the parent's `item`
+```
+
+Any deeper indent works too; under the parent's text is the natural choice (and
+matches how a sub-list reads in Markdown).
+
+(Yes, `•` is awkward to type; bind it to a snippet or keyboard shortcut in your
+editor. The unambiguity is worth it.)
 
 ---
 

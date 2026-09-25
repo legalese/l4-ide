@@ -1,0 +1,109 @@
+IMPORT prelude
+IMPORT daydate
+
+-- M4 (spec §10): date literals and calendar-exact date arithmetic.
+--
+-- Statutory age is the case where docassemble's convenient idiom is WRONG.
+-- `date_difference(starting=…, ending=…).years` is
+-- `(delta.days + delta.seconds/86400.0) / 365.2425` — elapsed days over the
+-- MEAN GREGORIAN YEAR, as a float (dates.py:482 at 1b6678384). Swept over
+-- every birth date from 1970-01-01 to 2006-12-31, each tested on the L4
+-- majority date and the day before — 13,514 birth dates, 27,028 comparisons —
+-- it disagrees with the L4 oracle on 6,629 of them, always by reporting
+-- 17.999 on the person's own eighteenth birthday. It denies majority on the
+-- one day that decides it. The first #EVAL below is one of those 6,629:
+-- date_difference(2001-03-01 -> 2019-03-01).years is 17.99900.
+--
+-- The sound idiom builds the birthday and compares dates. That is what this
+-- module says, and what the emitted Python must say.
+--
+-- THE LEAP-DAY DIVERGENCE, deliberately pinned. L4's `Date d m y` is the
+-- LENIENT constructor: `Date 29 2 2022` ROLLS FORWARD to 2022-03-01 (probed).
+-- Python's dateutil `relativedelta`, which is what `DADateTime.plus(years=18)`
+-- uses, CLAMPS BACK: 2004-02-29 plus 18 years is 2022-02-28. So a lowering
+-- that reaches for `.plus(years=…)` and stops there answers the third #EVAL
+-- below TRUE where L4 answers FALSE. Whether a leap-day child comes of age on
+-- 28 February or 1 March is a question of law, not of libraries; what is not
+-- open is that the emitted interview must agree with the L4 the lawyer read.
+--
+-- THE LITERAL. `YMD 2015 4 1` is a date literal, and the only sound way for
+-- one to enter a docassemble interview is `as_datetime('2015-04-01')`: a
+-- `datatype: date` answer is stored as `as_datetime(<submitted string>)`
+-- (webapp interview/views.py:1372), i.e. a tz-aware DADateTime, and comparing
+-- a DADateTime against a bare string raises TypeError (executed). The failure
+-- is loud, not silent — but it is certain.
+
+DECLARE Applicant
+    HAS
+      @desc The applicant's date of birth
+      `date of birth` IS A DATE
+      @desc The date on which the application is assessed
+      `the assessment date` IS A DATE
+
+@export Whether the applicant may hold a licence on the assessment date
+GIVEN a IS AN Applicant @desc The applicant for a licence
+GIVETH A BOOLEAN
+DECIDE `the applicant may hold a licence` a IF
+        `the scheme is in force`
+    AND `the applicant is of full age`
+ WHERE
+    -- The literal: the scheme commenced on 1 April 2015.
+    `the scheme is in force` MEANS
+        YMD 2015 4 1 AT MOST a's `the assessment date`
+
+    -- Calendar-exact: build the eighteenth birthday, then compare dates.
+    -- Never elapsed-days-over-365.2425.
+    `the applicant is of full age` MEANS
+        `the eighteenth birthday` AT MOST a's `the assessment date`
+
+    `the eighteenth birthday` MEANS
+        Date (DATE_DAY   (a's `date of birth`))
+             (DATE_MONTH (a's `date of birth`))
+             ((DATE_YEAR (a's `date of birth`)) PLUS 18)
+
+-- ON the eighteenth birthday. `date_difference(...).years` reports 17.99900
+-- here and would refuse the licence.
+#EVAL `the applicant may hold a licence` OF
+        Applicant WITH
+            `date of birth`       IS YMD 2001 3 1
+            `the assessment date` IS YMD 2019 3 1
+-- TRUE
+
+-- The day before. Both idioms agree; this is the control.
+#EVAL `the applicant may hold a licence` OF
+        Applicant WITH
+            `date of birth`       IS YMD 2001 3 1
+            `the assessment date` IS YMD 2019 2 28
+-- FALSE
+
+-- LEAP DAY, the divergence. L4 rolls 29 February 2022 forward to 1 March, so
+-- the applicant is not yet of full age on 28 February. dateutil would clamp to
+-- 28 February and say TRUE.
+#EVAL `the applicant may hold a licence` OF
+        Applicant WITH
+            `date of birth`       IS YMD 2004 2 29
+            `the assessment date` IS YMD 2022 2 28
+-- FALSE
+
+-- The same leap-day applicant, one day later.
+#EVAL `the applicant may hold a licence` OF
+        Applicant WITH
+            `date of birth`       IS YMD 2004 2 29
+            `the assessment date` IS YMD 2022 3 1
+-- TRUE
+
+-- Month-end boundary: 31 January is 31 January eighteen years later, under
+-- both idioms. The control for the leap-day case.
+#EVAL `the applicant may hold a licence` OF
+        Applicant WITH
+            `date of birth`       IS YMD 2001 1 31
+            `the assessment date` IS YMD 2019 1 31
+-- TRUE
+
+-- Of full age, but assessed before the scheme commenced. This is the literal's
+-- own test: drop `YMD 2015 4 1` and this case silently flips.
+#EVAL `the applicant may hold a licence` OF
+        Applicant WITH
+            `date of birth`       IS YMD 1990 1 1
+            `the assessment date` IS YMD 2014 1 1
+-- FALSE

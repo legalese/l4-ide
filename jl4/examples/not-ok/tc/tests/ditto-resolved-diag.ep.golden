@@ -1,0 +1,13 @@
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: ditto-resolved-diag.l4
+  Hidden: no
+  Range: 7:13-7:14
+  Source: parser
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+      |
+    7 | huh MEANS   ^
+      |             ^
+    unexpected ^ (resolved to PLUS)
+    expecting (, AT, ATTEST, BRANCH, BREACH, COMMIT, CONCAT, CONSIDER, ENV, FETCH, Float Literal, GIVEN, IF, LET, LIST, NOT, Numeric Literal, PARTY, POST, RECALL, RECORD, String Literal, identifier, space token, or •

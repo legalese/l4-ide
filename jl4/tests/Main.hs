@@ -3,6 +3,7 @@ module Main (main) where
 
 import Base
 import Control.Monad.Trans.Maybe
+import Data.Char (isAlphaNum)
 import qualified Data.Aeson.Encode.Pretty as AP
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.List as List
@@ -16,7 +17,10 @@ import qualified L4.Export as Export
 import L4.JsonSchema (SchemaContext (..))
 import qualified L4.JsonSchema as JsonSchema
 import qualified L4.Nlg as Nlg
+import L4.DirectiveFilter (filterIdeDirectives)
+import L4.Parser (execProgramParserWithHintPass)
 import qualified L4.Parser.SrcSpan as JL4
+import L4.Print (prettyLayout, restoreMixfixPatterns)
 import L4.Syntax
 import qualified L4.TypeCheck as JL4
 
@@ -25,27 +29,47 @@ import qualified Paths_jl4_core
 
 import qualified Base.Text as Text
 import qualified LSP.Core.Shake as Shake
-import LSP.L4.Oneshot (oneshotL4ActionAndErrors)
+import LSP.Core.Types.Diagnostics (FileDiagnostic (..))
+import LSP.L4.Oneshot (oneshotL4ActionAndDiagnostics, oneshotL4ActionAndErrors)
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types
 import Optics
+import System.Directory (XdgDirectory (XdgData), getXdgDirectory)
+import System.Environment (getExecutablePath, lookupEnv, setEnv)
 import System.FilePath
 import System.FilePath.Glob
 import System.IO.Silently
 import Test.Hspec
+import Text.Read (readMaybe)
 import Test.Hspec.Golden
 import qualified Regex.Text as RE
 import qualified Data.CharSet as CharSet
 import qualified System.OsPath as OsPath
 import LSP.L4.Rules
 
+import qualified BpmnExport
 import qualified Hover
 import qualified SemanticTokens
+import qualified VizAutoRefresh
+import qualified VizImplies
+import qualified VizGuardedRows
+import qualified DmnExport
+import qualified RelationalExport
 
 main :: IO ()
 main = do
   dataDir <- Paths_jl4.getDataDir
   dataDirCore <- Paths_jl4_core.getDataDir
+  -- Make the golden suite self-sufficient under a bare `cabal test`: point
+  -- library resolution at the bundled core libraries unless the caller has
+  -- already chosen a store. Without this, examples that IMPORT a library (e.g.
+  -- actus-library-test) fail locally because embedded transitive resolution is
+  -- incomplete. CI already exports JL4_LIBRARY_PATH, so this only restores
+  -- local/CI parity; an explicit setting is respected.
+  mLibEnv <- lookupEnv "JL4_LIBRARY_PATH"
+  case mLibEnv of
+    Just _  -> pure ()
+    Nothing -> setEnv "JL4_LIBRARY_PATH" (dataDirCore </> "libraries")
   envFixed <- JL4Lazy.readFixedNowEnv
   let fallbackNow =
         fromMaybe (error "Internal: invalid fallback timestamp for JL4 tests")
@@ -61,12 +85,66 @@ main = do
   nlgFailsFiles <- sort <$> globDir1 (compile "not-ok/nlg/**/*.l4") examplesRoot
   semanticTokenFiles <- sort <$> globDir1 (compile "lsp/semantic-tokens/**/*.l4") examplesRoot
   hoverFiles <- sort <$> globDir1 (compile "lsp/hover/**/*.l4") examplesRoot
+  -- Top-level not-ok/ fixtures, missed by the not-ok/tc and not-ok/nlg globs.
+  -- The export-*.l4 files typecheck fine but assert (via their schema golden)
+  -- that an @export in an unsupported position yields no default export.
+  -- (empty.l4 used to live here while warnings still failed typecheck; now
+  -- that only SError blocks 'SuccessfulTypeCheck', it lives in ok/.)
+  exportPlacementFiles <- sort <$> globDir1 (compile "not-ok/export-*.l4") examplesRoot
+  -- The unresolvable-IMPORT diagnostic (smucclaw/l4-ide#971). Its own glob
+  -- rather than the whole directory, so that a library placed beside an
+  -- importer later can stay out of every glob. These two import a module that
+  -- exists nowhere, so they need no neighbour at all.
+  importUnresolvedFiles <- sort <$> globDir1 (compile "not-ok/import/unresolved-*.l4") examplesRoot
   hspec do
+    describe "corpus sanity (every glob matched something)" $ do
+      let corpusNonEmpty nm xs = it (nm <> " corpus is non-empty") $ xs `shouldSatisfy` (not . null)
+      corpusNonEmpty "ok"              okFiles
+      corpusNonEmpty "libraries"       librariesFiles
+      corpusNonEmpty "legal"           legalFiles
+      corpusNonEmpty "tc-fails"        tcFailsFiles
+      corpusNonEmpty "nlg-fails"       nlgFailsFiles
+      corpusNonEmpty "semantic-tokens" semanticTokenFiles
+      corpusNonEmpty "hover"           hoverFiles
+      corpusNonEmpty "export-placement" exportPlacementFiles
+      corpusNonEmpty "import-unresolved" importUnresolvedFiles
     describe "ok files" $ tests evalConfig (True, True) (okFiles <> legalFiles <> librariesFiles) examplesRoot
+    -- Invariant: exactprint is the identity on the source for every parseable
+    -- corpus file. This is the single guard against the whole class of
+    -- format-mangling bugs (mixfix/event reordering, dropped TIMEZONE/DECIDE
+    -- tokens, duplicated UNLESS, re-escaped unicode). Unlike the per-file
+    -- ".ep.golden" test — which blesses whatever exactprint currently emits, so
+    -- it silently records mangled output — this compares against the verbatim
+    -- source and so cannot bless a regression.
+    describe "exactprint identity (source round-trips l4 format)" $
+      forM_ (okFiles <> legalFiles <> librariesFiles) $ \inputFile ->
+        it (makeRelative examplesRoot inputFile) $
+          jl4ExactPrintIdentity evalConfig inputFile
+    -- Invariant: the *other* printer round-trips too. `l4 batch` (and the REPL)
+    -- reconstruct a module by running the typechecked AST through
+    -- 'filterIdeDirectives' and 'prettyLayout', then re-parsing the result; if
+    -- that text does not parse, the command fails before it evaluates anything
+    -- (smucclaw/l4-ide#932). Unlike exactprint this path has no golden at all,
+    -- so it is asserted as a property over the whole corpus rather than on a
+    -- fixture: exactly the files the "ok files" block typechecks.
+    describe "prettyLayout round-trip (filter -> print -> parse; #932)" $
+      forM_ (okFiles <> legalFiles <> librariesFiles) $ \inputFile ->
+        it (makeRelative examplesRoot inputFile) $
+          jl4PrettyLayoutRoundTrip evalConfig inputFile
     describe "tc fails" $ tests evalConfig (False, True) tcFailsFiles examplesRoot
+    describe "unresolvable IMPORT (#971)" $
+      tests evalConfig (False, True) importUnresolvedFiles examplesRoot
     describe "nlg fails" $ tests evalConfig (True, False) nlgFailsFiles examplesRoot
+    describe "export placement (typechecks; no default export)" $
+      tests evalConfig (True, True) exportPlacementFiles examplesRoot
     describe "lsp" $ SemanticTokens.semanticTokenTests evalConfig semanticTokenFiles examplesRoot
     describe "lsp hover" $ Hover.hoverTests evalConfig hoverFiles examplesRoot
+    describe "viz" VizAutoRefresh.spec
+    describe "viz implies" VizImplies.spec
+    describe "viz guarded rows" VizGuardedRows.spec
+    DmnExport.spec examplesRoot
+    RelationalExport.spec examplesRoot
+    describe "bpmn export" BpmnExport.spec
   where
     tests evalConfig (tcOk, nlgOk) files root =
       forM_ files $ \inputFile -> do
@@ -74,7 +152,7 @@ main = do
         let goldenDir = takeDirectory inputFile </> "tests"
         describe testCase $ do
           it "parses and checks" $
-            l4Golden evalConfig tcOk goldenDir inputFile
+            l4Golden evalConfig tcOk root goldenDir inputFile
           it "exactprints" $
             jl4ExactPrintGolden evalConfig goldenDir inputFile
           it "natural language annotations" $
@@ -82,19 +160,89 @@ main = do
           it "json schema" $
             jl4JsonSchemaGolden evalConfig goldenDir inputFile
 
-l4Golden :: JL4Lazy.EvalConfig -> Bool -> String -> String -> IO (Golden String)
-l4Golden evalConfig isOk dir inputFile = do
+l4Golden :: JL4Lazy.EvalConfig -> Bool -> String -> String -> String -> IO (Golden String)
+l4Golden evalConfig isOk examplesRoot dir inputFile = do
   (output, _) <- capture (checkFile evalConfig isOk inputFile)
+  scrubPaths <- mkPathScrubber examplesRoot
+  let normalize = scrubPaths . normalizeWhitespaceString . stripAnsiCodesString
   pure
     Golden
-      { output = normalizeWhitespaceString $ stripAnsiCodesString output
+      { output = normalize output
       , encodePretty = show
       , writeToFile = writeFile
-      , readFromFile = fmap (normalizeWhitespaceString . stripAnsiCodesString) . readFile
+      , readFromFile = fmap normalize . readFile
       , goldenFile = dir </> (takeFileName inputFile -<.> "golden")
       , actualFile = Just (dir </> (takeFileName inputFile -<.> "actual"))
       , failFirstTime = True
       }
+
+-- | Build a scrubber that replaces the two absolute, machine-specific path
+-- prefixes that reach golden output with stable tokens, so goldens capturing
+-- import-resolution logs like @Found on filesystem: <abspath>@ are portable
+-- across machines and CI.
+--
+-- There are TWO such prefixes and scrubbing only one is not enough:
+--
+--   * @JL4_LIBRARY_PATH@ -> @$JL4_LIBRARY_PATH@, for an import resolved out of
+--     the stdlib. In jl4-test the variable is always set (see 'main').
+--   * the examples root -> @$JL4_EXAMPLES@, for a candidate built
+--     /importer-relative/ — one corpus file importing its neighbour, or the
+--     importer-relative line of the not-found list below. Upstream nothing
+--     scrubbed this until 2026-09-08, when the first goldens to capture such a
+--     resolution were committed with a developer\'s own worktree path baked
+--     in. They passed on that machine, deterministically, and failed in CI,
+--     whose checkout lives at @/__w/l4-ide/l4-ide@ — a green local run is
+--     structurally unable to catch this, so the scrub belongs here rather than
+--     in a reviewer\'s eye.
+--
+--   * the XDG data store and the executable's own directory, for a module that
+--     resolves NOWHERE. The not-found diagnostic lists every tier it probed, and
+--     two of those tiers are machine-global: @$XDG_DATA_HOME\/jl4\/libraries@ and
+--     @<exeDir>\/..\/..\/libraries@ (the VSCode bundle). So the moment a golden
+--     captures an unresolvable IMPORT it captures a home directory and a
+--     dist-newstyle path -- which is why nothing could be goldened for
+--     smucclaw\/l4-ide#971 until these two were scrubbed. Both are computed here
+--     exactly as 'LSP.L4.Rules.resolveLibrary' computes them, in this same
+--     process, so they cannot drift from what the resolver printed.
+--
+-- Each replacement is a no-op when its prefix is empty.
+mkPathScrubber :: String -> IO (String -> String)
+mkPathScrubber examplesRoot = do
+  mp <- lookupEnv "JL4_LIBRARY_PATH"
+  xdgJl4 <- getXdgDirectory XdgData "jl4"
+  exeDir <- takeDirectory <$> getExecutablePath
+  let sub prefix token
+        | null prefix = id
+        | otherwise = Text.unpack . Text.replace (Text.pack prefix) token . Text.pack
+      -- TWO SPELLINGS of each directory are scrubbed, because two reach the
+      -- output. The candidate paths the resolver builds from its root directory
+      -- keep whatever spelling 'examplesRoot' has; the importer-relative
+      -- candidate is built from 'fromNormalizedFilePath', which is
+      -- 'System.FilePath.normalise'. The not-found diagnostic lists every tier,
+      -- so it prints both -- and a scrubber that knew only one of them left the
+      -- other absolute. Measured 2026-09-21: the first golden ever to capture an
+      -- unresolvable IMPORT came out with "$JL4_EXAMPLES/not-ok/import/..." on
+      -- one line and the developer's own "/Users/.../jl4/examples/not-ok/..." on
+      -- the next, which is CLAUDE.md §3.1.1's forever-green-here,
+      -- forever-red-in-CI trap. The two spellings differed by a "/./" that
+      -- `normalise` removes, which is why scrubbing both fixes it.
+      --
+      -- 'null' is checked before 'normalise', which turns "" into "." -- a
+      -- prefix that would match a dot anywhere in the output.
+      spellings p
+        | null p = []
+        | otherwise = List.nub [p, normalise p]
+      -- Longest prefix first. None of these nests inside another on any layout we
+      -- build in today, but if one ever does, substituting the shorter one first
+      -- would leave the longer one half-replaced -- and a half-scrubbed golden is
+      -- machine-specific again while looking scrubbed.
+      subs = List.sortOn (negate . length . fst) $ concat
+        [ [ (p, "$JL4_LIBRARY_PATH") | p <- spellings (fromMaybe "" mp) ]
+        , [ (p, "$JL4_EXAMPLES")     | p <- spellings examplesRoot ]
+        , [ (p, "$EXE_DIR")          | p <- spellings exeDir ]
+        , [ (p, "$XDG_DATA_JL4")     | p <- spellings xdgJl4 ]
+        ]
+  pure $ \ txt -> foldl' (\ acc (prefix, token) -> sub prefix token acc) txt subs
 
 jl4ExactPrintGolden :: JL4Lazy.EvalConfig -> String -> String -> IO (Golden Text)
 jl4ExactPrintGolden evalConfig dir inputFile = do
@@ -117,6 +265,161 @@ jl4ExactPrintGolden evalConfig dir inputFile = do
       , actualFile = Just (dir </> (takeFileName inputFile -<.> "ep.actual"))
       , failFirstTime = True
       }
+
+-- | Assert @exactprint (parse f) == f@: the exact-printer reproduces the source
+-- byte-for-byte. Runs the same 'Rules.ExactPrint' rule that @l4 format@ uses and
+-- compares to the verbatim file contents (no whitespace normalisation — that is
+-- the whole point). On mismatch we report the first differing line so failures
+-- stay legible instead of dumping the whole file.
+jl4ExactPrintIdentity :: JL4Lazy.EvalConfig -> FilePath -> IO ()
+jl4ExactPrintIdentity evalConfig inputFile = do
+  (errs, moutput) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+    let uri = normalizedFilePathToUri nfp
+    _ <- Shake.addVirtualFileFromFS nfp
+    Shake.use Rules.ExactPrint uri
+  src <- Text.readFile inputFile
+  case moutput of
+    Nothing ->
+      expectationFailure $
+        "exactprint produced no output for " <> inputFile <> ":\n"
+          <> Text.unpack (Text.unlines errs)
+    Just out
+      | out == src -> pure ()
+      | otherwise ->
+          expectationFailure $
+            "exactprint is not the identity for " <> inputFile
+              <> firstDiff (Text.lines src) (Text.lines out)
+  where
+    firstDiff ss os =
+      let n      = max (length ss) (length os)
+          pad xs = xs <> replicate (n - length xs) ""
+          diffs  = [ (i, s, o)
+                   | (i, s, o) <- zip3 [1 :: Int ..] (pad ss) (pad os)
+                   , s /= o ]
+      in case diffs of
+        [] -> " (line contents match; differ only in trailing newline / length: "
+                <> show (length ss) <> " vs " <> show (length os) <> " lines)"
+        ((i, s, o) : _) ->
+          "\n  first difference at line " <> show i
+            <> "\n  source:    " <> show s
+            <> "\n  exactprint:" <> show o
+
+-- | Assert @parse (prettyLayout (filterIdeDirectives (typecheck f)))@ succeeds:
+-- the AST pretty-printer emits source the layout parser accepts. This is the
+-- exact pipeline of @jl4/app/L4/Cli/Batch.hs@ (typecheck, filter, print, write
+-- the text to @<file>.batchN.l4@, re-run the front end on it), so a failure here
+-- is a failure of @l4 batch@ on that file. We stop at the parser because the
+-- reported defect is a parser diagnostic; a stricter re-typecheck would fold in
+-- unrelated name-resolution questions.
+jl4PrettyLayoutRoundTrip :: JL4Lazy.EvalConfig -> FilePath -> IO ()
+jl4PrettyLayoutRoundTrip evalConfig inputFile = do
+  (errs, mtc) <- oneshotL4ActionAndErrors evalConfig inputFile \nfp -> do
+    let uri = normalizedFilePathToUri nfp
+    _ <- Shake.addVirtualFileFromFS nfp
+    Shake.use Rules.SuccessfulTypeCheck uri
+  case mtc of
+    Nothing ->
+      expectationFailure $
+        "typecheck produced no module for " <> inputFile <> ":\n"
+          <> Text.unpack (Text.unlines errs)
+    Just tc -> do
+      -- restoreMixfixPatterns first: without it the printer emits only a
+      -- mixfix name's head keyword and two operators sharing one collapse
+      -- together (smucclaw/l4-ide#967).
+      let printed = prettyLayout (filterIdeDirectives (restoreMixfixPatterns tc.mixfixRegistry tc.module'))
+          printUri = toNormalizedUri (Uri "file:///pretty-layout-roundtrip")
+      -- Debugging affordance: prettyLayout output for a corpus module runs to
+      -- thousands of columns, so the inline excerpt below is rarely enough to
+      -- diagnose a layout failure. Point JL4_PRETTY_DUMP_DIR at a scratch
+      -- directory to get the whole emitted module written out for inspection
+      -- (it is then a plain .l4 file you can run `l4 check` on).
+      mDump <- lookupEnv "JL4_PRETTY_DUMP_DIR"
+      for_ mDump $ \d ->
+        Text.writeFile (d </> takeFileName inputFile <> ".pl.l4") printed
+      -- Second affordance, for the property this one does NOT assert:
+      -- EVALUATION equality. `JL4_EVALDIFF=1` writes the UNFILTERED print (the
+      -- directives kept, so `#EVAL`/`#ASSERT` still fire) next to each source
+      -- file, at `<file>.evaldiff.l4`. Next to it, and not in a scratch dir,
+      -- because a printed module has to resolve the same IMPORTs. Then
+      -- `l4 run` both and compare the `Result:` blocks; see CLAUDE.md §3.2 for
+      -- the loop and the cleanup, which you MUST run — these files are inside
+      -- the corpus globs and a later run would try to golden them.
+      mEvalDiff <- lookupEnv "JL4_EVALDIFF"
+      for_ mEvalDiff $ \_ ->
+        Text.writeFile (inputFile <> ".evaldiff.l4") (prettyLayout (restoreMixfixPatterns tc.mixfixRegistry tc.module'))
+      -- No gensym may reach the output. Every inference variable in the
+      -- type-checked module is rendered exactly as `seed <> uniq` by the
+      -- 'Type'' printer, so we can name the forbidden strings precisely rather
+      -- than pattern-matching on "looks like an identifier ending in digits" —
+      -- which would false-positive on `identity1`, `const1a`, `s24`.
+      let leaked = leakedInfVars tc.module' printed
+      unless (null leaked) $
+        expectationFailure $
+          "prettyLayout leaked an inference variable (gensym) for " <> inputFile
+            <> "\n--- leaked ---\n"
+            <> unlines [ "  " <> Text.unpack v | v <- leaked ]
+      case execProgramParserWithHintPass printUri printed of
+        Left perrs ->
+          expectationFailure $
+            "prettyLayout output did NOT re-parse for " <> inputFile
+              <> "\n--- parser errors ---\n"
+              <> show perrs
+              <> "\n--- printed (offending lines) ---\n"
+              <> Text.unpack (offending printed perrs)
+        -- Parsing is necessary but not sufficient: `l4 batch` re-runs the whole
+        -- front end on the printed text, and a printer that drops brackets can
+        -- produce source that parses into a DIFFERENT tree. (`f OF x AND y`
+        -- re-parses as `f OF (x AND y)`.) So the printed module must also
+        -- type-check, from the ORIGINAL file's directory, exactly as batch
+        -- places its `<file>.batchN.l4`.
+        Right _ -> do
+          let virtualPath = inputFile <> ".prettylayout.l4"
+          (errs2, mtc2) <- oneshotL4ActionAndErrors evalConfig virtualPath \_nfp -> do
+            let uri2 = normalizedFilePathToUri (toNormalizedFilePath virtualPath)
+            _ <- Shake.addVirtualFile (toNormalizedFilePath virtualPath) printed
+            Shake.use Rules.SuccessfulTypeCheck uri2
+          case mtc2 of
+            Just tc2 | tc2.success -> pure ()
+            _ ->
+              expectationFailure $
+                "prettyLayout output re-parsed but did NOT type-check for " <> inputFile
+                  <> "\n--- checker errors ---\n"
+                  <> Text.unpack (Text.unlines (map sanitizeFilePaths errs2))
+  where
+    -- Show only the lines the parser complained about (plus one of context);
+    -- prettyLayout output for a corpus module is thousands of columns wide.
+    offending printed perrs =
+      let ls    = zip [1 :: Int ..] (Text.lines printed)
+          rows  = [ r | r <- errorRows (show perrs), r > 0 ]
+          keep  = [ (i, l) | (i, l) <- ls
+                  , any (\r -> i >= r - contextBefore && i <= r + contextAfter) rows ]
+          shown = if null keep then take 5 ls else keep
+      in Text.unlines [ Text.pack (show i) <> " | " <> Text.take 400 l | (i, l) <- shown ]
+    contextBefore = 18 :: Int
+    contextAfter  = 3 :: Int
+    -- Pull "line N" style row numbers out of the rendered error; a miss just
+    -- means we print the head of the document instead.
+    errorRows s =
+      [ n | w <- words (map (\c -> if c `elem` (":,()" :: String) then ' ' else c) s)
+          , Just n <- [readMaybe w] ]
+
+-- | The renderings of every inference variable in @m@ that occur as a whole
+-- token in @printed@.
+--
+-- 'L4.Print' renders @InfVar _ raw uniq@ as @raw <> uniq@; that is the exact
+-- string we forbid. Word-boundary matching keeps a legitimate identifier that
+-- merely ends in the same characters from counting (and, conversely, catches a
+-- gensym wherever it appears — binder annotation, GIVETH, nested type).
+leakedInfVars :: Module Resolved -> Text -> [Text]
+leakedInfVars m printed =
+  List.nub [ v | v <- renderings, v `elem` tokens ]
+  where
+    renderings =
+      [ rawNameToText raw <> Text.pack (show uniq)
+      | InfVar _ raw uniq <- toListOf (gplate @(Type' Resolved)) m
+      ]
+    tokens = Text.split (not . isTokenChar) printed
+    isTokenChar c = isAlphaNum c || c == '_'
 
 jl4NlgAnnotationsGolden :: JL4Lazy.EvalConfig -> Bool -> String -> FilePath -> IO (Golden Text)
 jl4NlgAnnotationsGolden evalConfig isOk dir inputFile = do
@@ -275,7 +578,7 @@ normalizeWhitespaceString = unlines . map normalizeLine . lines
 
 checkFile :: JL4Lazy.EvalConfig -> Bool -> FilePath -> IO ()
 checkFile evalConfig isOk file = do
-  (errs, isJust ->  success) <- oneshotL4ActionAndErrors evalConfig file \nfp -> runMaybeT do
+  (errs, diags, isJust -> typechecked) <- oneshotL4ActionAndDiagnostics evalConfig file \nfp -> runMaybeT do
       let uri = normalizedFilePathToUri nfp
       _        <- lift   $ Shake.addVirtualFileFromFS nfp
       _        <- MaybeT $ Shake.use GetParsedAst uri        <* liftIO (Text.putStrLn "Parsing successful")
@@ -287,13 +590,30 @@ checkFile evalConfig isOk file = do
           formatted = foldMap (sanitizeFilePaths . renderMessage) $ sortOn fst msgs
       liftIO $ Text.putStr formatted
   -- NOTE: if we're okay, we don't expect any errors, if we are not, we do expect them
+  --
+  -- 'typechecked' alone is not the whole verdict: a rule OTHER than the
+  -- typechecker can publish an Error that 'SuccessfulTypeCheck' does not gate.
+  -- 'Rules.GetImports''s unresolvable-IMPORT error is the case that forced this
+  -- (smucclaw/l4-ide#971): a module that imports a module existing nowhere, and
+  -- happens to reference nothing from it, typechecks -- so this suite passed it
+  -- while @l4 check@ on the same file exited 1. A test harness that cannot see a
+  -- whole class of error is worse than no harness for that class, because it
+  -- reads as coverage.
+  let success = typechecked && not (any isStructuralError diags)
   success `shouldBe` isOk
   unless success do
     Text.putStr $ foldMap sanitizeFilePaths errs
 
  where
+  -- The same partition 'L4.Cli.Common.hasBlockingError' makes, and for the same
+  -- reason: a diagnostic whose source is @eval@ is an #EVAL directive's outcome,
+  -- which several corpus files deliberately expect to fail, not a structural
+  -- error in the module.
+  isStructuralError FileDiagnostic{fdLspDiagnostic = Diagnostic{_severity, _source}} =
+    _severity == Just DiagnosticSeverity_Error && _source /= Just "eval"
+
   typeErrorToMessage err = (JL4.rangeOf err, JL4.prettyCheckErrorWithContext err)
-  evalLazyDirectiveResultToMessage res@(JL4Lazy.MkEvalDirectiveResult r _ _) =
+  evalLazyDirectiveResultToMessage res@(JL4Lazy.MkEvalDirectiveResult r _ _ _) =
     (r, Text.lines (JL4Lazy.prettyEvalDirectiveResult res))
   renderMessage (r, txt) = cliErrorMessage r txt
 

@@ -1,0 +1,2065 @@
+IMPORT prelude
+IMPORT `charities-common`
+IMPORT `part-1-interpretation`
+IMPORT `part-3-charity-test`
+
+§ `Charities (Jersey) Law 2014 — Part 4 — The Charity Register (Articles 8-12)`
+
+-- ===========================================================================
+-- PART 4 — THE CHARITY REGISTER. Articles 8, 9, 10, 11 and 12.
+--
+-- Source: Charities (Jersey) Law 2014 (L.41/2014), Official Consolidated
+-- Version, showing the law from 16 October 2025 to Current.
+-- https://www.jerseylaw.je/laws/current/l_41_2014
+--
+-- THE SHAPE OF EACH PROVISION
+--
+--   Art 8(1)-(2)  DUTY + STRUCTURE. Establish and maintain a register; keep it so
+--                 as to distinguish three sections (general / restricted / historic).
+--                 Modelled as a duty plus a `RegisterSection` enum.
+--
+--   Art 8(3)      A DUTY CHECKLIST, NOT A TEST. "The Commissioner must enter ...
+--                 (a) to (n)". Nothing turns on it as a condition of anything: it
+--                 is an obligation on the Commissioner. So it is modelled as a
+--                 CONJUNCTION that says whether the duty has been DISCHARGED, plus
+--                 a `PARTY Commissioner MUST` clause that says who owes it. Several
+--                 limbs — (a)(ii), (h), (i), (k), (l), (m), (n) — are CONDITIONAL,
+--                 and are therefore proviso limbs `(NOT applies) OR entered`.
+--
+--   Art 8(4)      A CASCADING DEFINITION (a priority cascade, not a free
+--                 disjunction): (a), else (b), else (c). Feeds Art 11(4)(d).
+--
+--   Art 8(5)      A DUTY CHECKLIST for the historic section (a)-(e), with one
+--                 conditional limb inside (b) and one inside (c).
+--
+--   Art 8(6)      A RETENTION DUTY (10 years) over four classes of document.
+--
+--   Art 9(1)      A DEFINITION of the "public elements" of the restricted section —
+--                 a DISJUNCTION over matters, consumed by Art 10(3)(b).
+--   Art 9(2)      THE FUNDING-CONDITION REQUEST — a DISJUNCTION ((a) or (b)).
+--   Art 9(3)      A PURE ORDER-MAKING POWER. Carried as an inert-prose stub; its
+--                 only computable residue is the single BOOLEAN atom "a ground
+--                 prescribed under paragraph (3) applies", which Art 9(6)(c) negates.
+--   Art 9(4)-(5)  FORM, EVIDENCE and the STATEMENT OF INTENTION — conjuncts feeding
+--                 Art 9(6)(a).
+--   Art 9(6)      A PROHIBITION-UNLESS. "The Commissioner must NOT enter a charity
+--                 in the restricted section UNLESS satisfied — (a) AND (b) AND (c)."
+--                 A THREE-LIMB CONJUNCTION behind a SHANT. Note that being satisfied
+--                 of all three does NOT create a duty to enter: it lifts the
+--                 prohibition. So: satisfied -> MAY; not satisfied -> SHANT.
+--   Art 9(7)      Refusal: a MUST (written notice) RAND a MAY (proceed on the stated
+--                 intention).
+--
+--   Art 10(1)     A DUTY (public access, on a website, without charge).
+--   Art 10(2)     A PURE ORDER-MAKING POWER — inert-prose stub.
+--   Art 10(3)     A DISJUNCTION over the three sections, expressly "SUBJECT TO
+--                 paragraph (5)" — so the 10(5) designation is a KNOCK-OUT on it.
+--   Art 10(4)-(5) A GATED PERMISSION: 10(4) is the gate; 10(5) is the MAY.
+--
+--   Art 11(1)     A PERMISSION (the entity "may apply").
+--   Art 11(2)     A DUTY CHECKLIST on the APPLICANT — (a) to (f). Unlike Art 8(3),
+--                 this one IS load-bearing: compliance with it is the first term of
+--                 the Art 11(4) COMPLIANCE GATE. So it is modelled as a conjunction
+--                 that feeds that gate, AND as a duty on the applicant.
+--   Art 11(3)     REGULATION-MAKING POWER — inert-prose stub; residue = one BOOLEAN.
+--
+--   Art 11(4)     *** THE REGISTRATION TEST — THE CENTREPIECE OF THIS FILE. ***
+--                 Its structure is:
+--
+--                     COMPLIANCE GATE                       (a precondition)
+--                       the applicant complies with (2),
+--                       with any Regulations under (3),
+--                       and with Article 19(5)
+--                   AND
+--                     MANDATORY DUTY ON THE COMMISSIONER    ("must register ...")
+--                       CONDITIONED ON a SIX-LIMB CONJUNCTION ("... if satisfied that")
+--                         (a) meets the charity test, OR WILL DO SO ON REGISTRATION
+--                             -- a disjunction; the second limb imported from Part 3
+--                         (b) the constitution is a written document
+--                         (c) (i) is a Jersey entity, OR (ii) substantial activity
+--                             in or from within Jersey  -- a disjunction
+--                         (d) has a principal address in Jersey (Art 8(4))
+--                         (e) NEGATIVE LIMB: the name is NOT undesirable under Art 12
+--                             -- i.e. NOT (the Art 12(1) four-limb disjunction)
+--                         (f) NEGATIVE LIMB: NO other prescribed ground for refusal
+--                             applies or should be applied
+--
+--   Art 11(5)     THE MANDATORY REFUSAL ARM. "If not so satisfied, the Commissioner
+--                 must refuse to register the applicant." Both arms are modelled.
+--   Art 11(6)     GUIDANCE on "substantial" — duties to publish, and to have regard.
+--   Art 11(7)-(8) REGULATION- and ORDER-MAKING POWERS — inert-prose stubs.
+--   Art 11(9)     CERTIFICATE — (a) on registration; (b) on entry of a new name.
+--   Art 11(10)-(11) NPO CROSS-REGISTRATION — a duty on the applicant, then a duty on
+--                 the Commissioner to pass it on, then a duty on the JFSC to receive
+--                 it as an application. A three-link HENCE chain across three parties.
+--
+--   Art 12(1)     THE "UNDESIRABLE" TEST — a four-limb DISJUNCTION (a) .. (d),
+--                 negated by Art 11(4)(e) and re-used verbatim by Art 12(4) and
+--                 Art 12(7)(b)(ii).
+--   Art 12(2)     A DUTY consequential on registration (name + number).
+--   Art 12(3)-(5) Change of name: a PERMISSION to apply (3); a MANDATORY REFUSAL (4);
+--                 a DUTY to enter the new name once granted and notified (5).
+--   Art 12(7)     A PROHIBITION on using other names, with a two-limb exception.
+--
+-- ENCODING STYLE — INERT: verbatim statute inline as bare strings (identity of
+-- their context), `...` = AND-sugar, `..` = OR-sugar, layout IS the bracketing.
+--
+-- ===========================================================================
+-- INTERPRETATION CALLS
+-- ===========================================================================
+--
+-- >>> [1] Art 11(4)/(5) — THE GAP AT THE COMPLIANCE GATE. Art 11(4) reads: "IF the
+--     applicant complies with (2), (3)-Regulations and Art 19(5), the Commissioner
+--     MUST register the applicant IF SATISFIED THAT (a)-(f)." Art 11(5) reads: "If
+--     NOT SO SATISFIED, the Commissioner must refuse." On its face "not so satisfied"
+--     attaches to the SATISFACTION condition, not to the COMPLIANCE GATE. Read
+--     literally, an applicant who fails the gate (an incomplete application)
+--     triggers NEITHER a duty to register NOR a duty to refuse: the Commissioner is
+--     simply not seized of a decidable application. We model BOTH readings and let
+--     the reader choose:
+--       * `Article 11(4) and 11(5) — the registration decision` — the TWO-ARM
+--         reading: gate-failure is folded into the refusal arm (register / refuse).
+--       * `Article 11(4) and 11(5) — the registration decision (the literal
+--         three-way reading)` — the LITERAL reading: gate-failure yields NO duty at
+--         all. In practice the Order under Art 11(8)(a) (the decision period) and
+--         the Regulations under Art 11(3) (procedure) are where this gap is closed.
+--
+-- >>> [2] Art 8(4) — HAVING a principal address. Art 8(4) defines WHICH address is
+--     the principal address; it is not, in terms, a test of whether an entity HAS
+--     one. But Art 11(4)(d) asks exactly that ("has a principal address in Jersey,
+--     within the meaning of Article 8(4)"). We read it as: at least one of the three
+--     limbs of Art 8(4) yields an address. Limbs (b) and (c) are mutually exclusive
+--     by their own terms ("if the charity is NOT such an entity"; "if NEITHER (a)
+--     NOR (b) applies"), so the disjunction is in truth a PRIORITY CASCADE; we
+--     encode the exclusivity explicitly so each limb reads independently.
+--     NOTE THE STING IN LIMB (b): if the only Jersey premises are a private dwelling
+--     house, limb (b) yields NO address, and the cascade falls through to limb (c) —
+--     the Jersey address of a governor. So a charity run from a spare bedroom still
+--     has a principal address, provided some governor has a Jersey address. Tested.
+--
+-- >>> [3] "In the opinion of the Commissioner" (Art 11(4)(c)(ii), Art 12(1),
+--     Art 12(4), Art 12(7)(b)(ii)) is a SUBJECTIVE QUALIFIER over the limb, not a
+--     separate limb of its own. We fold it into the atom (each atom is asked as
+--     "does the Commissioner think so"), rather than adding a further conjunct. The
+--     consequence is that these atoms are not reviewable on the facts, only on
+--     Wednesbury-type grounds — which is what the drafting intends.
+--
+-- >>> [4] Art 10(5) — an ULTRA VIRES designation is no designation. Art 10(5) confers
+--     the power to designate a matter as non-public; Art 10(4) states when
+--     "paragraph (5) applies". We therefore treat a designation as EFFECTIVE only if
+--     the Art 10(4) safety-or-security condition is met. A designation made without
+--     it does not remove the matter from the public parts of the register.
+--
+-- >>> [5] Art 9(6) — SATISFACTION LIFTS THE PROHIBITION; IT DOES NOT CREATE A DUTY.
+--     "The Commissioner must not enter ... unless satisfied ...". Being satisfied of
+--     (a), (b) and (c) removes the bar; it does not oblige entry. Art 9(3)(a) confirms
+--     this, requiring the Order to prescribe grounds "on which the Commissioner MAY
+--     accept or refuse such a request". So: satisfied -> MAY enter; not satisfied ->
+--     SHANT enter.
+--
+-- >>> [6] Art 12(4) — there is NO DUTY TO GRANT. Art 12(4) obliges refusal where a
+--     paragraph (1) ground applies. It is silent on the converse: no ground, no duty
+--     to grant. Permission remains discretionary. The ELSE arm is FULFILLED.
+--
+-- >>> [7] Art 8(6) — "must retain for 10 years" is a RETENTION PERIOD, not a
+--     performance deadline. `WITHIN 30` below is a REVIEWABLE PLACEHOLDER for the
+--     (unstated) time within which the copy must be taken into retention.
+--
+-- >>> [8] OPEN-TEXTURED DEADLINES. The Law fixes NO period for the registration
+--     decision: Art 11(8)(a) leaves "the period within which the Commissioner must
+--     make a decision on an application" to be prescribed by Order, and no Order
+--     number appears in the Law. Every `WITHIN n` in this file is therefore a
+--     REVIEWABLE PLACEHOLDER, not a statutory number. They are flagged at each site.
+--
+-- >>> [9] TWO ACTION ENUMS. `charities-common` already supplies the four Part 4
+--     actions the corpus shares (register / refuse to register / issue a certificate
+--     / refuse permission to change the registered name). The remaining Part 4 acts
+--     are declared LOCALLY as `Part4Action`. A HENCE chain cannot cross the two
+--     types, so where a duty in one enum is consequential on a duty in the other
+--     (Art 12(5) -> Art 11(9)(b)), we guard the second on a BOOLEAN rather than
+--     chaining it. The seam is noted at each site.
+-- ===========================================================================
+
+§§ `The Part 4 actions not already in charities-common`
+
+DECLARE Part4Action IS ONE OF
+  `establish and maintain a register of charities`                                  -- Art 8(1)
+  `keep the register so as to distinguish the general, restricted and historic sections`  -- Art 8(2)
+  `enter in the register the matters required by Article 8(3)`                      -- Art 8(3)
+  `enter in the historic section the matters required by Article 8(5)`              -- Art 8(5)
+  `retain the documents required by Article 8(6)`                                   -- Art 8(6)
+  `enter the charity in the restricted section of the register`                     -- Art 9(6)
+  `give written notice of the refusal of the request`                               -- Art 9(7)(a)
+  `proceed on the basis of the intention stated under Article 9(5)`                 -- Art 9(7)(b)
+  `make the public parts of the register available on a website without charge`     -- Art 10(1)
+  `designate the matter as not being a public part of the register`                 -- Art 10(5)
+  `apply to be registered as a charity`                                             -- Art 11(1)
+  `provide to the Commissioner the information, documents and evidence required by Article 11(2)`  -- Art 11(2)
+  `publish and maintain guidance as to whether an activity is substantial`          -- Art 11(6)(a)
+  `have regard to the guidance as to whether an activity is substantial`            -- Art 11(6)(c), (d)
+  `provide with the application the additional information required by the JFSC`    -- Art 11(10)(a)
+  `request to be registered under the Non-Profit Organizations (Jersey) Law 2008`   -- Art 11(10)(b)
+  `pass the request, information and documents to the JFSC`                         -- Art 11(11)(a)
+  `treat the request as an application for registration under that Law`             -- Art 11(11)(b)
+  `enter the registered name and allocate and enter the registration number`        -- Art 12(2)
+  `apply for permission to change or add a registered name`                         -- Art 12(3)
+  `enter on the register the new or alternative registered name`                    -- Art 12(5)
+  `require the charity to apply to change its registered name`                      -- Art 12(6)
+  `use a name other than a permitted name`                                          -- Art 12(7)
+
+§ `Article 8 — Charity register`
+
+§§ `Article 8(2) — the three sections`
+
+DECLARE RegisterSection IS ONE OF
+  `the general section`
+  `the restricted section`
+  `the historic section`
+
+§§ `Article 8(3) — the mandatory register entries (a) to (n): a DUTY CHECKLIST`
+
+-- This is a DUTY on the Commissioner, not a test of anything. The record below asks,
+-- of a given charity's register entry, whether each required matter HAS BEEN entered;
+-- the conjunction says whether the Art 8(3) duty has been DISCHARGED; the deontic at
+-- the foot of this Article says who owes it. Seven of the fourteen limbs are
+-- CONDITIONAL, so each of those is a proviso limb: (NOT the condition) OR (entered).
+DECLARE RegisterEntry HAS
+    `the charity`                                                   IS A STRING
+    section                                                         IS A RegisterSection
+
+    -- the chapeau: "in addition to the registered name and registration number
+    -- entered under Article 12(2)"
+    `the registered name and registration number are entered under Article 12(2)`  IS A BOOLEAN
+
+    -- (a) the status of the entity
+    `(a)(i) a note of the sub-paragraph of the definition of 'entity' in Article 2(1) within which the entity falls (including, for an entity within (f) to (j), whether it also falls within (a)) is entered`  IS A BOOLEAN
+    `the entity falls within one of sub-paragraphs (e), (g), (h) or (j) of the definition of 'entity'`  IS A BOOLEAN
+    `(a)(ii) details of the enactment, Act of the States, Royal Charter, Act of the United Kingdom Parliament, Order in Council or foreign law by virtue of which the entity falls within that sub-paragraph are entered`  IS A BOOLEAN
+
+    `(b) the names of each of the governors of the registered charity are entered`  IS A BOOLEAN
+    `(c) the principal address of the registered charity, within the meaning of Article 8(4), is entered`  IS A BOOLEAN
+    `(d) the address of any other premises in Jersey, other than a private dwelling house, at or from which the registered charity undertakes any activity, is entered`  IS A BOOLEAN
+    `(e) a statement of the purposes of the registered charity, drawn by the charity from its constitution and approved by the Commissioner as accurately reflecting the constitution as to the purposes, is entered`  IS A BOOLEAN
+    `(f) a registered public benefit statement, approved by the Commissioner, of the public benefit provided by the charity and of the means by which the charity ensures that it provides that public benefit, is entered`  IS A BOOLEAN
+    `(g) the date on which the charity was registered is entered`   IS A BOOLEAN
+
+    -- (h) conditional on organized-religious-charity status (Art 28)
+    `the registered charity is an organized religious charity within the meaning of Article 28`  IS A BOOLEAN
+    `(h) a note of that fact, and of the provision of the Order under Article 28 by virtue of which it is such a charity, is entered`  IS A BOOLEAN
+
+    -- (i) conditional on the Art 5(3) Order route
+    `the registered charity meets the charity test by virtue of an Order under Article 5(3)`  IS A BOOLEAN
+    `(i) the text of the provision in the constitution that falls within Article 5(2) is entered`  IS A BOOLEAN
+
+    `(j) whether the registered charity has or has not sent its annual return for the most recent year is entered`  IS A BOOLEAN
+
+    -- (k) conditional on service of a required steps notice
+    `a required steps notice has been served on the registered charity, or on a governor of the registered charity`  IS A BOOLEAN
+    `(k) a note of that fact (or a copy of the notice), and of the date on which the notice was served, is entered`  IS A BOOLEAN
+
+    -- (l) conditional on a change of registered name
+    `the registered name has been changed`                          IS A BOOLEAN
+    `(l) the previous registered name or names are entered`         IS A BOOLEAN
+
+    -- (m) conditional on an Order under Article 13(9)(c)
+    `an Order under Article 13(9)(c) applies to the registered charity`  IS A BOOLEAN
+    `(m) any details or statement that must be entered on the register under that Order are entered`  IS A BOOLEAN
+
+    -- (n) conditional on the Minister having prescribed anything by Order
+    `other information has been prescribed by the Minister by Order under Article 8(3)(n)`  IS A BOOLEAN
+    `(n) that other information is entered`                         IS A BOOLEAN
+
+    -- Article 9(1) — the public elements of the restricted section, asked of THIS
+    -- matter. Carried here because Art 10(3)(b) needs them.
+    `(9(1)(a)) the matter is the registration number (but not the registered name) of the charity`  IS A BOOLEAN
+    `(9(1)(b)) the matter is registered under sub-paragraph (a), (e), (f), (j) or (k) of Article 8(3)`  IS A BOOLEAN
+    `(9(1)(c)) the matter is a summary, produced by the charity to the satisfaction of the Commissioner, of the reasons for registration of the charity in the restricted section`  IS A BOOLEAN
+    `(9(1)(d)) the matter is another element prescribed by the Minister by Order under Article 9(1)(d)`  IS A BOOLEAN
+
+    -- Article 10(4) and 10(5)
+    `the Commissioner considers that the safety or security of any person, property or premises would be significantly put at risk by public access to the matter`  IS A BOOLEAN
+    `the Commissioner has purported to designate the matter as not being a public part of the register`  IS A BOOLEAN
+
+GIVEN e IS A RegisterEntry
+GIVETH A BOOLEAN
+`Article 8(3)(a) — a note of the status of the entity` e MEANS
+        "(a) a note of the status of the entity that is the registered charity, being -"
+    ... "(i) the sub-paragraph of the definition 'entity' in Article 2(1) within which the entity falls (including, in the case of an entity falling within one of sub-paragraphs (f) to (j) of that definition, whether it also falls within sub-paragraph (a)), and"
+    ... e's `(a)(i) a note of the sub-paragraph of the definition of 'entity' in Article 2(1) within which the entity falls (including, for an entity within (f) to (j), whether it also falls within (a)) is entered`
+    AND     "(ii) in the case of an entity falling within one of sub-paragraphs (e), (g), (h) or (j) of that definition, details of the enactment, Act of the States, Royal Charter, Act of the United Kingdom Parliament, Order in Council or foreign law, by virtue of which it falls within that sub-paragraph;"
+        ..  NOT e's `the entity falls within one of sub-paragraphs (e), (g), (h) or (j) of the definition of 'entity'`
+        ..  e's `(a)(ii) details of the enactment, Act of the States, Royal Charter, Act of the United Kingdom Parliament, Order in Council or foreign law by virtue of which the entity falls within that sub-paragraph are entered`
+
+GIVEN e IS A RegisterEntry
+GIVETH A BOOLEAN
+`Article 8(3)(h) — the organized religious charity note` e MEANS
+        "(h) if the registered charity is an organized religious charity, within the meaning of Article 28, a note of that fact and of the provision of the Order under that Article by virtue of which it is such a charity;"
+    ..  NOT e's `the registered charity is an organized religious charity within the meaning of Article 28`
+    ..  e's `(h) a note of that fact, and of the provision of the Order under Article 28 by virtue of which it is such a charity, is entered`
+
+GIVEN e IS A RegisterEntry
+GIVETH A BOOLEAN
+`Article 8(3)(i) — the Article 5(3) constitutional provision` e MEANS
+        "(i) if the registered charity meets the charity test by virtue of an Order under Article 5(3), the text of the provision in the constitution that falls within paragraph (2) of that Article;"
+    ..  NOT e's `the registered charity meets the charity test by virtue of an Order under Article 5(3)`
+    ..  e's `(i) the text of the provision in the constitution that falls within Article 5(2) is entered`
+
+GIVEN e IS A RegisterEntry
+GIVETH A BOOLEAN
+`Article 8(3)(k) — the required steps notice note` e MEANS
+        "(k) if a required steps notice has been served on the registered charity, or on a governor of the registered charity, a note of that fact (or a copy of the notice) and of the date on which the notice was served;"
+    ..  NOT e's `a required steps notice has been served on the registered charity, or on a governor of the registered charity`
+    ..  e's `(k) a note of that fact (or a copy of the notice), and of the date on which the notice was served, is entered`
+
+GIVEN e IS A RegisterEntry
+GIVETH A BOOLEAN
+`Article 8(3)(l) — the previous registered names` e MEANS
+        "(l) if the registered name has been changed, the previous registered name or names;"
+    ..  NOT e's `the registered name has been changed`
+    ..  e's `(l) the previous registered name or names are entered`
+
+GIVEN e IS A RegisterEntry
+GIVETH A BOOLEAN
+`Article 8(3)(m) — the Article 13(9)(c) Order details` e MEANS
+        "(m) if an Order under Article 13(9)(c) applies to the registered charity, any details or statement that must be entered on the register under that Order; and"
+    ..  NOT e's `an Order under Article 13(9)(c) applies to the registered charity`
+    ..  e's `(m) any details or statement that must be entered on the register under that Order are entered`
+
+-- Art 8(3)(n) is a PURE ORDER-MAKING POWER with no computable content of its own.
+-- We do not invent any. Its residue is a proviso: nothing is owed unless and until
+-- the Minister prescribes something.
+GIVEN e IS A RegisterEntry
+GIVETH A BOOLEAN
+`Article 8(3)(n) — any other information prescribed by the Minister by Order` e MEANS
+        "(n) any other information prescribed by the Minister by Order."
+    ..  NOT e's `other information has been prescribed by the Minister by Order under Article 8(3)(n)`
+    ..  e's `(n) that other information is entered`
+
+GIVEN e IS A RegisterEntry
+GIVETH A BOOLEAN
+`Article 8(3) — the register entry is complete` e MEANS
+        "(3) The Commissioner must enter in the register, in respect of each registered charity (whether entered in the general or restricted section), in addition to the registered name and registration number entered under Article 12(2) -"
+    ... e's `the registered name and registration number are entered under Article 12(2)`
+    AND `Article 8(3)(a) — a note of the status of the entity` e
+    AND "(b) the names of each of the governors of the registered charity;"
+    ... e's `(b) the names of each of the governors of the registered charity are entered`
+    AND "(c) the principal address of the registered charity with the meaning of paragraph (4);"
+    ... e's `(c) the principal address of the registered charity, within the meaning of Article 8(4), is entered`
+    AND "(d) the address of any other premises in Jersey, other than a private dwelling house, at or from which the registered charity undertakes any activity;"
+    ... e's `(d) the address of any other premises in Jersey, other than a private dwelling house, at or from which the registered charity undertakes any activity, is entered`
+    AND "(e) a statement of the purposes of the registered charity (the charity's 'registered charitable purposes'), drawn by the charity from its constitution and approved by the Commissioner as accurately reflecting the constitution as to the purposes;"
+    ... e's `(e) a statement of the purposes of the registered charity, drawn by the charity from its constitution and approved by the Commissioner as accurately reflecting the constitution as to the purposes, is entered`
+    AND "(f) a statement (the charity's 'registered public benefit statement'), approved by the Commissioner, of the public benefit provided by the charity and of the means by which the charity ensures that it provides that public benefit;"
+    ... e's `(f) a registered public benefit statement, approved by the Commissioner, of the public benefit provided by the charity and of the means by which the charity ensures that it provides that public benefit, is entered`
+    AND "(g) the date on which the charity was registered;"
+    ... e's `(g) the date on which the charity was registered is entered`
+    AND `Article 8(3)(h) — the organized religious charity note` e
+    AND `Article 8(3)(i) — the Article 5(3) constitutional provision` e
+    AND "(j) whether the registered charity has or has not sent its annual return for the most recent year;"
+    ... e's `(j) whether the registered charity has or has not sent its annual return for the most recent year is entered`
+    AND `Article 8(3)(k) — the required steps notice note` e
+    AND `Article 8(3)(l) — the previous registered names` e
+    AND `Article 8(3)(m) — the Article 13(9)(c) Order details` e
+    AND `Article 8(3)(n) — any other information prescribed by the Minister by Order` e
+
+§§ `Article 8(4) — "principal address": a PRIORITY CASCADE`
+
+-- See INTERPRETATION CALL [2]. Three limbs, in strict priority. Limb (b) yields no
+-- address if the only Jersey premises are a private dwelling house — and then the
+-- cascade falls through to limb (c), the Jersey address of a governor.
+DECLARE PrincipalAddressFacts HAS
+    `(4)(a) the charity is a company, foundation, or other entity required by its constitutional Law to have a registered office or business address in Jersey`  IS A BOOLEAN
+    `(4)(b) there are main premises in Jersey at or from which the activities in Jersey of the charity are managed, controlled or undertaken`  IS A BOOLEAN
+    `(4)(b) those premises are a private dwelling house`             IS A BOOLEAN
+    `(4)(c) one of the governors of the charity has an address in Jersey`  IS A BOOLEAN
+
+GIVEN a IS A PrincipalAddressFacts
+GIVETH A BOOLEAN
+`Article 8(4)(a) — the registered office or business address in Jersey` a MEANS
+        "(a) if the registered charity is a company, foundation, or other entity required by its constitutional Law to have a registered office or business address in Jersey, the address of that registered office or that business address;"
+    ... a's `(4)(a) the charity is a company, foundation, or other entity required by its constitutional Law to have a registered office or business address in Jersey`
+
+GIVEN a IS A PrincipalAddressFacts
+GIVETH A BOOLEAN
+`Article 8(4)(b) — the main premises in Jersey, not being a private dwelling house` a MEANS
+        "(b) if the charity is not such an entity, the address of the main premises in Jersey at or from which the activities in Jersey of the registered charity are managed, controlled or undertaken, unless the premises are a private dwelling house; or"
+    ... NOT `Article 8(4)(a) — the registered office or business address in Jersey` a
+    AND a's `(4)(b) there are main premises in Jersey at or from which the activities in Jersey of the charity are managed, controlled or undertaken`
+    AND "unless the premises are a private dwelling house"
+    ... NOT a's `(4)(b) those premises are a private dwelling house`
+
+GIVEN a IS A PrincipalAddressFacts
+GIVETH A BOOLEAN
+`Article 8(4)(c) — the Jersey address of one of the governors` a MEANS
+        "(c) if neither sub-paragraph (a) nor (b) applies, the address in Jersey of one of the governors of the charity."
+    ... NOT `Article 8(4)(a) — the registered office or business address in Jersey` a
+    AND NOT `Article 8(4)(b) — the main premises in Jersey, not being a private dwelling house` a
+    AND a's `(4)(c) one of the governors of the charity has an address in Jersey`
+
+GIVEN a IS A PrincipalAddressFacts
+GIVETH A BOOLEAN
+`Article 8(4) — has a principal address in Jersey` a MEANS
+        "(4) The principal address for the purpose of paragraph (3)(c) is -"
+    ..  `Article 8(4)(a) — the registered office or business address in Jersey` a
+    ..  `Article 8(4)(b) — the main premises in Jersey, not being a private dwelling house` a
+    ..  `Article 8(4)(c) — the Jersey address of one of the governors` a
+
+§§ `Article 8(5) — the historic section: a second DUTY CHECKLIST`
+
+DECLARE HistoricEntry HAS
+    `the formerly registered charity`                               IS A STRING
+    `(a) the entity's former registered number is entered`          IS A BOOLEAN
+    `the entity was registered in the general section`              IS A BOOLEAN
+    `(b) the name under which the entity was registered immediately before deregistration, and any names under which it was previously so registered, are entered`  IS A BOOLEAN
+    `(c) a summary of the reason why the entity was deregistered is entered`  IS A BOOLEAN
+    `the reason for deregistration was a contravention of a required steps notice`  IS A BOOLEAN
+    `(c) the summary includes the reason for the service of that notice`  IS A BOOLEAN
+    `(d) the dates on which the entity was registered and deregistered are entered`  IS A BOOLEAN
+    `other matters have been prescribed by the Minister by Order under Article 8(5)(e)`  IS A BOOLEAN
+    `(e) those other matters are entered`                           IS A BOOLEAN
+
+GIVEN h IS A HistoricEntry
+GIVETH A BOOLEAN
+`Article 8(5)(b) — the former registered names` h MEANS
+        "(b) if the entity was registered in the general section, the name under which the entity was registered immediately before deregistration, and any names under which it was previously so registered;"
+    ..  NOT h's `the entity was registered in the general section`
+    ..  h's `(b) the name under which the entity was registered immediately before deregistration, and any names under which it was previously so registered, are entered`
+
+GIVEN h IS A HistoricEntry
+GIVETH A BOOLEAN
+`Article 8(5)(c) — the summary of the reason for deregistration` h MEANS
+        "(c) a summary of the reason why the entity was deregistered, including, if that reason was a contravention of a required steps notice, the reason for the service of that notice;"
+    ... h's `(c) a summary of the reason why the entity was deregistered is entered`
+    AND     "including, if that reason was a contravention of a required steps notice, the reason for the service of that notice"
+        ..  NOT h's `the reason for deregistration was a contravention of a required steps notice`
+        ..  h's `(c) the summary includes the reason for the service of that notice`
+
+GIVEN h IS A HistoricEntry
+GIVETH A BOOLEAN
+`Article 8(5) — the historic section entry is complete` h MEANS
+        "(5) The Commissioner must enter in the historic section, in relation to any formerly registered charity that has been deregistered -"
+    ... "(a) the entity's former registered number;"
+    ... h's `(a) the entity's former registered number is entered`
+    AND `Article 8(5)(b) — the former registered names` h
+    AND `Article 8(5)(c) — the summary of the reason for deregistration` h
+    AND "(d) the dates on which the entity was registered and deregistered; and"
+    ... h's `(d) the dates on which the entity was registered and deregistered are entered`
+    AND     "(e) such other matters as the Minister may prescribe by Order."
+        ..  NOT h's `other matters have been prescribed by the Minister by Order under Article 8(5)(e)`
+        ..  h's `(e) those other matters are entered`
+
+§§ `Article 8(6) — the 10-year retention duty`
+
+DECLARE RetainedDocuments HAS
+    `the charity`                                                   IS A STRING
+    `(a) the constitution of the charity, and any amendments to it, are retained`  IS A BOOLEAN
+    `(b) the annual returns of the charity are retained`            IS A BOOLEAN
+    `(c) any notice served on the charity under this Law is retained`  IS A BOOLEAN
+    `other documents have been prescribed by the Minister by Order under Article 8(6)(d)`  IS A BOOLEAN
+    `(d) those other documents are retained`                        IS A BOOLEAN
+
+GIVEN r IS A RetainedDocuments
+GIVETH A BOOLEAN
+`Article 8(6) — the retention duty is discharged` r MEANS
+        "(6) The Commissioner must retain for 10 years, in respect of each registered charity, a copy of -"
+    ... "(a) the constitution of the charity, and any amendments to it;"
+    ... r's `(a) the constitution of the charity, and any amendments to it, are retained`
+    AND "(b) the annual returns of the charity;"
+    ... r's `(b) the annual returns of the charity are retained`
+    AND "(c) any notice served on the charity under this Law; and"
+    ... r's `(c) any notice served on the charity under this Law is retained`
+    AND     "(d) any other document prescribed by the Minister by Order."
+        ..  NOT r's `other documents have been prescribed by the Minister by Order under Article 8(6)(d)`
+        ..  r's `(d) those other documents are retained`
+
+§§ `Article 8 — the regulative layer`
+
+-- REVIEWABLE PLACEHOLDERS: the Law fixes no period for any of these. See [8].
+GIVETH A DEONTIC Actor Part4Action
+`Article 8(1) and 8(2) — the duty to establish and maintain the register` MEANS
+    PARTY Commissioner MUST `establish and maintain a register of charities` WITHIN 90
+    HENCE PARTY Commissioner MUST `keep the register so as to distinguish the general, restricted and historic sections` WITHIN 30
+
+-- Art 8(3) is a DUTY CHECKLIST: the conjunction above says whether it has been
+-- DISCHARGED; this says who owes it.
+GIVETH A DEONTIC Actor Part4Action
+`Article 8(3) — the Commissioner's duty to complete the register entry` MEANS
+    PARTY Commissioner MUST `enter in the register the matters required by Article 8(3)` WITHIN 30
+
+GIVETH A DEONTIC Actor Part4Action
+`Article 8(5) — the Commissioner's duty to complete the historic section entry` MEANS
+    PARTY Commissioner MUST `enter in the historic section the matters required by Article 8(5)` WITHIN 30
+
+-- See INTERPRETATION CALL [7]: the "10 years" is the RETENTION PERIOD, not a
+-- deadline for performance. WITHIN 30 is the placeholder for taking the copy into
+-- retention.
+GIVETH A DEONTIC Actor Part4Action
+`Article 8(6) — the Commissioner's 10-year retention duty` MEANS
+    PARTY Commissioner MUST `retain the documents required by Article 8(6)` WITHIN 30
+
+§ `Article 9 — Restricted section`
+
+§§ `Article 9(1) — the public elements of the restricted section`
+
+-- A DISJUNCTION over the matters entered in respect of a charity registered in the
+-- restricted section. Consumed by Art 10(3)(b). Note limb (a): the registration
+-- NUMBER is public, the registered NAME is not — that is the whole point of the
+-- restricted section.
+GIVEN e IS A RegisterEntry
+GIVETH A BOOLEAN
+`Article 9(1) — a public element of the restricted section` e MEANS
+        "(1) For the purpose of Article 10 the public elements of the restricted section are, in relation to each charity registered in that section -"
+    ... e's section EQUALS `the restricted section`
+    AND     "(a) the registration number (but not the registered name) of the charity;"
+        ..  e's `(9(1)(a)) the matter is the registration number (but not the registered name) of the charity`
+        ..  "(b) the matters registered under sub-paragraphs (a), (e), (f), (j) and (k) of Article 8(3);"
+        ..  e's `(9(1)(b)) the matter is registered under sub-paragraph (a), (e), (f), (j) or (k) of Article 8(3)`
+        ..  "(c) a summary, produced by the charity, to the satisfaction of the Commissioner, of the reasons for registration of the charity in the restricted section; and"
+        ..  e's `(9(1)(c)) the matter is a summary, produced by the charity to the satisfaction of the Commissioner, of the reasons for registration of the charity in the restricted section`
+        ..  "(d) any other element that may be prescribed by the Minister by Order."
+        ..  e's `(9(1)(d)) the matter is another element prescribed by the Minister by Order under Article 9(1)(d)`
+
+§§ `Article 9(2) to 9(7) — the request for entry in the restricted section`
+
+DECLARE RestrictedSectionRequest HAS
+    `the requester`                                                 IS A STRING
+
+    -- Art 9(2) chapeau: who may ask.
+    `the requester is an applicant for registration, or a charity registered in the general section of the register`  IS A BOOLEAN
+
+    -- Art 9(2)(a) and (b) — the two prescribed conditions.
+    `(2)(a) the applicant meets the funding condition, prescribed by the Minister by Order for this purpose, as to refraining from soliciting donations from the general public or from any prescribed description of persons`  IS A BOOLEAN
+    `(2)(b) the applicant meets any other condition that may be prescribed by the Minister by Order, whether by reference to any other source of the entity's funds or on any other basis`  IS A BOOLEAN
+
+    -- Art 9(4) — form and evidence.
+    `(4)(a) the request was made in the form published by the Commissioner`  IS A BOOLEAN
+    `(4)(b) the request was supported by information and evidence to the satisfaction of the Commissioner`  IS A BOOLEAN
+
+    -- Art 9(5) — the statement of intention in the event of refusal.
+    `(5) the request was accompanied by a statement of the applicant's intention in the event of refusal of the request`  IS A BOOLEAN
+
+    -- Art 9(3) — the ONLY computable residue of the Order-making power: see the stub
+    -- below. Two atoms, because Art 9(6)(c) distinguishes mandatory from discretionary.
+    `there is a ground, prescribed under Article 9(3), on which the request must be refused`  IS A BOOLEAN
+    `there is a discretionary ground, prescribed under Article 9(3), on which the Commissioner considers the request should be refused`  IS A BOOLEAN
+
+    -- Art 9(7) — the fact of refusal.
+    `the Commissioner refuses the request`                          IS A BOOLEAN
+
+GIVEN r IS A RestrictedSectionRequest
+GIVETH A BOOLEAN
+`Article 9(2) — the funding condition (or other prescribed condition) is met` r MEANS
+        "(2) An applicant for registration, or a charity registered in the general section of the register, may request entry in the restricted section of the register if -"
+    ... r's `the requester is an applicant for registration, or a charity registered in the general section of the register`
+    AND     "(a) the applicant meets the funding condition, prescribed by the Minister by Order for this purpose, as to refraining from soliciting donations from the general public or from any prescribed description of persons; or"
+        ..  r's `(2)(a) the applicant meets the funding condition, prescribed by the Minister by Order for this purpose, as to refraining from soliciting donations from the general public or from any prescribed description of persons`
+        ..  "(b) the applicant meets any other condition that may be prescribed by the Minister by Order, whether by reference to any other source of the entity's funds or on any other basis."
+        ..  r's `(2)(b) the applicant meets any other condition that may be prescribed by the Minister by Order, whether by reference to any other source of the entity's funds or on any other basis`
+
+GIVEN r IS A RestrictedSectionRequest
+GIVETH A BOOLEAN
+`Article 9(4) — the form of the request` r MEANS
+        "(4) A request under paragraph (2) must be -"
+    ... "(a) made in the form published by the Commissioner; and"
+    ... r's `(4)(a) the request was made in the form published by the Commissioner`
+    AND "(b) supported by information and evidence to the satisfaction of the Commissioner."
+    ... r's `(4)(b) the request was supported by information and evidence to the satisfaction of the Commissioner`
+
+GIVEN r IS A RestrictedSectionRequest
+GIVETH A BOOLEAN
+`Article 9(5) — the statement of the applicant's intention` r MEANS
+        "(5) A request under paragraph (2) must be accompanied by a statement of the applicant's intention, in the event of refusal of the request, being - (a) in the case of an application for registration - (i) that that application should be treated as withdrawn, or (ii) that it should be treated as an application for entry in the general section of the register, on provision of any further information and evidence required for such an application; or (b) in the case of a charity registered in the general section of the register - (i) that the charity should remain so registered, or (ii) that the charity should be treated as applying to be deregistered, on provision of any further information and evidence required for such an application."
+    ... r's `(5) the request was accompanied by a statement of the applicant's intention in the event of refusal of the request`
+
+§§ `Article 9(6) — the THREE-LIMB CONJUNCTION behind a PROHIBITION-UNLESS`
+
+GIVEN r IS A RestrictedSectionRequest
+GIVETH A BOOLEAN
+`Article 9(6)(a) — the request complied with paragraphs (4) and (5)` r MEANS
+        "(a) that the request complied with paragraphs (4) and (5);"
+    ... `Article 9(4) — the form of the request` r
+    AND `Article 9(5) — the statement of the applicant's intention` r
+
+GIVEN r IS A RestrictedSectionRequest
+GIVETH A BOOLEAN
+`Article 9(6)(b) — one of the conditions prescribed under paragraph (2) is met` r MEANS
+        "(b) that one of the conditions prescribed under paragraph (2) is met; and"
+    ... `Article 9(2) — the funding condition (or other prescribed condition) is met` r
+
+-- A NEGATIVE limb: no mandatory ground, and no discretionary ground the Commissioner
+-- thinks should be acted on.
+GIVEN r IS A RestrictedSectionRequest
+GIVETH A BOOLEAN
+`Article 9(6)(c) — no ground prescribed under paragraph (3) requires or warrants refusal` r MEANS
+        "(c) that there is no ground, prescribed under paragraph (3), on which the request must be refused or, in the case of a discretionary ground, on which the Commissioner considers the request should be refused."
+    ... NOT r's `there is a ground, prescribed under Article 9(3), on which the request must be refused`
+    AND NOT r's `there is a discretionary ground, prescribed under Article 9(3), on which the Commissioner considers the request should be refused`
+
+GIVEN r IS A RestrictedSectionRequest
+GIVETH A BOOLEAN
+`Article 9(6) — the Commissioner is satisfied of all three limbs` r MEANS
+        "(6) The Commissioner must not enter a charity in the restricted section of the register unless satisfied -"
+    ... `Article 9(6)(a) — the request complied with paragraphs (4) and (5)` r
+    AND `Article 9(6)(b) — one of the conditions prescribed under paragraph (2) is met` r
+    AND `Article 9(6)(c) — no ground prescribed under paragraph (3) requires or warrants refusal` r
+
+-- The PROHIBITION-UNLESS. See INTERPRETATION CALL [5]: satisfaction LIFTS the bar;
+-- it does not create a duty to enter.
+GIVEN r IS A RestrictedSectionRequest
+GIVETH A DEONTIC Actor Part4Action
+`Article 9(6) — the prohibition on entry in the restricted section` r MEANS
+    IF   `Article 9(6) — the Commissioner is satisfied of all three limbs` r
+    THEN PARTY Commissioner MAY   `enter the charity in the restricted section of the register` WITHIN 90
+    ELSE PARTY Commissioner SHANT `enter the charity in the restricted section of the register` WITHIN 90
+
+GIVEN r IS A RestrictedSectionRequest
+GIVETH A DEONTIC Actor Part4Action
+`Article 9(7) — the consequences of refusing a request` r MEANS
+    -- "(7) If the Commissioner refuses a request, he or she -"
+    IF   r's `the Commissioner refuses the request`
+    -- "(a) must give written notice of the refusal to the applicant or charity; and"
+    THEN (PARTY Commissioner MUST `give written notice of the refusal of the request` WITHIN 14)
+         RAND
+         -- "(b) may proceed on the basis of the intention stated under paragraph (5)."
+         (PARTY Commissioner MAY `proceed on the basis of the intention stated under Article 9(5)` WITHIN 14)
+    ELSE FULFILLED
+
+§ `Article 10 — Public access`
+
+§§ `Article 10(4) and 10(5) — the safety or security designation`
+
+-- See INTERPRETATION CALL [4]: a purported designation only BITES if the Art 10(4)
+-- condition is made out. Art 10(4) says "Paragraph (5) APPLIES IF ..." — so a
+-- designation outside it is ultra vires and does not remove the matter from the
+-- public parts of the register.
+GIVEN e IS A RegisterEntry
+GIVETH A BOOLEAN
+`Article 10(4) — paragraph (5) applies` e MEANS
+        "(4) Paragraph (5) applies if the Commissioner considers, in relation to a particular registered charity, that the safety or security of any person, property or premises would be significantly put at risk by public access to a matter entered on any section of the register in respect of that charity."
+    ... e's `the Commissioner considers that the safety or security of any person, property or premises would be significantly put at risk by public access to the matter`
+
+GIVEN e IS A RegisterEntry
+GIVETH A BOOLEAN
+`Article 10(5) — the matter is effectively designated as not being a public part` e MEANS
+        "(5) The Commissioner may designate that matter as not being a public part of the register, in relation to that registered charity."
+    ... e's `the Commissioner has purported to designate the matter as not being a public part of the register`
+    AND `Article 10(4) — paragraph (5) applies` e
+
+§§ `Article 10(3) — the public parts of the register`
+
+GIVEN e IS A RegisterEntry
+GIVETH A BOOLEAN
+`Article 10(3) — the matter is a public part of the register` e MEANS
+        "(3) For the purpose of paragraphs (1) and (2), the public parts of the register are, subject to paragraph (5) -"
+    ...     "(a) the general section;"
+        ..  e's section EQUALS `the general section`
+        ..  "(b) the public elements of the restricted section, within the meaning of Article 9(1); and"
+        ..  `Article 9(1) — a public element of the restricted section` e
+        ..  "(c) the historic section."
+        ..  e's section EQUALS `the historic section`
+    AND "subject to paragraph (5)"
+    ... NOT `Article 10(5) — the matter is effectively designated as not being a public part` e
+
+§§ `Article 10 — the regulative layer`
+
+GIVETH A DEONTIC Actor Part4Action
+`Article 10(1) — the duty of public access` MEANS
+    PARTY Commissioner MUST `make the public parts of the register available on a website without charge` WITHIN 30
+
+GIVEN e IS A RegisterEntry
+GIVETH A DEONTIC Actor Part4Action
+`Article 10(5) — the power to designate a matter as not being a public part` e MEANS
+    IF   `Article 10(4) — paragraph (5) applies` e
+    THEN PARTY Commissioner MAY `designate the matter as not being a public part of the register` WITHIN 30
+    ELSE FULFILLED
+
+§ `Article 12(1) — the "undesirable" test (defined here; consumed by Article 11(4)(e))`
+
+-- Art 12(1) is stated FOR THE PURPOSE OF Art 11(4)(e), so it is defined before the
+-- registration test that negates it. A four-limb DISJUNCTION. "In the opinion of the
+-- Commissioner" is folded into each atom: INTERPRETATION CALL [3].
+DECLARE ProposedName HAS
+    `the name`                                                      IS A STRING
+    `(a) is the same as, or too similar to, the name of any other registered charity`  IS A BOOLEAN
+    `(b) is likely to mislead the public as to the purpose, activities or identity of the entity`  IS A BOOLEAN
+    `(c) gives the impression that the entity is connected to any person to which it is not connected, whether in Jersey or elsewhere`  IS A BOOLEAN
+    `(d) is offensive`                                              IS A BOOLEAN
+
+GIVEN n IS A ProposedName
+GIVETH A BOOLEAN
+`Article 12(1) — the name is undesirable` n MEANS
+        "(1) For the purpose of Article 11(4)(e), the name of an entity is undesirable as the registered name of a charity if, in the opinion of the Commissioner, the name -"
+    ..  "(a) is the same as, or too similar to, the name of any other registered charity;"
+    ..  n's `(a) is the same as, or too similar to, the name of any other registered charity`
+    ..  "(b) is likely to mislead the public as to the purpose, activities or identity of the entity;"
+    ..  n's `(b) is likely to mislead the public as to the purpose, activities or identity of the entity`
+    ..  "(c) gives the impression that the entity is connected to any person to which it is not connected, whether in Jersey or elsewhere; or"
+    ..  n's `(c) gives the impression that the entity is connected to any person to which it is not connected, whether in Jersey or elsewhere`
+    ..  "(d) is offensive."
+    ..  n's `(d) is offensive`
+
+§ `Article 11 — Application to register`
+
+§§ `The application`
+
+DECLARE RegistrationApplication HAS
+    applicant                                                       IS A CandidateCharity
+    `the proposed name`                                             IS A ProposedName
+    address                                                         IS A PrincipalAddressFacts
+
+    -- Article 11(2) — the applicant's DUTY CHECKLIST, (a) to (f). Unlike Art 8(3),
+    -- this checklist IS load-bearing: it is the first term of the Art 11(4)
+    -- COMPLIANCE GATE. So it is modelled as a conjunction that feeds that gate.
+    `(2)(a) information and evidence, as at the time of the application and (if different) as proposed once the entity is registered, as to how the entity meets the requirements of paragraphs (4)(c) and (d), the matters required to be registered under sub-paragraphs (a), (b) and (d) of Article 8(3), and (if applicable) those under sub-paragraphs (h), (i), (m) and (n) of Article 8(3)`  IS A BOOLEAN
+    `(2)(b) a copy of the applicant's constitution`                 IS A BOOLEAN
+    `(2)(c) a draft of the proposed statement of the entity's registered charitable purposes`  IS A BOOLEAN
+    `(2)(d) a draft of the entity's registered public benefit statement`  IS A BOOLEAN
+    `(2)(e) details of the applicant's most recent financial accounts, of any payment made to any governor in the 12 months preceding the application, of any other financial information that would be required on an application under the Non-Profit Organizations (Jersey) Law 2008, and of any further financial information prescribed by the Minister by Order`  IS A BOOLEAN
+    `(2)(f) such other information, documents and evidence as may be required by Regulations under paragraph (3), or otherwise requested by the Commissioner in order to determine the application`  IS A BOOLEAN
+
+    -- The other two terms of the Art 11(4) compliance gate.
+    `the applicant complies with any Regulations under Article 11(3)`  IS A BOOLEAN
+    -- Art 19(5) lives in Part 5 (governors' reportable-matter declarations). It is a
+    -- CROSS-PART gate; carried here as an atom, to be discharged by that file.
+    `the applicant complies with Article 19(5)`                      IS A BOOLEAN
+
+    -- Article 11(4)(a) — the second disjunct. The first is `meets the charity test`,
+    -- imported from Part 3 and asked of `applicant`.
+    `the applicant will meet the charity test on registration`       IS A BOOLEAN
+
+    -- Article 11(4)(b)
+    `the constitution of the applicant is a written document`        IS A BOOLEAN
+
+    -- Article 11(4)(c)(ii). "(i) is a Jersey entity" is imported from Part 1 and
+    -- asked of the applicant's Entity.
+    `the applicant carries out, or intends to carry out, in or from within Jersey, an activity that is, in the opinion of the Commissioner, substantial`  IS A BOOLEAN
+
+    -- Article 11(4)(f) / 11(7). The ONLY computable residue of the Regulation-making
+    -- power in Art 11(7): a single atom, exposed so that 11(4)(f) has something to
+    -- negate. We invent NO grounds. See the stub below.
+    `a ground for refusal, prescribed under Article 11(7), applies or should be applied`  IS A BOOLEAN
+
+    -- Article 11(10) — the NPO cross-registration.
+    `the applicant is an entity that is required to be registered under the Non-Profit Organizations (Jersey) Law 2008 but is not so registered`  IS A BOOLEAN
+    `(10)(a) the applicant provided with the application the additional information that must be provided to the JFSC in an application for registration under that Law`  IS A BOOLEAN
+    `(10)(b) the applicant requested to be registered under that Law`  IS A BOOLEAN
+
+§§ `Article 11(2) — the applicant's checklist: the first term of the compliance gate`
+
+GIVEN app IS A RegistrationApplication
+GIVETH A BOOLEAN
+`Article 11(2) — the applicant complies with paragraph (2)` app MEANS
+        "(2) The applicant must provide to the Commissioner, in such form as the Commissioner may publish in relation to an entity of a description into which that charity falls -"
+    ... "(a) information and evidence, as at the time of the application and (if different) as proposed once the entity is registered, as to - (i) how the entity meets the requirements of paragraphs (4)(c) and (d), (ii) the matters that are required to be registered under sub-paragraphs (a), (b) and (d) of Article 8(3), and (iii) if applicable, the matters that are required to be registered under sub-paragraphs (h), (i), (m) and (n) of Article 8(3);"
+    ... app's `(2)(a) information and evidence, as at the time of the application and (if different) as proposed once the entity is registered, as to how the entity meets the requirements of paragraphs (4)(c) and (d), the matters required to be registered under sub-paragraphs (a), (b) and (d) of Article 8(3), and (if applicable) those under sub-paragraphs (h), (i), (m) and (n) of Article 8(3)`
+    AND "(b) a copy of the applicant's constitution;"
+    ... app's `(2)(b) a copy of the applicant's constitution`
+    AND "(c) a draft of the proposed statement of the entity's registered charitable purposes;"
+    ... app's `(2)(c) a draft of the proposed statement of the entity's registered charitable purposes`
+    AND "(d) a draft of the entity's registered public benefit statement;"
+    ... app's `(2)(d) a draft of the entity's registered public benefit statement`
+    AND "(e) details of - (i) the applicant's most recent, if any, financial accounts, (ii) any payment made to any governor of the entity in the 12 months preceding the application, and if an Order under Article 13(9)(b) applies to the registered charity, a draft of the proposed statement under that Order, (iii) any other financial information that would be required if the application were for registration under the Non-Profit Organizations (Jersey) Law 2008, and (iv) if the applicant is not requesting entry in the restricted section of the register, any further financial information prescribed by the Minister by Order; and"
+    ... app's `(2)(e) details of the applicant's most recent financial accounts, of any payment made to any governor in the 12 months preceding the application, of any other financial information that would be required on an application under the Non-Profit Organizations (Jersey) Law 2008, and of any further financial information prescribed by the Minister by Order`
+    AND "(f) such other information, documents and evidence as may be - (i) required by Regulations under paragraph (3), or (ii) otherwise requested by the Commissioner in order to determine the application."
+    ... app's `(2)(f) such other information, documents and evidence as may be required by Regulations under paragraph (3), or otherwise requested by the Commissioner in order to determine the application`
+
+§§ `Article 11(4) — THE REGISTRATION TEST`
+
+-- ---------------------------------------------------------------------------
+-- THE COMPLIANCE GATE. "If the applicant complies with paragraph (2), with any
+-- Regulations under paragraph (3), and with Article 19(5), ..."
+-- ---------------------------------------------------------------------------
+GIVEN app IS A RegistrationApplication
+GIVETH A BOOLEAN
+`Article 11(4) — the compliance gate` app MEANS
+        "(4) If the applicant complies with paragraph (2), with any Regulations under paragraph (3), and with Article 19(5),"
+    ... `Article 11(2) — the applicant complies with paragraph (2)` app
+    AND app's `the applicant complies with any Regulations under Article 11(3)`
+    AND app's `the applicant complies with Article 19(5)`
+
+-- ---------------------------------------------------------------------------
+-- THE SIX LIMBS the Commissioner must be satisfied of. (a) and (c) are themselves
+-- DISJUNCTIONS; (e) and (f) are NEGATIVE limbs.
+-- ---------------------------------------------------------------------------
+
+-- (a) — a DISJUNCTION, and the hinge on which Part 3 is imported. Note "or will do
+-- so ON REGISTRATION": an entity whose constitution takes effect, or whose purposes
+-- crystallise, only upon registration is not shut out.
+GIVEN app IS A RegistrationApplication
+GIVETH A BOOLEAN
+`Article 11(4)(a) — meets the charity test, or will do so on registration` app MEANS
+        "(a) the applicant meets the charity test, or will do so on registration;"
+    ..  `meets the charity test` (app's applicant)
+    ..  "or will do so on registration"
+    ..  app's `the applicant will meet the charity test on registration`
+
+GIVEN app IS A RegistrationApplication
+GIVETH A BOOLEAN
+`Article 11(4)(b) — the constitution of the applicant is a written document` app MEANS
+        "(b) the constitution of the applicant is a written document;"
+    ... app's `the constitution of the applicant is a written document`
+
+-- (c) — a DISJUNCTION. Limb (i) is imported from Part 1 (Art 2(3)); limb (ii) is the
+-- "substantial activity" route, on which Art 11(6) requires published guidance.
+GIVEN app IS A RegistrationApplication
+GIVETH A BOOLEAN
+`Article 11(4)(c) — Jersey entity or substantial activity in or from within Jersey` app MEANS
+        "(c) the applicant -"
+    ..  "(i) is a Jersey entity, or"
+    ..  `is a Jersey entity` (app's applicant's entity)
+    ..  "(ii) carries out, or intends to carry out, in or from within Jersey, an activity that is, in the opinion of the Commissioner, substantial;"
+    ..  app's `the applicant carries out, or intends to carry out, in or from within Jersey, an activity that is, in the opinion of the Commissioner, substantial`
+
+GIVEN app IS A RegistrationApplication
+GIVETH A BOOLEAN
+`Article 11(4)(d) — a principal address in Jersey within the meaning of Article 8(4)` app MEANS
+        "(d) the applicant has a principal address in Jersey, within the meaning of Article 8(4);"
+    ... `Article 8(4) — has a principal address in Jersey` (app's address)
+
+-- (e) — a NEGATIVE limb over the Article 12(1) four-limb disjunction.
+GIVEN app IS A RegistrationApplication
+GIVETH A BOOLEAN
+`Article 11(4)(e) — the name of the applicant is not undesirable under Article 12` app MEANS
+        "(e) the name of the applicant is not undesirable under Article 12; and"
+    ... NOT `Article 12(1) — the name is undesirable` (app's `the proposed name`)
+
+-- (f) — a second NEGATIVE limb, this one over the (as yet unmade) Regulations under
+-- paragraph (7). We invent no grounds; we expose the single atom that (f) negates.
+GIVEN app IS A RegistrationApplication
+GIVETH A BOOLEAN
+`Article 11(4)(f) — no other prescribed ground for refusal applies or should be applied` app MEANS
+        "(f) no other ground for refusal, prescribed under paragraph (7), applies or should be applied."
+    ... NOT app's `a ground for refusal, prescribed under Article 11(7), applies or should be applied`
+
+-- ---------------------------------------------------------------------------
+-- "the Commissioner must register the applicant as a charity IF SATISFIED THAT -"
+-- ---------------------------------------------------------------------------
+GIVEN app IS A RegistrationApplication
+GIVETH A BOOLEAN
+`Article 11(4) — the Commissioner is satisfied of sub-paragraphs (a) to (f)` app MEANS
+        "the Commissioner must register the applicant as a charity if satisfied that -"
+    ... `Article 11(4)(a) — meets the charity test, or will do so on registration` app
+    AND `Article 11(4)(b) — the constitution of the applicant is a written document` app
+    AND `Article 11(4)(c) — Jersey entity or substantial activity in or from within Jersey` app
+    AND `Article 11(4)(d) — a principal address in Jersey within the meaning of Article 8(4)` app
+    AND `Article 11(4)(e) — the name of the applicant is not undesirable under Article 12` app
+    AND `Article 11(4)(f) — no other prescribed ground for refusal applies or should be applied` app
+
+-- THE WHOLE OF ARTICLE 11(4), IN TWO LINES: the gate, then the six limbs.
+GIVEN app IS A RegistrationApplication
+GIVETH A BOOLEAN
+`Article 11(4) — the registration test is met` app MEANS
+        `Article 11(4) — the compliance gate` app
+    AND `Article 11(4) — the Commissioner is satisfied of sub-paragraphs (a) to (f)` app
+
+-- Article 11(5) — "If not so satisfied, the Commissioner must refuse to register the
+-- applicant." "So satisfied" points back at (a) to (f), NOT at the compliance gate.
+-- See INTERPRETATION CALL [1].
+GIVEN app IS A RegistrationApplication
+GIVETH A BOOLEAN
+`Article 11(5) — the Commissioner is not so satisfied` app MEANS
+        "(5) If not so satisfied, the Commissioner must refuse to register the applicant."
+    ... NOT `Article 11(4) — the Commissioner is satisfied of sub-paragraphs (a) to (f)` app
+
+§§ `Article 11(10) and 11(11) — NPO cross-registration`
+
+GIVEN app IS A RegistrationApplication
+GIVETH A BOOLEAN
+`Article 11(10) — the applicant is an unregistered NPO` app MEANS
+        "(10) An applicant for registration, if it is an entity that is required to be registered under the Non-Profit Organizations (Jersey) Law 2008 but is not so registered, must -"
+    ... app's `the applicant is an entity that is required to be registered under the Non-Profit Organizations (Jersey) Law 2008 but is not so registered`
+
+GIVEN app IS A RegistrationApplication
+GIVETH A BOOLEAN
+`Article 11(11) — the Commissioner receives information and a request under paragraph (10)` app MEANS
+        "(11) If the Commissioner receives information and a request under paragraph (10) -"
+    ... `Article 11(10) — the applicant is an unregistered NPO` app
+    AND "(10)(a) provide with the application any additional information that must be provided to the JFSC in an application for registration under that Law; and"
+    ... app's `(10)(a) the applicant provided with the application the additional information that must be provided to the JFSC in an application for registration under that Law`
+    AND "(10)(b) request to be registered under that Law (by virtue of paragraph (11))."
+    ... app's `(10)(b) the applicant requested to be registered under that Law`
+
+§§ `Article 11 — the regulative layer`
+
+-- REVIEWABLE PLACEHOLDERS. Art 11(8)(a) leaves "the period within which the
+-- Commissioner must make a decision on an application" to be prescribed by Order.
+-- There is NO number in the Law. WITHIN 90 (decision) and WITHIN 14 (certificate)
+-- are placeholders, not statute. See INTERPRETATION CALL [8].
+
+GIVETH A DEONTIC Actor Part4Action
+`Article 11(1) — an entity may apply to be registered` MEANS
+    PARTY Applicant MAY `apply to be registered as a charity` WITHIN 365
+
+GIVETH A DEONTIC Actor Part4Action
+`Article 11(2) — the applicant's duty to provide` MEANS
+    PARTY Applicant MUST `provide to the Commissioner the information, documents and evidence required by Article 11(2)` WITHIN 30
+
+-- *** ARTICLE 11(4) AND 11(5) — THE GUARDED MANDATORY DUTY. ***
+-- The two-arm reading: register (and then certify, Art 11(9)(a)), or refuse.
+GIVEN app IS A RegistrationApplication
+GIVETH A DEONTIC Actor Action
+`Article 11(4) and 11(5) — the registration decision` app MEANS
+    IF   `Article 11(4) — the registration test is met` app
+    THEN PARTY Commissioner MUST `register the applicant as a charity` WITHIN 90
+         -- Art 11(9)(a): "on registering an entity as a charity, issue to that
+         -- charity a certificate of registration ... confirming the registered name,
+         -- the registration number and the date of registration".
+         HENCE PARTY Commissioner MUST `issue a certificate of registration` WITHIN 14
+    ELSE PARTY Commissioner MUST `refuse to register the applicant` WITHIN 90
+
+-- The LITERAL three-way reading. See INTERPRETATION CALL [1]: on the face of the
+-- text, an applicant who fails the COMPLIANCE GATE engages neither the duty to
+-- register (11(4)) nor the duty to refuse (11(5)) — the Commissioner is not seized
+-- of a decidable application. Kept alongside the two-arm model so the gap is visible
+-- rather than papered over.
+GIVEN app IS A RegistrationApplication
+GIVETH A DEONTIC Actor Action
+`Article 11(4) and 11(5) — the registration decision (the literal three-way reading)` app MEANS
+    IF   NOT `Article 11(4) — the compliance gate` app
+    THEN FULFILLED                                   -- incomplete: no Art 11(4)/(5) duty arises
+    ELSE IF   `Article 11(4) — the Commissioner is satisfied of sub-paragraphs (a) to (f)` app
+         THEN PARTY Commissioner MUST `register the applicant as a charity` WITHIN 90
+              HENCE PARTY Commissioner MUST `issue a certificate of registration` WITHIN 14
+         ELSE PARTY Commissioner MUST `refuse to register the applicant` WITHIN 90
+
+-- Article 11(6) — the "substantial activity" guidance. (a) publish and maintain;
+-- (b) Arts 5(6)-(8) apply to it (see Part 3's consultation-and-laying chain);
+-- (c) the Commissioner must have regard to it; (d) so must a registered charity, a
+-- governor, the tribunal and the court. Five duty-bearers, woven with RAND.
+GIVETH A DEONTIC Actor Part4Action
+`Article 11(6) — the substantial-activity guidance` MEANS
+    (PARTY Commissioner MUST `publish and maintain guidance as to whether an activity is substantial` WITHIN 90)
+    RAND
+    (PARTY Commissioner MUST `have regard to the guidance as to whether an activity is substantial` WITHIN 90)
+    RAND
+    (PARTY Charity MUST `have regard to the guidance as to whether an activity is substantial` WITHIN 90)
+    RAND
+    (PARTY Governor MUST `have regard to the guidance as to whether an activity is substantial` WITHIN 90)
+    RAND
+    (PARTY Tribunal MUST `have regard to the guidance as to whether an activity is substantial` WITHIN 90)
+    RAND
+    (PARTY Court MUST `have regard to the guidance as to whether an activity is substantial` WITHIN 90)
+
+-- Article 11(10) and 11(11) — the cross-registration chain, across THREE parties:
+-- the applicant provides and requests; the Commissioner passes on; the JFSC receives
+-- the request AS an application under the 2008 Law.
+GIVEN app IS A RegistrationApplication
+GIVETH A DEONTIC Actor Part4Action
+`Article 11(10) — the unregistered NPO applicant's duty` app MEANS
+    IF   `Article 11(10) — the applicant is an unregistered NPO` app
+    THEN (PARTY Applicant MUST `provide with the application the additional information required by the JFSC` WITHIN 30)
+         RAND
+         (PARTY Applicant MUST `request to be registered under the Non-Profit Organizations (Jersey) Law 2008` WITHIN 30)
+    ELSE FULFILLED
+
+GIVEN app IS A RegistrationApplication
+GIVETH A DEONTIC Actor Part4Action
+`Article 11(11) — onward transmission to the JFSC` app MEANS
+    IF   `Article 11(11) — the Commissioner receives information and a request under paragraph (10)` app
+    THEN PARTY Commissioner MUST `pass the request, information and documents to the JFSC` WITHIN 30
+         HENCE PARTY JFSC MUST `treat the request as an application for registration under that Law` WITHIN 30
+    ELSE FULFILLED
+
+§ `Article 12 — Name of charity (paragraphs (2) to (7))`
+
+§§ `Article 12(2) — the registered name and the registration number`
+
+-- A duty CONSEQUENTIAL on registration. The antecedent is exactly the Art 11(4) test.
+GIVEN app IS A RegistrationApplication
+GIVETH A DEONTIC Actor Part4Action
+`Article 12(2) — the registered name and registration number` app MEANS
+    -- "(2) If the Commissioner registers the entity, the Commissioner must -
+    --      (a) enter the name of the entity in the register (the 'registered name'); and
+    --      (b) allocate a number in respect of the registration, and enter that
+    --          number ('the registration number') in the register."
+    IF   `Article 11(4) — the registration test is met` app
+    THEN PARTY Commissioner MUST `enter the registered name and allocate and enter the registration number` WITHIN 14
+    ELSE FULFILLED
+
+§§ `Article 12(3) to 12(6) — change of, or addition to, the registered name`
+
+DECLARE NameChangeApplication HAS
+    `the registered charity`                                        IS A STRING
+    `the proposed name`                                             IS A ProposedName
+    `the Commissioner grants permission`                            IS A BOOLEAN
+    `the registered charity notifies the Commissioner that it has changed or added the name accordingly`  IS A BOOLEAN
+    -- Art 12(6): the cross-reference to Art 13(6)(b) (Part 4, but the other agent's
+    -- file). Carried as an atom.
+    `the registered charity has reported a matter relating to its registered name under Article 13(6)(b)`  IS A BOOLEAN
+
+-- Art 12(4) applies "any of the grounds in sub-paragraphs (a) to (d) of paragraph
+-- (1)" — the SAME four-limb disjunction as Art 12(1), so it is re-used verbatim.
+GIVEN c IS A NameChangeApplication
+GIVETH A BOOLEAN
+`Article 12(4) — a ground in paragraph (1)(a) to (d) applies to the proposed name` c MEANS
+        "(4) The Commissioner must refuse permission if, in his or her opinion, any of the grounds in sub-paragraphs (a) to (d) of paragraph (1) applies in relation to the proposed name."
+    ... `Article 12(1) — the name is undesirable` (c's `the proposed name`)
+
+GIVEN c IS A NameChangeApplication
+GIVETH A BOOLEAN
+`Article 12(5) — the new or alternative name falls to be entered` c MEANS
+        "(5) If the Commissioner grants permission, and the registered charity notifies the Commissioner that it has changed or added the name accordingly, the Commissioner must enter on the register the new or alternative registered name."
+    ... c's `the Commissioner grants permission`
+    AND c's `the registered charity notifies the Commissioner that it has changed or added the name accordingly`
+
+-- Art 12(3) — a PERMISSION.
+GIVETH A DEONTIC Actor Part4Action
+`Article 12(3) — a registered charity may apply to change or add a registered name` MEANS
+    PARTY Charity MAY `apply for permission to change or add a registered name` WITHIN 365
+
+-- Art 12(4) — the MANDATORY REFUSAL arm. See INTERPRETATION CALL [6]: there is NO
+-- converse duty to grant, so the ELSE arm is FULFILLED, not a duty to permit.
+GIVEN c IS A NameChangeApplication
+GIVETH A DEONTIC Actor Action
+`Article 12(4) — the Commissioner must refuse permission` c MEANS
+    IF   `Article 12(4) — a ground in paragraph (1)(a) to (d) applies to the proposed name` c
+    THEN PARTY Commissioner MUST `refuse permission to change the registered name` WITHIN 30
+    ELSE FULFILLED
+
+-- Art 12(5) — the DUTY to enter, once permission is granted AND the change notified.
+GIVEN c IS A NameChangeApplication
+GIVETH A DEONTIC Actor Part4Action
+`Article 12(5) — the duty to enter the new or alternative registered name` c MEANS
+    IF   `Article 12(5) — the new or alternative name falls to be entered` c
+    THEN PARTY Commissioner MUST `enter on the register the new or alternative registered name` WITHIN 30
+    ELSE FULFILLED
+
+-- Art 11(9)(b) — the FURTHER certificate, on entry of a new or alternative name.
+-- THE ENUM SEAM (see INTERPRETATION CALL [9]): `issue a certificate of registration`
+-- lives in charities-common's Action, while `enter on the register the new or
+-- alternative registered name` lives in Part4Action. A HENCE chain cannot cross the
+-- two types, so this duty is GUARDED on the same BOOLEAN that Art 12(5) is guarded
+-- on, rather than chained off it. Same logic, different surface.
+GIVEN c IS A NameChangeApplication
+GIVETH A DEONTIC Actor Action
+`Article 11(9)(b) — a further certificate on entry of a new or alternative name` c MEANS
+    -- "(9)(b) on entering on the register a new or alternative registered name, under
+    --  Article 12(5), issue a further such certificate confirming the new or
+    --  alternative registered name and the date on which that name was entered."
+    IF   `Article 12(5) — the new or alternative name falls to be entered` c
+    THEN PARTY Commissioner MUST `issue a certificate of registration` WITHIN 14
+    ELSE FULFILLED
+
+-- Art 12(6) — a POWER to require an application under (3), triggered by a report
+-- under Art 13(6)(b).
+GIVEN c IS A NameChangeApplication
+GIVETH A DEONTIC Actor Part4Action
+`Article 12(6) — the power to require an application to change the registered name` c MEANS
+    -- "(6) If a registered charity reports a matter relating to its registered name
+    --  under Article 13(6)(b), the Commissioner may require the charity to apply to
+    --  change its registered name under paragraph (3)."
+    IF   c's `the registered charity has reported a matter relating to its registered name under Article 13(6)(b)`
+    THEN PARTY Commissioner MAY `require the charity to apply to change its registered name` WITHIN 30
+    ELSE FULFILLED
+
+§§ `Article 12(7) — the restriction on using other names`
+
+DECLARE NameInUse HAS
+    `the name as used`                                              IS A ProposedName
+    `(7)(a) it is the charity's registered name or one of its registered names`  IS A BOOLEAN
+    `(7)(b)(i) it is related to such a name`                        IS A BOOLEAN
+
+-- The two-limb EXCEPTION to the prohibition. Limb (b) reaches back into Art 12(1),
+-- but asked "in the context in which it is used" — the SAME four grounds, a
+-- different frame of reference. INTERPRETATION CALL [3] applies to the opinion.
+GIVEN u IS A NameInUse
+GIVETH A BOOLEAN
+`Article 12(7) — the name is a permitted name` u MEANS
+        "(7) A registered charity must not use any name other than -"
+    ..  "(a) its registered name or one of its registered names; or"
+    ..  u's `(7)(a) it is the charity's registered name or one of its registered names`
+    ..      "(b) another name that -"
+        ... "(i) is related to such a name, and"
+        ... u's `(7)(b)(i) it is related to such a name`
+        AND "(ii) is not, in the opinion of the Commissioner, undesirable within the meaning of paragraph (1), in the context in which it is used."
+        ... NOT `Article 12(1) — the name is undesirable` (u's `the name as used`)
+
+GIVEN u IS A NameInUse
+GIVETH A DEONTIC Actor Part4Action
+`Article 12(7) — the prohibition on using other names` u MEANS
+    IF   `Article 12(7) — the name is a permitted name` u
+    THEN FULFILLED
+    ELSE PARTY Charity SHANT `use a name other than a permitted name` WITHIN 30
+
+§ `The Order- and Regulation-making powers: labelled INERT-PROSE stubs`
+
+-- These provisions confer power to make subordinate legislation. They have NO
+-- computable content until the Order or Regulations are made. We carry them as
+-- labelled inert-prose stubs so the corpus has NO SILENT GAP, and we invent NO
+-- logic for them. Where a power has a computable RESIDUE, that residue is a single
+-- BOOLEAN atom on the relevant record, named at the stub.
+
+`Article 9(3) — the Order prescribing grounds for accepting or refusing a request (STUB)` MEANS
+        "(3) The Order -"
+    ... "(a) must prescribe grounds, that may include the exercise of discretion by the Commissioner, on which the Commissioner may accept or refuse such a request;"
+    ... "(b) must specify, for the purpose of paragraph (2)(a) - (i) what constitutes soliciting, (ii) what constitutes a donation, and (iii) if the Order does not prescribe a description of persons, what constitutes the general public for the purpose of the Order; and"
+    ... "(c) may make provision under sub-paragraph (b) by reference to the exercise of discretion by the Commissioner, or in any other manner."
+    -- RESIDUE: RestrictedSectionRequest's two atoms
+    --   `there is a ground, prescribed under Article 9(3), on which the request must be refused`
+    --   `there is a discretionary ground, prescribed under Article 9(3), on which the Commissioner considers the request should be refused`
+    -- which Article 9(6)(c) negates.
+#EVAL `Article 9(3) — the Order prescribing grounds for accepting or refusing a request (STUB)`
+
+`Article 10(2) — the Order providing for other means of public access (STUB)` MEANS
+        "(2) The Minister may by Order provide for the Commissioner to make the public parts of the register available in any other specified manner, to the public or to such description of persons as may be specified, on payment of -"
+    ... "(a) a specified charge; or"
+    ... "(b) a charge determined and published by the Commissioner."
+    -- NO residue: this power adds an ADDITIONAL channel of access, and cannot
+    -- subtract from the Art 10(1) website duty.
+#EVAL `Article 10(2) — the Order providing for other means of public access (STUB)`
+
+`Article 11(3) — the Regulations as to information and procedure (STUB)` MEANS
+        "(3) The States may by Regulations -"
+    ... "(a) prescribe other information, documents or evidence that must be provided on an application;"
+    ... "(b) make further provision as to the procedure for making an application."
+    -- RESIDUE: RegistrationApplication's atom
+    --   `the applicant complies with any Regulations under Article 11(3)`
+    -- which is the SECOND term of the Article 11(4) compliance gate.
+#EVAL `Article 11(3) — the Regulations as to information and procedure (STUB)`
+
+`Article 11(7) — the Regulations prescribing further grounds of refusal (STUB)` MEANS
+        "(7) The States may by Regulations prescribe further grounds on which an application must or may be refused, and those grounds may, without limitation, include -"
+    ... "(a) that the entity has only one governor, not being a person who, by way of acting as a governor, carries on a prescribed description of regulated financial services business or any other prescribed description of business; or"
+    ... "(b) that a number or proportion of its governors are related to each other in prescribed ways."
+    -- RESIDUE: RegistrationApplication's atom
+    --   `a ground for refusal, prescribed under Article 11(7), applies or should be applied`
+    -- which Article 11(4)(f) negates. The two illustrations in (a) and (b) are
+    -- expressly non-exhaustive ("without limitation") and are NOT yet law, so we
+    -- do NOT lift them into limbs of their own.
+#EVAL `Article 11(7) — the Regulations prescribing further grounds of refusal (STUB)`
+
+`Article 11(8) — the Order as to the decision period, notification and relief (STUB)` MEANS
+        "(8) The Minister may by Order -"
+    ... "(a) make provision as to - (i) the period within which the Commissioner must make a decision on an application, (ii) the notification to applicants of decisions and of reasons for refusal;"
+    ... "(b) after consulting the Commissioner and any body appearing to the Minister to be representative of interested entities, provide that any provision of paragraph (2) - (i) does not apply to a prescribed description of applicant appearing to the Minister to require relief from the burden of that provision by virtue of the small size, or lack of resources or expertise of applicants of that description, or (ii) applies to a prescribed description of applicant only subject to a modification prescribed by the Order, being a modification that appears to the Minister to give reasonable relief from the burden of that provision, having regard to the small size, or lack of resources or expertise of applicants of that description."
+    -- THIS is why every WITHIN n in this file is a REVIEWABLE PLACEHOLDER: the
+    -- decision period is left ENTIRELY to the Order (8)(a)(i), and no number appears
+    -- anywhere in the Law. See INTERPRETATION CALL [8].
+    -- (8)(b) is also the statutory escape hatch from the Art 11(2) checklist for
+    -- small applicants; until made, the checklist binds in full.
+#EVAL `Article 11(8) — the Order as to the decision period, notification and relief (STUB)`
+
+§ `Tests — Part 4`
+
+§§ `Article 12(1) — the "undesirable" disjunction: one case per limb`
+
+`the name 'Jersey Heritage Trust'` MEANS ProposedName WITH
+    `the name`                                                      IS "Jersey Heritage Trust"
+    `(a) is the same as, or too similar to, the name of any other registered charity`  IS FALSE
+    `(b) is likely to mislead the public as to the purpose, activities or identity of the entity`  IS FALSE
+    `(c) gives the impression that the entity is connected to any person to which it is not connected, whether in Jersey or elsewhere`  IS FALSE
+    `(d) is offensive`                                              IS FALSE
+
+#ASSERT NOT `Article 12(1) — the name is undesirable` `the name 'Jersey Heritage Trust'`
+
+-- 12(1)(a) — too similar to an existing registered charity.
+`the name 'Jersey Heritage Trvst'` MEANS ProposedName WITH
+    `the name`                                                      IS "Jersey Heritage Trvst"
+    `(a) is the same as, or too similar to, the name of any other registered charity`  IS TRUE
+    `(b) is likely to mislead the public as to the purpose, activities or identity of the entity`  IS FALSE
+    `(c) gives the impression that the entity is connected to any person to which it is not connected, whether in Jersey or elsewhere`  IS FALSE
+    `(d) is offensive`                                              IS FALSE
+
+#ASSERT `Article 12(1) — the name is undesirable` `the name 'Jersey Heritage Trvst'`
+
+-- 12(1)(b) — misleading as to purpose or activities.
+`the name 'Jersey Cancer Cure Guarantee'` MEANS ProposedName WITH
+    `the name`                                                      IS "Jersey Cancer Cure Guarantee"
+    `(a) is the same as, or too similar to, the name of any other registered charity`  IS FALSE
+    `(b) is likely to mislead the public as to the purpose, activities or identity of the entity`  IS TRUE
+    `(c) gives the impression that the entity is connected to any person to which it is not connected, whether in Jersey or elsewhere`  IS FALSE
+    `(d) is offensive`                                              IS FALSE
+
+#ASSERT `Article 12(1) — the name is undesirable` `the name 'Jersey Cancer Cure Guarantee'`
+
+-- 12(1)(c) — a false impression of connection. Note it bites "whether in Jersey or
+-- elsewhere", so borrowing the good name of a foreign body is caught too.
+`the name 'The Royal Bailiwick Foundation'` MEANS ProposedName WITH
+    `the name`                                                      IS "The Royal Bailiwick Foundation"
+    `(a) is the same as, or too similar to, the name of any other registered charity`  IS FALSE
+    `(b) is likely to mislead the public as to the purpose, activities or identity of the entity`  IS FALSE
+    `(c) gives the impression that the entity is connected to any person to which it is not connected, whether in Jersey or elsewhere`  IS TRUE
+    `(d) is offensive`                                              IS FALSE
+
+#ASSERT `Article 12(1) — the name is undesirable` `the name 'The Royal Bailiwick Foundation'`
+
+-- 12(1)(d) — offensive.
+`an offensive name` MEANS ProposedName WITH
+    `the name`                                                      IS "an offensive name"
+    `(a) is the same as, or too similar to, the name of any other registered charity`  IS FALSE
+    `(b) is likely to mislead the public as to the purpose, activities or identity of the entity`  IS FALSE
+    `(c) gives the impression that the entity is connected to any person to which it is not connected, whether in Jersey or elsewhere`  IS FALSE
+    `(d) is offensive`                                              IS TRUE
+
+#ASSERT `Article 12(1) — the name is undesirable` `an offensive name`
+
+§§ `Article 8(4) — the principal-address CASCADE`
+
+-- Limb (a): a Jersey company, so its registered office is the principal address.
+-- Limbs (b) and (c) are never reached.
+`a company with a registered office in Jersey` MEANS PrincipalAddressFacts WITH
+    `(4)(a) the charity is a company, foundation, or other entity required by its constitutional Law to have a registered office or business address in Jersey`  IS TRUE
+    `(4)(b) there are main premises in Jersey at or from which the activities in Jersey of the charity are managed, controlled or undertaken`  IS FALSE
+    `(4)(b) those premises are a private dwelling house`             IS FALSE
+    `(4)(c) one of the governors of the charity has an address in Jersey`  IS FALSE
+
+#ASSERT `Article 8(4)(a) — the registered office or business address in Jersey` `a company with a registered office in Jersey`
+#ASSERT NOT `Article 8(4)(b) — the main premises in Jersey, not being a private dwelling house` `a company with a registered office in Jersey`
+#ASSERT NOT `Article 8(4)(c) — the Jersey address of one of the governors` `a company with a registered office in Jersey`
+#ASSERT `Article 8(4) — has a principal address in Jersey` `a company with a registered office in Jersey`
+
+-- Limb (b): an unincorporated club with a clubhouse. Not a limb-(a) entity, but it
+-- has real Jersey premises that are not a dwelling house.
+`an association with a clubhouse in Jersey` MEANS PrincipalAddressFacts WITH
+    `(4)(a) the charity is a company, foundation, or other entity required by its constitutional Law to have a registered office or business address in Jersey`  IS FALSE
+    `(4)(b) there are main premises in Jersey at or from which the activities in Jersey of the charity are managed, controlled or undertaken`  IS TRUE
+    `(4)(b) those premises are a private dwelling house`             IS FALSE
+    `(4)(c) one of the governors of the charity has an address in Jersey`  IS TRUE
+
+#ASSERT `Article 8(4)(b) — the main premises in Jersey, not being a private dwelling house` `an association with a clubhouse in Jersey`
+-- The cascade is a PRIORITY cascade: limb (c) is expressly shut once (b) applies.
+#ASSERT NOT `Article 8(4)(c) — the Jersey address of one of the governors` `an association with a clubhouse in Jersey`
+#ASSERT `Article 8(4) — has a principal address in Jersey` `an association with a clubhouse in Jersey`
+
+-- THE STING IN LIMB (b) — INTERPRETATION CALL [2]. The charity is run from a
+-- governor's spare bedroom. The premises ARE the main Jersey premises, but they are
+-- a private dwelling house, so limb (b) yields NO address. The cascade FALLS THROUGH
+-- to limb (c) — and is rescued by the governor's own Jersey address.
+`a charity run from a governor's spare bedroom` MEANS PrincipalAddressFacts WITH
+    `(4)(a) the charity is a company, foundation, or other entity required by its constitutional Law to have a registered office or business address in Jersey`  IS FALSE
+    `(4)(b) there are main premises in Jersey at or from which the activities in Jersey of the charity are managed, controlled or undertaken`  IS TRUE
+    `(4)(b) those premises are a private dwelling house`             IS TRUE   -- the sting
+    `(4)(c) one of the governors of the charity has an address in Jersey`  IS TRUE
+
+#ASSERT NOT `Article 8(4)(b) — the main premises in Jersey, not being a private dwelling house` `a charity run from a governor's spare bedroom`
+#ASSERT `Article 8(4)(c) — the Jersey address of one of the governors` `a charity run from a governor's spare bedroom`
+#ASSERT `Article 8(4) — has a principal address in Jersey` `a charity run from a governor's spare bedroom`
+
+-- All three limbs fail: an entirely offshore body with no Jersey footprint and no
+-- Jersey-resident governor. NO principal address -> Art 11(4)(d) fails.
+`an offshore body with no Jersey footprint` MEANS PrincipalAddressFacts WITH
+    `(4)(a) the charity is a company, foundation, or other entity required by its constitutional Law to have a registered office or business address in Jersey`  IS FALSE
+    `(4)(b) there are main premises in Jersey at or from which the activities in Jersey of the charity are managed, controlled or undertaken`  IS FALSE
+    `(4)(b) those premises are a private dwelling house`             IS FALSE
+    `(4)(c) one of the governors of the charity has an address in Jersey`  IS FALSE
+
+#ASSERT NOT `Article 8(4) — has a principal address in Jersey` `an offshore body with no Jersey footprint`
+
+§§ `The applicants`
+
+-- Part 3 supplies two ready-made candidates, both built on Part 1's `Jersey Heritage
+-- Ltd` (a Jersey company, and so a Jersey entity):
+--   * `Victoria College Trust`               — MEETS the charity test
+--   * `the Le Sueur Family Education Trust`  — FAILS it (Art 7(3)(b): it benefits
+--                                              only identified natural persons)
+-- We add one of our own, built on Part 1's `Guernsey Trust Co (a foreign entity)` —
+-- a (1)(j) entity, and so NOT a Jersey entity. It meets the charity test, but it can
+-- only reach Art 11(4)(c) through the "substantial activity" limb (ii).
+`the Guernsey Heritage Foundation` MEANS CandidateCharity WITH
+    entity                                                          IS `Guernsey Trust Co (a foreign entity)`
+    purposes                                                        IS LIST `the advancement of education`
+    `in giving effect to those purposes, it provides (or, in the case of an applicant, provides or intends to provide) public benefit in Jersey or elsewhere to a reasonable degree`  IS TRUE
+    `the entity benefits only one particular natural person or a group of identified natural persons`  IS FALSE
+    `its constitution expressly permits its activities to be directed or otherwise controlled by, or any of its governors to be, a person of the following description, acting in that capacity`  IS FALSE
+    `(2)(a) a Minister`                                             IS FALSE
+    `(2)(b) a member of the States Assembly`                        IS FALSE
+    `(2)(c) any equivalent of such a person in another jurisdiction`  IS FALSE
+    `an Order under Article 5(3) disapplies paragraph (2) in relation to this entity`  IS FALSE
+
+#ASSERT `meets the charity test` `the Guernsey Heritage Foundation`
+#ASSERT NOT `is a Jersey entity` (`the Guernsey Heritage Foundation`'s entity)
+
+§§ `The application constructor`
+
+-- L4 builds records only from a TYPE NAME; there is no record-update operator. So we
+-- expose a GIVEN-parameterised constructor and vary ONE dial at a time, which is what
+-- makes the knock-out suite below readable. The six Art 11(2) limbs move together on
+-- the single dial `paragraph (2) is complied with`; a separate FULL literal below
+-- breaks one of them individually, to show that the checklist is granular.
+-- The three Art 11(10) NPO fields are FALSE here; a full literal exercises them.
+GIVEN applicant                            IS A CandidateCharity
+      `paragraph (2) is complied with`     IS A BOOLEAN
+      `Regulations under (3) complied with`  IS A BOOLEAN
+      `Article 19(5) complied with`        IS A BOOLEAN
+      `will meet the charity test on registration`  IS A BOOLEAN
+      `the constitution is a written document`  IS A BOOLEAN
+      `substantial activity in or from within Jersey`  IS A BOOLEAN
+      address                              IS A PrincipalAddressFacts
+      `proposed name`                      IS A ProposedName
+      `a prescribed ground for refusal applies`  IS A BOOLEAN
+GIVETH A RegistrationApplication
+`mk application` MEANS RegistrationApplication WITH
+    applicant                                                       IS applicant
+    `the proposed name`                                             IS `proposed name`
+    address                                                         IS address
+    `(2)(a) information and evidence, as at the time of the application and (if different) as proposed once the entity is registered, as to how the entity meets the requirements of paragraphs (4)(c) and (d), the matters required to be registered under sub-paragraphs (a), (b) and (d) of Article 8(3), and (if applicable) those under sub-paragraphs (h), (i), (m) and (n) of Article 8(3)`  IS `paragraph (2) is complied with`
+    `(2)(b) a copy of the applicant's constitution`                 IS `paragraph (2) is complied with`
+    `(2)(c) a draft of the proposed statement of the entity's registered charitable purposes`  IS `paragraph (2) is complied with`
+    `(2)(d) a draft of the entity's registered public benefit statement`  IS `paragraph (2) is complied with`
+    `(2)(e) details of the applicant's most recent financial accounts, of any payment made to any governor in the 12 months preceding the application, of any other financial information that would be required on an application under the Non-Profit Organizations (Jersey) Law 2008, and of any further financial information prescribed by the Minister by Order`  IS `paragraph (2) is complied with`
+    `(2)(f) such other information, documents and evidence as may be required by Regulations under paragraph (3), or otherwise requested by the Commissioner in order to determine the application`  IS `paragraph (2) is complied with`
+    `the applicant complies with any Regulations under Article 11(3)`  IS `Regulations under (3) complied with`
+    `the applicant complies with Article 19(5)`                     IS `Article 19(5) complied with`
+    `the applicant will meet the charity test on registration`      IS `will meet the charity test on registration`
+    `the constitution of the applicant is a written document`       IS `the constitution is a written document`
+    `the applicant carries out, or intends to carry out, in or from within Jersey, an activity that is, in the opinion of the Commissioner, substantial`  IS `substantial activity in or from within Jersey`
+    `a ground for refusal, prescribed under Article 11(7), applies or should be applied`  IS `a prescribed ground for refusal applies`
+    `the applicant is an entity that is required to be registered under the Non-Profit Organizations (Jersey) Law 2008 but is not so registered`  IS FALSE
+    `(10)(a) the applicant provided with the application the additional information that must be provided to the JFSC in an application for registration under that Law`  IS FALSE
+    `(10)(b) the applicant requested to be registered under that Law`  IS FALSE
+
+§§ `Article 11(4) — THE MODEL APPLICATION: all of (a) to (f) satisfied`
+
+-- A Jersey company, meeting the charity test today, written constitution, a Jersey
+-- entity, a registered office in Jersey, an unobjectionable name, no prescribed
+-- ground of refusal — and a complete application. The Commissioner MUST register.
+`the Victoria College Trust application` MEANS
+    `mk application`
+        `Victoria College Trust`                      -- meets the charity test (Part 3)
+        TRUE                                          -- Art 11(2): complete
+        TRUE                                          -- Art 11(3) Regulations: complied with
+        TRUE                                          -- Art 19(5): complied with
+        FALSE                                         -- 11(4)(a): does not NEED the "will do so" limb
+        TRUE                                          -- 11(4)(b): written constitution
+        FALSE                                         -- 11(4)(c)(ii): does not NEED the substantial-activity limb
+        `a company with a registered office in Jersey`  -- 11(4)(d)
+        `the name 'Jersey Heritage Trust'`            -- 11(4)(e)
+        FALSE                                         -- 11(4)(f): no prescribed ground
+
+#ASSERT `Article 11(2) — the applicant complies with paragraph (2)` `the Victoria College Trust application`
+#ASSERT `Article 11(4) — the compliance gate` `the Victoria College Trust application`
+#ASSERT `Article 11(4)(a) — meets the charity test, or will do so on registration` `the Victoria College Trust application`
+#ASSERT `Article 11(4)(b) — the constitution of the applicant is a written document` `the Victoria College Trust application`
+#ASSERT `Article 11(4)(c) — Jersey entity or substantial activity in or from within Jersey` `the Victoria College Trust application`
+#ASSERT `Article 11(4)(d) — a principal address in Jersey within the meaning of Article 8(4)` `the Victoria College Trust application`
+#ASSERT `Article 11(4)(e) — the name of the applicant is not undesirable under Article 12` `the Victoria College Trust application`
+#ASSERT `Article 11(4)(f) — no other prescribed ground for refusal applies or should be applied` `the Victoria College Trust application`
+#ASSERT `Article 11(4) — the Commissioner is satisfied of sub-paragraphs (a) to (f)` `the Victoria College Trust application`
+#ASSERT `Article 11(4) — the registration test is met` `the Victoria College Trust application`
+#ASSERT NOT `Article 11(5) — the Commissioner is not so satisfied` `the Victoria College Trust application`
+
+§§ `THE KNOCK-OUT SUITE — one failure per limb of Article 11(4)`
+
+-- (a) FAILS — the family trust: charitable purposes, but it benefits only identified
+-- natural persons, so Art 7(3)(b) forbids the public-benefit conclusion. It does not
+-- meet the charity test, and it is not said that it will do so on registration.
+`knock-out (a) — does not meet the charity test` MEANS
+    `mk application`
+        `the Le Sueur Family Education Trust`         -- FAILS the charity test (Part 3)
+        TRUE TRUE TRUE
+        FALSE                                         -- nor will it meet it on registration
+        TRUE FALSE
+        `a company with a registered office in Jersey`
+        `the name 'Jersey Heritage Trust'`
+        FALSE
+
+#ASSERT NOT `Article 11(4)(a) — meets the charity test, or will do so on registration` `knock-out (a) — does not meet the charity test`
+#ASSERT `Article 11(4) — the compliance gate` `knock-out (a) — does not meet the charity test`
+#ASSERT NOT `Article 11(4) — the registration test is met` `knock-out (a) — does not meet the charity test`
+#ASSERT `Article 11(5) — the Commissioner is not so satisfied` `knock-out (a) — does not meet the charity test`
+
+-- (a) RESCUED — the SAME entity that fails the charity test today, but which WILL
+-- meet it on registration. Art 11(4)(a) is a DISJUNCTION, and the second limb saves
+-- it. (This is the limb that lets a body whose charitable constitution only takes
+-- effect on registration get onto the register at all.)
+`the second limb of (a) — will meet the test on registration` MEANS
+    `mk application`
+        `the Le Sueur Family Education Trust`         -- fails the test TODAY...
+        TRUE TRUE TRUE
+        TRUE                                          -- ...but WILL meet it on registration
+        TRUE FALSE
+        `a company with a registered office in Jersey`
+        `the name 'Jersey Heritage Trust'`
+        FALSE
+
+#ASSERT NOT `meets the charity test` (`the second limb of (a) — will meet the test on registration`'s applicant)
+#ASSERT `Article 11(4)(a) — meets the charity test, or will do so on registration` `the second limb of (a) — will meet the test on registration`
+#ASSERT `Article 11(4) — the registration test is met` `the second limb of (a) — will meet the test on registration`
+
+-- (b) FAILS — an oral or customary constitution. No written document, no register.
+`knock-out (b) — the constitution is not a written document` MEANS
+    `mk application`
+        `Victoria College Trust`
+        TRUE TRUE TRUE
+        FALSE
+        FALSE                                         -- 11(4)(b): NOT a written document
+        FALSE
+        `a company with a registered office in Jersey`
+        `the name 'Jersey Heritage Trust'`
+        FALSE
+
+#ASSERT NOT `Article 11(4)(b) — the constitution of the applicant is a written document` `knock-out (b) — the constitution is not a written document`
+#ASSERT NOT `Article 11(4) — the registration test is met` `knock-out (b) — the constitution is not a written document`
+#ASSERT `Article 11(5) — the Commissioner is not so satisfied` `knock-out (b) — the constitution is not a written document`
+
+-- (c) FAILS — the Guernsey foundation: NOT a Jersey entity (Art 2(3): a (1)(j) body
+-- is outside "(a) to (h)"), and it carries out no substantial activity in or from
+-- within Jersey. BOTH limbs of the (c) disjunction are shut.
+`knock-out (c) — neither a Jersey entity nor substantial activity` MEANS
+    `mk application`
+        `the Guernsey Heritage Foundation`            -- NOT a Jersey entity
+        TRUE TRUE TRUE
+        FALSE
+        TRUE
+        FALSE                                         -- 11(4)(c)(ii): no substantial activity either
+        `a company with a registered office in Jersey`
+        `the name 'Jersey Heritage Trust'`
+        FALSE
+
+#ASSERT NOT `Article 11(4)(c) — Jersey entity or substantial activity in or from within Jersey` `knock-out (c) — neither a Jersey entity nor substantial activity`
+#ASSERT NOT `Article 11(4) — the registration test is met` `knock-out (c) — neither a Jersey entity nor substantial activity`
+
+-- (c) RESCUED — the SAME foreign foundation, but it runs a substantial programme in
+-- Jersey. Limb (ii) opens. (Whether the activity is "substantial" is a matter for the
+-- Commissioner's opinion, guided by the guidance the Commissioner must publish under
+-- Art 11(6). Only ONE dial differs from the case above.)
+`the second limb of (c) — a foreign body with substantial Jersey activity` MEANS
+    `mk application`
+        `the Guernsey Heritage Foundation`
+        TRUE TRUE TRUE
+        FALSE
+        TRUE
+        TRUE                                          -- the only change
+        `a company with a registered office in Jersey`
+        `the name 'Jersey Heritage Trust'`
+        FALSE
+
+#ASSERT `Article 11(4)(c) — Jersey entity or substantial activity in or from within Jersey` `the second limb of (c) — a foreign body with substantial Jersey activity`
+#ASSERT `Article 11(4) — the registration test is met` `the second limb of (c) — a foreign body with substantial Jersey activity`
+
+-- (d) FAILS — no principal address in Jersey under ANY limb of Art 8(4).
+`knock-out (d) — no principal address in Jersey` MEANS
+    `mk application`
+        `Victoria College Trust`
+        TRUE TRUE TRUE
+        FALSE TRUE FALSE
+        `an offshore body with no Jersey footprint`   -- 11(4)(d): all three limbs of 8(4) fail
+        `the name 'Jersey Heritage Trust'`
+        FALSE
+
+#ASSERT NOT `Article 11(4)(d) — a principal address in Jersey within the meaning of Article 8(4)` `knock-out (d) — no principal address in Jersey`
+#ASSERT NOT `Article 11(4) — the registration test is met` `knock-out (d) — no principal address in Jersey`
+
+-- (d) RESCUED — the spare-bedroom charity. The dwelling-house exclusion shuts limb
+-- (b) of Art 8(4), but the cascade falls through to limb (c) and the governor's own
+-- Jersey address carries the day. INTERPRETATION CALL [2], made operative.
+`the spare-bedroom charity's application` MEANS
+    `mk application`
+        `Victoria College Trust`
+        TRUE TRUE TRUE
+        FALSE TRUE FALSE
+        `a charity run from a governor's spare bedroom`
+        `the name 'Jersey Heritage Trust'`
+        FALSE
+
+#ASSERT `Article 11(4)(d) — a principal address in Jersey within the meaning of Article 8(4)` `the spare-bedroom charity's application`
+#ASSERT `Article 11(4) — the registration test is met` `the spare-bedroom charity's application`
+
+-- (e) FAILS — the NEGATIVE limb. An impeccable charity with an offensive name. One
+-- limb of the Art 12(1) disjunction is enough to make the name undesirable, and
+-- Art 11(4)(e) then fails, and with it the whole conjunction.
+`knock-out (e) — the name is undesirable` MEANS
+    `mk application`
+        `Victoria College Trust`
+        TRUE TRUE TRUE
+        FALSE TRUE FALSE
+        `a company with a registered office in Jersey`
+        `an offensive name`                           -- 12(1)(d)
+        FALSE
+
+#ASSERT `Article 12(1) — the name is undesirable` (`knock-out (e) — the name is undesirable`'s `the proposed name`)
+#ASSERT NOT `Article 11(4)(e) — the name of the applicant is not undesirable under Article 12` `knock-out (e) — the name is undesirable`
+#ASSERT NOT `Article 11(4) — the registration test is met` `knock-out (e) — the name is undesirable`
+
+-- (f) FAILS — the second NEGATIVE limb. Everything else is in order, but a ground
+-- prescribed by Regulations under Art 11(7) applies (or the Commissioner considers
+-- it should be applied — the statute treats both alike).
+`knock-out (f) — a prescribed ground for refusal applies` MEANS
+    `mk application`
+        `Victoria College Trust`
+        TRUE TRUE TRUE
+        FALSE TRUE FALSE
+        `a company with a registered office in Jersey`
+        `the name 'Jersey Heritage Trust'`
+        TRUE                                          -- 11(4)(f): a prescribed ground applies
+
+#ASSERT NOT `Article 11(4)(f) — no other prescribed ground for refusal applies or should be applied` `knock-out (f) — a prescribed ground for refusal applies`
+#ASSERT NOT `Article 11(4) — the registration test is met` `knock-out (f) — a prescribed ground for refusal applies`
+#ASSERT `Article 11(5) — the Commissioner is not so satisfied` `knock-out (f) — a prescribed ground for refusal applies`
+
+§§ `THE COMPLIANCE GATE — the three ways in which an application may be incomplete`
+
+-- Gate term 1 — Art 11(2). Note what happens: (a) to (f) are ALL SATISFIED. The
+-- Commissioner would be bound to register but for the gate. This is the case that
+-- exposes INTERPRETATION CALL [1]: on the literal reading, Art 11(5) does NOT bite
+-- either, because the Commissioner IS "so satisfied".
+`gate failure — paragraph (2) not complied with` MEANS
+    `mk application`
+        `Victoria College Trust`
+        FALSE                                         -- Art 11(2): INCOMPLETE
+        TRUE TRUE
+        FALSE TRUE FALSE
+        `a company with a registered office in Jersey`
+        `the name 'Jersey Heritage Trust'`
+        FALSE
+
+#ASSERT NOT `Article 11(2) — the applicant complies with paragraph (2)` `gate failure — paragraph (2) not complied with`
+#ASSERT NOT `Article 11(4) — the compliance gate` `gate failure — paragraph (2) not complied with`
+-- The six limbs ARE all made out...
+#ASSERT `Article 11(4) — the Commissioner is satisfied of sub-paragraphs (a) to (f)` `gate failure — paragraph (2) not complied with`
+-- ...and so, on the literal reading, Art 11(5) does NOT bite: the Commissioner is
+-- "so satisfied". Yet the gate is shut, so Art 11(4) imposes no duty to register.
+-- THE GAP, made visible.
+#ASSERT NOT `Article 11(5) — the Commissioner is not so satisfied` `gate failure — paragraph (2) not complied with`
+#ASSERT NOT `Article 11(4) — the registration test is met` `gate failure — paragraph (2) not complied with`
+
+-- Gate term 2 — the Art 11(3) Regulations.
+`gate failure — the Article 11(3) Regulations not complied with` MEANS
+    `mk application`
+        `Victoria College Trust`
+        TRUE
+        FALSE                                         -- Regulations under (3): NOT complied with
+        TRUE
+        FALSE TRUE FALSE
+        `a company with a registered office in Jersey`
+        `the name 'Jersey Heritage Trust'`
+        FALSE
+
+#ASSERT NOT `Article 11(4) — the compliance gate` `gate failure — the Article 11(3) Regulations not complied with`
+#ASSERT NOT `Article 11(4) — the registration test is met` `gate failure — the Article 11(3) Regulations not complied with`
+
+-- Gate term 3 — Article 19(5). A CROSS-PART gate: the governors' reportable-matter
+-- declarations, which live in Part 5. Registration is barred until they are in.
+`gate failure — Article 19(5) not complied with` MEANS
+    `mk application`
+        `Victoria College Trust`
+        TRUE TRUE
+        FALSE                                         -- Art 19(5): NOT complied with
+        FALSE TRUE FALSE
+        `a company with a registered office in Jersey`
+        `the name 'Jersey Heritage Trust'`
+        FALSE
+
+#ASSERT NOT `Article 11(4) — the compliance gate` `gate failure — Article 19(5) not complied with`
+#ASSERT NOT `Article 11(4) — the registration test is met` `gate failure — Article 19(5) not complied with`
+
+§§ `Article 11(2) — the checklist is GRANULAR: one missing document is enough`
+
+-- A FULL literal (the constructor moves the six limbs together). Everything is in
+-- order except Art 11(2)(b): the applicant forgot to enclose its constitution. One
+-- limb of a six-limb conjunction, and the gate is shut.
+`the Victoria College Trust application, missing its constitution` MEANS RegistrationApplication WITH
+    applicant                                                       IS `Victoria College Trust`
+    `the proposed name`                                             IS `the name 'Jersey Heritage Trust'`
+    address                                                         IS `a company with a registered office in Jersey`
+    `(2)(a) information and evidence, as at the time of the application and (if different) as proposed once the entity is registered, as to how the entity meets the requirements of paragraphs (4)(c) and (d), the matters required to be registered under sub-paragraphs (a), (b) and (d) of Article 8(3), and (if applicable) those under sub-paragraphs (h), (i), (m) and (n) of Article 8(3)`  IS TRUE
+    `(2)(b) a copy of the applicant's constitution`                 IS FALSE   -- the only omission
+    `(2)(c) a draft of the proposed statement of the entity's registered charitable purposes`  IS TRUE
+    `(2)(d) a draft of the entity's registered public benefit statement`  IS TRUE
+    `(2)(e) details of the applicant's most recent financial accounts, of any payment made to any governor in the 12 months preceding the application, of any other financial information that would be required on an application under the Non-Profit Organizations (Jersey) Law 2008, and of any further financial information prescribed by the Minister by Order`  IS TRUE
+    `(2)(f) such other information, documents and evidence as may be required by Regulations under paragraph (3), or otherwise requested by the Commissioner in order to determine the application`  IS TRUE
+    `the applicant complies with any Regulations under Article 11(3)`  IS TRUE
+    `the applicant complies with Article 19(5)`                     IS TRUE
+    `the applicant will meet the charity test on registration`      IS FALSE
+    `the constitution of the applicant is a written document`       IS TRUE
+    `the applicant carries out, or intends to carry out, in or from within Jersey, an activity that is, in the opinion of the Commissioner, substantial`  IS FALSE
+    `a ground for refusal, prescribed under Article 11(7), applies or should be applied`  IS FALSE
+    `the applicant is an entity that is required to be registered under the Non-Profit Organizations (Jersey) Law 2008 but is not so registered`  IS FALSE
+    `(10)(a) the applicant provided with the application the additional information that must be provided to the JFSC in an application for registration under that Law`  IS FALSE
+    `(10)(b) the applicant requested to be registered under that Law`  IS FALSE
+
+#ASSERT NOT `Article 11(2) — the applicant complies with paragraph (2)` `the Victoria College Trust application, missing its constitution`
+#ASSERT NOT `Article 11(4) — the compliance gate` `the Victoria College Trust application, missing its constitution`
+#ASSERT NOT `Article 11(4) — the registration test is met` `the Victoria College Trust application, missing its constitution`
+-- Note the irony: the constitution IS a written document (11(4)(b) is satisfied) —
+-- the applicant simply did not ENCLOSE it (11(2)(b) is not).
+#ASSERT `Article 11(4)(b) — the constitution of the applicant is a written document` `the Victoria College Trust application, missing its constitution`
+
+§§ `Article 11(10) and 11(11) — the unregistered NPO`
+
+`the Ile de Lumiere Trust application (an unregistered NPO)` MEANS RegistrationApplication WITH
+    applicant                                                       IS `Victoria College Trust`
+    `the proposed name`                                             IS `the name 'Jersey Heritage Trust'`
+    address                                                         IS `a company with a registered office in Jersey`
+    `(2)(a) information and evidence, as at the time of the application and (if different) as proposed once the entity is registered, as to how the entity meets the requirements of paragraphs (4)(c) and (d), the matters required to be registered under sub-paragraphs (a), (b) and (d) of Article 8(3), and (if applicable) those under sub-paragraphs (h), (i), (m) and (n) of Article 8(3)`  IS TRUE
+    `(2)(b) a copy of the applicant's constitution`                 IS TRUE
+    `(2)(c) a draft of the proposed statement of the entity's registered charitable purposes`  IS TRUE
+    `(2)(d) a draft of the entity's registered public benefit statement`  IS TRUE
+    `(2)(e) details of the applicant's most recent financial accounts, of any payment made to any governor in the 12 months preceding the application, of any other financial information that would be required on an application under the Non-Profit Organizations (Jersey) Law 2008, and of any further financial information prescribed by the Minister by Order`  IS TRUE
+    `(2)(f) such other information, documents and evidence as may be required by Regulations under paragraph (3), or otherwise requested by the Commissioner in order to determine the application`  IS TRUE
+    `the applicant complies with any Regulations under Article 11(3)`  IS TRUE
+    `the applicant complies with Article 19(5)`                     IS TRUE
+    `the applicant will meet the charity test on registration`      IS FALSE
+    `the constitution of the applicant is a written document`       IS TRUE
+    `the applicant carries out, or intends to carry out, in or from within Jersey, an activity that is, in the opinion of the Commissioner, substantial`  IS FALSE
+    `a ground for refusal, prescribed under Article 11(7), applies or should be applied`  IS FALSE
+    `the applicant is an entity that is required to be registered under the Non-Profit Organizations (Jersey) Law 2008 but is not so registered`  IS TRUE
+    `(10)(a) the applicant provided with the application the additional information that must be provided to the JFSC in an application for registration under that Law`  IS TRUE
+    `(10)(b) the applicant requested to be registered under that Law`  IS TRUE
+
+#ASSERT `Article 11(10) — the applicant is an unregistered NPO` `the Ile de Lumiere Trust application (an unregistered NPO)`
+#ASSERT `Article 11(11) — the Commissioner receives information and a request under paragraph (10)` `the Ile de Lumiere Trust application (an unregistered NPO)`
+#ASSERT `Article 11(4) — the registration test is met` `the Ile de Lumiere Trust application (an unregistered NPO)`
+-- The NPO duty does NOT fire for an ordinary applicant.
+#ASSERT NOT `Article 11(10) — the applicant is an unregistered NPO` `the Victoria College Trust application`
+#ASSERT NOT `Article 11(11) — the Commissioner receives information and a request under paragraph (10)` `the Victoria College Trust application`
+
+§§ `Article 8(3) — the DUTY CHECKLIST, and its conditional limbs`
+
+-- A plain-vanilla general-section charity: a Jersey company, no religious-charity
+-- note, no Art 5(3) Order, no required steps notice, no name change, no Art 13(9)(c)
+-- Order, nothing prescribed under (n). SEVEN of the fourteen limbs are therefore
+-- VACUOUSLY satisfied — the proviso limbs do not bite. The entry is complete.
+`the register entry for Victoria College Trust` MEANS RegisterEntry WITH
+    `the charity`                                                   IS "Victoria College Trust"
+    section                                                         IS `the general section`
+    `the registered name and registration number are entered under Article 12(2)`  IS TRUE
+    `(a)(i) a note of the sub-paragraph of the definition of 'entity' in Article 2(1) within which the entity falls (including, for an entity within (f) to (j), whether it also falls within (a)) is entered`  IS TRUE
+    `the entity falls within one of sub-paragraphs (e), (g), (h) or (j) of the definition of 'entity'`  IS FALSE   -- a (f) company: (a)(ii) does not bite
+    `(a)(ii) details of the enactment, Act of the States, Royal Charter, Act of the United Kingdom Parliament, Order in Council or foreign law by virtue of which the entity falls within that sub-paragraph are entered`  IS FALSE
+    `(b) the names of each of the governors of the registered charity are entered`  IS TRUE
+    `(c) the principal address of the registered charity, within the meaning of Article 8(4), is entered`  IS TRUE
+    `(d) the address of any other premises in Jersey, other than a private dwelling house, at or from which the registered charity undertakes any activity, is entered`  IS TRUE
+    `(e) a statement of the purposes of the registered charity, drawn by the charity from its constitution and approved by the Commissioner as accurately reflecting the constitution as to the purposes, is entered`  IS TRUE
+    `(f) a registered public benefit statement, approved by the Commissioner, of the public benefit provided by the charity and of the means by which the charity ensures that it provides that public benefit, is entered`  IS TRUE
+    `(g) the date on which the charity was registered is entered`   IS TRUE
+    `the registered charity is an organized religious charity within the meaning of Article 28`  IS FALSE
+    `(h) a note of that fact, and of the provision of the Order under Article 28 by virtue of which it is such a charity, is entered`  IS FALSE
+    `the registered charity meets the charity test by virtue of an Order under Article 5(3)`  IS FALSE
+    `(i) the text of the provision in the constitution that falls within Article 5(2) is entered`  IS FALSE
+    `(j) whether the registered charity has or has not sent its annual return for the most recent year is entered`  IS TRUE
+    `a required steps notice has been served on the registered charity, or on a governor of the registered charity`  IS FALSE
+    `(k) a note of that fact (or a copy of the notice), and of the date on which the notice was served, is entered`  IS FALSE
+    `the registered name has been changed`                          IS FALSE
+    `(l) the previous registered name or names are entered`         IS FALSE
+    `an Order under Article 13(9)(c) applies to the registered charity`  IS FALSE
+    `(m) any details or statement that must be entered on the register under that Order are entered`  IS FALSE
+    `other information has been prescribed by the Minister by Order under Article 8(3)(n)`  IS FALSE
+    `(n) that other information is entered`                         IS FALSE
+    `(9(1)(a)) the matter is the registration number (but not the registered name) of the charity`  IS FALSE
+    `(9(1)(b)) the matter is registered under sub-paragraph (a), (e), (f), (j) or (k) of Article 8(3)`  IS FALSE
+    `(9(1)(c)) the matter is a summary, produced by the charity to the satisfaction of the Commissioner, of the reasons for registration of the charity in the restricted section`  IS FALSE
+    `(9(1)(d)) the matter is another element prescribed by the Minister by Order under Article 9(1)(d)`  IS FALSE
+    `the Commissioner considers that the safety or security of any person, property or premises would be significantly put at risk by public access to the matter`  IS FALSE
+    `the Commissioner has purported to designate the matter as not being a public part of the register`  IS FALSE
+
+#ASSERT `Article 8(3)(a) — a note of the status of the entity` `the register entry for Victoria College Trust`
+-- All seven conditional limbs are VACUOUSLY satisfied: their antecedents are false.
+#ASSERT `Article 8(3)(h) — the organized religious charity note` `the register entry for Victoria College Trust`
+#ASSERT `Article 8(3)(i) — the Article 5(3) constitutional provision` `the register entry for Victoria College Trust`
+#ASSERT `Article 8(3)(k) — the required steps notice note` `the register entry for Victoria College Trust`
+#ASSERT `Article 8(3)(l) — the previous registered names` `the register entry for Victoria College Trust`
+#ASSERT `Article 8(3)(m) — the Article 13(9)(c) Order details` `the register entry for Victoria College Trust`
+#ASSERT `Article 8(3)(n) — any other information prescribed by the Minister by Order` `the register entry for Victoria College Trust`
+#ASSERT `Article 8(3) — the register entry is complete` `the register entry for Victoria College Trust`
+-- It is in the general section, so it is a public part of the register.
+#ASSERT `Article 10(3) — the matter is a public part of the register` `the register entry for Victoria College Trust`
+
+-- The SAME charity, but it is a (j) foreign entity AND a required steps notice has
+-- been served on it. TWO proviso antecedents now bite, and the Commissioner has
+-- entered NEITHER the (a)(ii) details NOR the (k) note. The Art 8(3) duty is NOT
+-- discharged. This is what makes the proviso limbs load-bearing.
+`the register entry for a foreign charity under a required steps notice` MEANS RegisterEntry WITH
+    `the charity`                                                   IS "Guernsey Heritage Foundation"
+    section                                                         IS `the general section`
+    `the registered name and registration number are entered under Article 12(2)`  IS TRUE
+    `(a)(i) a note of the sub-paragraph of the definition of 'entity' in Article 2(1) within which the entity falls (including, for an entity within (f) to (j), whether it also falls within (a)) is entered`  IS TRUE
+    `the entity falls within one of sub-paragraphs (e), (g), (h) or (j) of the definition of 'entity'`  IS TRUE   -- a (j) entity: (a)(ii) BITES
+    `(a)(ii) details of the enactment, Act of the States, Royal Charter, Act of the United Kingdom Parliament, Order in Council or foreign law by virtue of which the entity falls within that sub-paragraph are entered`  IS FALSE  -- but nothing entered
+    `(b) the names of each of the governors of the registered charity are entered`  IS TRUE
+    `(c) the principal address of the registered charity, within the meaning of Article 8(4), is entered`  IS TRUE
+    `(d) the address of any other premises in Jersey, other than a private dwelling house, at or from which the registered charity undertakes any activity, is entered`  IS TRUE
+    `(e) a statement of the purposes of the registered charity, drawn by the charity from its constitution and approved by the Commissioner as accurately reflecting the constitution as to the purposes, is entered`  IS TRUE
+    `(f) a registered public benefit statement, approved by the Commissioner, of the public benefit provided by the charity and of the means by which the charity ensures that it provides that public benefit, is entered`  IS TRUE
+    `(g) the date on which the charity was registered is entered`   IS TRUE
+    `the registered charity is an organized religious charity within the meaning of Article 28`  IS FALSE
+    `(h) a note of that fact, and of the provision of the Order under Article 28 by virtue of which it is such a charity, is entered`  IS FALSE
+    `the registered charity meets the charity test by virtue of an Order under Article 5(3)`  IS FALSE
+    `(i) the text of the provision in the constitution that falls within Article 5(2) is entered`  IS FALSE
+    `(j) whether the registered charity has or has not sent its annual return for the most recent year is entered`  IS TRUE
+    `a required steps notice has been served on the registered charity, or on a governor of the registered charity`  IS TRUE   -- (k) BITES
+    `(k) a note of that fact (or a copy of the notice), and of the date on which the notice was served, is entered`  IS FALSE  -- but nothing entered
+    `the registered name has been changed`                          IS FALSE
+    `(l) the previous registered name or names are entered`         IS FALSE
+    `an Order under Article 13(9)(c) applies to the registered charity`  IS FALSE
+    `(m) any details or statement that must be entered on the register under that Order are entered`  IS FALSE
+    `other information has been prescribed by the Minister by Order under Article 8(3)(n)`  IS FALSE
+    `(n) that other information is entered`                         IS FALSE
+    `(9(1)(a)) the matter is the registration number (but not the registered name) of the charity`  IS FALSE
+    `(9(1)(b)) the matter is registered under sub-paragraph (a), (e), (f), (j) or (k) of Article 8(3)`  IS FALSE
+    `(9(1)(c)) the matter is a summary, produced by the charity to the satisfaction of the Commissioner, of the reasons for registration of the charity in the restricted section`  IS FALSE
+    `(9(1)(d)) the matter is another element prescribed by the Minister by Order under Article 9(1)(d)`  IS FALSE
+    `the Commissioner considers that the safety or security of any person, property or premises would be significantly put at risk by public access to the matter`  IS FALSE
+    `the Commissioner has purported to designate the matter as not being a public part of the register`  IS FALSE
+
+#ASSERT NOT `Article 8(3)(a) — a note of the status of the entity` `the register entry for a foreign charity under a required steps notice`
+#ASSERT NOT `Article 8(3)(k) — the required steps notice note` `the register entry for a foreign charity under a required steps notice`
+#ASSERT NOT `Article 8(3) — the register entry is complete` `the register entry for a foreign charity under a required steps notice`
+
+§§ `Articles 9(1), 10(3), 10(4) and 10(5) — what the public may see`
+
+-- A restricted-section charity's REGISTERED NAME. It is NOT one of the Art 9(1)
+-- public elements — none of (a) to (d) is ticked — so the public may not see it.
+-- This is the whole point of the restricted section.
+`the registered name of a restricted-section charity` MEANS RegisterEntry WITH
+    `the charity`                                                   IS "a restricted-section charity"
+    section                                                         IS `the restricted section`
+    `the registered name and registration number are entered under Article 12(2)`  IS TRUE
+    `(a)(i) a note of the sub-paragraph of the definition of 'entity' in Article 2(1) within which the entity falls (including, for an entity within (f) to (j), whether it also falls within (a)) is entered`  IS TRUE
+    `the entity falls within one of sub-paragraphs (e), (g), (h) or (j) of the definition of 'entity'`  IS FALSE
+    `(a)(ii) details of the enactment, Act of the States, Royal Charter, Act of the United Kingdom Parliament, Order in Council or foreign law by virtue of which the entity falls within that sub-paragraph are entered`  IS FALSE
+    `(b) the names of each of the governors of the registered charity are entered`  IS TRUE
+    `(c) the principal address of the registered charity, within the meaning of Article 8(4), is entered`  IS TRUE
+    `(d) the address of any other premises in Jersey, other than a private dwelling house, at or from which the registered charity undertakes any activity, is entered`  IS TRUE
+    `(e) a statement of the purposes of the registered charity, drawn by the charity from its constitution and approved by the Commissioner as accurately reflecting the constitution as to the purposes, is entered`  IS TRUE
+    `(f) a registered public benefit statement, approved by the Commissioner, of the public benefit provided by the charity and of the means by which the charity ensures that it provides that public benefit, is entered`  IS TRUE
+    `(g) the date on which the charity was registered is entered`   IS TRUE
+    `the registered charity is an organized religious charity within the meaning of Article 28`  IS FALSE
+    `(h) a note of that fact, and of the provision of the Order under Article 28 by virtue of which it is such a charity, is entered`  IS FALSE
+    `the registered charity meets the charity test by virtue of an Order under Article 5(3)`  IS FALSE
+    `(i) the text of the provision in the constitution that falls within Article 5(2) is entered`  IS FALSE
+    `(j) whether the registered charity has or has not sent its annual return for the most recent year is entered`  IS TRUE
+    `a required steps notice has been served on the registered charity, or on a governor of the registered charity`  IS FALSE
+    `(k) a note of that fact (or a copy of the notice), and of the date on which the notice was served, is entered`  IS FALSE
+    `the registered name has been changed`                          IS FALSE
+    `(l) the previous registered name or names are entered`         IS FALSE
+    `an Order under Article 13(9)(c) applies to the registered charity`  IS FALSE
+    `(m) any details or statement that must be entered on the register under that Order are entered`  IS FALSE
+    `other information has been prescribed by the Minister by Order under Article 8(3)(n)`  IS FALSE
+    `(n) that other information is entered`                         IS FALSE
+    -- the matter in question is the NAME: none of the Art 9(1) public elements
+    `(9(1)(a)) the matter is the registration number (but not the registered name) of the charity`  IS FALSE
+    `(9(1)(b)) the matter is registered under sub-paragraph (a), (e), (f), (j) or (k) of Article 8(3)`  IS FALSE
+    `(9(1)(c)) the matter is a summary, produced by the charity to the satisfaction of the Commissioner, of the reasons for registration of the charity in the restricted section`  IS FALSE
+    `(9(1)(d)) the matter is another element prescribed by the Minister by Order under Article 9(1)(d)`  IS FALSE
+    `the Commissioner considers that the safety or security of any person, property or premises would be significantly put at risk by public access to the matter`  IS FALSE
+    `the Commissioner has purported to designate the matter as not being a public part of the register`  IS FALSE
+
+#ASSERT NOT `Article 9(1) — a public element of the restricted section` `the registered name of a restricted-section charity`
+#ASSERT NOT `Article 10(3) — the matter is a public part of the register` `the registered name of a restricted-section charity`
+
+-- The SAME charity's registration NUMBER: Art 9(1)(a) expressly makes it public.
+`the registration number of a restricted-section charity` MEANS RegisterEntry WITH
+    `the charity`                                                   IS "a restricted-section charity"
+    section                                                         IS `the restricted section`
+    `the registered name and registration number are entered under Article 12(2)`  IS TRUE
+    `(a)(i) a note of the sub-paragraph of the definition of 'entity' in Article 2(1) within which the entity falls (including, for an entity within (f) to (j), whether it also falls within (a)) is entered`  IS TRUE
+    `the entity falls within one of sub-paragraphs (e), (g), (h) or (j) of the definition of 'entity'`  IS FALSE
+    `(a)(ii) details of the enactment, Act of the States, Royal Charter, Act of the United Kingdom Parliament, Order in Council or foreign law by virtue of which the entity falls within that sub-paragraph are entered`  IS FALSE
+    `(b) the names of each of the governors of the registered charity are entered`  IS TRUE
+    `(c) the principal address of the registered charity, within the meaning of Article 8(4), is entered`  IS TRUE
+    `(d) the address of any other premises in Jersey, other than a private dwelling house, at or from which the registered charity undertakes any activity, is entered`  IS TRUE
+    `(e) a statement of the purposes of the registered charity, drawn by the charity from its constitution and approved by the Commissioner as accurately reflecting the constitution as to the purposes, is entered`  IS TRUE
+    `(f) a registered public benefit statement, approved by the Commissioner, of the public benefit provided by the charity and of the means by which the charity ensures that it provides that public benefit, is entered`  IS TRUE
+    `(g) the date on which the charity was registered is entered`   IS TRUE
+    `the registered charity is an organized religious charity within the meaning of Article 28`  IS FALSE
+    `(h) a note of that fact, and of the provision of the Order under Article 28 by virtue of which it is such a charity, is entered`  IS FALSE
+    `the registered charity meets the charity test by virtue of an Order under Article 5(3)`  IS FALSE
+    `(i) the text of the provision in the constitution that falls within Article 5(2) is entered`  IS FALSE
+    `(j) whether the registered charity has or has not sent its annual return for the most recent year is entered`  IS TRUE
+    `a required steps notice has been served on the registered charity, or on a governor of the registered charity`  IS FALSE
+    `(k) a note of that fact (or a copy of the notice), and of the date on which the notice was served, is entered`  IS FALSE
+    `the registered name has been changed`                          IS FALSE
+    `(l) the previous registered name or names are entered`         IS FALSE
+    `an Order under Article 13(9)(c) applies to the registered charity`  IS FALSE
+    `(m) any details or statement that must be entered on the register under that Order are entered`  IS FALSE
+    `other information has been prescribed by the Minister by Order under Article 8(3)(n)`  IS FALSE
+    `(n) that other information is entered`                         IS FALSE
+    `(9(1)(a)) the matter is the registration number (but not the registered name) of the charity`  IS TRUE   -- the only change
+    `(9(1)(b)) the matter is registered under sub-paragraph (a), (e), (f), (j) or (k) of Article 8(3)`  IS FALSE
+    `(9(1)(c)) the matter is a summary, produced by the charity to the satisfaction of the Commissioner, of the reasons for registration of the charity in the restricted section`  IS FALSE
+    `(9(1)(d)) the matter is another element prescribed by the Minister by Order under Article 9(1)(d)`  IS FALSE
+    `the Commissioner considers that the safety or security of any person, property or premises would be significantly put at risk by public access to the matter`  IS FALSE
+    `the Commissioner has purported to designate the matter as not being a public part of the register`  IS FALSE
+
+#ASSERT `Article 9(1) — a public element of the restricted section` `the registration number of a restricted-section charity`
+#ASSERT `Article 10(3) — the matter is a public part of the register` `the registration number of a restricted-section charity`
+
+-- Art 10(4)/(5) — a women's refuge in the general section. Its ADDRESS is ordinarily
+-- a public part (Art 8(3)(c), general section), but the Commissioner considers public
+-- access would put safety significantly at risk, and designates it. The designation
+-- KNOCKS OUT the Art 10(3) disjunction: the address leaves the public register.
+`the address of a refuge, designated under Article 10(5)` MEANS RegisterEntry WITH
+    `the charity`                                                   IS "a women's refuge"
+    section                                                         IS `the general section`
+    `the registered name and registration number are entered under Article 12(2)`  IS TRUE
+    `(a)(i) a note of the sub-paragraph of the definition of 'entity' in Article 2(1) within which the entity falls (including, for an entity within (f) to (j), whether it also falls within (a)) is entered`  IS TRUE
+    `the entity falls within one of sub-paragraphs (e), (g), (h) or (j) of the definition of 'entity'`  IS FALSE
+    `(a)(ii) details of the enactment, Act of the States, Royal Charter, Act of the United Kingdom Parliament, Order in Council or foreign law by virtue of which the entity falls within that sub-paragraph are entered`  IS FALSE
+    `(b) the names of each of the governors of the registered charity are entered`  IS TRUE
+    `(c) the principal address of the registered charity, within the meaning of Article 8(4), is entered`  IS TRUE
+    `(d) the address of any other premises in Jersey, other than a private dwelling house, at or from which the registered charity undertakes any activity, is entered`  IS TRUE
+    `(e) a statement of the purposes of the registered charity, drawn by the charity from its constitution and approved by the Commissioner as accurately reflecting the constitution as to the purposes, is entered`  IS TRUE
+    `(f) a registered public benefit statement, approved by the Commissioner, of the public benefit provided by the charity and of the means by which the charity ensures that it provides that public benefit, is entered`  IS TRUE
+    `(g) the date on which the charity was registered is entered`   IS TRUE
+    `the registered charity is an organized religious charity within the meaning of Article 28`  IS FALSE
+    `(h) a note of that fact, and of the provision of the Order under Article 28 by virtue of which it is such a charity, is entered`  IS FALSE
+    `the registered charity meets the charity test by virtue of an Order under Article 5(3)`  IS FALSE
+    `(i) the text of the provision in the constitution that falls within Article 5(2) is entered`  IS FALSE
+    `(j) whether the registered charity has or has not sent its annual return for the most recent year is entered`  IS TRUE
+    `a required steps notice has been served on the registered charity, or on a governor of the registered charity`  IS FALSE
+    `(k) a note of that fact (or a copy of the notice), and of the date on which the notice was served, is entered`  IS FALSE
+    `the registered name has been changed`                          IS FALSE
+    `(l) the previous registered name or names are entered`         IS FALSE
+    `an Order under Article 13(9)(c) applies to the registered charity`  IS FALSE
+    `(m) any details or statement that must be entered on the register under that Order are entered`  IS FALSE
+    `other information has been prescribed by the Minister by Order under Article 8(3)(n)`  IS FALSE
+    `(n) that other information is entered`                         IS FALSE
+    `(9(1)(a)) the matter is the registration number (but not the registered name) of the charity`  IS FALSE
+    `(9(1)(b)) the matter is registered under sub-paragraph (a), (e), (f), (j) or (k) of Article 8(3)`  IS FALSE
+    `(9(1)(c)) the matter is a summary, produced by the charity to the satisfaction of the Commissioner, of the reasons for registration of the charity in the restricted section`  IS FALSE
+    `(9(1)(d)) the matter is another element prescribed by the Minister by Order under Article 9(1)(d)`  IS FALSE
+    `the Commissioner considers that the safety or security of any person, property or premises would be significantly put at risk by public access to the matter`  IS TRUE
+    `the Commissioner has purported to designate the matter as not being a public part of the register`  IS TRUE
+
+#ASSERT `Article 10(4) — paragraph (5) applies` `the address of a refuge, designated under Article 10(5)`
+#ASSERT `Article 10(5) — the matter is effectively designated as not being a public part` `the address of a refuge, designated under Article 10(5)`
+-- It is in the general section — but "subject to paragraph (5)" subtracts it.
+#ASSERT NOT `Article 10(3) — the matter is a public part of the register` `the address of a refuge, designated under Article 10(5)`
+
+§§ `Article 9(2) to 9(7) — the restricted-section request`
+
+`a good restricted-section request` MEANS RestrictedSectionRequest WITH
+    `the requester`                                                 IS "a privately funded family foundation"
+    `the requester is an applicant for registration, or a charity registered in the general section of the register`  IS TRUE
+    `(2)(a) the applicant meets the funding condition, prescribed by the Minister by Order for this purpose, as to refraining from soliciting donations from the general public or from any prescribed description of persons`  IS TRUE
+    `(2)(b) the applicant meets any other condition that may be prescribed by the Minister by Order, whether by reference to any other source of the entity's funds or on any other basis`  IS FALSE
+    `(4)(a) the request was made in the form published by the Commissioner`  IS TRUE
+    `(4)(b) the request was supported by information and evidence to the satisfaction of the Commissioner`  IS TRUE
+    `(5) the request was accompanied by a statement of the applicant's intention in the event of refusal of the request`  IS TRUE
+    `there is a ground, prescribed under Article 9(3), on which the request must be refused`  IS FALSE
+    `there is a discretionary ground, prescribed under Article 9(3), on which the Commissioner considers the request should be refused`  IS FALSE
+    `the Commissioner refuses the request`                          IS FALSE
+
+#ASSERT `Article 9(2) — the funding condition (or other prescribed condition) is met` `a good restricted-section request`
+#ASSERT `Article 9(6)(a) — the request complied with paragraphs (4) and (5)` `a good restricted-section request`
+#ASSERT `Article 9(6)(b) — one of the conditions prescribed under paragraph (2) is met` `a good restricted-section request`
+#ASSERT `Article 9(6)(c) — no ground prescribed under paragraph (3) requires or warrants refusal` `a good restricted-section request`
+#ASSERT `Article 9(6) — the Commissioner is satisfied of all three limbs` `a good restricted-section request`
+
+-- 9(6)(a) FAILS — no statement of intention under Art 9(5). The request is otherwise
+-- impeccable; the SHANT still bites. This is the sting of a prohibition-unless: every
+-- limb is a veto.
+`a request with no statement of intention` MEANS RestrictedSectionRequest WITH
+    `the requester`                                                 IS "a privately funded family foundation"
+    `the requester is an applicant for registration, or a charity registered in the general section of the register`  IS TRUE
+    `(2)(a) the applicant meets the funding condition, prescribed by the Minister by Order for this purpose, as to refraining from soliciting donations from the general public or from any prescribed description of persons`  IS TRUE
+    `(2)(b) the applicant meets any other condition that may be prescribed by the Minister by Order, whether by reference to any other source of the entity's funds or on any other basis`  IS FALSE
+    `(4)(a) the request was made in the form published by the Commissioner`  IS TRUE
+    `(4)(b) the request was supported by information and evidence to the satisfaction of the Commissioner`  IS TRUE
+    `(5) the request was accompanied by a statement of the applicant's intention in the event of refusal of the request`  IS FALSE   -- the omission
+    `there is a ground, prescribed under Article 9(3), on which the request must be refused`  IS FALSE
+    `there is a discretionary ground, prescribed under Article 9(3), on which the Commissioner considers the request should be refused`  IS FALSE
+    `the Commissioner refuses the request`                          IS TRUE
+
+#ASSERT NOT `Article 9(5) — the statement of the applicant's intention` `a request with no statement of intention`
+#ASSERT NOT `Article 9(6)(a) — the request complied with paragraphs (4) and (5)` `a request with no statement of intention`
+#ASSERT NOT `Article 9(6) — the Commissioner is satisfied of all three limbs` `a request with no statement of intention`
+
+-- 9(6)(c) FAILS — no MANDATORY ground, but a DISCRETIONARY one the Commissioner
+-- considers should be applied. Art 9(6)(c) treats the two alike: either shuts the door.
+`a request caught by a discretionary ground` MEANS RestrictedSectionRequest WITH
+    `the requester`                                                 IS "a privately funded family foundation"
+    `the requester is an applicant for registration, or a charity registered in the general section of the register`  IS TRUE
+    `(2)(a) the applicant meets the funding condition, prescribed by the Minister by Order for this purpose, as to refraining from soliciting donations from the general public or from any prescribed description of persons`  IS TRUE
+    `(2)(b) the applicant meets any other condition that may be prescribed by the Minister by Order, whether by reference to any other source of the entity's funds or on any other basis`  IS FALSE
+    `(4)(a) the request was made in the form published by the Commissioner`  IS TRUE
+    `(4)(b) the request was supported by information and evidence to the satisfaction of the Commissioner`  IS TRUE
+    `(5) the request was accompanied by a statement of the applicant's intention in the event of refusal of the request`  IS TRUE
+    `there is a ground, prescribed under Article 9(3), on which the request must be refused`  IS FALSE
+    `there is a discretionary ground, prescribed under Article 9(3), on which the Commissioner considers the request should be refused`  IS TRUE
+    `the Commissioner refuses the request`                          IS TRUE
+
+#ASSERT `Article 9(6)(a) — the request complied with paragraphs (4) and (5)` `a request caught by a discretionary ground`
+#ASSERT `Article 9(6)(b) — one of the conditions prescribed under paragraph (2) is met` `a request caught by a discretionary ground`
+#ASSERT NOT `Article 9(6)(c) — no ground prescribed under paragraph (3) requires or warrants refusal` `a request caught by a discretionary ground`
+#ASSERT NOT `Article 9(6) — the Commissioner is satisfied of all three limbs` `a request caught by a discretionary ground`
+
+§§ `Articles 8(5) and 8(6) — the historic section and the retention duty`
+
+-- Deregistered for contravening a required steps notice. The Art 8(5)(c) sub-proviso
+-- therefore bites: the summary must ALSO give the reason the notice was served.
+`the historic entry for a deregistered charity` MEANS HistoricEntry WITH
+    `the formerly registered charity`                               IS "St Helier Benevolent Society"
+    `(a) the entity's former registered number is entered`          IS TRUE
+    `the entity was registered in the general section`              IS TRUE
+    `(b) the name under which the entity was registered immediately before deregistration, and any names under which it was previously so registered, are entered`  IS TRUE
+    `(c) a summary of the reason why the entity was deregistered is entered`  IS TRUE
+    `the reason for deregistration was a contravention of a required steps notice`  IS TRUE
+    `(c) the summary includes the reason for the service of that notice`  IS TRUE
+    `(d) the dates on which the entity was registered and deregistered are entered`  IS TRUE
+    `other matters have been prescribed by the Minister by Order under Article 8(5)(e)`  IS FALSE
+    `(e) those other matters are entered`                           IS FALSE
+
+#ASSERT `Article 8(5)(b) — the former registered names` `the historic entry for a deregistered charity`
+#ASSERT `Article 8(5)(c) — the summary of the reason for deregistration` `the historic entry for a deregistered charity`
+#ASSERT `Article 8(5) — the historic section entry is complete` `the historic entry for a deregistered charity`
+
+-- The SAME entry, but the summary omits WHY the required steps notice was served.
+-- Art 8(5)(c)'s inner proviso bites, and the historic entry is incomplete.
+`the historic entry, with an incomplete summary` MEANS HistoricEntry WITH
+    `the formerly registered charity`                               IS "St Helier Benevolent Society"
+    `(a) the entity's former registered number is entered`          IS TRUE
+    `the entity was registered in the general section`              IS TRUE
+    `(b) the name under which the entity was registered immediately before deregistration, and any names under which it was previously so registered, are entered`  IS TRUE
+    `(c) a summary of the reason why the entity was deregistered is entered`  IS TRUE
+    `the reason for deregistration was a contravention of a required steps notice`  IS TRUE
+    `(c) the summary includes the reason for the service of that notice`  IS FALSE   -- the omission
+    `(d) the dates on which the entity was registered and deregistered are entered`  IS TRUE
+    `other matters have been prescribed by the Minister by Order under Article 8(5)(e)`  IS FALSE
+    `(e) those other matters are entered`                           IS FALSE
+
+#ASSERT NOT `Article 8(5)(c) — the summary of the reason for deregistration` `the historic entry, with an incomplete summary`
+#ASSERT NOT `Article 8(5) — the historic section entry is complete` `the historic entry, with an incomplete summary`
+
+`the retained documents for Victoria College Trust` MEANS RetainedDocuments WITH
+    `the charity`                                                   IS "Victoria College Trust"
+    `(a) the constitution of the charity, and any amendments to it, are retained`  IS TRUE
+    `(b) the annual returns of the charity are retained`            IS TRUE
+    `(c) any notice served on the charity under this Law is retained`  IS TRUE
+    `other documents have been prescribed by the Minister by Order under Article 8(6)(d)`  IS FALSE
+    `(d) those other documents are retained`                        IS FALSE
+
+#ASSERT `Article 8(6) — the retention duty is discharged` `the retained documents for Victoria College Trust`
+
+§§ `Article 12(3) to 12(7) — change of name, and the restriction on other names`
+
+`an application to be renamed 'Jersey Heritage Trust'` MEANS NameChangeApplication WITH
+    `the registered charity`                                        IS "Victoria College Trust"
+    `the proposed name`                                             IS `the name 'Jersey Heritage Trust'`
+    `the Commissioner grants permission`                            IS TRUE
+    `the registered charity notifies the Commissioner that it has changed or added the name accordingly`  IS TRUE
+    `the registered charity has reported a matter relating to its registered name under Article 13(6)(b)`  IS FALSE
+
+#ASSERT NOT `Article 12(4) — a ground in paragraph (1)(a) to (d) applies to the proposed name` `an application to be renamed 'Jersey Heritage Trust'`
+#ASSERT `Article 12(5) — the new or alternative name falls to be entered` `an application to be renamed 'Jersey Heritage Trust'`
+
+-- Art 12(4) — the MANDATORY REFUSAL arm. The proposed new name is too similar to an
+-- existing registered charity's, so Art 12(1)(a) applies, and the Commissioner has no
+-- choice.
+`an application to be renamed 'Jersey Heritage Trvst'` MEANS NameChangeApplication WITH
+    `the registered charity`                                        IS "Some Other Charity"
+    `the proposed name`                                             IS `the name 'Jersey Heritage Trvst'`
+    `the Commissioner grants permission`                            IS FALSE
+    `the registered charity notifies the Commissioner that it has changed or added the name accordingly`  IS FALSE
+    `the registered charity has reported a matter relating to its registered name under Article 13(6)(b)`  IS TRUE
+
+#ASSERT `Article 12(4) — a ground in paragraph (1)(a) to (d) applies to the proposed name` `an application to be renamed 'Jersey Heritage Trvst'`
+#ASSERT NOT `Article 12(5) — the new or alternative name falls to be entered` `an application to be renamed 'Jersey Heritage Trvst'`
+
+-- Art 12(7) — a permitted working name: related to the registered name, and not
+-- undesirable in the context in which it is used.
+`the working name 'Jersey Heritage'` MEANS NameInUse WITH
+    `the name as used`                                              IS `the name 'Jersey Heritage Trust'`
+    `(7)(a) it is the charity's registered name or one of its registered names`  IS FALSE
+    `(7)(b)(i) it is related to such a name`                        IS TRUE
+
+#ASSERT `Article 12(7) — the name is a permitted name` `the working name 'Jersey Heritage'`
+
+-- Art 12(7) — a name that IS related to the registered name, but is undesirable in
+-- the context in which it is used (it gives a false impression of connection). Limb
+-- (b)(ii) shuts, limb (a) does not apply, and the charity is PROHIBITED from using it.
+`the working name 'The Royal Bailiwick Foundation'` MEANS NameInUse WITH
+    `the name as used`                                              IS `the name 'The Royal Bailiwick Foundation'`
+    `(7)(a) it is the charity's registered name or one of its registered names`  IS FALSE
+    `(7)(b)(i) it is related to such a name`                        IS TRUE
+
+#ASSERT NOT `Article 12(7) — the name is a permitted name` `the working name 'The Royal Bailiwick Foundation'`
+
+§§ `The regulative layer, exercised`
+
+-- ARTICLE 11(4) — THE COMMISSIONER REGISTERS. The application passes the compliance
+-- gate and all six limbs; the duty is mandatory; the Commissioner registers on day 60
+-- and issues the Art 11(9)(a) certificate on day 70. Residual: FULFILLED.
+#TRACE `Article 11(4) and 11(5) — the registration decision` `the Victoria College Trust application` AT 0 WITH
+    PARTY Commissioner DOES `register the applicant as a charity` AT 60
+    PARTY Commissioner DOES `issue a certificate of registration` AT 70
+
+-- ARTICLE 11(5) — THE COMMISSIONER REFUSES. The family trust does not meet the
+-- charity test (Art 7(3)(b)), so limb (a) fails and the Commissioner is "not so
+-- satisfied". The duty to REFUSE is equally mandatory.
+#TRACE `Article 11(4) and 11(5) — the registration decision` `knock-out (a) — does not meet the charity test` AT 0 WITH
+    PARTY Commissioner DOES `refuse to register the applicant` AT 45
+
+-- THE MANDATORY DUTY, BREACHED. The application is impeccable. The Commissioner never
+-- registers the applicant, and purports to issue a certificate on day 100 — past the
+-- (placeholder) 90-day decision deadline. MUST + omission past the deadline = BREACH.
+-- The residual names the Commissioner and the obligation left undone.
+#TRACE `Article 11(4) and 11(5) — the registration decision` `the Victoria College Trust application` AT 0 WITH
+    PARTY Commissioner DOES `issue a certificate of registration` AT 100
+
+-- INTERPRETATION CALL [1], made visible. The SAME facts, on the LITERAL three-way
+-- reading: the application fails the COMPLIANCE GATE (no constitution enclosed), so
+-- neither Art 11(4) nor Art 11(5) is engaged, and the residual is FULFILLED — the
+-- Commissioner owes no duty at all. Contrast the two-arm reading immediately below,
+-- which converts the same facts into a mandatory REFUSAL.
+#TRACE `Article 11(4) and 11(5) — the registration decision (the literal three-way reading)` `the Victoria College Trust application, missing its constitution` AT 0 WITH
+    PARTY Commissioner DOES `register the applicant as a charity` AT 60
+
+-- ...and the two-arm reading of the SAME application: a duty to refuse, discharged.
+#TRACE `Article 11(4) and 11(5) — the registration decision` `the Victoria College Trust application, missing its constitution` AT 0 WITH
+    PARTY Commissioner DOES `refuse to register the applicant` AT 45
+
+-- ARTICLE 9(6) — THE PROHIBITION-UNLESS, BREACHED. The Commissioner is NOT satisfied
+-- of limb (a) (no statement of intention), yet enters the charity in the restricted
+-- section anyway. SHANT: doing the act IS the breach.
+#TRACE `Article 9(6) — the prohibition on entry in the restricted section` `a request with no statement of intention` AT 0 WITH
+    PARTY Commissioner DOES `enter the charity in the restricted section of the register` AT 30
+
+-- ARTICLE 9(6) — satisfied of all three limbs, so the bar is LIFTED and entry is
+-- permitted. INTERPRETATION CALL [5]: a MAY, not a MUST.
+#TRACE `Article 9(6) — the prohibition on entry in the restricted section` `a good restricted-section request` AT 0 WITH
+    PARTY Commissioner DOES `enter the charity in the restricted section of the register` AT 30
+
+-- ARTICLE 9(7) — the refusal consequences: written notice (MUST) is given; the power
+-- to proceed on the stated intention (MAY) is left unexercised, benignly.
+#TRACE `Article 9(7) — the consequences of refusing a request` `a request with no statement of intention` AT 0 WITH
+    PARTY Commissioner DOES `give written notice of the refusal of the request` AT 7
+
+-- ARTICLE 12(4) — the mandatory refusal of permission to change the registered name.
+#TRACE `Article 12(4) — the Commissioner must refuse permission` `an application to be renamed 'Jersey Heritage Trvst'` AT 0 WITH
+    PARTY Commissioner DOES `refuse permission to change the registered name` AT 20
+
+-- ARTICLE 12(5) and 11(9)(b) — permission granted and the change notified: the
+-- Commissioner enters the new name, and (across the enum seam) issues a further
+-- certificate.
+#TRACE `Article 12(5) — the duty to enter the new or alternative registered name` `an application to be renamed 'Jersey Heritage Trust'` AT 0 WITH
+    PARTY Commissioner DOES `enter on the register the new or alternative registered name` AT 10
+
+#TRACE `Article 11(9)(b) — a further certificate on entry of a new or alternative name` `an application to be renamed 'Jersey Heritage Trust'` AT 0 WITH
+    PARTY Commissioner DOES `issue a certificate of registration` AT 12
+
+-- ARTICLE 12(7) — the charity uses a name it is prohibited from using. SHANT: the act
+-- is the breach.
+#TRACE `Article 12(7) — the prohibition on using other names` `the working name 'The Royal Bailiwick Foundation'` AT 0 WITH
+    PARTY Charity DOES `use a name other than a permitted name` AT 15
+
+-- ARTICLES 11(10) and 11(11) — the three-party cross-registration chain, run to
+-- completion: the applicant provides and requests; the Commissioner passes it on; the
+-- JFSC receives it as an application under the 2008 Law.
+#TRACE `Article 11(10) — the unregistered NPO applicant's duty` `the Ile de Lumiere Trust application (an unregistered NPO)` AT 0 WITH
+    PARTY Applicant DOES `provide with the application the additional information required by the JFSC` AT 5
+    PARTY Applicant DOES `request to be registered under the Non-Profit Organizations (Jersey) Law 2008` AT 5
+
+#TRACE `Article 11(11) — onward transmission to the JFSC` `the Ile de Lumiere Trust application (an unregistered NPO)` AT 0 WITH
+    PARTY Commissioner DOES `pass the request, information and documents to the JFSC` AT 20
+    PARTY JFSC DOES `treat the request as an application for registration under that Law` AT 40
+
+-- The Commissioner sits on it: the JFSC is never seized, and the chain BREACHES at
+-- the Commissioner's own link.
+#TRACE `Article 11(11) — onward transmission to the JFSC` `the Ile de Lumiere Trust application (an unregistered NPO)` AT 0 WITH
+    PARTY JFSC DOES `treat the request as an application for registration under that Law` AT 40
+
+-- ARTICLE 8 — the register itself: established, then kept so as to distinguish the
+-- three sections.
+#TRACE `Article 8(1) and 8(2) — the duty to establish and maintain the register` AT 0 WITH
+    PARTY Commissioner DOES `establish and maintain a register of charities` AT 30
+    PARTY Commissioner DOES `keep the register so as to distinguish the general, restricted and historic sections` AT 45
+
+-- ARTICLE 10(1) — public access, on a website, without charge.
+#TRACE `Article 10(1) — the duty of public access` AT 0 WITH
+    PARTY Commissioner DOES `make the public parts of the register available on a website without charge` AT 20
+
+-- ARTICLE 10(5) — the designation power, exercised where the Art 10(4) gate is open.
+#TRACE `Article 10(5) — the power to designate a matter as not being a public part` `the address of a refuge, designated under Article 10(5)` AT 0 WITH
+    PARTY Commissioner DOES `designate the matter as not being a public part of the register` AT 10

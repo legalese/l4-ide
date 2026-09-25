@@ -1,0 +1,25 @@
+-- Regression test for lexical section scoping — FIX D, sibling shape.
+--
+-- Two SIBLING sections each define x and each reference it from inside
+-- themselves. Both references resolve to their own section's x (spec §3.1:
+-- same section first). The first section's reference must not become
+-- ambiguous merely because a LATER sibling rebinds the name.
+--
+-- Previously this reported
+--
+--     There are multiple definitions for the identifier x
+--
+-- at line 18 — the reference inside `Title`, i.e. the location of the
+-- (spurious) ambiguity, not the rebinding at line 21. Reversing the order of
+-- the two sections made the error disappear; see FIX B/FIX D in spec §12.
+
+§ `Title`
+x MEANS 1
+f MEANS x PLUS 1              -- Title's x
+
+§ `One`
+x MEANS 2
+g MEANS x PLUS 1              -- One's x
+
+#EVAL f    -- 2
+#EVAL g    -- 3

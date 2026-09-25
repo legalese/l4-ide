@@ -1,0 +1,47 @@
+IMPORT prelude
+
+-- A paired `MAYBE NUMBER` INSIDE a gathered list element.
+--
+-- The §8.4 changed-answer repair clears a gated answer by putting `undefine:`
+-- on the question that gates it. That does not reach inside a gather, and the
+-- reason is a docassemble asymmetry: `ask` runs `substitute_vars` over
+-- `reconsider:` and NOT over `undefine:` (parse.py:5389 beside :5392 at
+-- 1b6678384), so a `<list>[i].<attr>` spelling would arrive at `undefine()`
+-- with the iterator unresolved.
+--
+-- So the emitter emits no `undefine:` on an element question, and declares the
+-- omission as `DA-UNDEFINE-LIST` rather than leaving it silent. Expect: the
+-- element's is-known flag question carries `show if:` on the value question but
+-- NO `undefine:` anywhere carrying `[i]`, and the fidelity report names the
+-- gated element variable.
+
+DECLARE Claimant
+    HAS
+      @desc The claimant's name
+      `the name`         IS A STRING
+      @desc The claimant's declared income, if they gave one
+      `declared income`  IS A MAYBE NUMBER
+
+DECLARE Household
+    HAS
+      @desc Everyone claiming in this household
+      claimants IS A LIST OF Claimant
+
+@export whether every claimant declared an income above the threshold
+GIVEN h IS A Household @desc The household under assessment
+GIVETH A BOOLEAN
+DECIDE `the household is above the threshold` h IF
+    all (GIVEN c YIELD `the claimant is above the threshold` c) (h's claimants)
+
+GIVEN c IS A Claimant
+GIVETH A BOOLEAN
+DECIDE `the claimant is above the threshold` c IF
+    CONSIDER c's `declared income`
+    WHEN JUST amount THEN amount AT LEAST 1000
+    WHEN NOTHING     THEN FALSE
+
+#EVAL `the household is above the threshold` OF
+        Household WITH
+            claimants IS LIST
+                Claimant WITH `the name` IS "A", `declared income` IS JUST 2000
+-- TRUE

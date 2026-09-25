@@ -1,0 +1,108 @@
+IMPORT prelude
+IMPORT daydate
+
+§ `Housing Act 1988 — Schedule 2 — Part IV — Notices relating to recovery of possession (REPEALED / OMITTED by Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- PART IV — NOTICES RELATING TO RECOVERY OF POSSESSION — REPEALED.
+--
+-- The whole of Part IV (paras 7-11: the cross-cutting notice provisions that the
+-- former Grounds 1 to 5 relied on) was OMITTED from Schedule 2 to the Housing Act
+-- 1988 by the Renters' Rights Act 2025. The Part is gone because RRA 2025 removed
+-- the prior-written-notice requirements from Grounds 1-5, leaving nothing for
+-- these notice-reading rules to operate on.
+--
+-- Provenance (Textual Amendment F76):
+--   "Sch. 2 Pt. 4 omitted (1.5.2026 for specified purposes) by virtue of Renters'
+--    Rights Act 2025 (c. 26), s. 145(1)(8), Sch. 2 para. 36(b) (with ss. 138,
+--    146(1), Sch. 6 paras. 1, 3, 4, 16, 17); S.I. 2026/421, reg. 2(c)"
+--
+-- This file is a deliberate STUB so the in-order corpus (Part III -> [Part IV] ->
+-- Part 5) has no silent gap. There is NO operative logic and NO Court MUST/MAY
+-- outcome: the Part no longer exists in the in-force text. The FORMER text of
+-- paras 7-11 is preserved below as inert prose for the record only.
+-- ===========================================================================
+
+§§ `Former Part IV, paragraph 7 — joint-landlord notice reading (no longer in force)`
+
+-- "Any reference in Grounds 1 to 5 in Part I of this Schedule or in the following
+-- provisions of this Part to the landlord giving a notice in writing to the tenant
+-- is, in the case of joint landlords, a reference to at least one of the joint
+-- landlords giving such a notice."
+GIVETH A BOOLEAN
+`former para 7 — joint-landlord notice (REPEALED)` MEANS
+        "7. Any reference in Grounds 1 to 5 in Part I of this Schedule or in the following provisions of this Part to the landlord giving a notice in writing to the tenant is, in the case of joint landlords, a reference to at least one of the joint landlords giving such a notice."
+    ... TRUE   -- AND-identity: inert prose, no present-day effect (Part IV omitted)
+
+§§ `Former Part IV, paragraph 8 — notice carrying over to a later tenancy (no longer in force)`
+
+-- "(1) If, not later than the beginning of a tenancy (the "earlier tenancy"), the
+-- landlord gives such a notice in writing to the tenant as is mentioned in any of
+-- Grounds 1 to 5 in Part I, then, for the purposes of the ground in question and
+-- any further application of this paragraph, that notice shall also have effect as
+-- if it had been given immediately before the beginning of any later tenancy
+-- falling within sub-paragraph (2).
+-- (2) Subject to (3), (1) applies to a later tenancy— (a) which takes effect
+-- immediately on the coming to an end of the earlier tenancy; and (b) which is
+-- granted (or deemed to be granted) to the person who was the tenant under the
+-- earlier tenancy immediately before it came to an end; and (c) which is of
+-- substantially the same dwelling-house as the earlier tenancy.
+-- (3) (1) does not apply to a later tenancy if, not later than the beginning of
+-- the tenancy, the landlord gave notice in writing to the tenant that the tenancy
+-- is not one in respect of which possession can be recovered on the ground in
+-- question."
+GIVETH A BOOLEAN
+`former para 8 — notice carries over to a later tenancy (REPEALED)` MEANS
+        "8.(1) If, not later than the beginning of a tenancy (in this paragraph referred to as “the earlier tenancy”), the landlord gives such a notice in writing to the tenant as is mentioned in any of Grounds 1 to 5 in Part I of this Schedule, then, for the purposes of the ground in question and any further application of this paragraph, that notice shall also have effect as if it had been given immediately before the beginning of any later tenancy falling within sub-paragraph (2) below."
+    ... "(2) Subject to sub-paragraph (3) below, sub-paragraph (1) above applies to a later tenancy—"
+    ... "(a) which takes effect immediately on the coming to an end of the earlier tenancy; and"
+    ... "(b) which is granted (or deemed to be granted) to the person who was the tenant under the earlier tenancy immediately before it came to an end; and"
+    ... "(c) which is of substantially the same dwelling-house as the earlier tenancy."
+    ... "(3) Sub-paragraph (1) above does not apply in relation to a later tenancy if, not later than the beginning of the tenancy, the landlord gave notice in writing to the tenant that the tenancy is not one in respect of which possession can be recovered on the ground in question."
+
+§§ `Former Part IV, paragraph 9 — Ground 1 reversion reference (no longer in force)`
+
+-- "Where paragraph 8(1) above has effect in relation to a notice given as
+-- mentioned in Ground 1 in Part I of this Schedule, the reference in paragraph (b)
+-- of that ground to the reversion on the tenancy is a reference to the reversion on
+-- the earlier tenancy and on any later tenancy falling within paragraph 8(2)
+-- above."
+GIVETH A BOOLEAN
+`former para 9 — Ground 1 reversion reference (REPEALED)` MEANS
+        "9. Where paragraph 8(1) above has effect in relation to a notice given as mentioned in Ground 1 in Part I of this Schedule, the reference in paragraph (b) of that ground to the reversion on the tenancy is a reference to the reversion on the earlier tenancy and on any later tenancy falling within paragraph 8(2) above."
+    ... TRUE
+
+§§ `Former Part IV, paragraph 10 — Grounds 3/4 beginning-of-tenancy reading (no longer in force)`
+
+-- "Where paragraph 8(1) above has effect in relation to a notice given as
+-- mentioned in Ground 3 or Ground 4 in Part I of this Schedule, any second or
+-- subsequent tenancy in relation to which the notice has effect shall be treated
+-- for the purpose of that ground as beginning at the beginning of the tenancy in
+-- respect of which the notice was actually given."
+GIVETH A BOOLEAN
+`former para 10 — Grounds 3/4 beginning-of-tenancy reading (REPEALED)` MEANS
+        "10. Where paragraph 8(1) above has effect in relation to a notice given as mentioned in Ground 3 or Ground 4 in Part I of this Schedule, any second or subsequent tenancy in relation to which the notice has effect shall be treated for the purpose of that ground as beginning at the beginning of the tenancy in respect of which the notice was actually given."
+    ... TRUE
+
+§§ `Former Part IV, paragraph 11 — "not later than the beginning of the tenancy" reading (no longer in force)`
+
+-- "Any reference in Grounds 1 to 5 in Part I of this Schedule to a notice being
+-- given not later than the beginning of the tenancy is a reference to its being
+-- given not later than the day on which the tenancy is entered into and,
+-- accordingly, section 45(2) of this Act shall not apply to any such reference."
+GIVETH A BOOLEAN
+`former para 11 — "not later than the beginning of the tenancy" reading (REPEALED)` MEANS
+        "11. Any reference in Grounds 1 to 5 in Part I of this Schedule to a notice being given not later than the beginning of the tenancy is a reference to its being given not later than the day on which the tenancy is entered into and, accordingly, section 45(2) of this Act shall not apply to any such reference."
+    ... TRUE
+
+§§ `Documentation markers — the former text is recorded; NOT operative assertions`
+
+-- Each inert-prose predicate collapses to TRUE (the AND-identity), confirming the
+-- former wording is recorded here next to its repeal provenance. These are NOT
+-- operative assertions about any present-day legal effect — the whole of Part IV
+-- has been omitted by RRA 2025.
+#EVAL `former para 7 — joint-landlord notice (REPEALED)`
+#EVAL `former para 8 — notice carries over to a later tenancy (REPEALED)`
+#EVAL `former para 9 — Ground 1 reversion reference (REPEALED)`
+#EVAL `former para 10 — Grounds 3/4 beginning-of-tenancy reading (REPEALED)`
+#EVAL `former para 11 — "not later than the beginning of the tenancy" reading (REPEALED)`

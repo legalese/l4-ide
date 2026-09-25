@@ -1,0 +1,40 @@
+-- The OTHER half of the refused band, and the fixture that keeps the
+-- diagnostic honest.
+--
+-- `zero-arity.l4` beside this file shows an input with NO subject. This one has
+-- a subject — `severity exceeds` takes an `ASSUME`d TYPE as its first parameter,
+-- which is exactly what an author following the old wording of the error
+-- message would have written — and it is refused anyway, because the real
+-- condition is on ARITY: `classifyPred` (`L4.Blawx.Lower`) places an input as an
+-- attribute only at `(category)` or `(category) -> value`, and Blawx's
+-- relationship blocks do not start until total arity 3. A two-place input falls
+-- in the gap between them.
+--
+-- The message must therefore name the arity band, not the first parameter. It
+-- used to say "… whose first parameter is not a category … an ASSUME must take
+-- the thing it is about … as its first parameter", which for THIS module is
+-- advice the author has already followed — there is no edit that satisfies it.
+-- Keeping the module as a fixture is what stops that wording coming back.
+--
+-- What a user does about it: give the second argument a category of its own and
+-- add a third (a relationship), or fold the NUMBER into the decision that reads
+-- it (`ASSUME `severity` c IS A NUMBER` and compare in the DECIDE, which is
+-- what `alcohol.l4` and `antisocial.l4` do).
+
+§ `Arity two with a category subject`
+
+ASSUME Consequence IS A TYPE
+
+GIVEN c IS A Consequence
+ASSUME `is severe` c IS A BOOLEAN
+
+GIVEN c IS A Consequence
+      n IS A NUMBER
+ASSUME `severity exceeds` c n IS A BOOLEAN
+
+@export A consequence that is severe and over the numeric threshold.
+GIVEN c IS A Consequence
+GIVETH A BOOLEAN
+DECIDE `qualifies` c IF
+        `is severe` c
+    AND `severity exceeds` c 10

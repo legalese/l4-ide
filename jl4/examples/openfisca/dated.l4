@@ -1,0 +1,33 @@
+IMPORT prelude
+
+DECLARE Person HAS salary IS A NUMBER
+DECLARE Period HAS year IS A NUMBER, month IS A NUMBER
+
+GIVEN `the period` IS A Period
+      y            IS A NUMBER
+      m            IS A NUMBER
+GIVETH A BOOLEAN
+`period reaches` MEANS
+        (`the period`'s year GREATER THAN y)
+    OR  (`the period`'s year EQUALS y AND `the period`'s month AT LEAST m)
+
+@export Basic income payable to a person for a period
+GIVEN p      IS A Person
+      period IS A Period
+GIVETH A NUMBER
+`basic income` p period MEANS
+    BRANCH
+        IF `period reaches` OF period, 2016, 12 THEN 600
+        IF `period reaches` OF period, 2015, 12 THEN IF p's salary EQUALS 0 THEN 600 ELSE 0
+        OTHERWISE 0
+
+`earner` MEANS Person WITH salary IS 1200
+`zero`   MEANS Person WITH salary IS 0
+`nov2015` MEANS Period WITH year IS 2015, month IS 11
+`dec2015` MEANS Period WITH year IS 2015, month IS 12
+`dec2016` MEANS Period WITH year IS 2016, month IS 12
+
+#ASSERT (`basic income` OF `zero`,   `nov2015`) EQUALS 0
+#ASSERT (`basic income` OF `zero`,   `dec2015`) EQUALS 600
+#ASSERT (`basic income` OF `earner`, `dec2015`) EQUALS 0
+#ASSERT (`basic income` OF `earner`, `dec2016`) EQUALS 600

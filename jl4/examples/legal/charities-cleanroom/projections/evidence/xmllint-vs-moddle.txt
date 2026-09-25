@@ -1,0 +1,7 @@
+/tmp/cc/malformed-comment.dmn:10: parser error : Double hyphen within comment: <!--
+  NOT AN EMITTER OUTPUT. This is charity-test.dmn
+  SUCCEEDED) -- and both answer 993/1000, disagreeing with L4 on the same seven
+             ^
+OK    /tmp/cc/malformed-comment.dmn
+       40 decision(s): 0 table(s), 40 literal expression(s); 2 inputData; 1 diagram(s)
+SKIP  dmnmd legs (set DMNMD=<path to the cabal-built dmnmd binary> to run them)

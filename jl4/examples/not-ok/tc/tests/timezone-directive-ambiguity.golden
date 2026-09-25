@@ -1,0 +1,19 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: timezone-directive-ambiguity.l4
+  Hidden: no
+  Range: 11:13-11:21
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: <none>
+  Message:
+    There are multiple definitions for the identifier
+
+      foo
+
+    and I do not have sufficient information to make a choice between them.
+    The options are:
+
+      foo (defined at timezone-directive-ambiguity.l4:8:8-11) of type FUNCTION FROM BOOLEAN TO BOOLEAN
+      foo (defined at timezone-directive-ambiguity.l4:5:8-11) of type FUNCTION FROM BOOLEAN TO BOOLEAN

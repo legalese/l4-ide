@@ -1,0 +1,2452 @@
+{
+  "note": [
+    "Engine cases for the BNA smoke-test projection (bna.dmn) — British",
+    "Nationality Act 1981 s 1, the de novo (G2) encoding subject.",
+    "",
+    "STATUS 2026-08-02 — 25 cases, GENERATED from the L4 source: one case per",
+    "distinct scenario appearing in bna.l4's #ASSERT directives (25 person",
+    "scenarios x 9 adoption scenarios, paired person i with adoption i mod 9 so",
+    "every #ASSERT scenario of both kinds is exercised at least twice for",
+    "adoptions, once for persons). The model has THREE inputData — `person`,",
+    "`adoption`, `entitled_under_subsection_3_3A_or_4` — because the exporter's",
+    "D-PARAM-AS-INPUT lowering un-lifts each GIVEN parameter to one GLOBAL",
+    "input; a case therefore carries one person AND one adoption world, and",
+    "the s 41A grant-gate flag is set true exactly on the five subsection (4)",
+    "cases so `registration_may_be_granted` reproduces the two #ASSERTs on the",
+    "grant gate (lead case: granted; applicant of bad character: not granted).",
+    "",
+    "ACTIVATION CONTRACT (house rule, per regcf-corpus.cases.json): every",
+    "value in `expect` is derived from the L4 SOURCE — evaluated with the",
+    "prebuilt l4 binary over a copy of bna.l4 carrying one #EVAL per (case,",
+    "decision), 979 evaluations in all, cross-checked against the file's own",
+    "42 #ASSERT directives (all satisfied on the same run) — NEVER from a DMN",
+    "engine's own output. A pin regenerated from the thing it pins is vacuous.",
+    "",
+    "KNOWN BLOCKING DEFECT CARRIED HONESTLY: bna.fidelity.txt records 3",
+    "blocking D-LITERALEXPR — the dated constants `commencement`,",
+    "`the_appointed_day`, `the_relevant_day` are emitted as raw L4 text",
+    "(`YMD OF 1983, 1, 1`) with no FEEL rendering. Their pins below are the L4",
+    "truth ($date 1983-01-01 / 2002-05-21 / 2010-01-13); whatever an engine",
+    "does with the raw-L4 bodies is a MEASUREMENT, not a target — do not",
+    "adjust these pins to make an engine pass, and do not delete cases.",
+    "",
+    "MEASURED 2026-08-02 on both engines at the R12/R13 tree plus this file:",
+    "BOTH REFUSE WHOLE-FILE on exactly those three expressions, so not one of",
+    "the 25 x 43 pins below was ever compared. Banners verbatim:",
+    "  * KIE 8.44.0.Final: XSD valid; VALID 3 error(s) + BUILD 3 error(s),",
+    "    all ERR_COMPILING_FEEL 'syntax error near ''OF''' on",
+    "    decision_commencement_literal / decision_the_appointed_day_literal /",
+    "    decision_the_relevant_day_literal; BUILD errors abort before any",
+    "    case runs. 'KIE 8.44.0.Final VERDICT: 1 file(s), 0 case(s),",
+    "    6 error(s), 0 warning(s), 0/0 decision(s) SUCCEEDED, 0/0 value(s)",
+    "    as expected, 0/0 service output value(s) as expected   <<< FAILED',",
+    "    exit 1.",
+    "  * Camunda 8.7.6 (zeebe-dmn): 'PARSE  INVALID: FEEL expression: failed",
+    "    to parse expression ''YMD OF 1983, 1, 1'': Expected",
+    "    (binaryComparison | between | instanceOf | in | \"and\" | \"or\" |",
+    "    end-of-input):1:5, found \"OF 1983, 1\"' (and the same for the 2002",
+    "    and 2010 constants). 'Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s),",
+    "    0 case(s), 0 parsed, 1 error(s), 0/0 decision(s) evaluated,",
+    "    0/0 value(s) as expected   <<< FAILED', exit 1.",
+    "This is the regcf pre-R12 refusal shape reproduced on a fresh corpus:",
+    "a standalone dated constant (GIVETH A DATE ... MEANS YMD y m d) has no",
+    "FEEL lowering, where regcf's dated constants survived only because the",
+    "rule-version axis turned them into guarded chains. The fix belongs in",
+    "the exporter (YMD y m d -> FEEL date(y,m,d)), not in these pins.",
+    "",
+    "CAUSE ISOLATED + PINS PROVEN, same day: a SCRATCH copy of bna.dmn with",
+    "ONLY those three <text> lines rewritten to FEEL date literals",
+    "(date(\"1983-01-01\") / date(\"2002-05-21\") / date(\"2010-01-13\")) and",
+    "nothing else changed goes fully green on BOTH engines against THIS file:",
+    "  * KIE 8.44.0.Final: '1 file(s), 25 case(s), 0 error(s), 0 warning(s),",
+    "    1075/1075 decision(s) SUCCEEDED, 1075/1075 value(s) as expected,",
+    "    325/325 service output value(s) as expected', exit 0.",
+    "  * Camunda 8.7.6 (zeebe-dmn): '1 file(s), 25 case(s), 1 parsed,",
+    "    0 error(s), 1075/1075 decision(s) evaluated, 1075/1075 value(s) as",
+    "    expected', exit 0.",
+    "So the missing YMD lowering is the SOLE defect between bna.dmn and a",
+    "two-engine green run, and every pin below has been value-checked on both",
+    "engines via that scratch variant (which is an experiment, not a shipped",
+    "artifact — the emitted bna.dmn still refuses as recorded above).",
+    "",
+    "section_1_outcome_at_birth is the corpus's one decision TABLE (FIRST hit",
+    "policy); its expected strings are the BirthOutcome enum's DMN renderings."
+  ],
+  "cases": [
+    {
+      "name": "Peter (Sergot et al. 1986, s 1(1)(a)) + UK adoption order 2004-07-01, citizen adopter (s 1(5) in)",
+      "context": {
+        "person": {
+          "name": "Peter",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "1983-05-03"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": true,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "1983-05-03"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": true,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2004-07-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": true,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": true,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": true,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": true,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": false,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "a British citizen from birth under subsection (1)",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": true,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": true
+      }
+    },
+    {
+      "name": "UK birth on commencement day, settled parent (s 1(1)(b) boundary in) + UK adoption order, adopter not a citizen (s 1(5A)(a) fails)",
+      "context": {
+        "person": {
+          "name": "a UK-born child",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "1983-01-01"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": true,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "1983-01-01"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": true,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2004-07-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": false,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": true,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": true,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": true,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": true,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": false,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "a British citizen from birth under subsection (1)",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": false,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": false,
+        "a_British_citizen_by_virtue_of_subsection_5": false,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": false
+      }
+    },
+    {
+      "name": "UK birth the day before commencement (boundary out) + Convention adoption 2006-02-01, citizen + resident (in)",
+      "context": {
+        "person": {
+          "name": "a UK-born child",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "1982-12-31"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": true,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "1982-12-31"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": false,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": true,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2006-02-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": false,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_1_a_father_or_mother_a_British_citizen": true,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": true,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": false,
+        "_1_5_b_adopted_under_a_Convention_adoption": true,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": true,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": true
+      }
+    },
+    {
+      "name": "the child of visitors (s 1(3) lead case) + Convention adoption, adopters not habitually resident (s 1(5A)(b) fails)",
+      "context": {
+        "person": {
+          "name": "a child of visitors",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "2012-05-10"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "2012-05-10"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": true,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": true,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": false,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": true,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2006-02-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": false,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": true,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": true,
+        "_1_3_b_an_application_is_made_while_a_minor": true,
+        "entitled_to_be_registered_under_subsection_3": true,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": true,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": false,
+        "_1_5_b_adopted_under_a_Convention_adoption": true,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": false,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": false,
+        "a_British_citizen_by_virtue_of_subsection_5": false,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": false
+      }
+    },
+    {
+      "name": "qualifying-territory birth on the appointed day, settled parent (in) + Gibraltar order 2005 (territory court; (5A)(b) proviso vacuous)",
+      "context": {
+        "person": {
+          "name": "a territory-born child",
+          "born_in_the_United_Kingdom": false,
+          "born_in_a_qualifying_territory": true,
+          "date_of_birth": {
+            "$date": "2002-05-21"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": true,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "2002-05-21"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": false,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": true,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2005-04-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": false,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": false,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": true,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": true,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": true,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": true,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": false,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "a British citizen from birth under subsection (1)",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": true,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": true
+      }
+    },
+    {
+      "name": "qualifying-territory birth the day before the appointed day (out) + pre-appointed-day Gibraltar order (limb (5)(a) not engaged)",
+      "context": {
+        "person": {
+          "name": "a territory-born child",
+          "born_in_the_United_Kingdom": false,
+          "born_in_a_qualifying_territory": true,
+          "date_of_birth": {
+            "$date": "2002-05-20"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": true,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "2002-05-20"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": false,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": true,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2001-04-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": false,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": false,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": true,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": true,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": false,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": false,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": false,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": false
+      }
+    },
+    {
+      "name": "UK birth on the relevant day, forces parent (s 1(1A) boundary in) + adoption of a person already a British citizen (chapeau negative)",
+      "context": {
+        "person": {
+          "name": "a UK-born child",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "2010-01-13"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": true,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "2010-01-13"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": true,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": true,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2010-09-15"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": true,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": true,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": false,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "a British citizen from birth under subsection (1A)",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": false,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": false,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": false
+      }
+    },
+    {
+      "name": "UK birth the day before the relevant day, forces parent (out) + UK adoption order later ceasing (s 1(6) invariance)",
+      "context": {
+        "person": {
+          "name": "a UK-born child",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "2010-01-12"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": true,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "2010-01-12"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": true,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2004-07-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": true
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": true,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": true
+      }
+    },
+    {
+      "name": "qualifying-territory birth 2012, forces parent (s 1(1A) in territory) + ceased order that never conferred citizenship (s 1(6) negative)",
+      "context": {
+        "person": {
+          "name": "a territory-born child",
+          "born_in_the_United_Kingdom": false,
+          "born_in_a_qualifying_territory": true,
+          "date_of_birth": {
+            "$date": "2012-03-01"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": true,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "2012-03-01"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": true,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2004-07-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": false,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": true
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": false,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": true,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": false,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "a British citizen from birth under subsection (1A)",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": false,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": false,
+        "a_British_citizen_by_virtue_of_subsection_5": false,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": false
+      }
+    },
+    {
+      "name": "the forces child (s 1(1A) lead case) + UK adoption order 2004-07-01, citizen adopter (s 1(5) in)",
+      "context": {
+        "person": {
+          "name": "a UK-born child",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "2015-06-01"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": true,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "2015-06-01"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": true,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2004-07-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": true,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": true,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": false,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "a British citizen from birth under subsection (1A)",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": true,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": true
+      }
+    },
+    {
+      "name": "UK birth 2015, no qualifying parent (s 1(1A) limb fails) + UK adoption order, adopter not a citizen (s 1(5A)(a) fails)",
+      "context": {
+        "person": {
+          "name": "a UK-born child",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "2015-06-01"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "2015-06-01"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": true,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2004-07-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": false,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": true,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": false,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": false,
+        "a_British_citizen_by_virtue_of_subsection_5": false,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": false
+      }
+    },
+    {
+      "name": "the foundling (s 1(2) presumption) + Convention adoption 2006-02-01, citizen + resident (in)",
+      "context": {
+        "person": {
+          "name": "a foundling",
+          "born_in_the_United_Kingdom": false,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "2020-06-01"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": true,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "2020-06-01"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": false,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": true,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2006-02-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": false,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": false,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": true,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": true,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": true,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": true,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": false,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "a British citizen from birth under subsection (1)",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": false,
+        "_1_5_b_adopted_under_a_Convention_adoption": true,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": true,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": true
+      }
+    },
+    {
+      "name": "the rebutted foundling (contrary shown) + Convention adoption, adopters not habitually resident (s 1(5A)(b) fails)",
+      "context": {
+        "person": {
+          "name": "a foundling",
+          "born_in_the_United_Kingdom": false,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "2020-06-01"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": true,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "2020-06-01"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": true,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": false,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": true,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2006-02-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": false,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": false,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": false,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": true,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": true,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": false,
+        "_1_5_b_adopted_under_a_Convention_adoption": true,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": false,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": false,
+        "a_British_citizen_by_virtue_of_subsection_5": false,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": false
+      }
+    },
+    {
+      "name": "foundling found before commencement (deeming does not run) + Gibraltar order 2005 (territory court; (5A)(b) proviso vacuous)",
+      "context": {
+        "person": {
+          "name": "a foundling",
+          "born_in_the_United_Kingdom": false,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "1982-06-01"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": true,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "1982-06-01"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": false,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": true,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2005-04-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": false,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": false,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": false,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": true,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": true
+      }
+    },
+    {
+      "name": "child of visitors, no application while a minor (s 1(3)(b) fails) + pre-appointed-day Gibraltar order (limb (5)(a) not engaged)",
+      "context": {
+        "person": {
+          "name": "a child of visitors",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "2012-05-10"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "2012-05-10"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": true,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": false,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": true,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2001-04-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": false,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": true,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": true,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": false,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": false,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": false,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": false
+      }
+    },
+    {
+      "name": "child of visitors, parent never qualifies (s 1(3)(a) fails) + adoption of a person already a British citizen (chapeau negative)",
+      "context": {
+        "person": {
+          "name": "a child of visitors",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "2012-05-10"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "2012-05-10"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": true,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": true,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": true,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2010-09-15"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": true,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": true,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": true,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": false,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": false,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": false
+      }
+    },
+    {
+      "name": "child of visitors, parent joins the forces + application (s 1(3A) in) + UK adoption order later ceasing (s 1(6) invariance)",
+      "context": {
+        "person": {
+          "name": "a child of visitors",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "2012-05-10"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "2012-05-10"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": true,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": true,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": true,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2004-07-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": true
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": true,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": true,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": true,
+        "_1_3A_b_an_application_is_made_while_a_minor": true,
+        "entitled_to_be_registered_under_subsection_3A": true,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": true,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": true
+      }
+    },
+    {
+      "name": "child of visitors born before the relevant day (s 1(3A) chapeau fails) + ceased order that never conferred citizenship (s 1(6) negative)",
+      "context": {
+        "person": {
+          "name": "a child of visitors",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "2005-05-10"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "2005-05-10"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": true,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": true,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": true,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2004-07-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": false,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": true
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": true,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": true,
+        "_1_3A_b_an_application_is_made_while_a_minor": true,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": false,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": false,
+        "a_British_citizen_by_virtue_of_subsection_5": false,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": false
+      }
+    },
+    {
+      "name": "child of visitors, forces parent but no application (s 1(3A)(b) fails) + UK adoption order 2004-07-01, citizen adopter (s 1(5) in)",
+      "context": {
+        "person": {
+          "name": "a child of visitors",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "2012-05-10"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "2012-05-10"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": true,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": true,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2004-07-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": true,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": true,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": true,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": true
+      }
+    },
+    {
+      "name": "the ten-year lead case (90 days, s 1(4) in; grant gate open) + UK adoption order, adopter not a citizen (s 1(5A)(a) fails)",
+      "context": {
+        "person": {
+          "name": "a ten-year applicant",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "1995-03-01"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "1995-03-01"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": true,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 90,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": true,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": true,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2004-07-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": false,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": true,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": true,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": true,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": false,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": false,
+        "a_British_citizen_by_virtue_of_subsection_5": false,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": false
+      }
+    },
+    {
+      "name": "ten-year applicant, 91 days absent (s 1(4) out) + Convention adoption 2006-02-01, citizen + resident (in)",
+      "context": {
+        "person": {
+          "name": "a ten-year applicant",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "1995-03-01"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "1995-03-01"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": true,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 91,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": true,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": false,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": true,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2006-02-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": true,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": false,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": false,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": true,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": false,
+        "_1_5_b_adopted_under_a_Convention_adoption": true,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": true,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": true
+      }
+    },
+    {
+      "name": "ten-year applicant, 91 days but s 1(7) dispensation (in) + Convention adoption, adopters not habitually resident (s 1(5A)(b) fails)",
+      "context": {
+        "person": {
+          "name": "a ten-year applicant",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "1995-03-01"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "1995-03-01"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": true,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 91,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": true,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": true,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": false,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": true,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2006-02-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": false,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": true,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": false,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": true,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": true,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": true,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": false,
+        "_1_5_b_adopted_under_a_Convention_adoption": true,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": false,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": false,
+        "a_British_citizen_by_virtue_of_subsection_5": false,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": false
+      }
+    },
+    {
+      "name": "ten-year applicant, no application after ten (limb fails) + Gibraltar order 2005 (territory court; (5A)(b) proviso vacuous)",
+      "context": {
+        "person": {
+          "name": "a ten-year applicant",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "1995-03-01"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "1995-03-01"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 90,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": true,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": false,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": true,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2005-04-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": false,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": true,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": true,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": true
+      }
+    },
+    {
+      "name": "the applicant of bad character (entitled, but grant gate shut) + pre-appointed-day Gibraltar order (limb (5)(a) not engaged)",
+      "context": {
+        "person": {
+          "name": "a ten-year applicant",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "1995-03-01"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": false,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "1995-03-01"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": false,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": false,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": true,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 90,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": false
+        },
+        "entitled_under_subsection_3_3A_or_4": true,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": false,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": false,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": true,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2001-04-01"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": false,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": false,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": false,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": false,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": false,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": true,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": false,
+        "_1_3_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": false,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": true,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": true,
+        "section_1_outcome_at_birth": "not a British citizen from birth under section 1",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": false,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": false,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": true,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": false,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": false
+      }
+    },
+    {
+      "name": "Peter with the s 1(3) limbs satisfied (chapeau isolation) + adoption of a person already a British citizen (chapeau negative)",
+      "context": {
+        "person": {
+          "name": "Peter",
+          "born_in_the_United_Kingdom": true,
+          "born_in_a_qualifying_territory": false,
+          "date_of_birth": {
+            "$date": "1983-05-03"
+          },
+          "father_or_mother_a_British_citizen_at_the_time_of_the_birth": true,
+          "father_or_mother_settled_in_the_United_Kingdom_or_the_territory_of_birth_at_the_time_of_the_birth": false,
+          "father_or_mother_a_member_of_the_armed_forces_at_the_time_of_the_birth": false,
+          "found_abandoned_as_a_new_born_infant_in_the_United_Kingdom": false,
+          "found_abandoned_as_a_new_born_infant_in_a_qualifying_territory": false,
+          "date_found_abandoned": {
+            "$date": "1983-05-03"
+          },
+          "the_contrary_shown_rebutting_the_subsection_2_presumption": false,
+          "a_British_citizen_under_section_10A": false,
+          "while_a_minor_father_or_mother_became_a_British_citizen_or_became_settled_in_the_United_Kingdom": true,
+          "while_a_minor_father_or_mother_became_a_member_of_the_armed_forces": false,
+          "while_a_minor_an_application_made_for_registration_as_a_British_citizen": true,
+          "an_application_for_registration_made_after_attaining_the_age_of_ten_years": false,
+          "greatest_number_of_days_absent_from_the_United_Kingdom_in_any_one_of_the_first_ten_years_of_life": 0,
+          "the_Secretary_of_State_treats_the_subsection_4_residence_requirement_as_fulfilled": false,
+          "of_good_character_where_the_good_character_requirement_applies": true
+        },
+        "entitled_under_subsection_3_3A_or_4": false,
+        "adoption": {
+          "the_adopted_person_a_minor_on_the_date_of_the_order_or_adoption": true,
+          "the_adopted_person_already_a_British_citizen": true,
+          "an_order_of_a_court_in_the_United_Kingdom_authorising_the_adoption": true,
+          "an_order_of_a_court_in_a_qualifying_territory_authorising_the_adoption": false,
+          "a_Convention_adoption_effected_under_the_law_of_a_country_or_territory_outside_the_United_Kingdom": false,
+          "date_of_the_order_or_Convention_adoption": {
+            "$date": "2010-09-15"
+          },
+          "the_adopter_or_in_a_joint_adoption_one_of_the_adopters_a_British_citizen_on_that_date": true,
+          "the_adopter_or_in_a_joint_adoption_both_of_the_adopters_habitually_resident_in_the_United_Kingdom_or_a_designated_territory_on_that_date": true,
+          "the_order_or_Convention_adoption_since_ceased_to_have_effect_whether_on_annulment_or_otherwise": false
+        }
+      },
+      "expect": {
+        "commencement": {
+          "$date": "1983-01-01"
+        },
+        "the_appointed_day": {
+          "$date": "2002-05-21"
+        },
+        "the_relevant_day": {
+          "$date": "2010-01-13"
+        },
+        "permitted_days_of_absence_in_each_of_the_first_ten_years": 90,
+        "born_in_the_United_Kingdom_after_commencement": true,
+        "born_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "born_in_the_United_Kingdom_or_a_qualifying_territory": true,
+        "born_in_the_United_Kingdom_on_or_after_the_relevant_day": false,
+        "_1_1_born_in_the_United_Kingdom_after_commencement_or_in_a_qualifying_territory_on_or_after_the_appointed_day": true,
+        "_1_1_a_father_or_mother_a_British_citizen": true,
+        "_1_1_b_father_or_mother_settled_in_the_United_Kingdom_or_that_territory": false,
+        "_1_1_at_the_time_of_the_birth_his_father_or_mother_is_a_citizen_or_settled": true,
+        "_1_1_satisfied_on_the_actual_facts_of_the_birth": true,
+        "found_abandoned_in_the_United_Kingdom_after_commencement": false,
+        "found_abandoned_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_2_found_abandoned_in_the_United_Kingdom_or_a_qualifying_territory_in_time": false,
+        "deemed_by_subsection_2_to_satisfy_subsection_1": false,
+        "a_British_citizen_by_virtue_of_subsection_1_or_2": true,
+        "a_British_citizen_by_virtue_of_subsection_1A": false,
+        "not_already_a_British_citizen_by_virtue_of_subsection_1_1A_or_2_or_section_10A": false,
+        "_1_3_a_father_or_mother_becomes_a_British_citizen_or_settled": true,
+        "_1_3_b_an_application_is_made_while_a_minor": true,
+        "entitled_to_be_registered_under_subsection_3": false,
+        "_1_3A_a_father_or_mother_becomes_a_member_of_the_armed_forces": false,
+        "_1_3A_b_an_application_is_made_while_a_minor": true,
+        "entitled_to_be_registered_under_subsection_3A": false,
+        "_1_4_application_made_after_attaining_the_age_of_ten_years": false,
+        "_1_4_absences_within_the_ninety_day_ceiling_in_each_of_the_first_ten_years": true,
+        "_1_7_the_Secretary_of_State_treats_the_residence_requirement_as_fulfilled": false,
+        "_1_4_the_residence_requirement_met_or_treated_as_met": true,
+        "entitled_to_be_registered_under_subsection_4": false,
+        "section_1_outcome_at_birth": "a British citizen from birth under subsection (1)",
+        "registration_may_be_granted": false,
+        "order_of_a_court_in_a_qualifying_territory_on_or_after_the_appointed_day": false,
+        "_1_5_a_a_court_order_authorising_the_adoption": true,
+        "_1_5_b_adopted_under_a_Convention_adoption": false,
+        "_1_5_an_order_is_made_or_a_Convention_adoption_is_effected": true,
+        "the_adopted_person_a_minor_and_not_already_a_British_citizen": false,
+        "_1_5A_a_the_adopter_or_one_joint_adopter_a_British_citizen": true,
+        "_1_5A_b_habitual_residence_in_a_Convention_case": true,
+        "_1_5A_the_requirements_are_met_on_the_date_of_the_order_or_adoption": true,
+        "a_British_citizen_by_virtue_of_subsection_5": false,
+        "a_British_citizen_notwithstanding_cesser_of_the_order_subsection_6": false
+      }
+    }
+  ]
+}

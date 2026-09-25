@@ -1,0 +1,9 @@
+`_ UNIONN _` with 1 and `_ INTERSECTN _` with 2 and 3
+`UNIONN` with `_ UNIONN _` with 1 and 2 and 3
+`UNIONN` with `_ INTERSECTN _` with 2 and 3 and 1
+`_ UNIONN _` with 1 and `_ INTERSECTN _` with 2 and 3
+`UNIONN` with `_ UNIONN _` with 1 and 2 and 3
+`INTERSECTN` with `_ UNIONN _` with 1 and 2 and 3
+`UNIONN` with `_ UNIONN _` with 1 and `_ INTERSECTN _` with 2 and 3 and 4
+`_ UNIONN _` with 1 and 2
+`_ INTERSECTN _` with 2 and 3

@@ -1,0 +1,88 @@
+-- Differential-parity probe for the EITHER builtin (LEFT / RIGHT) under
+-- CONSIDER — the ledger #10 fix. EITHER a b is a payload-CARRYING ADT
+-- from the prelude (like MAYBE), not a nullary enum, so the CONSIDER
+-- lowering used to refuse the RIGHT/LEFT constructor patterns
+-- ("could not be resolved to an enum tag by the WASM backend").
+--
+-- Every exported function CONSTRUCTS the EITHER internally (so no EITHER
+-- value crosses the ABI boundary) and takes only scalar inputs, then
+-- dispatches on RIGHT vs LEFT and USES the bound payload. The cases
+-- deliberately separate:
+--   * which branch is taken (LEFT vs RIGHT — tag resolution), and
+--   * the payload value from the tag (1.0 / 0.0) and from the other
+--     branch's value (payload binding).
+-- A broken tag test or a slot-0-vs-slot-1 payload bug therefore diverges
+-- from jl4-service. These mirror orchestrator.l4's isViolation /
+-- getConfidence / extractText shapes with the IO (JSONDECODE / POST)
+-- removed.
+
+IMPORT prelude
+
+-- Build RIGHT for positive n, LEFT for non-positive. RIGHT carries the
+-- NUMBER itself (distinct from the tag 1.0); LEFT carries a STRING.
+GIVEN n IS A NUMBER
+GIVETH AN EITHER STRING NUMBER
+`classify number` MEANS
+  IF n GREATER THAN 0
+  THEN RIGHT n
+  ELSE LEFT "non-positive"
+
+-- RIGHT branch doubles the bound payload; LEFT branch returns the
+-- negated length of the bound message. Tag swap ⇒ payload type mismatch;
+-- slot-0 payload bug ⇒ RIGHT yields 2 (tag*2) instead of n*2.
+@export Dispatch on EITHER: RIGHT doubles payload, LEFT gives -length
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`either dispatch` MEANS
+  CONSIDER `classify number` n
+    WHEN RIGHT v THEN v TIMES 2
+    WHEN LEFT  s THEN 0 MINUS STRINGLENGTH s
+
+-- Mirrors getConfidence: RIGHT payload used directly, LEFT ⇒ sentinel 0.
+@export Confidence from EITHER (RIGHT payload, else 0)
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`either confidence` MEANS
+  CONSIDER `classify number` n
+    WHEN RIGHT v THEN v
+    WHEN LEFT  s THEN 0
+
+-- Mirrors isViolation: RIGHT carries a BOOLEAN payload, LEFT ⇒ FALSE.
+GIVEN n IS A NUMBER
+GIVETH AN EITHER STRING BOOLEAN
+`classify verdict` MEANS
+  IF n GREATER THAN 10
+  THEN RIGHT TRUE
+  ELSE IF n GREATER THAN 0
+       THEN RIGHT FALSE
+       ELSE LEFT "no verdict"
+
+@export Verdict from EITHER (RIGHT boolean payload, else FALSE)
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`either verdict` MEANS
+  CONSIDER `classify verdict` n
+    WHEN RIGHT b THEN b
+    WHEN LEFT  s THEN FALSE
+
+-- Mirrors extractText: RIGHT carries a LIST, and the RIGHT branch runs a
+-- NESTED CONSIDER over that list (FOLLOWED BY / EMPTY); LEFT ⇒ negated
+-- message length. Exercises payload binding of a compound (list) payload
+-- plus a nested CONSIDER inside the RIGHT arm.
+GIVEN n IS A NUMBER
+GIVETH AN EITHER STRING (LIST OF NUMBER)
+`classify list` MEANS
+  IF n GREATER THAN 0
+  THEN RIGHT (LIST n, n PLUS 1, n PLUS 2)
+  ELSE LEFT "empty"
+
+@export Nested CONSIDER over EITHER-of-LIST (head, else -length)
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`either nested` MEANS
+  CONSIDER `classify list` n
+    WHEN RIGHT xs THEN
+      CONSIDER xs
+        WHEN h FOLLOWED BY rest THEN h
+        WHEN EMPTY THEN 0 MINUS 1
+    WHEN LEFT s THEN 0 MINUS STRINGLENGTH s

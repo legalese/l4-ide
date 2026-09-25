@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  What this pins: that a computed record field can lower as a boxed CONTEXT
+  whose later entries are computed from EARLIER SIBLING ENTRIES by bare name,
+  with the hydrated record flowing downstream as a typed value read by plain
+  path access, and with NO final result entry (the context itself is the value).
+
+      decision `investor` = boxed context, every entry NAMED:
+          annual_income: investor_raw.annual_income
+          net_worth:     investor_raw.net_worth
+          greater_of:    max(annual_income, net_worth)   <- SIBLING references
+      decision `eligible` = investor.greater_of >= 100000  <- path access on
+                                                              the hydrated value
+
+  That is the IDIOM jl4-core/src/L4/Dmn/Lower.hs emits for every hydrated
+  record, so an engine upgrade that changed the answer would change every
+  hydrated decision in the corpus at once.
+
+  NOT byte-for-byte the emitter's output, and the difference is deliberate:
+  `greater_of` is written here as `max(annual_income, net_worth)`, whereas the
+  emitter produces `(if annual_income >= net_worth then annual_income else
+  net_worth)` for the same L4 source. The select idiom does not fold inside a
+  hydrator; that is a stated boundary with a measured cause, see
+  specs/todo/DMN-EXPORT-PROGRAM-MODEL-SPEC.md §4.4.4b. Both forms are FullFeel
+  literal expressions and both evaluate, so the idiom this probe pins is
+  unaffected; what the probe does NOT pin is the expression text. The emitter's
+  own output is measured separately and more strongly, on
+  jl4/examples/dmn/expected/hydration.dmn.
+
+  MEASURED 2026-07-31 on KIE 8.44.0.Final and zeebe-dmn 8.7.6: 6/6 values as
+  expected on both, 0 warnings on KIE, XSD valid.
+
+  The boundary, from PR #176 and still in force: a decision TABLE inside a
+  context entry is zeebe-unparseable. Literal-expression entries are fine, and
+  that is all hydration needs.
+
+  EDITING THIS HEADER: no `- -` (without the space) anywhere inside it. XML
+  forbids a double hyphen in a comment, and the two engines disagree about it:
+  KIE 8.44 accepts the file and answers 6/6, zeebe-dmn 8.7.6 rejects the WHOLE
+  model with `DmnModelException: Unable to parse model` and no line number.
+  Measured 2026-07-31, by writing one. Every other fixture header in
+  jl4/tests-cli/fixtures/ already avoids it; this line is why.
+
+  There is NO negative control here, deliberately, and the asymmetry is not an
+  omission: dmn-date-probe and dmn-xsd-order each ask "does the gate REJECT the
+  bad file", which a positive alone cannot show. This probe asks "does the idiom
+  EVALUATE", which the positive answers completely.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_hydration_context" name="hydration_context" namespace="https://legalese.com/l4/dmn/hydration_context" exporter="hand">
+  <itemDefinition id="itemdef_investor_raw" name="InvestorRaw">
+    <itemComponent id="itemdef_investor_raw_c1" name="annual_income">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_investor_raw_c2" name="net_worth">
+      <typeRef>number</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_investor_hydrated" name="InvestorHydrated">
+    <itemComponent id="itemdef_investor_hydrated_c1" name="annual_income">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_investor_hydrated_c2" name="net_worth">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_investor_hydrated_c3" name="greater_of">
+      <typeRef>number</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <inputData id="input_investor_raw" name="investor_raw">
+    <variable id="input_investor_raw_var" name="investor_raw" typeRef="InvestorRaw"/>
+  </inputData>
+  <decision id="decision_investor" name="investor" label="investor (hydrated)">
+    <variable id="decision_investor_var" name="investor" typeRef="InvestorHydrated"/>
+    <informationRequirement id="ir_investor_raw">
+      <requiredInput href="#input_investor_raw"/>
+    </informationRequirement>
+    <context id="ctx_investor">
+      <contextEntry id="ce_annual_income">
+        <variable id="ce_annual_income_var" name="annual_income" typeRef="number"/>
+        <literalExpression id="ce_annual_income_lit">
+          <text>investor_raw.annual_income</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="ce_net_worth">
+        <variable id="ce_net_worth_var" name="net_worth" typeRef="number"/>
+        <literalExpression id="ce_net_worth_lit">
+          <text>investor_raw.net_worth</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry id="ce_greater_of">
+        <variable id="ce_greater_of_var" name="greater_of" typeRef="number"/>
+        <literalExpression id="ce_greater_of_lit">
+          <text>max(annual_income, net_worth)</text>
+        </literalExpression>
+      </contextEntry>
+    </context>
+  </decision>
+  <decision id="decision_eligible" name="eligible">
+    <variable id="decision_eligible_var" name="eligible" typeRef="boolean"/>
+    <informationRequirement id="ir_investor">
+      <requiredDecision href="#decision_investor"/>
+    </informationRequirement>
+    <literalExpression id="decision_eligible_lit">
+      <text>investor.greater_of &gt;= 100000</text>
+    </literalExpression>
+  </decision>
+</definitions>

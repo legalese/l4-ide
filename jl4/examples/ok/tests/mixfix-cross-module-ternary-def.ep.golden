@@ -10,6 +10,6 @@ GIVETH BOOLEAN
 a `added to` b `should equal` c MEANS (a + b) EQUALS c
 
 -- Same-module test
-DECIDE same_module_ternary IS `added to` `should equal` 1 2 `should equal` 3
+DECIDE same_module_ternary IS 1 `added to` 2 `should equal` 3
 
 #CHECK same_module_ternary

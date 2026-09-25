@@ -1,0 +1,20 @@
+-- Regression test for lexical section scoping — FIX B.
+--
+-- A nearer inner-section binding must shadow a farther same-named ancestor even
+-- when the inner binding is a FORWARD reference to a not-yet-inferred
+-- un-annotated DECIDE (its type is still an unresolved inference variable).
+--
+-- Previously, because candidates were grouped by type BEFORE proximity was
+-- considered, the inner `bonus` (unknown type) and the outer `bonus` (NUMBER)
+-- fell into different type groups and were never compared by proximity,
+-- producing a spurious, order-dependent AmbiguousTermError. Proximity must win:
+-- `usage` sees the inner `bonus` (5), so `usage` is 6.
+
+§ a
+bonus MEANS 20
+
+§§ inner
+usage MEANS bonus PLUS 1    -- forward reference to the inner `bonus` below
+bonus MEANS 5
+
+#EVAL usage    -- 6

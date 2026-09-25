@@ -1,0 +1,125 @@
+{
+  "kind": "source-bundle",
+  "bundle_version": 1,
+  "subject": "regcf",
+  "citation": "17 CFR Part 227 — Regulation Crowdfunding, General Rules and Regulations (Securities and Exchange Commission)",
+  "retrieved": "2026-08-05",
+  "note": "Everything here was reached DIRECTLY, over the eCFR versioner API, so every document is pinned by its own bytes and no archive fallback was needed — the opposite of the BNA smoke run, which reached nothing directly. One qualification: the eCFR *website* is not reachable from this environment. https://www.ecfr.gov/current/title-17/chapter-II/part-227 answers HTTP 302 to https://unblock.federalregister.gov/ for curl and for WebFetch alike, as does federalregister.gov (its API returns 503). That is why in_force quotes the versioner's machine-readable currency record rather than the HTML currency banner: the banner was not obtainable, and the most recent Wayback capture of the part page is 20250819182143, whose banner would state a 2025 currency and so would MISstate ours. Three things a reader should carry forward. (1) The part has not been amended since 2023-03-01 even though title 17 as a whole was amended 2026-07-26; the versioner reports both, and the distinction is the whole of the currency claim here. (2) The corroboration is quantified, not asserted: the GPO annual edition's 22 section bodies against the eCFR's, citation notes excluded and punctuation normalised, differ in exactly one block — govinfo prints \"offeringstatement\" for \"offering statement\" in § 227.503(a)(1), a typesetting artifact across a page break — SequenceMatcher ratio 0.999907 over 101,803 vs 101,802 characters. (3) The ten Federal Register documents named by the part's citation apparatus are recorded as the annotation inventory, each resolved to a govinfo granule and then verified by content — agency, SEC release number, and a page range containing the cited page. The verification earned its keep: govinfo's link service resolves an FR page to the granule that BEGINS on it, not the one that CONTAINS it, and four of the ten cites name a document's last page, so the naive redirect made 87 FR 57398 a Coast Guard safety-zone rule rather than SEC Release 33-11098. This is the BNA smoke run's §3.3 lesson recurring in a new disguise: a pinpoint that resolves is not thereby a pinpoint that is right. The granules themselves are NOT captured, because their amendments are already integrated into the text and the 2015 release alone runs to 225 FR pages. Four side-notes for P2 and P3, which do not belong in the inventory because they are not part of the printed apparatus. (i) WHY covers.from IS 2023-03-01, established by diffing the versioner's own renderings of the part at 2023-02-28 and 2023-03-02 rather than inferred from a date: on 1 March 2023 three COVID-era provisions added by 86 FR 3590/3591/3592 with a built-in sunset expired together — § 227.201(bb) (the relaxed financial-statement route for offerings initiated 1 Mar 2021 to 28 Aug 2022) and § 227.301(e) (the matching intermediary belief) were removed outright, and § 227.100(b)(7) (the expedited COVID offering route) reverted to \"[Reserved]\", which is why the current text carries a reserved paragraph and no \"Effective Date Note:\" annotations at all. Anyone encoding a rule-version axis has a real dated arm here: 14 Jan 2021 to 1 Mar 2023. (ii) The same pattern, checked the same way, explains § 227.202's 2020-07-15 row: paragraph (c), the temporary filing-deadline relief added by 85 FR 17751, lapsed on 15 July 2020. (iii) § 227.201's 2022-09-29 row is NOT an amendment: the eCFR had been collapsing the paragraph as \"(z)-(aa)\" and on that date restored (z)'s text — an editorial rendering change. § 227.302's 2017-08-29 row shows no textual change at all across the boundary; it is versioner bookkeeping. (iv) The versioner records a § 227.306 added 2021-01-14 and removed 2021-03-15 whose name is the placeholder \"§ 227.306   xxx\"; no such section appears in any rendering, so it reads as an eCFR data artifact rather than a repealed provision. Finally, the govinfo document's covers range is a single day on purpose: an annual edition states the law in force on its revision date, and widening that to the range over which the law happened not to change would be our inference, not its claim.",
+  "in_force": {
+    "statement": "{\"number\":17,\"name\":\"Commodity and Securities Exchanges\",\"latest_amended_on\":\"2026-07-26\",\"latest_issue_date\":\"2026-07-27\",\"up_to_date_as_of\":\"2026-08-03\",\"reserved\":false}",
+    "as_of": "2026-08-03",
+    "document": "ecfr-title-17-currency"
+  },
+  "assembled": {
+    "local_path": "jl4/examples/legal/regcf/denovo/source/part227.txt",
+    "sha256": "a2ddacb76c97006abca1d6f590ebce3259de562995cbf5a82c2d4f7219ba06e2",
+    "note": "The provenance-headed artifact P3 encodes from and P9 cites: all 22 sections of part 227 in order, each with the citation note the eCFR prints under it, plus an annex carrying § 230.501 and § 270.3a-9 — the two provisions outside the part that its operative text depends on for meaning (the accredited-investor income/net-worth calculation § 227.100(a)(2) incorporates, and the crowdfunding vehicle § 227.100(d) excludes from \"investor\"). Words are verbatim; whitespace is normalised, each <P> becomes one block paragraph, and eCFR italics are written _like this_ so the \"Instruction to paragraph (x)\" headings and italicised defined terms survive the flattening."
+  },
+  "documents": [
+    {
+      "id": "ecfr-part227-xml",
+      "role": "current",
+      "title": "17 CFR Part 227 — Regulation Crowdfunding: complete part text, eCFR versioner XML as of 2026-08-03 (22 sections, subparts A–E)",
+      "citation": "17 CFR pt. 227; 80 FR 71537, Nov. 16, 2015, as amended (see the annotation inventory)",
+      "url": "https://www.ecfr.gov/api/versioner/v1/full/2026-08-03/title-17.xml?chapter=II&part=227",
+      "retrieved": "2026-08-05",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "aa7cf83f82fa99089a43332fe15645e7e979e0bffa8512e8ec8e90e63d7cc527",
+        "local_path": "jl4/examples/legal/regcf/denovo/source/part227.raw.xml"
+      },
+      "covers": { "from": "2023-03-01", "to": null },
+      "annotations": [
+        {
+          "scheme": "amendment",
+          "markers": [
+            "FR2015Nov16",
+            "FR2017Apr12",
+            "FR2017Oct02",
+            "FR2018Sep21",
+            "FR2018Oct19",
+            "FR2020Mar31",
+            "FR2020May07",
+            "FR2020Sep02",
+            "FR2021Jan14",
+            "FR2022Sep20"
+          ],
+          "inventory_complete": true,
+          "inventory_note": "The eCFR's citation apparatus for this part is eleven <CITA> notes, one under each amended section, of the form \"[80 FR 71537, Nov. 16, 2015, as amended at 82 FR 17552, Apr. 12, 2017; ...]\". The markers above are OURS, not the publisher's: unlike legislation.gov.uk's F/C numbering, the CFR names its amending instruments by citation and not by symbol, so a symbol had to be minted for the disposition table to join on. One marker per amending Federal Register DOCUMENT, not per page anchor — 86 FR 3590, 3591, 3592 and 3593 are four pages of one document and are one marker. Completeness is mechanical: every FR citation appearing in any of the eleven notes is here, and nothing else is. EACH RESOLUTION BELOW WAS VERIFIED BY CONTENT (issuing agency, SEC release number, and a printed page range containing the cited page), because govinfo's link service https://www.govinfo.gov/link/fr/<volume>/<page> resolves a page to the granule that BEGINS on it rather than the one that CONTAINS it, and four of these ten cites name a document's last page: taking the redirect at face value would have recorded 82 FR 45725 as doc 2017-21074, 83 FR 52964 as 2018-22840, 85 FR 17751 as 2020-06259, and 87 FR 57398 as 2022-20290 — the last of which is a Coast Guard safety-zone rule, not an SEC release. All granule paths below are under https://www.govinfo.gov/content/pkg/. ||| FR2015Nov16 = 80 FR 71537 (Nov. 16, 2015) — the part-level source note, Release Nos. 33-9974; 34-76324, \"Crowdfunding\", 17 CFR pts. 200, 227, 232, 239, 240, 249, 269, 274, at 80 FR 71388-71615, effective May 16, 2016 (part 227 added by instruction 3, effective Jan. 29, 2016), FR-2015-11-16/html/2015-28220.htm; named in every section note except §§ 227.206 and 227.504, which did not exist until 2021. ||| FR2017Apr12 = 82 FR 17552 (Apr. 12, 2017) — Release Nos. 33-10332; 34-80355, \"Inflation Adjustments and Other Technical Amendments Under Titles I and III of the JOBS Act\", at 17545-17557, effective Apr. 12, 2017, FR-2017-04-12/html/2017-06797.htm; §§ 227.100, 227.201. ||| FR2017Oct02 = 82 FR 45725 (Oct. 2, 2017) — Release No. 33-10416, \"Regulation Crowdfunding and Regulation A Relief and Assistance for Victims of Hurricane Harvey, Hurricane Irma, and Hurricane Maria\", at 45722-45725, effective Sept. 28 through Nov. 22, 2017 (a temporary rule, now expired), FR-2017-10-02/html/2017-21094.htm; § 227.202. ||| FR2018Sep21 = 83 FR 47836 (Sept. 21, 2018) — Release No. 33-10556, Hurricane Florence relief, at 47834-47836, effective Sept. 21 through Oct. 29, 2018 (expired), FR-2018-09-21/html/2018-20740.htm; § 227.202. ||| FR2018Oct19 = 83 FR 52964 (Oct. 19, 2018) — Release No. 33-10567, Hurricane Michael relief, at 52962-52964, effective Oct. 19 through Nov. 23, 2018 except the part 227 authority citation, effective Oct. 19, 2018 (otherwise expired), FR-2018-10-19/html/2018-22930.htm; § 227.202. ||| FR2020Mar31 = 85 FR 17751 (Mar. 31, 2020) — Release Nos. 33-10768; 34-88492; 39-2531; IC-33832, COVID-19 relief for Form ID filers and Regulation Crowdfunding and Regulation A issuers, at 17747-17751, the § 227.202 amendment effective Mar. 30 through July 15, 2020 (expired), FR-2020-03-31/html/2020-06721.htm; § 227.202. ||| FR2020May07 = 85 FR 27131 and 27132 (May 7, 2020) — Release No. 33-10781, \"Temporary Amendments to Regulation Crowdfunding\", at 27116-27133, effective May 4, 2020 through Mar. 1, 2021, FR-2020-05-07/html/2020-09806.htm; §§ 227.100, 227.201, 227.301, 227.303, 227.304. ||| FR2020Sep02 = 85 FR 54490 (Sept. 2, 2020) — Release No. 33-10829, \"Temporary Amendments to Regulation Crowdfunding; Extension\", at 54483-54490, effective Aug. 31, 2020 through Sept. 1, 2021, FR-2020-09-02/html/2020-19468.htm; §§ 227.100, 227.201, 227.301, 227.303, 227.304. ||| FR2021Jan14 = 86 FR 3590, 3591, 3592, 3593 (Jan. 14, 2021) — Release Nos. 33-10884; 34-90300; IC-34082, \"Facilitating Capital Formation and Expanding Investment Opportunities by Improving Access to Capital in Private Markets\", 17 CFR pts. 227, 229, 230, 239, 240, 249, 270, 274, at 3496-3605, generally effective Mar. 15, 2021 with dated exceptions (revised § 227.100(b)(7) picking up on Sept. 1, 2021 as the 85 FR 27132 temporary text lapsed), FR-2021-01-14/html/2020-24749.htm; §§ 227.100, 227.201, 227.203, 227.204, 227.206, 227.301, 227.303, 227.304, 227.503, 227.504 — and, at 86 FR 3602, the § 270.3a-9 crowdfunding vehicle carried in this bundle's annex. ||| FR2022Sep20 = 87 FR 57398 (Sept. 20, 2022) — Release Nos. 33-11098; 34-95715, \"Inflation Adjustments Under Titles I and III of the JOBS Act\", at 57394-57398, effective Sept. 20, 2022, FR-2022-09-20/html/2022-19867.htm; §§ 227.100, 227.201 — the five-yearly adjustment that set the $5,000,000 offering cap and the $2,500 / $124,000 investor limits now in the text. ||| The apparatus is preserved because P2 disposes over it and P5 joins on that disposition table; the words alone would not have carried it."
+        }
+      ]
+    },
+    {
+      "id": "ecfr-230-501",
+      "role": "current",
+      "title": "17 CFR § 230.501 — Definitions and terms used in Regulation D (the accredited-investor definition and the annual-income / net-worth calculation incorporated by § 227.100(a)(2))",
+      "citation": "17 CFR § 230.501; 47 FR 11262, Mar. 16, 1982, as amended at 90 FR 9687, Feb. 18, 2025",
+      "url": "https://www.ecfr.gov/api/versioner/v1/full/2026-08-03/title-17.xml?part=230&section=230.501",
+      "retrieved": "2026-08-05",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "a54a63376aa3e8a20b053759ebda57d7ed371a373794351ba299292f11b08b1a",
+        "local_path": "jl4/examples/legal/regcf/denovo/source/ref-230.501.xml"
+      },
+      "covers": { "from": "2025-02-18", "to": null },
+      "annotations": []
+    },
+    {
+      "id": "ecfr-270-3a-9",
+      "role": "current",
+      "title": "17 CFR § 270.3a-9 — Crowdfunding vehicle (the entity § 227.100(d) excludes from the meaning of \"investor\")",
+      "citation": "17 CFR § 270.3a-9; 86 FR 3602, Jan. 14, 2021",
+      "url": "https://www.ecfr.gov/api/versioner/v1/full/2026-08-03/title-17.xml?part=270&section=270.3a-9",
+      "retrieved": "2026-08-05",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "378e666be245737ae469767c71c390ebc8f2673716ff34c07e4378de2f03282b",
+        "local_path": "jl4/examples/legal/regcf/denovo/source/ref-270.3a-9.xml"
+      },
+      "covers": { "from": "2021-03-15", "to": null },
+      "annotations": []
+    },
+    {
+      "id": "govinfo-cfr-2025-part227",
+      "role": "corroboration",
+      "title": "17 CFR Part 227 — GPO annual CFR edition, title 17 vol. 3, revised as of April 1, 2025 (independent copy used to show the eCFR capture had not drifted)",
+      "citation": "17 CFR pt. 227 (2025 ed.)",
+      "url": "https://www.govinfo.gov/content/pkg/CFR-2025-title17-vol3/xml/CFR-2025-title17-vol3-part227.xml",
+      "retrieved": "2026-08-05",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "fa4e65c95be65f171bd347e4b976448a9121a7e462212434998d8dc978a62e5c",
+        "local_path": "jl4/examples/legal/regcf/denovo/source/part227.govinfo-2025.xml"
+      },
+      "covers": { "from": "2025-04-01", "to": "2025-04-01" }
+    },
+    {
+      "id": "ecfr-title-17-currency",
+      "role": "corroboration",
+      "title": "eCFR versioner title index — the publisher's own currency record, carrying title 17's up_to_date_as_of and latest_amended_on (quoted verbatim in in_force)",
+      "citation": "eCFR versioner API, /api/versioner/v1/titles.json, record for title 17",
+      "url": "https://www.ecfr.gov/api/versioner/v1/titles.json",
+      "retrieved": "2026-08-05",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "54406e21d560e56b8a47bb896013a59238921ddc8d62f95ebfeb91c5817ac7d3",
+        "local_path": "jl4/examples/legal/regcf/denovo/source/ecfr-titles.json"
+      },
+      "covers_absent_reason": "It states no law. It is the publisher's currency declaration about the title, which is why it is named by in_force rather than encoded from."
+    },
+    {
+      "id": "ecfr-part227-versions",
+      "role": "corroboration",
+      "title": "eCFR versioner section-version history for 17 CFR Part 227 — 85 rows, latest_amendment_date 2023-03-01, latest_issue_date 2023-03-30",
+      "citation": "eCFR versioner API, /api/versioner/v1/versions/title-17.json?part=227",
+      "url": "https://www.ecfr.gov/api/versioner/v1/versions/title-17.json?part=227",
+      "retrieved": "2026-08-05",
+      "retrieval_method": "direct",
+      "integrity": {
+        "sha256": "fb2b9004544429edc03251fd4f50c9ab044f1992646167fa768969eafee9cb8c",
+        "local_path": "jl4/examples/legal/regcf/denovo/source/part227.versions.json"
+      },
+      "covers_absent_reason": "It states no law either: it is the index of when each section last changed, and it is captured because it is the evidence for this bundle's covers.from of 2023-03-01 and for the claim that nothing has amended the part since — a claim the part text itself cannot make."
+    }
+  ]
+}

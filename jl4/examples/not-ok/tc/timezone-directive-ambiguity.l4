@@ -1,0 +1,11 @@
+-- T4 regression test: an ambiguous-but-well-typed expression under
+-- TIMEZONE IS must produce an AmbiguousTermError diagnostic, not crash the
+-- typechecker with "internal error: expected unique result, got several".
+
+ASSUME foo IS A FUNCTION FROM BOOLEAN TO BOOLEAN
+
+GIVEN p IS A BOOLEAN
+DECIDE foo OF p
+  IF p
+
+TIMEZONE IS foo TRUE

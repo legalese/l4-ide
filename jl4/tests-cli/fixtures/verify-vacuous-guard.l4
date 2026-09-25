@@ -1,0 +1,13 @@
+§ `VerifyVacuousGuardFixture`
+
+-- Negative control: a guard that excludes nothing.
+--
+-- `x OR y` is already entailed by the `x` it is conjoined with, so the second
+-- clause never rules anybody out. A reader would take it for a second hurdle;
+-- it is not one.
+
+GIVEN x IS A BOOLEAN
+      y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the second hurdle is not one` IS
+  x AND (x OR y)

@@ -1,0 +1,46 @@
+§ `String ordering NUL probe`
+-- Exercises ordered STRING comparison (<,<=,>,>=) via __l4_str_cmp and
+-- equality (==) via __l4_str_eq on two STRING params. The curated cases
+-- are branch-crossing on embedded NUL (U+0000): a correct Data.Text
+-- comparison keeps the whole string, a NUL-terminated reader truncates.
+-- Names are prefixed to avoid the prelude builtins gt/lt/ge/le/eq.
+--
+-- NOTE: the first @export in a §-sectioned file is emitted as a helper
+-- (frontend/schema quirk), so the first DECIDE below is a SACRIFICIAL
+-- throwaway; every comparison we actually curate cases for
+-- (strGt/strGe/strLt/strLe/strEq) comes after it and is exported for real.
+
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+@export
+DECIDE probePrime IF x
+
+GIVEN a IS A STRING
+      b IS A STRING
+GIVETH A BOOLEAN
+@export
+DECIDE strGt IF a > b
+
+GIVEN a IS A STRING
+      b IS A STRING
+GIVETH A BOOLEAN
+@export
+DECIDE strGe IF a >= b
+
+GIVEN a IS A STRING
+      b IS A STRING
+GIVETH A BOOLEAN
+@export
+DECIDE strLt IF a < b
+
+GIVEN a IS A STRING
+      b IS A STRING
+GIVETH A BOOLEAN
+@export
+DECIDE strLe IF a <= b
+
+GIVEN a IS A STRING
+      b IS A STRING
+GIVETH A BOOLEAN
+@export
+DECIDE strEq IF a EQUALS b

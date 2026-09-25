@@ -1,0 +1,49 @@
+{
+  "is-British-citizen": [
+    {
+      "p_name": "Alice",
+      "p_birthPlace": "UK",
+      "p_birthDate": "1990-06-15",
+      "m_settledIn": "France",
+      "m_knownBritish": false,
+      "f_settledIn": "UK",
+      "f_knownBritish": false
+    },
+    {
+      "p_name": "Bob",
+      "p_birthPlace": "UK",
+      "p_birthDate": "1980-01-01",
+      "m_settledIn": "France",
+      "m_knownBritish": false,
+      "f_settledIn": "UK",
+      "f_knownBritish": false
+    },
+    {
+      "p_name": "Carol",
+      "p_birthPlace": "UK",
+      "p_birthDate": "1983-01-01",
+      "m_settledIn": "France",
+      "m_knownBritish": false,
+      "f_settledIn": "UK",
+      "f_knownBritish": false
+    },
+    {
+      "p_name": "Dave",
+      "p_birthPlace": "Gibraltar",
+      "p_birthDate": "2010-01-01",
+      "m_settledIn": "France",
+      "m_knownBritish": false,
+      "f_settledIn": "Gibraltar",
+      "f_knownBritish": false
+    },
+    {
+      "p_name": "Eve",
+      "p_birthPlace": "Gibraltar",
+      "p_birthDate": "2002-02-21",
+      "m_settledIn": "France",
+      "m_knownBritish": false,
+      "f_settledIn": "Gibraltar",
+      "f_knownBritish": false
+    }
+  ]
+}

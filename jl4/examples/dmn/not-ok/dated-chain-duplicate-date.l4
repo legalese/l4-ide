@@ -1,0 +1,40 @@
+-- NEGATIVE fixture for the rule-date interval table (spec §15.3, R10).
+--
+-- Two arms on the SAME day. The second is dead under L4's first-match reading,
+-- and the derived interval `[2023-01-01..2023-01-01)` would be empty -- which
+-- is isomorphic to the L4, and also un-analysable and almost certainly not what
+-- the drafter meant. Duplicates are therefore caught by the same
+-- strictly-descending predicate as a misordering, giving one rule and one
+-- message shape for both defects.
+--
+-- NEVER added to `goldenSubjects`. Asserted from jl4/tests/DmnExport.hs.
+
+IMPORT prelude
+IMPORT daydate
+
+§ `duplicate dated chain`
+
+TIMEZONE IS "Asia/Singapore"
+
+GIVETH A DATE
+`the 2023 rate change` MEANS Date 1 1 2023
+
+GIVETH A DATE
+`the other 2023 change` MEANS Date 1 1 2023
+
+GIVETH A DATE
+`GST commenced` MEANS Date 1 4 1994
+
+ASSUME `no GST rate exists before commencement` IS A NUMBER
+
+GIVEN change IS A DATE
+GIVETH A BOOLEAN
+`the rules in force include` change MEANS
+    `RULES EFFECTIVE DATE` AT LEAST change
+
+GIVETH A NUMBER
+`GST rate percent` MEANS
+    BRANCH IF `the rules in force include` `the 2023 rate change`  THEN 8
+           IF ^                            `the other 2023 change` THEN 7
+           IF ^                            `GST commenced`         THEN 3
+           OTHERWISE `no GST rate exists before commencement`

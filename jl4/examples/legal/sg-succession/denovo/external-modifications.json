@@ -1,0 +1,189 @@
+{
+  "kind": "external-modifications",
+  "register_version": 1,
+  "subject": "sg-succession",
+  "swept": "2026-08-18",
+  "note": "Sweep over three Singapore Acts. The publisher (SSO) exposes a per-Act version timeline rather than the UK-style F-marker apparatus, so the annotation inventory in the source bundle is the set of dated versions and the dispositions below join on it.",
+  "searches": [
+    {
+      "id": "S1",
+      "question": "Has any Singapore court struck down, stayed or read down a provision of the ISA, the Wills Act or the PAA?",
+      "method": "court-docket",
+      "scope": "lawplain judgments corpus (SGCA/SGHC/SGDC), full text, all years",
+      "query": "Intestate Succession Act section 7 distribution per stirpes",
+      "performed": "2026-08-18",
+      "outcome": "findings",
+      "findings": [
+        "E1",
+        "E2"
+      ],
+      "coverage_note": "Does NOT cover: unreported decisions; Syariah Court rulings (which is where a Muslim estate would be decided, and which this encoding routes to rather than modelling); decisions turning on the Wills Act's formal-validity sections, which were not separately searched."
+    },
+    {
+      "id": "S2",
+      "question": "Is any amendment to these Acts enacted but not yet reflected, or formally proposed?",
+      "method": "publisher-page",
+      "scope": "sso.agc.gov.sg landing page version timeline for ISA1967, WA1838, PAA1934",
+      "query": "Historical version links + in-force banner",
+      "performed": "2026-08-18",
+      "outcome": "findings",
+      "findings": [
+        "E3"
+      ],
+      "coverage_note": "Captures what SSO PUBLISHES as versions. Does NOT cover Bills before Parliament that SSO has not yet published, nor commencement notices for enacted-but-unbrought-into-force provisions."
+    },
+    {
+      "id": "S3",
+      "question": "Is reform of intestate succession -- in particular the exclusion of illegitimate children -- pending?",
+      "method": "web-search",
+      "scope": "open web, 2024-2026",
+      "query": "Singapore Intestate Succession Act amendment 2024 2025 2026 reform illegitimate children",
+      "performed": "2026-08-18",
+      "outcome": "findings",
+      "findings": [
+        "E4"
+      ],
+      "coverage_note": "Open-web search only. Does NOT cover the Government Gazette, Parliamentary Hansard, or Law Reform Committee papers, none of which were searched. A negative result here is weak evidence of no reform, and is recorded as a currency risk rather than as an all-clear."
+    }
+  ],
+  "entries": [
+    {
+      "id": "E1",
+      "class": "interpretive",
+      "summary": "Lim Weipin v Lim Boh Chuan [2010] SGHC 99 applies ISA s 3's definition of 'child' -- 'a legitimate child and includes any child adopted by virtue of an order of court' -- as the gate on who may claim under s 7 rule 3. The court treated the definition as decisive of standing, litigating adoption on the facts.",
+      "provenance": {
+        "source": "lawplain judgments corpus (SGHC)",
+        "url": "https://www.elitigation.sg/gd/s/2010_SGHC_99",
+        "citation": "Lim Weipin and another v Lim Boh Chuan and others [2010] SGHC 99",
+        "retrieved": "2026-08-18",
+        "quote": "\"child\" means a legitimate child and includes any child adopted by virtue of an order of court"
+      },
+      "routing": {
+        "fork_ids": [
+          "F2"
+        ],
+        "currency_risk": false
+      },
+      "disposition": "encoded",
+      "disposition_note": "Settles fork F2 in favour of the narrow reading: membership of the `children` list is a legitimacy/adoption question decided before the rules run. The encoding delegates it to the fact supplier and says so, rather than silently admitting every biological child.",
+      "found_by": [
+        "S1"
+      ]
+    },
+    {
+      "id": "E2",
+      "class": "interpretive",
+      "summary": "Cheng Tze Tzuen v Dang Lan Anh [2025] SGHC 112: entitlement to letters of administration is based on priority of entitlement to the estate under s 7 of the ISA -- linking the PAA's grant question to the ISA's distribution order.",
+      "provenance": {
+        "source": "lawplain judgments corpus (SGHC)",
+        "url": "https://www.elitigation.sg/gd/s/2025_SGHC_112",
+        "citation": "Cheng Tze Tzuen v Dang Lan Anh [2025] SGHC 112",
+        "retrieved": "2026-08-18",
+        "quote": "Entitlement to the letters of administration is based on priority of entitlement to the estate under s 7 of the Intestate Succession Act 1967"
+      },
+      "routing": {
+        "fork_ids": [
+          "F7"
+        ],
+        "currency_risk": false
+      },
+      "disposition": "encoded",
+      "disposition_note": "Corroborates encoding PAA s 18(4) against the ISA s 7 class order rather than as a free-standing list, which is how the PAA module is written.",
+      "found_by": [
+        "S1"
+      ]
+    },
+    {
+      "id": "E3",
+      "class": "binding",
+      "binding_effect": "substituted",
+      "summary": "The 2020 Revised Edition (in force 31 Dec 2021) restated all three Acts, and Act 24 of 2022 (wef 28/10/2022) extended Wills Act s 27(5)'s definition of 'soldier' to a serviceman serving in the digital and intelligence service of the Singapore Armed Forces.",
+      "provenance": {
+        "source": "Singapore Statutes Online",
+        "url": "https://sso.agc.gov.sg/Act/WA1838",
+        "citation": "Wills Act 1838 s 27(5), as amended by Act 24 of 2022 wef 28/10/2022",
+        "retrieved": "2026-08-18",
+        "quote": "\u201csoldier\u201d includes a member of an air force and a serviceman serving in the digital and intelligence service of the Singapore Armed Forces"
+      },
+      "routing": {
+        "fork_ids": [],
+        "currency_risk": false,
+        "effective_from": "2022-10-28"
+      },
+      "disposition": "subsumed",
+      "disposition_note": "Already present in the fetched current text and encoded from it. Disposed as SUBSUMED rather than as a dated arm because this corpus carries no rule-version axis: it states the law as at the bundle's in-force date, and this amendment is inside that date. A corpus that later gains dated arms should re-dispose this entry as `encoded` naming the arm.",
+      "found_by": [
+        "S2"
+      ]
+    },
+    {
+      "id": "E4",
+      "class": "prospective",
+      "summary": "Reform of the exclusion of illegitimate children from intestate succession is under public discussion, but no Bill, no formal proposal and no commencement notice was found.",
+      "provenance": {
+        "source": "open-web search (see S3)",
+        "url_absent_reason": "No instrument exists to cite. The finding is the ABSENCE of a Bill or proposal, which is why it is routed as a currency risk rather than as a modification.",
+        "citation": "no instrument found; public commentary only",
+        "retrieved": "2026-08-18"
+      },
+      "routing": {
+        "fork_ids": [
+          "F2"
+        ],
+        "currency_risk": true,
+        "effective_from_absent_reason": "Nothing has been enacted or formally proposed, so there is no date to record."
+      },
+      "disposition": "deferred",
+      "disposition_note": "CURRENCY RISK, UNDATED. If the exclusion is reformed, ISA s 3 changes and the `children` list's membership rule changes with it -- which would alter the answer for a large class of real users without altering a single rule in s 7. Flagged rather than encoded because there is nothing to encode: no instrument exists. Re-run S3 against Hansard and the Gazette before relying on this corpus for a death after 2026.",
+      "found_by": [
+        "S3"
+      ]
+    }
+  ],
+  "dispositions": [
+    {
+      "document": "isa1967",
+      "markers": [
+        "v19870330",
+        "v20131231"
+      ],
+      "disposition": "scoped-out",
+      "note": "The corpus encodes the CURRENT consolidated text (in force 18 Aug 2026) and does not carry dated arms on the rule-version axis. Each SSO version marker is therefore scoped out rather than encoded: the encoding answers as at the current version only. This is a stated limitation, not an oversight -- a query about a death in 1990 would need the 1987 Rev Ed arm, which is not here. Recorded so a reader cannot mistake silence for coverage."
+    },
+    {
+      "document": "wa1838",
+      "markers": [
+        "v19870330",
+        "v19920626",
+        "v19961227",
+        "v19971001",
+        "v20161201",
+        "v20210102",
+        "v20211231"
+      ],
+      "disposition": "scoped-out",
+      "note": "The corpus encodes the CURRENT consolidated text (in force 18 Aug 2026) and does not carry dated arms on the rule-version axis. Each SSO version marker is therefore scoped out rather than encoded: the encoding answers as at the current version only. This is a stated limitation, not an oversight -- a query about a death in 1990 would need the 1987 Rev Ed arm, which is not here. Recorded so a reader cannot mistake silence for coverage. WA's 2016-12-01 version carries the s 28 rectification power (Act 16 of 2016), which IS in the current text and is encoded."
+    },
+    {
+      "document": "paa1934",
+      "markers": [
+        "v19870330",
+        "v19971001",
+        "v19990225",
+        "v20000701",
+        "v20040308",
+        "v20060101",
+        "v20060201",
+        "v20100301",
+        "v20140307",
+        "v20141231",
+        "v20150101",
+        "v20160610",
+        "v20210102",
+        "v20211231"
+      ],
+      "disposition": "scoped-out",
+      "note": "The corpus encodes the CURRENT consolidated text (in force 18 Aug 2026) and does not carry dated arms on the rule-version axis. Each SSO version marker is therefore scoped out rather than encoded: the encoding answers as at the current version only. This is a stated limitation, not an oversight -- a query about a death in 1990 would need the 1987 Rev Ed arm, which is not here. Recorded so a reader cannot mistake silence for coverage. PAA's 2015-01-01 version reflects Act 27 of 2014, which repealed ss 34, 36, 45 and 53; the repeals are already absent from the fetched current text."
+    }
+  ]
+}

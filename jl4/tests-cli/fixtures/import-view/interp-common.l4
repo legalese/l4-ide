@@ -1,0 +1,26 @@
+§ `Importer-view fixture — the hyphenated module`
+
+-- The basename is HYPHENATED on purpose: a hyphenated module name can only
+-- be imported backticked (IMPORT `interp-common`), which is how the sibling
+-- ground-user.l4 spells it. FIXTURE(d)'s textual importer scan must see that
+-- spelling, or this module appears to have no importers at all and
+-- `statute` — the §2.5.7 `relevant date` shape, satisfying FIXTURE(a)-(c)
+-- module-locally — is dropped from the export.
+--
+-- `local sample` is the discriminating negative: same module-local shape,
+-- but NOT referenced by the importer, so it must still drop. Together the
+-- two prove the scan returned real importer names, not a fail-open blanket.
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+statute n MEANS n PLUS 1
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+wrap n MEANS n TIMES 2
+
+GIVETH A NUMBER
+`local sample` MEANS 42
+
+#EVAL wrap (statute 1)
+#ASSERT wrap `local sample` EQUALS 84

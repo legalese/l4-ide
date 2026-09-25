@@ -1,0 +1,57 @@
+{
+  "_comment": [
+    "Measured defects, used as NEGATIVE CONTROLS.",
+    "",
+    "House convention (etc/kie-dmn-check, the zeebe boxed-context tripwire):",
+    "every positive control ships a negative sibling, and a negative control that",
+    "stops reproducing is itself a finding. So a leg that expects a defect and",
+    "does not find it reports BROKEN with an ::error:: telling you to delete the",
+    "entry, rather than quietly turning green. A stale negative control is a lie",
+    "about what the leg measures.",
+    "",
+    "EVERY entry below was measured on the date it records. Nothing here is",
+    "predicted. Groups with no measured entries are empty and say why — the MCP",
+    "group in particular, because no jl4-service was reachable when this file was",
+    "written and recording unmeasured defects would be exactly the drift this",
+    "orchestrator exists to prevent."
+  ],
+  "wizard": {
+    "measured_on": "2026-08-02",
+    "measured_by": "l4 render jl4/examples/legal/regcf/regcf-wizard.l4 --format plan",
+    "note": "406 units in the plan; the keys on every unit are exactly defaultDisposition, heading, id, kind, reachable.",
+    "defects": [
+      {
+        "id": "plan-has-no-asks",
+        "description": "`render --format plan` emits no `asks` anywhere: it is a disposition/reachability plan, not the interview query plan the wizard leg needs.",
+        "check": {
+          "kind": "json_literal_count",
+          "literal": "\"asks\"",
+          "expect": 0
+        }
+      },
+      {
+        "id": "plan-has-no-inputs",
+        "description": "The plan names no inputs, so nothing in it tells an interview what to collect.",
+        "check": {
+          "kind": "json_literal_count",
+          "literal": "\"inputs\"",
+          "expect": 0
+        }
+      },
+      {
+        "id": "plan-has-no-question-text",
+        "description": "No unit carries question text; `heading` is the L4 clause heading, not a question.",
+        "check": {
+          "kind": "json_literal_count",
+          "literal": "\"question\"",
+          "expect": 0
+        }
+      }
+    ]
+  },
+  "mcp": {
+    "measured_on": null,
+    "note": "EMPTY ON PURPOSE. No jl4-service was reachable when this file was written, so no MCP defect has been measured here. etc/go/phases/p7-mcp.sh therefore reports SKIPPED rather than asserting defects it has not seen. Populate this group from a real deployment, not from a prediction.",
+    "defects": []
+  }
+}

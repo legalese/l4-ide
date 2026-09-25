@@ -1,0 +1,8 @@
+Parsing successful
+Typechecking successful
+missing-nested-just.l4:11:3-13:17:
+  I found a problem while checking the definition of `f`:
+    The following branches still need to be considered:
+    
+      WHEN wa (JUST `_`) THEN
+    

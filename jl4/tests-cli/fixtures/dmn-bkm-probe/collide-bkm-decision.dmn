@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE E4. A COLLISION CLASS PHASE 5 INTRODUCES THAT D-FEELNAME CANNOT SEE:
+  a businessKnowledgeModel whose @name (and variable/@name) equals a
+  <decision>'s @name.
+
+      decision   dup      = 5
+      bkm        dup(v)   = v * 100
+      decision   call_dup = dup(3)    -> 300 if the BKM wins the name
+      decision   read_dup = dup + 1   -> 6   if the decision wins the name
+
+  Section 13.7-1's measured collision table covers inputData x inputData,
+  inputData x decision, and decision x decision. It does not cover this, and it
+  structurally cannot: varClaimants (Lower.hs:3879-3896) is built from freeTerms
+  and `decides` only, so a BKM name is not a claimant at all today. Phase 5 mints
+  BKM names from the same L4 identifiers that mint decision names, so the class
+  becomes reachable the moment Phase 5 lands.
+
+  The file asks for BOTH readings at once, deliberately: call_dup needs the BKM
+  to win the name, read_dup needs the decision to win it.
+
+  MEASURED 2026-07-31, and the two engines answer DIFFERENTLY IN KIND. The
+  premise that at most one reading can hold turned out to be false on one of
+  them, which is why this is written down rather than predicted.
+
+    KIE 8.44  : validator raises DUPLICATE_NAME twice (once against the decision
+                node, once against the BKM node); the BUILD is clean; and at
+                runtime the BKM WINS. call_dup = 300, correct. But the DECISION
+                `dup` comes back NOT_EVALUATED with a null value, and read_dup,
+                which requires it, is SUCCEEDED-BUT-NULL. So the colliding
+                decision is not out-voted, it is DELETED, and the only warning is
+                a validator message a build does not have to read.
+    Camunda 8 : entirely silent, and BOTH readings hold: dup = 5, read_dup = 6,
+                AND call_dup = 300. zeebe-dmn keeps invocables and variables in
+                DISJOINT namespaces, so the collision is not a collision there at
+                all.
+
+  CONSEQUENCE. This is worse than section 13.7-1's "an element wins silently".
+  On KIE a BKM name colliding with a decision name SILENTLY REMOVES that decision
+  from the result at build time; on Camunda the same file is well defined and
+  answers everything. So the emitter cannot use either engine as its backstop and
+  cannot even use portability as one: the two engines DISAGREE about what the
+  document means. BKM names must be uniquified against decision names by the
+  exporter, and D-FEELNAME's claimant set (Lower.hs:3879-3896, built from
+  freeTerms and `decides`) must grow a BKM-name claimant to see this class at all.
+
+  Wired HarnessMustFail on the KIE leg and HarnessMustPass on the Camunda leg.
+  The asymmetry is the finding, not an accident of the fixture.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_collide_bkm_decision" name="collide_bkm_decision" namespace="https://legalese.com/l4/dmn/collide_bkm_decision" exporter="hand">
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_dup" name="dup">
+    <variable id="decision_dup_var" name="dup" typeRef="number"/>
+    <informationRequirement id="ir_dup_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <literalExpression id="decision_dup_lit">
+      <text>n + 5</text>
+    </literalExpression>
+  </decision>
+  <businessKnowledgeModel id="bkm_dup" name="dup">
+    <variable id="bkm_dup_var" name="dup" typeRef="number"/>
+    <encapsulatedLogic id="bkm_dup_logic">
+      <formalParameter id="bkm_dup_p1" name="v" typeRef="number"/>
+      <literalExpression id="bkm_dup_lit">
+        <text>v * 100</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <decision id="decision_call_dup" name="call_dup">
+    <variable id="decision_call_dup_var" name="call_dup" typeRef="number"/>
+    <knowledgeRequirement id="kr_call_dup">
+      <requiredKnowledge href="#bkm_dup"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_call_dup_lit">
+      <text>dup(3)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_read_dup" name="read_dup">
+    <variable id="decision_read_dup_var" name="read_dup" typeRef="number"/>
+    <informationRequirement id="ir_read_dup">
+      <requiredDecision href="#decision_dup"/>
+    </informationRequirement>
+    <literalExpression id="decision_read_dup_lit">
+      <text>dup + 1</text>
+    </literalExpression>
+  </decision>
+</definitions>

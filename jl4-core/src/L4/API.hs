@@ -281,13 +281,13 @@ l4EvalDirective source line col directiveType =
       (_env, results) <- EL.execEvalModuleWithEnv evalConfig result.tcdEntityInfo importEnv result.tcdModule
       let conFields = extractConstructorFieldNames result.tcdEntityInfo
           targetPos = MkSrcPos line col
-          matchesPos (EL.MkEvalDirectiveResult rng _ _) = fmap (.start) rng == Just targetPos
+          matchesPos (EL.MkEvalDirectiveResult rng _ _ _) = fmap (.start) rng == Just targetPos
           matchingResult = List.find matchesPos results
       case matchingResult of
         Nothing ->
           pure $ encodeJson $ Aeson.object
             [ "error" .= ("No directive result found at the given position" :: Text) ]
-        Just (EL.MkEvalDirectiveResult mRange res _mtrace) ->
+        Just (EL.MkEvalDirectiveResult mRange res _mtrace _ledger) ->
           -- `range` mirrors the LSP-server shape: 1-indexed SrcPos
           -- objects {line, column}. The WASM eval path never lacks
           -- a range in practice (we matched on it above), but we
@@ -307,10 +307,12 @@ l4EvalDirective source line col directiveType =
             [ "directiveType" .= directiveType
             , "prettyText" .= prettyEvalResult conFields res
             , "success" .= case res of
-                EL.Assertion b -> Aeson.toJSON b
+                EL.Assertion (Right b) -> Aeson.toJSON b
+                EL.Assertion (Left _)  -> Aeson.toJSON False
                 EL.Reduction _ -> Aeson.Null
             , "structuredValue" .= case res of
-                EL.Assertion b -> Aeson.toJSON b
+                EL.Assertion (Right b) -> Aeson.toJSON b
+                EL.Assertion (Left _)  -> Aeson.Null
                 EL.Reduction (Left _) -> Aeson.Null
                 EL.Reduction (Right nf) -> Aeson.toJSON (prettyLayoutNF conFields nf)
             , "range" .= rangeJson
@@ -533,14 +535,14 @@ evalResultToJson fields edr = Aeson.object $
     Nothing -> []
     Just r -> ["range" .= rangeToJson r]
   where
-    isSuccess (EL.Assertion b) = b
+    isSuccess (EL.Assertion (Right b)) = b
+    isSuccess (EL.Assertion (Left _)) = False
     isSuccess (EL.Reduction (Right _)) = True
     isSuccess (EL.Reduction (Left _)) = False
 
 -- | Pretty print an evaluation directive result value.
 prettyEvalResult :: ConstructorFieldNames -> EL.EvalDirectiveValue -> Text
-prettyEvalResult _fields (EL.Assertion True)       = "assertion satisfied"
-prettyEvalResult _fields (EL.Assertion False)      = "assertion failed"
+prettyEvalResult _fields (EL.Assertion a)          = EL.prettyAssertionOutcome a
 prettyEvalResult _fields (EL.Reduction (Left exc)) = Text.unlines (prettyEvalException exc)
 prettyEvalResult fields  (EL.Reduction (Right v))  = prettyLayoutNF fields v
 
@@ -793,7 +795,7 @@ tokenToSemanticType tok = case tok.payload of
   -- Literals
   TLiterals (TIntLit _ _) -> Just 4      -- Numbers (type index 4)
   TLiterals (TRationalLit _ _) -> Just 4 -- Numbers (type index 4)
-  TLiterals (TStringLit _) -> Just 5     -- Strings (type index 5)
+  TLiterals (TStringLit _ _) -> Just 5   -- Strings (type index 5)
   
   -- Operators (type index 6)
   TOperators _ -> Just 6

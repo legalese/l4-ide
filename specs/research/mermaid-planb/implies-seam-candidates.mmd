@@ -1,0 +1,18 @@
+---
+config:
+  railroad:
+    nonTerminalFill: "#ffffff"
+    nonTerminalStroke: "#2f7a3f"
+    terminalFill: "transparent"
+    terminalStroke: "transparent"
+    terminalTextColor: "#8a6d1b"
+    lineColor: "#8a8a8a"
+    markerFill: "#222222"
+    strokeWidth: 1.5
+    fontSize: 14
+---
+railroad-beta
+OPT1_status_quo____correct_but_shapeless = choice(nonterminal("NOT: A.3 covers"), nonterminal("A.3 requirement met"));
+OPT2_bottleneck____reads_right_MEANS_AND = sequence(nonterminal("A.3 covers"), terminal("MUST"), nonterminal("A.3 requirement met"));
+OPT3_case_split____correct_AND_shows_seam = choice(nonterminal("NOT: A.3 covers"), sequence(nonterminal("A.3 covers"), terminal("MUST"), nonterminal("A.3 requirement met")));
+OPT4_optional______THE_TRAP_says_Q_is_moot = sequence(nonterminal("A.3 covers"), terminal("MUST"), optional(nonterminal("A.3 requirement met")));

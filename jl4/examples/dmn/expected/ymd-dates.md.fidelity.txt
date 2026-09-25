@@ -1,0 +1,34 @@
+fidelity report — dmnmd
+  [D-MD-NODRG] blocking — definitions_ymd_date_literals
+      dmnmd is a table format, not a graph: the 7 information requirement(s) between these decisions have no markdown form
+      lost: the decision requirements graph; which decision feeds which is invisible
+  [D-MD-NOLITERAL] blocking — decision_commencement
+      `commencement` is a formula (date("1983-01-01")), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_the_appointed_day
+      `the appointed day` is a formula (date("2024-02-29")), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_the_transition_day
+      `the transition day` is a formula (date("2026-01-01")), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-CELLSYNTAX] blocking — decision_the_regime_that_applies
+      rule decision_the_regime_that_applies_r1 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
+      lost: the whole table
+  [D-MD-CELLSYNTAX] blocking — decision_the_regime_that_applies
+      rule decision_the_regime_that_applies_r2 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
+      lost: the whole table
+  [D-MD-CELLSYNTAX] blocking — decision_the_regime_that_applies
+      rule decision_the_regime_that_applies_r3 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
+      lost: the whole table
+  [D-MD-CELLSYNTAX] blocking — decision_the_filing_fee
+      rule decision_the_filing_fee_r1 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
+      lost: the whole table
+  [D-MD-CELLSYNTAX] blocking — decision_the_filing_fee
+      rule decision_the_filing_fee_r2 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all; a half-open or non-integer range), so this table is omitted
+      lost: the whole table
+  [D-MD-CELLSYNTAX] blocking — decision_the_filing_fee
+      rule decision_the_filing_fee_r3 has a cell dmnmd cannot read (a DATE cell -- dmnmd's cell grammar has no date datatype at all), so this table is omitted
+      lost: the whole table
+  [D-MD-NOLITERAL] blocking — decision_the_fee_with_surcharge
+      `the fee with surcharge` is a formula (the_filing_fee * 2), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown

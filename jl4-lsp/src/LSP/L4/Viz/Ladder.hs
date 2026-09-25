@@ -39,11 +39,13 @@ import Control.Monad.Extra (unlessM)
 import qualified Language.LSP.Protocol.Types as LSP
 
 import qualified L4.TypeCheck as TC
-import L4.Viz.Ladder (InputRef(..), generateAtomId)
+import L4.Viz.Ladder (InputRef(..), generateAtomId, collectTypicallyDefaults, seamLabel)
 import L4.Annotation
 import L4.Syntax
 import L4.Print (prettyLayout)
 import qualified L4.Transform as Transform (simplify)
+import qualified L4.Viz.GuardedRows as GR
+import L4.Viz.GuardedRows (GuardedRows (..))
 import LSP.L4.Viz.VizExpr
   ( ID (..), IRExpr,
     RenderAsLadderInfo (..),
@@ -96,6 +98,8 @@ data VizState = MkVizState
   , defsForInlining :: IntMap (Expr Resolved)
   , atomDeps       :: IntMap IntSet
   , atomInputRefs  :: IntMap (Set InputRef)
+  , typicallyDefaults :: IntMap Bool
+  -- ^ Unique.unique -> the binder's BOOLEAN TYPICALLY default (see 'collectTypicallyDefaults').
   }
   deriving stock (Generic)
 
@@ -119,6 +123,7 @@ mkInitialVizState cfg =
     , defsForInlining = Map.empty
     , atomDeps = Map.empty
     , atomInputRefs = Map.empty
+    , typicallyDefaults = Map.empty
     }
 
 ------------------------------------------------------
@@ -311,6 +316,8 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
     let funName = mkPrettyVizName funResolved
     assign #functionName funName.label
     assign #defsForInlining =<< collectDefsForInlining
+    cfg <- getVizCfg
+    assign #typicallyDefaults (collectTypicallyDefaults givenSig cfg.module')
     shouldSimplify <- getShouldSimplify
     vid            <- getFresh
     vizBody        <- translateExpr shouldSimplify (carameliseExpr body)
@@ -332,23 +339,51 @@ translateDecide (MkDecide _ (MkTypeSig _ givenSig _) (MkAppForm _ funResolved ap
         -- TODO: I imagine there will be functionality for this kind of thing in a more central place soon;
         -- this can be replaced with that when that happens.
         getResolved :: OptionallyTypedName Resolved -> Resolved
-        getResolved (MkOptionallyTypedName _ paramName _) = paramName
+        getResolved (MkOptionallyTypedName _ paramName _ _) = paramName
 
 -- | Context for translating expressions - tracks whether we're inside And or Or
 data TranslateContext = CtxAnd | CtxOr | CtxNone
   deriving (Eq, Show)
 
+-- | The seam SURVIVES simplification — see 'L4.Viz.Ladder.translateExpr' for the
+-- argument (DESIGN §25a). In short: 'Transform.simplify' exists to reach CNF, and
+-- CNF's first act is to rewrite @P IMPLIES Q@ into @NOT P OR Q@, discarding the
+-- scope/requirement split. So peel the top-level implication off first, simplify
+-- each side on its own, and keep the connective.
 translateExpr :: Bool -> Expr Resolved -> Viz IRExpr
-translateExpr True  =
-  translateExpr False . Transform.simplify
-translateExpr False = go CtxNone
+translateExpr shouldSimplify = top
   where
+    top :: Expr Resolved -> Viz IRExpr
+    top = \case
+      -- A DECIDE's WHERE block wraps the implication, so peel it before looking.
+      Where _ e ds -> withLocalDecls ds (top e)
+      Implies ann p q -> do
+        vid <- getFresh
+        V.Implies vid <$> side p <*> side q <*> pure (seamLabel ann)
+      e -> side e
+
+    side :: Expr Resolved -> Viz IRExpr
+    side e = go CtxNone (if shouldSimplify then Transform.simplify e else e)
+
     go :: TranslateContext -> Expr Resolved -> Viz IRExpr
     go _ctx e =
       case e of
         Not _ negand -> do
           vid <- getFresh
           V.Not vid <$> go CtxNone negand
+
+        -- A NESTED implication: the two-sink form is top-level only (v1), since an
+        -- implication buried in a conjunction has nowhere to hang its lamps. Fall
+        -- back to the classical reading — still far better than the old behaviour,
+        -- where this fell through to 'leafFromExpr' and the whole implication was
+        -- swallowed into one opaque box.
+        Implies _ p q -> do
+          orId <- getFresh
+          notId <- getFresh
+          p' <- go CtxNone p
+          q' <- go CtxNone q
+          pure $ V.Or orId [V.Not notId p', q']
+
         And {} -> do
           vid <- getFresh
           V.And vid <$> traverse (go CtxAnd) (scanAnd e)
@@ -399,8 +434,20 @@ translateExpr False = go CtxNone
             else
               leafFromExpr e
 
+        -- A first-match guarded chain over BOOLEAN bodies -- @IF-THEN-ELSE@,
+        -- @BRANCH@, @CONSIDER@ -- is ladder structure, not a leaf. Shared with the
+        -- core visualiser via "L4.Viz.GuardedRows"; this module and
+        -- "L4.Viz.Ladder" carry near-identical copies of 'translateExpr', so the
+        -- expansion lives in neither. Every bail-out lands on 'leafFromExpr', i.e.
+        -- the pre-existing behaviour.
         _ -> do
-          leafFromExpr e
+          isBool <- hasBooleanType (getAnno e)
+          case GR.normaliseGuarded e of
+            Just rows
+              | isBool
+              , not (any (GR.hasEffectfulNode . fst) rows.grRows) ->
+                  GR.guardedToLadder getFresh (go CtxNone) rows
+            _ -> leafFromExpr e
 
 scanAnd :: Expr Resolved -> [Expr Resolved]
 scanAnd (And _ e1 e2) =
@@ -437,7 +484,9 @@ varLeaf vid vname resolved = do
   recordAtomInputRefs vname.unique refs
   functionName <- use #functionName
   let atomId = generateAtomId functionName vname.label refs
-  pure $ V.UBoolVar vid vname defaultUBoolVarValue canInline atomId
+  defaults <- use #typicallyDefaults
+  let mTypically = Map.lookup (getUnique resolved).unique defaults
+  pure $ V.UBoolVar vid vname defaultUBoolVarValue canInline atomId mTypically
 
 leafFromExpr :: Expr Resolved -> Viz IRExpr
 leafFromExpr expr = do
@@ -456,6 +505,7 @@ leafFromExpr expr = do
       defaultUBoolVarValue
       defaultUBoolVarCanInline
       atomId
+      Nothing  -- compound leaf: not a bare boolean binder, so no TYPICALLY prior
 
 ------------------------------------------------------
 -- Name helpers

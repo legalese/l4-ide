@@ -1,0 +1,1028 @@
+IMPORT prelude
+IMPORT `housing-act-common`
+IMPORT daydate
+IMPORT `housing-act-part-5-interpretation`   -- the `relevant date` selector (para. 12)
+
+§ `Housing Act 1988 — Schedule 2 — Part I — Ground 5F (Renters' Rights Act 2025)`
+
+-- ===========================================================================
+-- GROUND 5F — the "supported-accommodation when granted, and one of nine
+-- supported-accommodation circumstances applies" MANDATORY ground, inserted into
+-- Schedule 2 to the Housing Act 1988 by the Renters' Rights Act 2025 (c. 26),
+-- s. 145(1)(8), Sch. 1 para. 17(1) (commencement 1.5.2026 for specified
+-- purposes; S.I. 2026/421, reg. 2(b), marker F26). Part I (mandatory): where
+-- made out, the court MUST order possession.
+--
+-- HYBRID encoding:
+--   * the constitutive conditions -> predicates carrying the verbatim statute
+--     inline as inert prose; only the operative atoms are lifted;
+--   * the mandatory outcome       -> a guarded deontic clause.
+--
+-- Statutory text encoded ("The dwelling-house was supported accommodation when
+-- the tenancy was granted and any of the following applies—", a CONJUNCTION of
+-- the chapeau with a DISJUNCTION over (a)-(i)):
+--   (a) the tenancy was granted for the purpose of providing the tenant with
+--       support services for a limited time in order to enable the tenant to be
+--       able to live in other accommodation in the future and the period for
+--       which those support services were to be provided has ended;
+--   (b) a person other than the landlord provides or provided support services to
+--       the tenant, but—
+--         (i)  the support services have come to an end or the person is not
+--              fulfilling their obligations under the arrangements for the
+--              provision of those services, and
+--         (ii) where the dwelling-house is not managed accommodation, the
+--              landlord has used reasonable endeavours to find another person to
+--              provide support services to the tenant but has not been able to do
+--              so;
+--   (c) where the accommodation or support services were funded wholly or partly
+--       by someone other than the landlord or the tenant—
+--         (i)   that funding is no longer being provided,
+--         (ii)  where the dwelling-house is not managed accommodation, the
+--               landlord used reasonable endeavours to identify alternative
+--               funding before the relevant date but was not able to do so, and
+--         (iii) it would not be reasonable for the landlord to continue to
+--               provide accommodation or for the person who provided support
+--               services to continue that provision in the circumstances;
+--   (d) the financial viability of the landlord or of supported accommodation or
+--       support services the landlord provides to others would, in the
+--       landlord's reasonable opinion, be threatened if the landlord were to
+--       continue to provide or fund a supported accommodation project of which
+--       the tenant's dwelling-house forms part and the landlord used reasonable
+--       endeavours to identify alternative funding for the project before the
+--       relevant date but was not able to do so;
+--   (e) the tenant does not need the level of support services that are provided;
+--   (f) the tenant does not need any support services;
+--   (g) the support services that are provided do not meet the tenant's needs;
+--   (h) the dwelling-house has physical features intended to enable persons with
+--       needs for particular support services to live more independently than
+--       they could do so without those features and those physical features are
+--       not needed by the tenant;
+--   (i) the dwelling-house is physically unsuitable for a person with the
+--       tenant's needs for support services to live in.
+--
+-- INTERPRETATION CALLS flagged for the human reviewer:
+--   * "where the dwelling-house is not managed accommodation" (in (b)(ii) and
+--     (c)(ii)) is a PROVISO that only IMPOSES the reasonable-endeavours
+--     requirement when the dwelling-house is NOT managed accommodation. So where
+--     the dwelling-house IS managed accommodation, that sub-condition is
+--     vacuously satisfied. Encoded as:
+--         (dwelling-house is managed accommodation)
+--      OR (the reasonable-endeavours-but-failed requirement is met).
+--     ("managed accommodation" is defined in para. 12 as supported accommodation
+--     into which a tenant has been admitted to meet a need for care/support/
+--     supervision provided otherwise than by the landlord; carried inline.)
+--   * The chapeau "any of the following applies" is a DISJUNCTION over (a)-(i),
+--     conjoined with the gateway "was supported accommodation when the tenancy
+--     was granted": made out = (was supported accommodation when granted)
+--     AND (a OR b OR ... OR i).
+--   * "relevant date" — per para. 12, in Ground 5F means the date of service of
+--     the section 8 notice. It bounds the "before the relevant date" reasonable-
+--     endeavours windows in (c)(ii) and (d): the endeavours must have been made
+--     in the period up to and including the relevant date. Modelled with a DATE
+--     for the endeavours and a DATE for the relevant date, and an
+--     "on or before the relevant date" test.
+--   * Limbs (a)-(d) are multi-part; their (i)/(ii)/(iii) sub-conditions are
+--     modelled faithfully as nested AND/OR. Limbs (e)-(i) are single operative
+--     atoms.
+--   * "supported accommodation project" (defined for paragraph (d)) and the
+--     "references to the landlord are to the landlord seeking possession" rider
+--     are carried as inert prose; their operative effect is folded into the (d)
+--     atoms.
+-- ===========================================================================
+
+§§ `Domain model`
+
+-- Actor (Landlord, Tenant, Court) is imported from `housing-act-common`.
+
+DECLARE Ground5FClaim HAS
+  -- chapeau gateway
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS A BOOLEAN
+  -- "managed accommodation" status — toggles the (b)(ii)/(c)(ii) provisos
+  `dwelling-house is managed accommodation`                                  IS A BOOLEAN
+  -- the "before the relevant date" windows in (c)(ii), (d) are tested against the
+  -- relevant date, which is no longer supplied directly: it is DERIVED from the
+  -- Part 5 selector (para. 12) over these inputs. Per para. 12(1)(a), in Ground 5F
+  -- the relevant date is the date of SERVICE of the s.8 notice — unless the court
+  -- dispensed with notice under s.8(1)(b), when it is the date proceedings began.
+  -- The claim carries the raw inputs, with `ground class` pinned to `Ground 5F` by
+  -- the helper.
+  `relevant date inputs`                                                     IS A RelevantDateInputs
+
+  -- (a)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS A BOOLEAN
+  `the period for which those support services were to be provided has ended`  IS A BOOLEAN
+
+  -- (b)
+  `a person other than the landlord provides or provided support services to the tenant`  IS A BOOLEAN
+  `the support services have come to an end`                                  IS A BOOLEAN
+  `the person is not fulfilling their obligations for the provision of those services`  IS A BOOLEAN
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS A BOOLEAN
+
+  -- (c)
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS A BOOLEAN
+  `that funding is no longer being provided`                                 IS A BOOLEAN
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS A BOOLEAN
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS A DATE
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS A BOOLEAN
+
+  -- (d)
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS A BOOLEAN
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS A BOOLEAN
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS A DATE
+
+  -- (e)
+  `the tenant does not need the level of support services that are provided`  IS A BOOLEAN
+  -- (f)
+  `the tenant does not need any support services`                            IS A BOOLEAN
+  -- (g)
+  `the support services that are provided do not meet the tenant's needs`     IS A BOOLEAN
+  -- (h)
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS A BOOLEAN
+  `those physical features are not needed by the tenant`                      IS A BOOLEAN
+  -- (i)
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS A BOOLEAN
+
+§§ `The relevant date — derived from the Part 5 selector (para. 12)`
+
+-- Ground 5F is one of the three grounds (2ZA, 2ZB, 5F) that para. 12(1)(a) ties
+-- to the date of SERVICE of the s.8 notice — overridden, where the court dispensed
+-- with notice under s.8(1)(b), to the date proceedings began (para. 12(2)). Rather
+-- than store the answer, the claim stores the selector inputs and we DERIVE the
+-- date through the shared `relevant date` function imported from Part 5.
+
+-- Convenience constructor for the ordinary case: notice SERVED on a given date,
+-- the court NOT having dispensed with it. (For 5F the (b) "date specified" branch
+-- is never taken, so the specified-date input is immaterial; we pass the service
+-- date there too, and as the proceedings date, since neither is consulted.)
+GIVEN `date of service` IS A DATE
+GIVETH A RelevantDateInputs
+`5F notice served on` `date of service` MEANS RelevantDateInputs WITH
+  `ground class`                                          IS `Ground 5F`
+  `date of service of the notice under section 8`         IS `date of service`
+  `date specified in the notice under section 8`          IS `date of service`
+  `date on which proceedings for possession began`        IS `date of service`
+  `the court exercised the power conferred by section 8(1)(b)`  IS FALSE
+
+-- The relevant date for a 5F claim: the Part 5 selector applied to its inputs.
+GIVEN claim IS A Ground5FClaim
+GIVETH A DATE
+`the relevant date` claim MEANS `relevant date` (claim's `relevant date inputs`)
+
+§§ `Shared helper — the "before the relevant date" test (on or before, inclusive)`
+
+-- "before the relevant date" reasonable-endeavours windows in (c)(ii) and (d):
+-- the endeavours must have been made in the period up to and including the
+-- relevant date. (Per para. 12, in Ground 5F the relevant date is the date of
+-- service of the section 8 notice.)
+GIVEN `endeavour date` IS A DATE
+      `relevant date`  IS A DATE
+GIVETH A BOOLEAN
+`made on or before the relevant date` MEANS
+    Day `endeavour date` AT MOST Day `relevant date`
+
+§§ `Shared helper — the "not managed accommodation" proviso`
+
+-- "where the dwelling-house is not managed accommodation, [requirement]" only
+-- imposes the requirement when the dwelling-house is NOT managed accommodation.
+-- Where it IS managed accommodation, the requirement is vacuously satisfied.
+GIVEN `dwelling-house is managed accommodation` IS A BOOLEAN
+      `the requirement`                          IS A BOOLEAN
+GIVETH A BOOLEAN
+`managed-accommodation proviso on` MEANS
+        "managed accommodation means supported accommodation into which a tenant has been admitted in order to meet a need for care, support or supervision, in a case in which that care, support or supervision is provided otherwise than by the landlord or a person acting on behalf of the landlord"
+    ...     `dwelling-house is managed accommodation`
+        OR  `the requirement`
+
+§§ `(a) — limited-time support, the period for which it was to be provided has ended`
+
+GIVEN claim IS A Ground5FClaim
+GIVETH A BOOLEAN
+`(a) — limited-time support that has ended` claim MEANS
+        "(a) the tenancy was granted for the purpose of providing the tenant with support services for a limited time in order to enable the tenant to be able to live in other accommodation in the future"
+    ... claim's `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`
+    AND "and the period for which those support services were to be provided has ended;"
+    ... claim's `the period for which those support services were to be provided has ended`
+
+§§ `(b) — third-party support, ended/not fulfilled, and (where not managed) no replacement found`
+
+GIVEN claim IS A Ground5FClaim
+GIVETH A BOOLEAN
+`(b) — third-party support failed and no replacement` claim MEANS
+        "(b) a person other than the landlord provides or provided support services to the tenant, but—"
+    ... claim's `a person other than the landlord provides or provided support services to the tenant`
+    AND     "(i) the support services have come to an end or the person is not fulfilling their obligations under the arrangements for the provision of those services,"
+        ...     claim's `the support services have come to an end`
+            ..  claim's `the person is not fulfilling their obligations for the provision of those services`
+    AND "and"
+    AND     "(ii) where the dwelling-house is not managed accommodation, the landlord has used reasonable endeavours to find another person to provide support services to the tenant but has not been able to do so;"
+        ...     `managed-accommodation proviso on`
+                    (claim's `dwelling-house is managed accommodation`)
+                    (claim's `(b) landlord used reasonable endeavours to find another provider but was not able to`)
+
+§§ `(c) — third-party funding ended, (where not managed) no alt funding before relevant date, and not reasonable to continue`
+
+GIVEN claim IS A Ground5FClaim
+GIVETH A BOOLEAN
+`(c) — third-party funding ended and not reasonable to continue` claim MEANS
+        "(c) where the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant—"
+    ... claim's `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`
+    AND "(i) that funding is no longer being provided,"
+    ... claim's `that funding is no longer being provided`
+    AND     "(ii) where the dwelling-house is not managed accommodation, the landlord used reasonable endeavours to identify alternative funding before the relevant date but was not able to do so,"
+        ...     `managed-accommodation proviso on`
+                    (claim's `dwelling-house is managed accommodation`)
+                    (   claim's `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`
+                    AND `made on or before the relevant date`
+                            (claim's `(c) date the landlord made reasonable endeavours to identify alternative funding`)
+                            (`the relevant date` claim))
+    AND "and"
+    AND "(iii) it would not be reasonable for the landlord to continue to provide accommodation or for the person who provided support services to continue that provision in the circumstances;"
+    ... claim's `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`
+
+§§ `(d) — financial viability threatened, and no alt funding for the project before the relevant date`
+
+-- In paragraph (d), "supported accommodation project" means—
+--  (a) supported accommodation consisting of two or more dwelling-houses in the
+--      same building as, or otherwise nearby, each other,
+--  (b) supported accommodation consisting of two or more dwelling-houses occupied
+--      by tenants who receive support services of a similar kind, or
+--  (c) support services of a similar kind provided to tenants of two or more
+--      dwelling-houses that are supported accommodation.
+-- (carried as inert prose; "references to the landlord are to the landlord who
+-- is seeking possession").
+GIVEN claim IS A Ground5FClaim
+GIVETH A BOOLEAN
+`(d) — financial viability threatened, no alternative funding found` claim MEANS
+        "(d) the financial viability of the landlord or of supported accommodation or support services the landlord provides to others would, in the landlord's reasonable opinion, be threatened if the landlord were to continue to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part"
+    ... claim's `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`
+    AND "and the landlord used reasonable endeavours to identify alternative funding for the project before the relevant date but was not able to do so;"
+    ...     claim's `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`
+        AND `made on or before the relevant date`
+                (claim's `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`)
+                (`the relevant date` claim)
+
+§§ `(e) — tenant does not need the level of support provided`
+
+GIVEN claim IS A Ground5FClaim
+GIVETH A BOOLEAN
+`(e) — tenant does not need the level of support provided` claim MEANS
+        "(e) the tenant does not need the level of support services that are provided;"
+    ... claim's `the tenant does not need the level of support services that are provided`
+
+§§ `(f) — tenant does not need any support services`
+
+GIVEN claim IS A Ground5FClaim
+GIVETH A BOOLEAN
+`(f) — tenant does not need any support services` claim MEANS
+        "(f) the tenant does not need any support services;"
+    ... claim's `the tenant does not need any support services`
+
+§§ `(g) — support provided does not meet the tenant's needs`
+
+GIVEN claim IS A Ground5FClaim
+GIVETH A BOOLEAN
+`(g) — support provided does not meet the tenant's needs` claim MEANS
+        "(g) the support services that are provided do not meet the tenant's needs;"
+    ... claim's `the support services that are provided do not meet the tenant's needs`
+
+§§ `(h) — independence physical features present but not needed by the tenant`
+
+GIVEN claim IS A Ground5FClaim
+GIVETH A BOOLEAN
+`(h) — physical features present but not needed by the tenant` claim MEANS
+        "(h) the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently than they could do so without those features"
+    ... claim's `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`
+    AND "and those physical features are not needed by the tenant;"
+    ... claim's `those physical features are not needed by the tenant`
+
+§§ `(i) — dwelling-house physically unsuitable for the tenant's needs`
+
+GIVEN claim IS A Ground5FClaim
+GIVETH A BOOLEAN
+`(i) — dwelling-house physically unsuitable for the tenant's needs` claim MEANS
+        "(i) the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in."
+    ... claim's `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`
+
+§§ `Any of the following applies — disjunction over (a)-(i)`
+
+GIVEN claim IS A Ground5FClaim
+GIVETH A BOOLEAN
+`any of (a)-(i) applies` claim MEANS
+        "any of the following applies—"
+    ..  `(a) — limited-time support that has ended` claim
+    ..  `(b) — third-party support failed and no replacement` claim
+    ..  `(c) — third-party funding ended and not reasonable to continue` claim
+    ..  `(d) — financial viability threatened, no alternative funding found` claim
+    ..  `(e) — tenant does not need the level of support provided` claim
+    ..  `(f) — tenant does not need any support services` claim
+    ..  `(g) — support provided does not meet the tenant's needs` claim
+    ..  `(h) — physical features present but not needed by the tenant` claim
+    ..  `(i) — dwelling-house physically unsuitable for the tenant's needs` claim
+
+§§ `Ground 5F made out — supported accommodation when granted AND any of (a)-(i)`
+
+GIVEN claim IS A Ground5FClaim
+GIVETH A BOOLEAN
+`Ground 5F made out` claim MEANS
+        "The dwelling-house was supported accommodation when the tenancy was granted"
+    ... claim's `dwelling-house was supported accommodation when the tenancy was granted`
+    AND "and any of the following applies—"
+    ... `any of (a)-(i) applies` claim
+
+§§ `The mandatory outcome — Court MUST order possession`
+
+-- Action (`order possession`) is imported from `housing-act-common`.
+
+GIVEN claim IS A Ground5FClaim
+GIVETH A DEONTIC Actor Action
+`ground 5F possession order` claim MEANS
+    IF   `Ground 5F made out` claim
+    THEN PARTY Court MUST `order possession` WITHIN 30
+    ELSE FULFILLED
+
+
+§ `Tests`
+
+§§ `Dates — the relevant date and the "before the relevant date" windows`
+
+`relevant date 2025`              MEANS June 1 2025
+`endeavour before relevant date`  MEANS May 1 2025      -- on or before -> within window
+`endeavour on relevant date`      MEANS June 1 2025     -- exactly the relevant date -> within window
+`endeavour after relevant date`   MEANS July 1 2025     -- after the relevant date -> outside window
+
+-- ---------------------------------------------------------------------------
+-- Each test scenario is a FULLY-SPELLED Ground5FClaim value (the house style;
+-- L4 has no record-update). Every claim sets the gateway TRUE and every (a)-(i)
+-- atom FALSE except the ones a given scenario exercises. Dates are set inside
+-- the relevant-date window so the date predicates never spoil a limb on a stale
+-- date, except where a scenario deliberately puts the endeavours date AFTER the
+-- relevant date to test the window.
+-- ---------------------------------------------------------------------------
+
+§§ `Gateway only — no (a)-(i) circumstance applies -> NOT made out`
+
+`base — gateway only` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT NOT `any of (a)-(i) applies` `base — gateway only`
+#ASSERT NOT `Ground 5F made out`     `base — gateway only`
+
+§§ `Limb (a) made out — limited-time support whose period has ended`
+
+`claim via (a)` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS TRUE
+  `the period for which those support services were to be provided has ended`  IS TRUE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT `(a) — limited-time support that has ended` `claim via (a)`
+#ASSERT `Ground 5F made out`                        `claim via (a)`
+
+§§ `Limb (a) knocked out — granted for limited time, but the period has NOT ended`
+
+-- limb (a) needs BOTH conjuncts: granted-for-limited-time AND period-has-ended.
+`claim via (a) — period not ended` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS TRUE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT NOT `(a) — limited-time support that has ended` `claim via (a) — period not ended`
+
+§§ `Limb (b) made out — third-party support ended, not managed, no replacement found`
+
+`claim via (b)` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS TRUE
+  `the support services have come to an end`                                  IS TRUE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS TRUE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT `(b) — third-party support failed and no replacement` `claim via (b)`
+#ASSERT `Ground 5F made out`                                  `claim via (b)`
+
+§§ `Limb (b) — (i) satisfied via the "not fulfilling obligations" arm alone`
+
+-- (b)(i) is a disjunction: "ended OR not fulfilling obligations". The
+-- not-fulfilling arm alone also satisfies (b)(i).
+`claim via (b) — not-fulfilling arm` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS TRUE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS TRUE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS TRUE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT `(b) — third-party support failed and no replacement` `claim via (b) — not-fulfilling arm`
+
+§§ `Limb (b) knocked out — not managed, but the landlord did NOT use reasonable endeavours`
+
+-- (b)(ii) proviso: NOT managed accommodation -> the reasonable-endeavours
+-- requirement bites. With that endeavours atom FALSE -> limb (b) fails.
+`claim via (b) — no endeavours, not managed` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS TRUE
+  `the support services have come to an end`                                  IS TRUE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT NOT `(b) — third-party support failed and no replacement` `claim via (b) — no endeavours, not managed`
+
+§§ `Limb (b) — (ii) proviso vacuous when the dwelling-house IS managed accommodation`
+
+-- Even with the endeavours atom FALSE, where the dwelling-house IS managed
+-- accommodation the (b)(ii) requirement is bypassed -> limb (b) still holds.
+`claim via (b) — managed, no endeavours` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS TRUE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS TRUE
+  `the support services have come to an end`                                  IS TRUE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT `(b) — third-party support failed and no replacement` `claim via (b) — managed, no endeavours`
+
+§§ `Limb (c) made out — funding ended, not managed, alt funding sought before relevant date, not reasonable to continue`
+
+`claim via (c)` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS TRUE
+  `that funding is no longer being provided`                                 IS TRUE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS TRUE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS TRUE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT `(c) — third-party funding ended and not reasonable to continue` `claim via (c)`
+#ASSERT `Ground 5F made out`                                             `claim via (c)`
+
+§§ `Limb (c) knocked out — endeavours made AFTER the relevant date (not managed)`
+
+-- (c)(ii) date proviso: endeavours AFTER the relevant date fall outside the
+-- window -> the endeavours sub-condition fails -> limb (c) fails (not managed).
+`claim via (c) — endeavours too late` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS TRUE
+  `that funding is no longer being provided`                                 IS TRUE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS TRUE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour after relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS TRUE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT NOT `(c) — third-party funding ended and not reasonable to continue` `claim via (c) — endeavours too late`
+
+§§ `Limb (c) knocked out — it WOULD be reasonable for the landlord to continue (iii)`
+
+`claim via (c) — reasonable to continue` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS TRUE
+  `that funding is no longer being provided`                                 IS TRUE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS TRUE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT NOT `(c) — third-party funding ended and not reasonable to continue` `claim via (c) — reasonable to continue`
+
+§§ `Limb (c) — (ii) proviso vacuous when managed accommodation (late/absent endeavours bypassed)`
+
+-- Where managed accommodation, (c)(ii) is bypassed; limb (c) holds on (i) and
+-- (iii) alone even though no endeavours were made before the relevant date.
+`claim via (c) — managed, late endeavours` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS TRUE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS TRUE
+  `that funding is no longer being provided`                                 IS TRUE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour after relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS TRUE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT `(c) — third-party funding ended and not reasonable to continue` `claim via (c) — managed, late endeavours`
+
+§§ `Limb (d) made out — financial viability threatened, alt funding sought on the relevant date`
+
+`claim via (d)` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS TRUE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS TRUE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour on relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT `(d) — financial viability threatened, no alternative funding found` `claim via (d)`
+#ASSERT `Ground 5F made out`                                                `claim via (d)`
+
+§§ `Limb (d) knocked out — endeavours made AFTER the relevant date (no managed-accommodation proviso here)`
+
+-- (d) has NO managed-accommodation proviso: the date window always bites.
+-- Endeavours after the relevant date -> limb (d) fails even though viability is
+-- threatened. ("on relevant date" in the positive case confirms the inclusive
+-- boundary; "after relevant date" here confirms the window's upper edge.)
+`claim via (d) — endeavours too late` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS TRUE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS TRUE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour after relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT NOT `(d) — financial viability threatened, no alternative funding found` `claim via (d) — endeavours too late`
+
+§§ `Limb (e) made out — tenant does not need the level of support provided`
+
+`claim via (e)` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS TRUE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT `(e) — tenant does not need the level of support provided` `claim via (e)`
+#ASSERT `Ground 5F made out`                                       `claim via (e)`
+
+§§ `Limb (f) made out — tenant does not need any support services`
+
+`claim via (f)` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS TRUE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT `(f) — tenant does not need any support services` `claim via (f)`
+#ASSERT `Ground 5F made out`                               `claim via (f)`
+
+§§ `Limb (g) made out — support provided does not meet the tenant's needs`
+
+`claim via (g)` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS TRUE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT `(g) — support provided does not meet the tenant's needs` `claim via (g)`
+#ASSERT `Ground 5F made out`                                       `claim via (g)`
+
+§§ `Limb (h) made out — independence features present but not needed by the tenant`
+
+`claim via (h)` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS TRUE
+  `those physical features are not needed by the tenant`                      IS TRUE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT `(h) — physical features present but not needed by the tenant` `claim via (h)`
+#ASSERT `Ground 5F made out`                                           `claim via (h)`
+
+§§ `Limb (h) knocked out — features present BUT the tenant DOES need them`
+
+-- limb (h) needs BOTH conjuncts: feature present AND not needed.
+`claim via (h) — features needed` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS TRUE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT NOT `(h) — physical features present but not needed by the tenant` `claim via (h) — features needed`
+
+§§ `Limb (i) made out — dwelling-house physically unsuitable for the tenant's needs`
+
+`claim via (i)` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS TRUE
+
+#ASSERT `(i) — dwelling-house physically unsuitable for the tenant's needs` `claim via (i)`
+#ASSERT `Ground 5F made out`                                               `claim via (i)`
+
+§§ `Gateway knocked out — NOT supported accommodation when granted, though limb (a) applies`
+
+-- The gateway is a hard precondition: if the dwelling-house was not supported
+-- accommodation when the tenancy was granted, the ground is not made out even
+-- though limb (a) (and any other) would otherwise apply.
+`claim — gateway fails but (a) applies` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS FALSE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS (`5F notice served on` `relevant date 2025`)
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS TRUE
+  `the period for which those support services were to be provided has ended`  IS TRUE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS FALSE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS FALSE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour before relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+#ASSERT     `any of (a)-(i) applies` `claim — gateway fails but (a) applies`
+#ASSERT NOT `Ground 5F made out`     `claim — gateway fails but (a) applies`
+
+§§ `Property test — the s.8(1)(b) dispensation override moves the relevant date`
+
+-- The selector, not the claim, decides the relevant date — so the s.8(1)(b)
+-- dispensation power (para. 12(2)) can change the outcome. Take limb (d), whose
+-- date window always bites (no managed-accommodation proviso). The landlord's
+-- alternative-funding endeavours were made on `endeavour after relevant date`
+-- (July 1 2025) — ONE day AFTER the service-based relevant date (`relevant date
+-- 2025` = June 1 2025) — so under the ordinary `5F notice served on` encoding
+-- limb (d) FAILS (this is `claim via (d) — endeavours too late`). But here the
+-- court DISPENSED with the s.8 notice, so the relevant date becomes the date
+-- proceedings began (July 1 2025). That moves the window's upper edge from June 1
+-- to July 1, bringing the endeavours date back ON the (now-later) relevant date:
+-- July 1 AT MOST July 1 -> limb (d) fires. Under the old opaque-`relevant date`-
+-- field encoding this property was inexpressible.
+`proceedings began Jul 1 2025` MEANS July 1 2025
+
+`inputs — dispensed, proceedings Jul 1 2025` MEANS RelevantDateInputs WITH
+  `ground class`                                          IS `Ground 5F`
+  `date of service of the notice under section 8`         IS `relevant date 2025`
+  `date specified in the notice under section 8`          IS `relevant date 2025`
+  `date on which proceedings for possession began`        IS `proceedings began Jul 1 2025`
+  `the court exercised the power conferred by section 8(1)(b)`  IS TRUE
+
+`claim via (d) — dispensed flips the window` MEANS Ground5FClaim WITH
+  `dwelling-house was supported accommodation when the tenancy was granted`  IS TRUE
+  `dwelling-house is managed accommodation`                                  IS FALSE
+  `relevant date inputs`                                                     IS `inputs — dispensed, proceedings Jul 1 2025`
+  `tenancy granted to provide support services for a limited time to enable the tenant to live in other accommodation in the future`  IS FALSE
+  `the period for which those support services were to be provided has ended`  IS FALSE
+  `a person other than the landlord provides or provided support services to the tenant`  IS FALSE
+  `the support services have come to an end`                                  IS FALSE
+  `the person is not fulfilling their obligations for the provision of those services`  IS FALSE
+  `(b) landlord used reasonable endeavours to find another provider but was not able to`  IS FALSE
+  `the accommodation or support services were funded wholly or partly by someone other than the landlord or the tenant`  IS FALSE
+  `that funding is no longer being provided`                                 IS FALSE
+  `(c) landlord used reasonable endeavours to identify alternative funding but was not able to`  IS FALSE
+  `(c) date the landlord made reasonable endeavours to identify alternative funding`  IS `endeavour before relevant date`
+  `it would not be reasonable for the landlord to continue to provide accommodation or for the provider to continue`  IS FALSE
+  `the financial viability of the landlord or of supported accommodation provided to others would be threatened if the landlord continued to provide or fund a supported accommodation project of which the tenant's dwelling-house forms part`  IS TRUE
+  `(d) landlord used reasonable endeavours to identify alternative funding for the project but was not able to`  IS TRUE
+  `(d) date the landlord made reasonable endeavours to identify alternative funding for the project`  IS `endeavour after relevant date`
+  `the tenant does not need the level of support services that are provided`  IS FALSE
+  `the tenant does not need any support services`                            IS FALSE
+  `the support services that are provided do not meet the tenant's needs`     IS FALSE
+  `the dwelling-house has physical features intended to enable persons with needs for particular support services to live more independently`  IS FALSE
+  `those physical features are not needed by the tenant`                      IS FALSE
+  `the dwelling-house is physically unsuitable for a person with the tenant's needs for support services to live in`  IS FALSE
+
+-- The derived relevant date is the proceedings date, not the service date ...
+#ASSERT (Day (`the relevant date` `claim via (d) — dispensed flips the window`)) EQUALS (Day `proceedings began Jul 1 2025`)
+-- ... and that shift brings the endeavours date back inside the window: (d) fires.
+#ASSERT     `(d) — financial viability threatened, no alternative funding found` `claim via (d) — dispensed flips the window`
+#ASSERT     `Ground 5F made out`                                                `claim via (d) — dispensed flips the window`
+-- Contrast: the SAME endeavours date with notice NOT dispensed (relevant date =
+-- June 1 2025) stays one day outside the window — this is `claim via (d) —
+-- endeavours too late`.
+#ASSERT NOT `(d) — financial viability threatened, no alternative funding found` `claim via (d) — endeavours too late`

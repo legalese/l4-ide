@@ -50,6 +50,12 @@ data ContractFrame
   -- ^ Regulative BinOp frame while evaluating a regulative expression
   | RBinOp2 RBinOp2
   -- ^ Regulative BinOp frame while evaluating the second expression of a bin op
+  | ResolveParty ResolvePartyFrame
+  -- ^ STATE-AS-LEDGER: on the deadline-passed / LEST path the obligation party is
+  --   still an unevaluated expression; this frame forces it to a WHNF (via
+  --   'maybeEvaluate') so it can be keyed and the followup (e.g. a RECORD in a
+  --   breach reparation) attributed to the real acting party, not the anonymous
+  --   ledger. Mirrors how 'Contract6 PartyWHNF' forces the party on the match path.
   deriving stock Show
 
 data ScrutinizeEvents = ScrutinizeEvents
@@ -59,9 +65,17 @@ data ScrutinizeEvents = ScrutinizeEvents
   }
   deriving stock Show
 
+-- | The @ev'reoffered@ field threaded through 'ScrutinizeEvent',
+-- 'CurrentTimeWHNF', 'ScrutinizeDue' and 'CheckTiming' records whether the
+-- event under scrutiny was itself re-offered by an expiring obligation
+-- (looked up at Contract1 via @isReoffered@). It enforces the at-most-once
+-- re-offer rule at the Contract5 expiry step: a re-offered event that
+-- reveals a second expiry is consumed instead of being re-offered again,
+-- which keeps evaluation terminating for recursive HENCE/LEST continuations
+-- with non-positive deadlines. See the Contract5 NOTE in Machine.hs.
 data ScrutinizeEvent = ScrutinizeEvent
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
-  , events :: Reference, time :: Reference
+  , events :: Reference, time :: Reference, ev'reoffered :: Bool
   , env :: Environment
   }
   deriving stock Show
@@ -69,7 +83,7 @@ data ScrutinizeEvent = ScrutinizeEvent
 data CurrentTimeWHNF = CurrentTimeWHNF
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: Reference
-  , events :: Reference, time :: Reference
+  , events :: Reference, time :: Reference, ev'reoffered :: Bool
   , env :: Environment
   }
   deriving stock Show
@@ -77,7 +91,7 @@ data CurrentTimeWHNF = CurrentTimeWHNF
 data ScrutinizeDue = ScrutinizeDue
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
-  , events :: Reference, time :: Reference
+  , events :: Reference, time :: Reference, ev'reoffered :: Bool
   , env :: Environment
   }
   deriving stock Show
@@ -85,7 +99,7 @@ data ScrutinizeDue = ScrutinizeDue
 data CheckTiming = CheckTiming
   { party :: MaybeEvaluated, act :: RAction Resolved, due :: MaybeEvaluated' (Maybe RExpr), followup :: RExpr, lest :: Maybe RExpr
   , ev'party :: Reference, ev'act :: Reference, ev'time :: WHNF
-  , events :: Reference, time :: WHNF
+  , events :: Reference, time :: WHNF, ev'reoffered :: Bool
   , env :: Environment
   }
   deriving stock Show
@@ -150,5 +164,13 @@ data RBinOp2 = MkRBinOp2
   { op :: RBinOp
   , rval1 :: WHNF
   , env :: Environment
+  }
+  deriving stock Show
+
+data ResolvePartyFrame = ResolvePartyFrame
+  { followup :: RExpr        -- ^ the HENCE / LEST followup to run once the party is keyed
+  , env :: Environment       -- ^ environment in which to run the followup
+  , events :: Reference      -- ^ remaining event stream (passed on to 'continueWithFollowup')
+  , time :: Reference        -- ^ the (already-allocated) event time
   }
   deriving stock Show

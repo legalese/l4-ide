@@ -1,0 +1,39 @@
+-- NEGATIVE fixture for the future D-CYCLE check (spec §6.4.2, §6.3.7).
+--
+-- p2, NULLARY arm. The same mutual recursion as
+-- cycle-p2-mutual-parameterised.l4 with the parameters removed:
+--
+--     `the left total`  reads  `the right total`
+--     `the right total` reads  `the left total`
+--
+-- Nullary decides stay DECISIONS under Phase 4/5, so this cycle lives on the
+-- informationRequirement graph (§6.3.7), not on the knowledgeRequirement graph
+-- (§6.3.9) that its parameterised twin lands in. Two graphs, two detectors, two
+-- fixtures.
+--
+-- Nothing here is recursive BY INSPECTION: each body names the other, neither
+-- names itself, and no parameter shrinks. That is exactly §6.4.2's argument for
+-- why the check has to be an SCC rather than an own-name-mention test.
+--
+-- Expected after Phase 4: one D-CYCLE over an SCC of size 2.
+--
+--
+-- PROVENANCE OF THIS HEADER. The .l4 source was typechecked (`l4 check`, clean)
+-- when it was written on 2026-07-31, with a prebuilt CLI. The statements above
+-- about what TODAY'S EXPORTER emits and reports are taken from spec
+-- §6.4.2/§6.4.5's table and were NOT re-measured here: that session had no
+-- build. Whoever wires these fixtures into jl4/tests/DmnExport.hs must MEASURE
+-- the expectation rather than transcribe it.
+-- NEVER added to `goldenSubjects`.
+
+IMPORT prelude
+
+§ `mutual recursion, nullary`
+
+GIVETH A NUMBER
+`the left total` MEANS
+    `the right total` PLUS 1
+
+GIVETH A NUMBER
+`the right total` MEANS
+    `the left total` PLUS 1

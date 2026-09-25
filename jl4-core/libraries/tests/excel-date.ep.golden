@@ -412,7 +412,7 @@ ExcelWorkday startDate days holidays MEANS
                 ELSE walk nextDate (remaining MINUS stepConsumed)
                 WHERE
                     nextDate MEANS date PLUS direction
-                    isWorkday MEANS NOT `is weekend` nextDate AND NOT isHoliday nextDate
+                    isWorkday MEANS (NOT `is weekend` nextDate) AND (NOT isHoliday nextDate)
                     stepConsumed MEANS IF isWorkday THEN 1 ELSE 0
 
             isHoliday date MEANS containsDay (Day date) holidayDays
@@ -442,7 +442,7 @@ ExcelNetworkDays startDate endDate holidays MEANS
             THEN 0
             ELSE thisDay PLUS countBusiness (current PLUS 1) target
             WHERE
-                isWorkday MEANS NOT `is weekend` current AND NOT containsDay (Day current) holidayDays
+                isWorkday MEANS (NOT `is weekend` current) AND (NOT containsDay (Day current) holidayDays)
                 thisDay MEANS IF isWorkday THEN 1 ELSE 0
 
 

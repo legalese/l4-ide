@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE E1. THE PROBE THAT DECIDES THE `uniquifyIn` WIDENING.
+
+  jl4-core/src/L4/Dmn/Lower.hs:3712-3716 asserts, and has never tested, that BKM
+  formalParameter names are "its own uniquifyIn scope; neither shares this one,
+  so extending this is adding a scope, not widening it". If a formalParameter
+  name does NOT shadow a same-named global, that comment is wrong and parameter
+  names must JOIN scope 1, which is a WIDENING and a different change.
+
+      inputData  x  = 1        (the global)
+      bkm        echo(x) = x   (the parameter, same spelling)
+      decision   from_param  = echo(2)   -> 2 if the parameter shadows
+                                          -> 1 if the global wins
+      decision   from_global = x         -> 1, the control
+      decision   param_wins  = echo(2) = 2 and x = 1
+                              -> a single boolean stating the whole invariant
+
+  DMN 1.3 section 10.3.2.13 says the parameter shadows. Engines are not obliged
+  to agree with the specification and this repo has been surprised before, which
+  is the entire reason for measuring instead of citing.
+
+  WHAT A FLIP MEANS. If EITHER engine resolves `x` inside the BKM to the global,
+  then formalParameter names collide with inputData names on that engine, the
+  emitter must uniquify parameters against the top-level scope, and Lower.hs:3714
+  needs correcting rather than extending. Note the asymmetric consequence: the
+  emitter would have to satisfy the UNION of both engines' rules, so one engine
+  disagreeing is enough to force the widening.
+
+  MEASURED 2026-07-31: BOTH engines shadow, on both cases, 6/6 values each.
+  KIE clean, Camunda clean. DMN section 10.3.2.13 is followed. Lower.hs:3714
+  STANDS: formalParameter names are their own scope and extending uniquifyIn to
+  them is ADDING a scope, not widening scope 1. E7 confirms the same result
+  against a DECISION name, and with wrong answers that are large non-null
+  numbers rather than small ones; keep both.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_collide_param_input" name="collide_param_input" namespace="https://legalese.com/l4/dmn/collide_param_input" exporter="hand">
+  <businessKnowledgeModel id="bkm_echo" name="echo">
+    <variable id="bkm_echo_var" name="echo" typeRef="number"/>
+    <encapsulatedLogic id="bkm_echo_logic">
+      <formalParameter id="bkm_echo_p1" name="x" typeRef="number"/>
+      <literalExpression id="bkm_echo_lit">
+        <text>x</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <inputData id="input_x" name="x">
+    <variable id="input_x_var" name="x" typeRef="number"/>
+  </inputData>
+  <decision id="decision_from_param" name="from_param">
+    <variable id="decision_from_param_var" name="from_param" typeRef="number"/>
+    <knowledgeRequirement id="kr_from_param">
+      <requiredKnowledge href="#bkm_echo"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_from_param_lit">
+      <text>echo(2)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_from_global" name="from_global">
+    <variable id="decision_from_global_var" name="from_global" typeRef="number"/>
+    <informationRequirement id="ir_from_global_x">
+      <requiredInput href="#input_x"/>
+    </informationRequirement>
+    <literalExpression id="decision_from_global_lit">
+      <text>x</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_param_wins" name="param_wins">
+    <variable id="decision_param_wins_var" name="param_wins" typeRef="boolean"/>
+    <informationRequirement id="ir_param_wins_x">
+      <requiredInput href="#input_x"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_param_wins">
+      <requiredKnowledge href="#bkm_echo"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_param_wins_lit">
+      <text>echo(2) = 2 and x = 1</text>
+    </literalExpression>
+  </decision>
+</definitions>

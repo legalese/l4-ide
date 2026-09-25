@@ -1,0 +1,1679 @@
+IMPORT prelude
+IMPORT `charities-common`
+IMPORT `part-1-interpretation`
+IMPORT `part-3-charity-test`
+
+§ `Charities (Jersey) Law 2014 — Part 7 — Information and Enforcement (Articles 26-31)`
+
+-- ===========================================================================
+-- PART 7 — INFORMATION AND ENFORCEMENT. Articles 26 to 31.
+--
+-- Source: Charities (Jersey) Law 2014 (L.41/2014), Official Consolidated
+-- Version, showing the law from 16 October 2025 to Current.
+-- https://www.jerseylaw.je/laws/current/l_41_2014
+--
+-- THE SHAPE OF EACH PROVISION
+--
+--   Art 26(1)  A POWER on the Commissioner, which CONSTITUTES A DUTY on the
+--              person served: a notice in writing, served on a person within
+--              26(2), requiring (a) provision of information/documents OR
+--              (b) attendance and answers. Conjunction of the validity
+--              conditions; disjunction of the two limbs (a)/(b).
+--   Art 26(2)  A DISJUNCTION — who may be served (checkbox flags, not an enum:
+--              a person may be BOTH a former charity and a current governor).
+--   Art 26(3)  A SAVING — the lien survives provision of the document.
+--   Art 26(4)  TWO POWERS, in complementary cases: (a) fires WHERE THE DOCUMENT
+--              IS PROVIDED, (b) fires WHERE IT IS NOT. That complementarity is
+--              literally HENCE / LEST on the 26(1) duty, and is encoded as such.
+--   Art 26(5)  A COMPUTED RETENTION PERIOD — "whichever is the LONGER of (a) one
+--              year and (b) [if proceedings commenced within that period] until
+--              their conclusion". A `max` over NUMBERs of days. Genuinely
+--              computable; computed, and asserted both ways.
+--   Art 26(6)  A DUTY on the retainer to supply a copy back, "as soon as
+--              practicable".
+--   Art 26(7)  AN OFFENCE + DEFENCE: contravention of a 26(1) or 26(4)
+--              requirement, defeated by "reasonable excuse". Modelled as the
+--              LEST-consequence of the 26(1)/26(4) duties, with the excuse as a
+--              defeater routing to FULFILLED instead of BREACH.
+--   Art 26(8)  A SAVING (legal professional privilege) — subtracted from the
+--              26(1) requirement: LPP material is never "required" at all.
+--   Art 26(9)  AN EVIDENTIAL EXCLUSION with two exceptions (26(7), 26(10)).
+--   Art 26(10) AN OFFENCE — knowingly false information + one of two intents.
+--   Art 26(11) TWO IRRELEVANCY PROVISIONS — encoded by their ABSENCE from
+--              26(10), and demonstrated by the four-way test matrix below.
+--
+--   Art 27(1)  FIVE ALTERNATIVE TRIGGERS (a)-(e) — a disjunction under a
+--              belief chapeau.
+--   Art 27(2)  A POWER (MAY) on the Commissioner + a DUTY on the relevant person.
+--   Art 27(3)  A DISJUNCTION — the relevant persons.
+--   Art 27(4)  A POWER TO INCLUDE governor-suspension/removal/replacement steps,
+--              gated on the notice being served by virtue of 27(1)(c) or (d),
+--              and expressly "subject to Article 28".
+--   Art 28(1)-(2)  ORDER-MAKING POWERS (28(1)(a) is partly computable: it turns
+--              on meeting the charity test by virtue of the Art 6(1)(c) head).
+--   Art 28(3)  SEVERABILITY. See below.
+--
+--   Art 29(1)  AN OFFENCE with a LAYERED DEFENCE. See below.
+--   Art 29(2)  THREE CARVE-OUTS that take the information out of Art 29 entirely.
+--   Art 30     TWO DUTIES (MUST) on the Commissioner — modelled with RAND.
+--   Art 31     SIX GATEWAYS (a)-(f) — a disjunction that Art 29 "does not preclude".
+--
+-- ---------------------------------------------------------------------------
+-- THE TWO PROVISIONS THAT ARE THE POINT OF THIS PART
+--
+-- (1) ART 27(4) + ART 28(3) — SEVERABILITY, NOT WHOLESALE INVALIDITY.
+--     Art 27(4) gives the Commissioner power to require a governor's suspension,
+--     removal or replacement. Art 28(3) says a required steps notice served on
+--     an organized religious charity (or on a governor of one) "is INVALID TO THE
+--     EXTENT THAT it purports to impose a requirement to suspend, remove or
+--     replace a governor of that charity."
+--
+--     "To the extent that" is a SEVERANCE rule, not an annulment. So the notice
+--     is not modelled as one BOOLEAN. Each REQUIREMENT the notice purports to
+--     impose is validated SEPARATELY:
+--       `Article 28(3) — the governor-removal requirement stands` — which needs
+--            the 27(4) power AND the absence of the 28(3) bite; and
+--       `Article 28(3) — the other steps required by the notice stand` — which
+--            Art 28(3) does not touch AT ALL.
+--     The notice as a whole is wholly invalid only in the degenerate case where
+--     the ONLY requirement it imposes is the severed one. Tested both ways below.
+--
+-- (2) ART 29 vs ARTS 30/31 — AN OFFENCE WITH A LAYERED DEFENCE.
+--     The offence predicate is built as:
+--            received restricted information (via (1)(a) or (1)(b))
+--        AND disclosed it
+--        AND NOT the required consents were given
+--        AND NOT within any Art 29(2) carve-out          -- (a), (b) or (c)
+--        AND NOT within any Art 31 gateway               -- (a) to (f)
+--        AND NOT an Art 30 required disclosure           -- Comptroller / JFSC
+--     Each defeater is tested in turn, knocking the offence out on its own.
+--
+-- ---------------------------------------------------------------------------
+-- ENCODING STYLE — INERT: the verbatim statutory words ride inline as bare
+-- strings (inert: the identity of their context — TRUE under AND, FALSE under
+-- OR), with `...` as AND-sugar and `..` as OR-sugar. Layout IS the bracketing.
+-- Only the operative atoms are lifted to BOOLEANs. Read the left margin and you
+-- are reading Part 7.
+--
+-- ---------------------------------------------------------------------------
+-- INTERPRETATION CALLS
+--
+-- >>> ART 26(1) / ART 27(2) — OPEN-TEXTURED DEADLINES. The notice fixes its own
+--     time ("at such time and place as may be specified in the notice";
+--     "in a time specified in the notice"). We therefore carry the specified time
+--     as a NUMBER FIELD on the notice and feed it straight into `WITHIN`. Where
+--     the statute gives NO time at all — Art 26(6) "as soon as practicable",
+--     Art 26(4)'s follow-up requirements, Art 29's standing prohibition, Art 30's
+--     required disclosure — we use a NUMERIC PLACEHOLDER and say so at the site.
+--     These placeholders are REVIEWABLE: what is "practicable" is a question of
+--     fact, not of code.
+--
+-- >>> ART 26(9) — "WITHOUT THE CONSENT OF ... AND ... THE PERSON FROM WHOM IT WAS
+--     RECEIVED" (Art 29(1) closing words). We read "without the consent of X and
+--     (where (b) applies) Y" as requiring BOTH consents to escape liability: the
+--     disclosure is lawful only if consented to by the person to whom the
+--     information relates AND, where the information was received second-hand,
+--     by the person from whom it was received. The contrary reading (either
+--     consent suffices) would let a downstream recipient launder a disclosure
+--     through the consent of the intermediary alone.
+--
+-- >>> ART 27(1) — THE BELIEF CHAPEAU. "Paragraph (2) applies if the Commissioner
+--     BELIEVES that -". Belief is a subjective state, and the statute does not
+--     require the belief to be CORRECT. We model the CONTENT of each limb
+--     objectively (so that Art 2(10) misconduct and the Part 3 charity test do
+--     the work they were written to do) and carry the belief itself as a single
+--     chapeau flag. A notice founded on a mistaken belief is a matter for appeal
+--     under Art 33, not for this model.
+--
+-- >>> ART 26(3) — THE LIEN SAVING. "the provision is without prejudice to the
+--     lien" states a CONSEQUENCE OF LAW, not a fact to be found. We encode the
+--     predicate as: where a lien is claimed, it survives. It is therefore TRUE
+--     exactly when a lien is claimed, and carries the statutory words inertly.
+--
+-- >>> ART 27(1)(e) — "has ceased to meet the requirements of Article 11(4)(c) or
+--     (d)". Art 11 belongs to Part 4, which another file encodes. We do NOT
+--     import it (the corpus is being written in parallel); we lift the two limbs
+--     as named BOOLEANs quoting Art 11(4)(c) (Jersey entity, or substantial
+--     activity in or from within Jersey) and Art 11(4)(d) (principal address in
+--     Jersey) verbatim, with a pointer.
+--
+-- >>> THE ACTION ENUM. `charities-common` carries an `Action` enum. Arts 26 and
+--     27 need actions it does not have (provide an EXPLANATION of the document;
+--     STATE WHERE the document is; SUPPLY A COPY back; SERVE a required steps
+--     notice), and the Art 26(4)(a)/(b) complementarity must HENCE/LEST-chain off
+--     the Art 26(1) duty — which requires ONE action type across the chain. So
+--     Arts 26-27 are typed `DEONTIC Actor Part7Action` over a LOCAL enum, with
+--     names distinct from the common ones. Arts 29 and 30 need no chaining and
+--     use the common `Action` enum directly.
+-- ===========================================================================
+
+-- The regulated acts of Arts 26 and 27. Local to this Part; see the last
+-- INTERPRETATION CALL above for why these are not added to `charities-common`.
+DECLARE Part7Action IS ONE OF
+  `provide the information or document required by the Article 26(1) notice`   -- Art 26(1)(a)
+  `attend at the specified place and time and answer the specified questions`  -- Art 26(1)(b)
+  `provide an explanation of the document`                                     -- Art 26(4)(a)
+  `state, to the best of the person's knowledge and belief, where the document is`  -- Art 26(4)(b)
+  `supply a copy of the retained document to the person who requested it`      -- Art 26(6)
+  `serve a required steps notice`                                              -- Art 27(2)
+  `take the steps that stand under the required steps notice`                  -- Art 27(2)
+
+§ `Article 26 — Power to demand information`
+
+§§ `Article 26(2) — the persons on whom a notice may be served`
+
+-- CHECKBOXES, not an enum: one person may be several of these at once (a former
+-- governor of a former registered charity, for instance), and the Law does not
+-- make them exclusive.
+DECLARE InformationNoticeRecipient HAS
+    name                                                            IS A STRING
+    `(2)(a) a registered charity`                                   IS A BOOLEAN
+    `(2)(a) an entity that was formerly a registered charity`       IS A BOOLEAN
+    `(2)(b) a governor of a registered charity, or of an entity that was formerly a registered charity`  IS A BOOLEAN
+    `(2)(b) a former governor of a registered charity, or of an entity that was formerly a registered charity`  IS A BOOLEAN
+    -- Deliberately NOT a disjunct below: a stranger to the charity is outside
+    -- Art 26(2) and cannot be served at all.
+    `a person who is none of the above`                             IS A BOOLEAN
+
+GIVEN p IS AN InformationNoticeRecipient
+GIVETH A BOOLEAN
+`Article 26(2) — the person falls within paragraph (2)` p MEANS
+        "(2) The persons falling within this paragraph are -"
+    ..  "(a) a registered charity or an entity that was formerly a registered charity; and"
+    ..  p's `(2)(a) a registered charity`
+    ..  p's `(2)(a) an entity that was formerly a registered charity`
+    ..  "(b) a governor or former governor of a registered charity or of an entity that was formerly a registered charity."
+    ..  p's `(2)(b) a governor of a registered charity, or of an entity that was formerly a registered charity`
+    ..  p's `(2)(b) a former governor of a registered charity, or of an entity that was formerly a registered charity`
+
+§§ `Article 26(1) — the notice, and Article 26(8) — the privilege saving`
+
+DECLARE InformationNotice HAS
+    `the person served`                                             IS AN InformationNoticeRecipient
+
+    -- Article 26(1) chapeau
+    `the Commissioner serves a notice in writing on the person`     IS A BOOLEAN
+    `(1)(a) the notice requires the person to provide information or a document of a specified description`  IS A BOOLEAN
+    `(1)(b) the notice requires the person to attend and answer questions`  IS A BOOLEAN
+    `the Commissioner reasonably requires the information, document or answers for the purpose of determining whether to serve a required steps notice`  IS A BOOLEAN
+    -- ">>> at such time and place as may be specified in the notice" — the notice
+    -- fixes its own deadline. Carried as a NUMBER of days and fed to WITHIN.
+    `the time specified in the notice for compliance, in days`      IS A NUMBER
+
+    -- Article 26(8) — legal professional privilege.
+    `the person would, in an action in court, be entitled to refuse to disclose or produce the information or document on the grounds of legal professional privilege`  IS A BOOLEAN
+
+    -- Article 26(3) — the lien.
+    `the person from whom provision of the document is required claims a lien on the document`  IS A BOOLEAN
+
+    -- Article 26(4) — the Commissioner's follow-up powers, and whether they are exercised.
+    `the document is provided`                                      IS A BOOLEAN
+    `(4)(a) the Commissioner requires an explanation of the document from the person providing it, or from a person who appears to be in possession of relevant information and to be a governor or employee of the registered charity`  IS A BOOLEAN
+    `(4)(b) the Commissioner requires the person to state, to the best of the person's knowledge and belief, where the document is`  IS A BOOLEAN
+
+    -- Article 26(7) — the defeater on the offence.
+    `the person has a reasonable excuse for the contravention`      IS A BOOLEAN
+
+-- Article 26(8) is a SAVING, and it operates by SUBTRACTION: "Nothing in this
+-- Article is to be construed as REQUIRING the disclosure or production ... of
+-- information or documents that the person would in an action in court be
+-- entitled to refuse to disclose or produce on the grounds of legal professional
+-- privilege." So privileged material is not merely excused — it was never
+-- required. It is therefore a conjunct of the requirement's validity, not a
+-- defence to the 26(7) offence.
+GIVEN n IS AN InformationNotice
+GIVETH A BOOLEAN
+`Article 26(8) — the legal professional privilege saving bites` n MEANS
+        "(8) Nothing in this Article is to be construed as requiring the disclosure or production by a person to the Commissioner of information or documents that the person would in an action in court be entitled to refuse to disclose or produce on the grounds of legal professional privilege."
+    ... n's `the person would, in an action in court, be entitled to refuse to disclose or produce the information or document on the grounds of legal professional privilege`
+
+-- The conditions common to both limbs of Art 26(1).
+GIVEN n IS AN InformationNotice
+GIVETH A BOOLEAN
+`Article 26(1) — the notice is validly served` n MEANS
+        "(1) The Commissioner may, by notice in writing served on a person falling within paragraph (2), require that person -"
+    ... n's `the Commissioner serves a notice in writing on the person`
+    AND `Article 26(2) — the person falls within paragraph (2)` (n's `the person served`)
+    AND "... that the Commissioner reasonably requires for the purpose of determining whether to serve a required steps notice"
+    ... n's `the Commissioner reasonably requires the information, document or answers for the purpose of determining whether to serve a required steps notice`
+    AND "(8) [subject to the legal professional privilege saving]"
+    ... NOT `Article 26(8) — the legal professional privilege saving bites` n
+
+GIVEN n IS AN InformationNotice
+GIVETH A BOOLEAN
+`Article 26(1)(a) — a valid requirement to provide information or a document` n MEANS
+        "(a) to provide to the Commissioner, at such time and place as may be specified in the notice, any information or document of a specified description that the Commissioner reasonably requires for the purpose of determining whether to serve a required steps notice; or"
+    ... `Article 26(1) — the notice is validly served` n
+    AND n's `(1)(a) the notice requires the person to provide information or a document of a specified description`
+
+GIVEN n IS AN InformationNotice
+GIVETH A BOOLEAN
+`Article 26(1)(b) — a valid requirement to attend and answer questions` n MEANS
+        "(b) to attend at such place and time as may be specified in the notice and answer questions that the Commissioner reasonably requires the person to answer for that purpose."
+    ... `Article 26(1) — the notice is validly served` n
+    AND n's `(1)(b) the notice requires the person to attend and answer questions`
+
+GIVEN n IS AN InformationNotice
+GIVETH A BOOLEAN
+`Article 26(1) — a requirement is validly imposed on the person` n MEANS
+        `Article 26(1)(a) — a valid requirement to provide information or a document` n
+    ..  `Article 26(1)(b) — a valid requirement to attend and answer questions` n
+
+§§ `Article 26(3) — the lien is without prejudice`
+
+-- >>> See the INTERPRETATION CALL in the header: the consequence ("the provision
+--     is without prejudice to the lien") is a rule of law, not a fact to be
+--     found. The predicate is TRUE exactly where a lien is claimed on a document
+--     whose provision is required under paragraph (1).
+GIVEN n IS AN InformationNotice
+GIVETH A BOOLEAN
+`Article 26(3) — the lien survives provision of the document` n MEANS
+        "(3) If a person from whom provision of a document is required under paragraph (1) claims a lien on any such document, the provision is without prejudice to the lien."
+    ... `Article 26(1)(a) — a valid requirement to provide information or a document` n
+    AND n's `the person from whom provision of the document is required claims a lien on the document`
+
+§§ `Article 26(4) — the follow-up powers`
+
+-- The two limbs are COMPLEMENTARY: (a) bites where the document IS provided,
+-- (b) where it is NOT. That complementarity is the HENCE / LEST of the Art 26(1)
+-- duty, and it is encoded as exactly that in the regulative layer below.
+GIVEN n IS AN InformationNotice
+GIVETH A BOOLEAN
+`Article 26(4)(a) — the power to retain, copy, and require an explanation` n MEANS
+        "(4) If the Commissioner exercises a power under paragraph (1) to require a document to be provided, the Commissioner may -"
+    ... `Article 26(1)(a) — a valid requirement to provide information or a document` n
+    AND "(a) if the document is provided, retain or take copies of it or extracts from it and require the person providing it, or any person who appears to be in possession of relevant information and to be a governor or employee of the registered charity, to provide an explanation of the document; and"
+    ... n's `the document is provided`
+    AND n's `(4)(a) the Commissioner requires an explanation of the document from the person providing it, or from a person who appears to be in possession of relevant information and to be a governor or employee of the registered charity`
+
+GIVEN n IS AN InformationNotice
+GIVETH A BOOLEAN
+`Article 26(4)(b) — the power to require a statement of where the document is` n MEANS
+        "(4) If the Commissioner exercises a power under paragraph (1) to require a document to be provided, the Commissioner may -"
+    ... `Article 26(1)(a) — a valid requirement to provide information or a document` n
+    AND "(b) if the document is not provided, require the person to whom the requirement was directed to state, to the best of the person's knowledge and belief, where the document is."
+    ... NOT n's `the document is provided`
+    AND n's `(4)(b) the Commissioner requires the person to state, to the best of the person's knowledge and belief, where the document is`
+
+§§ `Article 26(5) — the retention period: whichever is the LONGER`
+
+DECLARE RetentionCase HAS
+    `a document, copy or extract was retained or taken under paragraph (4)(a)`  IS A BOOLEAN
+    `proceedings to which the document is relevant are commenced against a person within that period`  IS A BOOLEAN
+    `the number of days, from the taking of the document, until the conclusion of those proceedings`  IS A NUMBER
+    -- Article 26(6)
+    `a person who requires the document for the purpose of the person's business has requested that document`  IS A BOOLEAN
+
+-- >>> "a period of one year" is taken as 365 days. Leap years would make it 366;
+--     the Law does not say, and nothing in Part 7 turns on the difference.
+`Article 26(5)(a) — a period of one year, in days` MEANS 365
+
+-- The whole of Art 26(5), computed. "whichever is the LONGER of (a) ... and
+-- (b) ..." is a `max`: even where proceedings ARE commenced within the year, if
+-- they conclude inside it the document may still be kept for the full year.
+GIVEN r IS A RetentionCase
+GIVETH A NUMBER
+`Article 26(5) — the period for which the document may be retained, in days` r MEANS
+    -- "(5) A document, copy or extract retained or taken under paragraph (4)(a)
+    --      may be retained for whichever is the longer of -
+    --      (a) a period of one year; and
+    --      (b) if within that period proceedings to which the document is relevant
+    --          are commenced against any person, until the conclusion of those
+    --          proceedings."
+    IF   r's `proceedings to which the document is relevant are commenced against a person within that period`
+    THEN max `Article 26(5)(a) — a period of one year, in days`
+             (r's `the number of days, from the taking of the document, until the conclusion of those proceedings`)
+    ELSE `Article 26(5)(a) — a period of one year, in days`
+
+-- A retention on day `d` is lawful iff the document was retained under (4)(a) and
+-- `d` is within the computed period.
+GIVEN r    IS A RetentionCase
+      day  IS A NUMBER
+GIVETH A BOOLEAN
+`Article 26(5) — retention on that day is lawful` r day MEANS
+        r's `a document, copy or extract was retained or taken under paragraph (4)(a)`
+    AND day AT MOST (`Article 26(5) — the period for which the document may be retained, in days` r)
+
+§ `Article 26(7), (9), (10) and (11) — the offences and the savings`
+
+§§ `Article 26(7) — the offence of contravening a requirement, and its defence`
+
+DECLARE ContraventionOfInformationNotice HAS
+    `the notice`                                                    IS AN InformationNotice
+    `the person contravenes a requirement imposed on the person under paragraph (1)`  IS A BOOLEAN
+    `the person contravenes a requirement imposed on the person under paragraph (4)`  IS A BOOLEAN
+
+GIVEN c IS A ContraventionOfInformationNotice
+GIVETH A BOOLEAN
+`Article 26(7) — a requirement under paragraph (1) or (4) is contravened` c MEANS
+        "... contravenes a requirement imposed on the person under paragraph (1) or (4) ..."
+    ..      `Article 26(1) — a requirement is validly imposed on the person` (c's `the notice`)
+        AND c's `the person contravenes a requirement imposed on the person under paragraph (1)`
+    ..      (   `Article 26(4)(a) — the power to retain, copy, and require an explanation` (c's `the notice`)
+             OR `Article 26(4)(b) — the power to require a statement of where the document is` (c's `the notice`) )
+        AND c's `the person contravenes a requirement imposed on the person under paragraph (4)`
+
+GIVEN c IS A ContraventionOfInformationNotice
+GIVETH A BOOLEAN
+`Article 26(7) — the offence of contravening a requirement` c MEANS
+        "(7) A person who without reasonable excuse contravenes a requirement imposed on the person under paragraph (1) or (4), commits an offence and is liable to imprisonment for a term of 3 months and to a fine of level 3 on the standard scale."
+    ... `Article 26(7) — a requirement under paragraph (1) or (4) is contravened` c
+    AND "without reasonable excuse"
+    ... NOT (c's `the notice`)'s `the person has a reasonable excuse for the contravention`
+
+`Article 26(7) — the maximum term of imprisonment, in months` MEANS 3
+`Article 26(7) — the level on the standard scale of the maximum fine` MEANS 3
+
+§§ `Article 26(9) — the self-incrimination saving`
+
+DECLARE ProsecutionUseOfStatement HAS
+    `the statement was made by the person in compliance with a requirement imposed under Article 26`  IS A BOOLEAN
+    `the prosecution seeks to use the statement in evidence against the person in criminal proceedings`  IS A BOOLEAN
+    `the proceedings are proceedings under paragraph (7)`           IS A BOOLEAN
+    `the proceedings are proceedings under paragraph (10)`          IS A BOOLEAN
+
+GIVEN u IS A ProsecutionUseOfStatement
+GIVETH A BOOLEAN
+`Article 26(9) — the proceedings are within the exception` u MEANS
+        "... except proceedings under paragraph (7) or (10)."
+    ..  u's `the proceedings are proceedings under paragraph (7)`
+    ..  u's `the proceedings are proceedings under paragraph (10)`
+
+GIVEN u IS A ProsecutionUseOfStatement
+GIVETH A BOOLEAN
+`Article 26(9) — the statement may not be used by the prosecution against the person` u MEANS
+        "(9) A statement made by a person in compliance with a requirement imposed under this Article may not be used by the prosecution in evidence against the person in any criminal proceedings except proceedings under paragraph (7) or (10)."
+    ... u's `the statement was made by the person in compliance with a requirement imposed under Article 26`
+    AND u's `the prosecution seeks to use the statement in evidence against the person in criminal proceedings`
+    AND NOT `Article 26(9) — the proceedings are within the exception` u
+
+§§ `Article 26(10) — the offence of knowingly providing false information; Article 26(11) — the irrelevancies`
+
+DECLARE FalseInformation HAS
+    `the person provides information to the Commissioner`           IS A BOOLEAN
+    `the person knows that it is false in a material particular`    IS A BOOLEAN
+    `the person intends it to be used by the Commissioner for the purpose of an application for registration`  IS A BOOLEAN
+    `the person intends it to be used by the Commissioner for the purpose of determining whether to serve a required steps notice`  IS A BOOLEAN
+    -- Article 26(11) — the two IRRELEVANCIES. These fields exist so that the
+    -- irrelevancy can be TESTED (see the four-way matrix below); they are
+    -- DELIBERATELY not consulted by the offence predicate. Their absence from
+    -- the predicate IS Article 26(11).
+    `the information is contained in a document`                    IS A BOOLEAN
+    `the information is provided under Article 26`                  IS A BOOLEAN
+
+GIVEN f IS A FalseInformation
+GIVETH A BOOLEAN
+`Article 26(10) — the required intent` f MEANS
+        "... and intending it to be used by the Commissioner -"
+    ..  "for the purpose of an application for registration"
+    ..  f's `the person intends it to be used by the Commissioner for the purpose of an application for registration`
+    ..  "or for the purpose of determining whether to serve a required steps notice."
+    ..  f's `the person intends it to be used by the Commissioner for the purpose of determining whether to serve a required steps notice`
+
+GIVEN f IS A FalseInformation
+GIVETH A BOOLEAN
+`Article 26(10) — the offence of knowingly providing false information` f MEANS
+        "(10) A person commits an offence, and is liable to imprisonment for a term of 2 years and to a fine, if the person provides information to the Commissioner, knowing that it is false in a material particular and intending it to be used by the Commissioner for the purpose of an application for registration or for the purpose of determining whether to serve a required steps notice."
+    ... f's `the person provides information to the Commissioner`
+    AND "knowing that it is false in a material particular"
+    ... f's `the person knows that it is false in a material particular`
+    AND `Article 26(10) — the required intent` f
+    -- "(11) For the purpose of paragraph (10) it is irrelevant whether the
+    --       information - (a) is contained in a document or not; or
+    --                     (b) is provided under this Article or not."
+    -- The two flags are NOT conjuncts. That omission is the whole of Art 26(11).
+
+`Article 26(10) — the maximum term of imprisonment, in years` MEANS 2
+
+§ `Article 27 — Required steps notices`
+
+§§ `Article 27(1) — the five triggers`
+
+DECLARE RequiredStepsCase HAS
+    `the registered charity`                                        IS A CandidateCharity
+    `the governor referred to in paragraph (1)(c) or (d)`           IS AN Officer
+
+    -- The chapeau. >>> See the INTERPRETATION CALL: the CONTENT of each limb is
+    -- modelled objectively; the belief itself is this one flag.
+    `the Commissioner believes the matters set out in the applicable sub-paragraph of paragraph (1)`  IS A BOOLEAN
+
+    -- (1)(a) and (1)(c) — the allegation, tested against Art 2(10) "misconduct".
+    `the allegation`                                                IS A MisconductAllegation
+    `the misconduct alleged is misconduct by the registered charity`  IS A BOOLEAN
+    `the misconduct alleged is misconduct engaged in by a governor of the registered charity`  IS A BOOLEAN
+
+    -- (1)(d)
+    `the governor is, by reason of a reportable matter, unfit to be a governor of a registered charity`  IS A BOOLEAN
+
+    -- (1)(e) — >>> Art 11(4)(c) and (d) live in Part 4, encoded in another file.
+    -- The two limbs are lifted here, quoting Art 11(4) verbatim.
+    `the registered charity has ceased to be a Jersey entity, and has ceased to carry out, or intend to carry out, in or from within Jersey, an activity that is in the opinion of the Commissioner substantial (Article 11(4)(c))`  IS A BOOLEAN
+    `the registered charity has ceased to have a principal address in Jersey, within the meaning of Article 8(4) (Article 11(4)(d))`  IS A BOOLEAN
+
+GIVEN rc IS A RequiredStepsCase
+GIVETH A BOOLEAN
+`Article 27(1)(a) — there has been misconduct by a registered charity` rc MEANS
+        "(a) there has been misconduct by a registered charity;"
+    ... `is misconduct` (rc's `the allegation`)
+    AND rc's `the misconduct alleged is misconduct by the registered charity`
+
+GIVEN rc IS A RequiredStepsCase
+GIVETH A BOOLEAN
+`Article 27(1)(b) — a registered charity does not pass the charity test` rc MEANS
+        "(b) a registered charity does not pass the charity test;"
+    -- A NEGATIVE limb over the whole of Part 3.
+    ... NOT `meets the charity test` (rc's `the registered charity`)
+
+GIVEN rc IS A RequiredStepsCase
+GIVETH A BOOLEAN
+`Article 27(1)(c) — a governor of a registered charity has engaged in misconduct` rc MEANS
+        "(c) a governor of a registered charity has engaged in misconduct;"
+    ... `is misconduct` (rc's `the allegation`)
+    AND rc's `the misconduct alleged is misconduct engaged in by a governor of the registered charity`
+    AND `is a governor of` (rc's `the governor referred to in paragraph (1)(c) or (d)`)
+                           ((rc's `the registered charity`)'s entity)
+
+GIVEN rc IS A RequiredStepsCase
+GIVETH A BOOLEAN
+`Article 27(1)(d) — a governor is unfit by reason of a reportable matter` rc MEANS
+        "(d) a governor of a registered charity is, by reason of a reportable matter, unfit to be a governor of a registered charity; or"
+    ... rc's `the governor is, by reason of a reportable matter, unfit to be a governor of a registered charity`
+    AND `is a governor of` (rc's `the governor referred to in paragraph (1)(c) or (d)`)
+                           ((rc's `the registered charity`)'s entity)
+
+GIVEN rc IS A RequiredStepsCase
+GIVETH A BOOLEAN
+`Article 27(1)(e) — the charity has ceased to meet Article 11(4)(c) or (d)` rc MEANS
+        "(e) a registered charity has ceased to meet the requirements of Article 11(4)(c) or (d)."
+    ..  rc's `the registered charity has ceased to be a Jersey entity, and has ceased to carry out, or intend to carry out, in or from within Jersey, an activity that is in the opinion of the Commissioner substantial (Article 11(4)(c))`
+    ..  rc's `the registered charity has ceased to have a principal address in Jersey, within the meaning of Article 8(4) (Article 11(4)(d))`
+
+-- The disjunction of the five triggers, under the belief chapeau.
+GIVEN rc IS A RequiredStepsCase
+GIVETH A BOOLEAN
+`Article 27(1) — the triggers for a required steps notice` rc MEANS
+        "(1) Paragraph (2) applies if the Commissioner believes that -"
+    ... rc's `the Commissioner believes the matters set out in the applicable sub-paragraph of paragraph (1)`
+    AND     `Article 27(1)(a) — there has been misconduct by a registered charity` rc
+        ..  `Article 27(1)(b) — a registered charity does not pass the charity test` rc
+        ..  `Article 27(1)(c) — a governor of a registered charity has engaged in misconduct` rc
+        ..  `Article 27(1)(d) — a governor is unfit by reason of a reportable matter` rc
+        ..  `Article 27(1)(e) — the charity has ceased to meet Article 11(4)(c) or (d)` rc
+
+-- Article 27(4) opens only where the notice is served BY VIRTUE OF (1)(c) or (d).
+GIVEN rc IS A RequiredStepsCase
+GIVETH A BOOLEAN
+`Article 27(1)(c) or (d) — the governor-facing triggers` rc MEANS
+        `Article 27(1)(c) — a governor of a registered charity has engaged in misconduct` rc
+    ..  `Article 27(1)(d) — a governor is unfit by reason of a reportable matter` rc
+
+§§ `Articles 27(2), (3) and (4) — the notice, the relevant persons, and the governor-removal power`
+
+DECLARE RequiredStepsNotice HAS
+    `the case`                                                      IS A RequiredStepsCase
+
+    -- Article 27(2)
+    `the Commissioner serves written notice`                        IS A BOOLEAN
+    `the steps specified in the notice are, in the Commissioner's opinion, appropriate to remedy the matter prompting service of the notice`  IS A BOOLEAN
+    -- ">>> in a time specified in the notice" — the notice fixes its own deadline.
+    `the time specified in the notice for taking the steps, in days`  IS A NUMBER
+
+    -- Article 27(3) — on which of the relevant persons is it served?
+    `(3)(a) the notice is served on the registered charity`         IS A BOOLEAN
+    `(3)(b) the notice is served on a governor of the registered charity`  IS A BOOLEAN
+
+    -- THE CONTENT of the notice. Kept as TWO separate requirements, because
+    -- Art 28(3) severs one and leaves the other standing.
+    `the notice purports to require the suspension, removal or replacement of the governor referred to in Article 27(1)(c) or (d)`  IS A BOOLEAN
+    `the notice purports to require other steps, being steps other than the suspension, removal or replacement of a governor`  IS A BOOLEAN
+
+    -- Article 28(1) — the Order.
+    `the registered charity is categorized as an organized religious charity by Order under Article 28(1)`  IS A BOOLEAN
+
+GIVEN n IS A RequiredStepsNotice
+GIVETH A BOOLEAN
+`Article 27(3) — the notice is served on one or more relevant persons` n MEANS
+        "(3) The relevant persons for the purpose of paragraph (2) are -"
+    ..  "(a) the registered charity; and"
+    ..  n's `(3)(a) the notice is served on the registered charity`
+    ..  "(b) the governors of the registered charity."
+    ..  n's `(3)(b) the notice is served on a governor of the registered charity`
+
+GIVEN n IS A RequiredStepsNotice
+GIVETH A BOOLEAN
+`Article 27(2) — the Commissioner may serve a required steps notice` n MEANS
+        "(2) The Commissioner may serve written notice on any one or more of the relevant persons, within the meaning of paragraph (3), requiring steps specified in the notice to be taken by that person in a time specified in the notice, being steps that in Commissioner's opinion are appropriate to remedy the matter prompting service of the notice."
+    ... `Article 27(1) — the triggers for a required steps notice` (n's `the case`)
+    AND n's `the Commissioner serves written notice`
+    AND `Article 27(3) — the notice is served on one or more relevant persons` n
+    AND "being steps that in Commissioner's opinion are appropriate to remedy the matter prompting service of the notice"
+    ... n's `the steps specified in the notice are, in the Commissioner's opinion, appropriate to remedy the matter prompting service of the notice`
+
+-- Article 27(4) — the POWER to include a governor-removal requirement. It exists
+-- only where the notice was served by virtue of (1)(c) or (d); and it is expressly
+-- "subject to Article 28", which is discharged in the severance below.
+GIVEN n IS A RequiredStepsNotice
+GIVETH A BOOLEAN
+`Article 27(4) — the power to require the suspension, removal or replacement of the governor` n MEANS
+        "(4) If the notice is served by virtue of paragraph (1)(c) or (d), the steps required may include (subject to Article 28) the suspension, removal or replacement of the governor referred to in that paragraph."
+    ... `Article 27(2) — the Commissioner may serve a required steps notice` n
+    AND `Article 27(1)(c) or (d) — the governor-facing triggers` (n's `the case`)
+
+-- Article 27(5) — the Order-making power. No operative content until an Order is
+-- made; carried inert, and DELIBERATELY not a conjunct of anything above.
+`Article 27(5) — the Order-making power` MEANS
+    "(5) The Minister may by Order make further provision as to the procedure for, and restrictions on, serving a notice under this Article."
+
+§ `Article 28 — Required steps notices restricted: organized religious charities`
+
+§§ `Article 28(1) and 28(2) — the categorization Order`
+
+-- Art 28(1)(a) is PARTLY COMPUTABLE: it turns on the charity meeting the charity
+-- test "by virtue of Article 6(1)(c)" — the advancement of religion — "whether
+-- solely or in combination with any other charitable purpose". So: it meets the
+-- test (Part 3), AND at least one of its purposes is the advancement of religion.
+GIVEN c IS A CandidateCharity
+GIVETH A BOOLEAN
+`Article 28(1)(a) — meets the charity test by virtue of Article 6(1)(c)` c MEANS
+        "(a) to meet the charity test by virtue of Article 6(1)(c), whether solely or in combination with any other charitable purpose; and"
+    ... `meets the charity test` c
+    AND any `is the advancement of religion` (c's purposes)
+    WHERE
+        `is the advancement of religion` p MEANS p's `(c) the advancement of religion`
+
+DECLARE OrganizedReligiousCharityCategorization HAS
+    `the registered charity to be categorized`                      IS A CandidateCharity
+    `(b) it appears to the Minister that the charity is organized in such a way that the supervision and discipline of its governors, in relation to its activities in Jersey (whether or not also in relation to activities elsewhere), is adequate to justify the application of paragraph (3)`  IS A BOOLEAN
+
+GIVEN cat IS AN OrganizedReligiousCharityCategorization
+GIVETH A BOOLEAN
+`Article 28(1) — the charity may be categorized as an organized religious charity` cat MEANS
+        "(1) The Minister may by Order provide for registered charities to be categorized as organized religious charities for the purpose of paragraph (3), being registered charities that appear to the Minister -"
+    ... `Article 28(1)(a) — meets the charity test by virtue of Article 6(1)(c)` (cat's `the registered charity to be categorized`)
+    AND cat's `(b) it appears to the Minister that the charity is organized in such a way that the supervision and discipline of its governors, in relation to its activities in Jersey (whether or not also in relation to activities elsewhere), is adequate to justify the application of paragraph (3)`
+
+-- Article 28(2) — what the Order MAY provide. Entirely inert: it constrains the
+-- content of a future Order, not the validity of any notice.
+`Article 28(2) — what the Order may provide` MEANS
+        "(2) The provision that may be made under paragraph (1) includes, without limitation -"
+    ... "(a) provision granting discretion to the Commissioner to grant or withdraw status as an organized religious charity;"
+    ... "(b) provision that distinguishes between charities on the basis of the status of the charity as -"
+    ...     "(i) a designated religious charity within the meaning of the Charities and Trustee Investment (Scotland) Act 2005 of the Scottish Parliament,"
+        ... "(ii) an institution falling within section 10(2) of the Charities Act 2011 of the parliament of the United Kingdom, or"
+        ... "(iii) an entity in Jersey that is similar to such a designated religious charity or to such an institution."
+
+§§ `Article 28(3) — INVALID TO THE EXTENT THAT: the severance`
+
+-- THE OPERATIVE RULE. It bites on ONE requirement of the notice — the governor
+-- suspension/removal/replacement requirement — and on nothing else.
+GIVEN n IS A RequiredStepsNotice
+GIVETH A BOOLEAN
+`Article 28(3) — the Article 28(3) restriction bites` n MEANS
+        "(3) A required steps notice served on an organized religious charity, or on a governor of such a charity, is invalid to the extent that it purports to impose a requirement to suspend, remove or replace a governor of that charity."
+    ... n's `the registered charity is categorized as an organized religious charity by Order under Article 28(1)`
+    AND "served on an organized religious charity, or on a governor of such a charity"
+    ...     n's `(3)(a) the notice is served on the registered charity`
+        ..  n's `(3)(b) the notice is served on a governor of the registered charity`
+    AND "to the extent that it purports to impose a requirement to suspend, remove or replace a governor of that charity"
+    ... n's `the notice purports to require the suspension, removal or replacement of the governor referred to in Article 27(1)(c) or (d)`
+
+-- THE SEVERANCE, requirement by requirement.
+--
+-- (i) The governor-removal requirement. It stands only if the notice actually
+--     imposes it, the Art 27(4) power exists to impose it, AND Art 28(3) does not
+--     bite. Art 27(4) is expressly "subject to Article 28": this is where that
+--     subjection is discharged.
+GIVEN n IS A RequiredStepsNotice
+GIVETH A BOOLEAN
+`Article 28(3) — the governor-removal requirement stands` n MEANS
+        n's `the notice purports to require the suspension, removal or replacement of the governor referred to in Article 27(1)(c) or (d)`
+    AND `Article 27(4) — the power to require the suspension, removal or replacement of the governor` n
+    AND "(subject to Article 28)"
+    ... NOT `Article 28(3) — the Article 28(3) restriction bites` n
+
+-- (ii) The OTHER steps. Article 28(3) does not touch them AT ALL: it is a
+--      severance, not an annulment. Their validity turns on Art 27(2) alone.
+GIVEN n IS A RequiredStepsNotice
+GIVETH A BOOLEAN
+`Article 28(3) — the other steps required by the notice stand` n MEANS
+        n's `the notice purports to require other steps, being steps other than the suspension, removal or replacement of a governor`
+    AND `Article 27(2) — the Commissioner may serve a required steps notice` n
+
+GIVEN n IS A RequiredStepsNotice
+GIVETH A BOOLEAN
+`Article 28(3) — some requirement of the notice stands` n MEANS
+        `Article 28(3) — the governor-removal requirement stands` n
+    ..  `Article 28(3) — the other steps required by the notice stand` n
+
+-- The notice is WHOLLY invalid only in the degenerate case: Art 28(3) bites, and
+-- the severed requirement was the ONLY thing the notice required. That is the
+-- difference between "invalid to the extent that" and "invalid".
+GIVEN n IS A RequiredStepsNotice
+GIVETH A BOOLEAN
+`Article 28(3) — the notice is wholly invalid (the degenerate case)` n MEANS
+        `Article 28(3) — the Article 28(3) restriction bites` n
+    AND NOT `Article 28(3) — the other steps required by the notice stand` n
+
+-- Explainability: WHICH requirements of the notice survive? A labelled list, so
+-- the answer to "what must we actually do?" is a sentence, not a bit.
+GIVEN n IS A RequiredStepsNotice
+GIVETH A LIST OF STRING
+`the requirements of the notice that stand` n MEANS
+    mapMaybe `the label, if the requirement stands`
+        (LIST (PAIR "the suspension, removal or replacement of the governor"
+                    (`Article 28(3) — the governor-removal requirement stands` n))
+              (PAIR "the other steps specified in the notice"
+                    (`Article 28(3) — the other steps required by the notice stand` n)))
+    WHERE
+        `the label, if the requirement stands` pr MEANS
+            IF pr's snd THEN JUST (pr's fst) ELSE NOTHING
+
+§ `Articles 29, 30 and 31 — Restricted, required and permitted disclosure`
+
+§§ `The disclosure event`
+
+DECLARE DisclosureEvent HAS
+    -- Article 29(1) — the chapeau: how the information was received.
+    `the person receives information relating to the business or other affairs of any person`  IS A BOOLEAN
+    `(1)(a) under or for the purposes of this Law`                  IS A BOOLEAN
+    `(1)(b) directly or indirectly from a person who has so received it`  IS A BOOLEAN
+
+    -- Article 29(1) — the act, and the consents.
+    `the person discloses the information`                          IS A BOOLEAN
+    `the disclosure is made with the consent of the person to whom the information relates`  IS A BOOLEAN
+    `the disclosure is made with the consent of the person from whom the information was received`  IS A BOOLEAN
+
+    -- Article 29(2) — the three carve-outs.
+    `(2)(a) the information is registered in the public parts of the register, within the meaning of Article 10(3) to (5)`  IS A BOOLEAN
+    `(2)(b) the information is, at the time of the disclosure, or has already been, made available to the public from other sources`  IS A BOOLEAN
+    `(2)(c) the information is in the form of a summary or collection of information so framed as not to enable information relating to any particular person to be ascertained from it`  IS A BOOLEAN
+
+    -- Article 30 — the two required disclosures.
+    `(30(1)) the disclosure is to the Comptroller, and is required by the Comptroller for the purpose of enabling the Comptroller to discharge any of his or her functions in relation to the taxation of registered charities or other entities with any charitable purposes`  IS A BOOLEAN
+    `(30(2)) the disclosure is to the JFSC, and is required by the JFSC for the purpose of enabling the JFSC to discharge any of its functions under the Non-Profit Organizations (Jersey) Law 2008`  IS A BOOLEAN
+
+    -- Article 31 — the six gateways.
+    `(31(a)) by or on behalf of the Commissioner, for the purpose of enabling the Commissioner to discharge any of his or her functions`  IS A BOOLEAN
+    `(31(b)) to the Comptroller for the purpose of enabling the Comptroller to discharge any of his or her functions`  IS A BOOLEAN
+    `(31(c)) to the JFSC for the purpose of enabling the JFSC to discharge any of its functions`  IS A BOOLEAN
+    `(31(d)) to the Attorney General, the Bailiff or the court for the purpose of enabling them to discharge any of their functions in relation to charities, whether under this Law, a constitutional Law, the customary law, or any other law`  IS A BOOLEAN
+    `(31(e)) to any person for the purpose of the investigation or prosecution of any offence under any enactment or under the customary law of Jersey, or for the purpose of taking or deciding whether to take any proceedings under this Law`  IS A BOOLEAN
+    `(31(f)) in any other circumstances prescribed by the States by Regulations`  IS A BOOLEAN
+
+§§ `Article 29(2) — the information to which Article 29 does not apply`
+
+GIVEN d IS A DisclosureEvent
+GIVETH A BOOLEAN
+`Article 29(2) — the information is outside Article 29 altogether` d MEANS
+        "(2) This Article does not apply to information -"
+    ..  "(a) that is registered in the public parts of the register, within the meaning of Article 10(3) to (5);"
+    ..  d's `(2)(a) the information is registered in the public parts of the register, within the meaning of Article 10(3) to (5)`
+    ..  "(b) that at the time of the disclosure is or has already been made available to the public from other sources; or"
+    ..  d's `(2)(b) the information is, at the time of the disclosure, or has already been, made available to the public from other sources`
+    ..  "(c) in the form of a summary or collection of information so framed as not to enable information relating to any particular person to be ascertained from it."
+    ..  d's `(2)(c) the information is in the form of a summary or collection of information so framed as not to enable information relating to any particular person to be ascertained from it`
+
+§§ `Article 30 — required disclosure`
+
+GIVEN d IS A DisclosureEvent
+GIVETH A BOOLEAN
+`Article 30 — the disclosure is one that the Commissioner MUST make` d MEANS
+        "30 Required disclosure of information"
+    ..  "(1) The Commissioner must disclose information to the Comptroller, if required by the Comptroller for the purpose of enabling the Comptroller to discharge any of his or her functions in relation to the taxation of registered charities or other entities with any charitable purposes."
+    ..  d's `(30(1)) the disclosure is to the Comptroller, and is required by the Comptroller for the purpose of enabling the Comptroller to discharge any of his or her functions in relation to the taxation of registered charities or other entities with any charitable purposes`
+    ..  "(2) The Commissioner must disclose information to the JFSC, if required by the JFSC for the purpose of enabling the JFSC to discharge any of its functions under the Non-Profit Organizations (Jersey) Law 2008."
+    ..  d's `(30(2)) the disclosure is to the JFSC, and is required by the JFSC for the purpose of enabling the JFSC to discharge any of its functions under the Non-Profit Organizations (Jersey) Law 2008`
+
+§§ `Article 31 — permitted disclosure: the six gateways`
+
+GIVEN d IS A DisclosureEvent
+GIVETH A BOOLEAN
+`Article 31 — the disclosure passes through one of the six gateways` d MEANS
+        "31 Permitted disclosure of information. Article 29 does not preclude the disclosure of information -"
+    ..  "(a) by or on behalf of the Commissioner, for purpose of enabling the Commissioner to discharge any of his or her functions;"
+    ..  d's `(31(a)) by or on behalf of the Commissioner, for the purpose of enabling the Commissioner to discharge any of his or her functions`
+    ..  "(b) to the Comptroller for purpose of enabling the Comptroller to discharge any of his or her functions;"
+    ..  d's `(31(b)) to the Comptroller for the purpose of enabling the Comptroller to discharge any of his or her functions`
+    ..  "(c) to the JFSC for the purpose of enabling the JFSC to discharge any of its functions;"
+    ..  d's `(31(c)) to the JFSC for the purpose of enabling the JFSC to discharge any of its functions`
+    ..  "(d) to the Attorney General, the Bailiff or the court for the purpose of enabling them to discharge any of their functions in relation to charities, whether under this Law, a constitutional Law, the customary law, or any other law;"
+    ..  d's `(31(d)) to the Attorney General, the Bailiff or the court for the purpose of enabling them to discharge any of their functions in relation to charities, whether under this Law, a constitutional Law, the customary law, or any other law`
+    ..  "(e) to any person for the purpose of the investigation or prosecution of any offence under any enactment or under the customary law of Jersey, or for the purpose of taking or deciding whether to take any proceedings under this Law;"
+    ..  d's `(31(e)) to any person for the purpose of the investigation or prosecution of any offence under any enactment or under the customary law of Jersey, or for the purpose of taking or deciding whether to take any proceedings under this Law`
+    ..  "(f) in any other circumstances prescribed by the States by Regulations."
+    ..  d's `(31(f)) in any other circumstances prescribed by the States by Regulations`
+
+§§ `Article 29(1) — the offence, and its layered defence`
+
+-- >>> THE CONSENT LIMB. See the INTERPRETATION CALL in the header: we read
+--     "without the consent of the person to whom it relates and (where
+--     sub-paragraph (b) applies) the person from whom it was received" as
+--     requiring BOTH consents. The second consent is a PROVISO limb — a material
+--     implication, vacuously satisfied where (1)(b) does not apply.
+GIVEN d IS A DisclosureEvent
+GIVETH A BOOLEAN
+`Article 29(1) — the required consents were given` d MEANS
+        "... without the consent of the person to whom it relates and (where sub-paragraph (b) applies) the person from whom it was received."
+    ... d's `the disclosure is made with the consent of the person to whom the information relates`
+    AND     "(where sub-paragraph (b) applies)"
+        ..  NOT d's `(1)(b) directly or indirectly from a person who has so received it`
+        ..  d's `the disclosure is made with the consent of the person from whom the information was received`
+
+GIVEN d IS A DisclosureEvent
+GIVETH A BOOLEAN
+`Article 29(1) — the person received the information in a way that engages this Article` d MEANS
+        "(1) ... a person who receives information relating to the business or other affairs of any person -"
+    ... d's `the person receives information relating to the business or other affairs of any person`
+    AND     "(a) under or for the purposes of this Law; or"
+        ..  d's `(1)(a) under or for the purposes of this Law`
+        ..  "(b) directly or indirectly from a person who has so received it,"
+        ..  d's `(1)(b) directly or indirectly from a person who has so received it`
+
+-- THE INFORMATION IS RESTRICTED, and no gateway makes its disclosure lawful.
+-- Everything except the act of disclosure itself. This is the guard on the
+-- Art 29(1) SHANT in the regulative layer below, and the spine of the offence.
+GIVEN d IS A DisclosureEvent
+GIVETH A BOOLEAN
+`Article 29 — the information is restricted and its disclosure is not otherwise lawful` d MEANS
+        `Article 29(1) — the person received the information in a way that engages this Article` d
+    AND "Subject to paragraph (2) ..."
+    ... NOT `Article 29(2) — the information is outside Article 29 altogether` d
+    AND "... and to Articles 30 and 31."
+    ... NOT `Article 30 — the disclosure is one that the Commissioner MUST make` d
+    AND NOT `Article 31 — the disclosure passes through one of the six gateways` d
+
+-- THE OFFENCE. Layered: the act, minus the consents, minus each defeater.
+GIVEN d IS A DisclosureEvent
+GIVETH A BOOLEAN
+`Article 29(1) — the offence of disclosing restricted information` d MEANS
+        "(1) Subject to paragraph (2) and to Articles 30 and 31, a person who receives information relating to the business or other affairs of any person - (a) under or for the purposes of this Law; or (b) directly or indirectly from a person who has so received it, commits an offence and is liable to imprisonment for a term of 2 years and a fine if he or she discloses the information without the consent of the person to whom it relates and (where sub-paragraph (b) applies) the person from whom it was received."
+    ... `Article 29 — the information is restricted and its disclosure is not otherwise lawful` d
+    AND "if he or she discloses the information"
+    ... d's `the person discloses the information`
+    AND "without the consent of ..."
+    ... NOT `Article 29(1) — the required consents were given` d
+
+`Article 29(1) — the maximum term of imprisonment, in years` MEANS 2
+
+§ `The regulative layer — the duties, powers and prohibitions of Part 7`
+
+-- >>> DEADLINES. Where the notice specifies its own time, we read that time off
+--     the notice (Arts 26(1), 27(2)). Where the statute is silent or open-textured
+--     — Art 26(4)'s follow-up requirements, Art 26(6) "as soon as practicable",
+--     Art 27(2)'s power to serve, Art 29's standing prohibition, Art 30's required
+--     disclosure — the numbers below are REVIEWABLE PLACEHOLDERS, flagged at each
+--     site. The model must pick a number to be executable; the Law does not.
+
+§§ `Article 26 — the duty on the person served, its follow-up, and the Article 26(7) liability`
+
+-- Article 26(7), as the consequence of failing a requirement. "Without reasonable
+-- excuse" is a DEFEATER on the liability: with the excuse, the failure is not an
+-- offence, and the residual is FULFILLED rather than BREACH.
+GIVEN n IS AN InformationNotice
+GIVETH A DEONTIC Actor Part7Action
+`Article 26(7) — the liability for contravening the requirement` n MEANS
+    IF   n's `the person has a reasonable excuse for the contravention`
+    THEN FULFILLED
+    ELSE BREACH BY Person BECAUSE "Article 26(7): a person who without reasonable excuse contravenes a requirement imposed on the person under paragraph (1) or (4) commits an offence and is liable to imprisonment for a term of 3 months and to a fine of level 3 on the standard scale."
+
+-- Article 26(4)(a) — the explanation. A POWER of the Commissioner, so it creates a
+-- duty only where it is EXERCISED. WITHIN 14: >>> REVIEWABLE PLACEHOLDER (the
+-- statute fixes no time for the follow-up requirements).
+GIVEN n IS AN InformationNotice
+GIVETH A DEONTIC Actor Part7Action
+`Article 26(4)(a) — the duty to explain the document` n MEANS
+    IF   n's `(4)(a) the Commissioner requires an explanation of the document from the person providing it, or from a person who appears to be in possession of relevant information and to be a governor or employee of the registered charity`
+    THEN PARTY Person MUST `provide an explanation of the document` WITHIN 14
+         LEST `Article 26(7) — the liability for contravening the requirement` n
+    ELSE FULFILLED
+
+-- Article 26(4)(b) — where the document is NOT provided. Same shape.
+GIVEN n IS AN InformationNotice
+GIVETH A DEONTIC Actor Part7Action
+`Article 26(4)(b) — the duty to say where the document is` n MEANS
+    IF   n's `(4)(b) the Commissioner requires the person to state, to the best of the person's knowledge and belief, where the document is`
+    THEN PARTY Person MUST `state, to the best of the person's knowledge and belief, where the document is` WITHIN 14
+         LEST `Article 26(7) — the liability for contravening the requirement` n
+    ELSE FULFILLED
+
+-- THE ART 26 SPINE. Note the shape: Art 26(4) says (a) applies "if the document is
+-- provided" and (b) "if the document is not provided". That is HENCE / LEST on the
+-- Art 26(1)(a) duty — the statute's own branching, made executable.
+--
+-- On the LEST branch the failure to provide is ITSELF a contravention of the
+-- paragraph (1) requirement (so the Art 26(7) liability arises), AND the
+-- Commissioner may still require a statement of the document's whereabouts.
+-- Both, in parallel: RAND.
+GIVEN n IS AN InformationNotice
+GIVETH A DEONTIC Actor Part7Action
+`Article 26 — the notice, the follow-up, and the liability` n MEANS
+    IF   `Article 26(1)(a) — a valid requirement to provide information or a document` n
+    THEN PARTY Person MUST `provide the information or document required by the Article 26(1) notice`
+                      WITHIN n's `the time specified in the notice for compliance, in days`
+         HENCE `Article 26(4)(a) — the duty to explain the document` n
+         LEST      `Article 26(7) — the liability for contravening the requirement` n
+               RAND `Article 26(4)(b) — the duty to say where the document is` n
+    ELSE IF   `Article 26(1)(b) — a valid requirement to attend and answer questions` n
+         THEN PARTY Person MUST `attend at the specified place and time and answer the specified questions`
+                           WITHIN n's `the time specified in the notice for compliance, in days`
+              LEST `Article 26(7) — the liability for contravening the requirement` n
+         ELSE FULFILLED
+
+-- Article 26(6) — the copy-back duty. WITHIN 7: >>> REVIEWABLE PLACEHOLDER for
+-- "as soon as practicable".
+GIVEN r IS A RetentionCase
+GIVETH A DEONTIC Actor Part7Action
+`Article 26(6) — the duty to supply a copy of the retained document` r MEANS
+    IF       r's `a document, copy or extract was retained or taken under paragraph (4)(a)`
+         AND r's `a person who requires the document for the purpose of the person's business has requested that document`
+    THEN PARTY Commissioner MUST `supply a copy of the retained document to the person who requested it` WITHIN 7
+    ELSE FULFILLED
+
+§§ `Article 27(2) — the power to serve, and the duty it creates`
+
+-- A POWER (MAY): the Commissioner is never in breach for NOT serving a notice.
+-- WITHIN 30: >>> REVIEWABLE PLACEHOLDER — the Law fixes no time within which the
+-- power must be exercised.
+--
+-- The HENCE is the point: once the notice is served, the relevant person must take
+-- the steps — but only THE STEPS THAT STAND. If Article 28(3) has severed the only
+-- requirement the notice imposed, the notice is served and there is NOTHING TO DO.
+GIVEN n IS A RequiredStepsNotice
+GIVETH A DEONTIC Actor Part7Action
+`Article 27(2) — the Commissioner's power to serve a required steps notice` n MEANS
+    IF   `Article 27(1) — the triggers for a required steps notice` (n's `the case`)
+    THEN PARTY Commissioner MAY `serve a required steps notice` WITHIN 30
+         HENCE IF   `Article 28(3) — some requirement of the notice stands` n
+               THEN PARTY Charity MUST `take the steps that stand under the required steps notice`
+                                  WITHIN n's `the time specified in the notice for taking the steps, in days`
+               ELSE FULFILLED
+    ELSE FULFILLED
+
+§§ `Article 29(1) — the prohibition; Article 30 — the two duties`
+
+-- SHANT: doing the act IS the breach. Guarded by the full layered defence, so a
+-- disclosure through an Art 29(2) carve-out or an Art 30/31 gateway is not even
+-- prohibited. WITHIN 365: >>> REVIEWABLE PLACEHOLDER — Art 29's prohibition is
+-- STANDING and has no deadline; the number is the horizon over which we trace it.
+GIVEN d IS A DisclosureEvent
+GIVETH A DEONTIC Actor Action
+`Article 29(1) — the prohibition on disclosing restricted information` d MEANS
+    IF   `Article 29 — the information is restricted and its disclosure is not otherwise lawful` d
+    THEN PARTY Person SHANT `disclose restricted information` WITHIN 365
+    ELSE FULFILLED
+
+-- Article 30 — TWO duties, each triggered by a requirement made of the
+-- Commissioner. Parallel composition (RAND): both must be discharged.
+-- WITHIN 30: >>> REVIEWABLE PLACEHOLDER — Art 30 fixes no time.
+GIVEN d IS A DisclosureEvent
+GIVETH A DEONTIC Actor Action
+`Article 30 — the Commissioner's duties of required disclosure` d MEANS
+        ( IF   d's `(30(1)) the disclosure is to the Comptroller, and is required by the Comptroller for the purpose of enabling the Comptroller to discharge any of his or her functions in relation to the taxation of registered charities or other entities with any charitable purposes`
+          THEN PARTY Commissioner MUST `disclose information to the Comptroller` WITHIN 30
+          ELSE FULFILLED )
+    RAND
+        ( IF   d's `(30(2)) the disclosure is to the JFSC, and is required by the JFSC for the purpose of enabling the JFSC to discharge any of its functions under the Non-Profit Organizations (Jersey) Law 2008`
+          THEN PARTY Commissioner MUST `disclose information to the JFSC` WITHIN 30
+          ELSE FULFILLED )
+
+§ `Tests — Part 7`
+
+§§ `Article 26(2) — who may be served`
+
+`the Jersey Cat Sanctuary, a registered charity` MEANS InformationNoticeRecipient WITH
+    name                                                            IS "the Jersey Cat Sanctuary"
+    `(2)(a) a registered charity`                                   IS TRUE
+    `(2)(a) an entity that was formerly a registered charity`       IS FALSE
+    `(2)(b) a governor of a registered charity, or of an entity that was formerly a registered charity`  IS FALSE
+    `(2)(b) a former governor of a registered charity, or of an entity that was formerly a registered charity`  IS FALSE
+    `a person who is none of the above`                             IS FALSE
+
+`Mr de Gruchy, a former governor` MEANS InformationNoticeRecipient WITH
+    name                                                            IS "Mr de Gruchy"
+    `(2)(a) a registered charity`                                   IS FALSE
+    `(2)(a) an entity that was formerly a registered charity`       IS FALSE
+    `(2)(b) a governor of a registered charity, or of an entity that was formerly a registered charity`  IS FALSE
+    `(2)(b) a former governor of a registered charity, or of an entity that was formerly a registered charity`  IS TRUE
+    `a person who is none of the above`                             IS FALSE
+
+-- A stranger: the charity's landlord. Outside Art 26(2); cannot be served at all.
+`the charity's landlord, a stranger to the charity` MEANS InformationNoticeRecipient WITH
+    name                                                            IS "the charity's landlord"
+    `(2)(a) a registered charity`                                   IS FALSE
+    `(2)(a) an entity that was formerly a registered charity`       IS FALSE
+    `(2)(b) a governor of a registered charity, or of an entity that was formerly a registered charity`  IS FALSE
+    `(2)(b) a former governor of a registered charity, or of an entity that was formerly a registered charity`  IS FALSE
+    `a person who is none of the above`                             IS TRUE
+
+#ASSERT `Article 26(2) — the person falls within paragraph (2)` `the Jersey Cat Sanctuary, a registered charity`
+#ASSERT `Article 26(2) — the person falls within paragraph (2)` `Mr de Gruchy, a former governor`
+#ASSERT NOT `Article 26(2) — the person falls within paragraph (2)` `the charity's landlord, a stranger to the charity`
+
+§§ `Article 26(1) — a valid notice; Article 26(8) — the privilege saving`
+
+-- A GIVEN-parameterised constructor. There is no record-update operator in this
+-- L4, so each scenario would otherwise be a full literal; this keeps the suite
+-- readable, varying only the operative fields.
+GIVEN `served on`     IS AN InformationNoticeRecipient
+      `requires (a)`  IS A BOOLEAN
+      `requires (b)`  IS A BOOLEAN
+      `privileged`    IS A BOOLEAN
+      `provided`      IS A BOOLEAN
+      `wants (4)(a)`  IS A BOOLEAN
+      `wants (4)(b)`  IS A BOOLEAN
+      `excuse`        IS A BOOLEAN
+GIVETH AN InformationNotice
+`an Article 26(1) notice` MEANS InformationNotice WITH
+    `the person served`                                             IS `served on`
+    `the Commissioner serves a notice in writing on the person`     IS TRUE
+    `(1)(a) the notice requires the person to provide information or a document of a specified description`  IS `requires (a)`
+    `(1)(b) the notice requires the person to attend and answer questions`  IS `requires (b)`
+    `the Commissioner reasonably requires the information, document or answers for the purpose of determining whether to serve a required steps notice`  IS TRUE
+    `the time specified in the notice for compliance, in days`      IS 28
+    `the person would, in an action in court, be entitled to refuse to disclose or produce the information or document on the grounds of legal professional privilege`  IS `privileged`
+    `the person from whom provision of the document is required claims a lien on the document`  IS FALSE
+    `the document is provided`                                      IS `provided`
+    `(4)(a) the Commissioner requires an explanation of the document from the person providing it, or from a person who appears to be in possession of relevant information and to be a governor or employee of the registered charity`  IS `wants (4)(a)`
+    `(4)(b) the Commissioner requires the person to state, to the best of the person's knowledge and belief, where the document is`  IS `wants (4)(b)`
+    `the person has a reasonable excuse for the contravention`      IS `excuse`
+
+-- A document notice on the charity: valid, not privileged, document provided,
+-- explanation required.
+`the document notice on the Cat Sanctuary` MEANS
+    `an Article 26(1) notice` `the Jersey Cat Sanctuary, a registered charity` TRUE FALSE FALSE TRUE TRUE FALSE FALSE
+
+-- The same notice, but the document is NOT provided and the Commissioner asks
+-- where it is. No reasonable excuse.
+`the document notice, document withheld, no excuse` MEANS
+    `an Article 26(1) notice` `the Jersey Cat Sanctuary, a registered charity` TRUE FALSE FALSE FALSE FALSE TRUE FALSE
+
+-- Same again, but the person HAS a reasonable excuse.
+`the document notice, document withheld, with a reasonable excuse` MEANS
+    `an Article 26(1) notice` `the Jersey Cat Sanctuary, a registered charity` TRUE FALSE FALSE FALSE FALSE TRUE TRUE
+
+-- An attendance notice on the former governor.
+`the attendance notice on Mr de Gruchy` MEANS
+    `an Article 26(1) notice` `Mr de Gruchy, a former governor` FALSE TRUE FALSE FALSE FALSE FALSE FALSE
+
+-- ARTICLE 26(8): the document is privileged. Nothing in Article 26 "is to be
+-- construed as requiring" its production — so there is NO valid requirement at
+-- all, and therefore nothing to contravene.
+`the document notice, but the document is privileged` MEANS
+    `an Article 26(1) notice` `the Jersey Cat Sanctuary, a registered charity` TRUE FALSE TRUE FALSE FALSE FALSE FALSE
+
+-- ARTICLE 26(2): a notice served on a stranger to the charity is not a valid notice.
+`a document notice served on a stranger` MEANS
+    `an Article 26(1) notice` `the charity's landlord, a stranger to the charity` TRUE FALSE FALSE FALSE FALSE FALSE FALSE
+
+#ASSERT `Article 26(1) — the notice is validly served` `the document notice on the Cat Sanctuary`
+#ASSERT `Article 26(1)(a) — a valid requirement to provide information or a document` `the document notice on the Cat Sanctuary`
+#ASSERT NOT `Article 26(1)(b) — a valid requirement to attend and answer questions` `the document notice on the Cat Sanctuary`
+#ASSERT `Article 26(1)(b) — a valid requirement to attend and answer questions` `the attendance notice on Mr de Gruchy`
+#ASSERT `Article 26(1) — a requirement is validly imposed on the person` `the attendance notice on Mr de Gruchy`
+
+-- Article 26(8): the privilege saving knocks out the requirement itself.
+#ASSERT `Article 26(8) — the legal professional privilege saving bites` `the document notice, but the document is privileged`
+#ASSERT NOT `Article 26(1) — the notice is validly served` `the document notice, but the document is privileged`
+#ASSERT NOT `Article 26(1) — a requirement is validly imposed on the person` `the document notice, but the document is privileged`
+
+-- Article 26(2): a stranger cannot be served.
+#ASSERT NOT `Article 26(1) — a requirement is validly imposed on the person` `a document notice served on a stranger`
+
+-- Article 26(4): the two limbs are complementary. On the notice where the document
+-- WAS provided, (4)(a) is available and (4)(b) is not; and vice versa.
+#ASSERT `Article 26(4)(a) — the power to retain, copy, and require an explanation` `the document notice on the Cat Sanctuary`
+#ASSERT NOT `Article 26(4)(b) — the power to require a statement of where the document is` `the document notice on the Cat Sanctuary`
+#ASSERT NOT `Article 26(4)(a) — the power to retain, copy, and require an explanation` `the document notice, document withheld, no excuse`
+#ASSERT `Article 26(4)(b) — the power to require a statement of where the document is` `the document notice, document withheld, no excuse`
+
+§§ `Article 26(3) — the lien`
+
+`the document notice, with a lien claimed` MEANS InformationNotice WITH
+    `the person served`                                             IS `the Jersey Cat Sanctuary, a registered charity`
+    `the Commissioner serves a notice in writing on the person`     IS TRUE
+    `(1)(a) the notice requires the person to provide information or a document of a specified description`  IS TRUE
+    `(1)(b) the notice requires the person to attend and answer questions`  IS FALSE
+    `the Commissioner reasonably requires the information, document or answers for the purpose of determining whether to serve a required steps notice`  IS TRUE
+    `the time specified in the notice for compliance, in days`      IS 28
+    `the person would, in an action in court, be entitled to refuse to disclose or produce the information or document on the grounds of legal professional privilege`  IS FALSE
+    `the person from whom provision of the document is required claims a lien on the document`  IS TRUE
+    `the document is provided`                                      IS TRUE
+    `(4)(a) the Commissioner requires an explanation of the document from the person providing it, or from a person who appears to be in possession of relevant information and to be a governor or employee of the registered charity`  IS FALSE
+    `(4)(b) the Commissioner requires the person to state, to the best of the person's knowledge and belief, where the document is`  IS FALSE
+    `the person has a reasonable excuse for the contravention`      IS FALSE
+
+#ASSERT `Article 26(3) — the lien survives provision of the document` `the document notice, with a lien claimed`
+#ASSERT NOT `Article 26(3) — the lien survives provision of the document` `the document notice on the Cat Sanctuary`
+
+§§ `Article 26(5) — the retention period, computed BOTH WAYS`
+
+-- (a) alone: no proceedings. One year.
+`a retention, no proceedings commenced` MEANS RetentionCase WITH
+    `a document, copy or extract was retained or taken under paragraph (4)(a)`  IS TRUE
+    `proceedings to which the document is relevant are commenced against a person within that period`  IS FALSE
+    `the number of days, from the taking of the document, until the conclusion of those proceedings`  IS 0
+    `a person who requires the document for the purpose of the person's business has requested that document`  IS FALSE
+
+-- (b) longer: proceedings commenced within the year, concluding on day 900.
+`a retention, proceedings concluding on day 900` MEANS RetentionCase WITH
+    `a document, copy or extract was retained or taken under paragraph (4)(a)`  IS TRUE
+    `proceedings to which the document is relevant are commenced against a person within that period`  IS TRUE
+    `the number of days, from the taking of the document, until the conclusion of those proceedings`  IS 900
+    `a person who requires the document for the purpose of the person's business has requested that document`  IS TRUE
+
+-- The interesting corner: proceedings ARE commenced within the year, but they
+-- CONCLUDE inside it (day 200). "Whichever is the LONGER" still gives the year —
+-- so the document may be kept for 365 days, not 200. `max`, not "the later event".
+`a retention, proceedings concluding on day 200` MEANS RetentionCase WITH
+    `a document, copy or extract was retained or taken under paragraph (4)(a)`  IS TRUE
+    `proceedings to which the document is relevant are commenced against a person within that period`  IS TRUE
+    `the number of days, from the taking of the document, until the conclusion of those proceedings`  IS 200
+    `a person who requires the document for the purpose of the person's business has requested that document`  IS FALSE
+
+#EVAL `Article 26(5) — the period for which the document may be retained, in days` `a retention, no proceedings commenced`
+#EVAL `Article 26(5) — the period for which the document may be retained, in days` `a retention, proceedings concluding on day 900`
+#EVAL `Article 26(5) — the period for which the document may be retained, in days` `a retention, proceedings concluding on day 200`
+
+#ASSERT (`Article 26(5) — the period for which the document may be retained, in days` `a retention, no proceedings commenced`) EQUALS 365
+#ASSERT (`Article 26(5) — the period for which the document may be retained, in days` `a retention, proceedings concluding on day 900`) EQUALS 900
+-- The `max` at work: 200 < 365, so the one-year limb still wins.
+#ASSERT (`Article 26(5) — the period for which the document may be retained, in days` `a retention, proceedings concluding on day 200`) EQUALS 365
+
+-- Retention on day 500 is UNLAWFUL where no proceedings were commenced, but
+-- LAWFUL where proceedings run to day 900.
+#ASSERT NOT `Article 26(5) — retention on that day is lawful` `a retention, no proceedings commenced` 500
+#ASSERT `Article 26(5) — retention on that day is lawful` `a retention, proceedings concluding on day 900` 500
+#ASSERT `Article 26(5) — retention on that day is lawful` `a retention, no proceedings commenced` 365
+#ASSERT NOT `Article 26(5) — retention on that day is lawful` `a retention, proceedings concluding on day 900` 901
+
+§§ `Article 26(7) — the offence, with and without reasonable excuse`
+
+`a contravention of the paragraph (1) requirement, no excuse` MEANS ContraventionOfInformationNotice WITH
+    `the notice`                                                    IS `the document notice, document withheld, no excuse`
+    `the person contravenes a requirement imposed on the person under paragraph (1)`  IS TRUE
+    `the person contravenes a requirement imposed on the person under paragraph (4)`  IS FALSE
+
+`a contravention of the paragraph (1) requirement, with a reasonable excuse` MEANS ContraventionOfInformationNotice WITH
+    `the notice`                                                    IS `the document notice, document withheld, with a reasonable excuse`
+    `the person contravenes a requirement imposed on the person under paragraph (1)`  IS TRUE
+    `the person contravenes a requirement imposed on the person under paragraph (4)`  IS FALSE
+
+-- Contravening the paragraph (4)(b) requirement (refusing to say where the
+-- document is) is equally an offence.
+`a contravention of the paragraph (4) requirement, no excuse` MEANS ContraventionOfInformationNotice WITH
+    `the notice`                                                    IS `the document notice, document withheld, no excuse`
+    `the person contravenes a requirement imposed on the person under paragraph (1)`  IS FALSE
+    `the person contravenes a requirement imposed on the person under paragraph (4)`  IS TRUE
+
+-- Contravening a PRIVILEGED "requirement": there was never a requirement to
+-- contravene (Art 26(8)), so no offence — even with no excuse at all.
+`a purported contravention of a privileged requirement` MEANS ContraventionOfInformationNotice WITH
+    `the notice`                                                    IS `the document notice, but the document is privileged`
+    `the person contravenes a requirement imposed on the person under paragraph (1)`  IS TRUE
+    `the person contravenes a requirement imposed on the person under paragraph (4)`  IS FALSE
+
+#ASSERT `Article 26(7) — the offence of contravening a requirement` `a contravention of the paragraph (1) requirement, no excuse`
+-- THE DEFEATER: "without reasonable excuse".
+#ASSERT `Article 26(7) — a requirement under paragraph (1) or (4) is contravened` `a contravention of the paragraph (1) requirement, with a reasonable excuse`
+#ASSERT NOT `Article 26(7) — the offence of contravening a requirement` `a contravention of the paragraph (1) requirement, with a reasonable excuse`
+#ASSERT `Article 26(7) — the offence of contravening a requirement` `a contravention of the paragraph (4) requirement, no excuse`
+-- Article 26(8) upstream: no requirement, so no offence.
+#ASSERT NOT `Article 26(7) — the offence of contravening a requirement` `a purported contravention of a privileged requirement`
+
+§§ `Article 26(9) — the self-incrimination saving`
+
+GIVEN `under (7)`   IS A BOOLEAN
+      `under (10)`  IS A BOOLEAN
+GIVETH A ProsecutionUseOfStatement
+`the prosecution's use of a compelled statement` MEANS ProsecutionUseOfStatement WITH
+    `the statement was made by the person in compliance with a requirement imposed under Article 26`  IS TRUE
+    `the prosecution seeks to use the statement in evidence against the person in criminal proceedings`  IS TRUE
+    `the proceedings are proceedings under paragraph (7)`           IS `under (7)`
+    `the proceedings are proceedings under paragraph (10)`          IS `under (10)`
+
+`in a money-laundering prosecution` MEANS `the prosecution's use of a compelled statement` FALSE FALSE
+`in a paragraph (7) prosecution`    MEANS `the prosecution's use of a compelled statement` TRUE FALSE
+`in a paragraph (10) prosecution`   MEANS `the prosecution's use of a compelled statement` FALSE TRUE
+
+-- The general rule: the compelled statement is inadmissible against its maker.
+#ASSERT `Article 26(9) — the statement may not be used by the prosecution against the person` `in a money-laundering prosecution`
+-- The two exceptions: it MAY be used in proceedings under (7) or under (10).
+#ASSERT NOT `Article 26(9) — the statement may not be used by the prosecution against the person` `in a paragraph (7) prosecution`
+#ASSERT NOT `Article 26(9) — the statement may not be used by the prosecution against the person` `in a paragraph (10) prosecution`
+
+§§ `Article 26(10) — false information; Article 26(11) — and the two irrelevancies`
+
+GIVEN `for registration`  IS A BOOLEAN
+      `for a notice`      IS A BOOLEAN
+      `in a document`     IS A BOOLEAN
+      `under Article 26`  IS A BOOLEAN
+GIVETH A FalseInformation
+`a knowingly false statement to the Commissioner` MEANS FalseInformation WITH
+    `the person provides information to the Commissioner`           IS TRUE
+    `the person knows that it is false in a material particular`    IS TRUE
+    `the person intends it to be used by the Commissioner for the purpose of an application for registration`  IS `for registration`
+    `the person intends it to be used by the Commissioner for the purpose of determining whether to serve a required steps notice`  IS `for a notice`
+    `the information is contained in a document`                    IS `in a document`
+    `the information is provided under Article 26`                  IS `under Article 26`
+
+-- The two intents, each on its own, makes out the offence.
+#ASSERT `Article 26(10) — the offence of knowingly providing false information` (`a knowingly false statement to the Commissioner` TRUE FALSE TRUE TRUE)
+#ASSERT `Article 26(10) — the offence of knowingly providing false information` (`a knowingly false statement to the Commissioner` FALSE TRUE TRUE TRUE)
+-- Neither intent: no offence. The intent element is not window-dressing.
+#ASSERT NOT `Article 26(10) — the offence of knowingly providing false information` (`a knowingly false statement to the Commissioner` FALSE FALSE TRUE TRUE)
+
+-- ARTICLE 26(11), MADE EXECUTABLE. The offence is made out on ALL FOUR
+-- combinations of the two irrelevant facts — in a document or not; provided under
+-- Article 26 or not. That invariance IS Article 26(11).
+#ASSERT `Article 26(10) — the offence of knowingly providing false information` (`a knowingly false statement to the Commissioner` TRUE FALSE TRUE TRUE)
+#ASSERT `Article 26(10) — the offence of knowingly providing false information` (`a knowingly false statement to the Commissioner` TRUE FALSE TRUE FALSE)
+#ASSERT `Article 26(10) — the offence of knowingly providing false information` (`a knowingly false statement to the Commissioner` TRUE FALSE FALSE TRUE)
+#ASSERT `Article 26(10) — the offence of knowingly providing false information` (`a knowingly false statement to the Commissioner` TRUE FALSE FALSE FALSE)
+
+§§ `Article 27(1) — each of the five triggers in turn`
+
+-- The charity under scrutiny: a registered charity that DOES pass the charity test
+-- (so trigger (b) is off unless we swap in a failing charity).
+`the Jersey Cat Sanctuary (a charity that passes the test)` MEANS CandidateCharity WITH
+    entity                                                          IS `Jersey Heritage Ltd`
+    purposes                                                        IS LIST `the advancement of education`
+    `in giving effect to those purposes, it provides (or, in the case of an applicant, provides or intends to provide) public benefit in Jersey or elsewhere to a reasonable degree`  IS TRUE
+    `the entity benefits only one particular natural person or a group of identified natural persons`  IS FALSE
+    `its constitution expressly permits its activities to be directed or otherwise controlled by, or any of its governors to be, a person of the following description, acting in that capacity`  IS FALSE
+    `(2)(a) a Minister`                                             IS FALSE
+    `(2)(b) a member of the States Assembly`                        IS FALSE
+    `(2)(c) any equivalent of such a person in another jurisdiction`  IS FALSE
+    `an Order under Article 5(3) disapplies paragraph (2) in relation to this entity`  IS FALSE
+
+-- The same charity, but campaigning for a political party: Art 6(5) knocks the
+-- purpose out, so it FAILS the charity test — trigger 27(1)(b).
+`the Cat Sanctuary, now campaigning (fails the test)` MEANS CandidateCharity WITH
+    entity                                                          IS `Jersey Heritage Ltd`
+    purposes                                                        IS LIST `campaigning for a political party (pleaded as merely incidental)`
+    `in giving effect to those purposes, it provides (or, in the case of an applicant, provides or intends to provide) public benefit in Jersey or elsewhere to a reasonable degree`  IS TRUE
+    `the entity benefits only one particular natural person or a group of identified natural persons`  IS FALSE
+    `its constitution expressly permits its activities to be directed or otherwise controlled by, or any of its governors to be, a person of the following description, acting in that capacity`  IS FALSE
+    `(2)(a) a Minister`                                             IS FALSE
+    `(2)(b) a member of the States Assembly`                        IS FALSE
+    `(2)(c) any equivalent of such a person in another jurisdiction`  IS FALSE
+    `an Order under Article 5(3) disapplies paragraph (2) in relation to this entity`  IS FALSE
+
+-- An organized religious charity: it meets the charity test by virtue of the
+-- Art 6(1)(c) head (the advancement of religion). Needed for Art 28.
+`St Aubin's Chapel Trust (an organized religious charity)` MEANS CandidateCharity WITH
+    entity                                                          IS `Jersey Heritage Ltd`
+    purposes                                                        IS LIST `the advancement of religion, at St Aubin's Chapel`
+    `in giving effect to those purposes, it provides (or, in the case of an applicant, provides or intends to provide) public benefit in Jersey or elsewhere to a reasonable degree`  IS TRUE
+    `the entity benefits only one particular natural person or a group of identified natural persons`  IS FALSE
+    `its constitution expressly permits its activities to be directed or otherwise controlled by, or any of its governors to be, a person of the following description, acting in that capacity`  IS FALSE
+    `(2)(a) a Minister`                                             IS FALSE
+    `(2)(b) a member of the States Assembly`                        IS FALSE
+    `(2)(c) any equivalent of such a person in another jurisdiction`  IS FALSE
+    `an Order under Article 5(3) disapplies paragraph (2) in relation to this entity`  IS FALSE
+
+`the advancement of religion, at St Aubin's Chapel` MEANS CharitablePurpose WITH
+    description                                                     IS "the advancement of religion, at St Aubin's Chapel"
+    `(a) the prevention or relief of poverty`                       IS FALSE
+    `(b) the advancement of education`                              IS FALSE
+    `(c) the advancement of religion`                               IS TRUE
+    `(d) the advancement of health`                                 IS FALSE
+    `(e) the saving of lives`                                       IS FALSE
+    `(f) the advancement of citizenship or community development`   IS FALSE
+    `(g) the advancement of the arts, heritage, culture or science`  IS FALSE
+    `(h) the advancement of public participation in sport`          IS FALSE
+    `(i) the provision of recreational facilities, or the organisation of recreational activities, with the object of improving the conditions of life for the persons for whom the facilities or activities are primarily intended`  IS FALSE
+    `(j) the advancement of human rights, conflict resolution or reconciliation`  IS FALSE
+    `(k) the promotion of religious or racial harmony`              IS FALSE
+    `(l) the promotion of equality and diversity`                   IS FALSE
+    `(m) the advancement of environmental protection or improvement`  IS FALSE
+    `(n) the relief of those in need by reason of age, ill-health, disability, financial hardship or other disadvantage`  IS FALSE
+    `(o) the advancement of animal welfare`                         IS FALSE
+    `(p) any other purpose that may reasonably be regarded as analogous to any of the purposes listed in sub-paragraphs (a) to (o)`  IS FALSE
+    `(2)(a) the prevention or relief of sickness, disease or human suffering`  IS FALSE
+    `(2)(b)(i) rural or urban regeneration`                         IS FALSE
+    `(2)(b)(ii) the promotion of civic responsibility, volunteering, the voluntary sector or the effectiveness or efficiency of registered charities`  IS FALSE
+    `(2)(c) the sport involves physical skill and exertion`         IS FALSE
+    `(2)(d)(i) the facilities or activities are primarily intended for persons who have need of them by reason of their age, ill-health, disability, financial hardship or other disadvantage`  IS FALSE
+    `(2)(d)(ii) the facilities or activities are available to members of the public at large or to male or female members of the public at large`  IS FALSE
+    `(2)(e) relief given by the provision of accommodation or care`  IS FALSE
+    `(2)(f) the advancement of a philosophical belief (whether or not involving belief in a god)`  IS FALSE
+    `is purely ancillary or incidental to any of the entity's charitable purposes`  IS FALSE
+    `(5) is the purpose of advancing a political party or promoting a candidate for election to any office, whether in Jersey or elsewhere`  IS FALSE
+
+-- The governor: a director of the (company) entity, so Art 2(7)(c) makes her a governor.
+`Mme Bisson, a governor` MEANS Officer WITH
+    name                                                            IS "Mme Bisson"
+    `is a trustee or fideicommissaire of the trust or fideicommis`  IS FALSE
+    `is a member of the council of the foundation`                  IS FALSE
+    `is a director of the company`                                  IS TRUE
+    `is a member of the management committee of the entity`         IS FALSE
+    `under the constitution of the entity, has the general control and management of the administration of the entity`  IS FALSE
+    `has that general control and management only on behalf of another person who has it in that other person's own right under the constitution of the entity`  IS FALSE
+
+`no misconduct alleged` MEANS MisconductAllegation WITH
+    `the actor is the registered charity or one of its governors`   IS FALSE
+    `(a)(i) contravention of a provision of this Law, or of any enactment under this Law`  IS FALSE
+    `(a)(ii) contravention of a provision of the constitution of the registered charity, or of the constitutional Law of the charity`  IS FALSE
+    `(a)(iii) contravention of a provision of a required steps notice`  IS FALSE
+    `(a)(iv) contravention of a provision of an order of the court under this Law or under the constitutional Law of the charity, or under any enactment under such a Law`  IS FALSE
+    `the offence was committed in relation to a registered charity, an excepted foreign charity, or a foreign entity equivalent to a registered charity`  IS FALSE
+    `(b)(i) an offence under the constitutional Law of that charity or other entity`  IS FALSE
+    `(b)(ii) an offence under the financial services enactments (Financial Services, Banking Business, Collective Investment Funds, Insurance Business, or the Alternative Investment Funds (Jersey) Regulations 2012)`  IS FALSE
+    `(b)(iii) an offence under the Income Tax (Jersey) Law 1961, the Goods and Services Tax (Jersey) Law 2007, or the Taxation (Land Transactions) (Jersey) Law 2009`  IS FALSE
+    `(b)(iv) an offence under any other enactment relating to money laundering or terrorist financing`  IS FALSE
+    `(b)(v) an offence under any other enactment or under customary law, involving deception or dishonesty`  IS FALSE
+    `(b)(vi) an offence under the law of a jurisdiction other than Jersey, similar to any of those listed in clauses (i) to (v)`  IS FALSE
+
+GIVEN `the charity`   IS A CandidateCharity
+      `the allegation` IS A MisconductAllegation
+      `by the charity` IS A BOOLEAN
+      `by a governor`  IS A BOOLEAN
+      `unfit`          IS A BOOLEAN
+      `ceased 11(4)(c)`  IS A BOOLEAN
+      `ceased 11(4)(d)`  IS A BOOLEAN
+GIVETH A RequiredStepsCase
+`a required steps case` MEANS RequiredStepsCase WITH
+    `the registered charity`                                        IS `the charity`
+    `the governor referred to in paragraph (1)(c) or (d)`           IS `Mme Bisson, a governor`
+    `the Commissioner believes the matters set out in the applicable sub-paragraph of paragraph (1)`  IS TRUE
+    `the allegation`                                                IS `the allegation`
+    `the misconduct alleged is misconduct by the registered charity`  IS `by the charity`
+    `the misconduct alleged is misconduct engaged in by a governor of the registered charity`  IS `by a governor`
+    `the governor is, by reason of a reportable matter, unfit to be a governor of a registered charity`  IS `unfit`
+    `the registered charity has ceased to be a Jersey entity, and has ceased to carry out, or intend to carry out, in or from within Jersey, an activity that is in the opinion of the Commissioner substantial (Article 11(4)(c))`  IS `ceased 11(4)(c)`
+    `the registered charity has ceased to have a principal address in Jersey, within the meaning of Article 8(4) (Article 11(4)(d))`  IS `ceased 11(4)(d)`
+
+-- (a) — misconduct BY THE CHARITY (a breach of an earlier required steps notice).
+`trigger (a) — misconduct by the charity` MEANS
+    `a required steps case` `the Jersey Cat Sanctuary (a charity that passes the test)`
+                            `breach of a required steps notice by the charity` TRUE FALSE FALSE FALSE FALSE
+
+-- (b) — the charity no longer passes the charity test.
+`trigger (b) — the charity fails the charity test` MEANS
+    `a required steps case` `the Cat Sanctuary, now campaigning (fails the test)`
+                            `no misconduct alleged` FALSE FALSE FALSE FALSE FALSE
+
+-- (c) — misconduct BY A GOVERNOR.
+`trigger (c) — misconduct by a governor` MEANS
+    `a required steps case` `the Jersey Cat Sanctuary (a charity that passes the test)`
+                            `breach of a required steps notice by the charity` FALSE TRUE FALSE FALSE FALSE
+
+-- (d) — the governor is unfit by reason of a reportable matter.
+`trigger (d) — the governor is unfit` MEANS
+    `a required steps case` `the Jersey Cat Sanctuary (a charity that passes the test)`
+                            `no misconduct alleged` FALSE FALSE TRUE FALSE FALSE
+
+-- (e) — the charity has ceased to meet Art 11(4)(c) (no longer a Jersey entity,
+-- and no longer substantially active in or from within Jersey).
+`trigger (e) — the charity has ceased to meet Article 11(4)(c)` MEANS
+    `a required steps case` `the Jersey Cat Sanctuary (a charity that passes the test)`
+                            `no misconduct alleged` FALSE FALSE FALSE TRUE FALSE
+
+-- NO trigger at all: a compliant charity, no misconduct, no unfitness.
+`no trigger at all` MEANS
+    `a required steps case` `the Jersey Cat Sanctuary (a charity that passes the test)`
+                            `no misconduct alleged` FALSE FALSE FALSE FALSE FALSE
+
+#ASSERT `Article 27(1)(a) — there has been misconduct by a registered charity` `trigger (a) — misconduct by the charity`
+#ASSERT `Article 27(1) — the triggers for a required steps notice` `trigger (a) — misconduct by the charity`
+
+#ASSERT `Article 27(1)(b) — a registered charity does not pass the charity test` `trigger (b) — the charity fails the charity test`
+#ASSERT `Article 27(1) — the triggers for a required steps notice` `trigger (b) — the charity fails the charity test`
+-- and the negative limb really is negative: the compliant charity does NOT trigger (b).
+#ASSERT NOT `Article 27(1)(b) — a registered charity does not pass the charity test` `no trigger at all`
+
+#ASSERT `Article 27(1)(c) — a governor of a registered charity has engaged in misconduct` `trigger (c) — misconduct by a governor`
+#ASSERT `Article 27(1) — the triggers for a required steps notice` `trigger (c) — misconduct by a governor`
+
+#ASSERT `Article 27(1)(d) — a governor is unfit by reason of a reportable matter` `trigger (d) — the governor is unfit`
+#ASSERT `Article 27(1) — the triggers for a required steps notice` `trigger (d) — the governor is unfit`
+
+#ASSERT `Article 27(1)(e) — the charity has ceased to meet Article 11(4)(c) or (d)` `trigger (e) — the charity has ceased to meet Article 11(4)(c)`
+#ASSERT `Article 27(1) — the triggers for a required steps notice` `trigger (e) — the charity has ceased to meet Article 11(4)(c)`
+
+#ASSERT NOT `Article 27(1) — the triggers for a required steps notice` `no trigger at all`
+
+-- Only (c) and (d) open the Article 27(4) door.
+#ASSERT `Article 27(1)(c) or (d) — the governor-facing triggers` `trigger (c) — misconduct by a governor`
+#ASSERT `Article 27(1)(c) or (d) — the governor-facing triggers` `trigger (d) — the governor is unfit`
+#ASSERT NOT `Article 27(1)(c) or (d) — the governor-facing triggers` `trigger (a) — misconduct by the charity`
+#ASSERT NOT `Article 27(1)(c) or (d) — the governor-facing triggers` `trigger (b) — the charity fails the charity test`
+
+§§ `Article 27(4) + Article 28(3) — THE SEVERANCE`
+
+-- The organized religious charity case: a governor of St Aubin's Chapel Trust has
+-- engaged in misconduct (trigger (c)).
+`trigger (c), at an organized religious charity` MEANS
+    `a required steps case` `St Aubin's Chapel Trust (an organized religious charity)`
+                            `breach of a required steps notice by the charity` FALSE TRUE FALSE FALSE FALSE
+
+GIVEN `the case`            IS A RequiredStepsCase
+      `removal required`    IS A BOOLEAN
+      `other steps required` IS A BOOLEAN
+      `organized religious` IS A BOOLEAN
+GIVETH A RequiredStepsNotice
+`a required steps notice` MEANS RequiredStepsNotice WITH
+    `the case`                                                      IS `the case`
+    `the Commissioner serves written notice`                        IS TRUE
+    `the steps specified in the notice are, in the Commissioner's opinion, appropriate to remedy the matter prompting service of the notice`  IS TRUE
+    `the time specified in the notice for taking the steps, in days`  IS 60
+    `(3)(a) the notice is served on the registered charity`         IS TRUE
+    `(3)(b) the notice is served on a governor of the registered charity`  IS TRUE
+    `the notice purports to require the suspension, removal or replacement of the governor referred to in Article 27(1)(c) or (d)`  IS `removal required`
+    `the notice purports to require other steps, being steps other than the suspension, removal or replacement of a governor`  IS `other steps required`
+    `the registered charity is categorized as an organized religious charity by Order under Article 28(1)`  IS `organized religious`
+
+-- CASE 1 — an ORDINARY charity. Trigger (c); the notice requires BOTH the removal
+-- of the governor AND other remedial steps. Article 28(3) does not apply.
+-- BOTH requirements stand.
+`the notice on an ordinary charity: remove the governor, and other steps` MEANS
+    `a required steps notice` `trigger (c) — misconduct by a governor` TRUE TRUE FALSE
+
+-- CASE 2 — THE POINT OF ARTICLE 28. The SAME notice, but on an ORGANIZED RELIGIOUS
+-- CHARITY. Article 28(3) bites on the governor-removal requirement and on NOTHING
+-- ELSE: the removal requirement falls; the other steps stand.
+`the notice on an organized religious charity: remove the governor, and other steps` MEANS
+    `a required steps notice` `trigger (c), at an organized religious charity` TRUE TRUE TRUE
+
+-- CASE 3 — the DEGENERATE case. A notice on an organized religious charity whose
+-- ONLY requirement is the removal of the governor. Severing that requirement
+-- leaves nothing: the notice is wholly invalid.
+`the notice on an organized religious charity: remove the governor, and nothing else` MEANS
+    `a required steps notice` `trigger (c), at an organized religious charity` TRUE FALSE TRUE
+
+-- CASE 4 — an organized religious charity, but the notice asks only for OTHER
+-- steps. Article 28(3) has nothing to bite on. The notice stands in full.
+`the notice on an organized religious charity: other steps only` MEANS
+    `a required steps notice` `trigger (c), at an organized religious charity` FALSE TRUE TRUE
+
+-- CASE 5 — a notice served on the strength of trigger (a) (misconduct by the
+-- CHARITY, not a governor) that nevertheless purports to require the removal of a
+-- governor. Article 27(4) never opened: the power does not exist, regardless of
+-- Article 28. The removal requirement falls; the other steps stand.
+`a notice on trigger (a) that purports to remove a governor` MEANS
+    `a required steps notice` `trigger (a) — misconduct by the charity` TRUE TRUE FALSE
+
+-- CASE 1: an ordinary charity. Everything stands.
+#ASSERT `Article 27(2) — the Commissioner may serve a required steps notice` `the notice on an ordinary charity: remove the governor, and other steps`
+#ASSERT `Article 27(4) — the power to require the suspension, removal or replacement of the governor` `the notice on an ordinary charity: remove the governor, and other steps`
+#ASSERT NOT `Article 28(3) — the Article 28(3) restriction bites` `the notice on an ordinary charity: remove the governor, and other steps`
+#ASSERT `Article 28(3) — the governor-removal requirement stands` `the notice on an ordinary charity: remove the governor, and other steps`
+#ASSERT `Article 28(3) — the other steps required by the notice stand` `the notice on an ordinary charity: remove the governor, and other steps`
+#ASSERT NOT `Article 28(3) — the notice is wholly invalid (the degenerate case)` `the notice on an ordinary charity: remove the governor, and other steps`
+#EVAL `the requirements of the notice that stand` `the notice on an ordinary charity: remove the governor, and other steps`
+
+-- CASE 2: THE SEVERANCE. Article 28(3) bites. The removal requirement is INVALID
+-- TO THAT EXTENT — but the REST OF THE NOTICE STANDS. This is the assertion the
+-- whole of Article 28 exists to support.
+#ASSERT `Article 28(3) — the Article 28(3) restriction bites` `the notice on an organized religious charity: remove the governor, and other steps`
+#ASSERT NOT `Article 28(3) — the governor-removal requirement stands` `the notice on an organized religious charity: remove the governor, and other steps`
+#ASSERT `Article 28(3) — the other steps required by the notice stand` `the notice on an organized religious charity: remove the governor, and other steps`
+#ASSERT `Article 28(3) — some requirement of the notice stands` `the notice on an organized religious charity: remove the governor, and other steps`
+-- NOT wholly invalid. "Invalid to the extent that" is a severance, not an annulment.
+#ASSERT NOT `Article 28(3) — the notice is wholly invalid (the degenerate case)` `the notice on an organized religious charity: remove the governor, and other steps`
+-- And the Art 27(2) power to serve the notice at all is untouched.
+#ASSERT `Article 27(2) — the Commissioner may serve a required steps notice` `the notice on an organized religious charity: remove the governor, and other steps`
+#EVAL `the requirements of the notice that stand` `the notice on an organized religious charity: remove the governor, and other steps`
+
+-- CASE 3: the degenerate case — severing the only requirement leaves nothing.
+#ASSERT `Article 28(3) — the Article 28(3) restriction bites` `the notice on an organized religious charity: remove the governor, and nothing else`
+#ASSERT NOT `Article 28(3) — the governor-removal requirement stands` `the notice on an organized religious charity: remove the governor, and nothing else`
+#ASSERT NOT `Article 28(3) — the other steps required by the notice stand` `the notice on an organized religious charity: remove the governor, and nothing else`
+#ASSERT NOT `Article 28(3) — some requirement of the notice stands` `the notice on an organized religious charity: remove the governor, and nothing else`
+#ASSERT `Article 28(3) — the notice is wholly invalid (the degenerate case)` `the notice on an organized religious charity: remove the governor, and nothing else`
+#EVAL `the requirements of the notice that stand` `the notice on an organized religious charity: remove the governor, and nothing else`
+
+-- CASE 4: nothing for Article 28(3) to bite on.
+#ASSERT NOT `Article 28(3) — the Article 28(3) restriction bites` `the notice on an organized religious charity: other steps only`
+#ASSERT `Article 28(3) — the other steps required by the notice stand` `the notice on an organized religious charity: other steps only`
+#ASSERT `Article 28(3) — some requirement of the notice stands` `the notice on an organized religious charity: other steps only`
+
+-- CASE 5: the Article 27(4) power never opened (trigger (a), not (c)/(d)). The
+-- removal requirement falls for want of power, not for want of Article 28.
+#ASSERT NOT `Article 27(1)(c) or (d) — the governor-facing triggers` (`a notice on trigger (a) that purports to remove a governor`'s `the case`)
+#ASSERT NOT `Article 27(4) — the power to require the suspension, removal or replacement of the governor` `a notice on trigger (a) that purports to remove a governor`
+#ASSERT NOT `Article 28(3) — the governor-removal requirement stands` `a notice on trigger (a) that purports to remove a governor`
+#ASSERT `Article 28(3) — the other steps required by the notice stand` `a notice on trigger (a) that purports to remove a governor`
+
+§§ `Article 28(1) — the categorization`
+
+`the categorization of St Aubin's Chapel Trust` MEANS OrganizedReligiousCharityCategorization WITH
+    `the registered charity to be categorized`                      IS `St Aubin's Chapel Trust (an organized religious charity)`
+    `(b) it appears to the Minister that the charity is organized in such a way that the supervision and discipline of its governors, in relation to its activities in Jersey (whether or not also in relation to activities elsewhere), is adequate to justify the application of paragraph (3)`  IS TRUE
+
+-- A secular charity cannot be categorized: Art 28(1)(a) requires the Art 6(1)(c)
+-- head, and the Cat Sanctuary's only purpose is the advancement of education.
+`the (impossible) categorization of the Cat Sanctuary` MEANS OrganizedReligiousCharityCategorization WITH
+    `the registered charity to be categorized`                      IS `the Jersey Cat Sanctuary (a charity that passes the test)`
+    `(b) it appears to the Minister that the charity is organized in such a way that the supervision and discipline of its governors, in relation to its activities in Jersey (whether or not also in relation to activities elsewhere), is adequate to justify the application of paragraph (3)`  IS TRUE
+
+#ASSERT `Article 28(1)(a) — meets the charity test by virtue of Article 6(1)(c)` `St Aubin's Chapel Trust (an organized religious charity)`
+#ASSERT `Article 28(1) — the charity may be categorized as an organized religious charity` `the categorization of St Aubin's Chapel Trust`
+#ASSERT NOT `Article 28(1)(a) — meets the charity test by virtue of Article 6(1)(c)` `the Jersey Cat Sanctuary (a charity that passes the test)`
+#ASSERT NOT `Article 28(1) — the charity may be categorized as an organized religious charity` `the (impossible) categorization of the Cat Sanctuary`
+
+§§ `Article 29 — the offence, and EACH of its defeaters in turn`
+
+GIVEN `(2)(a) public register`  IS A BOOLEAN
+      `(2)(b) already public`   IS A BOOLEAN
+      `(2)(c) anonymised`       IS A BOOLEAN
+      `Art 30 Comptroller`      IS A BOOLEAN
+      `Art 30 JFSC`             IS A BOOLEAN
+      `Art 31(e) prosecution`   IS A BOOLEAN
+      `consented`               IS A BOOLEAN
+GIVETH A DisclosureEvent
+`a disclosure by a person who received the information under this Law` MEANS DisclosureEvent WITH
+    `the person receives information relating to the business or other affairs of any person`  IS TRUE
+    `(1)(a) under or for the purposes of this Law`                  IS TRUE
+    `(1)(b) directly or indirectly from a person who has so received it`  IS FALSE
+    `the person discloses the information`                          IS TRUE
+    `the disclosure is made with the consent of the person to whom the information relates`  IS `consented`
+    `the disclosure is made with the consent of the person from whom the information was received`  IS FALSE
+    `(2)(a) the information is registered in the public parts of the register, within the meaning of Article 10(3) to (5)`  IS `(2)(a) public register`
+    `(2)(b) the information is, at the time of the disclosure, or has already been, made available to the public from other sources`  IS `(2)(b) already public`
+    `(2)(c) the information is in the form of a summary or collection of information so framed as not to enable information relating to any particular person to be ascertained from it`  IS `(2)(c) anonymised`
+    `(30(1)) the disclosure is to the Comptroller, and is required by the Comptroller for the purpose of enabling the Comptroller to discharge any of his or her functions in relation to the taxation of registered charities or other entities with any charitable purposes`  IS `Art 30 Comptroller`
+    `(30(2)) the disclosure is to the JFSC, and is required by the JFSC for the purpose of enabling the JFSC to discharge any of its functions under the Non-Profit Organizations (Jersey) Law 2008`  IS `Art 30 JFSC`
+    `(31(a)) by or on behalf of the Commissioner, for the purpose of enabling the Commissioner to discharge any of his or her functions`  IS FALSE
+    `(31(b)) to the Comptroller for the purpose of enabling the Comptroller to discharge any of his or her functions`  IS FALSE
+    `(31(c)) to the JFSC for the purpose of enabling the JFSC to discharge any of its functions`  IS FALSE
+    `(31(d)) to the Attorney General, the Bailiff or the court for the purpose of enabling them to discharge any of their functions in relation to charities, whether under this Law, a constitutional Law, the customary law, or any other law`  IS FALSE
+    `(31(e)) to any person for the purpose of the investigation or prosecution of any offence under any enactment or under the customary law of Jersey, or for the purpose of taking or deciding whether to take any proceedings under this Law`  IS `Art 31(e) prosecution`
+    `(31(f)) in any other circumstances prescribed by the States by Regulations`  IS FALSE
+
+-- THE OFFENCE, MADE OUT. Received under the Law; disclosed; no consent; no
+-- carve-out; no gateway; not a required disclosure.
+`the bare leak` MEANS
+    `a disclosure by a person who received the information under this Law` FALSE FALSE FALSE FALSE FALSE FALSE FALSE
+
+-- DEFEATER 1 — Article 29(2)(a): already on the public parts of the register.
+`a leak of information already on the public register` MEANS
+    `a disclosure by a person who received the information under this Law` TRUE FALSE FALSE FALSE FALSE FALSE FALSE
+
+-- DEFEATER 2 — Article 29(2)(b): already public from other sources.
+`a leak of information already public elsewhere` MEANS
+    `a disclosure by a person who received the information under this Law` FALSE TRUE FALSE FALSE FALSE FALSE FALSE
+
+-- DEFEATER 3 — Article 29(2)(c): an anonymised summary.
+`the publication of an anonymised summary` MEANS
+    `a disclosure by a person who received the information under this Law` FALSE FALSE TRUE FALSE FALSE FALSE FALSE
+
+-- DEFEATER 4 — Article 31(e): a disclosure to the police for the purposes of a
+-- prosecution. A GATEWAY.
+`a disclosure to the police for a prosecution` MEANS
+    `a disclosure by a person who received the information under this Law` FALSE FALSE FALSE FALSE FALSE TRUE FALSE
+
+-- DEFEATER 5 — Article 30(1): a REQUIRED disclosure to the Comptroller.
+`a required disclosure to the Comptroller` MEANS
+    `a disclosure by a person who received the information under this Law` FALSE FALSE FALSE TRUE FALSE FALSE FALSE
+
+-- DEFEATER 5b — Article 30(2): a REQUIRED disclosure to the JFSC.
+`a required disclosure to the JFSC` MEANS
+    `a disclosure by a person who received the information under this Law` FALSE FALSE FALSE FALSE TRUE FALSE FALSE
+
+-- DEFEATER 6 — consent. Not a carve-out or a gateway, but an element of the offence.
+`a disclosure with the consent of the person to whom the information relates` MEANS
+    `a disclosure by a person who received the information under this Law` FALSE FALSE FALSE FALSE FALSE FALSE TRUE
+
+-- THE OFFENCE, MADE OUT.
+#ASSERT `Article 29(1) — the person received the information in a way that engages this Article` `the bare leak`
+#ASSERT `Article 29 — the information is restricted and its disclosure is not otherwise lawful` `the bare leak`
+#ASSERT `Article 29(1) — the offence of disclosing restricted information` `the bare leak`
+
+-- EACH DEFEATER, KNOCKING IT OUT ON ITS OWN.
+#ASSERT `Article 29(2) — the information is outside Article 29 altogether` `a leak of information already on the public register`
+#ASSERT NOT `Article 29(1) — the offence of disclosing restricted information` `a leak of information already on the public register`
+
+#ASSERT `Article 29(2) — the information is outside Article 29 altogether` `a leak of information already public elsewhere`
+#ASSERT NOT `Article 29(1) — the offence of disclosing restricted information` `a leak of information already public elsewhere`
+
+#ASSERT `Article 29(2) — the information is outside Article 29 altogether` `the publication of an anonymised summary`
+#ASSERT NOT `Article 29(1) — the offence of disclosing restricted information` `the publication of an anonymised summary`
+
+#ASSERT `Article 31 — the disclosure passes through one of the six gateways` `a disclosure to the police for a prosecution`
+#ASSERT NOT `Article 29(1) — the offence of disclosing restricted information` `a disclosure to the police for a prosecution`
+
+#ASSERT `Article 30 — the disclosure is one that the Commissioner MUST make` `a required disclosure to the Comptroller`
+#ASSERT NOT `Article 29(1) — the offence of disclosing restricted information` `a required disclosure to the Comptroller`
+
+#ASSERT `Article 30 — the disclosure is one that the Commissioner MUST make` `a required disclosure to the JFSC`
+#ASSERT NOT `Article 29(1) — the offence of disclosing restricted information` `a required disclosure to the JFSC`
+
+#ASSERT `Article 29(1) — the required consents were given` `a disclosure with the consent of the person to whom the information relates`
+#ASSERT NOT `Article 29(1) — the offence of disclosing restricted information` `a disclosure with the consent of the person to whom the information relates`
+-- But note: with consent, the information is still RESTRICTED — it is the ACT that
+-- is licensed, not the information that is declassified. Contrast the Art 29(2)
+-- carve-outs, which take the information outside the Article altogether.
+#ASSERT `Article 29 — the information is restricted and its disclosure is not otherwise lawful` `a disclosure with the consent of the person to whom the information relates`
+#ASSERT NOT `Article 29 — the information is restricted and its disclosure is not otherwise lawful` `a leak of information already on the public register`
+
+§§ `Article 29(1)(b) — the second-hand recipient, and the second consent`
+
+-- >>> THE INTERPRETATION CALL, MADE EXECUTABLE. A person who received the
+--     information SECOND-HAND (limb (1)(b)) needs BOTH consents. With only the
+--     consent of the person to whom the information relates, the offence still
+--     stands.
+`a second-hand leak, with only the first consent` MEANS DisclosureEvent WITH
+    `the person receives information relating to the business or other affairs of any person`  IS TRUE
+    `(1)(a) under or for the purposes of this Law`                  IS FALSE
+    `(1)(b) directly or indirectly from a person who has so received it`  IS TRUE
+    `the person discloses the information`                          IS TRUE
+    `the disclosure is made with the consent of the person to whom the information relates`  IS TRUE
+    `the disclosure is made with the consent of the person from whom the information was received`  IS FALSE
+    `(2)(a) the information is registered in the public parts of the register, within the meaning of Article 10(3) to (5)`  IS FALSE
+    `(2)(b) the information is, at the time of the disclosure, or has already been, made available to the public from other sources`  IS FALSE
+    `(2)(c) the information is in the form of a summary or collection of information so framed as not to enable information relating to any particular person to be ascertained from it`  IS FALSE
+    `(30(1)) the disclosure is to the Comptroller, and is required by the Comptroller for the purpose of enabling the Comptroller to discharge any of his or her functions in relation to the taxation of registered charities or other entities with any charitable purposes`  IS FALSE
+    `(30(2)) the disclosure is to the JFSC, and is required by the JFSC for the purpose of enabling the JFSC to discharge any of its functions under the Non-Profit Organizations (Jersey) Law 2008`  IS FALSE
+    `(31(a)) by or on behalf of the Commissioner, for the purpose of enabling the Commissioner to discharge any of his or her functions`  IS FALSE
+    `(31(b)) to the Comptroller for the purpose of enabling the Comptroller to discharge any of his or her functions`  IS FALSE
+    `(31(c)) to the JFSC for the purpose of enabling the JFSC to discharge any of its functions`  IS FALSE
+    `(31(d)) to the Attorney General, the Bailiff or the court for the purpose of enabling them to discharge any of their functions in relation to charities, whether under this Law, a constitutional Law, the customary law, or any other law`  IS FALSE
+    `(31(e)) to any person for the purpose of the investigation or prosecution of any offence under any enactment or under the customary law of Jersey, or for the purpose of taking or deciding whether to take any proceedings under this Law`  IS FALSE
+    `(31(f)) in any other circumstances prescribed by the States by Regulations`  IS FALSE
+
+`a second-hand disclosure, with BOTH consents` MEANS DisclosureEvent WITH
+    `the person receives information relating to the business or other affairs of any person`  IS TRUE
+    `(1)(a) under or for the purposes of this Law`                  IS FALSE
+    `(1)(b) directly or indirectly from a person who has so received it`  IS TRUE
+    `the person discloses the information`                          IS TRUE
+    `the disclosure is made with the consent of the person to whom the information relates`  IS TRUE
+    `the disclosure is made with the consent of the person from whom the information was received`  IS TRUE
+    `(2)(a) the information is registered in the public parts of the register, within the meaning of Article 10(3) to (5)`  IS FALSE
+    `(2)(b) the information is, at the time of the disclosure, or has already been, made available to the public from other sources`  IS FALSE
+    `(2)(c) the information is in the form of a summary or collection of information so framed as not to enable information relating to any particular person to be ascertained from it`  IS FALSE
+    `(30(1)) the disclosure is to the Comptroller, and is required by the Comptroller for the purpose of enabling the Comptroller to discharge any of his or her functions in relation to the taxation of registered charities or other entities with any charitable purposes`  IS FALSE
+    `(30(2)) the disclosure is to the JFSC, and is required by the JFSC for the purpose of enabling the JFSC to discharge any of its functions under the Non-Profit Organizations (Jersey) Law 2008`  IS FALSE
+    `(31(a)) by or on behalf of the Commissioner, for the purpose of enabling the Commissioner to discharge any of his or her functions`  IS FALSE
+    `(31(b)) to the Comptroller for the purpose of enabling the Comptroller to discharge any of his or her functions`  IS FALSE
+    `(31(c)) to the JFSC for the purpose of enabling the JFSC to discharge any of its functions`  IS FALSE
+    `(31(d)) to the Attorney General, the Bailiff or the court for the purpose of enabling them to discharge any of their functions in relation to charities, whether under this Law, a constitutional Law, the customary law, or any other law`  IS FALSE
+    `(31(e)) to any person for the purpose of the investigation or prosecution of any offence under any enactment or under the customary law of Jersey, or for the purpose of taking or deciding whether to take any proceedings under this Law`  IS FALSE
+    `(31(f)) in any other circumstances prescribed by the States by Regulations`  IS FALSE
+
+#ASSERT NOT `Article 29(1) — the required consents were given` `a second-hand leak, with only the first consent`
+#ASSERT `Article 29(1) — the offence of disclosing restricted information` `a second-hand leak, with only the first consent`
+#ASSERT `Article 29(1) — the required consents were given` `a second-hand disclosure, with BOTH consents`
+#ASSERT NOT `Article 29(1) — the offence of disclosing restricted information` `a second-hand disclosure, with BOTH consents`
+
+§§ `The regulative layer, exercised`
+
+-- ARTICLE 26(1)(a) + 26(4)(a): the person provides the document on day 20 (inside
+-- the 28 days the notice specified), and then explains it. The HENCE branch runs.
+#TRACE `Article 26 — the notice, the follow-up, and the liability` `the document notice on the Cat Sanctuary` AT 0 WITH
+    PARTY Person DOES `provide the information or document required by the Article 26(1) notice` AT 20
+    PARTY Person DOES `provide an explanation of the document` AT 30
+
+-- ARTICLE 26(7), MADE OUT: the person never provides the document. The LEST branch
+-- runs: the Article 26(7) liability (no reasonable excuse -> BREACH), RAND the
+-- Article 26(4)(b) duty to say where the document is — which is also never done.
+#TRACE `Article 26 — the notice, the follow-up, and the liability` `the document notice, document withheld, no excuse` AT 0 WITH
+    PARTY Commissioner DOES `serve a required steps notice` AT 40
+
+-- ARTICLE 26(7), DEFEATED: the same total non-compliance, but the person HAS a
+-- reasonable excuse. The liability thread collapses to FULFILLED instead of BREACH.
+-- The 26(4)(b) duty is then discharged on day 40.
+#TRACE `Article 26 — the notice, the follow-up, and the liability` `the document notice, document withheld, with a reasonable excuse` AT 0 WITH
+    PARTY Person DOES `state, to the best of the person's knowledge and belief, where the document is` AT 40
+
+-- ARTICLE 26(1)(b): attendance. The former governor attends and answers on day 14.
+#TRACE `Article 26 — the notice, the follow-up, and the liability` `the attendance notice on Mr de Gruchy` AT 0 WITH
+    PARTY Person DOES `attend at the specified place and time and answer the specified questions` AT 14
+
+-- ARTICLE 26(8): a privileged document. There is NO valid requirement, so there is
+-- nothing to comply with and nothing to breach: FULFILLED from the start.
+#TRACE `Article 26 — the notice, the follow-up, and the liability` `the document notice, but the document is privileged` AT 0 WITH
+    PARTY Commissioner DOES `serve a required steps notice` AT 1
+
+-- ARTICLE 26(6): the copy-back duty, discharged on day 3.
+#TRACE `Article 26(6) — the duty to supply a copy of the retained document` `a retention, proceedings concluding on day 900` AT 0 WITH
+    PARTY Commissioner DOES `supply a copy of the retained document to the person who requested it` AT 3
+
+-- ARTICLE 26(6), BREACHED: the copy is never supplied.
+#TRACE `Article 26(6) — the duty to supply a copy of the retained document` `a retention, proceedings concluding on day 900` AT 0 WITH
+    PARTY Person DOES `provide an explanation of the document` AT 3
+
+-- ARTICLE 27(2): the Commissioner serves the notice on an ORDINARY charity; the
+-- charity then takes the steps (including removing the governor) within the 60 days
+-- the notice specified.
+#TRACE `Article 27(2) — the Commissioner's power to serve a required steps notice` `the notice on an ordinary charity: remove the governor, and other steps` AT 0 WITH
+    PARTY Commissioner DOES `serve a required steps notice` AT 10
+    PARTY Charity DOES `take the steps that stand under the required steps notice` AT 50
+
+-- ARTICLE 28(3), IN THE REGULATIVE LAYER — THE DEGENERATE CASE. The Commissioner
+-- serves a notice on an organized religious charity whose only requirement is the
+-- removal of a governor. The notice is served — and there is NOTHING TO DO. The
+-- charity takes no steps, and is NOT in breach.
+#TRACE `Article 27(2) — the Commissioner's power to serve a required steps notice` `the notice on an organized religious charity: remove the governor, and nothing else` AT 0 WITH
+    PARTY Commissioner DOES `serve a required steps notice` AT 10
+
+-- Contrast: the SAME organized religious charity, but the notice ALSO requires
+-- other steps. Those steps survive the severance, so the charity must take them —
+-- and here it does not. BREACH.
+#TRACE `Article 27(2) — the Commissioner's power to serve a required steps notice` `the notice on an organized religious charity: remove the governor, and other steps` AT 0 WITH
+    PARTY Commissioner DOES `serve a required steps notice` AT 10
+
+-- ARTICLE 27(2) IS A POWER (MAY): the Commissioner who declines to serve is not in
+-- breach, even though the triggers are made out.
+#TRACE `Article 27(2) — the Commissioner's power to serve a required steps notice` `the notice on an ordinary charity: remove the governor, and other steps` AT 0 WITH
+    PARTY Charity DOES `take the steps that stand under the required steps notice` AT 50
+
+-- ARTICLE 29(1): SHANT. The person discloses the restricted information on day 5.
+-- Doing the act IS the breach.
+#TRACE `Article 29(1) — the prohibition on disclosing restricted information` `the bare leak` AT 0 WITH
+    PARTY Person DOES `disclose restricted information` AT 5
+
+-- ARTICLE 29(2)(c): the same act, but the information is an anonymised summary.
+-- The prohibition never attached: FULFILLED.
+#TRACE `Article 29(1) — the prohibition on disclosing restricted information` `the publication of an anonymised summary` AT 0 WITH
+    PARTY Person DOES `disclose restricted information` AT 5
+
+-- ARTICLE 30: both required disclosures made.
+#TRACE `Article 30 — the Commissioner's duties of required disclosure` (`a disclosure by a person who received the information under this Law` FALSE FALSE FALSE TRUE TRUE FALSE FALSE) AT 0 WITH
+    PARTY Commissioner DOES `disclose information to the Comptroller` AT 10
+    PARTY Commissioner DOES `disclose information to the JFSC` AT 20
+
+-- ARTICLE 30, HALF-BREACHED: the Comptroller is served, the JFSC is not. RAND means
+-- both threads must be discharged; the residual is the outstanding JFSC duty.
+#TRACE `Article 30 — the Commissioner's duties of required disclosure` (`a disclosure by a person who received the information under this Law` FALSE FALSE FALSE TRUE TRUE FALSE FALSE) AT 0 WITH
+    PARTY Commissioner DOES `disclose information to the Comptroller` AT 10

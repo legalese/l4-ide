@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PROBE C1. What this asks: may a BKM require ANOTHER BKM, with the edge
+  declared on the CALLING BKM, and does the caller decision then need only one
+  edge of its own?
+
+      inner(v)  = v + 1
+      outer(v)  = inner(v) * 10          <<< a BKM calling a BKM
+      result    = outer(n)               <<< decision, KR to `outer` ONLY
+
+  `outer` carries <knowledgeRequirement> to `inner` in the XSD mandated child
+  position: tInvocable is `variable?` then `encapsulatedLogic?` then
+  `knowledgeRequirement*`, so the edge comes AFTER the body, unlike on a
+  decision where informationRequirement and knowledgeRequirement both precede
+  the expression. Getting that order wrong is an XSD error, which is why the
+  probe states it.
+
+  Section 13.3 measured knowledgeRequirement only where the requiring element
+  was a DECISION. Whether the same edge works BKM-to-BKM was unmeasured on both
+  engines, and it is the shape any tier-2 decide that calls another tier-2
+  decide will take.
+
+  C2 (bkm-chain-flat.dmn) is this file's discriminator and MUST be read with it:
+  it moves both edges onto the caller. If C2 passes where C1 fails, the emitter's
+  edge set is a TRANSITIVE CLOSURE rather than a direct-call set, and checkDrg's
+  section 6.3.9 SCC would then be running over a different graph than the one
+  emitted.
+
+  MEASURED 2026-07-31: 2/2 values on BOTH engines, KIE clean, Camunda clean. A
+  BKM MAY require another BKM with the edge declared on the calling BKM, and the
+  caller decision then needs only its own direct edge. Read with C2, which fails
+  on both engines: the direct-edge spelling is not merely allowed, it is the
+  only one that works.
+
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_bkm_chain" name="bkm_chain" namespace="https://legalese.com/l4/dmn/bkm_chain" exporter="hand">
+  <businessKnowledgeModel id="bkm_inner" name="inner">
+    <variable id="bkm_inner_var" name="inner" typeRef="number"/>
+    <encapsulatedLogic id="bkm_inner_logic">
+      <formalParameter id="bkm_inner_p1" name="v" typeRef="number"/>
+      <literalExpression id="bkm_inner_lit">
+        <text>v + 1</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <businessKnowledgeModel id="bkm_outer" name="outer">
+    <variable id="bkm_outer_var" name="outer" typeRef="number"/>
+    <encapsulatedLogic id="bkm_outer_logic">
+      <formalParameter id="bkm_outer_p1" name="v" typeRef="number"/>
+      <literalExpression id="bkm_outer_lit">
+        <text>inner(v) * 10</text>
+      </literalExpression>
+    </encapsulatedLogic>
+    <knowledgeRequirement id="kr_outer_inner">
+      <requiredKnowledge href="#bkm_inner"/>
+    </knowledgeRequirement>
+  </businessKnowledgeModel>
+  <inputData id="input_n" name="n">
+    <variable id="input_n_var" name="n" typeRef="number"/>
+  </inputData>
+  <decision id="decision_result" name="result">
+    <variable id="decision_result_var" name="result" typeRef="number"/>
+    <informationRequirement id="ir_result_n">
+      <requiredInput href="#input_n"/>
+    </informationRequirement>
+    <knowledgeRequirement id="kr_result_outer">
+      <requiredKnowledge href="#bkm_outer"/>
+    </knowledgeRequirement>
+    <literalExpression id="decision_result_lit">
+      <text>outer(n)</text>
+    </literalExpression>
+  </decision>
+</definitions>

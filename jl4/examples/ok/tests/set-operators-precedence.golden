@@ -1,0 +1,21 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+set-operators-precedence.l4:18:1-59:
+  LIST "alice", "bob", "carol"
+set-operators-precedence.l4:20:1-61:
+  LIST "alice", "bob", "carol"
+set-operators-precedence.l4:28:1-36:
+  LIST 1, 2, 3, 4
+set-operators-precedence.l4:29:1-38:
+  LIST 1, 2, 3, 4
+set-operators-precedence.l4:34:1-61:
+  LIST "bob", "carol"
+set-operators-precedence.l4:39:1-38:
+  LIST 1, 2
+set-operators-precedence.l4:40:1-40:
+  LIST 1, 2
+set-operators-precedence.l4:47:1-48:
+  LIST 1, 2, 3, 4, 5
+set-operators-precedence.l4:48:1-52:
+  LIST 1, 2, 3, 4, 5

@@ -1,0 +1,24 @@
+-- Regression fixture: a project-local override must reach EMBEDDED importers
+-- too, not just the top-level module.
+--
+--     main  ->  actus-schedule (embedded)  ->  daydate
+--                                              ^
+--                        ./daydate.l4 (this directory) must win here as well
+--
+-- `actus-schedule` is served by the embedded stdlib; it imports `daydate`, and
+-- so does the project (see the sibling daydate.l4). Option B′ ranks the project
+-- root above the embedded stdlib, and the shadow warning promises in so many
+-- words that "the [chosen] copy is used wherever this module is imported" — so
+-- the embedded importer must bind to the project copy, giving one source per
+-- module name across the whole build.
+--
+-- It did not. An embedded importer's own URI used to be the bare
+-- `file://actus-schedule.l4`, so `takeDirectory` of it was ".", and its
+-- candidate URI for `daydate` collided with the URI the embedded `daydate` was
+-- registered under. The VFS tier hit that before library resolution ever ran,
+-- and this file checked CLEAN — with `actus-schedule` type-checked against the
+-- embedded `daydate` while `main` and every other module saw the project copy.
+--
+-- The positive control for this fixture is ../../embedded-diamond/main.l4:
+-- the same embedded closure, with no project-local override, checks clean.
+IMPORT `actus-schedule`
