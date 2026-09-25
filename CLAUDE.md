@@ -177,7 +177,8 @@ Test suites include `jl4-test` (goldens), `jl4-core-test`, `l4-cli-test`, `jl4-l
 etc/verify-branch.sh [--quick] [--base <ref>] <ABSOLUTE-worktree-path>
 ```
 
-It runs the build, `jl4-test`, `l4-cli-test`, `jl4-core-test`, `check-corpus-goldens`,
+It runs the build, `jl4-test`, `l4-cli-test`, `jl4-core-test`, `jl4-service-test`,
+`check-corpus-goldens`, `check-canon-citations`, the canon-mirror check (`sync-canon.mjs --check`),
 `doc/test-docs.sh` and prettier, pins `JL4_LIBRARY_PATH` for you, and exits non-zero on any failure.
 `--quick` skips `jl4-test`, which is the ~12-minute one.
 
@@ -239,6 +240,19 @@ deleting the stale golden and running the suite twice is right everywhere else a
 wrong move here, because it makes this repository's copy disagree with canon silently. Edit the
 file in canon, re-bless it there, then `node etc/sync-canon.mjs --bump <sha> --ref <branch>`. The
 `Canon Mirror` CI job fails when the mirror and canon at the pin disagree.
+
+**A merge can edit the mirror for you, with no conflict and no red test.** When one branch moves a
+file into the mirror and another edits it at its old path, git's rename detection carries the edit
+onto the mirror copy. `jl4-test` stays green, because the file and its `.ep.golden` moved and
+changed together, and the conflict list is silent, because nothing conflicted. After any merge that
+involves a branch moving subjects into canon, run `node etc/sync-canon.mjs --check`;
+`etc/verify-branch.sh` now does. To repair, restore the mirror copies (`--pull` when the pin is
+right) and make the intended edit in canon instead.
+
+> **Why.** 2026-09-24: #490 respelled two comments in `legal/miles-card/uob-ladys-solitaire.l4`,
+> and SUITCASE (#489) moved that file to `canon/contracts/payments/sg-miles-card/`. Merging the
+> first into the second put the respelled text into the mirror. The full local gate passed on the
+> merged tree, and only CI's `Canon Mirror` job caught it.
 
 > **Do not wrap a code span in bold when the span itself ends in two asterisks.** Doing that
 > unbalances markdown emphasis for the rest of the paragraph, and `prettier --write` then

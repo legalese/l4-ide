@@ -151,6 +151,24 @@ step "check-corpus-goldens" bash -c "cd '$WT' && node etc/check-corpus-goldens.m
 step "check-canon-citations --selftest" bash -c "cd '$WT' && node etc/check-canon-citations.mjs --selftest"
 step "check-canon-citations" bash -c "cd '$WT' && node etc/check-canon-citations.mjs"
 
+# The vendored mirror under jl4/examples/canon/ must equal legalese/canon at the
+# pin (CLAUDE.md §3.1). Nothing above looks at that: jl4-test compares the
+# mirror's files with the mirror's own goldens, so a mirror file edited together
+# with its golden stays green here and goes red only in CI's Canon Mirror job.
+# A merge makes exactly that edit, with no conflict, when one side moves a file
+# into the mirror and the other side edits it at its old path (measured
+# 2026-09-24 on #489). --check fetches canon at the pin; its exit 3 means canon
+# was unreachable, which offline is a normal state and not a branch defect, so
+# it is noted rather than failed.
+step "sync-canon --selftest" bash -c "cd '$WT' && node etc/sync-canon.mjs --selftest | tail -1; exit \${PIPESTATUS[0]}"
+printf '\n=== sync-canon --check (mirror = canon at the pin) ===\n'
+(cd "$WT" && node etc/sync-canon.mjs --check)
+case $? in
+  0) RESULTS+=("PASS  sync-canon --check (mirror = canon at the pin)") ;;
+  3) note "sync-canon --check SKIPPED: canon unreachable at the pin; CI's Canon Mirror job still runs it" ;;
+  *) RESULTS+=("FAIL  sync-canon --check (mirror = canon at the pin)"); FAILED=1 ;;
+esac
+
 step "doc/test-docs.sh --no-l4" bash -c "cd '$WT' && ./doc/test-docs.sh --no-l4 2>&1 | tail -6"
 
 # Prettier over the WHOLE repo trips on a missing workspace package in a fresh
