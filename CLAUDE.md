@@ -146,6 +146,52 @@ there.
 > with it. Same family as §3.2.1's snapshot rule — a probe that reads a name rather than a fact
 > reports confidently about a world it is not observing.
 
+### 2.2 Cloud sessions (claude.ai/code): the paths above do not exist, and neither does the toolchain on PATH
+
+A cloud session gets one fresh clone at `/home/user/l4-ide`, checked out on whatever branch the
+session was pointed at; there is no `~/src/legalese`. The rule survives the move, only the paths
+change: treat `/home/user/l4-ide` as the reference checkout and add worktrees beside it, e.g.
+`git -C /home/user/l4-ide worktree add -b <branch> /home/user/l4wt/<name> origin/unstable`. The
+clone is **shallow**, so `git log -S` and `git blame` answer from a truncated history — a pickaxe
+that finds only a merge commit is reporting the depth limit, not the origin of the change.
+
+**The toolchain is installed but not reachable.** Measured 2026-09-24 in a default cloud
+environment:
+
+| tool           | installed at            | on the agent's PATH?                                    |
+| -------------- | ----------------------- | ------------------------------------------------------- |
+| GHC 9.10.2     | `~/.ghcup/bin`          | **no** — `ghc: command not found`                       |
+| cabal 3.16.1.0 | `~/.ghcup/bin`          | **no**                                                  |
+| Node           | `/opt/node22/bin` (v22) | yes, and it is the **wrong** one                        |
+| nvm            | `/opt/nvm`              | loaded by `~/.bashrc`, which agent shells do not source |
+
+Node 22 fails `npm ci` outright with `EBADENGINE`: `package.json` requires `>=24` and `.npmrc`
+sets `engine-strict=true`. `nvm install 24` succeeds and sets the default alias, **and the next
+shell is still on 22**, because `/opt/node22/bin` is hard-coded in PATH and nothing loads nvm.
+`/root/.local/bin` is first on PATH, so linking into it is what works. Put this in the
+environment's setup script (tested by hand, not yet as a setup script):
+
+```bash
+source /opt/nvm/nvm.sh
+nvm install 24
+N="$(dirname "$(nvm which 24)")"
+for b in node npm npx corepack; do ln -sf "$N/$b" /root/.local/bin/$b; done
+for b in ghc ghc-pkg ghci cabal; do ln -sf /root/.ghcup/bin/$b /root/.local/bin/$b; done
+```
+
+With that, `npm ci` completes (40 s) and `npm run format:check` passes. Two things it does not fix:
+the cabal store starts **empty** — `cabal build all --dry-run` plans 254 units from scratch, so the
+first build is a cold one unless the setup script pre-builds dependencies (whether that is cached
+across sessions is unmeasured); and npm 11, which ships with Node 24, **skipped package install
+scripts** in that run, esbuild's among them, which has not been checked against the
+Vite/Svelte builds.
+
+> **Why.** On 2026-09-24 the pre-commit gate in `AGENTS.md` could not run in a cloud session at
+> either of its first two steps (`cabal test all`, then `npm ci`), while `etc/verify-branch.sh`'s
+> prettier step still worked — so a session that trusted the latter could believe it had run the
+> gate. `.nvmrc` said `20` at the time, contradicting `>=24`; nothing in the tree or in CI reads it
+> (every workflow pins `24.x`), which is how it drifted unnoticed.
+
 ---
 
 ## 3. Build and test facts
