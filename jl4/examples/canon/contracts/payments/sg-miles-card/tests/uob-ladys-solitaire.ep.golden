@@ -1148,7 +1148,7 @@ GIVETH A BOOLEAN
 -- shape was wrong in a way nothing here could see: a rule that CALLS an
 -- @export'd rule but is not itself @export'd has no Catala counterpart,
 -- because an exported rule becomes a scope and Catala allows a scope call only
--- from inside another scope. `l4 catala` says so in terms (R1, §8.1). While
+-- from inside another scope. `l4 export catala` says so in terms (R1, §8.1). While
 -- the exporter collected only what the export reached, the helper was never
 -- lowered and the defect sat behind a passing gate; it surfaced the moment
 -- directive-rooted helpers began to be collected (2026-09-21).
@@ -1220,7 +1220,7 @@ GIVETH A BOOLEAN
 --
 -- THESE FIVE ARE L4-ONLY, and a reader comparing the two artifacts should know
 -- it. `pool` is a STRING, so Catala elides it and a comparison of it is not
--- expressible there; `l4 catala` says so and declines to emit these directives
+-- expressible there; `l4 export catala` says so and declines to emit these directives
 -- as test scopes. That is the right trade rather than a loss: the pot has to be
 -- NAMED for a projection to render "S$750 left in Dining" beside "S$750 left in
 -- Family", and it is L4, not Catala, that checks the naming.
